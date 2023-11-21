@@ -47,7 +47,9 @@ systemd = dependency('systemd')
 systemd_system_unit_dir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
 
 subdir('services')
+subdir('nsmtool')
 
 if get_option('tests').enabled()
   subdir('libnsm/test')
+  subdir('nsmtool/test')
 endif

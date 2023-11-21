@@ -49,7 +49,7 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 		return NSM_ERR_INVALID_DATA;
 	}
 
-	if (msg->pci_vendor_id != htobe16(PCI_VENDOR_ID)) {
+	if (be16toh(msg->pci_vendor_id) != PCI_VENDOR_ID) {
 		return NSM_ERR_INVALID_DATA;
 	}
 
@@ -57,7 +57,7 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 		return NSM_ERR_INVALID_DATA;
 	}
 
-	if (msg->ocp_type != OCP_VERSION) {
+	if (msg->ocp_version != OCP_VERSION) {
 		return NSM_ERR_INVALID_DATA;
 	}
 
