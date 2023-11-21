@@ -1,0 +1,13 @@
+[Unit]
+Description=MCTP Nvidia System Management Daemon
+#TDB add After Clause
+[Service]
+Restart=always
+Type=dbus
+ExecStart=/usr/bin/env nsmd
+SyslogIdentifier=nsmd
+BusName=xyz.openbmc_project.NSM
+
+[Install]
+WantedBy=multi-user.target
+
