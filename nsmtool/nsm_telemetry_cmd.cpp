@@ -38,47 +38,19 @@ class GetInvectoryInformation : public CommandInterface
 
     using CommandInterface::CommandInterface;
 
-    void exec() override
+    explicit GetInvectoryInformation(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
     {
-        std::cout << "[\n";
+        auto getInvectoryInformationOptionGroup = app->add_option_group(
+            "Required",
+            "Property Id for which Inventory Information is to be retrieved.");
 
-        // Retrieve all inventory information starting from the transfer handle
-        // = 0
-        transferHandle = 0;
-        uint32_t prevTransferHandle = 0;
-        std::map<uint32_t, uint32_t> transferHandleSeen;
-
-        do
-        {
-            CommandInterface::exec();
-            // transferHandle is updated to nextTransferHandle when
-            // CommandInterface::exec() is successful, inside
-            // parseResponseMsg().
-
-            if (transferHandle == prevTransferHandle)
-            {
-                return;
-            }
-
-            // check for circular references.
-            auto result =
-                transferHandleSeen.emplace(transferHandle, prevTransferHandle);
-            if (!result.second)
-            {
-                std::cerr << "Transfer handle " << transferHandle
-                          << " has multiple references: "
-                          << result.first->second << ", " << prevTransferHandle
-                          << "\n";
-                return;
-            }
-            prevTransferHandle = transferHandle;
-
-            if (transferHandle != 0)
-            {
-                std::cout << ",";
-            }
-        } while (transferHandle != 0);
-        std::cout << "]\n";
+        propertyId = 0;
+        getInvectoryInformationOptionGroup->add_option(
+            "-p, --propertyId", propertyId,
+            "retrieve inventory information for propertyId");
+        getInvectoryInformationOptionGroup->require_option(1);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -87,19 +59,18 @@ class GetInvectoryInformation : public CommandInterface
             sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_get_inventory_information_req(instanceId,
-                                                       transferHandle, request);
+                                                       propertyId, request);
         return {rc, requestMsg};
     }
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
         uint8_t cc = NSM_SUCCESS;
-        uint16_t dataLen = 0;
-        uint32_t nextTransferHandle = 0;
+        uint16_t dataSize = 0;
         std::vector<uint8_t> inventoryInformation(65535, 0);
 
         auto rc = decode_get_inventory_information_resp(
-            responsePtr, payloadLength, &cc, &dataLen, &nextTransferHandle,
+            responsePtr, payloadLength, &cc, &dataSize,
             inventoryInformation.data());
         if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
         {
@@ -108,12 +79,11 @@ class GetInvectoryInformation : public CommandInterface
             return;
         }
 
-        printInventoryInfo(nextTransferHandle, dataLen, &inventoryInformation);
-        transferHandle = nextTransferHandle;
+        printInventoryInfo(propertyId, dataSize, &inventoryInformation);
     }
 
-    void printInventoryInfo(uint32_t& nextTransferHandle,
-                            const uint16_t dataLen,
+    void printInventoryInfo(uint8_t& propertyIdentifier,
+                            const uint16_t dataSize,
                             const std::vector<uint8_t>* inventoryInformation)
     {
         if (inventoryInformation == NULL)
@@ -123,19 +93,11 @@ class GetInvectoryInformation : public CommandInterface
         }
 
         ordered_json result;
-        result["Next Transfer Handle"] = nextTransferHandle;
-        result["Data Length"] = dataLen;
-
         ordered_json propRecordResult;
         nsm_inventory_property_record* propertyRecord =
             (nsm_inventory_property_record*)inventoryInformation->data();
-        propRecordResult["Property ID"] = propertyRecord->property_id;
-        propRecordResult["Data Type"] =
-            static_cast<uint8_t>(propertyRecord->data_type);
-        propRecordResult["Reserved"] =
-            static_cast<uint8_t>(propertyRecord->reserved);
-        propRecordResult["Data Length"] =
-            static_cast<uint16_t>(propertyRecord->data_length);
+        propRecordResult["Property ID"] = propertyIdentifier;
+        propRecordResult["Data Length"] = static_cast<uint16_t>(dataSize);
 
         union Data
         {
@@ -151,63 +113,35 @@ class GetInvectoryInformation : public CommandInterface
             int32_t nvs24_8Val;
         } dataPayload;
 
-        switch (static_cast<uint8_t>(propertyRecord->data_type))
+        // todo: display aggregate data
+        switch (propertyIdentifier)
         {
-            case NvBool8:
-                std::memcpy(&(dataPayload.bool8Val), propertyRecord->data,
-                            sizeof(int8_t));
-                propRecordResult["Data"] = dataPayload.bool8Val;
-                break;
-            case NvU8:
-                std::memcpy(&(dataPayload.nvu8Val), propertyRecord->data,
-                            sizeof(uint8_t));
-                propRecordResult["Data"] = dataPayload.nvu8Val;
-                break;
-            case NvS8:
-                std::memcpy(&(dataPayload.nvs8Val), propertyRecord->data,
-                            sizeof(int8_t));
-                propRecordResult["Data"] = dataPayload.nvs8Val;
-                break;
-            case NvU16:
-                std::memcpy(&(dataPayload.nvu16Val), propertyRecord->data,
-                            sizeof(uint16_t));
-                propRecordResult["Data"] = dataPayload.nvu16Val;
-                break;
-            case NvS16:
-                std::memcpy(&(dataPayload.nvs16Val), propertyRecord->data,
-                            sizeof(int16_t));
-                propRecordResult["Data"] = dataPayload.nvs16Val;
-                break;
-            case NvU32:
-                std::memcpy(&(dataPayload.nvu32Val), propertyRecord->data,
-                            sizeof(uint32_t));
-                propRecordResult["Data"] = dataPayload.nvu32Val;
-                break;
-            case NvS32:
+            case MAXIMUM_MEMORY_CAPACITY:
+            case PRODUCT_LENGTH:
+            case PRODUCT_WIDTH:
+            case PRODUCT_HEIGHT:
+            case RATED_DEVICE_POWER_LIMIT:
+            case MINIMUM_DEVICE_POWER_LIMIT:
+            case MAXIMUM_DEVICE_POWER_LIMIT:
+            case MINIMUM_MODULE_POWER_LIMIT:
+            case MAXMUM_MODULE_POWER_LIMIT:
+            case RATED_MODULE_POWER_LIMIT:
+            case DEFAULT_BOOST_CLOCKS:
+            case DEFAULT_BASE_CLOCKS:
                 std::memcpy(&(dataPayload.nvs32Val), propertyRecord->data,
                             sizeof(int32_t));
                 propRecordResult["Data"] = dataPayload.nvs32Val;
                 break;
-            case NvU64:
-                std::memcpy(&(dataPayload.nvu64Val), propertyRecord->data,
-                            sizeof(uint64_t));
-                propRecordResult["Data"] = dataPayload.nvu64Val;
-                break;
-            case NvS64:
-                std::memcpy(&(dataPayload.nvs64Val), propertyRecord->data,
-                            sizeof(int64_t));
-                propRecordResult["Data"] = dataPayload.nvs64Val;
-                break;
-            case NvS24_8:
-                std::memcpy(&(dataPayload.nvs24_8Val), propertyRecord->data,
-                            sizeof(int32_t));
-                propRecordResult["Data"] = dataPayload.nvs24_8Val;
-                break;
-            case NvCString:
-                propRecordResult["Data"] =
-                    reinterpret_cast<char*>(propertyRecord->data);
-                break;
-            case NvCharArray:
+            case BOARD_PART_NUMBER:
+            case SERIAL_NUMBER:
+            case MARKETING_NAME:
+            case DEVICE_PART_NUMBER:
+            case FRU_PART_NUMBER:
+            case MEMORY_VENDOR:
+            case MEMORY_PART_NUMBER:
+            case BUILD_DATE:
+            case FIRMWARE_VERSION:
+            case INFO_ROM_VERSION:
                 propRecordResult["Data"] =
                     reinterpret_cast<char*>(propertyRecord->data);
                 break;
@@ -223,7 +157,7 @@ class GetInvectoryInformation : public CommandInterface
     }
 
   private:
-    uint32_t transferHandle;
+    uint8_t propertyId;
 };
 
 class GetTemperatureReading : public CommandInterface

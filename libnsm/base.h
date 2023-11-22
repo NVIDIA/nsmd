@@ -44,21 +44,14 @@ enum nsm_device_capability_discovery_commands {
  */
 enum nsm_completion_codes {
 	NSM_SUCCESS = 0x00,
-	NSM_ACCEPTED = 0x01,
-	NSM_ERR_GENERIC = 0x02,
-	NSM_ERR_NOT_READY = 0x03,
-	NSM_ERR_REQUEST = 0x04,
-	NSM_ERR_UNSUPPORTED_MSG_TYPE = 0x05,
-	NSM_ERR_UNSUPPORTED_COMMAND_CODE = 0x06,
-	NSM_ERR_INVALID_DATA_SIZE = 0x07,
-	NSM_ERR_INVALID_ARG1 = 0x08,
-	NSM_ERR_INVALID_ARG2 = 0x09,
-	NSM_ERR_INVALID_DATA = 0x0A,
-	NSM_ERR_BUSY = 0x0B,
-	NSM_ERR_DATA_NOT_AVAILABLE = 0x0C,
-	NSM_ERR_BUS_ACCESS = 0x0D,
-	NSM_ERR_AGAIN = 0x0E,
-	NSM_PARTIAL_SUCCESS = 0x0F
+	NSM_ERROR = 0x01,
+	NSM_ERR_INVALID_DATA = 0x02,
+	NSM_ERR_INVALID_DATA_LENGTH = 0x03,
+	NSM_ERR_NOT_READY = 0x04,
+	NSM_ERR_UNSUPPORTED_COMMAND_CODE = 0x05,
+	NSM_ERR_UNSUPPORTED_MSG_TYPE = 0x06,
+	NSM_ACCEPTED = 0x7e,
+	NSM_ERR_BUS_ACCESS = 0x7f
 };
 
 typedef union {
@@ -77,7 +70,9 @@ typedef union {
 
 typedef float real32_t;
 
+// command(1byte) + data_size(1byte)
 #define NSM_REQUEST_CONVENTION_LEN 2
+// command(1byte) + completion code(1byte) + data_size(2bytes)
 #define NSM_RESPONSE_CONVENTION_LEN 4
 
 /** @enum MessageType
@@ -141,18 +136,16 @@ struct nsm_header_info {
 
 /** @struct nsm_common_req
  *
- *  Structure representing NSM request.
+ *  Structure representing NSM request without data
  */
 struct nsm_common_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
 } __attribute__((packed));
 
 /** @struct nsm_common_resp
  *
- *  Structure representing NSM response.
+ *  Structure representing NSM response without data
  */
 struct nsm_common_resp {
 	uint8_t command;
@@ -167,8 +160,6 @@ struct nsm_common_resp {
 struct nsm_get_supported_nvidia_message_types_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_nvidia_message_types_resp
@@ -179,7 +170,7 @@ struct nsm_get_supported_nvidia_message_types_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t data_size;
-	bitfield8_t types[8];
+	bitfield8_t supported_nvidia_message_types[32];
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_command_code_req
@@ -189,8 +180,7 @@ struct nsm_get_supported_nvidia_message_types_resp {
 struct nsm_get_supported_command_codes_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
+	uint8_t nvidia_message_type;
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_command_code_resp
@@ -211,8 +201,6 @@ struct nsm_get_supported_command_codes_resp {
 struct nsm_query_device_identification_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
 } __attribute__((packed));
 
 /** @struct nsm_query_device_identification_resp
@@ -267,7 +255,7 @@ int encode_cc_only_resp(uint8_t instance_id, uint8_t type, uint8_t command,
 
 /** @brief Create a NSM ping request message
  *
- *  @param[in] cc - NSM Completion Code
+ *  @param[in] instance_id - NSM instance ID
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */

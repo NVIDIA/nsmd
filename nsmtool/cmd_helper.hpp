@@ -21,11 +21,11 @@ namespace nsmtool
 namespace helper
 {
 
-constexpr uint8_t PLDM_ENTITY_ID = 8;
+constexpr uint8_t NSM_ENTITY_ID = 8;
 constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
 using ordered_json = nlohmann::ordered_json;
 
-/** @brief print the input message if pldmverbose is enabled
+/** @brief print the input message if verbose is enabled
  *
  *  @param[in]  verbose - verbosity flag - true/false
  *  @param[in]  msg         - message to print
@@ -35,9 +35,9 @@ using ordered_json = nlohmann::ordered_json;
  */
 
 template <class T>
-void Logger(bool pldmverbose, const char* msg, const T& data)
+void Logger(bool verbose, const char* msg, const T& data)
 {
-    if (pldmverbose)
+    if (verbose)
     {
         std::stringstream s;
         s << data;
@@ -61,7 +61,7 @@ static inline void DisplayInJson(const ordered_json& data)
  *  @param[in]  requestMsg - Request message to compare against loopback
  *              message recieved from mctp socket
  *  @param[out] responseMsg - Response buffer recieved from mctp socket
- *  @param[in]  pldmVerbose - verbosity flag - true/false
+ *  @param[in]  verbose - verbosity flag - true/false
  *
  *  @return -   0 on success.
  *             -1 or -errno on failure.
@@ -76,7 +76,7 @@ class CommandInterface
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :
         nsmType(type),
-        commandName(name), mctp_eid(PLDM_ENTITY_ID), verbose(false),
+        commandName(name), mctp_eid(NSM_ENTITY_ID), verbose(false),
         instanceId(0)
     {
         app->add_option("-m,--mctp_eid", mctp_eid, "MCTP endpoint ID");

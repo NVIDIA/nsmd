@@ -7,12 +7,13 @@ TEST(getInventoryInformation, testGoodEncodeRequest)
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_req));
 
-	uint32_t transfer_handle = 0xaabbaabb;
+	uint8_t property_identifier = 0xab;
+	uint8_t data_size = sizeof(property_identifier);
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
-	auto rc =
-	    encode_get_inventory_information_req(0, transfer_handle, request);
+	auto rc = encode_get_inventory_information_req(0, property_identifier,
+						       request);
 
 	struct nsm_get_inventory_information_req *req =
 	    reinterpret_cast<struct nsm_get_inventory_information_req *>(
@@ -26,10 +27,8 @@ TEST(getInventoryInformation, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, req->command);
-	EXPECT_EQ(6, req->data_size);
-	EXPECT_EQ(0, req->arg1);
-	EXPECT_EQ(0, req->arg2);
-	EXPECT_EQ(transfer_handle, le32toh(req->transfer_handle));
+	EXPECT_EQ(data_size, req->data_size);
+	EXPECT_EQ(property_identifier, req->property_identifier);
 }
 
 TEST(getInventoryInformation, testBadEncodeRequest)
@@ -52,51 +51,36 @@ TEST(getInventoryInformation, testGoodDecodeRequest)
 	    0x89,			     // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
 	    NSM_GET_INVENTORY_INFORMATION,   // command
-	    6,				     // data size
-	    0,				     // arg1
-	    0,				     // arg2
-	    0x78,
-	    0x56,
-	    0x34,
-	    0x12 // transfer handle = 0x12345678
+	    1,				     // data size
+	    0xab			     // property_identifier
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
 	size_t msg_len = requestMsg.size();
 
-	uint32_t transfer_handle = 0;
+	uint8_t property_identifier = 0;
 	auto rc = decode_get_inventory_information_req(request, msg_len,
-						       &transfer_handle);
+						       &property_identifier);
 
 	EXPECT_EQ(rc, NSM_SUCCESS);
-	EXPECT_EQ(0x12345678, le32toh(transfer_handle));
+	EXPECT_EQ(0xab, property_identifier);
 }
 
 TEST(getInventoryInformation, testGoodEncodeResponse)
 {
-	std::vector<uint8_t> property_record1{
-	    0x01,	 // property ID
-	    NvU16,	 // data type
-	    0x02,  0x00, // data length=2
-	    0x34,  0x12	 // NvU16=0x1234
-	};
+	std::vector<uint8_t> board_part_number{'1', '2', '3', '4'};
 
-	std::vector<uint8_t> responseMsg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) +
-	    property_record1.size());
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 NSM_RESPONSE_CONVENTION_LEN +
+					 board_part_number.size());
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
-	uint32_t next_transfer_handle = 0x12345678;
-
-	uint8_t *inventory_information = property_record1.data();
-	uint32_t inventory_information_len = property_record1.size();
-	uint16_t data_size =
-	    sizeof(next_transfer_handle) + inventory_information_len;
+	uint8_t *inventory_information = board_part_number.data();
+	uint16_t data_size = board_part_number.size();
 
 	auto rc = encode_get_inventory_information_resp(
-	    0, NSM_SUCCESS, next_transfer_handle, inventory_information,
-	    inventory_information_len, response);
+	    0, NSM_SUCCESS, data_size, inventory_information, response);
 
 	struct nsm_get_inventory_information_resp *resp =
 	    reinterpret_cast<struct nsm_get_inventory_information_resp *>(
@@ -111,7 +95,10 @@ TEST(getInventoryInformation, testGoodEncodeResponse)
 
 	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, resp->command);
 	EXPECT_EQ(data_size, le16toh(resp->data_size));
-	EXPECT_EQ(next_transfer_handle, le32toh(resp->next_transfer_handle));
+	EXPECT_EQ('1', resp->inventory_information[0]);
+	EXPECT_EQ('2', resp->inventory_information[1]);
+	EXPECT_EQ('3', resp->inventory_information[2]);
+	EXPECT_EQ('4', resp->inventory_information[3]);
 }
 
 TEST(getInventoryInformation, testGoodDecodeResponse)
@@ -125,42 +112,30 @@ TEST(getInventoryInformation, testGoodDecodeResponse)
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
 	    NSM_GET_INVENTORY_INFORMATION,   // command
 	    0,				     // completion code
-	    10, 0,			     // data size
-	    0x78, 0x56, 0x34, 0x12,	     // next transfer handle
-					     // property record1
-	    PCIE_VENDOR_ID,		     // property id
-	    NvU16,			     // data type
-	    2, 0,			     // data length
-	    0xde, 0x10			     // PCI VID
-	};
+	    4,
+	    0, // data size
+	    '1',
+	    '2',
+	    '3',
+	    '4'};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
-
 	size_t msg_len = responseMsg.size();
 
 	uint8_t cc = 0;
 	uint16_t data_size = 0;
-	uint32_t next_transfer_handle = 0;
-
-	uint8_t inventory_information[6];
+	uint8_t inventory_information[4];
 
 	auto rc = decode_get_inventory_information_resp(
-	    response, msg_len, &cc, &data_size, &next_transfer_handle,
-	    inventory_information);
-
-	uint8_t property_id = *((uint8_t *)inventory_information);
-	uint8_t property_type = *((uint8_t *)inventory_information + 1);
-	uint16_t property_length =
-	    le16toh(*((uint16_t *)(inventory_information + 2)));
-	uint16_t pic_vid = le16toh(*((uint16_t *)(inventory_information + 4)));
+	    response, msg_len, &cc, &data_size, inventory_information);
 
 	EXPECT_EQ(rc, NSM_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(0x12345678, le32toh(next_transfer_handle));
-	EXPECT_EQ(property_id, PCIE_VENDOR_ID);
-	EXPECT_EQ(property_type, NvU16);
-	EXPECT_EQ(property_length, 2);
-	EXPECT_EQ(pic_vid, 0x10de);
+	EXPECT_EQ(4, data_size);
+	EXPECT_EQ('1', inventory_information[0]);
+	EXPECT_EQ('2', inventory_information[1]);
+	EXPECT_EQ('3', inventory_information[2]);
+	EXPECT_EQ('4', inventory_information[3]);
 }
 
 TEST(getTemperature, testGoodEncodeRequest)
@@ -185,9 +160,8 @@ TEST(getTemperature, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, req->command);
-	EXPECT_EQ(2, req->data_size);
-	EXPECT_EQ(sensor_id, req->arg1);
-	EXPECT_EQ(0, req->arg2);
+	EXPECT_EQ(sizeof(sensor_id), req->data_size);
+	EXPECT_EQ(sensor_id, req->sensor_id);
 }
 
 TEST(getTemperature, testGoodDecodeRequest)
@@ -200,9 +174,8 @@ TEST(getTemperature, testGoodDecodeRequest)
 	    0x89,			     // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
 	    NSM_GET_TEMPERATURE_READING,     // command
-	    2,				     // data size
-	    1,				     // arg1=sensor_id
-	    0				     // arg2
+	    1,				     // data size
+	    1				     // sensor_id
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
@@ -241,10 +214,12 @@ TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, resp->command);
 	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->data_size));
 
-	uint32_t data = le32toh(resp->reading);
+	uint32_t data = 0;
+	memcpy(&data, &resp->reading, sizeof(uint32_t));
+	data = le32toh(data);
 	real32_t reading = 0;
-	memcpy(&reading, &data, 4);
-	EXPECT_EQ(temperature_reading, reading);
+	memcpy(&reading, &data, sizeof(uint32_t));
+	EXPECT_FLOAT_EQ(temperature_reading, reading);
 }
 
 TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)

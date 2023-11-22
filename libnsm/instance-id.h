@@ -16,7 +16,7 @@ struct instance_db;
 /**
  * @brief Instantiates an instance ID database object for a given database path
  *
- * @param[out] ctx - *ctx must be NULL, and will point to a PLDM instance ID
+ * @param[out] ctx - *ctx must be NULL, and will point to a instance ID
  * 		     database object on success.
  * @param[in] dbpath - the path to the instance ID database file to use
  *
@@ -30,7 +30,7 @@ int instance_db_init(struct instance_db **ctx, const char *dbpath);
  * @brief Instantiates an instance ID database object for the default database
  * 	  path
  *
- * @param[out] ctx - *ctx will point to a PLDM instance ID database object on
+ * @param[out] ctx - *ctx will point to a instance ID database object on
  * 	       success.
  *
  * @return int - Returns 0 on success. Returns -EINVAL if ctx is NULL or *ctx
@@ -42,7 +42,7 @@ int instance_db_init_default(struct instance_db **ctx);
 /**
  * @brief Destroys an instance ID database object
  *
- * @param[in] ctx - PLDM instance ID database object
+ * @param[in] ctx - instance ID database object
  *
  * @return int - Returns 0 on success or if *ctx is NULL. No specific errors are
  *		 specified.
@@ -53,10 +53,9 @@ int instance_db_destroy(struct instance_db *ctx);
  * @brief Allocates an instance ID for a destination TID from the instance ID
  * 	  database
  *
- * @param[in] ctx - PLDM instance ID database object
- * @param[in] tid - PLDM TID
- * @param[in] iid - caller owned pointer to a PLDM instance ID object. On
- * 	      success, this points to an instance ID to use for a PLDM request
+ * @param[in] ctx - instance ID database object
+ * @param[in] iid - caller owned pointer to a instance ID object. On
+ * 	      success, this points to an instance ID to use for a request
  * 	      message.
  *
  * @return int - Returns 0 on success if we were able to allocate an instance
@@ -68,15 +67,14 @@ int instance_id_alloc(struct instance_db *ctx, mctp_eid_t eid,
 		      instance_id_t *iid);
 
 /**
- * @brief Frees an instance ID previously allocated by pldm_instance_id_alloc
+ * @brief Frees an instance ID previously allocated by instance_id_alloc
  *
- * @param[in] ctx - PLDM instance ID database object
- * @param[in] tid - PLDM TID
+ * @param[in] ctx - instance ID database object
  * @param[in] iid - If this instance ID was not previously allocated by
- * 	      pldm_instance_id_alloc then EINVAL is returned.
+ * 	      instance_id_alloc then EINVAL is returned.
  *
  * @return int - Returns 0 on success. Returns -EINVAL if the iid supplied was
- * 		 not previously allocated by pldm_instance_id_alloc or it has
+ * 		 not previously allocated by instance_id_alloc or it has
  * 		 previously been freed. Returns -EAGAIN if a successive call may
  * 		 succeed. Returns -EPROTO if the operation has entered an
  *		 undefined state.

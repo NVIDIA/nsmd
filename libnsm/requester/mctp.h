@@ -38,14 +38,14 @@ nsm_requester_rc_t nsm_open();
  * @param[in] eid - destination MCTP eid
  * @param[in] mctp_fd - MCTP socket fd
  * @param[in] nsm_req_msg - caller owned pointer to NSM request msg
- * @param[in] req_msg_len - size of PLDM request msg
- * @param[out] nsm_resp_msg - *nsm_resp_msg will point to NSM response msg,
+ * @param[in] req_msg_len - size of request msg
+ * @param[out] nsm_resp_msg - *nsm_resp_msg will point to response msg,
  *             this function allocates memory, caller to free(*nsm_resp_msg) on
  *             success.
  * @param[out] resp_msg_len - caller owned pointer that will be made point to
- *             the size of the PLDM response msg.
+ *             the size of the response msg.
  *
- * @return pldm_requester_rc_t (errno may be set)
+ * @return nsm_requester_rc_t (errno may be set)
  */
 nsm_requester_rc_t nsm_send_recv(mctp_eid_t eid, int mctp_fd,
 				 const uint8_t *nsm_req_msg, size_t req_msg_len,
@@ -62,7 +62,7 @@ nsm_requester_rc_t nsm_send_recv(mctp_eid_t eid, int mctp_fd,
  * @param[in] nsm_req_msg - caller owned pointer to NSM request msg
  * @param[in] req_msg_len - size of NSM request msg
  *
- * @return pldm_requester_rc_t (errno may be set)
+ * @return nsm_requester_rc_t (errno may be set)
  */
 nsm_requester_rc_t nsm_send(mctp_eid_t eid, int mctp_fd,
 			    const uint8_t *nsm_req_msg, size_t req_msg_len);
@@ -75,7 +75,7 @@ nsm_requester_rc_t nsm_send(mctp_eid_t eid, int mctp_fd,
  * @param[in] mctp_fd - MCTP socket fd
  * @param[in] instance_id - NSM instance id of previously sent NSM request msg
  * @param[out] nsm_resp_msg - *nsm_resp_msg will point to NSM response msg,
- *             this function allocates memory, caller to free(*pldm_resp_msg) on
+ *             this function allocates memory, caller to free(*nsm_resp_msg) on
  *             success.
  * @param[out] resp_msg_len - caller owned pointer that will be made point to
  *             the size of the NSM response msg.

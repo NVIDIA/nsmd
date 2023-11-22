@@ -194,7 +194,7 @@ void DBusHandler::setDbusProperty(const DBusMapping& dBusMap,
     }
     else
     {
-        throw std::invalid_argument("UnSpported Dbus Type");
+        throw std::invalid_argument("Unsupported Dbus Type");
     }
 }
 

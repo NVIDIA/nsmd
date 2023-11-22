@@ -56,8 +56,7 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getInventoryInformationHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
-    std::vector<uint8_t> getProperty(uint32_t transfer_handle,
-                                     uint32_t& next_transfer_handle);
+    std::vector<uint8_t> getProperty(uint8_t propertyIdentifier);
     std::optional<std::vector<uint8_t>>
         getTemperatureReadingHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);

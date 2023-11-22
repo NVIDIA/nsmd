@@ -119,9 +119,7 @@ int encode_ping_req(uint8_t instance_id, struct nsm_msg *msg)
 	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 
 	request->command = NSM_PING;
-	request->data_size = 2;
-	request->arg1 = 0;
-	request->arg2 = 0;
+	request->data_size = 0;
 
 	return NSM_SUCCESS;
 }
@@ -143,7 +141,7 @@ int decode_ping_resp(const struct nsm_msg *msg, size_t msgLen, uint8_t *cc)
 	*cc = resp->completion_code;
 
 	if (resp->data_size != 0) {
-		return NSM_ERR_INVALID_DATA_SIZE;
+		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 
 	return NSM_SUCCESS;
@@ -166,12 +164,11 @@ int encode_get_supported_nvidia_message_types_req(uint8_t instance_id,
 		return rc;
 	}
 
-	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+	struct nsm_get_supported_nvidia_message_types_req *request =
+	    (struct nsm_get_supported_nvidia_message_types_req *)msg->payload;
 
 	request->command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
-	request->data_size = 2;
-	request->arg1 = 0;
-	request->arg2 = 0;
+	request->data_size = 0;
 
 	return NSM_SUCCESS;
 }
@@ -199,9 +196,9 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance_id,
 
 	response->command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
 	response->completion_code = NSM_SUCCESS;
-	response->data_size = 8;
+	response->data_size = 32;
 
-	memcpy(response->types, types, 8);
+	memcpy(response->supported_nvidia_message_types, types, 32);
 
 	return NSM_SUCCESS;
 }
@@ -227,13 +224,13 @@ int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
 		return NSM_SUCCESS;
 	}
 
-	memcpy(&(types->byte), resp->types, 8);
+	memcpy(&(types->byte), resp->supported_nvidia_message_types, 32);
 
 	return NSM_SUCCESS;
 }
 
 int encode_get_supported_command_codes_req(uint8_t instance_id,
-					   uint8_t msg_type,
+					   uint8_t nvidia_message_type,
 					   struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -254,9 +251,8 @@ int encode_get_supported_command_codes_req(uint8_t instance_id,
 	    (struct nsm_get_supported_command_codes_req *)msg->payload;
 
 	request->command = NSM_SUPPORTED_COMMAND_CODES;
-	request->data_size = 2;
-	request->arg1 = msg_type;
-	request->arg2 = 0;
+	request->data_size = 1;
+	request->nvidia_message_type = nvidia_message_type;
 
 	return NSM_SUCCESS;
 }
@@ -338,12 +334,11 @@ int encode_nsm_query_device_identification_req(uint8_t instance_id,
 		return rc;
 	}
 
-	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+	struct nsm_query_device_identification_req *request =
+	    (struct nsm_query_device_identification_req *)msg->payload;
 
 	request->command = NSM_QUERY_DEVICE_IDENTIFICATION;
-	request->data_size = 2;
-	request->arg1 = 0;
-	request->arg2 = 0;
+	request->data_size = 0;
 
 	return NSM_SUCCESS;
 }
