@@ -96,7 +96,7 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 	}
 
 	struct nsm_msg_hdr *hdr = (struct nsm_msg_hdr *)(*nsm_resp_msg);
-	if (hdr->request == 0 && hdr->datagram == 0) {
+	if (hdr->request != 0 || hdr->datagram != 0) {
 		free(*nsm_resp_msg);
 		return NSM_REQUESTER_NOT_RESP_MSG;
 	}

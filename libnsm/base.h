@@ -113,8 +113,8 @@ struct nsm_msg_hdr {
 	uint8_t datagram : 1;	 //!< Datagram bit
 	uint8_t request : 1;	 //!< Request bit
 
-	uint8_t ocp_type : 4;	 //!< OCP type
 	uint8_t ocp_version : 4; //!< OCP version
+	uint8_t ocp_type : 4;	 //!< OCP type
 
 	uint8_t nvidia_msg_type; //!< NVIDIA Message Type
 } __attribute__((packed));
