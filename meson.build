@@ -49,7 +49,12 @@ systemd_system_unit_dir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir'
 subdir('services')
 subdir('nsmtool')
 
+if get_option('mockup-responder').enabled()
+  subdir('mockupResponder')
+endif
+
 if get_option('tests').enabled()
   subdir('libnsm/test')
+  subdir('mockupResponder/test')
   subdir('nsmtool/test')
 endif
