@@ -92,9 +92,9 @@ uint8_t NsmSWInventoryDriverVersionAndStatus::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
-static void createNsmNVLinkManagerDriverSensor(const std::string& interface,
-                                               const std::string& objPath,
-                                               NsmDeviceTable& nsmDevices)
+static void createNsmNVLinkManagerDriverSensor(SensorManager& manager,
+                                               const std::string& interface,
+                                               const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto name = utils::DBusHandler().getDbusProperty<std::string>(
@@ -107,7 +107,7 @@ static void createNsmNVLinkManagerDriverSensor(const std::string& interface,
         objPath.c_str(), "UUID", interface.c_str());
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor

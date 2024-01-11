@@ -26,7 +26,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                      std::vector<uint8_t>& responseMsg, bool verbose)
 {
 
-    const char devPath[] = "\0mctp-mux";
+    const char devPath[] = "\0mctp-pcie-mux";
     int returnCode = 0;
 
     int sockFd = socket(AF_UNIX, SOCK_SEQPACKET, 0);

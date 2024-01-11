@@ -7,6 +7,8 @@ sources = [
   '../libnsm/platform-environmental.c',
   '../libnsm/network-ports.c',
   '../libnsm/base.c',
+  '../libnsm/device-capability-discovery.c',
+  '../libnsm/platform-environmental.c',
   '../libnsm/requester/mctp.c',
   '../common/utils.cpp',
 ]

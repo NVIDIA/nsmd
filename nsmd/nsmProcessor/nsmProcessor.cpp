@@ -2,9 +2,10 @@
 
 #include "platform-environmental.h"
 
-#include <phosphor-logging/lg2.hpp>
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
+
+#include <phosphor-logging/lg2.hpp>
 
 #include <optional>
 #include <vector>
@@ -14,11 +15,13 @@
 namespace nsm
 {
 
-NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath):
+NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
+                                       std::string& name, std::string& type,
+                                       std::string& inventoryObjPath) :
     NsmObject(name, type)
 {
-    acceleratorIntf = std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
+    acceleratorIntf =
+        std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::GPU);
 }
 
@@ -39,8 +42,7 @@ void NsmMigMode::updateReading(bitfield8_t flags)
 std::optional<std::vector<uint8_t>>
     NsmMigMode::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_common_req));
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_get_MIG_mode_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
@@ -82,7 +84,6 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
                        std::shared_ptr<EccModeIntf> eccIntf) :
     NsmSensor(name, type)
@@ -101,8 +102,7 @@ void NsmEccMode::updateReading(bitfield8_t flags)
 std::optional<std::vector<uint8_t>>
     NsmEccMode::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_common_req));
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_get_ECC_mode_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
@@ -144,7 +144,6 @@ uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-
 NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
                                      std::shared_ptr<EccModeIntf> eccIntf) :
     NsmSensor(name, type)
@@ -165,8 +164,7 @@ void NsmEccErrorCounts::updateReading(struct nsm_ECC_error_counts errorCounts)
 std::optional<std::vector<uint8_t>>
     NsmEccErrorCounts::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_common_req));
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_get_ECC_error_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
@@ -206,10 +204,9 @@ uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-static void
-    createNsmProcessorSensor(const std::string& interface,
-                             const std::string& objPath,
-                             NsmDeviceTable& nsmDevices)
+static void createNsmProcessorSensor(SensorManager& manager,
+                                     const std::string& interface,
+                                     const std::string& objPath)
 {
     try
     {
@@ -227,7 +224,7 @@ static void
             utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "InventoryObjPath", interface.c_str());
 
-        auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+        auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
         {
             // cannot found a nsmDevice for the sensor
@@ -237,17 +234,17 @@ static void
             return;
         }
 
-        if(type == "NSM_Processor")
+        if (type == "NSM_Processor")
         {
-            auto sensor =
-                std::make_shared<NsmAcceleratorIntf>(bus, name, type, inventoryObjPath);
+            auto sensor = std::make_shared<NsmAcceleratorIntf>(
+                bus, name, type, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
         }
 
         if (type == "NSM_MIG")
         {
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+                objPath.c_str(), "Priority", interface.c_str());
 
             auto sensor =
                 std::make_shared<NsmMigMode>(bus, name, type, inventoryObjPath);
@@ -264,7 +261,7 @@ static void
         else if (type == "NSM_ECC")
         {
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+                objPath.c_str(), "Priority", interface.c_str());
 
             auto eccIntf =
                 std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
@@ -275,7 +272,7 @@ static void
 
             auto eccErrorCntSensor =
                 std::make_shared<NsmEccErrorCounts>(name, type, eccIntf);
-            
+
             nsmDevice->deviceSensors.push_back(eccErrorCntSensor);
 
             if (priority)
@@ -300,12 +297,13 @@ static void
     }
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                "xyz.openbmc_project.Configuration.NSM_Processor")
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                 "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor, "xyz.openbmc_project.Configuration.NSM_Processor")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
 
-
-} // namespace
+} // namespace nsm

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "invoker.hpp"
 #include "requester/handler.hpp"
 #include "socket_manager.hpp"
+#include "eventManager.hpp"
 #include "types.hpp"
 
 #include <sdeventplus/event.hpp>
@@ -45,16 +45,16 @@ class Handler
      *
      *  @param[in] event - NSM daemon's main event loop
      *  @param[in] handler - NSM request handler
-     *  @param[in] invoker - NSM responder handler
+     *  @param[in] eventManager - NSM event Manager
      *  @param[in] verbose - Verbose tracing flag
      *  @param[in/out] manager - MCTP socket manager
      */
     explicit Handler(sdeventplus::Event& event,
                      requester::Handler<requester::Request>& handler,
-                     responder::Invoker& invoker, Manager& manager,
+                     nsm::EventManager& eventManager, Manager& manager,
                      bool verbose) :
         event(event),
-        handler(handler), invoker(invoker), manager(manager), verbose(verbose)
+        handler(handler), eventManager(eventManager), manager(manager), verbose(verbose)
     {}
 
     int registerMctpEndpoint(eid_t eid, int type, int protocol,
@@ -63,7 +63,7 @@ class Handler
   private:
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
-    responder::Invoker& invoker;
+    nsm::EventManager& eventManager;
     Manager& manager;
     bool verbose;
 

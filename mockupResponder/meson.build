@@ -4,6 +4,7 @@ sources = [
   'mockupResponder.cpp',
   '../common/utils.cpp',
   '../libnsm/base.c',
+  '../libnsm/device-capability-discovery.c',
   '../libnsm/platform-environmental.c',
   '../libnsm/network-ports.c',
 ]

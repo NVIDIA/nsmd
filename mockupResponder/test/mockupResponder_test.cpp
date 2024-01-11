@@ -11,12 +11,21 @@ using ::testing::ElementsAre;
 class MockupResponderTest : public testing::Test
 {
   protected:
-    MockupResponderTest() :
-        event(sdeventplus::Event::get_default()), mockupResponder(false, event)
-    {}
+    MockupResponderTest() : event(sdeventplus::Event::get_default())
+
+    {
+        systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+        objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
+        mockupResponder = std::make_shared<MockupResponder::MockupResponder>(
+            false, event, *objServer, 30, NSM_DEV_ID_GPU, 0);
+    }
 
     sdeventplus::Event event;
-    MockupResponder::MockupResponder mockupResponder;
+
+    boost::asio::io_context io;
+    std::shared_ptr<sdbusplus::asio::connection> systemBus;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+    std::shared_ptr<MockupResponder::MockupResponder> mockupResponder;
 };
 
 TEST_F(MockupResponderTest, getPropertyTest)
@@ -27,7 +36,7 @@ TEST_F(MockupResponderTest, getPropertyTest)
     uint32_t propertyIdentifier = BOARD_PART_NUMBER;
 
     // get first property
-    auto res = mockupResponder.getProperty(propertyIdentifier);
+    auto res = mockupResponder->getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
 
     // verify board part number property
@@ -36,7 +45,7 @@ TEST_F(MockupResponderTest, getPropertyTest)
 
     // get second property
     propertyIdentifier = SERIAL_NUMBER;
-    res = mockupResponder.getProperty(propertyIdentifier);
+    res = mockupResponder->getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
 
     // verify serial number property

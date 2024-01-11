@@ -3,8 +3,6 @@
 #include "common/types.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
-#include "nsmObject.hpp"
-#include "nsmSensor.hpp"
 #include "requester/handler.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
@@ -33,7 +31,7 @@ class SensorManager
                   nsm::InstanceIdDb& instanceIdDb,
                   sdbusplus::asio::object_server& objServer,
                   std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
-                  NsmDeviceTable& nsmDevices);
+                  NsmDeviceTable& nsmDevices, eid_t localEid);
 
     void startPolling();
     void stopPolling();
@@ -49,6 +47,15 @@ class SensorManager
                                         size_t* responseLen);
     void scanInventory();
 
+    requester::Coroutine pollEvents(eid_t eid);
+    eid_t getLocalEid()
+    {
+        return localEid;
+    }
+
+    eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice);
+    std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
+
   private:
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
@@ -58,13 +65,11 @@ class SensorManager
     std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable;
 
     std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
-
-    std::map<eid_t, std::unique_ptr<phosphor::Timer>> pollingTimers;
-    std::map<eid_t, std::coroutine_handle<>> doPollingTaskHandles;
-
+    std::unique_ptr<sdeventplus::source::Defer> deferScanInventory;
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
 
     NsmDeviceTable& nsmDevices;
+    eid_t localEid;
 };
 
 } // namespace nsm

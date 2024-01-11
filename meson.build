@@ -35,6 +35,7 @@ conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
 if get_option('shmem').enabled()
   conf_data.set('NVIDIA_SHMEM', 0)
 endif
+conf_data.set('LOCAL_EID', get_option('local-eid'))
 configure_file(output: 'config.h',
   configuration: conf_data
 )

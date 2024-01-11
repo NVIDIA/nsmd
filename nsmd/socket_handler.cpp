@@ -193,9 +193,6 @@ SocketInfo Handler::initSocket(int type, int protocol,
 std::optional<Response>
     Handler::processRxMsg(const std::vector<uint8_t>& nsmMsg)
 {
-    using command = uint8_t;
-    using length = uint16_t;
-
     uint8_t eid = nsmMsg[1];
     nsm_header_info hdrFields{};
     auto hdr =
@@ -208,10 +205,27 @@ std::optional<Response>
 
     const size_t nsmRespMinimusLen = MCTP_DEMUX_PREFIX +
                                      sizeof(struct nsm_msg_hdr) +
-                                     sizeof(command) + sizeof(length);
+                                     NSM_RESPONSE_CONVENTION_LEN;
+    const size_t nsmEventMinimusLen =
+        MCTP_DEMUX_PREFIX + sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN;
 
-    if (NSM_RESPONSE == hdrFields.nsm_msg_type &&
-        nsmMsg.size() >= nsmRespMinimusLen)
+    if (NSM_EVENT == hdrFields.nsm_msg_type &&
+        nsmMsg.size() >= nsmEventMinimusLen)
+    {
+        auto event = reinterpret_cast<const nsm_msg*>(hdr);
+        size_t eventLen = nsmMsg.size() - MCTP_DEMUX_PREFIX;
+        uint8_t type = event->hdr.nvidia_msg_type;
+        uint8_t eventId = event->payload[1];
+        if (verbose)
+        {
+            lg2::info(
+                "received nsm event type={TYPE} eventId={ID} eventLen={LEN} from EID={EID}",
+                "TYPE", type, "ID", eventId, "LEN", eventLen, "EID", eid);
+        }
+        return eventManager.handle(eid, type, eventId, event, eventLen);
+    }
+    else if (NSM_RESPONSE == hdrFields.nsm_msg_type &&
+             nsmMsg.size() >= nsmRespMinimusLen)
     {
         auto response = reinterpret_cast<const nsm_msg*>(hdr);
         size_t responseLen = nsmMsg.size() - MCTP_DEMUX_PREFIX;

@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -25,6 +26,17 @@ extern "C" {
 #define NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2 7
 
 #define INSTANCEID_MASK 0x1f
+#define NSM_EVENT_VERSION 0
+
+#define NSM_EVENT_MIN_LEN 6
+// rsvd:ackr:version(1byte) + event id(1byte) + event class(1byte) + event +
+// state(2byte) + data size(1byte)
+
+#define NSM_EVENT_CONVENTION_LEN 3
+// rsvd_ackr_version(1byte) + data size(1byte) + eventId(1byte)
+
+#define NSM_EVENT_ACK_LEN 1
+// eventId(1byte)
 
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
@@ -48,6 +60,8 @@ enum nsm_device_capability_discovery_commands {
 	NSM_GET_EVENT_SUBSCRIPTION = 0x07,
 	NSM_GET_EVENT_LOG_RECORD = 0x08,
 	NSM_QUERY_DEVICE_IDENTIFICATION = 0x09,
+	NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT = 0x0A,
+	NSM_GET_DEVICE_CAPABILITIES = 0x0B
 };
 
 /** @brief NSM completion codes
@@ -91,6 +105,13 @@ enum nsm_sw_codes {
 	NSM_SW_ERROR_COMMAND_FAIL = 0x05
 };
 
+/** @brief NSM event class
+ */
+enum nsm_evnet_class {
+	NSM_GENERAL_EVENT_CLASS = 0x00,
+	NSM_ASSERTION_DEASSERTION_EVENT_CLASS = 0x01
+};
+
 typedef union {
 	uint8_t byte;
 	struct {
@@ -132,6 +153,8 @@ typedef union {
 // command(1byte) + completion code(1byte) + reserved(2bytes) +
 // data_size(2bytes)
 #define NSM_RESPONSE_CONVENTION_LEN 6
+
+typedef float real32_t;
 
 /** @enum MessageType
  *
@@ -218,6 +241,29 @@ struct nsm_common_non_success_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t reason_code;
+} __attribute__((packed));
+
+/** @struct nsm_event
+ *
+ *  Structure representing NSM event message.
+ */
+struct nsm_event {
+	uint8_t version : 4;
+	uint8_t ackr : 1;
+	uint16_t resvd : 3;
+	uint8_t event_id;
+	uint8_t event_class;
+	uint16_t event_state;
+	uint8_t data_size;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_event_ack
+ *
+ *  Structure representing NSM event ack message.
+ */
+struct nsm_event_ack {
+	uint8_t event_id;
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_nvidia_message_types_req
@@ -481,6 +527,49 @@ int decode_query_device_identification_resp(const struct nsm_msg *msg,
 					    uint16_t *reason_code,
 					    uint8_t *device_identification,
 					    uint8_t *device_instance);
+
+/** @brief Create an event acknowledgement message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] nsm_type - NSM Message type
+ *  @param[in] event_id - event ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_event_acknowledgement(uint8_t instance_id, uint8_t nsm_type,
+				     uint8_t event_id, struct nsm_msg *msg);
+
+/** @brief Decode an event acknowledgement message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] instance_id - pointer to instance id
+ *  @param[out] nsm_type - pointer to NSM Message type
+ *  @param[out] event_id - pointer to NSM Event ID
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_event_acknowledgement(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *instance_id, uint8_t *nsm_type,
+				     uint8_t *event_id);
+
+/** @brief Create a event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] nsm_type - Nvidia Message Type
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] version - event payload version
+ *  @param[in] event_id - event identifier
+ *  @param[in] event_class - category of the reported event
+ *  @param[in] event_state - additional information about the event
+ *  @param[in] data_size - the length of data
+ *  @param[in] data - point to data payload
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
+		     uint8_t version, uint8_t event_id, uint8_t event_class,
+		     uint16_t event_state, uint8_t data_size, uint8_t *data,
+		     struct nsm_msg *msg);
 
 #ifdef __cplusplus
 }

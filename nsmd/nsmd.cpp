@@ -1,8 +1,9 @@
 #include "config.h"
 
 #include "deviceManager.hpp"
+#include "eventManager.hpp"
+#include "eventType0Handler.hpp"
 #include "instance_id.hpp"
-#include "invoker.hpp"
 #include "nsmDevice.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
@@ -30,14 +31,17 @@ void optionUsage(void)
     std::cerr << "Usage: nsmd [options]\n";
     std::cerr << "Options:\n";
     std::cerr << " [--verbose] - would enable verbosity\n";
+    std::cerr << " [--eid <EID>] - local EID\n";
 }
 
 int main(int argc, char** argv)
 {
     bool verbose = false;
     int argflag;
+    int localEid = LOCAL_EID;
     static struct option long_options[] = {{"verbose", no_argument, 0, 'v'},
                                            {"help", no_argument, 0, 'h'},
+                                           {"eid", required_argument, 0, 'e'},
                                            {0, 0, 0, 0}};
 
     while ((argflag =
@@ -51,6 +55,14 @@ int main(int argc, char** argv)
                 break;
             case 'v':
                 verbose = true;
+                break;
+            case 'e':
+                localEid = std::stoi(optarg);
+                if (localEid < 0 || localEid > 255)
+                {
+                    optionUsage();
+                    exit(EXIT_FAILURE);
+                }
                 break;
             default:
                 exit(EXIT_FAILURE);
@@ -80,10 +92,15 @@ int main(int argc, char** argv)
         // with different medium types.
         std::multimap<uuid_t, std::pair<eid_t, MctpMedium>> eidTable;
 
-        responder::Invoker invoker{};
+        nsm::EventManager eventManager;
+
+        auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
+        eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                     std::move(eventType0Handler));
+
         requester::Handler<requester::Request> reqHandler(event, instanceIdDb,
                                                           sockManager, verbose);
-        mctp_socket::Handler sockHandler(event, reqHandler, invoker,
+        mctp_socket::Handler sockHandler(event, reqHandler, eventManager,
                                          sockManager, verbose);
 
         nsm::NsmDeviceTable nsmDevices;
@@ -98,9 +115,9 @@ int main(int argc, char** argv)
                     deviceManager.get()});
 
         std::unique_ptr<nsm::SensorManager> sensorManager =
-            std::make_unique<nsm::SensorManager>(bus, event, reqHandler,
-                                                 instanceIdDb, objServer,
-                                                 eidTable, nsmDevices);
+            std::make_unique<nsm::SensorManager>(
+                bus, event, reqHandler, instanceIdDb, objServer, eidTable,
+                nsmDevices, localEid);
 
 #ifdef NVIDIA_SHMEM
         // Initializing shared memory

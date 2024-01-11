@@ -1,18 +1,11 @@
 #pragma once
 
-#include "nsmDevice.hpp"
-#include "nsmObject.hpp"
-#include "nsmSensor.hpp"
+#include "sensorManager.hpp"
 #include "types.hpp"
 
-#include <phosphor-logging/lg2.hpp>
-
-#include <deque>
 #include <functional>
 #include <map>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace nsm
 {
@@ -23,8 +16,8 @@ namespace nsm
 #define UNIQUE_NAME(base) CONCAT(base, __FILE__##_##__COUNTER__)
 
 using CreationFunction =
-    std::function<void(const std::string& interface, const std::string& objPath,
-                       NsmDeviceTable& nsmDevices)>;
+    std::function<void(SensorManager& manager, const std::string& interface,
+                       const std::string& objPath)>;
 
 #define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
     static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)()         \
@@ -41,8 +34,8 @@ class NsmObjectFactory
 
     static NsmObjectFactory& instance();
 
-    void createObjects(const std::string& interface, const std::string& objPath,
-                       NsmDeviceTable& nsmDevices);
+    void createObjects(SensorManager& manager, const std::string& interface,
+                       const std::string& objPath);
 
     void registerCreationFunction(const CreationFunction& func,
                                   const std::string interfaceName);
