@@ -51,18 +51,14 @@ enum nsm_inventory_property_identifiers {
 	PRODUCT_LENGTH = 12,
 	PRODUCT_WIDTH = 13,
 	PRODUCT_HEIGHT = 14,
-	MAXIMUM_PCIE_LINK_SPEED = 15,
-	MAXIMUM_PCIE_LINK_WIDTH = 16,
-	PCIE_VENDOR_ID = 17,
-	PCIE_DEVICE_ID = 18,
-	PCIE_SUBSYSTEM_VENDOR_ID = 19,
-	PCIE_SUBSYSTEM_DEVICE_ID = 20,
-	RATED_DEVICE_POWER_LIMIT = 21,
-	MINIMUM_DEVICE_POWER_LIMIT = 22,
-	MAXIMUM_DEVICE_POWER_LIMIT = 23,
-	MAXIMUM_MODULE_POWER_LIMIT = 24,
-	MINIMUM_MODULE_POWER_LIMIT = 25,
-	RATED_MODULE_POWER_LIMIT = 26
+	RATED_DEVICE_POWER_LIMIT = 15,
+	MINIMUM_DEVICE_POWER_LIMIT = 16,
+	MAXIMUM_DEVICE_POWER_LIMIT = 17,
+	MINIMUM_MODULE_POWER_LIMIT = 18,
+	MAXMUM_MODULE_POWER_LIMIT = 19,
+	RATED_MODULE_POWER_LIMIT = 20,
+	DEFAULT_BOOST_CLOCKS = 21,
+	DEFAULT_BASE_CLOCKS = 22
 };
 
 enum nsm_data_type {
@@ -95,9 +91,7 @@ struct nsm_inventory_property_record {
 struct nsm_get_inventory_information_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
-	uint32_t transfer_handle;
+	uint8_t property_identifier;
 } __attribute__((packed));
 
 /** @struct nsm_get_inventory_information_resp
@@ -108,7 +102,6 @@ struct nsm_get_inventory_information_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t data_size;
-	uint32_t next_transfer_handle;
 	uint8_t inventory_information[1];
 } __attribute__((packed));
 
@@ -119,8 +112,7 @@ struct nsm_get_inventory_information_resp {
 struct nsm_get_temperature_reading_req {
 	uint8_t command;
 	uint8_t data_size;
-	uint8_t arg1;
-	uint8_t arg2;
+	uint8_t sensor_id;
 } __attribute__((packed));
 
 /** @struct nsm_get_temperature_reading_resp
@@ -131,45 +123,45 @@ struct nsm_get_temperature_reading_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t data_size;
-	uint32_t reading;
+	real32_t reading;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
  *
  *  @param[in] instance_id - NSM instance ID
- *  @param[in] transfer_handle - transfer Handle
+ *  @param[in] property_identifier - unique identifier representing a device
+ * property
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_inventory_information_req(uint8_t instance_id,
-					 uint32_t transfer_handle,
+					 uint8_t property_identifier,
 					 struct nsm_msg *msg);
 
 /** @brief Decode a Get Inventory Information request message
  *
- *  @param[in] msg    - request message
+ *  @param[in] msg - request message
  *  @param[in] msg_len - Length of request message
- *  @param[out] transfer handle - transfer handle
+ *  @param[out] property_identifier - unique identifier representing a device
+ * property
  *  @return nsm_completion_codes
  */
 int decode_get_inventory_information_req(const struct nsm_msg *msg,
 					 size_t msg_len,
-					 uint32_t *transfer_handle);
+					 uint8_t *property_identifier);
 
 /** @brief Encode a Get Inventory Information response message
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
- *  @param[in] next_transfer_handle - next transfer handle
+ *  @param[in] inventory_information_len - inventory information size in bytes
  *  @param[in] inventory_information - Inventory Information
- *  @param[in] inventory_information_len - Inventory Information length
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
-					  uint32_t next_transfer_handle,
+					  const uint16_t data_size,
 					  const uint8_t *inventory_information,
-					  uint32_t inventory_information_len,
 					  struct nsm_msg *msg);
 
 /** @brief Decode a Get Inventory Information response message
@@ -178,14 +170,12 @@ int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
  *  @param[out] data_size - data size in bytes
- *  @param[out] next_transfer_handle - next transfer handle
  *  @param[out] inventory_information - Inventory Information
  *  @return nsm_completion_codes
  */
 int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
 					  uint16_t *data_size,
-					  uint32_t *next_transfer_handle,
 					  uint8_t *inventory_information);
 
 /** @brief Encode a Get temperature readings request message

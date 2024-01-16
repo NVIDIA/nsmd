@@ -139,7 +139,6 @@ int MockupResponder::connectMockupEID(uint8_t eid)
                 utils::printBuffer(utils::Tx, *response);
             }
 
-
             int result = sendmsg(fd, &msg, 0);
             if (result < 0)
             {
@@ -301,37 +300,23 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::vector<uint8_t>
-    MockupResponder::getProperty(uint32_t transfer_handle,
-                                 uint32_t& next_transfer_handle)
+std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
 {
-    std::vector<uint8_t> property(sizeof(nsm_inventory_property_record) - 1);
-    switch (transfer_handle)
+    std::vector<uint8_t> property;
+    switch (propertyIdentifier)
     {
         case BOARD_PART_NUMBER:
         {
             std::string data = "MCX750500B-0D00_DK";
-            property.resize(property.size() + data.length());
-            nsm_inventory_property_record* ptr =
-                (nsm_inventory_property_record*)property.data();
-            ptr->property_id = BOARD_PART_NUMBER;
-            ptr->data_type = NvCharArray;
-            ptr->data_length = data.length();
-            memcpy(ptr->data, data.data(), data.length());
-            next_transfer_handle = SERIAL_NUMBER;
+            property.resize(data.length());
+            memcpy(property.data(), data.data(), data.length());
             break;
         }
         case SERIAL_NUMBER:
         {
             std::string data = "SN123456789";
-            property.resize(property.size() + data.length());
-            nsm_inventory_property_record* ptr =
-                (nsm_inventory_property_record*)property.data();
-            ptr->property_id = SERIAL_NUMBER;
-            ptr->data_type = NvCharArray;
-            ptr->data_length = data.length();
-            memcpy(ptr->data, data.data(), data.length());
-            next_transfer_handle = 0;
+            property.resize(data.length());
+            memcpy(property.data(), data.data(), data.length());
             break;
         }
         default:
@@ -347,9 +332,9 @@ std::optional<std::vector<uint8_t>>
     lg2::info("getInventoryInformationHandler: request length={LEN}", "LEN",
               requestLen);
 
-    uint32_t transferHandle = 0;
+    uint8_t propertyIdentifier = 0;
     auto rc = decode_get_inventory_information_req(requestMsg, requestLen,
-                                                   &transferHandle);
+                                                   &propertyIdentifier);
     if (rc)
     {
         lg2::error("decode_get_inventory_information_req failed: rc={RC}", "RC",
@@ -357,18 +342,14 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    uint32_t nextTransferHandle = 0;
-    auto property = getProperty(transferHandle, nextTransferHandle);
+    auto property = getProperty(propertyIdentifier);
 
     std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) +
-            property.size(),
-        0);
-
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + property.size(), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = encode_get_inventory_information_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, nextTransferHandle,
-        (uint8_t*)property.data(), property.size(), responseMsg);
+        requestMsg->hdr.instance_id, NSM_SUCCESS, property.size(),
+        (uint8_t*)property.data(), responseMsg);
     if (rc)
     {
         lg2::error("encode_get_inventory_information_resp failed: rc={RC}",

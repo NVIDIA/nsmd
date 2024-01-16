@@ -24,34 +24,22 @@ TEST_F(MockupResponderTest, getPropertyTest)
     std::string expectedBoardPartNumber("MCX750500B-0D00_DK");
     std::string expectedSerialNumber("SN123456789");
 
-    uint32_t handle = BOARD_PART_NUMBER;
-    uint32_t nextHandle = 0;
-    nsm_inventory_property_record* ptr = NULL;
+    uint32_t propertyIdentifier = BOARD_PART_NUMBER;
 
     //get first property
-    auto res = mockupResponder.getProperty(handle, nextHandle);
+    auto res = mockupResponder.getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
-    ptr = (nsm_inventory_property_record*)res.data();
 
     //verify board part number property
-    EXPECT_EQ(ptr->property_id, BOARD_PART_NUMBER);
-    EXPECT_EQ(ptr->data_type, NvCharArray);
-    EXPECT_EQ(ptr->data_length, expectedBoardPartNumber.length());
-    std::string returnedBoardPartNumber((char*)ptr->data, ptr->data_length);
+    std::string returnedBoardPartNumber((char*)res.data(), res.size());
     EXPECT_EQ(returnedBoardPartNumber, expectedBoardPartNumber);
-    EXPECT_EQ(nextHandle, SERIAL_NUMBER);
 
     //get second property
-    handle = nextHandle;
-    res = mockupResponder.getProperty(handle, nextHandle);
+    propertyIdentifier = SERIAL_NUMBER;
+    res = mockupResponder.getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
-    ptr = (nsm_inventory_property_record*)res.data();
 
     //verify serial number property
-    EXPECT_EQ(ptr->property_id, SERIAL_NUMBER);
-    EXPECT_EQ(ptr->data_type, NvCharArray);
-    EXPECT_EQ(ptr->data_length, expectedSerialNumber.length());
-    std::string returnedSerialNumber((char*)ptr->data, ptr->data_length);
+    std::string returnedSerialNumber((char*)res.data(), res.size());
     EXPECT_EQ(returnedSerialNumber, expectedSerialNumber);
-    EXPECT_EQ(nextHandle, 0);
 }

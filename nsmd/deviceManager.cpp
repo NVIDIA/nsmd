@@ -1,0 +1,341 @@
+
+#include "deviceManager.hpp"
+
+#include "base.h"
+#include "platform-environmental.h"
+
+#include "nsmDevice.hpp"
+
+#include <cstdint>
+#include <vector>
+
+namespace nsm
+{
+
+void DeviceManager::discoverNsmDevice(const MctpInfos& mctpInfos)
+{
+    queuedMctpInfos.emplace(mctpInfos);
+    if (discoverNsmDeviceTaskHandle)
+    {
+        if (!discoverNsmDeviceTaskHandle.done())
+        {
+            return;
+        }
+        discoverNsmDeviceTaskHandle.destroy();
+    }
+
+    auto co = discoverNsmDeviceTask();
+    discoverNsmDeviceTaskHandle = co.handle;
+    if (discoverNsmDeviceTaskHandle.done())
+    {
+        discoverNsmDeviceTaskHandle = nullptr;
+    }
+}
+
+requester::Coroutine DeviceManager::discoverNsmDeviceTask()
+{
+    while (!queuedMctpInfos.empty())
+    {
+        const MctpInfos& mctpInfos = queuedMctpInfos.front();
+        for (auto& mctpInfo : mctpInfos)
+        {
+            // try ping
+            auto& [eid, uuid, mctpMedium, networkdId, mctpBinding] = mctpInfo;
+            auto rc = co_await ping(eid);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc,
+                           "EID", eid);
+                continue;
+            }
+
+            // update eid table
+            eidTable[uuid] = eid;
+
+            lg2::info("found NSM device. eid={EID} uuid={UUID}", "EID", eid,
+                      "UUID", uuid);
+            // get message type
+
+            // if(support msg type 3)
+
+            auto nsmDevice = std::make_shared<NsmDevice>(eid);
+            nsmDevices.emplace(eid, nsmDevice);
+
+            // get inventory information from device
+            uint8_t deviceIdentification = 0;
+            uint8_t deviceInstance = 0;
+            rc = co_await getQueryDeviceIdentification(
+                eid, deviceIdentification, deviceInstance);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error(
+                    "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
+                    "RC", rc, "EID", eid);
+                continue;
+            }
+
+            InventoryProperties properties{};
+            rc = co_await getFRU(eid, properties);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
+                           rc, "EID", eid);
+                continue;
+            }
+
+            // expose inventory information to FruDevice PDI
+            nsmDevice->fruDeviceIntf = objServer.add_interface(
+                "/xyz/openbmc_project/FruDevice/" + std::to_string(eid),
+                "xyz.openbmc_project.FruDevice");
+
+            if (properties.find(BOARD_PART_NUMBER) != properties.end())
+            {
+                nsmDevice->fruDeviceIntf->register_property(
+                    "BOARD_PART_NUMBER",
+                    std::get<std::string>(properties[BOARD_PART_NUMBER]));
+            }
+
+            if (properties.find(SERIAL_NUMBER) != properties.end())
+            {
+                nsmDevice->fruDeviceIntf->register_property(
+                    "SERIAL_NUMBER",
+                    std::get<std::string>(properties[SERIAL_NUMBER]));
+            }
+
+            nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
+                                                        deviceIdentification);
+            nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
+                                                        deviceInstance);
+
+            nsmDevice->fruDeviceIntf->register_property("EID", eid);
+
+            nsmDevice->fruDeviceIntf->initialize();
+        }
+        queuedMctpInfos.pop();
+    }
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine DeviceManager::ping(eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) + 4);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    uint8_t instanceId = instanceIdDb.next(eid);
+
+    auto rc = encode_ping_req(instanceId, requestMsg);
+    if (rc)
+    {
+        lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* respMsg = NULL;
+    size_t respLen = 0;
+    rc = co_await SendRecvNsmMsg(eid, request, &respMsg, &respLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    rc = decode_ping_resp(respMsg, respLen, &cc);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    co_return cc;
+}
+
+requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
+    eid_t eid, std::vector<uint8_t>& supportedTypes)
+{
+    if (supportedTypes.size() != 8)
+    {
+        co_return NSM_ERR_INVALID_DATA_LENGTH;
+    }
+
+    Request request(sizeof(nsm_msg_hdr) + 4);
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    uint8_t instanceId = instanceIdDb.next(eid);
+    auto rc =
+        encode_get_supported_nvidia_message_types_req(instanceId, requestMsg);
+
+    if (rc)
+    {
+        lg2::error("getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    bitfield8_t types[8];
+    rc = decode_get_supported_nvidia_message_types_resp(
+        responseMsg, responseLen, &cc, types);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    co_return cc;
+}
+
+requester::Coroutine DeviceManager::getFRU(eid_t eid,
+                                           nsm::InventoryProperties& properties)
+{
+    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER};
+    for (auto propertyId : propertyIds)
+    {
+        auto rc = co_await getInventoryInformation(eid, propertyId, properties);
+        if (rc)
+        {
+            lg2::error("getInventoryInformation failed. eid={EID} rc={RC}",
+                       "EID", eid, "RC", rc);
+            co_return rc;
+        }
+    }
+
+    co_return NSM_SUCCESS;
+}
+
+requester::Coroutine DeviceManager::getInventoryInformation(
+    eid_t eid, uint8_t& propertyIdentifier, InventoryProperties& properties)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    uint8_t instanceId = instanceIdDb.next(eid);
+
+    auto rc = encode_get_inventory_information_req(
+        instanceId, propertyIdentifier, requestMsg);
+    if (rc)
+    {
+        lg2::error(
+            "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t dataSize = 0;
+    std::vector<uint8_t> data(65535, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg, responseLen, &cc,
+                                               &dataSize, data.data());
+    if (rc)
+    {
+        lg2::error(
+            "decode_get_inventory_information_resp failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    if (cc != NSM_SUCCESS)
+    {
+        co_return cc;
+    }
+
+    switch (propertyIdentifier)
+    {
+        case BOARD_PART_NUMBER:
+        case SERIAL_NUMBER:
+        case MARKETING_NAME:
+        case DEVICE_PART_NUMBER:
+        case FRU_PART_NUMBER:
+        case MEMORY_VENDOR:
+        case MEMORY_PART_NUMBER:
+        case BUILD_DATE:
+        case FIRMWARE_VERSION:
+        case INFO_ROM_VERSION:
+        {
+            std::string property((char*)data.data(), dataSize);
+            properties.emplace(propertyIdentifier, property);
+        }
+        break;
+        default:
+        {
+            lg2::info("getInventoryInformation unsupported id={ID}", "ID",
+                      propertyIdentifier);
+        }
+        break;
+    }
+
+    for (auto& p : properties)
+    {
+        lg2::info("id={ID} value={VALUE}", "ID", p.first, "VALUE",
+                  std::get<std::string>(p.second).c_str());
+    }
+
+    co_return cc;
+}
+
+requester::Coroutine DeviceManager::getQueryDeviceIdentification(
+    eid_t eid, uint8_t& deviceIdentification, uint8_t& deviceInstance)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_device_identification_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    uint8_t instanceId = instanceIdDb.next(eid);
+    auto rc =
+        encode_nsm_query_device_identification_req(instanceId, requestMsg);
+    if (rc)
+    {
+        lg2::error(
+            "encode_nsm_query_device_identification_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    rc = decode_query_device_identification_resp(
+        responseMsg, responseLen, &cc, &deviceIdentification, &deviceInstance);
+    if (rc)
+    {
+        lg2::error(
+            "decode_query_device_identification_resp failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    co_return cc;
+}
+
+requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
+                                                   const nsm_msg** responseMsg,
+                                                   size_t* responseLen)
+{
+    auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
+        handler, eid, request, responseMsg, responseLen);
+    if (rc)
+    {
+        lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
+                   rc);
+    }
+    co_return rc;
+}
+
+} // namespace nsm

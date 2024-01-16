@@ -19,7 +19,7 @@ namespace nsmtool
 namespace helper
 {
 /*
- * Initialize the socket, send pldm command & recieve response from socket
+ * Initialize the socket, send nsm command & recieve response from socket
  *
  */
 int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
@@ -251,7 +251,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         printBuffer(Tx, requestMsg);
     }
 
-    if (mctp_eid != PLDM_ENTITY_ID)
+    if (mctp_eid != NSM_ENTITY_ID)
     {
         auto [type, protocol, sockAddress] = getMctpSockInfo(mctp_eid);
         if (sockAddress.empty())

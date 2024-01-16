@@ -66,9 +66,7 @@ TEST(ping, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_PING, req->command);
-	EXPECT_EQ(2, req->data_size);
-	EXPECT_EQ(0, req->arg1);
-	EXPECT_EQ(0, req->arg2);
+	EXPECT_EQ(0, req->data_size);
 }
 
 TEST(ping, testGoodEncodeResponse)
@@ -140,9 +138,7 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES, req->command);
-	EXPECT_EQ(2, req->data_size);
-	EXPECT_EQ(0, req->arg1);
-	EXPECT_EQ(0, req->arg2);
+	EXPECT_EQ(0, req->data_size);
 }
 
 TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
@@ -154,7 +150,10 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t instance_id = 0x12;
-	std::vector<uint8_t> types{0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+	std::vector<uint8_t> types{0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
 	auto rc = encode_get_supported_nvidia_message_types_resp(
 	    instance_id, (bitfield8_t *)types.data(), response);
@@ -173,12 +172,15 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 		  response->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES, resp->command);
-	EXPECT_EQ(8, le16toh(resp->data_size));
+	EXPECT_EQ(32, le16toh(resp->data_size));
 
-	uint8_t responseTypes[8];
-	memcpy(responseTypes, resp->types, 8);
+	uint8_t responseTypes[32];
+	memcpy(responseTypes, resp->supported_nvidia_message_types, 32);
 	EXPECT_THAT(responseTypes,
-		    ElementsAre(0x0f, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0));
+		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0));
 }
 
 TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
@@ -192,9 +194,33 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,	  // command
 	    0,					  // completion code
-	    10,
+	    32,
 	    0, // data size
 	    0xf,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
 	    0x0,
 	    0x0,
 	    0x0,
@@ -209,7 +235,7 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 	size_t msg_len = responseMsg.size();
 
 	uint8_t cc = 0;
-	uint8_t responseTypes[8];
+	uint8_t responseTypes[32];
 
 	auto rc = decode_get_supported_nvidia_message_types_resp(
 	    response, msg_len, &cc, (bitfield8_t *)responseTypes);
@@ -217,7 +243,10 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_THAT(responseTypes,
-		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0));
+		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+				0x0, 0x0, 0x0, 0x0, 0x0));
 }
 
 TEST(getSupportedCommandCodes, testGoodEncodeRequest)
@@ -244,9 +273,8 @@ TEST(getSupportedCommandCodes, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, req->command);
-	EXPECT_EQ(2, req->data_size);
-	EXPECT_EQ(msg_type, req->arg1);
-	EXPECT_EQ(0, req->arg2);
+	EXPECT_EQ(1, req->data_size);
+	EXPECT_EQ(msg_type, req->nvidia_message_type);
 }
 
 TEST(getSupportedCommandCodes, testGoodEncodeResponse)
@@ -377,9 +405,7 @@ TEST(queryDeviceIdentification, testGoodEncodeRequest)
 		  request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_QUERY_DEVICE_IDENTIFICATION, req->command);
-	EXPECT_EQ(2, req->data_size);
-	EXPECT_EQ(0, req->arg1);
-	EXPECT_EQ(0, req->arg2);
+	EXPECT_EQ(0, req->data_size);
 }
 
 TEST(queryDeviceIdentification, testGoodEncodeResponse)

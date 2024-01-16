@@ -110,7 +110,7 @@ class DBusHandlerInterface
  *  Wrapper class to handle the D-Bus calls
  *
  *  This class contains the APIs to handle the D-Bus calls
- *  to cater the request from pldm requester.
+ *  to cater the request from nsm requester.
  *  A class is created to mock the apis in the test cases
  */
 class DBusHandler : public DBusHandlerInterface
@@ -212,8 +212,8 @@ class DBusHandler : public DBusHandlerInterface
 
 /** @brief Print the buffer
  *
- *  @param[in]  isTx - True if the buffer is an outgoing PLDM message, false if
-                       the buffer is an incoming PLDM message
+ *  @param[in]  isTx - True if the buffer is an outgoing NSM message, false if
+                       the buffer is an incoming NSM message
  *  @param[in]  buffer - Buffer to print
  *
  *  @return - None
@@ -222,10 +222,10 @@ void printBuffer(bool isTx, const std::vector<uint8_t>& buffer);
 
 /** @brief Print the buffer
  *
- *  @param[in]  isTx - True if the buffer is an outgoing PLDM message, false if
-                       the buffer is an incoming PLDM message
- *  @param[in] buffer - pldm message buffer to log
- *  @param[in] bufferLen - pldm message buffer length
+ *  @param[in]  isTx - True if the buffer is an outgoing NSM message, false if
+                       the buffer is an incoming NSM message
+ *  @param[in] buffer - NSM message buffer to log
+ *  @param[in] bufferLen - NSM message buffer length
  *
  *  @return - None
  */
