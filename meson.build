@@ -67,6 +67,7 @@ if get_option('mockup-responder').enabled()
 endif
 
 if get_option('tests').enabled()
+  subdir('common/test')
   subdir('libnsm/test')
   subdir('mockupResponder/test')
   subdir('nsmtool/test')

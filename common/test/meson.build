@@ -1,7 +1,5 @@
 dep_src_files = [
-  '../base.c',
-  '../platform-environmental.c',
-  '../network-ports.c',
+  '../utils.cpp'
 ]
 
 dep_src_headers = [
@@ -15,12 +13,8 @@ test_src = declare_dependency(sources: dep_src_files,
                               include_directories: dep_src_headers)
 
 tests = [
-  'libnsm_base_test',
-  'libnsm_platform_environmental_test',
-  'libnsm_network_ports_test'
+  'common_utils_test'
 ]
-
-libnsm_headers = ['.', '..', '../../common']
 
 foreach t : tests
   test(t, executable(t.underscorify(), t + '.cpp',
@@ -29,6 +23,8 @@ foreach t : tests
                      build_rpath: '',
                      dependencies: [
                          test_src,
+                         sdbusplus,
+                         phosphor_logging,
                          gtest,
                          gmock]),
        workdir: meson.current_source_dir())

@@ -272,10 +272,17 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         break;
         case DEVICE_GUID:
         {
-            std::vector<uint8_t> nvu8ArrVal(16, 0);
+            std::vector<uint8_t> nvu8ArrVal(UUID_INT_SIZE, 0);
+            if (dataSize < UUID_INT_SIZE || sizeof(data) < UUID_INT_SIZE)
+            {
+                lg2::error(
+                    "decode_get_inventory_information_resp invalid property data. eid={EID} porpertyID={PID}",
+                    "EID", eid, "PID", propertyIdentifier);
+                co_return NSM_SW_ERROR_LENGTH;
+            }
             memcpy(nvu8ArrVal.data(), data.data(), dataSize);
 
-            uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal.data());
+            uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal);
             properties.emplace(propertyIdentifier, uuidStr);
         }
         break;

@@ -41,6 +41,7 @@ using Interfaces = std::vector<std::string>;
 using MapperServiceMap = std::vector<std::pair<ServiceName, Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
 
+#define UUID_INT_SIZE 16
 #define UUID_LEN 36
 namespace utils
 {
@@ -263,5 +264,6 @@ eid_t getEidFromUUID(
  *  @param[in] uuidIntArr   - The integer array to be converted to string
  *  @return - uuid_t
  */
-uuid_t convertUUIDToString(const uint8_t* uuidIntArr);
+uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr);
+
 } // namespace utils

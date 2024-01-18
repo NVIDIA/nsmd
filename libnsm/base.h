@@ -7,6 +7,7 @@ extern "C" {
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define NSM_INSTANCE_MAX 31
 
@@ -22,6 +23,8 @@ extern "C" {
 #define NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE 0xEF
 // NSM Aggregate sample size is represented in 3 bits as power of 2
 #define NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2 7
+
+#define INSTANCEID_MASK 0x1f
 
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,

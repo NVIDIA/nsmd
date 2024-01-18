@@ -81,7 +81,7 @@ int encode_cc_only_resp(uint8_t instance_id, uint8_t type, uint8_t command,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = type;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -165,7 +165,7 @@ int encode_get_supported_nvidia_message_types_req(uint8_t instance_id,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -194,7 +194,7 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance_id,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -234,6 +234,7 @@ int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
 	}
 
 	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
 	    sizeof(struct nsm_get_supported_nvidia_message_types_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
@@ -256,7 +257,7 @@ int encode_get_supported_command_codes_req(uint8_t instance_id,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -285,7 +286,7 @@ int encode_get_supported_command_codes_resp(uint8_t instance_id, uint8_t cc,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
@@ -350,7 +351,7 @@ int encode_nsm_query_device_identification_req(uint8_t instance_id,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -379,7 +380,7 @@ int encode_query_device_identification_resp(uint8_t instance, uint8_t cc,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance & 0x1f;
+	header.instance_id = instance & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
