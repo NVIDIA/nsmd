@@ -133,6 +133,47 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     return NSM_SW_SUCCESS;
 }
 
+// parser for bitField variable
+void parseBitfieldVar(ordered_json& res, const std::string& key, const bitfield8_t* value,
+                      uint8_t size)
+{
+    for (uint8_t i=0; i<size; i++)
+    {
+        if (value[i].bits.bit0)
+        {
+            res[key].push_back((i * 8) + 0);
+        }
+        if (value[i].bits.bit1)
+        {
+            res[key].push_back((i * 8) + 1);
+        }
+        if (value[i].bits.bit2)
+        {
+            res[key].push_back((i * 8) + 2);
+        }
+        if (value[i].bits.bit3)
+        {
+            res[key].push_back((i * 8) + 3);
+        }
+        if (value[i].bits.bit4)
+        {
+            res[key].push_back((i * 8) + 4);
+        }
+        if (value[i].bits.bit5)
+        {
+            res[key].push_back((i * 8) + 5);
+        }
+        if (value[i].bits.bit6)
+        {
+            res[key].push_back((i * 8) + 6);
+        }
+        if (value[i].bits.bit7)
+        {
+            res[key].push_back((i * 8) + 7);
+        }
+    }
+}
+
 void CommandInterface::exec()
 {
     instanceId = 0;

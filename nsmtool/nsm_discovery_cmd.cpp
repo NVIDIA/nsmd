@@ -15,43 +15,6 @@ namespace discovery
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
 
-void parseBitfieldVar(ordered_json& res, std::string key, bitfield8_t& value,
-                      uint8_t n)
-{
-    if (value.bits.bit0)
-    {
-        res[key].push_back(n * 8 + 0);
-    }
-    if (value.bits.bit1)
-    {
-        res[key].push_back(n * 8 + 1);
-    }
-    if (value.bits.bit2)
-    {
-        res[key].push_back(n * 8 + 2);
-    }
-    if (value.bits.bit3)
-    {
-        res[key].push_back(n * 8 + 3);
-    }
-    if (value.bits.bit4)
-    {
-        res[key].push_back(n * 8 + 4);
-    }
-    if (value.bits.bit5)
-    {
-        res[key].push_back(n * 8 + 5);
-    }
-    if (value.bits.bit6)
-    {
-        res[key].push_back(n * 8 + 6);
-    }
-    if (value.bits.bit7)
-    {
-        res[key].push_back(n * 8 + 7);
-    }
-}
-
 class Ping : public CommandInterface
 {
   public:
@@ -138,10 +101,8 @@ class GetSupportedMessageTypes : public CommandInterface
         result["Completion Code"] = cc;
         std::string key("Supported Nvidia Message Types");
 
-        for (int i = 0; i < SUPPORTED_MSG_TYPE_DATA_SIZE; i++)
-        {
-            parseBitfieldVar(result, key, supportedTypes[i], i);
-        }
+        parseBitfieldVar(result, key, &supportedTypes[0],
+                         SUPPORTED_MSG_TYPE_DATA_SIZE);
 
         nsmtool::helper::DisplayInJson(result);
     }
@@ -205,10 +166,8 @@ class GetSupportedCommandCodes : public CommandInterface
         result["Nvidia Message Type"] = nvidiaMsgType;
         std::string key("Supported Command codes");
 
-        for (int i = 0; i < SUPPORTED_COMMAND_CODE_DATA_SIZE; i++)
-        {
-            parseBitfieldVar(result, key, supportedCommandCodes[i], i);
-        }
+        parseBitfieldVar(result, key, &supportedCommandCodes[0],
+                         SUPPORTED_COMMAND_CODE_DATA_SIZE);
 
         nsmtool::helper::DisplayInJson(result);
     }
@@ -259,7 +218,28 @@ class QueryDeviceIdentification : public CommandInterface
 
         ordered_json result;
         result["Compeletion Code"] = cc;
-        result["Device Identification"] = device_identification;
+        switch (device_identification)
+        {
+            case NSM_DEV_ID_GPU:
+                result["Device Identification"] = "GPU";
+                break;
+            case NSM_DEV_ID_SWITCH:
+                result["Device Identification"] = "Switch";
+                break;
+            case NSM_DEV_ID_PCIE_BRIDGE:
+                result["Device Identification"] = "PCIe Bridge";
+                break;
+            case NSM_DEV_ID_BASEBOARD:
+                result["Device Identification"] = "Baseboard";
+                break;
+            case NSM_DEV_ID_UNKNOWN:
+                result["Device Identification"] = "Unknown";
+                break;
+            default:
+                std::cerr << "Invalid device identification received: "
+                          << (int)device_identification << "\n";
+                return;
+        }
         result["Device Instance ID"] = device_instanceID;
 
         nsmtool::helper::DisplayInJson(result);
