@@ -7,6 +7,7 @@
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/asio/object_server.hpp>
+#include <boost/algorithm/string.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
@@ -20,20 +21,27 @@ void optionUsage(void)
     std::cerr << "Usage: nsmMockupResponder [options]\n";
     std::cerr << "Options:\n";
     std::cerr << " [--verbose] - would enable verbosity\n"
-              << " [--eid <EID>] - assign EID to mockup responder\n";
+              << " [--eid <EID>] - assign EID to mockup responder\n"
+              << " [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]\n"
+              << " [--deviceType <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge and Baseboard]\n";
 }
 
 int main(int argc, char** argv)
 {
     bool verbose = false;
     int eid = 0;
+    std::string device = "";
+    int deviceType = 0;
+    int instanceId = 0;
     int argflag;
-    static struct option long_options[] = {{"verbose", no_argument, 0, 'v'},
+    static struct option long_options[] = {{"help", no_argument, 0, 'h'},
+                                           {"verbose", no_argument, 0, 'v'},
                                            {"eid", required_argument, 0, 'e'},
-                                           {"help", no_argument, 0, 'h'},
+                                           {"device", required_argument, 0, 'd'},
+                                           {"instanceId", required_argument, 0, 'i'},
                                            {0, 0, 0, 0}};
 
-    while ((argflag = getopt_long(argc, argv, "hve:", long_options, nullptr)) >=
+    while ((argflag = getopt_long(argc, argv, "hve:d:i:", long_options, nullptr)) >=
            0)
     {
         switch (argflag)
@@ -53,6 +61,38 @@ int main(int argc, char** argv)
                     exit(EXIT_FAILURE);
                 }
                 break;
+            case 'd':
+                device = optarg;
+                if (boost::iequals(device, "GPU"))
+                {
+                    deviceType = NSM_DEV_ID_GPU;
+                }
+                else if (boost::iequals(device, "Switch"))
+                {
+                    deviceType = NSM_DEV_ID_SWITCH;
+                }
+                else if (boost::iequals(device, "PCIeBridge"))
+                {
+                    deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+                }
+                else if (boost::iequals(device, "Baseboard"))
+                {
+                    deviceType = NSM_DEV_ID_BASEBOARD;
+                }
+                else
+                {
+                    optionUsage();
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            case 'i':
+                instanceId = std::stoi(optarg);
+                if (instanceId < 0 || instanceId > 255)
+                {
+                    optionUsage();
+                    exit(EXIT_FAILURE);
+                }
+                break;
             default:
                 exit(EXIT_FAILURE);
         }
@@ -60,7 +100,9 @@ int main(int argc, char** argv)
 
     if (verbose)
     {
-        lg2::info("start a Mockup Responder EID={EID}", "EID", eid);
+        lg2::info(
+            "start a Mockup Responder EID={EID} DeviceType={DT} ({DID}) InstanceID={IID}",
+            "EID", eid, "DT", device, "DID", deviceType, "IID", instanceId);
     }
 
     try
@@ -75,10 +117,11 @@ int main(int argc, char** argv)
         sdbusplus::server::manager::manager objManager(bus, "/");
 
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
-        bus.request_name("xyz.openbmc_project.NSM.MockupResponder");
+        std::string serviceName = "xyz.openbmc_project.NSM.eid_" + std::to_string(eid);
+        bus.request_name(serviceName.c_str());
 
         MockupResponder::MockupResponder mockupResponder(verbose, event);
-        mockupResponder.connectMockupEID(eid);
+        mockupResponder.connectMockupEID(eid, deviceType, instanceId);
 
         return event.loop();
     }

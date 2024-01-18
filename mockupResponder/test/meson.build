@@ -2,6 +2,7 @@ dep_src_files = [
   '../mockupResponder.cpp',
   '../../common/utils.cpp',
   '../../libnsm/base.c',
+  '../../libnsm/network-ports.c',
   '../../libnsm/platform-environmental.c',
   '../../libnsm/requester/mctp.c',
 ]
