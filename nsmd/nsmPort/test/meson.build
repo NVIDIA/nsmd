@@ -1,27 +1,30 @@
 dep_src_files = [
-  '../nsmDevice.cpp',
-  '../nsmObjectFactory.cpp',
-  '../../common/utils.cpp',
-  '../../libnsm/base.c',
-  '../../libnsm/platform-environmental.c',
-  '../../libnsm/device-capability-discovery.c',
-  '../../libnsm/network-ports.c',
-  '../../libnsm/requester/mctp.c',
+  '../nsmPort.cpp',
+  '../../nsmDevice.cpp',
+  '../../nsmObjectFactory.cpp',
+  '../../sensorManager.cpp',
+  '../../nsmSensor.cpp',
+  '../../../common/utils.cpp',
+  '../../../libnsm/base.c',
+  '../../../libnsm/network-ports.c',
+  '../../../libnsm/instance-id.c',
+  '../../../libnsm/requester/mctp.c',
 ]
 
 dep_src_headers = [
   '.',
   '..',
   '../../',
-  '../../common',
-  '../../libnsm',
+  '../../../',
+  '../../../common',
+  '../../../libnsm',
 ]
 
 test_src = declare_dependency(sources: dep_src_files,
                               include_directories: dep_src_headers)
 
 tests = [
-  'nsmDevice_test',
+  'nsmPort_test',
 ]
 
 foreach t : tests

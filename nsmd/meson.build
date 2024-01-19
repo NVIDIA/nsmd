@@ -23,6 +23,7 @@ sources = [
     subdir('nsmProcessor')
     subdir('nsmEventConfig')
     subdir('nsmChassis')
+    subdir('nsmPort')
 
             executable('nsmd', sources, implicit_include_directories
                        : false, include_directories
