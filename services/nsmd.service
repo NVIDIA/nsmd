@@ -1,6 +1,8 @@
 [Unit]
 Description=MCTP Nvidia System Management Daemon
+After=mctp-pcie-ctrl.service
 #TDB add After Clause
+
 [Service]
 Restart=always
 Type=dbus
