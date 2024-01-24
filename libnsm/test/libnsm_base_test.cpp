@@ -96,7 +96,6 @@ TEST(ping, testGoodEncodeResponse)
 TEST(ping, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE, // PCI VID: NVIDIA 0x10DE
 	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
@@ -186,7 +185,6 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE, // PCI VID: NVIDIA 0x10DE
 	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
@@ -320,7 +318,6 @@ TEST(getSupportedCommandCodes, testGoodEncodeResponse)
 TEST(getSupportedCommandCodes, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE, // PCI VID: NVIDIA 0x10DE
 	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
@@ -442,7 +439,6 @@ TEST(queryDeviceIdentification, testGoodEncodeResponse)
 TEST(queryDeviceIdentification, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE, // PCI VID: NVIDIA 0x10DE
 	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0

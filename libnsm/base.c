@@ -30,7 +30,6 @@ uint8_t pack_nsm_header(const struct nsm_header_info *hdr,
 		msg->request = 1;
 	}
 
-	msg->message_type = MCTP_MSG_TYPE_PCI_VDM;
 	msg->pci_vendor_id = htobe16(PCI_VENDOR_ID);
 	msg->datagram = datagram;
 	msg->reserved = 0;

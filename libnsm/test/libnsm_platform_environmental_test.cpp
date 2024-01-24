@@ -44,7 +44,6 @@ TEST(getInventoryInformation, testBadEncodeRequest)
 TEST(getInventoryInformation, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
 	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
@@ -104,7 +103,6 @@ TEST(getInventoryInformation, testGoodEncodeResponse)
 TEST(getInventoryInformation, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
 	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
@@ -167,7 +165,6 @@ TEST(getTemperature, testGoodEncodeRequest)
 TEST(getTemperature, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
 	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
@@ -225,7 +222,6 @@ TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
 TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
-	    0x7e, // message type( VDM-PCI)
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
 	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
