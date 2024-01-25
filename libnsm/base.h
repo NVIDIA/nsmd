@@ -99,8 +99,6 @@ typedef enum {
  * Structure representing NSM message header fields
  */
 struct nsm_msg_hdr {
-	uint8_t message_type : 7; //!< vendor-defined message - PCI(0x7E)
-	uint8_t ic : 1;		  //!< Integrity check
 	uint16_t pci_vendor_id;	  //!< PCI defined vendor ID for NVIDIA (0x10DE)
 
 	uint8_t instance_id : 5; //!< Instance ID
