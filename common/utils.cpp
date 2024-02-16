@@ -212,4 +212,48 @@ PropertyValue DBusHandler::getDbusPropertyVariant(
     return value;
 }
 
+eid_t getEidFromUUID(
+    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable, uuid_t uuid)
+{
+    eid_t eid = std::numeric_limits<uint8_t>::max();
+    for (auto itr = eidTable.begin(); itr != eidTable.end(); itr++)
+    {
+        // TODO: as of now it is hard-coded for PCIe meidium, will handle in
+        // seperate MR for selecting the fasted bandwidth medium instead of hard
+        // coded value
+        if ((itr->first).substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN) &&
+            itr->second.second ==
+                "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe")
+        {
+            eid = itr->second.first;
+            break;
+        }
+    }
+
+    if (eid == std::numeric_limits<uint8_t>::max())
+    {
+        lg2::error("EID not Found for UUID={UUID}", "UUID", uuid);
+    }
+    else
+    {
+        lg2::info("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
+    }
+    return eid;
+}
+
+uuid_t convertUUIDToString(const uint8_t* uuidIntArr)
+{
+    uuid_t uuidStr;
+    uuidStr.resize(37, 0);
+
+    snprintf(
+        const_cast<char*>(uuidStr.data()), uuidStr.size(),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        uuidIntArr[0], uuidIntArr[1], uuidIntArr[2], uuidIntArr[3],
+        uuidIntArr[4], uuidIntArr[5], uuidIntArr[6], uuidIntArr[7],
+        uuidIntArr[8], uuidIntArr[9], uuidIntArr[10], uuidIntArr[11],
+        uuidIntArr[12], uuidIntArr[13], uuidIntArr[14], uuidIntArr[15]);
+
+    return uuidStr;
+}
 } // namespace utils

@@ -49,19 +49,22 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
-            // update eid table
-            eidTable[uuid] = eid;
-
             lg2::info("found NSM device. eid={EID} uuid={UUID}", "EID", eid,
                       "UUID", uuid);
-            // get message type
-
-            // if(support msg type 3)
 
             auto nsmDevice = std::make_shared<NsmDevice>(eid);
             nsmDevices.emplace(eid, nsmDevice);
 
             // get inventory information from device
+            InventoryProperties properties{};
+            rc = co_await getFRU(eid, properties);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
+                           rc, "EID", eid);
+                continue;
+            }
+
             uint8_t deviceIdentification = 0;
             uint8_t deviceInstance = 0;
             rc = co_await getQueryDeviceIdentification(
@@ -74,14 +77,9 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
-            InventoryProperties properties{};
-            rc = co_await getFRU(eid, properties);
-            if (rc != NSM_SUCCESS)
-            {
-                lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
-                           rc, "EID", eid);
-                continue;
-            }
+            // update eid table [from UUID from MCTP dbus property]
+            eidTable.insert(
+                std::make_pair(uuid, std::make_pair(eid, mctpMedium)));
 
             // expose inventory information to FruDevice PDI
             nsmDevice->fruDeviceIntf = objServer.add_interface(
@@ -106,8 +104,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                                                         deviceIdentification);
             nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
                                                         deviceInstance);
-
-            nsmDevice->fruDeviceIntf->register_property("EID", eid);
+            nsmDevice->fruDeviceIntf->register_property("UUID", uuid);
 
             nsmDevice->fruDeviceIntf->initialize();
         }
@@ -266,6 +263,15 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         {
             std::string property((char*)data.data(), dataSize);
             properties.emplace(propertyIdentifier, property);
+        }
+        break;
+        case DEVICE_GUID:
+        {
+            std::vector<uint8_t> nvu8ArrVal(16, 0);
+            memcpy(nvu8ArrVal.data(), data.data(), dataSize);
+
+            uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal.data());
+            properties.emplace(propertyIdentifier, uuidStr);
         }
         break;
         default:

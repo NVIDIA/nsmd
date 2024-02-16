@@ -17,10 +17,12 @@ SensorManager::SensorManager(sdbusplus::bus::bus& bus,
                              sdeventplus::Event& event,
                              requester::Handler<requester::Request>& handler,
                              nsm::InstanceIdDb& instanceIdDb,
-                             sdbusplus::asio::object_server& objServer) :
+                             sdbusplus::asio::object_server& objServer,
+                             std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable) :
     bus(bus),
     event(event), handler(handler), instanceIdDb(instanceIdDb),
     objServer(objServer),
+    eidTable(eidTable),
     inventoryAddedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
@@ -41,10 +43,6 @@ void SensorManager::addTemp(std::string objPath)
             objPath.c_str(), "Name",
             "xyz.openbmc_project.Configuration.NSM_Temp");
 
-        auto eid = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "EID",
-            "xyz.openbmc_project.Configuration.NSM_Temp");
-
         auto sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "SensorId",
             "xyz.openbmc_project.Configuration.NSM_Temp");
@@ -57,17 +55,31 @@ void SensorManager::addTemp(std::string objPath)
             objPath.c_str(), "Priority",
             "xyz.openbmc_project.Configuration.NSM_Temp");
 
-        // create sensor
-        auto sensor = std::make_shared<NsmTemp>(bus, name, priority, sensorId,
-                                                association);
-        deviceSensors[eid].emplace_back(sensor);
-        if (sensor->isPriority())
+        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+            objPath.c_str(), "UUID",
+            "xyz.openbmc_project.Configuration.NSM_Temp");
+        
+        eid_t eid = utils::getEidFromUUID(eidTable, uuid);
+        if(eid != std::numeric_limits<uint8_t>::max())
         {
-            prioritySensors[eid].emplace_back(sensor);
+            // create sensor
+            auto sensor = std::make_shared<NsmTemp>(bus, name, priority, sensorId,
+                                                    association);
+            deviceSensors[eid].emplace_back(sensor);
+            if (sensor->isPriority())
+            {
+                prioritySensors[eid].emplace_back(sensor);
+            }
+            else
+            {
+                roundRobinSensors[eid].push(sensor);
+            }
         }
         else
         {
-            roundRobinSensors[eid].push(sensor);
+            lg2::error("found NSM_Sensor [{NAME}] but not created, EID not Found for UUID={UUID}",
+                "UUID", uuid,
+                "NAME", name);
         }
     }
     catch (const std::exception& e)
