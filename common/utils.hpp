@@ -41,6 +41,7 @@ using Interfaces = std::vector<std::string>;
 using MapperServiceMap = std::vector<std::pair<ServiceName, Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
 
+#define UUID_LEN 36
 namespace utils
 {
 constexpr bool Tx = true;
@@ -250,4 +251,17 @@ std::vector<std::string> split(std::string_view srcStr, std::string_view delim,
  */
 std::string getCurrentSystemTime();
 
+/** @brief Get eid from the UUID
+ *
+ *  @return - eid_t eid for corresponding UUID
+ */
+eid_t getEidFromUUID(
+    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable, uuid_t uuid);
+
+/** @brief UUID conversion from integer array to std::string.
+ *
+ *  @param[in] uuidIntArr   - The integer array to be converted to string
+ *  @return - uuid_t
+ */
+uuid_t convertUUIDToString(const uint8_t* uuidIntArr);
 } // namespace utils

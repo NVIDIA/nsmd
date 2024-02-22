@@ -29,7 +29,8 @@ class SensorManager
     SensorManager(sdbusplus::bus::bus& bus, sdeventplus::Event& event,
                   requester::Handler<requester::Request>& handler,
                   nsm::InstanceIdDb& instanceIdDb,
-                  sdbusplus::asio::object_server& objServer);
+                  sdbusplus::asio::object_server& objServer,
+                  std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable);
 
     void startPolling();
     void stopPolling();
@@ -53,6 +54,7 @@ class SensorManager
     requester::Handler<requester::Request>& handler;
     nsm::InstanceIdDb& instanceIdDb;
     sdbusplus::asio::object_server& objServer;
+    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable;
 
     sdbusplus::bus::match_t inventoryAddedSignal;
     // sdbusplus::bus::match_t inventoryRemovbedSignal;

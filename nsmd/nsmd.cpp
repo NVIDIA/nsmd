@@ -72,14 +72,18 @@ int main(int argc, char** argv)
         bus.request_name("xyz.openbmc_project.NSM");
         nsm::InstanceIdDb instanceIdDb;
         mctp_socket::Manager sockManager;
+        // corresponding to a UUID there could be multiple occurance of same eid
+        // with different medium types.
+        std::multimap<uuid_t, std::pair<eid_t, MctpMedium>> eidTable;
+
         responder::Invoker invoker{};
         requester::Handler<requester::Request> reqHandler(event, instanceIdDb,
                                                           sockManager, verbose);
         mctp_socket::Handler sockHandler(event, reqHandler, invoker,
                                          sockManager, verbose);
         std::unique_ptr<nsm::DeviceManager> deviceManager =
-            std::make_unique<nsm::DeviceManager>(event, reqHandler,
-                                                 instanceIdDb, objServer);
+            std::make_unique<nsm::DeviceManager>(
+                event, reqHandler, instanceIdDb, objServer, eidTable);
         std::unique_ptr<mctp::MctpDiscovery> mctpDiscoveryHandler =
             std::make_unique<mctp::MctpDiscovery>(
                 bus, sockHandler,
@@ -87,8 +91,8 @@ int main(int argc, char** argv)
                     deviceManager.get()});
 
         std::unique_ptr<nsm::SensorManager> sensorManager =
-            std::make_unique<nsm::SensorManager>(bus, event, reqHandler,
-                                                 instanceIdDb, objServer);
+            std::make_unique<nsm::SensorManager>(
+                bus, event, reqHandler, instanceIdDb, objServer, eidTable);
 
         return event.loop();
     }
