@@ -150,8 +150,8 @@ int encode_get_temperature_reading_req(uint8_t instance_id, uint8_t sensor_id,
 		return rc;
 	}
 
-	struct nsm_get_temperature_reading_req *request =
-	    (struct nsm_get_temperature_reading_req *)msg->payload;
+	nsm_get_temperature_reading_req *request =
+	    (nsm_get_temperature_reading_req *)msg->payload;
 
 	request->hdr.command = NSM_GET_TEMPERATURE_READING;
 	request->hdr.data_size = sizeof(sensor_id);
@@ -168,12 +168,12 @@ int decode_get_temperature_reading_req(const struct nsm_msg *msg,
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_temperature_reading_req)) {
+			  sizeof(nsm_get_temperature_reading_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_get_temperature_reading_req *request =
-	    (struct nsm_get_temperature_reading_req *)msg->payload;
+	nsm_get_temperature_reading_req *request =
+	    (nsm_get_temperature_reading_req *)msg->payload;
 
 	if (request->hdr.data_size < sizeof(request->sensor_id)) {
 		return NSM_SW_ERROR_DATA;
@@ -329,8 +329,7 @@ int encode_get_current_power_draw_resp(uint8_t instance_id, uint8_t cc,
 	}
 
 	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(cc, reason_code,
-					  NSM_GET_TEMPERATURE_READING, msg);
+		return encode_reason_code(cc, reason_code, NSM_GET_POWER, msg);
 	}
 
 	struct nsm_get_current_power_draw_resp *response =
@@ -531,6 +530,238 @@ int decode_aggregate_get_current_power_draw_reading(const uint8_t *data,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_current_energy_count_req(uint8_t instance, uint8_t sensor_id,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_current_energy_count_req *request =
+	    (nsm_get_current_energy_count_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_ENERGY_COUNT;
+	request->hdr.data_size = sizeof(sensor_id);
+	request->sensor_id = sensor_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_energy_count_req(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *sensor_id)
+{
+	if (msg == NULL || sensor_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_current_energy_count_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_current_energy_count_req *request =
+	    (nsm_get_current_energy_count_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->sensor_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*sensor_id = request->sensor_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_current_energy_count_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint64_t energy_reading,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_ENERGY_COUNT,
+					  msg);
+	}
+
+	struct nsm_get_current_energy_count_resp *response =
+	    (struct nsm_get_current_energy_count_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_ENERGY_COUNT;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(energy_reading));
+	response->reading = htole64(energy_reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_energy_count_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *reason_code,
+					 uint64_t *energy_reading)
+{
+	if (energy_reading == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_current_energy_count_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_current_energy_count_resp *response =
+	    (struct nsm_get_current_energy_count_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	if (data_size != sizeof(*energy_reading)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*energy_reading = le64toh(response->reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_voltage_req(uint8_t instance, uint8_t sensor_id,
+			   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_voltage_req *request = (nsm_get_voltage_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_VOLTAGE;
+	request->hdr.data_size = sizeof(sensor_id);
+	request->sensor_id = sensor_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_voltage_req(const struct nsm_msg *msg, size_t msg_len,
+			   uint8_t *sensor_id)
+{
+	if (msg == NULL || sensor_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_voltage_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_voltage_req *request = (nsm_get_voltage_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->sensor_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*sensor_id = request->sensor_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_voltage_resp(uint8_t instance_id, uint8_t cc,
+			    uint16_t reason_code, uint32_t voltage,
+			    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_VOLTAGE,
+					  msg);
+	}
+
+	struct nsm_get_voltage_resp *response =
+	    (struct nsm_get_voltage_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_VOLTAGE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(voltage));
+	response->reading = htole32(voltage);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_voltage_resp(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *cc, uint16_t *reason_code,
+			    uint32_t *voltage)
+{
+	if (voltage == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_get_voltage_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_voltage_resp *response =
+	    (struct nsm_get_voltage_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	if (data_size != sizeof(*voltage)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*voltage = le64toh(response->reading);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_aggregate_timestamp_data(uint64_t timestamp, uint8_t *data,
 				    size_t *data_len)
 {
@@ -706,6 +937,74 @@ int decode_aggregate_temperature_reading_data(const uint8_t *data,
 	uint32_t reading = 0;
 	memcpy(&reading, data, sizeof(uint32_t));
 	*temperature_reading = (int32_t)le32toh(reading) / (double)(1 << 8);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_energy_count_data(uint64_t energy_count, uint8_t *data,
+				       size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint64_t le_reading = htole64(energy_count);
+
+	memcpy(data, &le_reading, sizeof(uint64_t));
+	*data_len = sizeof(uint64_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_energy_count_data(const uint8_t *data, size_t data_len,
+				       uint64_t *energy_count)
+{
+	if (data == NULL || energy_count == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint64_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint64_t le_reading;
+	memcpy(&le_reading, data, sizeof(uint64_t));
+
+	*energy_count = le64toh(le_reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_voltage_data(uint32_t voltage, uint8_t *data,
+				  size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint32_t le_reading = htole32(voltage);
+
+	memcpy(data, &le_reading, sizeof(uint32_t));
+	*data_len = sizeof(uint32_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_voltage_data(const uint8_t *data, size_t data_len,
+				  uint32_t *voltage)
+{
+	if (data == NULL || voltage == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t le_reading;
+	memcpy(&le_reading, data, sizeof(uint32_t));
+
+	*voltage = le32toh(le_reading);
 
 	return NSM_SW_SUCCESS;
 }

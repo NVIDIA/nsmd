@@ -153,8 +153,8 @@ TEST(getTemperature, testGoodEncodeRequest)
 
 	auto rc = encode_get_temperature_reading_req(0, sensor_id, request);
 
-	struct nsm_get_temperature_reading_req *req =
-	    reinterpret_cast<struct nsm_get_temperature_reading_req *>(
+	nsm_get_temperature_reading_req *req =
+	    reinterpret_cast<nsm_get_temperature_reading_req *>(
 		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -193,7 +193,7 @@ TEST(getTemperature, testGoodDecodeRequest)
 	EXPECT_EQ(sensor_id, 1);
 }
 
-TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
+TEST(getTemperature, testGoodEncodeResponse)
 {
 	std::vector<uint8_t> responseMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp));
@@ -226,7 +226,7 @@ TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
 	EXPECT_NEAR(temperature_reading, reading, 0.01);
 }
 
-TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)
+TEST(getTemperature, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
@@ -259,6 +259,107 @@ TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_NEAR(temperature_reading, 12.34, 0.01);
+}
+
+TEST(getTemperature, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x00 // temperature reading=12.34
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	double temperature_reading = 0;
+
+	auto rc = decode_get_temperature_reading_resp(
+	    response, msg_len, &cc, &reasonCode, &temperature_reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_DOUBLE_EQ(temperature_reading, 0);
+}
+
+TEST(getTemperature, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x0c,
+	    0x00,
+	    0x00 // temperature reading=12.34
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_temperature_reading_resp(response, msg_len, &cc,
+						      &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getTemperature, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    2,
+	    0, // data size
+	    0x57,
+	    0x0c,
+	    0x00,
+	    0x00 // temperature reading=12.34
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	double temperature_reading = 0;
+
+	auto rc = decode_get_temperature_reading_resp(
+	    response, msg_len, &cc, &reasonCode, &temperature_reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_DOUBLE_EQ(temperature_reading, 0);
 }
 
 TEST(getCurrentPowerDraw, testGoodEncodeRequest)
@@ -380,6 +481,553 @@ TEST(getCurrentPowerDraw, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(reading, 4203351);
+}
+
+
+TEST(getCurrentPowerDraw, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_current_power_draw_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getCurrentPowerDraw, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_current_power_draw_resp(response, msg_len, &cc,
+						     &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getCurrentPowerDraw, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    3,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_current_power_draw_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getCurrentEnergyCount, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t sensor_id = 0;
+
+	auto rc = encode_get_current_energy_count_req(0, sensor_id, request);
+
+	nsm_get_current_energy_count_req *req =
+	    reinterpret_cast<nsm_get_current_energy_count_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ENERGY_COUNT, req->hdr.command);
+	EXPECT_EQ(sizeof(sensor_id), req->hdr.data_size);
+	EXPECT_EQ(sensor_id, req->sensor_id);
+}
+
+TEST(getCurrentEnergyCount, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    1,				     // data size
+	    0,				     // sensor_id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t sensor_id = 0;
+
+	auto rc =
+	    decode_get_current_energy_count_req(request, msg_len, &sensor_id);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sensor_id, 0);
+}
+
+TEST(getCurrentEnergyCount, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint64_t reading = 38957248;
+	uint16_t reasonCode = 0;
+
+	auto rc = encode_get_current_energy_count_resp(
+	    0, NSM_SUCCESS, reasonCode, reading, response);
+
+	struct nsm_get_current_energy_count_resp *resp =
+	    reinterpret_cast<struct nsm_get_current_energy_count_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ENERGY_COUNT, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(reading, resp->reading);
+}
+
+TEST(getCurrentEnergyCount, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    8,
+	    0, // data size
+	    0x57,
+	    0x34,
+	    0x49,
+	    0x23,
+	    0x03,
+	    0x00,
+	    0x00,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint64_t reading = 0;
+
+	auto rc = decode_get_current_energy_count_resp(response, msg_len, &cc,
+						       &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 13476901975);
+}
+
+TEST(getCurrentEnergyCount, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    8,
+	    0, // data size
+	    0x57,
+	    0x34,
+	    0x23,
+	    0x03,
+	    0x00,
+	    0x00,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint64_t reading = 0;
+
+	auto rc = decode_get_current_energy_count_resp(response, msg_len, &cc,
+						       &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getCurrentEnergyCount, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    8,
+	    0, // data size
+	    0x57,
+	    0x34,
+	    0x49,
+	    0x23,
+	    0x03,
+	    0x00,
+	    0x00,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_current_energy_count_resp(response, msg_len, &cc,
+						       &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getCurrentEnergyCount, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    7,
+	    0, // data size
+	    0x57,
+	    0x34,
+	    0x49,
+	    0x23,
+	    0x03,
+	    0x00,
+	    0x00,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint64_t reading = 0;
+
+	auto rc = decode_get_current_energy_count_resp(response, msg_len, &cc,
+						       &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getVoltage, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_get_voltage_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t sensor_id = 1;
+
+	auto rc = encode_get_voltage_req(0, sensor_id, request);
+
+	nsm_get_voltage_req *req =
+	    reinterpret_cast<nsm_get_voltage_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_VOLTAGE, req->hdr.command);
+	EXPECT_EQ(sizeof(sensor_id), req->hdr.data_size);
+	EXPECT_EQ(sensor_id, req->sensor_id);
+}
+
+TEST(getVoltage, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_VOLTAGE,		     // command
+	    1,				     // data size
+	    5,				     // sensor_id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t sensor_id = 0;
+
+	auto rc = decode_get_voltage_req(request, msg_len, &sensor_id);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sensor_id, 5);
+}
+
+TEST(getVoltage, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_voltage_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t reading = 23442;
+	uint16_t reasonCode = 0;
+
+	auto rc = encode_get_voltage_resp(0, NSM_SUCCESS, reasonCode, reading,
+					  response);
+
+	struct nsm_get_voltage_resp *resp =
+	    reinterpret_cast<struct nsm_get_voltage_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_VOLTAGE, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(reading, resp->reading);
+}
+
+TEST(getVoltage, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x48,
+	    0x29,
+	    0x03,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_voltage_resp(response, msg_len, &cc, &reasonCode,
+					  &reading);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 207176);
+}
+
+TEST(getVoltage, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x48,
+	    0x03,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_voltage_resp(response, msg_len, &cc, &reasonCode,
+					  &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getVoltage, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x48,
+	    0x29,
+	    0x03,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_voltage_resp(response, msg_len, &cc, &reasonCode,
+					  nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getVoltage, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ENERGY_COUNT,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    2,
+	    0, // data size
+	    0x48,
+	    0x29,
+	    0x03,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_voltage_resp(response, msg_len, &cc, &reasonCode,
+					  &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
 }
 
 TEST(getDriverInfo, testGoodEncodeRequest)

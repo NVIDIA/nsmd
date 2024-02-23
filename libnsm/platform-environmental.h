@@ -14,7 +14,9 @@ const uint8_t MAX_VERSION_STRING_SIZE = 100;
  */
 enum nsm_platform_environmental_commands {
 	NSM_GET_TEMPERATURE_READING = 0x00,
-	NSM_GET_POWER = 0x01,
+	NSM_GET_POWER = 0x03,
+	NSM_GET_ENERGY_COUNT = 0x06,
+	NSM_GET_VOLTAGE = 0x0F,
 	NSM_GET_INVENTORY_INFORMATION = 0x11,
 	NSM_GET_DRIVER_INFO = 0x14,
 	NSM_GET_MIG_MODE = 0x4d,
@@ -108,14 +110,22 @@ struct nsm_get_inventory_information_resp {
 	uint8_t inventory_information[1];
 } __attribute__((packed));
 
+/** @struct nsm_get_numeric_sensor_reading_req
+ *
+ *  Structure representing NSM request to get reading of certain numeric
+ * sensors.
+ */
+struct nsm_get_numeric_sensor_reading_req {
+	struct nsm_common_req hdr;
+	uint8_t sensor_id;
+} __attribute__((packed));
+
 /** @struct nsm_get_temperature_reading_req
  *
  *  Structure representing NSM get temperature reading request.
  */
-struct nsm_get_temperature_reading_req {
-	struct nsm_common_req hdr;
-	uint8_t sensor_id;
-} __attribute__((packed));
+typedef struct nsm_get_numeric_sensor_reading_req
+    nsm_get_temperature_reading_req;
 
 /** @struct nsm_get_temperature_reading_resp
  *
@@ -141,6 +151,37 @@ struct nsm_get_current_power_draw_req {
  *  Structure representing NSM get current power draw response.
  */
 struct nsm_get_current_power_draw_resp {
+	struct nsm_common_resp hdr;
+	uint32_t reading;
+} __attribute__((packed));
+
+/** @struct nsm_get_current_energy_count_req
+ *
+ *  Structure representing NSM get current energy count request.
+ */
+typedef struct nsm_get_numeric_sensor_reading_req
+    nsm_get_current_energy_count_req;
+
+/** @struct nsm_get_current_energy_count_resp
+ *
+ *  Structure representing NSM get current energy count response.
+ */
+struct nsm_get_current_energy_count_resp {
+	struct nsm_common_resp hdr;
+	uint64_t reading;
+} __attribute__((packed));
+
+/** @struct nsm_get_voltage_req
+ *
+ *  Structure representing NSM get voltage request.
+ */
+typedef struct nsm_get_numeric_sensor_reading_req nsm_get_voltage_req;
+
+/** @struct nsm_get_voltage_resp
+ *
+ *  Structure representing NSM get voltage response.
+ */
+struct nsm_get_voltage_resp {
 	struct nsm_common_resp hdr;
 	uint32_t reading;
 } __attribute__((packed));
@@ -430,6 +471,100 @@ int decode_aggregate_get_current_power_draw_reading(const uint8_t *data,
 						    size_t data_len,
 						    uint32_t *reading);
 
+/** @brief Encode a Get Current Energy Counter Value request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] sensor_id - sensor id
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_energy_count_req(uint8_t instance, uint8_t sensor_id,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Energy Counter Value request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] sensor_id - sensor id
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_energy_count_req(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *sensor_id);
+
+/** @brief Encode a Get Current Energy Counter Value response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] energy_reading - temperature reading
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_energy_count_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint64_t energy_reading,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Energy Counter Value response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] energy_reading - temperature_reading
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_energy_count_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *reason_code,
+					 uint64_t *energy_reading);
+
+/** @brief Encode a Get Voltage request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] sensor_id - sensor id
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_voltage_req(uint8_t instance, uint8_t sensor_id,
+			   struct nsm_msg *msg);
+
+/** @brief Decode a Get Voltage request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] sensor_id - sensor id
+ *  @return nsm_completion_codes
+ */
+int decode_get_voltage_req(const struct nsm_msg *msg, size_t msg_len,
+			   uint8_t *sensor_id);
+
+/** @brief Encode a Get Voltage response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] voltage - voltage reading
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_voltage_resp(uint8_t instance_id, uint8_t cc,
+			    uint16_t reason_code, uint32_t voltage,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a Get Voltage response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] voltage - voltage reading
+ *  @return nsm_completion_codes
+ */
+int decode_get_voltage_resp(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *cc, uint16_t *reason_code,
+			    uint32_t *voltage);
+
 /** @brief Encode timestamp of a Get current power draw response message
  *
  *  @param[in] timestamp - timestamp of current power draw reading
@@ -525,7 +660,6 @@ int encode_aggregate_temperature_reading_data(double temperature_reading,
 int decode_aggregate_temperature_reading_data(const uint8_t *data,
 					      size_t data_len,
 					      double *temperature_reading);
-
 
 /** @brief Encode a Get MIG mode request message
  *
@@ -648,6 +782,46 @@ int decode_get_ECC_error_counts_resp(const struct nsm_msg *msg, size_t msg_len,
 				     uint8_t *cc, uint16_t *data_size,
 				     uint16_t *reason_code,
 				     struct nsm_ECC_error_counts *errorCounts);
+
+/** @brief Encode data of a Get Current Energy Count readings response message
+ *
+ *  @param[in] energy_count - energy_count
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_energy_count_data(uint64_t energy_count, uint8_t *data,
+				       size_t *data_len);
+
+/** @brief Decode data of a Get Current Energy Count readings response message
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data
+ *  @param[out] energy_count - energy_count
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_energy_count_data(const uint8_t *data, size_t data_len,
+				       uint64_t *energy_count);
+
+/** @brief Encode data of a Get Voltage readings response message
+ *
+ *  @param[in] voltage - voltage
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_voltage_data(uint32_t voltage, uint8_t *data,
+				  size_t *data_len);
+
+/** @brief Decode data of a Get Voltage readings response message
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data
+ *  @param[out] voltage - voltage
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_voltage_data(const uint8_t *data, size_t data_len,
+				  uint32_t *voltage);
 #ifdef __cplusplus
 }
 #endif
