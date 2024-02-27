@@ -1,19 +1,20 @@
 #include "nsmDevice.hpp"
 
 #include <phosphor-logging/lg2.hpp>
+#include "nsmNumericSensor/nsmNumericAggregator.hpp"
 
 namespace nsm
 {
 
 std::shared_ptr<NsmNumericAggregator>
-    NsmDevice::findAggregatorByType([[maybe_unused]] std::string type)
+    NsmDevice::findAggregatorByType([[maybe_unused]] const std::string& type)
 {
     std::shared_ptr<NsmNumericAggregator> aggregator{};
 
     auto itr =
-        std::find_if(SensorAggregators.begin(), SensorAggregators.end(),
+        std::find_if(sensorAggregators.begin(), sensorAggregators.end(),
                      [&](const auto& e) { return e->getType() == type; });
-    if (itr != SensorAggregators.end())
+    if (itr != sensorAggregators.end())
     {
         aggregator = *itr;
     }
@@ -22,7 +23,7 @@ std::shared_ptr<NsmNumericAggregator>
 }
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
-                                               uuid_t uuid)
+                                               const uuid_t& uuid)
 {
     std::shared_ptr<NsmDevice> ret{};
 

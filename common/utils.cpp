@@ -2,6 +2,7 @@
 
 #include "base.h"
 
+#include <boost/regex.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Logging/Entry/server.hpp>
@@ -20,6 +21,8 @@
 
 namespace utils
 {
+
+static const boost::regex invalidDBusNameSubString{"[^a-zA-Z0-9._/]+"};
 
 uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr)
 {
@@ -259,6 +262,55 @@ eid_t getEidFromUUID(
         lg2::info("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
     }
     return eid;
+}
+
+std::string makeDBusNameValid(const std::string& name)
+{
+    return boost::regex_replace(name, invalidDBusNameSubString, "_");
+}
+
+std::vector<Association> getAssociations(const std::string& objPath,
+                                         const std::string& interfaceSubStr)
+{
+    std::map<std::string, std::vector<std::string>> mapperResponse;
+    auto& bus = DBusHandler::getBus();
+
+    auto mapper = bus.new_method_call(mapperService, mapperPath,
+                                      mapperInterface, "GetObject");
+    mapper.append(objPath, std::vector<std::string>{});
+
+    auto mapperResponseMsg = bus.call(mapper);
+    mapperResponseMsg.read(mapperResponse);
+
+    std::vector<Association> associations;
+
+    for (const auto& [service, interfaces] : mapperResponse)
+    {
+        for (const auto& interface : interfaces)
+        {
+            if (interface.find(interfaceSubStr) != std::string::npos)
+            {
+                associations.push_back({});
+                auto& association = associations.back();
+
+                association.forward =
+                    utils::DBusHandler().getDbusProperty<std::string>(
+                        objPath.c_str(), "Forward", interface.c_str());
+
+                association.backward =
+                    utils::DBusHandler().getDbusProperty<std::string>(
+                        objPath.c_str(), "Backward", interface.c_str());
+
+                association.absolutePath =
+                    utils::DBusHandler().getDbusProperty<std::string>(
+                        objPath.c_str(), "AbsolutePath", interface.c_str());
+                association.absolutePath =
+                    utils::makeDBusNameValid(association.absolutePath);
+            }
+        }
+    }
+
+    return associations;
 }
 
 } // namespace utils

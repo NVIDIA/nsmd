@@ -5,12 +5,13 @@
 
 namespace nsm
 {
-class NsmTemp : public NsmSensor, public NsmNumericSensor
+class NsmTemp : public NsmNumericSensor
 {
   public:
     NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
             const std::string& type, uint8_t sensorId,
-            const std::string& association);
+            const std::vector<utils::Association>& association,
+            const std::string& chassis_association);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -18,12 +19,6 @@ class NsmTemp : public NsmSensor, public NsmNumericSensor
                               size_t responseLen) override;
 
   private:
-    static const std::string valueInterface;
-    static const std::string valueProperty;
-
     static constexpr auto sensor_type = "temperature";
-
-    uint8_t sensorId;
 };
-
 } // namespace nsm

@@ -10,16 +10,14 @@ sources = [
   'sensorManager.cpp',
   'socket_handler.cpp',
   'nsmDevice.cpp',
-  'nsmNumericSensor.cpp',
-  'nsmNumericAggregator.cpp',
   'nsmObjectFactory.cpp',
   'nsmd.cpp',
+  'nsmSensorAggregator.cpp',
 ]
 
 nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common']
 
-subdir('nsmTemp')
-subdir('nsmPower')
+subdir('nsmNumericSensor')
 subdir('nsmFwSwInventory')
 subdir('nsmProcessor')
 subdir('nsmEventConfig')
