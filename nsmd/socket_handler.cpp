@@ -1,5 +1,7 @@
 #include "socket_handler.hpp"
 
+#include "libnsm/base.h"
+
 #include "socket_manager.hpp"
 
 #include <sys/socket.h>
@@ -80,7 +82,7 @@ SocketInfo Handler::initSocket(int type, int protocol,
                     utils::printBuffer(utils::Rx, requestMsg);
                 }
 
-                if (MCTP_MSG_TYPE_VDM != requestMsg[1])
+                if (MCTP_MSG_TYPE_VDM != requestMsg[2])
                 {
                     // Skip this message and continue.
                 }
@@ -95,9 +97,14 @@ SocketInfo Handler::initSocket(int type, int protocol,
                             utils::printBuffer(utils::Tx, *response);
                         }
 
+                        constexpr uint8_t tagOwnerBitPos = 3;
+                        constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
+                        // Set tag owner bit to 0 for NSM responses
+                        requestMsg[0] = requestMsg[0] & tagOwnerMask;
                         iov[0].iov_base = &requestMsg[0];
-                        iov[0].iov_len =
-                            sizeof(requestMsg[0]) + sizeof(requestMsg[1]);
+                        iov[0].iov_len = sizeof(requestMsg[0]) +
+                                         sizeof(requestMsg[1]) +
+                                         sizeof(requestMsg[2]);
                         iov[1].iov_base = (*response).data();
                         iov[1].iov_len = (*response).size();
 
