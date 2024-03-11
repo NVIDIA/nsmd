@@ -39,7 +39,7 @@ class GetInvectoryInformation : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit GetInvectoryInformation(const char* type, const char* name,
-                                   CLI::App* app) :
+                                     CLI::App* app) :
         CommandInterface(type, name, app)
     {
         auto getInvectoryInformationOptionGroup = app->add_option_group(
@@ -58,24 +58,26 @@ class GetInvectoryInformation : public CommandInterface
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        auto rc = encode_get_inventory_information_req(instanceId,
-                                                       propertyId, request);
+        auto rc = encode_get_inventory_information_req(instanceId, propertyId,
+                                                       request);
         return {rc, requestMsg};
     }
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
         uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
         uint16_t dataSize = 0;
         std::vector<uint8_t> inventoryInformation(65535, 0);
 
         auto rc = decode_get_inventory_information_resp(
-            responsePtr, payloadLength, &cc, &dataSize,
+            responsePtr, payloadLength, &cc, &reason_code, &dataSize,
             inventoryInformation.data());
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
 
@@ -199,15 +201,17 @@ class GetTemperatureReading : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = NSM_SUCCESS;
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
         real32_t temperatureReading = 0;
 
         auto rc = decode_get_temperature_reading_resp(
-            responsePtr, payloadLength, &cc, &temperatureReading);
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+            responsePtr, payloadLength, &cc, &reason_code, &temperatureReading);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n"
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
                           sizeof(struct nsm_get_temperature_reading_resp));

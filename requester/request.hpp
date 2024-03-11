@@ -80,7 +80,7 @@ class RequestRetryTimer
             return NSM_ERROR;
         }
 
-        return NSM_SUCCESS;
+        return NSM_SW_SUCCESS;
     }
 
     /** @brief Stops the timer and no further request retries happen */
@@ -179,9 +179,9 @@ class Request final : public RequestRetryTimer
         {
             lg2::error("Failed to send NSM message. RC={RC}, errno={ERRNO}",
                        "RC", unsigned(rc), "ERRNO", strerror(errno));
-            return NSM_ERROR;
+            return NSM_SW_ERROR;
         }
-        return NSM_SUCCESS;
+        return NSM_SW_SUCCESS;
     }
 
     static int nsm_send(eid_t eid, int mctp_fd, const uint8_t* nsm_req_msg,
@@ -202,9 +202,9 @@ class Request final : public RequestRetryTimer
         ssize_t rc = sendmsg(mctp_fd, &msg, 0);
         if (rc == -1)
         {
-            return NSM_ERROR;
+            return NSM_SW_ERROR;
         }
-        return NSM_SUCCESS;
+        return NSM_SW_SUCCESS;
     }
 };
 

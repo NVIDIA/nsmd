@@ -383,7 +383,7 @@ struct SendRecvNsmMsg
     {
         if (responseMsg == nullptr || responseLen == nullptr)
         {
-            rc = NSM_ERR_INVALID_DATA;
+            rc = NSM_SW_ERROR_NULL;
             return false;
         }
 
@@ -429,13 +429,13 @@ struct SendRecvNsmMsg
         if (response == nullptr || !length)
         {
             lg2::error("No response received, EID={EID}", "EID", eid);
-            rc = NSM_ERROR;
+            rc = NSM_SW_ERROR_NULL;
         }
         else
         {
             *responseMsg = response;
             *responseLen = length;
-            rc = NSM_SUCCESS;
+            rc = NSM_SW_SUCCESS;
         }
         resumeHandle();
     }

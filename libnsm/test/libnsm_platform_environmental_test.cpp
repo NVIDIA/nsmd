@@ -19,7 +19,7 @@ TEST(getInventoryInformation, testGoodEncodeRequest)
 	    reinterpret_cast<struct nsm_get_inventory_information_req *>(
 		request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -38,7 +38,7 @@ TEST(getInventoryInformation, testBadEncodeRequest)
 
 	auto rc = encode_get_inventory_information_req(0, 0, nullptr);
 
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
 TEST(getInventoryInformation, testGoodDecodeRequest)
@@ -62,7 +62,7 @@ TEST(getInventoryInformation, testGoodDecodeRequest)
 	auto rc = decode_get_inventory_information_req(request, msg_len,
 						       &property_identifier);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(0xab, property_identifier);
 }
 
@@ -77,15 +77,17 @@ TEST(getInventoryInformation, testGoodEncodeResponse)
 
 	uint8_t *inventory_information = board_part_number.data();
 	uint16_t data_size = board_part_number.size();
+	uint16_t reason_code = 0;
 
 	auto rc = encode_get_inventory_information_resp(
-	    0, NSM_SUCCESS, data_size, inventory_information, response);
+	    0, NSM_SUCCESS, reason_code, data_size, inventory_information,
+	    response);
 
 	struct nsm_get_inventory_information_resp *resp =
 	    reinterpret_cast<struct nsm_get_inventory_information_resp *>(
 		response->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
@@ -120,14 +122,16 @@ TEST(getInventoryInformation, testGoodDecodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 	uint8_t inventory_information[4];
 
 	auto rc = decode_get_inventory_information_resp(
-	    response, msg_len, &cc, &data_size, inventory_information);
+	    response, msg_len, &cc, &reason_code, &data_size,
+	    inventory_information);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(4, data_size);
 	EXPECT_EQ('1', inventory_information[0]);
@@ -150,7 +154,7 @@ TEST(getTemperature, testGoodEncodeRequest)
 	    reinterpret_cast<struct nsm_get_temperature_reading_req *>(
 		request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -182,7 +186,7 @@ TEST(getTemperature, testGoodDecodeRequest)
 	auto rc =
 	    decode_get_temperature_reading_req(request, msg_len, &sensor_id);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(sensor_id, 1);
 }
 
@@ -193,15 +197,16 @@ TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	real32_t temperature_reading = 12.34;
+	uint16_t reasonCode = 0;
 
 	auto rc = encode_get_temperature_reading_resp(
-	    0, NSM_SUCCESS, temperature_reading, response);
+	    0, NSM_SUCCESS, reasonCode, temperature_reading, response);
 
 	struct nsm_get_temperature_reading_resp *resp =
 	    reinterpret_cast<struct nsm_get_temperature_reading_resp *>(
 		response->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
@@ -240,13 +245,14 @@ TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
 	real32_t temperature_reading = 0;
 
-	auto rc = decode_get_temperature_reading_resp(response, msg_len, &cc,
-						      &temperature_reading);
+	auto rc = decode_get_temperature_reading_resp(
+	    response, msg_len, &cc, &reasonCode, &temperature_reading);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_FLOAT_EQ(temperature_reading, 12.34);
 }

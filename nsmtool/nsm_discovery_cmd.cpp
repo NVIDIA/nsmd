@@ -75,12 +75,15 @@ class Ping : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = 0;
-        auto rc = decode_ping_resp(responsePtr, payloadLength, &cc);
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        auto rc =
+            decode_ping_resp(responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
 
@@ -117,15 +120,17 @@ class GetSupportedMessageTypes : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = 0;
-        bitfield8_t supportedTypes[8];
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        bitfield8_t supportedTypes[SUPPORTED_MSG_TYPE_DATA_SIZE];
 
         auto rc = decode_get_supported_nvidia_message_types_resp(
-            responsePtr, payloadLength, &cc, &supportedTypes[0]);
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+            responsePtr, payloadLength, &cc, &reason_code, &supportedTypes[0]);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
 
@@ -133,7 +138,7 @@ class GetSupportedMessageTypes : public CommandInterface
         result["Completion Code"] = cc;
         std::string key("Supported Nvidia Message Types");
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < SUPPORTED_MSG_TYPE_DATA_SIZE; i++)
         {
             parseBitfieldVar(result, key, supportedTypes[i], i);
         }
@@ -180,15 +185,18 @@ class GetSupportedCommandCodes : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = 0;
-        bitfield8_t supportedCommandCodes[8];
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        bitfield8_t supportedCommandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
 
         auto rc = decode_get_supported_command_codes_resp(
-            responsePtr, payloadLength, &cc, &supportedCommandCodes[0]);
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+            responsePtr, payloadLength, &cc, &reason_code,
+            &supportedCommandCodes[0]);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
 
@@ -197,7 +205,7 @@ class GetSupportedCommandCodes : public CommandInterface
         result["Nvidia Message Type"] = nvidiaMsgType;
         std::string key("Supported Command codes");
 
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < SUPPORTED_COMMAND_CODE_DATA_SIZE; i++)
         {
             parseBitfieldVar(result, key, supportedCommandCodes[i], i);
         }
@@ -234,16 +242,18 @@ class QueryDeviceIdentification : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = 0;
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
         uint8_t device_identification;
         uint8_t device_instanceID;
         auto rc = decode_query_device_identification_resp(
-            responsePtr, payloadLength, &cc, &device_identification,
-            &device_instanceID);
-        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+            responsePtr, payloadLength, &cc, &reason_code,
+            &device_identification, &device_instanceID);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
 
