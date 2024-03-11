@@ -234,10 +234,12 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
     auto rc = encode_cc_only_resp(
         requestMsg->hdr.instance_id, requestMsg->hdr.nvidia_msg_type,
-        requestMsg->payload[0], NSM_ERR_UNSUPPORTED_COMMAND_CODE, responseMsg);
-    assert(rc == NSM_SUCCESS);
+        requestMsg->payload[0], NSM_ERR_UNSUPPORTED_COMMAND_CODE, reason_code,
+        responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 
@@ -249,8 +251,10 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_ping_resp(requestMsg->hdr.instance_id, responseMsg);
-    assert(rc == NSM_SUCCESS);
+    uint16_t reason_code = 0;
+    auto rc =
+        encode_ping_resp(requestMsg->hdr.instance_id, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 
@@ -267,12 +271,17 @@ std::optional<std::vector<uint8_t>>
         0);
 
     // this is to mock that type-0 and type-3 are supported
-    bitfield8_t types[8] = {0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE] = {
+        0x9, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = encode_get_supported_nvidia_message_types_resp(
-        requestMsg->hdr.instance_id, types, responseMsg);
-    assert(rc == NSM_SUCCESS);
+        requestMsg->hdr.instance_id, cc, reason_code, types, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 
@@ -287,16 +296,18 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
     // this is to mock that 0,1,2,9 commandCodes are supported
-    bitfield8_t commandCode[32] = {
+    bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
         0x7, 0x2, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
     };
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = encode_get_supported_command_codes_resp(
-        requestMsg->hdr.instance_id, commandCode, responseMsg);
-    assert(rc == NSM_SUCCESS);
+        requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 
@@ -335,7 +346,7 @@ std::optional<std::vector<uint8_t>>
     uint8_t propertyIdentifier = 0;
     auto rc = decode_get_inventory_information_req(requestMsg, requestLen,
                                                    &propertyIdentifier);
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_inventory_information_req failed: rc={RC}", "RC",
                    rc);
@@ -347,10 +358,11 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + property.size(), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
     rc = encode_get_inventory_information_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, property.size(),
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, property.size(),
         (uint8_t*)property.data(), responseMsg);
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_inventory_information_resp failed: rc={RC}",
                    "RC", rc);
@@ -369,11 +381,13 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_identification_resp), 0);
 
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = encode_query_device_identification_resp(
-        requestMsg->hdr.instance_id, mockupDeviceIdentification,
-        mockupDeviceInstance, responseMsg);
-    assert(rc == NSM_SUCCESS);
+        requestMsg->hdr.instance_id, cc, reason_code,
+        mockupDeviceIdentification, mockupDeviceInstance, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 
@@ -388,9 +402,10 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp), 0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_temperature_reading_resp(requestMsg->hdr.instance_id,
-                                                  NSM_SUCCESS, 78, responseMsg);
-    assert(rc == NSM_SUCCESS);
+    uint16_t reason_code = ERR_NULL;
+    auto rc = encode_get_temperature_reading_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, 78, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     return response;
 }
 

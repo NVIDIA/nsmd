@@ -42,7 +42,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             // try ping
             auto& [eid, uuid, mctpMedium, networkdId, mctpBinding] = mctpInfo;
             auto rc = co_await ping(eid);
-            if (rc != NSM_SUCCESS)
+            if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc,
                            "EID", eid);
@@ -58,7 +58,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             // get inventory information from device
             InventoryProperties properties{};
             rc = co_await getFRU(eid, properties);
-            if (rc != NSM_SUCCESS)
+            if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
                            rc, "EID", eid);
@@ -110,7 +110,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
         }
         queuedMctpInfos.pop();
     }
-    co_return NSM_SUCCESS;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::ping(eid_t eid)
@@ -120,10 +120,10 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
     uint8_t instanceId = instanceIdDb.next(eid);
 
     auto rc = encode_ping_req(instanceId, requestMsg);
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC", rc);
-        co_return rc;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     const nsm_msg* respMsg = NULL;
@@ -135,21 +135,25 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
     }
 
     uint8_t cc = NSM_SUCCESS;
-    rc = decode_ping_resp(respMsg, respLen, &cc);
-    if (rc)
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_ping_resp(respMsg, respLen, &cc, &reason_code);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        co_return rc;
+        lg2::error(
+            "ping decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    co_return cc;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     eid_t eid, std::vector<uint8_t>& supportedTypes)
 {
-    if (supportedTypes.size() != 8)
+    if (supportedTypes.size() != SUPPORTED_MSG_TYPE_DATA_SIZE)
     {
-        co_return NSM_ERR_INVALID_DATA_LENGTH;
+        co_return NSM_SW_ERROR_LENGTH;
     }
 
     Request request(sizeof(nsm_msg_hdr) + 4);
@@ -158,11 +162,11 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     auto rc =
         encode_get_supported_nvidia_message_types_req(instanceId, requestMsg);
 
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-        co_return rc;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     const nsm_msg* responseMsg = NULL;
@@ -174,15 +178,19 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    bitfield8_t types[8];
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE];
     rc = decode_get_supported_nvidia_message_types_resp(
-        responseMsg, responseLen, &cc, types);
-    if (rc)
+        responseMsg, responseLen, &cc, &reason_code, types);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        co_return rc;
+        lg2::error(
+            "get supported msg type decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    co_return cc;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::getFRU(eid_t eid,
@@ -192,15 +200,15 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
     for (auto propertyId : propertyIds)
     {
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);
-        if (rc)
+        if (rc!= NSM_SW_SUCCESS)
         {
-            lg2::error("getInventoryInformation failed. eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc);
+            lg2::error("getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
+                       "PID", propertyId, "EID", eid, "RC", rc);
             co_return rc;
         }
     }
 
-    co_return NSM_SUCCESS;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::getInventoryInformation(
@@ -213,12 +221,12 @@ requester::Coroutine DeviceManager::getInventoryInformation(
 
     auto rc = encode_get_inventory_information_req(
         instanceId, propertyIdentifier, requestMsg);
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     const nsm_msg* responseMsg = NULL;
@@ -230,22 +238,18 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     }
 
     uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
     std::vector<uint8_t> data(65535, 0);
 
-    rc = decode_get_inventory_information_resp(responseMsg, responseLen, &cc,
-                                               &dataSize, data.data());
-    if (rc)
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
-            "decode_get_inventory_information_resp failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
-        co_return rc;
-    }
-
-    if (cc != NSM_SUCCESS)
-    {
-        co_return cc;
+            "decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     switch (propertyIdentifier)
@@ -288,7 +292,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
                   std::get<std::string>(p.second).c_str());
     }
 
-    co_return cc;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::getQueryDeviceIdentification(
@@ -300,12 +304,12 @@ requester::Coroutine DeviceManager::getQueryDeviceIdentification(
     uint8_t instanceId = instanceIdDb.next(eid);
     auto rc =
         encode_nsm_query_device_identification_req(instanceId, requestMsg);
-    if (rc)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "encode_nsm_query_device_identification_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     const nsm_msg* responseMsg = NULL;
@@ -317,17 +321,19 @@ requester::Coroutine DeviceManager::getQueryDeviceIdentification(
     }
 
     uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
     rc = decode_query_device_identification_resp(
-        responseMsg, responseLen, &cc, &deviceIdentification, &deviceInstance);
-    if (rc)
+        responseMsg, responseLen, &cc, &reason_code, &deviceIdentification,
+        &deviceInstance);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error(
-            "decode_query_device_identification_resp failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
-        co_return rc;
+            "decode_query_device_identification_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    co_return cc;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,

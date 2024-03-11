@@ -16,6 +16,9 @@ extern "C" {
 #define OCP_TYPE 8
 #define OCP_VERSION 9
 
+#define SUPPORTED_MSG_TYPE_DATA_SIZE 32
+#define SUPPORTED_COMMAND_CODE_DATA_SIZE 32
+
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,
@@ -52,6 +55,33 @@ enum nsm_completion_codes {
 	NSM_ERR_UNSUPPORTED_MSG_TYPE = 0x06,
 	NSM_ACCEPTED = 0x7e,
 	NSM_ERR_BUS_ACCESS = 0x7f
+};
+
+/** @brief NSM reason codes
+ */
+enum nsm_reason_codes {
+	ERR_NULL = 0x00,
+	ERR_INVALID_PCI = 0x01,
+	ERR_INVALID_RQD = 0x02,
+	ERR_TIMEOUT = 0x03,
+	ERR_DOWNSTREAM_TIMEOUT = 0x04,
+	ERR_I2C_NACK_FROM_DEV_ADDR = 0x05,
+	ERR_I2C_NACK_FROM_DEV_CMD_DATA = 0x06,
+	ERR_I2C_NACK_FROM_DEV_ADDR_RS = 0x07,
+	ERR_NVLINK_PORT_INVALID = 0x08,
+	ERR_NVLINK_PORT_DISABLED = 0x09,
+	ERR_NOT_SUPPORTED = 0x0A
+};
+
+/** @brief NSM Software Error codes
+ */
+enum nsm_sw_codes {
+	NSM_SW_SUCCESS = 0x00,
+	NSM_SW_ERROR = 0x01,
+	NSM_SW_ERROR_DATA = 0x02,
+	NSM_SW_ERROR_LENGTH = 0x03,
+	NSM_SW_ERROR_NULL = 0x04,
+	NSM_SW_ERROR_COMMAND_FAIL = 0x05
 };
 
 typedef union {
@@ -99,7 +129,7 @@ typedef enum {
  * Structure representing NSM message header fields
  */
 struct nsm_msg_hdr {
-	uint16_t pci_vendor_id;	  //!< PCI defined vendor ID for NVIDIA (0x10DE)
+	uint16_t pci_vendor_id; //!< PCI defined vendor ID for NVIDIA (0x10DE)
 
 	uint8_t instance_id : 5; //!< Instance ID
 	uint8_t reserved : 1;	 //!< Reserved
@@ -151,6 +181,16 @@ struct nsm_common_resp {
 	uint16_t data_size;
 } __attribute__((packed));
 
+/** @struct nsm_common_non_success_resp
+ *
+ *  Structure representing NSM response with reason code when CC != Success
+ */
+struct nsm_common_non_success_resp {
+	uint8_t command;
+	uint8_t completion_code;
+	uint16_t reason_code;
+} __attribute__((packed));
+
 /** @struct nsm_get_supported_nvidia_message_types_req
  *
  *  Structure representing NSM get supported NVIDIA message types request.
@@ -168,7 +208,8 @@ struct nsm_get_supported_nvidia_message_types_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t data_size;
-	bitfield8_t supported_nvidia_message_types[32];
+	bitfield8_t
+	    supported_nvidia_message_types[SUPPORTED_MSG_TYPE_DATA_SIZE];
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_command_code_req
@@ -189,7 +230,7 @@ struct nsm_get_supported_command_codes_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t data_size;
-	bitfield8_t supported_command_codes[32];
+	bitfield8_t supported_command_codes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
 } __attribute__((packed));
 
 /** @struct nsm_query_device_identification_req
@@ -245,11 +286,12 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
  *
  *  @param[in] command - NSM Command
  *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - NSM reason Code
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_cc_only_resp(uint8_t instance_id, uint8_t type, uint8_t command,
-			uint8_t cc, struct nsm_msg *msg);
+			uint8_t cc, uint16_t reason_code, struct nsm_msg *msg);
 
 /** @brief Create a NSM ping request message
  *
@@ -262,19 +304,44 @@ int encode_ping_req(uint8_t instance, struct nsm_msg *msg);
 /** @brief Create a NSM ping response message
  *
  *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_ping_resp(uint8_t instance, struct nsm_msg *req);
+int encode_ping_resp(uint8_t instance, uint16_t reason_code,
+		     struct nsm_msg *req);
 
 /** @brief decode a NSM ping response message
  *
  *  @param[in] resp    - response message
  *  @param[in] respLen - Length of response message
  *  @param[out] cc     - Completion Code
+ *  @param[out] reason_code  - Reason Code
  *  @return nsm_completion_codes
  */
-int decode_ping_resp(const struct nsm_msg *msg, size_t msgLen, uint8_t *cc);
+int decode_ping_resp(const struct nsm_msg *msg, size_t msgLen, uint8_t *cc,
+		     uint16_t *reason_code);
+
+/** @brief Encode reason code
+ *
+ *  @param[in] cc     - Completion Code
+ *  @param[in] reason_code - reason code
+ *  @param[out] msg     - msg
+ *  @return nsm_completion_code
+ */
+int encode_reason_code(uint8_t cc, uint8_t reason_code, uint8_t command_code,
+		       struct nsm_msg *msg);
+
+/** @brief Decode to get reason code
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to completion code
+ *  @param[out] reason_code - pointer to reason_code
+ *  @return nsm_completion_code
+ */
+int decode_reason_code_and_cc(const struct nsm_msg *msg, size_t msg_len,
+			      uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Create a Get Supported Nvidia Message Type request message
  *
@@ -290,10 +357,13 @@ int encode_get_supported_nvidia_message_types_req(uint8_t instance_id,
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] types - pointer to array bitfield8_t[8] containing supported
  *                       types
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_supported_nvidia_message_types_resp(uint8_t instance,
+int encode_get_supported_nvidia_message_types_resp(uint8_t instance, uint8_t cc,
+						   uint16_t reason_code,
 						   const bitfield8_t *types,
 						   struct nsm_msg *msg);
 
@@ -302,12 +372,14 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code  - pointer to reason code
  *  @param[out] types  - pointer to array bitfield8_t[8] for receiving supported
  *                       types
  *  @return nsm_completion_codes
  */
 int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
 						   size_t msg_len, uint8_t *cc,
+						   uint16_t *reason_code,
 						   bitfield8_t *types);
 
 /** @brief Create a Get Supported Command codes request message
@@ -325,10 +397,12 @@ int encode_get_supported_command_codes_req(uint8_t instance_id,
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] command_codes - pointer to array bitfield8_t[8] containing
  * supported command codes
+ *  @param[in] reason_code - reason code
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_supported_command_codes_resp(uint8_t instance_id,
+int encode_get_supported_command_codes_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
 					    const bitfield8_t *command_codes,
 					    struct nsm_msg *msg);
 
@@ -337,12 +411,14 @@ int encode_get_supported_command_codes_resp(uint8_t instance_id,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
  *  @param[out] command_codes  - pointer to array bitfield8_t[8] containing
  * supported command codes
  *  @return nsm_completion_codes
  */
 int decode_get_supported_command_codes_resp(const struct nsm_msg *msg,
 					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code,
 					    bitfield8_t *command_codes);
 
 /** @brief Create a Query device identification request message
@@ -357,12 +433,15 @@ int encode_nsm_query_device_identification_req(uint8_t instance_id,
 /** @brief Encode a Query device identification response message
  *
  *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc     - NSM completion code
+ *  @param[in] reason_code     - NSM reason code
  *  @param[in] device_identification - device identification
  *  @param[in] instance_id - instance id
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_query_device_identification_resp(uint8_t instance,
+int encode_query_device_identification_resp(uint8_t instance, uint8_t cc,
+					    uint16_t reason_code,
 					    const uint8_t device_identification,
 					    const uint8_t instance_id,
 					    struct nsm_msg *msg);
@@ -372,12 +451,14 @@ int encode_query_device_identification_resp(uint8_t instance,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to completion code
+ *  @param[out] reason_code     - pointer to reason code
  *  @param[out] device_identification - pointer to device_identification
  *  @param[out] instance_id - pointer to instance id
  *  @return nsm_completion_codes
  */
 int decode_query_device_identification_resp(const struct nsm_msg *msg,
 					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code,
 					    uint8_t *device_identification,
 					    uint8_t *device_instance);
 

@@ -154,12 +154,14 @@ int decode_get_inventory_information_req(const struct nsm_msg *msg,
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
  *  @param[in] inventory_information_len - inventory information size in bytes
  *  @param[in] inventory_information - Inventory Information
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
+					  uint16_t reason_code,
 					  const uint16_t data_size,
 					  const uint8_t *inventory_information,
 					  struct nsm_msg *msg);
@@ -169,12 +171,14 @@ int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
  *  @param[out] data_size - data size in bytes
  *  @param[out] inventory_information - Inventory Information
  *  @return nsm_completion_codes
  */
 int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code,
 					  uint16_t *data_size,
 					  uint8_t *inventory_information);
 
@@ -202,11 +206,13 @@ int decode_get_temperature_reading_req(const struct nsm_msg *msg,
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
  *  @param[in] temperature_reading - temperature reading
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_temperature_reading_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
 					real32_t temperature_reading,
 					struct nsm_msg *msg);
 
@@ -215,11 +221,13 @@ int encode_get_temperature_reading_resp(uint8_t instance_id, uint8_t cc,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
  *  @param[out] temperature_reading - temperature_reading
  *  @return nsm_completion_codes
  */
 int decode_get_temperature_reading_resp(const struct nsm_msg *msg,
 					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
 					real32_t *temperature_reading);
 
 #ifdef __cplusplus

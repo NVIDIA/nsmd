@@ -237,7 +237,7 @@ requester::Coroutine SensorManager::doPollingTask(eid_t eid)
             co_await getSensorReading(eid, sensor);
             if (pollingTimers[eid] && !pollingTimers[eid]->isRunning())
             {
-                co_return NSM_ERROR;
+                co_return NSM_SW_ERROR;
             }
         }
 
@@ -257,7 +257,7 @@ requester::Coroutine SensorManager::doPollingTask(eid_t eid)
             co_await getSensorReading(eid, sensor);
             if (pollingTimers[eid] && !pollingTimers[eid]->isRunning())
             {
-                co_return NSM_ERROR;
+                co_return NSM_SW_ERROR;
             }
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
@@ -279,7 +279,7 @@ requester::Coroutine
         lg2::error(
             "getSensorReading: sensor->genRequestMsg failed, name={NAME}, eid={EID}",
             "NAME", sensor->name, "EID", eid);
-        co_return NSM_ERROR;
+        co_return NSM_SW_ERROR;
     }
 
     const struct nsm_msg* responseMsg = NULL;

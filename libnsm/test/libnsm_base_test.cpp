@@ -14,21 +14,21 @@ TEST(PackNSMMessage, BadPathTest)
 
 	// header information pointer is NULL
 	auto rc = pack_nsm_header(hdr_ptr, &msg);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	// message pointer is NULL
 	rc = pack_nsm_header(&hdr, nullptr);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	// header information pointer and message pointer is NULL
 	rc = pack_nsm_header(hdr_ptr, nullptr);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	// Instance ID out of range
 	hdr.nsm_msg_type = NSM_REQUEST;
 	hdr.instance_id = 32;
 	rc = pack_nsm_header(&hdr, &msg);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
 TEST(UnpackNSMMessage, BadPathTest)
@@ -37,14 +37,14 @@ TEST(UnpackNSMMessage, BadPathTest)
 
 	// message pointer is NULL
 	auto rc = unpack_nsm_header(nullptr, &hdr);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	struct nsm_msg_hdr msg {
 	};
 
 	// hdr pointer is NULL
 	rc = unpack_nsm_header(&msg, nullptr);
-	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
 TEST(ping, testGoodEncodeRequest)
@@ -58,7 +58,7 @@ TEST(ping, testGoodEncodeRequest)
 	struct nsm_common_req *req =
 	    reinterpret_cast<struct nsm_common_req *>(request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -76,12 +76,13 @@ TEST(ping, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t instance_id = 0x12;
-	auto rc = encode_ping_resp(instance_id, response);
+	uint16_t reason_code = 0;
+	auto rc = encode_ping_resp(instance_id, reason_code, response);
 
 	struct nsm_common_resp *resp =
 	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
@@ -111,10 +112,11 @@ TEST(ping, testGoodDecodeResponse)
 
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
-	auto rc = decode_ping_resp(response, msg_len, &cc);
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc = decode_ping_resp(response, msg_len, &cc, &reason_code);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 }
 
@@ -129,7 +131,7 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeRequest)
 	struct nsm_common_req *req =
 	    reinterpret_cast<struct nsm_common_req *>(request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -149,13 +151,16 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t instance_id = 0x12;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 	std::vector<uint8_t> types{0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				   0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
 	auto rc = encode_get_supported_nvidia_message_types_resp(
-	    instance_id, (bitfield8_t *)types.data(), response);
+	    instance_id, cc, reason_code, (bitfield8_t *)types.data(),
+	    response);
 
 	struct nsm_get_supported_nvidia_message_types_resp *resp =
 	    reinterpret_cast<
@@ -173,8 +178,9 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES, resp->command);
 	EXPECT_EQ(32, le16toh(resp->data_size));
 
-	uint8_t responseTypes[32];
-	memcpy(responseTypes, resp->supported_nvidia_message_types, 32);
+	uint8_t responseTypes[SUPPORTED_MSG_TYPE_DATA_SIZE];
+	memcpy(responseTypes, resp->supported_nvidia_message_types,
+	       SUPPORTED_MSG_TYPE_DATA_SIZE);
 	EXPECT_THAT(responseTypes,
 		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -232,13 +238,14 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
-	uint8_t responseTypes[32];
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t responseTypes[SUPPORTED_MSG_TYPE_DATA_SIZE];
 
 	auto rc = decode_get_supported_nvidia_message_types_resp(
-	    response, msg_len, &cc, (bitfield8_t *)responseTypes);
+	    response, msg_len, &cc, &reason_code, (bitfield8_t *)responseTypes);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_THAT(responseTypes,
 		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -262,7 +269,7 @@ TEST(getSupportedCommandCodes, testGoodEncodeRequest)
 	    reinterpret_cast<struct nsm_get_supported_command_codes_req *>(
 		request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -283,19 +290,22 @@ TEST(getSupportedCommandCodes, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t instance_id = 0x12;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 	std::vector<uint8_t> command_codes{
 	    0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 	    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 	    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
 	auto rc = encode_get_supported_command_codes_resp(
-	    instance_id, (bitfield8_t *)command_codes.data(), response);
+	    instance_id, cc, reason_code, (bitfield8_t *)command_codes.data(),
+	    response);
 
 	struct nsm_get_supported_command_codes_resp *resp =
 	    reinterpret_cast<struct nsm_get_supported_command_codes_resp *>(
 		response->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
@@ -306,8 +316,9 @@ TEST(getSupportedCommandCodes, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, resp->command);
 	EXPECT_EQ(32, le16toh(resp->data_size));
 
-	uint8_t responseCodes[32];
-	memcpy(responseCodes, resp->supported_command_codes, 32);
+	uint8_t responseCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
+	memcpy(responseCodes, resp->supported_command_codes,
+	       SUPPORTED_COMMAND_CODE_DATA_SIZE);
 	EXPECT_THAT(responseCodes,
 		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
 				0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -365,13 +376,14 @@ TEST(getSupportedCommandCodes, testGoodDecodeResponse)
 
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
-	uint8_t responseCodes[32];
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t responseCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
 
 	auto rc = decode_get_supported_command_codes_resp(
-	    response, msg_len, &cc, (bitfield8_t *)responseCodes);
+	    response, msg_len, &cc, &reason_code, (bitfield8_t *)responseCodes);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_THAT(responseCodes,
 		    ElementsAre(0xf, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
@@ -393,7 +405,7 @@ TEST(queryDeviceIdentification, testGoodEncodeRequest)
 	struct nsm_common_req *req =
 	    reinterpret_cast<struct nsm_common_req *>(request->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -412,17 +424,20 @@ TEST(queryDeviceIdentification, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint8_t instance_id = 0x12;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 	uint8_t device_identification = NSM_DEV_ID_GPU;
 	uint8_t device_instance = 1;
 
 	auto rc = encode_query_device_identification_resp(
-	    instance_id, device_identification, device_instance, response);
+	    instance_id, cc, reason_code, device_identification,
+	    device_instance, response);
 
 	struct nsm_query_device_identification_resp *resp =
 	    reinterpret_cast<struct nsm_query_device_identification_resp *>(
 		response->payload);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
@@ -456,15 +471,137 @@ TEST(queryDeviceIdentification, testGoodDecodeResponse)
 
 	size_t msg_len = responseMsg.size();
 
-	uint8_t cc = 0;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
 	uint8_t device_identification = 0;
 	uint8_t device_instance = 0;
 
 	auto rc = decode_query_device_identification_resp(
-	    response, msg_len, &cc, &device_identification, &device_instance);
+	    response, msg_len, &cc, &reason_code, &device_identification,
+	    &device_instance);
 
-	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(NSM_DEV_ID_GPU, device_identification);
 	EXPECT_EQ(1, device_instance);
+}
+
+TEST(encodeReasonCode, testGoodEncodeReasonCode)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = encode_reason_code(cc, reasonCode, NSM_PING, response);
+
+	struct nsm_common_non_success_resp *resp =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, resp->completion_code);
+	EXPECT_EQ(NSM_PING, resp->command);
+	EXPECT_EQ(ERR_NULL, le16toh(resp->reason_code));
+}
+
+TEST(encodeReasonCode, testBadEncodeReasonCode)
+{
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = encode_reason_code(cc, reasonCode, NSM_PING, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decodeReasonCodeCC, testGoodDecodeReasonCode)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
+	    0x01, // completion code != NSM_SUCCESS
+	    0x00, // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    decode_reason_code_and_cc(response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_ERROR);
+	EXPECT_EQ(reason_code, 0x0000);
+}
+
+TEST(decodeReasonCodeCC, testGoodDecodeCompletionCode)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
+	    0x00, // completion code = NSM_SUCCESS
+	    0x00, // reason code
+	    0x02};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    decode_reason_code_and_cc(response, msg_len, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+}
+
+TEST(decodeReasonCode, testBadDecodeReasonCode)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
+	    0x01, // completion code
+	    0x00, // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    decode_reason_code_and_cc(nullptr, msg_len, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc =
+	    decode_reason_code_and_cc(response, msg_len, nullptr, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_reason_code_and_cc(response, msg_len, &cc, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_reason_code_and_cc(
+	    response, msg_len - 2, &cc,
+	    &reason_code); // sending msg len less then expected
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

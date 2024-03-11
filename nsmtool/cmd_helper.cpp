@@ -130,14 +130,14 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     }
 
     Logger(verbose, "Shutdown Socket successful :  RC = ", returnCode);
-    return NSM_SUCCESS;
+    return NSM_SW_SUCCESS;
 }
 
 void CommandInterface::exec()
 {
     instanceId = 0;
     auto [rc, requestMsg] = createRequestMsg();
-    if (rc != NSM_SUCCESS)
+    if (rc != NSM_SW_SUCCESS)
     {
         std::cerr << "Failed to encode request message for " << nsmType << ":"
                   << commandName << " rc = " << rc << "\n";
@@ -147,14 +147,14 @@ void CommandInterface::exec()
     std::vector<uint8_t> responseMsg;
     rc = nsmSendRecv(requestMsg, responseMsg);
 
-    if (rc != NSM_SUCCESS)
+    if (rc != NSM_SW_SUCCESS)
     {
         std::cerr << "nsmSendRecv: Failed to receive RC = " << rc << "\n";
         return;
     }
 
     auto responsePtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
-    parseResponseMsg(responsePtr, responseMsg.size() - sizeof(nsm_msg_hdr));
+    parseResponseMsg(responsePtr, responseMsg.size());
 }
 
 std::tuple<int, int, std::vector<uint8_t>>
@@ -334,7 +334,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         responseMsg.erase(responseMsg.begin(),
                           responseMsg.begin() + 2 /* skip the mctp header */);
     }
-    return NSM_SUCCESS;
+    return NSM_SW_SUCCESS;
 }
 } // namespace helper
 } // namespace nsmtool
