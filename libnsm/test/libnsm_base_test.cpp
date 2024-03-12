@@ -105,6 +105,8 @@ TEST(ping, testGoodDecodeResponse)
 	    NSM_PING,				  // command
 	    0,					  // completion code
 	    0,
+	    0,
+	    0,
 	    0 // data size
 	};
 
@@ -198,6 +200,8 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    32,
 	    0, // data size
 	    0xf,
@@ -336,6 +340,8 @@ TEST(getSupportedCommandCodes, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_SUPPORTED_COMMAND_CODES,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    32,
 	    0, // data size
 	    0xf,
@@ -461,6 +467,8 @@ TEST(queryDeviceIdentification, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    2,
 	    0,		    // data size
 	    NSM_DEV_ID_GPU, // device _identification

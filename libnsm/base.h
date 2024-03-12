@@ -102,8 +102,8 @@ typedef float real32_t;
 
 // command(1byte) + data_size(1byte)
 #define NSM_REQUEST_CONVENTION_LEN 2
-// command(1byte) + completion code(1byte) + data_size(2bytes)
-#define NSM_RESPONSE_CONVENTION_LEN 4
+// command(1byte) + completion code(1byte) + reserved(2bytes) + data_size(2bytes)
+#define NSM_RESPONSE_CONVENTION_LEN 6
 
 /** @enum MessageType
  *
@@ -178,6 +178,7 @@ struct nsm_common_req {
 struct nsm_common_resp {
 	uint8_t command;
 	uint8_t completion_code;
+	uint16_t reserved;
 	uint16_t data_size;
 } __attribute__((packed));
 

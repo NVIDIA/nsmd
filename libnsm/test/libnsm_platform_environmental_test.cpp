@@ -112,6 +112,8 @@ TEST(getInventoryInformation, testGoodDecodeResponse)
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
 	    NSM_GET_INVENTORY_INFORMATION,   // command
 	    0,				     // completion code
+	    0,
+	    0,
 	    4,
 	    0, // data size
 	    '1',
@@ -234,6 +236,8 @@ TEST(decode_get_temperature_reading_resp, testGoodDecodeResponse)
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
 	    NSM_GET_TEMPERATURE_READING,     // command
 	    0,				     // completion code
+	    0,
+	    0,
 	    4,
 	    0, // data size
 	    0xa4,
