@@ -105,6 +105,8 @@ TEST(ping, testGoodDecodeResponse)
 	    NSM_PING,				  // command
 	    0,					  // completion code
 	    0,
+	    0,
+	    0,
 	    0 // data size
 	};
 
@@ -175,8 +177,8 @@ TEST(getSupportedNvidiaMessageTypes, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES, resp->command);
-	EXPECT_EQ(32, le16toh(resp->data_size));
+	EXPECT_EQ(NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES, resp->hdr.command);
+	EXPECT_EQ(32, le16toh(resp->hdr.data_size));
 
 	uint8_t responseTypes[SUPPORTED_MSG_TYPE_DATA_SIZE];
 	memcpy(responseTypes, resp->supported_nvidia_message_types,
@@ -198,6 +200,8 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    32,
 	    0, // data size
 	    0xf,
@@ -277,8 +281,8 @@ TEST(getSupportedCommandCodes, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, req->command);
-	EXPECT_EQ(1, req->data_size);
+	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
 	EXPECT_EQ(msg_type, req->nvidia_message_type);
 }
 
@@ -313,8 +317,8 @@ TEST(getSupportedCommandCodes, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, resp->command);
-	EXPECT_EQ(32, le16toh(resp->data_size));
+	EXPECT_EQ(NSM_SUPPORTED_COMMAND_CODES, resp->hdr.command);
+	EXPECT_EQ(32, le16toh(resp->hdr.data_size));
 
 	uint8_t responseCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
 	memcpy(responseCodes, resp->supported_command_codes,
@@ -336,6 +340,8 @@ TEST(getSupportedCommandCodes, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_SUPPORTED_COMMAND_CODES,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    32,
 	    0, // data size
 	    0xf,
@@ -445,8 +451,8 @@ TEST(queryDeviceIdentification, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_QUERY_DEVICE_IDENTIFICATION, resp->command);
-	EXPECT_EQ(2, le16toh(resp->data_size));
+	EXPECT_EQ(NSM_QUERY_DEVICE_IDENTIFICATION, resp->hdr.command);
+	EXPECT_EQ(2, le16toh(resp->hdr.data_size));
 	EXPECT_EQ(device_identification, resp->device_identification);
 	EXPECT_EQ(device_instance, resp->instance_id);
 }
@@ -461,6 +467,8 @@ TEST(queryDeviceIdentification, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
 	    0,					  // completion code
+	    0,
+	    0,
 	    2,
 	    0,		    // data size
 	    NSM_DEV_ID_GPU, // device _identification
@@ -579,8 +587,8 @@ TEST(decodeReasonCode, testBadDecodeReasonCode)
 	    0x89, // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_QUERY_DEVICE_IDENTIFICATION,	  // command
-	    0x01, // completion code
-	    0x00, // reason code
+	    0x01,				  // completion code
+	    0x00,				  // reason code
 	    0x00};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());

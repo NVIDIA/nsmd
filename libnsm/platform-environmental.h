@@ -89,8 +89,7 @@ struct nsm_inventory_property_record {
  *  Structure representing NSM get inventory information request.
  */
 struct nsm_get_inventory_information_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t property_identifier;
 } __attribute__((packed));
 
@@ -99,9 +98,7 @@ struct nsm_get_inventory_information_req {
  *  Structure representing NSM get inventory information response.
  */
 struct nsm_get_inventory_information_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	uint8_t inventory_information[1];
 } __attribute__((packed));
 
@@ -110,8 +107,7 @@ struct nsm_get_inventory_information_resp {
  *  Structure representing NSM get temperature reading request.
  */
 struct nsm_get_temperature_reading_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t sensor_id;
 } __attribute__((packed));
 
@@ -120,9 +116,7 @@ struct nsm_get_temperature_reading_req {
  *  Structure representing NSM get temperature reading response.
  */
 struct nsm_get_temperature_reading_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	real32_t reading;
 } __attribute__((packed));
 

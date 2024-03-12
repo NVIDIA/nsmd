@@ -176,8 +176,8 @@ int encode_get_supported_nvidia_message_types_req(uint8_t instance_id,
 	struct nsm_get_supported_nvidia_message_types_req *request =
 	    (struct nsm_get_supported_nvidia_message_types_req *)msg->payload;
 
-	request->command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
-	request->data_size = 0;
+	request->hdr.command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
+	request->hdr.data_size = 0;
 
 	return NSM_SW_SUCCESS;
 }
@@ -210,9 +210,9 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance_id,
 	struct nsm_get_supported_nvidia_message_types_resp *response =
 	    (struct nsm_get_supported_nvidia_message_types_resp *)msg->payload;
 
-	response->command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
-	response->completion_code = cc;
-	response->data_size = htole16(32);
+	response->hdr.command = NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(32);
 
 	memcpy(response->supported_nvidia_message_types, types, 32);
 
@@ -267,8 +267,8 @@ int encode_get_supported_command_codes_req(uint8_t instance_id,
 	struct nsm_get_supported_command_codes_req *request =
 	    (struct nsm_get_supported_command_codes_req *)msg->payload;
 
-	request->command = NSM_SUPPORTED_COMMAND_CODES;
-	request->data_size = 1;
+	request->hdr.command = NSM_SUPPORTED_COMMAND_CODES;
+	request->hdr.data_size = 1;
 	request->nvidia_message_type = nvidia_message_type;
 
 	return NSM_SW_SUCCESS;
@@ -301,9 +301,9 @@ int encode_get_supported_command_codes_resp(uint8_t instance_id, uint8_t cc,
 	struct nsm_get_supported_command_codes_resp *response =
 	    (struct nsm_get_supported_command_codes_resp *)msg->payload;
 
-	response->command = NSM_SUPPORTED_COMMAND_CODES;
-	response->completion_code = cc;
-	response->data_size = htole16(32);
+	response->hdr.command = NSM_SUPPORTED_COMMAND_CODES;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(32);
 
 	if (command_codes == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -361,8 +361,8 @@ int encode_nsm_query_device_identification_req(uint8_t instance_id,
 	struct nsm_query_device_identification_req *request =
 	    (struct nsm_query_device_identification_req *)msg->payload;
 
-	request->command = NSM_QUERY_DEVICE_IDENTIFICATION;
-	request->data_size = 0;
+	request->hdr.command = NSM_QUERY_DEVICE_IDENTIFICATION;
+	request->hdr.data_size = 0;
 
 	return NSM_SW_SUCCESS;
 }
@@ -395,9 +395,9 @@ int encode_query_device_identification_resp(uint8_t instance, uint8_t cc,
 	struct nsm_query_device_identification_resp *response =
 	    (struct nsm_query_device_identification_resp *)msg->payload;
 
-	response->command = NSM_QUERY_DEVICE_IDENTIFICATION;
-	response->completion_code = cc;
-	response->data_size = htole16(2);
+	response->hdr.command = NSM_QUERY_DEVICE_IDENTIFICATION;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(2);
 
 	response->device_identification = device_identification;
 	response->instance_id = device_instance;
