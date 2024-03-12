@@ -196,8 +196,7 @@ struct nsm_common_non_success_resp {
  *  Structure representing NSM get supported NVIDIA message types request.
  */
 struct nsm_get_supported_nvidia_message_types_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 } __attribute__((packed));
 
 /** @struct nsm_get_supported_nvidia_message_types_resp
@@ -205,9 +204,7 @@ struct nsm_get_supported_nvidia_message_types_req {
  *  Structure representing NSM get supported NVIDIA message types response.
  */
 struct nsm_get_supported_nvidia_message_types_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	bitfield8_t
 	    supported_nvidia_message_types[SUPPORTED_MSG_TYPE_DATA_SIZE];
 } __attribute__((packed));
@@ -217,8 +214,7 @@ struct nsm_get_supported_nvidia_message_types_resp {
  *  Structure representing NSM get supported command codes request.
  */
 struct nsm_get_supported_command_codes_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 } __attribute__((packed));
 
@@ -227,9 +223,7 @@ struct nsm_get_supported_command_codes_req {
  *  Structure representing NSM get supported command codes response.
  */
 struct nsm_get_supported_command_codes_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	bitfield8_t supported_command_codes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
 } __attribute__((packed));
 
@@ -238,8 +232,7 @@ struct nsm_get_supported_command_codes_resp {
  *  Structure representing NSM query device identification request
  */
 struct nsm_query_device_identification_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 } __attribute__((packed));
 
 /** @struct nsm_query_device_identification_resp
@@ -247,9 +240,7 @@ struct nsm_query_device_identification_req {
  *  Structure representing NSM query device identification response.
  */
 struct nsm_query_device_identification_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	uint8_t device_identification;
 	uint8_t instance_id;
 } __attribute__((packed));

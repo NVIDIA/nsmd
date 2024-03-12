@@ -26,8 +26,8 @@ TEST(getInventoryInformation, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, req->command);
-	EXPECT_EQ(data_size, req->data_size);
+	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, req->hdr.command);
+	EXPECT_EQ(data_size, req->hdr.data_size);
 	EXPECT_EQ(property_identifier, req->property_identifier);
 }
 
@@ -94,8 +94,8 @@ TEST(getInventoryInformation, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, resp->command);
-	EXPECT_EQ(data_size, le16toh(resp->data_size));
+	EXPECT_EQ(NSM_GET_INVENTORY_INFORMATION, resp->hdr.command);
+	EXPECT_EQ(data_size, le16toh(resp->hdr.data_size));
 	EXPECT_EQ('1', resp->inventory_information[0]);
 	EXPECT_EQ('2', resp->inventory_information[1]);
 	EXPECT_EQ('3', resp->inventory_information[2]);
@@ -161,8 +161,8 @@ TEST(getTemperature, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, req->command);
-	EXPECT_EQ(sizeof(sensor_id), req->data_size);
+	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, req->hdr.command);
+	EXPECT_EQ(sizeof(sensor_id), req->hdr.data_size);
 	EXPECT_EQ(sensor_id, req->sensor_id);
 }
 
@@ -213,8 +213,8 @@ TEST(encode_get_temperature_reading_resp, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, resp->command);
-	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->data_size));
+	EXPECT_EQ(NSM_GET_TEMPERATURE_READING, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->hdr.data_size));
 
 	uint32_t data = 0;
 	memcpy(&data, &resp->reading, sizeof(uint32_t));
