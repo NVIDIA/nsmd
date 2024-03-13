@@ -56,8 +56,8 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     }
     Logger(verbose, "Success in connecting to socket : RC = ", returnCode);
 
-    auto mctpMsgTypeVDM = MCTP_MSG_TYPE_VDM;
-    result = write(socketFd(), &mctpMsgTypeVDM, sizeof(mctpMsgTypeVDM));
+    auto mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
+    result = write(socketFd(), &mctpMsgType, sizeof(mctpMsgType));
     if (-1 == result)
     {
         returnCode = -errno;
@@ -231,12 +231,6 @@ std::tuple<int, int, std::vector<uint8_t>>
 int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
                                   std::vector<uint8_t>& responseMsg)
 {
-
-    // Insert the NSM message type and EID at the beginning of the
-    // msg.
-    requestMsg.insert(requestMsg.begin(), MCTP_MSG_TYPE_VDM);
-    requestMsg.insert(requestMsg.begin(), mctp_eid);
-
     bool mctpVerbose = verbose;
 
     // By default enable request/response msgs for nsmtool raw commands.
@@ -288,8 +282,8 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         }
         Logger(verbose, "Success in connecting to socket : RC = ", rc);
 
-        auto mctpMsgTypeVDM = MCTP_MSG_TYPE_VDM;
-        rc = write(socketFd(), &mctpMsgTypeVDM, sizeof(mctpMsgTypeVDM));
+        auto mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
+        rc = write(socketFd(), &mctpMsgType, sizeof(mctpMsgType));
         if (-1 == rc)
         {
             rc = -errno;
@@ -305,8 +299,8 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
 
         uint8_t* responseMessage = nullptr;
         size_t responseMessageSize{};
-        rc = nsm_send_recv(mctp_eid, sockFd, requestMsg.data() + 2,
-                           requestMsg.size() - 2, &responseMessage,
+        rc = nsm_send_recv(mctp_eid, sockFd, requestMsg.data(),
+                           requestMsg.size(), &responseMessage,
                            &responseMessageSize);
         if (rc < 0)
         {
@@ -325,6 +319,10 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
     }
     else
     {
+        requestMsg.insert(requestMsg.begin(), MCTP_MSG_TAG_REQ);
+        requestMsg.insert(requestMsg.begin(), mctp_eid);
+        requestMsg.insert(requestMsg.begin(), MCTP_MSG_TYPE_PCI_VDM);
+
         mctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
         if (verbose)
         {

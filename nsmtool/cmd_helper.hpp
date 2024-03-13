@@ -22,7 +22,6 @@ namespace helper
 {
 
 constexpr uint8_t NSM_ENTITY_ID = 8;
-constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
 using ordered_json = nlohmann::ordered_json;
 
 /** @brief print the input message if verbose is enabled

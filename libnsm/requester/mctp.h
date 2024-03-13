@@ -5,10 +5,13 @@
 extern "C" {
 #endif
 
+#include <libmctp-externals.h>
 #include <stddef.h>
 #include <stdint.h>
 
 typedef uint8_t mctp_eid_t;
+#define MCTP_MSG_TYPE_PCI_VDM 0x7E
+#define MCTP_MSG_TAG_REQ (MCTP_TAG_NSM | 1 << 3)
 
 typedef enum nsm_requester_error_codes {
 	NSM_REQUESTER_SUCCESS = 0,

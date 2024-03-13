@@ -8,7 +8,6 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-#define MCTP_MSG_TYPE_PCI_VDM 0x7E
 #define NSM_INSTANCE_MAX 31
 
 #define PCI_VENDOR_ID 0x10de // NVIDIA

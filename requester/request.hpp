@@ -187,7 +187,8 @@ class Request final : public RequestRetryTimer
     static int nsm_send(eid_t eid, int mctp_fd, const uint8_t* nsm_req_msg,
                         size_t nsm_req_len)
     {
-        uint8_t hdr[2] = {eid, MCTP_MSG_TYPE_PCI_VDM};
+        uint8_t hdr[3] = {MCTP_MSG_TAG_REQ, eid,
+                          MCTP_MSG_TYPE_PCI_VDM}; // TO_TAG, EID, MCTP_MSG_TYPE
 
         struct iovec iov[2];
         iov[0].iov_base = hdr;

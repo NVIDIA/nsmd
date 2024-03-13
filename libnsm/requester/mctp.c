@@ -10,8 +10,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-const uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
-
 nsm_requester_rc_t nsm_open()
 {
 	int fd = -1;
@@ -32,7 +30,8 @@ nsm_requester_rc_t nsm_open()
 		close(fd);
 		return -1;
 	}
-	rc = write(fd, &MCTP_MSG_TYPE_VDM, sizeof(MCTP_MSG_TYPE_VDM));
+	uint8_t mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
+	rc = write(fd, &mctpMsgType, sizeof(mctpMsgType));
 	if (-1 == rc) {
 		close(fd);
 		return -1;
@@ -45,7 +44,10 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 				    uint8_t **nsm_resp_msg,
 				    size_t *resp_msg_len)
 {
-	ssize_t min_len = sizeof(eid) + sizeof(MCTP_MSG_TYPE_VDM) +
+	uint8_t msgTag = 0;
+	uint8_t mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
+	ssize_t min_len = sizeof(msgTag) + sizeof(eid) +
+			  sizeof(mctpMsgType) +
 			  sizeof(struct nsm_msg_hdr);
 	ssize_t length = recv(mctp_fd, NULL, 0, MSG_PEEK | MSG_TRUNC);
 	if (length <= 0) {
@@ -58,7 +60,7 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 	} else {
 		struct iovec iov[2];
 		size_t mctp_prefix_len =
-		    sizeof(eid) + sizeof(MCTP_MSG_TYPE_VDM);
+		    sizeof(msgTag) + sizeof(eid) + sizeof(mctpMsgType);
 		uint8_t mctp_prefix[mctp_prefix_len];
 		size_t nsm_len = length - mctp_prefix_len;
 		iov[0].iov_len = mctp_prefix_len;
@@ -76,8 +78,8 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 			return NSM_REQUESTER_INVALID_RECV_LEN;
 		}
 
-		if ((mctp_prefix[0] != eid) ||
-		    (mctp_prefix[1] != MCTP_MSG_TYPE_VDM)) {
+		if ((mctp_prefix[1] != eid) ||
+		    (mctp_prefix[2] != mctpMsgType)) {
 			free(*nsm_resp_msg);
 			return NSM_REQUESTER_NOT_NSM_MSG;
 		}
@@ -158,7 +160,7 @@ nsm_requester_rc_t nsm_send_recv(mctp_eid_t eid, int mctp_fd,
 nsm_requester_rc_t nsm_send(mctp_eid_t eid, int mctp_fd,
 			    const uint8_t *nsm_req_msg, size_t req_msg_len)
 {
-	uint8_t hdr[2] = {eid, MCTP_MSG_TYPE_VDM};
+	uint8_t hdr[3] = {MCTP_MSG_TAG_REQ, eid, MCTP_MSG_TYPE_PCI_VDM};
 
 	struct iovec iov[2];
 	iov[0].iov_base = hdr;
