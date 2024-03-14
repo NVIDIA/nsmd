@@ -1,4 +1,5 @@
 option('tests', type: 'feature', description: 'Build tests', value: 'enabled')
+option('shmem', type: 'feature', description: 'Use NVIDIA Shared-Memory IPC', value: 'enabled')
 option('sensor-polling-time', type: 'integer', min: 1, max: 4294967295, description: 'The interval time of sensor polling in milliseconds', value: 249)
 option('mockup-responder', type: 'feature', description: 'Mockup Responder', value: 'enabled')
 option('instance-id-expiration-interval', type: 'integer', min: 1, max: 4294967295, description: 'The interval time of NSM instance id expiration in seconds', value: 5)

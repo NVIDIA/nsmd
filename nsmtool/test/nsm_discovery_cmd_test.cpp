@@ -28,15 +28,15 @@ TEST(parseBitfieldVar, GoodTest)
         parseBitfieldVar(result, key, supportedTypes[i], i);
     }
     EXPECT_EQ(result[key].size(), 5);
-	EXPECT_THAT(result[key], ElementsAre(0,1,2,3,4));
+    EXPECT_THAT(result[key], ElementsAre(0, 1, 2, 3, 4));
 
     supportedTypes[0].byte = 0;
-	supportedTypes[7].byte = 0xf8;
-	result.clear();
+    supportedTypes[7].byte = 0xf8;
+    result.clear();
     for (int i = 0; i < 8; i++)
     {
         parseBitfieldVar(result, key, supportedTypes[i], i);
     }
     EXPECT_EQ(result[key].size(), 5);
-	EXPECT_THAT(result[key], ElementsAre(59,60,61,62,63));
+    EXPECT_THAT(result[key], ElementsAre(59, 60, 61, 62, 63));
 }

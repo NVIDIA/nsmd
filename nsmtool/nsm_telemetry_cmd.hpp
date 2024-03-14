@@ -1,4 +1,4 @@
-// NSM: Nvidia Message type 
+// NSM: Nvidia Message type
 //           - Network Ports            [Type 1]
 //           - PCI links                [Type 2]
 //           - Platform environments    [Type 3]
@@ -12,7 +12,7 @@ namespace nsmtool
 
 namespace telemetry
 {
-    void registerCommand(CLI::App& app);
+void registerCommand(CLI::App& app);
 } // namespace telemetry
 
 } // namespace nsmtool

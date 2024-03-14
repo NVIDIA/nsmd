@@ -1,30 +1,39 @@
 #pragma once
 
-#include "platform-environmental.h"
-
 #include "types.hpp"
+
+struct nsm_msg;
 
 namespace nsm
 {
 class NsmSensor
 {
   public:
-    NsmSensor(std::string& name, bool priority) : name(name), priority(priority)
+    NsmSensor(const std::string& name, const std::string& type) :
+        name(name), type(type)
     {}
+
     virtual ~NsmSensor() = default;
+
     virtual std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) = 0;
-    virtual uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+
+    virtual uint8_t handleResponseMsg(const nsm_msg* responseMsg,
                                       size_t responseLen) = 0;
-    bool isPriority()
+
+    const std::string& getName()
     {
-        return priority;
+        return name;
     }
 
-    const std::string name;
+    const std::string& getType()
+    {
+        return type;
+    }
 
-  protected:
-    bool priority;
+  private:
+    const std::string name;
+    const std::string type;
 };
 
 } // namespace nsm

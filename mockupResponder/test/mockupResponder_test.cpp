@@ -26,20 +26,20 @@ TEST_F(MockupResponderTest, getPropertyTest)
 
     uint32_t propertyIdentifier = BOARD_PART_NUMBER;
 
-    //get first property
+    // get first property
     auto res = mockupResponder.getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
 
-    //verify board part number property
+    // verify board part number property
     std::string returnedBoardPartNumber((char*)res.data(), res.size());
     EXPECT_EQ(returnedBoardPartNumber, expectedBoardPartNumber);
 
-    //get second property
+    // get second property
     propertyIdentifier = SERIAL_NUMBER;
     res = mockupResponder.getProperty(propertyIdentifier);
     EXPECT_NE(res.size(), 0);
 
-    //verify serial number property
+    // verify serial number property
     std::string returnedSerialNumber((char*)res.data(), res.size());
     EXPECT_EQ(returnedSerialNumber, expectedSerialNumber);
 }

@@ -12,6 +12,8 @@
 
 #include <CLI/CLI.hpp>
 
+#include <ctime>
+
 namespace nsmtool
 {
 
@@ -162,6 +164,127 @@ class GetInvectoryInformation : public CommandInterface
     uint8_t propertyId;
 };
 
+class AggregateResponseParser
+{
+  private:
+    virtual int handleSampleData(uint8_t tag, const uint8_t* data,
+                                 size_t data_len,
+                                 ordered_json& sample_json) = 0;
+
+  public:
+    virtual ~AggregateResponseParser() = default;
+
+    void parseAggregateResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        uint8_t cc{};
+        uint16_t telemetry_count{};
+        size_t consumed_len{};
+        size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        auto response_data = reinterpret_cast<const uint8_t*>(responsePtr);
+
+        auto rc = decode_aggregate_resp(responsePtr, msg_len, &consumed_len,
+                                        &cc, &telemetry_count);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sample Count"] = telemetry_count;
+
+        uint64_t timestamp{};
+        constexpr size_t time_size{100};
+        char time[time_size];
+        bool has_timestamp{false};
+
+        std::vector<ordered_json> samples;
+        while (telemetry_count--)
+        {
+            uint8_t tag;
+            bool valid;
+            const uint8_t* data;
+            size_t data_len;
+
+            msg_len -= consumed_len;
+
+            response_data += consumed_len;
+
+            auto sample = reinterpret_cast<const nsm_aggregate_resp_sample*>(
+                response_data);
+
+            rc = decode_aggregate_resp_sample(sample, msg_len, &consumed_len,
+                                              &tag, &valid, &data, &data_len);
+
+            if (rc != NSM_SW_SUCCESS || !valid)
+            {
+                std::cerr
+                    << "Response message error while parsing sample header: "
+                    << "tag=" << tag << ", rc=" << rc << "\n";
+
+                continue;
+            }
+
+            if (tag == 0xFF)
+            {
+                if (data_len != 8)
+                {
+                    std::cerr
+                        << "Response message error while parsing timestamp sample : "
+                        << "tag=" << tag << ", rc=" << rc << "\n";
+
+                    continue;
+                }
+
+                rc =
+                    decode_aggregate_timestamp_data(data, data_len, &timestamp);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error while parsing timestamp sample data : "
+                        << "tag=" << tag << ", rc=" << rc << "\n";
+
+                    continue;
+                }
+
+                has_timestamp = true;
+                auto stime = static_cast<std::time_t>(timestamp);
+                std::strftime(time, time_size, "%F %T %Z",
+                              std::localtime(&stime));
+            }
+            else if (tag < 0xF0)
+            {
+                ordered_json sample_json;
+
+                rc = handleSampleData(tag, data, data_len, sample_json);
+
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error while parsing sample data: "
+                        << "tag=" << tag << ", rc=" << rc << "\n";
+
+                    continue;
+                }
+
+                if (has_timestamp)
+                {
+                    sample_json["Timestamp"] = time;
+                }
+
+                samples.push_back(std::move(sample_json));
+            }
+        }
+
+        result["Samples"] = std::move(samples);
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class GetTemperatureReading : public CommandInterface
 {
   public:
@@ -170,7 +293,7 @@ class GetTemperatureReading : public CommandInterface
     GetTemperatureReading(const GetTemperatureReading&) = delete;
     GetTemperatureReading(GetTemperatureReading&&) = default;
     GetTemperatureReading& operator=(const GetTemperatureReading&) = delete;
-    GetTemperatureReading& operator=(GetTemperatureReading&&) = default;
+    GetTemperatureReading& operator=(GetTemperatureReading&&) = delete;
 
     using CommandInterface::CommandInterface;
 
@@ -178,17 +301,57 @@ class GetTemperatureReading : public CommandInterface
                                    CLI::App* app) :
         CommandInterface(type, name, app)
     {
-        auto tempReadingOptionGroup = app->add_option_group(
-            "Required",
-            "Sensor Id for which temperature value is to be retrieved.");
-
-        sensorId = 00;
-        tempReadingOptionGroup->add_option(
-            "-s, --sensorId", sensorId,
-            "retrieve temperature reading for sensorId");
-        tempReadingOptionGroup->require_option(1);
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
     }
 
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        double temperatureReading = 0;
+
+        auto rc = decode_get_temperature_reading_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &temperatureReading);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_temperature_reading_resp));
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sensor Id"] = sensorId;
+        result["Temperature Reading"] = temperatureReading;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    class GetTemperatureAggregateResponseParser : public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            double reading{};
+            auto rc = decode_aggregate_temperature_reading_data(data, data_len,
+                                                                &reading);
+
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Temperature Reading"] = reading;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(
@@ -201,33 +364,121 @@ class GetTemperatureReading : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
-        real32_t temperatureReading = 0;
+        if (sensorId == AggregateSensorId)
+        {
+            GetTemperatureAggregateResponseParser{}.parseAggregateResponse(
+                responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
+    }
 
-        auto rc = decode_get_temperature_reading_resp(
-            responsePtr, payloadLength, &cc, &reason_code, &temperatureReading);
-        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+  private:
+    uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+};
+
+class GetCurrentPowerDraw : public CommandInterface
+{
+  public:
+    GetCurrentPowerDraw() = delete;
+    GetCurrentPowerDraw(const GetCurrentPowerDraw&) = delete;
+    GetCurrentPowerDraw(GetCurrentPowerDraw&&) = default;
+    GetCurrentPowerDraw& operator=(const GetCurrentPowerDraw&) = delete;
+    GetCurrentPowerDraw& operator=(GetCurrentPowerDraw&&) = delete;
+
+    explicit GetCurrentPowerDraw(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
+
+        app->add_option("-a, --averagingInterval", averagingInterval,
+                        "averaging interval of current power draw reading")
+            ->required();
+    }
+
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        uint32_t reading;
+
+        auto rc = decode_get_current_power_draw_resp(responsePtr, msg_len, &cc,
+                                                     &reason_code, &reading);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
-                          sizeof(struct nsm_get_temperature_reading_resp));
+                          sizeof(struct nsm_get_current_power_draw_resp));
 
             return;
         }
 
         ordered_json result;
-        result["Compiletion Code"] = cc;
+        result["Completion Code"] = cc;
         result["Sensor Id"] = sensorId;
-        result["Temperature Reading"] = temperatureReading;
+        result["Averaging Interval"] = averagingInterval;
+        result["Current Power Draw"] = reading;
+
         nsmtool::helper::DisplayInJson(result);
+    }
+
+    class GetCurrentPowerDrawAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint32_t reading;
+            auto rc = decode_aggregate_get_current_power_draw_reading(
+                data, data_len, &reading);
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Current Power Draw"] = reading;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_current_power_draw_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_current_power_draw_req(instanceId, sensorId,
+                                                    averagingInterval, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (sensorId == AggregateSensorId)
+        {
+            GetCurrentPowerDrawAggregateResponseParser{}.parseAggregateResponse(
+                responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
     }
 
   private:
     uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+    uint8_t averagingInterval;
 };
 
 void registerCommand(CLI::App& app)
@@ -245,6 +496,11 @@ void registerCommand(CLI::App& app)
         "GetTemperatureReading", "get temperature reading of a sensor");
     commands.push_back(std::make_unique<GetTemperatureReading>(
         "telemetry", "GetTemperatureReading", getTemperatureReading));
+
+    auto getCurrentPowerDraw = telemetry->add_subcommand(
+        "GetCurrentPowerDraw", "get current power draw of a device");
+    commands.push_back(std::make_unique<GetCurrentPowerDraw>(
+        "telemetry", "GetCurrentPowerDraw", getCurrentPowerDraw));
 }
 
 } // namespace telemetry

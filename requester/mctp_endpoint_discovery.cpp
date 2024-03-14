@@ -155,7 +155,7 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 {
     constexpr std::string_view mctpEndpointIntfName{
         "xyz.openbmc_project.MCTP.Endpoint"};
-    MctpInfos mctpInfos {};
+    MctpInfos mctpInfos{};
 
     sdbusplus::message::object_path objPath;
     dbus::InterfaceMap interfaces;
