@@ -32,6 +32,9 @@ conf_data.set('SENSOR_POLLING_TIME', get_option('sensor-polling-time'))
 conf_data.set('INSTANCE_ID_EXPIRATION_INTERVAL', get_option('instance-id-expiration-interval'))
 conf_data.set('NUMBER_OF_REQUEST_RETRIES', get_option('number-of-request-retries'))
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
+if get_option('shmem').enabled()
+  conf_data.set('NVIDIA_SHMEM', 0)
+endif
 configure_file(output: 'config.h',
   configuration: conf_data
 )
@@ -39,12 +42,18 @@ configure_file(output: 'config.h',
 dynamic_linker = []
 
 deps = [
+  CLI11_dep,
   nlohmann_json,
   sdbusplus,
   sdeventplus,
   phosphor_dbus_interfaces,
   phosphor_logging,
 ]
+
+if get_option('shmem').enabled()
+  nvidia_shmem = dependency('nvidia-shmem', required : true)
+  deps += nvidia_shmem
+endif
 
 systemd = dependency('systemd')
 systemd_system_unit_dir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')

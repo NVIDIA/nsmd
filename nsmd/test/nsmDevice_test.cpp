@@ -4,6 +4,7 @@ using ::testing::ElementsAre;
 
 #include "base.h"
 #include "platform-environmental.h"
+
 #include <sdbusplus/bus.hpp>
 
 #define private public
@@ -13,10 +14,9 @@ using ::testing::ElementsAre;
 
 TEST(nsmDevice, GoodTest)
 {
-	uint8_t eid = 30;
+    uint8_t eid = 30;
 
-	nsm::NsmDevice nsmDevice(eid);
+    nsm::NsmDevice nsmDevice(eid);
 
     EXPECT_EQ(nsmDevice.eid, eid);
-
 }

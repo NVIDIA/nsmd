@@ -459,7 +459,7 @@ int decode_reason_code_and_cc(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	*cc = *(msg->payload + 1);
+	*cc = ((struct nsm_common_resp *)msg->payload)->completion_code;
 	if (*cc == NSM_SUCCESS) {
 		return NSM_SW_SUCCESS;
 	}

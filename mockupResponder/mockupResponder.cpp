@@ -10,6 +10,8 @@
 #include <phosphor-logging/lg2.hpp>
 #include <sdeventplus/source/io.hpp>
 
+#include <ctime>
+
 namespace MockupResponder
 {
 
@@ -162,7 +164,7 @@ std::optional<std::vector<uint8_t>>
     auto request = reinterpret_cast<const nsm_msg*>(hdr);
     size_t requestLen = requestMsg.size() - MCTP_DEMUX_PREFIX;
 
-    if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
+    if (NSM_SW_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
         lg2::error("Empty NSM request header");
         return std::nullopt;
@@ -208,6 +210,8 @@ std::optional<std::vector<uint8_t>>
                     return getInventoryInformationHandler(request, requestLen);
                 case NSM_GET_TEMPERATURE_READING:
                     return getTemperatureReadingHandler(request, requestLen);
+                case NSM_GET_POWER:
+                    return getCurrentPowerDrawHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -395,18 +399,152 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getTemperatureReadingHandler(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
-    lg2::info("getTemperatureReadingHandler: request length={LEN}", "LEN",
-              requestLen);
+    auto request = reinterpret_cast<const nsm_get_temperature_reading_req*>(
+        requestMsg->payload);
+    uint8_t sensor_id{request->sensor_id};
+    lg2::info(
+        "getTemperatureReadingHandler: Sensor_Id={ID}, request length={LEN}",
+        "LEN", requestLen, "ID", sensor_id);
 
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp), 0);
+    if (sensor_id == 255)
+    {
 
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    auto rc = encode_get_temperature_reading_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, 78, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
-    return response;
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                                        request->hdr.command, NSM_SUCCESS, 2,
+                                        responseMsg);
+
+        uint8_t reading[4]{};
+        size_t consumed_len;
+        std::array<uint8_t, 50> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        // add sample 1
+        rc = encode_aggregate_temperature_reading_data(46.189, reading,
+                                                       &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0, true, reading, 4, nsm_sample,
+                                          &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 2
+        rc = encode_aggregate_temperature_reading_data(-0.343878, reading,
+                                                       &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(39, true, reading, 4, nsm_sample,
+                                          &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        return response;
+    }
+    else
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp), 0);
+
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        uint16_t reason_code = ERR_NULL;
+        auto rc = encode_get_temperature_reading_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, 78,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        return response;
+    }
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentPowerDrawHandler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    auto request = reinterpret_cast<const nsm_get_current_power_draw_req*>(
+        requestMsg->payload);
+    uint8_t sensor_id{request->sensor_id};
+    lg2::info(
+        "getCurrentPowerDrawHandler: Sensor_Id={ID}, request length={LEN}",
+        "LEN", requestLen, "ID", sensor_id);
+
+    if (sensor_id == 255)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                                        request->hdr.command, NSM_SUCCESS, 3,
+                                        responseMsg);
+
+        auto const now = std::chrono::system_clock::now();
+        std::time_t newt = std::chrono::system_clock::to_time_t(now);
+        const auto timestamp = static_cast<uint64_t>(newt);
+        const uint32_t power[2]{25890, 17023};
+        uint8_t reading[8]{};
+        size_t consumed_len;
+        std::array<uint8_t, 50> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        // add sample 1
+        rc = encode_aggregate_timestamp_data(timestamp, reading, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0xFF, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 2
+        rc = encode_aggregate_get_current_power_draw_reading(power[0], reading,
+                                                             &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 3
+        rc = encode_aggregate_get_current_power_draw_reading(power[1], reading,
+                                                             &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(10, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        return response;
+    }
+    else
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_power_draw_resp), 0);
+
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        uint16_t reason_code = ERR_NULL;
+        uint32_t power{15870};
+        auto rc = encode_get_current_power_draw_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, power,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        return response;
+    }
+}
 } // namespace MockupResponder

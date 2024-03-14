@@ -1,6 +1,10 @@
 dep_src_files = [
   '../nsmTemp.cpp',
   '../nsmDevice.cpp',
+  '../nsmNumericSensor.cpp',
+  '../nsmNumericAggregator.cpp',
+  '../nsmTempAggregator.cpp',
+  '../nsmPowerAggregator.cpp',
   '../../common/utils.cpp',
   '../../libnsm/base.c',
   '../../libnsm/platform-environmental.c',
@@ -10,6 +14,7 @@ dep_src_files = [
 dep_src_headers = [
   '.',
   '..',
+  '../../',
   '../../common',
   '../../libnsm',
 ]
@@ -20,6 +25,7 @@ test_src = declare_dependency(sources: dep_src_files,
 tests = [
   'nsmTemp_test',
   'nsmDevice_test',
+  'nsmNumericAggregator_test'
 ]
 
 foreach t : tests
@@ -34,6 +40,7 @@ foreach t : tests
                          sdbusplus,
                          sdeventplus,
                          phosphor_logging,
+                         nvidia_shmem,
                          gtest,
                          gmock]),
        workdir: meson.current_source_dir())

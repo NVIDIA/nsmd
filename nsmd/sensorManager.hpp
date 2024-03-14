@@ -2,6 +2,7 @@
 
 #include "common/types.hpp"
 #include "instance_id.hpp"
+#include "nsmNumericAggregator.hpp"
 #include "nsmSensor.hpp"
 #include "requester/handler.hpp"
 
@@ -26,11 +27,12 @@ using RequesterHandler = requester::Handler<requester::Request>;
 class SensorManager
 {
   public:
-    SensorManager(sdbusplus::bus::bus& bus, sdeventplus::Event& event,
-                  requester::Handler<requester::Request>& handler,
-                  nsm::InstanceIdDb& instanceIdDb,
-                  sdbusplus::asio::object_server& objServer,
-                  std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable);
+    SensorManager(
+        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable);
 
     void startPolling();
     void stopPolling();
@@ -46,8 +48,16 @@ class SensorManager
     void scanInventory();
 
   private:
-    void addTemp(std::string objPath);
+    void addSensor(const std::string& objPath, const std::string& interface,
+                   const std::string& type);
     void addNVLink(std::string objPath);
+
+    std::shared_ptr<nsm::NsmSensor>
+        createNsmSensor(const std::string& objPath,
+                        const std::string& interface, const uint8_t eid,
+                        const std::string& name, const std::string& type,
+                        const std::string& association, const bool priority,
+                        const bool aggregate);
 
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
@@ -61,12 +71,18 @@ class SensorManager
 
     std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> deviceSensors;
     std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> prioritySensors;
-    std::map<eid_t, std::queue<std::shared_ptr<NsmSensor>>> roundRobinSensors;
+    std::map<eid_t, std::deque<std::shared_ptr<NsmSensor>>> roundRobinSensors;
 
     std::map<eid_t, std::unique_ptr<phosphor::Timer>> pollingTimers;
     std::map<eid_t, std::coroutine_handle<>> doPollingTaskHandles;
 
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
+
+    // Contains NSM Sensor Aggregators. Second field in std::pair indicates
+    // priority.
+    std::map<eid_t, std::vector<
+                        std::pair<std::shared_ptr<NsmNumericAggregator>, bool>>>
+        SensorAggregators;
 };
 
 } // namespace nsm

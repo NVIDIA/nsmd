@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include "deviceManager.hpp"
 #include "instance_id.hpp"
 #include "invoker.hpp"
@@ -16,6 +18,7 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
+#include <telemetry_mrd_producer.hpp>
 
 #include <iostream>
 
@@ -93,6 +96,14 @@ int main(int argc, char** argv)
         std::unique_ptr<nsm::SensorManager> sensorManager =
             std::make_unique<nsm::SensorManager>(
                 bus, event, reqHandler, instanceIdDb, objServer, eidTable);
+
+#ifdef NVIDIA_SHMEM
+        // Initializing shared memory
+        if (nv::shmem::AggregationService::namespaceInit("nsmd"))
+        {
+            lg2::info("Initialized shared memory nsmd");
+        }
+#endif
 
         return event.loop();
     }

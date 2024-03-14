@@ -9,7 +9,12 @@ sources = [
   'sensorManager.cpp',
   'socket_handler.cpp',
   'nsmDevice.cpp',
+  'nsmNumericSensor.cpp',
   'nsmTemp.cpp',
+  'nsmPower.cpp',
+  'nsmNumericAggregator.cpp',
+  'nsmTempAggregator.cpp',
+  'nsmPowerAggregator.cpp',
   'nsmd.cpp',
 ]
 
@@ -20,13 +25,6 @@ executable(
   sources,
   implicit_include_directories: false,
   include_directories: include_directories(nsmd_headers),
-  dependencies: [
-    CLI11_dep,
-    nlohmann_json,
-    sdbusplus,
-    sdeventplus,
-    phosphor_dbus_interfaces,
-    phosphor_logging,
-  ],
+  dependencies: deps,
   install: true,
   install_dir: get_option('bindir'))

@@ -18,6 +18,11 @@ extern "C" {
 #define SUPPORTED_MSG_TYPE_DATA_SIZE 32
 #define SUPPORTED_COMMAND_CODE_DATA_SIZE 32
 
+#define NSM_AGGREGATE_MAX_SAMPLE_TAG_VALUE 0xFF
+#define NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE 0xEF
+// NSM Aggregate sample size is represented in 3 bits as power of 2
+#define NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2 7
+
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,
@@ -97,11 +102,10 @@ typedef union {
 	} __attribute__((packed)) bits;
 } bitfield8_t;
 
-typedef float real32_t;
-
 // command(1byte) + data_size(1byte)
 #define NSM_REQUEST_CONVENTION_LEN 2
-// command(1byte) + completion code(1byte) + reserved(2bytes) + data_size(2bytes)
+// command(1byte) + completion code(1byte) + reserved(2bytes) +
+// data_size(2bytes)
 #define NSM_RESPONSE_CONVENTION_LEN 6
 
 /** @enum MessageType

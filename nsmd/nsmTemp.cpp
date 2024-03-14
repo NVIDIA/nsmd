@@ -3,55 +3,17 @@
 #include "platform-environmental.h"
 
 #include <phosphor-logging/lg2.hpp>
-
-#include <optional>
-#include <vector>
+#include <telemetry_mrd_producer.hpp>
 
 namespace nsm
 {
-
-NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, std::string& name, bool priority,
-                 uint8_t sensorId, std::string& association) :
-    NsmSensor(name, priority),
+NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
+                 const std::string& type, uint8_t sensorId,
+                 const std::string& association) :
+    NsmSensor(name, type),
+    NsmNumericSensor(bus, name, sensor_type, SensorUnit::DegreesC, association),
     sensorId(sensorId)
-{
-    lg2::info("NsmTemp: create sensor:{NAME}", "NAME", name.c_str());
-
-    std::string objPath = "/xyz/openbmc_project/sensors/temperature/" + name;
-
-    valueIntf = std::make_unique<ValueIntf>(bus, objPath.c_str());
-    valueIntf->unit(SensorUnit::DegreesC);
-
-    availabilityIntf = std::make_unique<AvailabilityIntf>(bus, objPath.c_str());
-    availabilityIntf->available(true);
-
-    operationalStatusIntf =
-        std::make_unique<OperationalStatusIntf>(bus, objPath.c_str());
-    operationalStatusIntf->functional(true);
-
-    associationDefinitionsIntf =
-        std::make_unique<AssociationDefinitionsInft>(bus, objPath.c_str());
-    associationDefinitionsIntf->associations(
-        {{"chassis", "all_sensors", association.c_str()}});
-}
-
-void NsmTemp::updateReading(bool available, bool functional, double value)
-{
-    if (availabilityIntf)
-    {
-        availabilityIntf->available(available);
-    }
-
-    if (operationalStatusIntf)
-    {
-        operationalStatusIntf->functional(functional);
-    }
-
-    if (valueIntf)
-    {
-        valueIntf->value(value);
-    }
-}
+{}
 
 std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,
                                                            uint8_t instanceId)
@@ -78,21 +40,22 @@ uint8_t NsmTemp::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
-    real32_t reading = 0;
+    double reading = 0;
 
     auto rc = decode_get_temperature_reading_resp(responseMsg, responseLen, &cc,
                                                   &reason_code, &reading);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateReading(true, true, reading);
+        updateReading(reading);
     }
     else
     {
-        lg2::error("handleResponseMsg: decode_get_temperature_reading_resp "
-                   "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-                   "NAME", name, "REASONCODE", reason_code, "CC", cc, "RC", rc);
-        updateReading(false, false);
+        updateStatus(false, false);
+        lg2::error(
+            "handleResponseMsg: decode_get_temperature_reading_resp "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

@@ -200,10 +200,11 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
     for (auto propertyId : propertyIds)
     {
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);
-        if (rc!= NSM_SW_SUCCESS)
+        if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error("getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
-                       "PID", propertyId, "EID", eid, "RC", rc);
+            lg2::error(
+                "getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
+                "PID", propertyId, "EID", eid, "RC", rc);
             co_return rc;
         }
     }

@@ -32,8 +32,9 @@ using InventoryPropertyId = uint8_t;
 using InventoryPropertyData =
     std::variant<bool, uint8_t, int8_t, uint16_t, int16_t, uint32_t, int32_t,
                  uint64_t, int64_t, float, std::string, std::vector<uint8_t>>;
-using InventoryProperties = std::map<InventoryPropertyId, InventoryPropertyData>;
-}
+using InventoryProperties =
+    std::map<InventoryPropertyId, InventoryPropertyData>;
+} // namespace nsm
 
 namespace dbus
 {
