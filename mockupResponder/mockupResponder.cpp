@@ -1,6 +1,7 @@
 #include "mockupResponder.hpp"
 
 #include "platform-environmental.h"
+#include "requester/mctp.h"
 
 #include "types.hpp"
 #include "utils.hpp"
@@ -106,7 +107,7 @@ int MockupResponder::connectMockupEID(uint8_t eid)
             return;
         }
 
-        if (requestMsg[1] != MCTP_MSG_TYPE_VDM)
+        if (requestMsg[2] != MCTP_MSG_TYPE_VDM)
         {
             lg2::error("Received non VDM message type={TYPE}", "TYPE",
                        requestMsg[1]);
@@ -128,8 +129,13 @@ int MockupResponder::connectMockupEID(uint8_t eid)
         auto response = processRxMsg(requestMsg);
         if (response.has_value())
         {
+            constexpr uint8_t tagOwnerBitPos = 3;
+            constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
+            // Set tag owner bit to 0 for NSM responses
+            requestMsg[0] = requestMsg[0] & tagOwnerMask;
             iov[0].iov_base = &requestMsg[0];
-            iov[0].iov_len = sizeof(requestMsg[0]) + sizeof(requestMsg[1]);
+            iov[0].iov_len = sizeof(requestMsg[0]) + sizeof(requestMsg[1]) +
+                             sizeof(requestMsg[2]);
             iov[1].iov_base = (*response).data();
             iov[1].iov_len = (*response).size();
 
@@ -157,7 +163,6 @@ int MockupResponder::connectMockupEID(uint8_t eid)
 std::optional<std::vector<uint8_t>>
     MockupResponder::processRxMsg(const std::vector<uint8_t>& requestMsg)
 {
-#define MCTP_DEMUX_PREFIX 2 // eid + mctp message type
     nsm_header_info hdrFields{};
     auto hdr = reinterpret_cast<const nsm_msg_hdr*>(requestMsg.data() +
                                                     MCTP_DEMUX_PREFIX);
