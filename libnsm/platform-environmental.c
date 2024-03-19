@@ -71,7 +71,7 @@ int encode_get_inventory_information_resp(uint8_t instance_id, uint8_t cc,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
@@ -195,7 +195,7 @@ int encode_get_temperature_reading_resp(uint8_t instance_id, uint8_t cc,
 
 	struct nsm_header_info header = {0};
 	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);

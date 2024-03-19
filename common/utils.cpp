@@ -21,6 +21,27 @@
 namespace utils
 {
 
+uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr)
+{
+    if (uuidIntArr.size() != UUID_INT_SIZE)
+    {
+        lg2::error("UUID Conversion: Failed, integer UUID size is not {UUIDSZ}",
+                   "UUIDSZ", UUID_INT_SIZE);
+        return "";
+    }
+    uuid_t uuidStr(UUID_LEN + 1, 0);
+
+    snprintf(
+        const_cast<char*>(uuidStr.data()), uuidStr.size(),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        uuidIntArr[0], uuidIntArr[1], uuidIntArr[2], uuidIntArr[3],
+        uuidIntArr[4], uuidIntArr[5], uuidIntArr[6], uuidIntArr[7],
+        uuidIntArr[8], uuidIntArr[9], uuidIntArr[10], uuidIntArr[11],
+        uuidIntArr[12], uuidIntArr[13], uuidIntArr[14], uuidIntArr[15]);
+
+    return uuidStr;
+}
+
 void printBuffer(bool isTx, const std::vector<uint8_t>& buffer)
 {
     if (!buffer.empty())
@@ -221,9 +242,7 @@ eid_t getEidFromUUID(
         // TODO: as of now it is hard-coded for PCIe meidium, will handle in
         // seperate MR for selecting the fasted bandwidth medium instead of hard
         // coded value
-        if ((itr->first).substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN) &&
-            itr->second.second ==
-                "xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe")
+        if ((itr->first).substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN))
         {
             eid = itr->second.first;
             break;
@@ -241,19 +260,4 @@ eid_t getEidFromUUID(
     return eid;
 }
 
-uuid_t convertUUIDToString(const uint8_t* uuidIntArr)
-{
-    uuid_t uuidStr;
-    uuidStr.resize(37, 0);
-
-    snprintf(
-        const_cast<char*>(uuidStr.data()), uuidStr.size(),
-        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-        uuidIntArr[0], uuidIntArr[1], uuidIntArr[2], uuidIntArr[3],
-        uuidIntArr[4], uuidIntArr[5], uuidIntArr[6], uuidIntArr[7],
-        uuidIntArr[8], uuidIntArr[9], uuidIntArr[10], uuidIntArr[11],
-        uuidIntArr[12], uuidIntArr[13], uuidIntArr[14], uuidIntArr[15]);
-
-    return uuidStr;
-}
 } // namespace utils

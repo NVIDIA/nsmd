@@ -258,6 +258,85 @@ TEST(getSupportedNvidiaMessageTypes, testGoodDecodeResponse)
 				0x0, 0x0, 0x0, 0x0, 0x0));
 }
 
+TEST(getSupportedNvidiaMessageTypes, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,	  // command
+	    0,					  // completion code
+	    0,
+	    0,
+	    32,
+	    0, // data size
+	    0xf,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0,
+	    0x0 // types
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t responseTypes[SUPPORTED_MSG_TYPE_DATA_SIZE];
+
+	auto rc = decode_get_supported_nvidia_message_types_resp(
+	    nullptr, msg_len, &cc, &reason_code, (bitfield8_t *)responseTypes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_nvidia_message_types_resp(
+	    response, msg_len, nullptr, &reason_code,
+	    (bitfield8_t *)responseTypes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_nvidia_message_types_resp(
+	    response, msg_len, &cc, nullptr, (bitfield8_t *)responseTypes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_nvidia_message_types_resp(
+	    response, msg_len, &cc, &reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_supported_nvidia_message_types_resp(
+	    response, msg_len - 4, &cc, &reason_code,
+	    (bitfield8_t *)responseTypes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 TEST(getSupportedCommandCodes, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(
