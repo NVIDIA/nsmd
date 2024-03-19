@@ -193,21 +193,20 @@ SocketInfo Handler::initSocket(int type, int protocol,
 std::optional<Response>
     Handler::processRxMsg(const std::vector<uint8_t>& nsmMsg)
 {
-    using type = uint8_t;
     using command = uint8_t;
     using length = uint16_t;
 
-    uint8_t eid = nsmMsg[0];
+    uint8_t eid = nsmMsg[1];
     nsm_header_info hdrFields{};
-    auto hdr = reinterpret_cast<const nsm_msg_hdr*>(nsmMsg.data() +
-                                                    sizeof(eid) + sizeof(type));
+    auto hdr =
+        reinterpret_cast<const nsm_msg_hdr*>(nsmMsg.data() + MCTP_DEMUX_PREFIX);
     if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
         lg2::error("Empty NSM request header");
         return std::nullopt;
     }
 
-    const size_t nsmRespMinimusLen = sizeof(eid) + sizeof(type) +
+    const size_t nsmRespMinimusLen = MCTP_DEMUX_PREFIX +
                                      sizeof(struct nsm_msg_hdr) +
                                      sizeof(command) + sizeof(length);
 
@@ -215,7 +214,7 @@ std::optional<Response>
         nsmMsg.size() >= nsmRespMinimusLen)
     {
         auto response = reinterpret_cast<const nsm_msg*>(hdr);
-        size_t responseLen = nsmMsg.size() - sizeof(eid) - sizeof(type);
+        size_t responseLen = nsmMsg.size() - MCTP_DEMUX_PREFIX;
         handler.handleResponse(eid, hdrFields.instance_id,
                                hdrFields.nvidia_msg_type, response->payload[0],
                                response, responseLen);

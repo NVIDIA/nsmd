@@ -9,6 +9,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
+#define MCTP_DEMUX_PREFIX 3 // tag + eid + mctp message type
+
 typedef uint8_t mctp_eid_t;
 #define MCTP_MSG_TYPE_PCI_VDM 0x7E
 #define MCTP_MSG_TAG_REQ (MCTP_TAG_NSM | 1 << 3)
