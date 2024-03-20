@@ -1,7 +1,8 @@
 #include "mockupResponder.hpp"
 
+#include "base.h"
+#include "network-ports.h"
 #include "platform-environmental.h"
-#include "requester/mctp.h"
 
 #include "types.hpp"
 #include "utils.hpp"
@@ -16,13 +17,13 @@
 namespace MockupResponder
 {
 
-const uint8_t mockupDeviceIdentification = NSM_DEV_ID_PCIE_BRIDGE;
-const uint8_t mockupDeviceInstance = 0;
-
-int MockupResponder::connectMockupEID(uint8_t eid)
+int MockupResponder::connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t instanceId)
 {
     lg2::info("connect to Mockup EID");
 
+    mockEid = eid;
+    mockDeviceType = deviceType;
+    mockInstanceId = instanceId;
     auto fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (fd == -1)
     {
@@ -208,6 +209,18 @@ std::optional<std::vector<uint8_t>>
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
+        case NSM_TYPE_NETWORK_PORT:
+            switch (command)
+            {
+                case NSM_GET_PORT_TELEMETRY_COUNTER:
+                    return getPortTelemetryCounterHandler(request, requestLen);
+                default:
+                    lg2::error("unsupported Command:{CMD} request length={LEN}",
+                               "CMD", command, "LEN", requestLen);
+
+                    return unsupportedCommandHandler(request, requestLen);
+            }
+            break;
         case NSM_TYPE_PLATFORM_ENVIRONMENTAL:
             switch (command)
             {
@@ -320,6 +333,12 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+void MockupResponder::generateDummyGUID(const uint8_t eid, uint8_t* data)
+{
+    // just adding eid for first byte and rest is zero
+    memcpy(data, &eid, sizeof(eid));
+}
+
 std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
 {
     std::vector<uint8_t> property;
@@ -339,10 +358,81 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             memcpy(property.data(), data.data(), data.length());
             break;
         }
+        case DEVICE_GUID:
+        {
+            std::vector<uint8_t> data{0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00};
+            generateDummyGUID(mockEid, data.data());
+
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
         default:
             break;
     }
     return property;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    lg2::info("getPortTelemetryCounterHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t portNumber = 0;
+    auto rc = decode_get_port_telemetry_counter_req(requestMsg, requestLen,
+                                                    &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_port_telemetry_counter_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // mock data to send [that is 25 counter data]
+    std::vector<uint8_t> data{
+        0xF7, 0x5A, 0x3E, 0x00, /*for supported counters, [for CX-7]*/
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0E, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x13, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    }; /*for counter values, 8 bytes each*/
+
+    auto portTelData = reinterpret_cast<nsm_port_counter_data*>(data.data());
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_port_telemetry_counter_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, reason_code,
+                                                portTelData, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_port_telemetry_counter_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
 }
 
 std::optional<std::vector<uint8_t>>
@@ -392,6 +482,9 @@ std::optional<std::vector<uint8_t>>
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
+    uint8_t mockupDeviceIdentification = mockDeviceType;
+    uint8_t mockupDeviceInstance = mockInstanceId;
+
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     auto rc = encode_query_device_identification_resp(
         requestMsg->hdr.instance_id, cc, reason_code,

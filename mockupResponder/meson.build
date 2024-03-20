@@ -5,6 +5,7 @@ sources = [
   '../common/utils.cpp',
   '../libnsm/base.c',
   '../libnsm/platform-environmental.c',
+  '../libnsm/network-ports.c',
 ]
 
 nsmMockupResponder_headers = ['.', '..', '../libnsm', '../common']

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "base.h"
+#include "network-ports.h"
+#include "requester/mctp.h"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdeventplus/event.hpp>
@@ -32,7 +34,7 @@ class MockupResponder
     ~MockupResponder()
     {}
 
-    int connectMockupEID(uint8_t eid);
+    int connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t instanceId);
 
     std::optional<std::vector<uint8_t>>
         processRxMsg(const std::vector<uint8_t>& request);
@@ -51,6 +53,12 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryDeviceIdentificationHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
+    void generateDummyGUID(const uint8_t eid, uint8_t *data);
+
+    // type1 handlers
+    std::optional<std::vector<uint8_t>>
+        getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
 
     // type3 handlers
     std::optional<std::vector<uint8_t>>
@@ -67,6 +75,9 @@ class MockupResponder
   private:
     sdeventplus::Event& event;
     bool verbose;
+    uint8_t mockEid;
+    uint8_t mockDeviceType;
+    uint8_t mockInstanceId;
 };
 
 } // namespace MockupResponder
