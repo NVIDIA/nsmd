@@ -4,6 +4,7 @@
 #include "instance_id.hpp"
 #include "nsmNumericAggregator.hpp"
 #include "nsmSensor.hpp"
+#include "nsmObject.hpp"
 #include "requester/handler.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
@@ -69,7 +70,7 @@ class SensorManager
     sdbusplus::bus::match_t inventoryAddedSignal;
     // sdbusplus::bus::match_t inventoryRemovbedSignal;
 
-    std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> deviceSensors;
+    std::map<eid_t, std::vector<std::shared_ptr<NsmObject>>> deviceSensors;
     std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> prioritySensors;
     std::map<eid_t, std::deque<std::shared_ptr<NsmSensor>>> roundRobinSensors;
 
