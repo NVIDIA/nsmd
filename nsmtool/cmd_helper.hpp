@@ -68,6 +68,18 @@ static inline void DisplayInJson(const ordered_json& data)
 int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                      std::vector<uint8_t>& responseMsg, bool verbose);
 
+/** @brief bitfield variable parser
+ *
+ *  @param[out]  res - result variable in which parsed values will be kept
+ *  @param[in]  key - key against which the value is to kept in ordered json
+ *  @param[in]  value - the bitfield array value
+ *  @param[in]  size - size of bitfield array
+ *
+ *  @return - None
+ */
+void parseBitfieldVar(ordered_json& res, const std::string& key, const bitfield8_t* value,
+                      uint8_t size);
+
 class CommandInterface
 {
 

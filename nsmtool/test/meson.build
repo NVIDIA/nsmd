@@ -5,6 +5,7 @@ dep_src_files = [
   '../../common/utils.cpp',
   '../../libnsm/base.c',
   '../../libnsm/platform-environmental.c',
+  '../../libnsm/network-ports.c',
   '../../libnsm/requester/mctp.c',
 ]
 
@@ -19,7 +20,7 @@ test_src = declare_dependency(sources: dep_src_files,
                               include_directories: dep_src_headers)
 
 tests = [
-  'nsm_discovery_cmd_test',
+  'cmd_helper_test'
 ]
 
 foreach t : tests

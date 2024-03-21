@@ -6,9 +6,11 @@
 #include "nsm_telemetry_cmd.hpp"
 
 #include "base.h"
+#include "network-ports.h"
 #include "platform-environmental.h"
 
 #include "cmd_helper.hpp"
+#include "utils.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -27,6 +29,268 @@ using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
 
 } // namespace
+
+class GetPortTelemetryCounter : public CommandInterface
+{
+  public:
+    ~GetPortTelemetryCounter() = default;
+    GetPortTelemetryCounter() = delete;
+    GetPortTelemetryCounter(const GetPortTelemetryCounter&) = delete;
+    GetPortTelemetryCounter(GetPortTelemetryCounter&&) = default;
+    GetPortTelemetryCounter& operator=(const GetPortTelemetryCounter&) = delete;
+    GetPortTelemetryCounter& operator=(GetPortTelemetryCounter&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPortTelemetryCounter(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portTeleOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which counter value is to be retrieved.");
+
+        portNumber = 00;
+        portTeleOptionGroup->add_option(
+            "-p, --portNum", portNumber,
+            "retrieve counter values for Port number");
+        portTeleOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_port_telemetry_counter_req(instanceId, portNumber,
+                                                        request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t dataLen = 0;
+        struct nsm_port_counter_data portTeleData;
+
+        auto rc = decode_get_port_telemetry_counter_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &dataLen,
+            &portTeleData);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            printPortTeleInfo(dataLen, &portTeleData);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_port_telemetry_resp fail"
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        return;
+    }
+
+    void printPortTeleInfo(uint16_t dataLen,
+                           const struct nsm_port_counter_data* portData)
+    {
+        if (portData == NULL)
+        {
+            std::cerr << "Failed to get port counter information" << std::endl;
+            return;
+        }
+
+        ordered_json result;
+        result["Port Number"] = portNumber;
+        result["Data Length"] = dataLen;
+        std::string key("Supported Counters");
+
+        ordered_json countersResult;
+        if (portData->supported_counter.port_rcv_pkts)
+        {
+            result[key].push_back(0);
+            countersResult["Port Rcv Pkt"] =
+                static_cast<uint64_t>(portData->port_rcv_pkts);
+        }
+
+        if (portData->supported_counter.port_rcv_data)
+        {
+            result[key].push_back(1);
+            countersResult["Port Rcv Data"] =
+                static_cast<uint64_t>(portData->port_rcv_data);
+        }
+
+        if (portData->supported_counter.port_multicast_rcv_pkts)
+        {
+            result[key].push_back(2);
+            countersResult["Port Multicast Rcv Pkt"] =
+                static_cast<uint64_t>(portData->port_multicast_rcv_pkts);
+        }
+
+        if (portData->supported_counter.port_unicast_rcv_pkts)
+        {
+            result[key].push_back(3);
+            countersResult["Port Unicast Rcv Pkt"] =
+                static_cast<uint64_t>(portData->port_unicast_rcv_pkts);
+        }
+
+        if (portData->supported_counter.port_malformed_pkts)
+        {
+            result[key].push_back(4);
+            countersResult["Port Malformed Pkt"] =
+                static_cast<uint64_t>(portData->port_malformed_pkts);
+        }
+
+        if (portData->supported_counter.vl15_dropped)
+        {
+            result[key].push_back(5);
+            countersResult["Vl15 Dropped"] =
+                static_cast<uint64_t>(portData->vl15_dropped);
+        }
+
+        if (portData->supported_counter.port_rcv_errors)
+        {
+            result[key].push_back(6);
+            countersResult["Port Rcv Error"] =
+                static_cast<uint64_t>(portData->port_rcv_errors);
+        }
+
+        if (portData->supported_counter.port_xmit_pkts)
+        {
+            result[key].push_back(7);
+            countersResult["Port Tx Pkt"] =
+                static_cast<uint64_t>(portData->port_xmit_pkts);
+        }
+
+        if (portData->supported_counter.port_xmit_pkts_vl15)
+        {
+            result[key].push_back(8);
+            countersResult["Port Tx Pkt Vl15"] =
+                static_cast<uint64_t>(portData->port_xmit_pkts_vl15);
+        }
+
+        if (portData->supported_counter.port_xmit_data)
+        {
+            result[key].push_back(9);
+            countersResult["Port Tx Data"] =
+                static_cast<uint64_t>(portData->port_xmit_data);
+        }
+
+        if (portData->supported_counter.port_xmit_data_vl15)
+        {
+            result[key].push_back(10);
+            countersResult["Port Tx Data Vl15"] =
+                static_cast<uint64_t>(portData->port_xmit_data_vl15);
+        }
+
+        if (portData->supported_counter.port_unicast_xmit_pkts)
+        {
+            result[key].push_back(11);
+            countersResult["Port Unicast Tx Pkt"] =
+                static_cast<uint64_t>(portData->port_unicast_xmit_pkts);
+        }
+
+        if (portData->supported_counter.port_multicast_xmit_pkts)
+        {
+            result[key].push_back(12);
+            countersResult["Port Multicast Tx Pkt"] =
+                static_cast<uint64_t>(portData->port_multicast_xmit_pkts);
+        }
+
+        if (portData->supported_counter.port_bcast_xmit_pkts)
+        {
+            result[key].push_back(13);
+            countersResult["Port Broadcast Tx Pkt"] =
+                static_cast<uint64_t>(portData->port_bcast_xmit_pkts);
+        }
+
+        if (portData->supported_counter.port_xmit_discard)
+        {
+            result[key].push_back(14);
+            countersResult["Port Tx Discard"] =
+                static_cast<uint64_t>(portData->port_xmit_discard);
+        }
+
+        if (portData->supported_counter.port_neighbor_mtu_discards)
+        {
+            result[key].push_back(15);
+            countersResult["Port Neighbour MTU Discard"] =
+                static_cast<uint64_t>(portData->port_neighbor_mtu_discards);
+        }
+
+        if (portData->supported_counter.port_rcv_ibg2_pkts)
+        {
+            result[key].push_back(16);
+            countersResult["Port Rcv IBG2 Pkt"] =
+                static_cast<uint64_t>(portData->port_rcv_ibg2_pkts);
+        }
+
+        if (portData->supported_counter.port_xmit_ibg2_pkts)
+        {
+            result[key].push_back(17);
+            countersResult["Port Tx IBG2 Pkt"] =
+                static_cast<uint64_t>(portData->port_xmit_ibg2_pkts);
+        }
+
+        if (portData->supported_counter.symbol_error)
+        {
+            result[key].push_back(18);
+            countersResult["Symbol Error"] =
+                static_cast<uint64_t>(portData->symbol_error);
+        }
+
+        if (portData->supported_counter.link_error_recovery_counter)
+        {
+            result[key].push_back(19);
+            countersResult["Link Error Recovery Counter"] =
+                static_cast<uint64_t>(portData->link_error_recovery_counter);
+        }
+
+        if (portData->supported_counter.link_downed_counter)
+        {
+            result[key].push_back(20);
+            countersResult["Link Downed Counter"] =
+                static_cast<uint64_t>(portData->link_downed_counter);
+        }
+
+        if (portData->supported_counter.port_rcv_remote_physical_errors)
+        {
+            result[key].push_back(21);
+            countersResult["Port Rcv Remote Physical Error"] =
+                static_cast<uint64_t>(
+                    portData->port_rcv_remote_physical_errors);
+        }
+
+        if (portData->supported_counter.port_rcv_switch_relay_errors)
+        {
+            result[key].push_back(22);
+            countersResult["Port Rcv Switch Relay Error"] =
+                static_cast<uint64_t>(portData->port_rcv_switch_relay_errors);
+        }
+
+        if (portData->supported_counter.QP1_dropped)
+        {
+            result[key].push_back(23);
+            countersResult["QP1 Dropped"] =
+                static_cast<uint64_t>(portData->QP1_dropped);
+        }
+
+        if (portData->supported_counter.xmit_wait)
+        {
+            result[key].push_back(24);
+            countersResult["Tx Wait"] =
+                static_cast<uint64_t>(portData->xmit_wait);
+        }
+        result["Port Counter Information"] = countersResult;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t portNumber;
+};
 
 class GetInvectoryInformation : public CommandInterface
 {
@@ -486,6 +750,11 @@ void registerCommand(CLI::App& app)
     auto telemetry = app.add_subcommand(
         "telemetry", "Network, PCI link and platform telemetry type command");
     telemetry->require_subcommand(1);
+
+    auto getPortTelemetryCounter = telemetry->add_subcommand(
+        "GetPortTelemetryCounter", "get port telemetry counter");
+    commands.push_back(std::make_unique<GetPortTelemetryCounter>(
+        "telemetry", "GetPortTelemetryCounter", getPortTelemetryCounter));
 
     auto getInvectoryInformation = telemetry->add_subcommand(
         "GetInvectoryInformation", "get inventory information");

@@ -14,8 +14,6 @@ using ordered_json = nlohmann::ordered_json;
 namespace discovery
 {
 void registerCommand(CLI::App& app);
-void parseBitfieldVar(ordered_json& res, std::string key, bitfield8_t& value,
-                      uint8_t n);
 } // namespace discovery
 
 } // namespace nsmtool
