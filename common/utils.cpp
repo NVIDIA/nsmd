@@ -234,7 +234,7 @@ PropertyValue DBusHandler::getDbusPropertyVariant(
 }
 
 eid_t getEidFromUUID(
-    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable, uuid_t uuid)
+    const std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable, uuid_t uuid)
 {
     eid_t eid = std::numeric_limits<uint8_t>::max();
     for (auto itr = eidTable.begin(); itr != eidTable.end(); itr++)

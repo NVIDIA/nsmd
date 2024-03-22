@@ -15,6 +15,8 @@ sources = [
   'nsmNumericAggregator.cpp',
   'nsmTempAggregator.cpp',
   'nsmPowerAggregator.cpp',
+  'nsmObjectFactory.cpp',
+  'nsmNumericSensorUtility.cpp',
   'nsmd.cpp',
 ]
 

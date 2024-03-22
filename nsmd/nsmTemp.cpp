@@ -1,9 +1,12 @@
 #include "nsmTemp.hpp"
 
+#include "nsmObjectFactory.hpp"
 #include "platform-environmental.h"
 
 #include <phosphor-logging/lg2.hpp>
 #include <telemetry_mrd_producer.hpp>
+
+#include "nsmNumericSensorUtility.hpp"
 
 namespace nsm
 {
@@ -62,4 +65,6 @@ uint8_t NsmTemp::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
+REGISTER_NSM_CREATION_FUNCTION(createNumericNsmSensor,
+                               "xyz.openbmc_project.Configuration.NSM_Temp")
 } // namespace nsm

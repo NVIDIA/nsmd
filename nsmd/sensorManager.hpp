@@ -2,7 +2,6 @@
 
 #include "common/types.hpp"
 #include "instance_id.hpp"
-#include "nsmNumericAggregator.hpp"
 #include "nsmSensor.hpp"
 #include "nsmObject.hpp"
 #include "requester/handler.hpp"
@@ -49,17 +48,6 @@ class SensorManager
     void scanInventory();
 
   private:
-    void addSensor(const std::string& objPath, const std::string& interface,
-                   const std::string& type);
-    void addNVLink(std::string objPath);
-
-    std::shared_ptr<nsm::NsmSensor>
-        createNsmSensor(const std::string& objPath,
-                        const std::string& interface, const uint8_t eid,
-                        const std::string& name, const std::string& type,
-                        const std::string& association, const bool priority,
-                        const bool aggregate);
-
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
@@ -68,7 +56,6 @@ class SensorManager
     std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable;
 
     sdbusplus::bus::match_t inventoryAddedSignal;
-    // sdbusplus::bus::match_t inventoryRemovbedSignal;
 
     std::map<eid_t, std::vector<std::shared_ptr<NsmObject>>> deviceSensors;
     std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> prioritySensors;
@@ -78,12 +65,6 @@ class SensorManager
     std::map<eid_t, std::coroutine_handle<>> doPollingTaskHandles;
 
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
-
-    // Contains NSM Sensor Aggregators. Second field in std::pair indicates
-    // priority.
-    std::map<eid_t, std::vector<
-                        std::pair<std::shared_ptr<NsmNumericAggregator>, bool>>>
-        SensorAggregators;
 };
 
 } // namespace nsm

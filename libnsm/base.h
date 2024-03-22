@@ -327,7 +327,7 @@ int decode_ping_resp(const struct nsm_msg *msg, size_t msgLen, uint8_t *cc,
  *  @param[out] msg     - msg
  *  @return nsm_completion_code
  */
-int encode_reason_code(uint8_t cc, uint8_t reason_code, uint8_t command_code,
+int encode_reason_code(uint8_t cc, uint16_t reason_code, uint8_t command_code,
 		       struct nsm_msg *msg);
 
 /** @brief Decode to get reason code
