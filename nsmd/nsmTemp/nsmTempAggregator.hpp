@@ -4,12 +4,10 @@
 
 namespace nsm
 {
-class NsmPowerAggregator : public NsmNumericAggregator
+class NsmTempAggregator : public NsmNumericAggregator
 {
   public:
-    NsmPowerAggregator(const std::string& name, const std::string& type,
-                       uint8_t averagingInterval);
-
+    NsmTempAggregator(const std::string& name, const std::string& type, bool priority);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
@@ -18,8 +16,5 @@ class NsmPowerAggregator : public NsmNumericAggregator
                          size_t data_len) override;
 
     static constexpr uint8_t sensorId = 255;
-    uint8_t averagingInterval;
-    uint64_t timestamp{};
 };
-
 } // namespace nsm

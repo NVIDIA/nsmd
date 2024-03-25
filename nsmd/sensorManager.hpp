@@ -2,8 +2,9 @@
 
 #include "common/types.hpp"
 #include "instance_id.hpp"
-#include "nsmSensor.hpp"
+#include "nsmDevice.hpp"
 #include "nsmObject.hpp"
+#include "nsmSensor.hpp"
 #include "requester/handler.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
@@ -27,19 +28,20 @@ using RequesterHandler = requester::Handler<requester::Request>;
 class SensorManager
 {
   public:
-    SensorManager(
-        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
-        requester::Handler<requester::Request>& handler,
-        nsm::InstanceIdDb& instanceIdDb,
-        sdbusplus::asio::object_server& objServer,
-        std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable);
+    SensorManager(sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+                  requester::Handler<requester::Request>& handler,
+                  nsm::InstanceIdDb& instanceIdDb,
+                  sdbusplus::asio::object_server& objServer,
+                  std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+                  NsmDeviceTable& nsmDevices);
 
     void startPolling();
     void stopPolling();
-    void doPolling(eid_t eid);
+    void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedhandler(sdbusplus::message::message& msg);
     void _startPolling(sdeventplus::source::EventBase& /* source */);
-    requester::Coroutine doPollingTask(eid_t eid);
+    requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
+
     requester::Coroutine getSensorReading(eid_t eid,
                                           std::shared_ptr<NsmSensor> sensor);
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
@@ -55,16 +57,14 @@ class SensorManager
     sdbusplus::asio::object_server& objServer;
     std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable;
 
-    sdbusplus::bus::match_t inventoryAddedSignal;
-
-    std::map<eid_t, std::vector<std::shared_ptr<NsmObject>>> deviceSensors;
-    std::map<eid_t, std::vector<std::shared_ptr<NsmSensor>>> prioritySensors;
-    std::map<eid_t, std::deque<std::shared_ptr<NsmSensor>>> roundRobinSensors;
+    std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
 
     std::map<eid_t, std::unique_ptr<phosphor::Timer>> pollingTimers;
     std::map<eid_t, std::coroutine_handle<>> doPollingTaskHandles;
 
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
+
+    NsmDeviceTable& nsmDevices;
 };
 
 } // namespace nsm

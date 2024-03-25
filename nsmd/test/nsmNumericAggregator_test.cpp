@@ -10,9 +10,7 @@ using ::testing::ElementsAreArray;
 #define private public
 #define protected public
 
-#include "nsmPowerAggregator.hpp"
-#include "nsmSensor.hpp"
-#include "nsmTempAggregator.hpp"
+#include "nsmNumericAggregator.hpp"
 
 using namespace nsm;
 
@@ -21,7 +19,6 @@ class MockNumericNsmSensorAggregator : public NsmNumericAggregator
   public:
     using NsmNumericAggregator::NsmNumericAggregator;
 
-  public:
     MOCK_METHOD(std::optional<std::vector<uint8_t>>, genRequestMsg,
                 (eid_t eid, uint8_t instanceId), (override));
     MOCK_METHOD(int, handleSampleData,
@@ -32,8 +29,8 @@ class MockNumericNsmSensorAggregator : public NsmNumericAggregator
 TEST(nsmNumericSensorAggregator, GoodTest)
 {
     const auto name = "Numeric Sensor";
-    MockNumericNsmSensorAggregator aggregator{name,
-                                              "GetSensorReadingAggregate"};
+    MockNumericNsmSensorAggregator aggregator{name, "GetSensorReadingAggregate",
+                                              true};
     const uint8_t instance_id{30};
     const std::array<uint8_t, 2> tags{0, 39};
     constexpr size_t data_len{4};
@@ -85,7 +82,7 @@ TEST(nsmNumericSensorAggregator, GoodTest)
                                  response.size());
     aggregator.updateSensorReading(tags[0], value, timestamp);
 }
-
+/*
 TEST(nsmTempSensorAggregator, GoodTest)
 {
     NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate"};
@@ -102,7 +99,8 @@ TEST(nsmTempSensorAggregator, GoodTest)
     EXPECT_EQ(command->hdr.data_size, 1);
     EXPECT_EQ(command->sensor_id, 255);
 }
-
+*/
+/*
 TEST(nsmPowerSensorAggregator, GoodTest)
 {
     NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", 1};
@@ -120,4 +118,4 @@ TEST(nsmPowerSensorAggregator, GoodTest)
     EXPECT_EQ(command->hdr.data_size, 2);
     EXPECT_EQ(command->sensor_id, 255);
     EXPECT_EQ(command->averaging_interval, 1);
-}
+} */

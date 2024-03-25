@@ -1,5 +1,8 @@
 #include "nsmObjectFactory.hpp"
 namespace nsm
 {
-std::map<std::string, CreationFunction> NsmObjectFactory::creationFunctions;
-}
+
+NsmObjectFactory* NsmObjectFactory::sInstance = nullptr;
+std::vector<InitFunction> NsmObjectFactory::initFunctions{};
+
+} // namespace nsm

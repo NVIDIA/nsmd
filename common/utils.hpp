@@ -257,7 +257,8 @@ std::string getCurrentSystemTime();
  *  @return - eid_t eid for corresponding UUID
  */
 eid_t getEidFromUUID(
-    const std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable, uuid_t uuid);
+    const std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+    uuid_t uuid);
 
 /** @brief UUID conversion from integer array to std::string.
  *

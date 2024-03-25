@@ -7,9 +7,9 @@
 namespace nsm
 {
 NsmPowerAggregator::NsmPowerAggregator(const std::string& name,
-                                       const std::string& type,
+                                       const std::string& type, bool priority,
                                        uint8_t averagingInterval) :
-    NsmNumericAggregator(name, type),
+    NsmNumericAggregator(name, type, priority),
     averagingInterval(averagingInterval)
 {}
 

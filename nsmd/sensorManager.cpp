@@ -4,13 +4,9 @@
 
 #include "libnsm/platform-environmental.h"
 
-#include "nsmPower.hpp"
-#include "nsmPowerAggregator.hpp"
-#include "nsmTemp.hpp"
-#include "nsmTempAggregator.hpp"
+#include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
-#include "nsmObjectFactory.hpp"
 #include <chrono>
 #include <iostream>
 
@@ -21,20 +17,23 @@ SensorManager::SensorManager(
     sdbusplus::bus::bus& bus, sdeventplus::Event& event,
     requester::Handler<requester::Request>& handler,
     nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
-    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable) :
+    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+    NsmDeviceTable& nsmDevices) :
     bus(bus),
     event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable),
-    inventoryAddedSignal(
-        bus,
-        sdbusplus::bus::match::rules::interfacesAdded(
-            "/xyz/openbmc_project/inventory"),
-        std::bind_front(&SensorManager::interfaceAddedhandler, this))
+    objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
 {
     scanInventory();
+
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(std::mem_fn(&SensorManager::_startPolling), this,
                          std::placeholders::_1));
+
+    inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
+        bus,
+        sdbusplus::bus::match::rules::interfacesAdded(
+            "/xyz/openbmc_project/inventory"),
+        std::bind_front(&SensorManager::interfaceAddedhandler, this));
 }
 
 void SensorManager::scanInventory()
@@ -42,10 +41,17 @@ void SensorManager::scanInventory()
     try
     {
         std::vector<std::string> ifaceList;
-        for (auto [interfaces, functionData] : NsmObjectFactory::creationFunctions) {
-            ifaceList.emplace_back(interfaces);
+        for (auto [interface, functionData] :
+             NsmObjectFactory::getInstance()->creationFunctions)
+        {
+            ifaceList.emplace_back(interface);
         }
-            
+
+        if (ifaceList.size() == 0)
+        {
+            return;
+        }
+
         GetSubTreeResponse getSubtreeResponse = utils::DBusHandler().getSubtree(
             "/xyz/openbmc_project/inventory", 0, ifaceList);
 
@@ -60,9 +66,8 @@ void SensorManager::scanInventory()
             {
                 for (const auto& interface : interfaces)
                 {
-                    NsmObjectFactory::createObjects(
-                        interface, objPath, eidTable, deviceSensors,
-                        prioritySensors, roundRobinSensors);
+                    NsmObjectFactory::getInstance()->createObjects(
+                        interface, objPath, nsmDevices);
                 }
             }
         }
@@ -84,9 +89,7 @@ void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
     msg.read(objPath, interfaces);
     for (const auto& [interface, _] : interfaces)
     {
-        NsmObjectFactory::createObjects(interface, objPath, eidTable,
-                                        deviceSensors, prioritySensors,
-                                        roundRobinSensors);
+        NsmObjectFactory::getInstance()->createObjects(interface, objPath, nsmDevices);
     }
 
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
@@ -96,28 +99,24 @@ void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
 
 void SensorManager::_startPolling(sdeventplus::source::EventBase& /* source */)
 {
+    newSensorEvent.reset();
     startPolling();
 }
 
 void SensorManager::startPolling()
 {
-    for (const auto& [eid, sensors] : deviceSensors)
+    for (auto& nsmDevice : nsmDevices)
     {
-        if (sensors.size() == 0)
+        if (!nsmDevice->pollingTimer)
         {
-            continue;
-        }
-
-        if (pollingTimers.find(eid) == pollingTimers.end())
-        {
-            pollingTimers[eid] = std::make_unique<phosphor::Timer>(
+            nsmDevice->pollingTimer = std::make_unique<phosphor::Timer>(
                 event.get(),
-                std::bind_front(&SensorManager::doPolling, this, eid));
+                std::bind_front(&SensorManager::doPolling, this, nsmDevice));
         }
 
-        if (!pollingTimers[eid]->isRunning())
+        if (!(nsmDevice->pollingTimer->isRunning()))
         {
-            pollingTimers[eid]->start(
+            nsmDevice->pollingTimer->start(
                 std::chrono::duration_cast<std::chrono::milliseconds>(
                     std::chrono::milliseconds(SENSOR_POLLING_TIME)),
                 true);
@@ -127,67 +126,70 @@ void SensorManager::startPolling()
 
 void SensorManager::stopPolling()
 {
-    for (const auto& [eid, pollingTimer] : pollingTimers)
+    for (auto& nsmDevice : nsmDevices)
     {
-        pollingTimer->stop();
+        nsmDevice->pollingTimer->stop();
     }
 }
 
-void SensorManager::doPolling(eid_t eid)
+void SensorManager::doPolling(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    if (doPollingTaskHandles[eid])
+    if (nsmDevice->doPollingTaskHandle)
     {
-        if (!doPollingTaskHandles[eid].done())
+        if (!(nsmDevice->doPollingTaskHandle.done()))
         {
             return;
         }
-        doPollingTaskHandles[eid].destroy();
+        nsmDevice->doPollingTaskHandle.destroy();
     }
 
-    auto co = doPollingTask(eid);
-    doPollingTaskHandles[eid] = co.handle;
-    if (doPollingTaskHandles[eid].done())
+    auto co = doPollingTask(nsmDevice);
+    nsmDevice->doPollingTaskHandle = co.handle;
+    if (nsmDevice->doPollingTaskHandle.done())
     {
-        doPollingTaskHandles[eid] = nullptr;
+        nsmDevice->doPollingTaskHandle = nullptr;
     }
 }
 
-requester::Coroutine SensorManager::doPollingTask(eid_t eid)
+requester::Coroutine
+    SensorManager::doPollingTask(std::shared_ptr<NsmDevice> nsmDevice)
 {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
-
+    eid_t eid = utils::getEidFromUUID(eidTable, nsmDevice->uuid);
     do
     {
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
         // update all priority sensors
-        auto& sensors = prioritySensors[eid];
+        auto& sensors = nsmDevice->prioritySensors;
         for (auto& sensor : sensors)
         {
             co_await getSensorReading(eid, sensor);
-            if (pollingTimers[eid] && !pollingTimers[eid]->isRunning())
+            if (nsmDevice->pollingTimer &&
+                !nsmDevice->pollingTimer->isRunning())
             {
                 co_return NSM_SW_ERROR;
             }
         }
 
         // update roundRobin sensors for rest of polling time interval
-        auto toBeUpdated = roundRobinSensors[eid].size();
+        auto toBeUpdated = nsmDevice->roundRobinSensors.size();
         do
         {
             if (toBeUpdated == 0)
             {
                 break;
             }
-            auto sensor = roundRobinSensors[eid].front();
-            roundRobinSensors[eid].pop_front();
-            roundRobinSensors[eid].push_back(sensor);
+            auto sensor = nsmDevice->roundRobinSensors.front();
+            nsmDevice->roundRobinSensors.pop_front();
+            nsmDevice->roundRobinSensors.push_back(sensor);
             toBeUpdated--;
 
             co_await getSensorReading(eid, sensor);
-            if (pollingTimers[eid] && !pollingTimers[eid]->isRunning())
+            if (nsmDevice->pollingTimer &&
+                !nsmDevice->pollingTimer->isRunning())
             {
                 co_return NSM_SW_ERROR;
             }
