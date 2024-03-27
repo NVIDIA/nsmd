@@ -25,7 +25,10 @@ class NsmNumericSensor;
 class NsmNumericAggregator : public NsmSensor
 {
   public:
-    using NsmSensor::NsmSensor;
+    NsmNumericAggregator(const std::string& name, const std::string& type,
+                         bool priority) :
+        NsmSensor(name, type),
+        priority(priority){};
     virtual ~NsmNumericAggregator() = default;
 
     int addSensor(uint8_t tag, std::shared_ptr<NsmNumericSensor> sensor);
@@ -36,6 +39,8 @@ class NsmNumericAggregator : public NsmSensor
     {
         return sensors[tag].get();
     };
+
+    bool priority;
 
   protected:
     int updateSensorReading(uint8_t tag, double reading,

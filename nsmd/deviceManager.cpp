@@ -49,11 +49,20 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
-            lg2::info("found NSM device. eid={EID} uuid={UUID}", "EID", eid,
+            lg2::info("found NSM device, eid={EID} uuid={UUID}", "EID", eid,
                       "UUID", uuid);
 
-            auto nsmDevice = std::make_shared<NsmDevice>(eid);
-            nsmDevices.emplace(eid, nsmDevice);
+            auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+            if (nsmDevice)
+            {
+                lg2::info(
+                    "The NSM device has been discovered before, uuid={UUID}",
+                    "UUID", uuid);
+                continue;
+            }
+
+            nsmDevice = std::make_shared<NsmDevice>(uuid);
+            nsmDevices.emplace_back(nsmDevice);
 
             // get inventory information from device
             InventoryProperties properties{};

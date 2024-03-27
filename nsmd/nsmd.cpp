@@ -3,6 +3,7 @@
 #include "deviceManager.hpp"
 #include "instance_id.hpp"
 #include "invoker.hpp"
+#include "nsmDevice.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "socket_handler.hpp"
@@ -84,9 +85,12 @@ int main(int argc, char** argv)
                                                           sockManager, verbose);
         mctp_socket::Handler sockHandler(event, reqHandler, invoker,
                                          sockManager, verbose);
+
+        nsm::NsmDeviceTable nsmDevices;
         std::unique_ptr<nsm::DeviceManager> deviceManager =
-            std::make_unique<nsm::DeviceManager>(
-                event, reqHandler, instanceIdDb, objServer, eidTable);
+            std::make_unique<nsm::DeviceManager>(event, reqHandler,
+                                                 instanceIdDb, objServer,
+                                                 eidTable, nsmDevices);
         std::unique_ptr<mctp::MctpDiscovery> mctpDiscoveryHandler =
             std::make_unique<mctp::MctpDiscovery>(
                 bus, sockHandler,
@@ -94,8 +98,9 @@ int main(int argc, char** argv)
                     deviceManager.get()});
 
         std::unique_ptr<nsm::SensorManager> sensorManager =
-            std::make_unique<nsm::SensorManager>(
-                bus, event, reqHandler, instanceIdDb, objServer, eidTable);
+            std::make_unique<nsm::SensorManager>(bus, event, reqHandler,
+                                                 instanceIdDb, objServer,
+                                                 eidTable, nsmDevices);
 
 #ifdef NVIDIA_SHMEM
         // Initializing shared memory

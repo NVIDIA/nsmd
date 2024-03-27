@@ -10,15 +10,15 @@ sources = [
   'socket_handler.cpp',
   'nsmDevice.cpp',
   'nsmNumericSensor.cpp',
-  'nsmTemp.cpp',
-  'nsmPower.cpp',
   'nsmNumericAggregator.cpp',
-  'nsmTempAggregator.cpp',
-  'nsmPowerAggregator.cpp',
+  'nsmObjectFactory.cpp',
   'nsmd.cpp',
 ]
 
 nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common']
+
+subdir('nsmTemp')
+subdir('nsmPower')
 
 executable(
   'nsmd',

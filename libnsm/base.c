@@ -435,7 +435,7 @@ int decode_query_device_identification_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
-int encode_reason_code(uint8_t cc, uint8_t reason_code, uint8_t command_code,
+int encode_reason_code(uint8_t cc, uint16_t reason_code, uint8_t command_code,
 		       struct nsm_msg *msg)
 {
 	if (msg == NULL) {

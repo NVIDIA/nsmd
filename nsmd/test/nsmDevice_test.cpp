@@ -14,9 +14,9 @@ using ::testing::ElementsAre;
 
 TEST(nsmDevice, GoodTest)
 {
-    uint8_t eid = 30;
+    uuid_t uuid = "00000000-0000-0000-0000-000000000000";
 
-    nsm::NsmDevice nsmDevice(eid);
+    nsm::NsmDevice nsmDevice(uuid);
 
-    EXPECT_EQ(nsmDevice.eid, eid);
+    EXPECT_EQ(nsmDevice.uuid, uuid);
 }

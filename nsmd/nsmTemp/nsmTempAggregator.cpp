@@ -7,8 +7,8 @@
 namespace nsm
 {
 NsmTempAggregator::NsmTempAggregator(const std::string& name,
-                                     const std::string& type) :
-    NsmNumericAggregator(name, type)
+                                     const std::string& type, bool priority) :
+    NsmNumericAggregator(name, type, priority)
 {}
 
 std::optional<std::vector<uint8_t>>

@@ -29,15 +29,15 @@ using RequesterHandler = requester::Handler<requester::Request>;
 class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
 {
   public:
-    DeviceManager(
-        sdeventplus::Event& event,
-        requester::Handler<requester::Request>& handler,
-        nsm::InstanceIdDb& instanceIdDb,
-        sdbusplus::asio::object_server& objServer,
-        std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable) :
+    DeviceManager(sdeventplus::Event& event,
+                  requester::Handler<requester::Request>& handler,
+                  nsm::InstanceIdDb& instanceIdDb,
+                  sdbusplus::asio::object_server& objServer,
+                  std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+                  NsmDeviceTable& nsmDevices) :
         event(event),
         handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-        eidTable(eidTable)
+        eidTable(eidTable), nsmDevices(nsmDevices)
     {}
 
     void handleMctpEndpoints(const MctpInfos& mctpInfos)
@@ -77,7 +77,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     std::queue<MctpInfos> queuedMctpInfos;
     std::coroutine_handle<> discoverNsmDeviceTaskHandle;
 
-    std::map<eid_t, std::shared_ptr<NsmDevice>> nsmDevices;
+    NsmDeviceTable& nsmDevices;
 };
 
 } // namespace nsm
