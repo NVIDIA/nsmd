@@ -27,19 +27,11 @@ using CreationFunction =
                        NsmDeviceTable& nsmDevices)>;
 
 #define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
-    static void UNIQUE_NAME(_init_)()                                          \
-    {                                                                          \
-        auto factory = NsmObjectFactory::getInstance();                        \
-        factory->registerCreationFunction(func, interfaceName);                \
-    }                                                                          \
-                                                                               \
     static void __attribute__((constructor)) UNIQUE_NAME(_register_)()         \
     {                                                                          \
-        NsmObjectFactory::registerNsmObject(UNIQUE_NAME(_init_),               \
-                                            interfaceName);                    \
+        auto& factory = NsmObjectFactory::instance();                          \
+        factory.registerCreationFunction(func, interfaceName);                 \
     }
-
-using InitFunction = std::function<void()>;
 
 class NsmObjectFactory
 {
@@ -47,52 +39,18 @@ class NsmObjectFactory
     void operator=(const NsmObjectFactory&) = delete;
     NsmObjectFactory(NsmObjectFactory& other) = delete;
 
-    static NsmObjectFactory* getInstance()
-    {
-        if (sInstance == nullptr)
-        {
-            sInstance = new NsmObjectFactory();
-            for (auto func : initFunctions)
-            {
-                func();
-            }
-        }
-
-        return sInstance;
-    }
-
-    static void registerNsmObject(const InitFunction& func,
-                                  const std::string interfaceName)
-    {
-        lg2::info("register nsmObject: interfaceName={NAME}", "NAME",
-                  interfaceName);
-        initFunctions.push_back(func);
-    }
+    static NsmObjectFactory& instance();
 
     void createObjects(const std::string& interface, const std::string& objPath,
-                       NsmDeviceTable& nsmDevices)
-    {
-        auto it = creationFunctions.find(interface);
-        if (it != creationFunctions.end())
-        {
-            it->second(interface, objPath, nsmDevices);
-        }
-    }
+                       NsmDeviceTable& nsmDevices);
 
     void registerCreationFunction(const CreationFunction& func,
-                                  const std::string interfaceName)
-    {
-        creationFunctions[interfaceName] = func;
-    }
+                                  const std::string interfaceName);
 
     std::map<std::string, CreationFunction> creationFunctions;
 
   private:
-    NsmObjectFactory()
-    {}
-
-    static std::vector<InitFunction> initFunctions;
-    static NsmObjectFactory* sInstance;
+    NsmObjectFactory() = default;
 };
 
 } // namespace nsm
