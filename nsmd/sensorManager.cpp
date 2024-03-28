@@ -19,8 +19,7 @@ SensorManager::SensorManager(
     nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
     NsmDeviceTable& nsmDevices) :
-    bus(bus),
-    event(event), handler(handler), instanceIdDb(instanceIdDb),
+    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
     objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
 {
     scanInventory();
@@ -42,7 +41,7 @@ void SensorManager::scanInventory()
     {
         std::vector<std::string> ifaceList;
         for (auto [interface, functionData] :
-             NsmObjectFactory::getInstance()->creationFunctions)
+             NsmObjectFactory::instance().creationFunctions)
         {
             ifaceList.emplace_back(interface);
         }
@@ -66,7 +65,7 @@ void SensorManager::scanInventory()
             {
                 for (const auto& interface : interfaces)
                 {
-                    NsmObjectFactory::getInstance()->createObjects(
+                    NsmObjectFactory::instance().createObjects(
                         interface, objPath, nsmDevices);
                 }
             }
@@ -89,7 +88,8 @@ void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
     msg.read(objPath, interfaces);
     for (const auto& [interface, _] : interfaces)
     {
-        NsmObjectFactory::getInstance()->createObjects(interface, objPath, nsmDevices);
+        NsmObjectFactory::instance().createObjects(interface, objPath,
+                                                   nsmDevices);
     }
 
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
