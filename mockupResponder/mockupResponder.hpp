@@ -2,6 +2,7 @@
 
 #include "base.h"
 #include "network-ports.h"
+#include "platform-environmental.h"
 #include "requester/mctp.h"
 
 #include <sdbusplus/asio/object_server.hpp>
@@ -71,6 +72,8 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getCurrentPowerDrawHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getDriverInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     sdeventplus::Event& event;

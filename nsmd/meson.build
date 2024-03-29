@@ -19,6 +19,7 @@ nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common']
 
 subdir('nsmTemp')
 subdir('nsmPower')
+subdir('nsmFwSwInventory')
 
 executable(
   'nsmd',

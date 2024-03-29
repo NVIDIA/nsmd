@@ -14,6 +14,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_TEMPERATURE_READING = 0x00,
 	NSM_GET_POWER = 0x01,
 	NSM_GET_INVENTORY_INFORMATION = 0x11,
+	NSM_GET_DRIVER_INFO = 0x14
 };
 
 enum nsm_inventory_property_identifiers {
@@ -57,12 +58,36 @@ enum nsm_data_type {
 	NvCharArray = 11,
 };
 
+typedef uint8_t enum8;
+
+// Driver states as specified in your documentation.
+typedef enum {
+    DriverStateUnknown = 0,
+    DriverNotLoaded = 1,
+    DriverLoaded = 2
+} DriverStateEnum;
+
+// Driver info
+struct nsm_driver_info {
+	enum8 driver_state;
+	char driver_version[1];
+} __attribute__((packed));
+
 struct nsm_inventory_property_record {
 	uint8_t property_id;
 	uint8_t data_type : 4;
 	uint8_t reserved : 4;
 	uint16_t data_length;
 	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_driver_info_resp
+ *
+ *  Structure representing NSM get Driver Information response.
+ */
+struct nsm_get_driver_info_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_driver_info driver_info;
 } __attribute__((packed));
 
 /** @struct nsm_get_inventory_information_req
@@ -141,6 +166,49 @@ struct nsm_aggregate_resp_sample {
 	uint8_t reserved : 4;
 	uint8_t data[1];
 } __attribute__((packed));
+
+/** @brief Encode a Get Driver Information request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_driver_info_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get Driver Information request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_driver_info_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get Driver Information response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] driver_state - State of the driver
+ *  @param[in] driver_version - Version of the driver
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_driver_info_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, struct nsm_driver_info *data,
+				struct nsm_msg *msg);
+
+/** @brief Decode a Get Driver Information response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion code
+ *  @param[out] driver_state - State of the driver
+ *  @param[out] driver_version - Version of the driver
+ *  @return nsm_completion_codes
+ */
+int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				struct nsm_driver_info *data);
 
 /** @brief Encode a Get Inventory Information request message
  *

@@ -230,6 +230,8 @@ std::optional<std::vector<uint8_t>>
                     return getTemperatureReadingHandler(request, requestLen);
                 case NSM_GET_POWER:
                     return getCurrentPowerDrawHandler(request, requestLen);
+                case NSM_GET_DRIVER_INFO:
+                    return getDriverInfoHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -644,5 +646,68 @@ std::optional<std::vector<uint8_t>>
         assert(rc == NSM_SW_SUCCESS);
         return response;
     }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDriverInfoHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    lg2::info("getDriverInfoHandler: request length={LEN}", "LEN", requestLen);
+
+    // Assuming decode_get_driver_info_req
+    auto rc = decode_get_driver_info_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_driver_info_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    // Prepare mock driver info data
+    const char* mockVersion = "MockDriverVersion 1.0.0";
+    size_t versionLength =
+        std::strlen(mockVersion) + 1; // Include null terminator
+
+    auto driver_info = reinterpret_cast<struct nsm_driver_info*>(
+        malloc(sizeof(struct nsm_driver_info) + versionLength));
+    if (!driver_info)
+    {
+        // Handle memory allocation failure
+        lg2::error("Failed to allocate memory for driver_info");
+        return std::nullopt;
+    }
+
+    // Initialize driver_info to zero, including the newly allocated memory
+    memset(driver_info, 0, sizeof(struct nsm_driver_info) - 1 + versionLength);
+
+    // Mocking driver state and version for the response
+    driver_info->driver_state = 2;
+    memcpy(driver_info->driver_version, mockVersion,
+           versionLength); // copy null string character
+
+    // Calculate total response size: header, fixed part of response, and
+    // dynamic driver version length
+    size_t totalResponseSize = sizeof(nsm_msg_hdr) +
+                               sizeof(nsm_get_driver_info_resp) - 1 +
+                               versionLength; // -1 because of FAM
+
+    lg2::info("Mock driver info - State: {STATE}, Version: {VERSION}", "STATE",
+              static_cast<int>(driver_info->driver_state), "VERSION",
+              mockVersion);
+
+    std::vector<uint8_t> response(totalResponseSize, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    // Assuming encode_get_driver_info_resp fills in the response with the
+    // provided driver state and version
+    rc = encode_get_driver_info_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, driver_info, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_driver_info_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
 }
 } // namespace MockupResponder
