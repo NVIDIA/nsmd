@@ -21,7 +21,6 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
-// using HealthIntf = object_t<State::Decorator::server::Health>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SoftwareIntf = object_t<Software::server::Version>;
 
@@ -39,11 +38,15 @@ class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
                               size_t responseLen) override;
 
   private:
-    void updateValue(enum8 driverState, char driverVersion[64]);
+    void updateValue(enum8 driverState, std::string driverVersion);
     std::unique_ptr<SoftwareIntf> softwareVer_ = nullptr;
     std::unique_ptr<OperationalStatusIntf> operationalStatus_ = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
     std::unique_ptr<AssetIntf> asset_ = nullptr;
     std::string assoc;
+
+    // to be consumed by unit tests
+    enum8 driverState_ = 0;
+    std::string driverVersion_ = "";
 };
 } // namespace nsm

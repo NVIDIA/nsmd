@@ -393,8 +393,7 @@ int encode_get_driver_info_req(uint8_t instance_id, struct nsm_msg *msg)
 	}
 
 	// Since there's no payload, we just set the command and data size
-	struct nsm_common_req *request =
-	    (struct nsm_common_req *)msg->payload;
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 
 	request->command = NSM_GET_DRIVER_INFO;
 	request->data_size = 0;
@@ -412,7 +411,7 @@ int decode_get_driver_info_req(const struct nsm_msg *msg, size_t msg_len)
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct  nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 
 	if (request->data_size != 0) {
 		return NSM_SW_ERROR_DATA;
@@ -420,22 +419,24 @@ int decode_get_driver_info_req(const struct nsm_msg *msg, size_t msg_len)
 	return NSM_SW_SUCCESS;
 }
 
-int encode_get_driver_info_resp(uint8_t instance_id,  uint8_t cc,
-			     uint16_t reason_code, struct nsm_driver_info *data, struct nsm_msg *msg)
+int encode_get_driver_info_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, const uint16_t data_size,
+				const uint8_t *driver_info_data,
+				struct nsm_msg *msg)
 {
-    if (msg == NULL || data == NULL) {
-        return NSM_SW_ERROR_NULL;
-    }
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
 
-    struct nsm_header_info header = {0};
-    header.nsm_msg_type = NSM_RESPONSE;
-    header.instance_id = instance_id & 0x1f;
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
 	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
 
-    uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-    if (rc != NSM_SUCCESS) {
-        return rc;
-    }
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(cc, reason_code, NSM_GET_DRIVER_INFO,
 					  msg);
@@ -446,60 +447,53 @@ int encode_get_driver_info_resp(uint8_t instance_id,  uint8_t cc,
 
 	response->hdr.command = NSM_GET_DRIVER_INFO;
 	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(data_size);
 
+	if (driver_info_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	response->driver_state = driver_info_data[0];
+	memcpy(response->driver_version,
+	       driver_info_data + sizeof(response->driver_state),
+	       data_size - sizeof(response->driver_state));
 
-	// +1 because it's a null-terminated string
-	size_t driver_version_size = strlen(data->driver_version) + 1;
-	size_t total_payload_size = sizeof(data->driver_state) + driver_version_size;
-	response->hdr.data_size = htole16(total_payload_size);
-
-	response->driver_info.driver_state = data->driver_state;
-	memcpy(response->driver_info.driver_version, data->driver_version, driver_version_size);
-    return NSM_SUCCESS;
+	return NSM_SUCCESS;
 }
 
-int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *reason_code, struct nsm_driver_info *data)
+int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				enum8 *driver_state, char *driver_version)
 {
-    if (msg == NULL || cc == NULL ||  data == NULL) {
-        return NSM_SW_ERROR_NULL;
-    }
+	if (driver_state == NULL || driver_version == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
 
 	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
 	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
 		return rc;
 	}
 
-	// Ensure message length is enough to at least contain the fixed parts of the response
-    size_t expected_min_length = sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp) + sizeof(enum8); // Size of driver_state
-    if (msg_len < expected_min_length) {
-        return NSM_SW_ERROR_LENGTH;
-    }
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_driver_info_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	struct nsm_get_driver_info_resp *response =
 	    (struct nsm_get_driver_info_resp *)msg->payload;
-	data->driver_state = response->driver_info.driver_state;
+	size_t data_size = le16toh(response->hdr.data_size);
+	*driver_state = response->driver_state;
+	size_t driver_version_length =
+	    data_size - sizeof(response->driver_state);
 
-	// Calculate the length available for the driver_version string
-    size_t available_length = msg_len - expected_min_length;
-	// Ensure there is space for at least a null terminator, indicating a non-empty string
-    if (available_length < 1) {
-        return NSM_SW_ERROR_DATA; // Or appropriate error code indicating incomplete/missing driver_version
-    }
+	if (driver_version_length > MAX_VERSION_STRING_SIZE ||
+	    response->driver_version[driver_version_length - 1] != '\0') {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
-	*cc = response->hdr.completion_code;
-	// Determine actual length of driver_version, ensuring not to exceed available_length
-    size_t driver_version_length = strnlen(response->driver_info.driver_version, available_length);
+	memcpy(driver_version, response->driver_version, driver_version_length);
 
-    // Ensure driver_version is null-terminated within bounds
-    if (driver_version_length == available_length && response->driver_info.driver_version[driver_version_length - 1] != '\0') {
-        return NSM_SW_ERROR_DATA; // Driver version string not properly terminated
-    }
-
-	strncpy(data->driver_version, response->driver_info.driver_version, driver_version_length);
-    data->driver_version[driver_version_length] = '\0'; // Ensure null-termination
-    return NSM_SUCCESS;
+	return NSM_SUCCESS;
 }
-
 
 int encode_aggregate_get_current_power_draw_reading(uint32_t reading,
 						    uint8_t *data,

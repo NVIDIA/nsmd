@@ -452,29 +452,31 @@ class GetDriverInfo : public CommandInterface
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
         uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
-        auto driver_info = reinterpret_cast<struct nsm_driver_info*>(
-            malloc(sizeof(struct nsm_driver_info) + 256));
+        uint16_t reasonCode = ERR_NULL;
+        enum8 driverState = 0;
+        char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
 
         auto rc = decode_get_driver_info_resp(responsePtr, payloadLength, &cc,
-                                              &reason_code, driver_info);
+                                              &reasonCode, &driverState,
+                                              driverVersion);
+
+        std::string version(driverVersion);
+
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << static_cast<int>(cc)
-                      << ", reasonCode=" << static_cast<int>(reason_code)
-                      << "\n"
+                      << ", reasonCode=" << static_cast<int>(reasonCode) << "\n"
                       << payloadLength << "...."
-                      << (sizeof(struct nsm_msg_hdr) +
-                          sizeof(driver_info->driver_state) +
-                          sizeof(driver_info->driver_version));
+                      << (sizeof(struct nsm_msg_hdr) + sizeof(driverState) +
+                          version.length());
             return;
         }
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["Driver State"] = static_cast<int>(driver_info->driver_state);
-        result["Driver Version"] = driver_info->driver_version;
+        result["Driver State"] = static_cast<int>(driverState);
+        result["Driver Version"] = version;
         nsmtool::helper::DisplayInJson(result);
     }
 };

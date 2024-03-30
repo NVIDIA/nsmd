@@ -229,8 +229,6 @@ requester::Coroutine
             "NAME", sensor->getName(), "EID", eid);
     }
 
-    utils::printBuffer(utils::Rx, responseMsg, responseLen);
-
     rc = sensor->handleResponseMsg(responseMsg, responseLen);
     if (rc)
     {

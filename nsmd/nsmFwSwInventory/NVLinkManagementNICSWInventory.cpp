@@ -29,11 +29,11 @@ NsmSWInventoryDriverVersionAndStatus::NsmSWInventoryDriverVersionAndStatus(
     asset_->manufacturer(manufacturer);
 }
 
-void NsmSWInventoryDriverVersionAndStatus::updateValue(enum8 driverState,
-                                                       char driverVersion[64])
+void NsmSWInventoryDriverVersionAndStatus::updateValue(
+    enum8 driverState, std::string driverVersion)
 {
-    softwareVer_->version(std::string(driverVersion));
-    switch (driverState)
+    softwareVer_->version(driverVersion);
+    switch (static_cast<int>(driverState))
     {
         case 2:
             operationalStatus_->functional(true);
@@ -42,6 +42,10 @@ void NsmSWInventoryDriverVersionAndStatus::updateValue(enum8 driverState,
             operationalStatus_->functional(false);
             break;
     }
+
+    // to be consumed by unit tests
+    driverState_ = driverState;
+    driverVersion_ = driverVersion;
 }
 
 std::optional<std::vector<uint8_t>>
@@ -53,7 +57,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_driver_info_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_driver_version_req failed. eid={EID} rc={RC}",
+        lg2::error("encode_get_driverVersion_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
     }
@@ -64,22 +68,24 @@ uint8_t NsmSWInventoryDriverVersionAndStatus::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
-    auto driver_info = reinterpret_cast<struct nsm_driver_info*>(
-        malloc(sizeof(struct nsm_driver_info) + 256));
+    uint16_t reasonCode = ERR_NULL;
+    enum8 driverState = 0;
+    char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
 
-    auto rc = decode_get_driver_info_resp(responseMsg, responseLen, &cc,
-                                          &reason_code, driver_info);
+    auto rc =
+        decode_get_driver_info_resp(responseMsg, responseLen, &cc, &reasonCode,
+                                    &driverState, driverVersion);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateValue(driver_info->driver_state, driver_info->driver_version);
+        std::string version(driverVersion);
+        updateValue(driverState, version);
     }
     else
     {
         lg2::error(
             "handleResponseMsg: decode_get_driver_info_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

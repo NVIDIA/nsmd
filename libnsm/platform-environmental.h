@@ -8,6 +8,8 @@ extern "C" {
 #include "base.h"
 #include <stdbool.h>
 
+const uint8_t MAX_VERSION_STRING_SIZE = 100;
+
 /** @brief NSM Type3 platform environmental commands
  */
 enum nsm_platform_environmental_commands {
@@ -67,12 +69,6 @@ typedef enum {
     DriverLoaded = 2
 } DriverStateEnum;
 
-// Driver info
-struct nsm_driver_info {
-	enum8 driver_state;
-	char driver_version[1];
-} __attribute__((packed));
-
 struct nsm_inventory_property_record {
 	uint8_t property_id;
 	uint8_t data_type : 4;
@@ -87,7 +83,8 @@ struct nsm_inventory_property_record {
  */
 struct nsm_get_driver_info_resp {
 	struct nsm_common_resp hdr;
-	struct nsm_driver_info driver_info;
+	enum8 driver_state;
+	uint8_t driver_version[1];
 } __attribute__((packed));
 
 /** @struct nsm_get_inventory_information_req
@@ -188,27 +185,28 @@ int decode_get_driver_info_req(const struct nsm_msg *msg, size_t msg_len);
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - Completion code
  *  @param[in] reason_code - NSM reason code
- *  @param[in] driver_state - State of the driver
- *  @param[in] driver_version - Version of the driver
+ *  @param[in] data_size - data size
+ *  @param[in] driver_info_data - driver related info
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_driver_info_resp(uint8_t instance_id, uint8_t cc,
-				uint16_t reason_code, struct nsm_driver_info *data,
-				struct nsm_msg *msg);
+int encode_get_driver_info_resp(uint8_t instance_id,  uint8_t cc,
+			     uint16_t reason_code, const uint16_t data_size,
+					  const uint8_t *driver_info_data, struct nsm_msg *msg);
 
 /** @brief Decode a Get Driver Information response message
  *
  *  @param[in] msg - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
  *  @param[out] driver_state - State of the driver
  *  @param[out] driver_version - Version of the driver
  *  @return nsm_completion_codes
  */
 int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint8_t *cc, uint16_t *reason_code,
-				struct nsm_driver_info *data);
+				enum8 *driver_state, char *driver_version);
 
 /** @brief Encode a Get Inventory Information request message
  *

@@ -663,45 +663,33 @@ std::optional<std::vector<uint8_t>>
     }
 
     // Prepare mock driver info data
-    const char* mockVersion = "MockDriverVersion 1.0.0";
-    size_t versionLength =
-        std::strlen(mockVersion) + 1; // Include null terminator
+    std::string data = "MockDriverVersion 1.0.0";
+    std::vector<uint8_t> driver_info_data;
+    driver_info_data.resize(data.length() + 2); // +2 for state and null string
+    driver_info_data[0] = 2;                    // driver state
+    int index = 1;
 
-    auto driver_info = reinterpret_cast<struct nsm_driver_info*>(
-        malloc(sizeof(struct nsm_driver_info) + versionLength));
-    if (!driver_info)
+    for (char& c : data)
     {
-        // Handle memory allocation failure
-        lg2::error("Failed to allocate memory for driver_info");
-        return std::nullopt;
+        driver_info_data[index++] = static_cast<uint8_t>(c);
     }
-
-    // Initialize driver_info to zero, including the newly allocated memory
-    memset(driver_info, 0, sizeof(struct nsm_driver_info) - 1 + versionLength);
-
-    // Mocking driver state and version for the response
-    driver_info->driver_state = 2;
-    memcpy(driver_info->driver_version, mockVersion,
-           versionLength); // copy null string character
-
-    // Calculate total response size: header, fixed part of response, and
-    // dynamic driver version length
-    size_t totalResponseSize = sizeof(nsm_msg_hdr) +
-                               sizeof(nsm_get_driver_info_resp) - 1 +
-                               versionLength; // -1 because of FAM
+    // Add null character at the end, position is data.length() + 1 due to
+    // starting at index 0
+    driver_info_data[data.length() + 1] = static_cast<uint8_t>('\0');
 
     lg2::info("Mock driver info - State: {STATE}, Version: {VERSION}", "STATE",
-              static_cast<int>(driver_info->driver_state), "VERSION",
-              mockVersion);
+              2, "VERSION", data);
 
-    std::vector<uint8_t> response(totalResponseSize, 0);
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      NSM_RESPONSE_CONVENTION_LEN +
+                                      driver_info_data.size(),
+                                  0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
-
-    // Assuming encode_get_driver_info_resp fills in the response with the
-    // provided driver state and version
     rc = encode_get_driver_info_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                     reason_code, driver_info, responseMsg);
+                                     reason_code, driver_info_data.size(),
+                                     (uint8_t*)driver_info_data.data(),
+                                     responseMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_driver_info_resp failed: rc={RC}", "RC", rc);
