@@ -798,6 +798,175 @@ class GetCurrentPowerDraw : public CommandInterface
     uint8_t averagingInterval;
 };
 
+class GetMigMode : public CommandInterface
+{
+  public:
+    ~GetMigMode() = default;
+    GetMigMode() = delete;
+    GetMigMode(const GetMigMode&) = delete;
+    GetMigMode(GetMigMode&&) = default;
+    GetMigMode& operator=(const GetMigMode&) = delete;
+    GetMigMode& operator=(GetMigMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_MIG_mode_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        bitfield8_t flags;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_MIG_mode_resp(responsePtr, payloadLength, &cc,
+                                           &data_size, &reason_code, &flags);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_MIG_mode_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        if (flags.bits.bit0)
+        {
+            result["MigModeEnabled"] = true;
+        }
+        else
+        {
+            result["MigModeEnabled"] = false;
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class GetEccMode : public CommandInterface
+{
+  public:
+    ~GetEccMode() = default;
+    GetEccMode() = delete;
+    GetEccMode(const GetEccMode&) = delete;
+    GetEccMode(GetEccMode&&) = default;
+    GetEccMode& operator=(const GetEccMode&) = delete;
+    GetEccMode& operator=(GetEccMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_ECC_mode_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        bitfield8_t flags;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_ECC_mode_resp(responsePtr, payloadLength, &cc,
+                                           &data_size, &reason_code, &flags);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_ECC_mode_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        if (flags.bits.bit0)
+        {
+            result["ECCModeEnabled"] = true;
+        }
+        else
+        {
+            result["ECCModeEnabled"] = false;
+        }
+        if (flags.bits.bit1)
+        {
+            result["PendingECCState"] = true;
+        }
+        else
+        {
+            result["PendingECCState"] = false;
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class GetEccErrorCounts : public CommandInterface
+{
+  public:
+    ~GetEccErrorCounts() = default;
+    GetEccErrorCounts() = delete;
+    GetEccErrorCounts(const GetEccErrorCounts&) = delete;
+    GetEccErrorCounts(GetEccErrorCounts&&) = default;
+    GetEccErrorCounts& operator=(const GetEccErrorCounts&) = delete;
+    GetEccErrorCounts& operator=(GetEccErrorCounts&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_ECC_error_counts_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        struct nsm_ECC_error_counts errorCounts;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_ECC_error_counts_resp(responsePtr, payloadLength,
+                                                   &cc, &data_size,
+                                                   &reason_code, &errorCounts);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_ECC_error_counts_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["ueCount"] = errorCounts.sram_uncorrected_parity +
+                            errorCounts.sram_uncorrected_secded;
+        result["ecCount"] = (int)errorCounts.sram_corrected;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -827,6 +996,19 @@ void registerCommand(CLI::App& app)
         telemetry->add_subcommand("GetDriverInfo", "get Driver info");
     commands.push_back(std::make_unique<GetDriverInfo>(
         "telemetry", "GetDriverInfo", getDriverInfo));
+
+    auto getMigMode = telemetry->add_subcommand("GetMigModes", "get MIG modes");
+    commands.push_back(
+        std::make_unique<GetMigMode>("telemetry", "GetMigMode", getMigMode));
+
+    auto getEccMode = telemetry->add_subcommand("GetEccMode", "get ECC modes");
+    commands.push_back(
+        std::make_unique<GetEccMode>("telemetry", "GetEccMode", getEccMode));
+
+    auto getEccErrorCounts =
+        telemetry->add_subcommand("GetEccErrorCounts", "get ECC error counts");
+    commands.push_back(std::make_unique<GetEccErrorCounts>(
+        "telemetry", "GetEccErrorCounts", getEccErrorCounts));
 }
 
 } // namespace telemetry

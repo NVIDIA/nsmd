@@ -12,11 +12,7 @@ void NsmObjectFactory::createObjects(const std::string& interface,
                                      const std::string& objPath,
                                      NsmDeviceTable& nsmDevices)
 {
-    auto it =
-        std::find_if(creationFunctions.begin(), creationFunctions.end(),
-                     [&interface](const auto& it) {
-                         return it.first.find(interface) != std::string::npos;
-                     });
+    auto it = creationFunctions.find(interface);
     if (it != creationFunctions.end())
     {
         it->second(interface, objPath, nsmDevices);

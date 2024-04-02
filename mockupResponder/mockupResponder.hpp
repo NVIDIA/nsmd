@@ -75,6 +75,15 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getDriverInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getMigModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getEccErrorCountsHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;

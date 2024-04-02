@@ -27,7 +27,7 @@ using CreationFunction =
                        NsmDeviceTable& nsmDevices)>;
 
 #define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
-    static void __attribute__((constructor)) UNIQUE_NAME(_register_)()         \
+    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)()         \
     {                                                                          \
         auto& factory = NsmObjectFactory::instance();                          \
         factory.registerCreationFunction(func, interfaceName);                 \
