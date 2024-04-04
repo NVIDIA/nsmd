@@ -230,6 +230,8 @@ std::optional<std::vector<uint8_t>>
                     return getTemperatureReadingHandler(request, requestLen);
                 case NSM_GET_POWER:
                     return getCurrentPowerDrawHandler(request, requestLen);
+                case NSM_GET_DRIVER_INFO:
+                    return getDriverInfoHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -644,5 +646,56 @@ std::optional<std::vector<uint8_t>>
         assert(rc == NSM_SW_SUCCESS);
         return response;
     }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDriverInfoHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    lg2::info("getDriverInfoHandler: request length={LEN}", "LEN", requestLen);
+
+    // Assuming decode_get_driver_info_req
+    auto rc = decode_get_driver_info_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_driver_info_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    // Prepare mock driver info data
+    std::string data = "MockDriverVersion 1.0.0";
+    std::vector<uint8_t> driver_info_data;
+    driver_info_data.resize(data.length() + 2); // +2 for state and null string
+    driver_info_data[0] = 2;                    // driver state
+    int index = 1;
+
+    for (char& c : data)
+    {
+        driver_info_data[index++] = static_cast<uint8_t>(c);
+    }
+    // Add null character at the end, position is data.length() + 1 due to
+    // starting at index 0
+    driver_info_data[data.length() + 1] = static_cast<uint8_t>('\0');
+
+    lg2::info("Mock driver info - State: {STATE}, Version: {VERSION}", "STATE",
+              2, "VERSION", data);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      NSM_RESPONSE_CONVENTION_LEN +
+                                      driver_info_data.size(),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_driver_info_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, driver_info_data.size(),
+                                     (uint8_t*)driver_info_data.data(),
+                                     responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_driver_info_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
 }
 } // namespace MockupResponder

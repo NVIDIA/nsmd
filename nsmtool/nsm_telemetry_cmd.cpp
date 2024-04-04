@@ -428,6 +428,59 @@ class GetInvectoryInformation : public CommandInterface
     uint8_t propertyId;
 };
 
+class GetDriverInfo : public CommandInterface
+{
+  public:
+    ~GetDriverInfo() = default;
+    GetDriverInfo() = delete;
+    GetDriverInfo(const GetDriverInfo&) = delete;
+    GetDriverInfo(GetDriverInfo&&) = default;
+    GetDriverInfo& operator=(const GetDriverInfo&) = delete;
+    GetDriverInfo& operator=(GetDriverInfo&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_driver_info_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        enum8 driverState = 0;
+        char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
+
+        auto rc = decode_get_driver_info_resp(responsePtr, payloadLength, &cc,
+                                              &reasonCode, &driverState,
+                                              driverVersion);
+
+        std::string version(driverVersion);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode) << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) + sizeof(driverState) +
+                          version.length());
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Driver State"] = static_cast<int>(driverState);
+        result["Driver Version"] = version;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class AggregateResponseParser
 {
   private:
@@ -770,6 +823,10 @@ void registerCommand(CLI::App& app)
         "GetCurrentPowerDraw", "get current power draw of a device");
     commands.push_back(std::make_unique<GetCurrentPowerDraw>(
         "telemetry", "GetCurrentPowerDraw", getCurrentPowerDraw));
+    auto getDriverInfo =
+        telemetry->add_subcommand("GetDriverInfo", "get Driver info");
+    commands.push_back(std::make_unique<GetDriverInfo>(
+        "telemetry", "GetDriverInfo", getDriverInfo));
 }
 
 } // namespace telemetry

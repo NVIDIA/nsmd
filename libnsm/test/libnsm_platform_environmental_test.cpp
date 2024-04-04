@@ -1,5 +1,6 @@
 #include "base.h"
 #include "platform-environmental.h"
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 TEST(getInventoryInformation, testGoodEncodeRequest)
@@ -379,4 +380,275 @@ TEST(getCurrentPowerDraw, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(reading, 4203351);
+}
+
+TEST(getDriverInfo, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_driver_info_req(0, request);
+
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_DRIVER_INFO, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getDriverInfo, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_driver_info_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getDriverInfo, testGoodEncodeResponse)
+{
+	// Prepare mock driver info data
+	std::string data = "Mock";
+	std::vector<uint8_t> driver_info_data;
+	driver_info_data.resize(data.length() +
+				2); // +2 for state and null string
+	driver_info_data[0] = 2;    // driver state
+	int index = 1;
+
+	for (char &c : data) {
+		driver_info_data[index++] = static_cast<uint8_t>(c);
+	}
+
+	driver_info_data[data.length() + 1] = static_cast<uint8_t>('\0');
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					     NSM_RESPONSE_CONVENTION_LEN +
+					     driver_info_data.size(),
+					 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint16_t reason_code = 0;
+
+	auto rc = encode_get_driver_info_resp(
+	    0, NSM_SUCCESS, reason_code, driver_info_data.size(),
+	    (uint8_t *)driver_info_data.data(), response);
+
+	struct nsm_get_driver_info_resp *resp =
+	    reinterpret_cast<struct nsm_get_driver_info_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_DRIVER_INFO, resp->hdr.command);
+	EXPECT_EQ(6, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(2, resp->driver_state);
+	size_t driver_version_length = (resp->hdr.data_size - 1);
+	char driverVersion[10] = {0};
+	memcpy(driverVersion, resp->driver_version, driver_version_length);
+	std::string version(driverVersion);
+	EXPECT_STREQ("Mock", version.c_str());
+}
+
+TEST(getDriverInfo, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    6,
+	    0, // data size
+	    2,
+	    'M',
+	    'o',
+	    'c',
+	    'k',
+	    '\0'};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	enum8 driverState = 0;
+	char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
+
+	auto rc = decode_get_driver_info_resp(
+	    response, msg_len, &cc, &reason_code, &driverState, driverVersion);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(2, driverState);
+	std::string version(driverVersion);
+	EXPECT_STREQ("Mock", version.c_str());
+}
+
+TEST(getDriverInfo, testNullDriverStatePointerDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    6,
+	    0, // data size
+	    2,
+	    'M',
+	    'o',
+	    'c',
+	    'k',
+	    '\0'};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code;
+	char driverVersion[MAX_VERSION_STRING_SIZE];
+
+	// Attempt to decode with a null pointer for driver_state
+	auto rc = decode_get_driver_info_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, driverVersion);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDriverInfo, testNullDriverVersionPointerDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    6,
+	    0, // data size
+	    2,
+	    'M',
+	    'o',
+	    'c',
+	    'k',
+	    '\0'};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code;
+	enum8 driverState = 0;
+
+	// Attempt to decode with a null pointer for driver_version
+	auto rc = decode_get_driver_info_resp(
+	    response, msg_len, &cc, &reason_code, &driverState, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDriverInfo, testDriverVersionNotNullTerminatedDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    6,
+	    0, // data size
+	    2,
+	    'M',
+	    'o',
+	    'c',
+	    'k',
+	    '!'};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code;
+	enum8 driverState = 0;
+	char driverVersion[MAX_VERSION_STRING_SIZE];
+
+	auto rc = decode_get_driver_info_resp(
+	    response, msg_len, &cc, &reason_code, &driverState, driverVersion);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getDriverInfo, testDriverVersionExceedsMaxSizeDecodeResponse)
+{
+	// Initialize a response message vector with enough space for headers
+	// and a too-long driver version string
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_DRIVER_INFO,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    110,
+	    0};
+
+	responseMsg.push_back(2); // Driver state
+
+	// Generate a driver version string that is MAX_VERSION_STRING_SIZE + 10
+	// character too long
+	for (int i = 0; i <= MAX_VERSION_STRING_SIZE; ++i) {
+		responseMsg.push_back('A'); // Filling the buffer with 'A's
+	}
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code;
+	enum8 driverState = 0;
+	char driverVersion[MAX_VERSION_STRING_SIZE + 10];
+
+	auto rc = decode_get_driver_info_resp(
+	    response, msg_len, &cc, &reason_code, &driverState, driverVersion);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
