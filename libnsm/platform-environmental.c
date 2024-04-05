@@ -709,3 +709,347 @@ int decode_aggregate_temperature_reading_data(const uint8_t *data,
 
 	return NSM_SW_SUCCESS;
 }
+
+// Get Mig Mode Command, NSM T3 spec
+int encode_get_MIG_mode_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request =
+	    (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_MIG_MODE;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+// Get Mig Mode Command, NSM T3 spec
+int decode_get_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
+}
+
+// Get Mig Mode Command, NSM T3 spec
+int encode_get_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg)
+{
+	if (msg == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_MIG_MODE,
+					  msg);
+	}
+
+	struct nsm_get_MIG_mode_resp *resp =
+	    (struct nsm_get_MIG_mode_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_MIG_MODE;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(bitfield8_t);
+	resp->hdr.data_size = htole16(data_size);
+	memcpy(&(resp->flags), flags, data_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Mig Mode Command, NSM T3 spec
+int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code, bitfield8_t *flags)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+    
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_MIG_mode_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_MIG_mode_resp *resp =
+	    (struct nsm_get_MIG_mode_resp *)msg->payload;
+
+	if (resp->hdr.command != NSM_GET_MIG_MODE) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < sizeof(bitfield8_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	memcpy(flags, &(resp->flags), sizeof(bitfield8_t));
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Mode Command, NSM T3 spec
+int encode_get_ECC_mode_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request =
+	    (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ECC_MODE;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Mode Command, NSM T3 spec
+int decode_get_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Mode Command, NSM T3 spec
+int encode_get_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg)
+{
+	if (msg == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_ECC_MODE,
+					  msg);
+	}
+	struct nsm_get_ECC_mode_resp *resp =
+	    (struct nsm_get_ECC_mode_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ECC_MODE;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(bitfield8_t);
+	resp->hdr.data_size = htole16(data_size);
+	memcpy(&(resp->flags), flags, data_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Mode Command, NSM T3 spec
+int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code, bitfield8_t *flags)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+    
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_ECC_mode_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_ECC_mode_resp *resp =
+	    (struct nsm_get_ECC_mode_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < sizeof(bitfield8_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	memcpy(flags, &(resp->flags), sizeof(bitfield8_t));
+
+	return NSM_SW_SUCCESS;
+}
+
+static void htoleEccErrorCounts(struct nsm_ECC_error_counts *errorCounts)
+{
+	errorCounts->flags.byte = htole16(errorCounts->flags.byte);
+	errorCounts->dram_corrected = htole32(errorCounts->dram_corrected);
+	errorCounts->dram_uncorrected = htole32(errorCounts->dram_uncorrected);
+	errorCounts->sram_corrected = htole32(errorCounts->sram_corrected);
+	errorCounts->sram_uncorrected_parity =
+	    htole32(errorCounts->sram_uncorrected_parity);
+	errorCounts->sram_uncorrected_secded =
+	    htole32(errorCounts->sram_uncorrected_secded);
+}
+
+static void letohEccErrorCounts(struct nsm_ECC_error_counts *errorCounts)
+{
+	errorCounts->flags.byte = le16toh(errorCounts->flags.byte);
+	errorCounts->dram_corrected = le32toh(errorCounts->dram_corrected);
+	errorCounts->dram_uncorrected = le32toh(errorCounts->dram_uncorrected);
+	errorCounts->sram_corrected = le32toh(errorCounts->sram_corrected);
+	errorCounts->sram_uncorrected_parity =
+	    le32toh(errorCounts->sram_uncorrected_parity);
+	errorCounts->sram_uncorrected_secded =
+	    le32toh(errorCounts->sram_uncorrected_secded);
+}
+
+// Get ECC Error Counts command, NSM T3 spec
+int encode_get_ECC_error_counts_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request =
+	    (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ECC_ERROR_COUNTS;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Error Counts command, NSM T3 spec
+int decode_get_ECC_error_counts_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Error Counts command, NSM T3 spec
+int encode_get_ECC_error_counts_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     struct nsm_ECC_error_counts *errorCounts,
+				     struct nsm_msg *msg)
+{
+	if (msg == NULL || errorCounts == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_ECC_ERROR_COUNTS, msg);
+	}
+	struct nsm_get_ECC_error_counts_resp *resp =
+	    (struct nsm_get_ECC_error_counts_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ECC_ERROR_COUNTS;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(struct nsm_ECC_error_counts);
+	resp->hdr.data_size = htole16(data_size);
+
+	htoleEccErrorCounts(errorCounts);
+	memcpy(&(resp->errorCounts), errorCounts,
+	       sizeof(struct nsm_ECC_error_counts));
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get ECC Error Counts command, NSM T3 spec
+int decode_get_ECC_error_counts_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *data_size,
+				     uint16_t *reason_code,
+				     struct nsm_ECC_error_counts *errorCounts)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    errorCounts == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_ECC_error_counts_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_ECC_error_counts_resp *resp =
+	    (struct nsm_get_ECC_error_counts_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	letohEccErrorCounts(&(resp->errorCounts));
+
+	if ((*data_size) < sizeof(struct nsm_ECC_error_counts)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	memcpy(errorCounts, &(resp->errorCounts),
+	       sizeof(struct nsm_ECC_error_counts));
+
+	return NSM_SW_SUCCESS;
+}

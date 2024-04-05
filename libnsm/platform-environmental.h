@@ -16,7 +16,10 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_TEMPERATURE_READING = 0x00,
 	NSM_GET_POWER = 0x01,
 	NSM_GET_INVENTORY_INFORMATION = 0x11,
-	NSM_GET_DRIVER_INFO = 0x14
+	NSM_GET_DRIVER_INFO = 0x14,
+	NSM_GET_MIG_MODE = 0x4d,
+	NSM_GET_ECC_MODE = 0x4f,
+	NSM_GET_ECC_ERROR_COUNTS = 0x7d
 };
 
 enum nsm_inventory_property_identifiers {
@@ -207,6 +210,48 @@ int encode_get_driver_info_resp(uint8_t instance_id,  uint8_t cc,
 int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint8_t *cc, uint16_t *reason_code,
 				enum8 *driver_state, char *driver_version);
+
+/** @struct nsm_get_MIG_reading_resp
+ *
+ *  Structure representing NSM get MIG Mode response.
+ */
+struct nsm_get_MIG_mode_resp {
+	struct nsm_common_resp hdr;
+	bitfield8_t flags;
+} __attribute__((packed));
+
+
+/** @struct nsm_get_ECC_mode_resp
+ *
+ *  Structure representing NSM get ECC Mode response.
+ */
+struct nsm_get_ECC_mode_resp {
+	struct nsm_common_resp hdr;
+	bitfield8_t flags;
+} __attribute__((packed));
+
+/** @struct nsm_ECC_error_counts
+ *
+ *  Structure representing NSM ECC error counts.
+ */
+struct nsm_ECC_error_counts {
+	bitfield16_t flags;
+	uint32_t sram_corrected;
+	uint32_t sram_uncorrected_secded;
+	uint32_t sram_uncorrected_parity;
+	uint32_t dram_corrected;
+	uint32_t dram_uncorrected;
+} __attribute__((packed));
+
+
+/** @struct nsm_get_ECC_error_counts_resp
+ *
+ *  Structure representing NSM get ECC error counts response.
+ */
+struct nsm_get_ECC_error_counts_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_ECC_error_counts errorCounts;
+} __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
  *
@@ -480,6 +525,129 @@ int encode_aggregate_temperature_reading_data(double temperature_reading,
 int decode_aggregate_temperature_reading_data(const uint8_t *data,
 					      size_t data_len,
 					      double *temperature_reading);
+
+
+/** @brief Encode a Get MIG mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_MIG_mode_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get MIG mode request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get MIG mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating MIG modes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg);
+
+/** @brief Decode a Get MIG mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] flags - flags indicating MIG modes
+ *  @return nsm_completion_codes
+ */
+int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Get ECC mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_ECC_mode_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get ECC mode request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get ECC mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating ECC modes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg);
+
+/** @brief Dncode a Get ECC mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] flags - flags indicating ECC modes
+ *  @return nsm_completion_codes
+ */
+int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Get ECC error counts request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_ECC_error_counts_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get ECC error counts request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_ECC_error_counts_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get ECC error counts response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] errorCounts - struct indicating ECC error counts
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_ECC_error_counts_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     struct nsm_ECC_error_counts *errorCounts,
+				     struct nsm_msg *msg);
+
+/** @brief Dncode a Get ECC error counts response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] errorCounts - struct indicating ECC error counts
+ *  @return nsm_completion_codes
+ */
+int decode_get_ECC_error_counts_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *data_size,
+				     uint16_t *reason_code,
+				     struct nsm_ECC_error_counts *errorCounts);
 #ifdef __cplusplus
 }
 #endif
