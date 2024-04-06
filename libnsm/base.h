@@ -8,7 +8,6 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 #define NSM_INSTANCE_MAX 31
 
@@ -570,6 +569,8 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 		     uint8_t version, uint8_t event_id, uint8_t event_class,
 		     uint16_t event_state, uint8_t data_size, uint8_t *data,
 		     struct nsm_msg *msg);
+
+int decode_common_req(const struct nsm_msg *msg, size_t msg_len);
 
 #ifdef __cplusplus
 }

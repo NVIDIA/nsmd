@@ -239,7 +239,7 @@ int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
 
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) +
-	    sizeof(struct nsm_get_supported_nvidia_message_types_resp)) {
+		sizeof(struct nsm_get_supported_nvidia_message_types_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -561,4 +561,17 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 	}
 
 	return NSM_SUCCESS;
+}
+
+int decode_common_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
 }

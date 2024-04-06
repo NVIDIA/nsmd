@@ -3,8 +3,8 @@
 #include "base.h"
 #include "device-capability-discovery.h"
 #include "network-ports.h"
-#include "platform-environmental.h"
 #include "pci-links.h"
+#include "platform-environmental.h"
 
 #include "types.hpp"
 #include "utils.hpp"
@@ -285,6 +285,8 @@ std::optional<std::vector<uint8_t>>
                     return getEccModeHandler(request, requestLen);
                 case NSM_GET_ECC_ERROR_COUNTS:
                     return getEccErrorCountsHandler(request, requestLen);
+                case NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
+                    return getEDPpScalingFactorHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -833,11 +835,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getMigModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen)
 {
-    auto rc = decode_get_MIG_mode_req(requestMsg, requestLen);
+    auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_get_MIG_mode_req failed: rc={RC}", "RC", rc);
+        lg2::error("decode request for getMigModeHandler failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
 
@@ -862,11 +865,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getEccModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen)
 {
-    auto rc = decode_get_ECC_mode_req(requestMsg, requestLen);
+    auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
-        lg2::error("decode_get_MIG_mode_req failed: rc={RC}", "RC", rc);
+        lg2::error("decode request for getEccModeHandler failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
 
@@ -892,11 +896,13 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getEccErrorCountsHandler(const nsm_msg* requestMsg,
                                               size_t requestLen)
 {
-    auto rc = decode_get_ECC_error_counts_req(requestMsg, requestLen);
+    auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
-        lg2::error("decode_get_ECC_error_counts_req failed: rc={RC}", "RC", rc);
+        lg2::error(
+            "decode requset for getEccErrorCountsHandler failed: rc={RC}", "RC",
+            rc);
         return std::nullopt;
     }
     struct nsm_ECC_error_counts errorCounts;
@@ -1324,7 +1330,6 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-
     switch (group_index)
     {
         case 1:
@@ -1449,6 +1454,44 @@ std::optional<std::vector<uint8_t>>
             break;
     }
     return std::nullopt;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    auto rc = decode_common_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode request for getEDPpScalingFactorHandler failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    struct nsm_EDPp_scaling_factors scaling_factors;
+    scaling_factors.default_scaling_factor = 70;
+    scaling_factors.maximum_scaling_factor = 90;
+    scaling_factors.minimum_scaling_factor = 60;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_programmable_EDPp_scaling_factor_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_programmable_EDPp_scaling_factor_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &scaling_factors,
+        responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_programmable_EDPp_scaling_factor_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
 }
 
 } // namespace MockupResponder

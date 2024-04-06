@@ -692,3 +692,21 @@ TEST(decodeReasonCode, testBadDecodeReasonCode)
 	    &reason_code); // sending msg len less then expected
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(decodeCommonReq, testGoodDecodeCommonRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    32,				     // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_common_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}

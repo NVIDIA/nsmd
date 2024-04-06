@@ -1,9 +1,11 @@
 #include "nsmProcessor.hpp"
 
+#include "pci-links.h"
 #include "platform-environmental.h"
+
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
-#include "pci-links.h"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -22,6 +24,15 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::GPU);
+}
+
+NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
+                         std::string& type, std::string& inventoryObjPath,
+                         uuid_t uuid) :
+    NsmObject(name, type)
+{
+    uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
+    uuidIntf->uuid(uuid);
 }
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
@@ -239,7 +250,8 @@ NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
     pCieEccIntf = pCieECCIntf;
 }
 
-void NsmPciGroup2::updateReading(const nsm_query_scalar_group_telemetry_group_2& data)
+void NsmPciGroup2::updateReading(
+    const nsm_query_scalar_group_telemetry_group_2& data)
 {
     pCieEccIntf->nonfeCount(data.non_fatal_errors);
     pCieEccIntf->feCount(data.fatal_errors);
@@ -283,7 +295,8 @@ NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
     pCieEccIntf = pCieECCIntf;
 }
 
-void NsmPciGroup3::updateReading(const nsm_query_scalar_group_telemetry_group_3& data)
+void NsmPciGroup3::updateReading(
+    const nsm_query_scalar_group_telemetry_group_3& data)
 {
     pCieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
 }
@@ -325,7 +338,8 @@ NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
     pCieEccIntf = pCieECCIntf;
 }
 
-void NsmPciGroup4::updateReading(const nsm_query_scalar_group_telemetry_group_4& data)
+void NsmPciGroup4::updateReading(
+    const nsm_query_scalar_group_telemetry_group_4& data)
 {
     pCieEccIntf->replayCount(data.replay_cnt);
     pCieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
@@ -352,6 +366,71 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         lg2::error(
             "handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group4_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
+NsmEDPpScalingFactor::NsmEDPpScalingFactor(sdbusplus::bus::bus& bus,
+                                           std::string& name, std::string& type,
+                                           std::string& inventoryObjPath) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmEDPpScalingFactor: create sensor:{NAME}", "NAME",
+              name.c_str());
+    eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath.c_str());
+}
+
+void NsmEDPpScalingFactor::updateReading(
+    struct nsm_EDPp_scaling_factors scaling_factors)
+{
+    eDPpIntf->allowableMax(scaling_factors.maximum_scaling_factor);
+    eDPpIntf->allowableMin(scaling_factors.minimum_scaling_factor);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmEDPpScalingFactor::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc =
+        encode_get_programmable_EDPp_scaling_factor_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_programmable_EDPp_scaling_factor_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmEDPpScalingFactor::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_EDPp_scaling_factors scaling_factors;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_get_programmable_EDPp_scaling_factor_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        &scaling_factors);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(scaling_factors);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg:  decode_get_programmable_EDPp_scaling_factor_resp"
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
@@ -395,6 +474,10 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto sensor = std::make_shared<NsmAcceleratorIntf>(
                 bus, name, type, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
+
+            auto uuidSensor = std::make_shared<NsmUuidIntf>(
+                bus, name, type, inventoryObjPath, uuid);
+            nsmDevice->deviceSensors.push_back(uuidSensor);
         }
 
         if (type == "NSM_MIG")
@@ -474,6 +557,22 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(eccErrorCntSensor);
             }
         }
+        else if (type == "NSM_EDPp")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto sensor = std::make_shared<NsmEDPpScalingFactor>(
+                bus, name, type, inventoryObjPath);
+            nsmDevice->deviceSensors.push_back(sensor);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(sensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(sensor);
+            }
+        }
     }
 
     catch (const std::exception& e)
@@ -485,16 +584,19 @@ static void createNsmProcessorSensor(SensorManager& manager,
     }
 }
 
-
-
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                "xyz.openbmc_project.Configuration.NSM_Processor")
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                 "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
-REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
-                                "xyz.openbmc_project.Configuration.NSM_Processor.PCIe")
-
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor, "xyz.openbmc_project.Configuration.NSM_Processor")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.PCIe")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor")
 
 } // namespace nsm

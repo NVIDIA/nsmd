@@ -32,7 +32,8 @@ class MockupResponder
 {
   public:
     MockupResponder(bool verbose, sdeventplus::Event& event,
-                    sdbusplus::asio::object_server& server, eid_t eid, uint8_t deviceType, uint8_t instanceId);
+                    sdbusplus::asio::object_server& server, eid_t eid,
+                    uint8_t deviceType, uint8_t instanceId);
     ~MockupResponder()
     {}
 
@@ -55,7 +56,7 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryDeviceIdentificationHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
-    void generateDummyGUID(const uint8_t eid, uint8_t *data);
+    void generateDummyGUID(const uint8_t eid, uint8_t* data);
 
     // type1 handlers
     std::optional<std::vector<uint8_t>>
@@ -114,6 +115,10 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getVoltageHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
 
   private:
     sdeventplus::Event& event;

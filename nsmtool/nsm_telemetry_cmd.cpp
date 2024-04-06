@@ -7,8 +7,8 @@
 
 #include "base.h"
 #include "network-ports.h"
-#include "platform-environmental.h"
 #include "pci-links.h"
+#include "platform-environmental.h"
 
 #include "cmd_helper.hpp"
 #include "utils.hpp"
@@ -1176,6 +1176,61 @@ class GetEccErrorCounts : public CommandInterface
     }
 };
 
+class GetEDPpScalingFactors : public CommandInterface
+{
+  public:
+    ~GetEDPpScalingFactors() = default;
+    GetEDPpScalingFactors() = delete;
+    GetEDPpScalingFactors(const GetEDPpScalingFactors&) = delete;
+    GetEDPpScalingFactors(GetEDPpScalingFactors&&) = default;
+    GetEDPpScalingFactors& operator=(const GetEDPpScalingFactors&) = delete;
+    GetEDPpScalingFactors& operator=(GetEDPpScalingFactors&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_programmable_EDPp_scaling_factor_req(instanceId,
+                                                                  request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        struct nsm_EDPp_scaling_factors scaling_factors;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_get_programmable_EDPp_scaling_factor_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &scaling_factors);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n"
+                << payloadLength << "...."
+                << (sizeof(struct nsm_msg_hdr) +
+                    sizeof(
+                        struct nsm_get_programmable_EDPp_scaling_factor_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["AllowableMax"] = scaling_factors.maximum_scaling_factor;
+        result["AllowableMin"] = scaling_factors.minimum_scaling_factor;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class QueryScalarGroupTelemetry : public CommandInterface
 {
   public:
@@ -1198,9 +1253,9 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
         groupId = 9;
         scalarTelemetryOptionGroup->add_option("-d, --deviceId", deviceId,
-                                          "retrieve deviceId");
-        scalarTelemetryOptionGroup->add_option("-g, --groupId", groupId,
-                                          "retrieve data source for groupId");
+                                               "retrieve deviceId");
+        scalarTelemetryOptionGroup->add_option(
+            "-g, --groupId", groupId, "retrieve data source for groupId");
         scalarTelemetryOptionGroup->require_option(2);
     }
 
@@ -1221,7 +1276,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
         switch (groupId)
         {
             case 1:
-             {
+            {
                 struct nsm_query_scalar_group_telemetry_group_1 data;
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
@@ -1446,6 +1501,11 @@ void registerCommand(CLI::App& app)
         telemetry->add_subcommand("GetEccErrorCounts", "get ECC error counts");
     commands.push_back(std::make_unique<GetEccErrorCounts>(
         "telemetry", "GetEccErrorCounts", getEccErrorCounts));
+
+    auto getEDPpScalingFactors = telemetry->add_subcommand(
+        "GetEDPpScalingFactors", "get programmable EDPp Scaling Factors");
+    commands.push_back(std::make_unique<GetEDPpScalingFactors>(
+        "telemetry", "GetEDPpScalingFactors", getEDPpScalingFactors));
 
     auto queryScalarGroupTelemetry = telemetry->add_subcommand(
         "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");
