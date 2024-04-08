@@ -4,7 +4,6 @@
 #include "device-capability-discovery.h"
 
 #include "common/types.hpp"
-#include "nsmNumericAggregator.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "types.hpp"
@@ -19,6 +18,7 @@
 namespace nsm
 {
 
+class NsmNumericAggregator;
 class NsmDevice;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
 
@@ -37,10 +37,10 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
     std::deque<std::shared_ptr<NsmSensor>> roundRobinSensors;
-    std::vector<std::shared_ptr<NsmNumericAggregator>> SensorAggregators;
+    std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
 
     std::shared_ptr<NsmNumericAggregator>
-        findAggregatorByType(std::string type);
+        findAggregatorByType(const std::string& type);
 
     void setEventMode(uint8_t mode);
     uint8_t getEventMode();
@@ -51,6 +51,6 @@ class NsmDevice
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
-                                               uuid_t uuid);
+                                               const uuid_t& uuid);
 
 } // namespace nsm

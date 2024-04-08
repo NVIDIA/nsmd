@@ -46,8 +46,7 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 {
 	uint8_t msgTag = 0;
 	uint8_t mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
-	ssize_t min_len = sizeof(msgTag) + sizeof(eid) +
-			  sizeof(mctpMsgType) +
+	ssize_t min_len = sizeof(msgTag) + sizeof(eid) + sizeof(mctpMsgType) +
 			  sizeof(struct nsm_msg_hdr);
 	ssize_t length = recv(mctp_fd, NULL, 0, MSG_PEEK | MSG_TRUNC);
 	if (length <= 0) {

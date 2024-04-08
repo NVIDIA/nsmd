@@ -104,6 +104,12 @@ class MockupResponder
 
     int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg,
                      bool verbose);
+    std::optional<std::vector<uint8_t>>
+        getCurrentEnergyCountHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getVoltageHandler(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     sdeventplus::Event& event;

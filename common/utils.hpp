@@ -53,6 +53,13 @@ constexpr auto mapperService = "xyz.openbmc_project.ObjectMapper";
 constexpr auto mapperPath = "/xyz/openbmc_project/object_mapper";
 constexpr auto mapperInterface = "xyz.openbmc_project.ObjectMapper";
 
+struct Association
+{
+    std::string forward;
+    std::string backward;
+    std::string absolutePath;
+};
+
 /** @struct CustomFD
  *
  *  RAII wrapper for file descriptor.
@@ -267,4 +274,21 @@ eid_t getEidFromUUID(
  */
 uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr);
 
+/** @brief Make valid D-Bus Object Path of Interface Name by replacing unwanted
+ * characters with underscore ('_')
+ *
+ *  @param[in] name - potentially invalid D-Bus Name
+ *  @return - valid D-Bus Name
+ */
+std::string makeDBusNameValid(const std::string& name);
+
+/** @brief Get associations of a configuration PDI
+ *
+ *  @param[in] objPath - D-Bus Object Path of configuration PDI
+ *  @param[in] interfaceSubStr - Sub string to identify association interfaces
+ * at objPath
+ *  @return - Associations
+ */
+std::vector<Association> getAssociations(const std::string& objPath,
+                                         const std::string& interfaceSubStr);
 } // namespace utils

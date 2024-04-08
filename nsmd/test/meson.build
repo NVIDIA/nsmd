@@ -1,8 +1,6 @@
 dep_src_files = [
   '../nsmDevice.cpp',
   '../nsmObjectFactory.cpp',
-  '../nsmNumericSensor.cpp',
-  '../nsmNumericAggregator.cpp',
   '../../common/utils.cpp',
   '../../libnsm/base.c',
   '../../libnsm/platform-environmental.c',
@@ -23,7 +21,6 @@ test_src = declare_dependency(sources: dep_src_files,
 
 tests = [
   'nsmDevice_test',
-  'nsmNumericAggregator_test'
 ]
 
 foreach t : tests

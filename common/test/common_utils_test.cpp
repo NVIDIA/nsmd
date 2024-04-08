@@ -27,3 +27,29 @@ TEST(ConvertUUIDToString, testGBadConversionToString)
 
     EXPECT_STREQ(stringUUID.c_str(), "");
 }
+
+TEST(makeDBusNameValid, Functional)
+{
+    const std::vector<std::array<std::string, 2>> data{
+        {{"HGX_GPU_SXM 1 DRAM_0_Temp_0", "HGX_GPU_SXM_1_DRAM_0_Temp_0"}},
+
+        {{"HGX_GPU_SXM    1 &^* DRAM_0_Temp_0", "HGX_GPU_SXM_1_DRAM_0_Temp_0"}},
+
+        {{"/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+          "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1"}},
+
+        {{"/xyz/openbmc_project/inventory/system/processors/GPU_SXM 1 DRAM_0",
+          "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1_DRAM_0"}},
+
+        {{"xyz.openbmc_project.Configuration.NSM_Temp",
+          "xyz.openbmc_project.Configuration.NSM_Temp"}},
+
+        {{"xyz.openbmc_project.Sensor.HGX_GPU_SXM 1 DRAM_0_Temp_0",
+          "xyz.openbmc_project.Sensor.HGX_GPU_SXM_1_DRAM_0_Temp_0"}},
+    };
+
+    for (const auto& e : data)
+    {
+        EXPECT_STREQ(utils::makeDBusNameValid(e[0]).c_str(), e[1].c_str());
+    }
+}

@@ -798,6 +798,194 @@ class GetCurrentPowerDraw : public CommandInterface
     uint8_t averagingInterval;
 };
 
+class GetCurrentEnergyCount : public CommandInterface
+{
+  public:
+    GetCurrentEnergyCount() = delete;
+    GetCurrentEnergyCount(const GetCurrentEnergyCount&) = delete;
+    GetCurrentEnergyCount(GetCurrentEnergyCount&&) = default;
+    GetCurrentEnergyCount& operator=(const GetCurrentEnergyCount&) = delete;
+    GetCurrentEnergyCount& operator=(GetCurrentEnergyCount&&) = delete;
+
+    explicit GetCurrentEnergyCount(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
+    }
+
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        uint64_t reading;
+
+        auto rc = decode_get_current_energy_count_resp(
+            responsePtr, msg_len, &cc, &reason_code, &reading);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_current_energy_count_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sensor Id"] = sensorId;
+        result["Current Energy Count"] = reading;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    class GetCurrentEnergyCountAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint64_t reading{};
+            auto rc =
+                decode_aggregate_energy_count_data(data, data_len, &reading);
+
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Current Energy Count"] = reading;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc =
+            encode_get_current_energy_count_req(instanceId, sensorId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (sensorId == AggregateSensorId)
+        {
+            GetCurrentEnergyCountAggregateResponseParser{}
+                .parseAggregateResponse(responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
+    }
+
+  private:
+    uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+};
+
+class GetVoltage : public CommandInterface
+{
+  public:
+    GetVoltage() = delete;
+    GetVoltage(const GetVoltage&) = delete;
+    GetVoltage(GetVoltage&&) = default;
+    GetVoltage& operator=(const GetVoltage&) = delete;
+    GetVoltage& operator=(GetVoltage&&) = delete;
+
+    explicit GetVoltage(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
+    }
+
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        uint32_t reading;
+
+        auto rc = decode_get_voltage_resp(responsePtr, msg_len, &cc,
+                                          &reason_code, &reading);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_voltage_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sensor Id"] = sensorId;
+        result["Voltage"] = reading;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    class GetVoltageAggregateResponseParser : public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint32_t reading{};
+            auto rc = decode_aggregate_voltage_data(data, data_len, &reading);
+
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Voltage"] = reading;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_voltage_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_voltage_req(instanceId, sensorId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (sensorId == AggregateSensorId)
+        {
+            GetVoltageAggregateResponseParser{}.parseAggregateResponse(
+                responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
+    }
+
+  private:
+    uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+};
+
 class GetMigMode : public CommandInterface
 {
   public:
@@ -992,6 +1180,18 @@ void registerCommand(CLI::App& app)
         "GetCurrentPowerDraw", "get current power draw of a device");
     commands.push_back(std::make_unique<GetCurrentPowerDraw>(
         "telemetry", "GetCurrentPowerDraw", getCurrentPowerDraw));
+
+    auto getCurrentEnergyCount = telemetry->add_subcommand(
+        "GetCurrentEnergyCount",
+        "get current energy counter value of a device");
+    commands.push_back(std::make_unique<GetCurrentEnergyCount>(
+        "telemetry", "GetCurrentPowerDraw", getCurrentEnergyCount));
+
+    auto getVoltage =
+        telemetry->add_subcommand("GetVoltage", "get voltage of a device");
+    commands.push_back(std::make_unique<GetVoltage>(
+        "telemetry", "GetCurrentPowerDraw", getVoltage));
+
     auto getDriverInfo =
         telemetry->add_subcommand("GetDriverInfo", "get Driver info");
     commands.push_back(std::make_unique<GetDriverInfo>(

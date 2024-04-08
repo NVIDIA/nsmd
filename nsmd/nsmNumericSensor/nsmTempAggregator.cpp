@@ -34,22 +34,36 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmTempAggregator::handleSampleData(uint8_t tag, const uint8_t* data,
-                                        size_t data_len)
+int NsmTempAggregator::handleSamples(
+    const std::vector<TelemetrySample>& samples)
 {
     double reading{};
-    auto rc =
-        decode_aggregate_temperature_reading_data(data, data_len, &reading);
+    uint8_t returnValue = NSM_SW_SUCCESS;
 
-    if (rc == NSM_SW_SUCCESS)
+    for (const auto& sample : samples)
     {
-        updateSensorReading(tag, reading);
-    }
-    else
-    {
-        updateSensorNotWorking(tag);
+        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            continue;
+        }
+
+        auto rc = decode_aggregate_temperature_reading_data(
+            sample.data, sample.data_len, &reading);
+
+        if (rc == NSM_SW_SUCCESS)
+        {
+            updateSensorReading(sample.tag, reading);
+        }
+        else
+        {
+            lg2::error(
+                "decode_aggregate_temperature_reading_data failed. rc={RC}.",
+                "RC", rc);
+            returnValue = rc;
+            updateSensorNotWorking(sample.tag);
+        }
     }
 
-    return rc;
+    return returnValue;
 }
 } // namespace nsm
