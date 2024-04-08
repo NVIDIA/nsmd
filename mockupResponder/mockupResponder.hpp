@@ -5,8 +5,11 @@
 #include "platform-environmental.h"
 #include "requester/mctp.h"
 
+#include "types.hpp"
+
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdeventplus/event.hpp>
+#include <sdeventplus/source/io.hpp>
 
 #include <optional>
 
@@ -28,17 +31,15 @@ struct HeaderType
 class MockupResponder
 {
   public:
-    MockupResponder(bool verbose, sdeventplus::Event& event) :
-        event(event), verbose(verbose)
-    {}
-
+    MockupResponder(bool verbose, sdeventplus::Event& event,
+                    sdbusplus::asio::object_server& server, eid_t eid, uint8_t deviceType, uint8_t instanceId);
     ~MockupResponder()
     {}
 
-    int connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t instanceId);
+    int initSocket();
 
     std::optional<std::vector<uint8_t>>
-        processRxMsg(const std::vector<uint8_t>& request);
+        processRxMsg(const std::vector<uint8_t>& rxMsg);
 
     // type0 handlers
     std::optional<std::vector<uint8_t>>
@@ -60,6 +61,15 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        setCurrentEventSources(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        configureEventAcknowledgement(const nsm_msg* requestMsg,
+                                      size_t requestLen);
 
     // type3 handlers
     std::optional<std::vector<uint8_t>>
@@ -84,12 +94,29 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getEccErrorCountsHandler(const nsm_msg* requestMsg, size_t requestLen);
 
+    // send rediscovery event
+    void sendRediscoveryEvent(uint8_t eid, bool ackr);
+
+    // send event
+    void sendNsmEvent(uint8_t dest, uint8_t nsmType, bool ackr, uint8_t ver,
+                      uint8_t eventId, uint8_t eventClass, uint16_t eventState,
+                      uint8_t dataSize, uint8_t* data);
+
+    int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg,
+                     bool verbose);
+
   private:
     sdeventplus::Event& event;
     bool verbose;
     uint8_t mockEid;
     uint8_t mockDeviceType;
     uint8_t mockInstanceId;
+    sdbusplus::asio::object_server& server;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> iface;
+    int sockFd;
+    std::unique_ptr<sdeventplus::source::IO> io;
+    eid_t eventReceiverEid;
+    uint8_t globalEventGenerationSetting;
 };
 
 } // namespace MockupResponder

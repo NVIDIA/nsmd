@@ -1,6 +1,7 @@
 #include "mockupResponder.hpp"
 
 #include "base.h"
+#include "device-capability-discovery.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
 
@@ -10,20 +11,50 @@
 #include <sys/socket.h>
 
 #include <phosphor-logging/lg2.hpp>
-#include <sdeventplus/source/io.hpp>
+
+using namespace utils;
 
 #include <ctime>
 
 namespace MockupResponder
 {
 
-int MockupResponder::connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t instanceId)
+MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
+                                 sdbusplus::asio::object_server& server,
+                                 eid_t eid, uint8_t deviceType,
+                                 uint8_t instanceId) :
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
+    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
-    lg2::info("connect to Mockup EID");
+    std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
+    iface = server.add_interface(path, "xyz.openbmc_project.NSM.Device");
+
+    iface->register_method("genRediscoveryEvent", [&](uint8_t eid, bool ackr) {
+        sendRediscoveryEvent(eid, ackr);
+    });
+
+    iface->register_method("genRawEvent",
+                           [&](uint8_t eid, uint8_t nsmType, bool ackr,
+                               uint8_t ver, uint8_t eventId, uint8_t eventClass,
+                               uint16_t eventState) {
+                               sendNsmEvent(eid, nsmType, ackr, ver, eventId,
+                                            eventClass, eventState, 0, NULL);
+                           });
+
+    iface->initialize();
 
     mockEid = eid;
     mockDeviceType = deviceType;
     mockInstanceId = instanceId;
+
+    sockFd = initSocket();
+}
+
+int MockupResponder::initSocket()
+{
+    lg2::info("connect to Mockup EID({EID})", "EID", mockEid);
+
     auto fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (fd == -1)
     {
@@ -69,7 +100,7 @@ int MockupResponder::connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t i
         return -1;
     }
 
-    ret = ::write(fd, &eid, sizeof(uint8_t));
+    ret = ::write(fd, &mockEid, sizeof(uint8_t));
     if (ret == -1)
     {
         lg2::error("Failed to write eid to socket, errno = {ERROR}, {STRERROR}",
@@ -156,37 +187,42 @@ int MockupResponder::connectMockupEID(uint8_t eid, uint8_t deviceType, uint8_t i
         }
     };
 
-    auto io = std::make_unique<sdeventplus::source::IO>(event, fd, EPOLLIN,
-                                                        std::move(callback));
-    return event.loop();
+    io = std::make_unique<sdeventplus::source::IO>(event, fd, EPOLLIN,
+                                                   std::move(callback));
+    return fd;
 }
 
 std::optional<std::vector<uint8_t>>
-    MockupResponder::processRxMsg(const std::vector<uint8_t>& requestMsg)
+    MockupResponder::processRxMsg(const std::vector<uint8_t>& rxMsg)
 {
     nsm_header_info hdrFields{};
-    auto hdr = reinterpret_cast<const nsm_msg_hdr*>(requestMsg.data() +
-                                                    MCTP_DEMUX_PREFIX);
-    auto request = reinterpret_cast<const nsm_msg*>(hdr);
-    size_t requestLen = requestMsg.size() - MCTP_DEMUX_PREFIX;
-
-    if (NSM_SW_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
+    auto hdr =
+        reinterpret_cast<const nsm_msg_hdr*>(rxMsg.data() + MCTP_DEMUX_PREFIX);
+    if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
         lg2::error("Empty NSM request header");
         return std::nullopt;
     }
 
+    if (NSM_EVENT_ACKNOWLEDGMENT == hdrFields.nsm_msg_type)
+    {
+        lg2::info("received NSM event acknowledgement length={LEN}", "LEN",
+                  rxMsg.size());
+        return std::nullopt;
+    }
+
     if (NSM_REQUEST == hdrFields.nsm_msg_type)
     {
-        lg2::error("received NSM request length={LEN}", "LEN",
-                   requestMsg.size());
+        lg2::info("received NSM request length={LEN}", "LEN", rxMsg.size());
     }
+    auto request = reinterpret_cast<const nsm_msg*>(hdr);
+    size_t requestLen = rxMsg.size() - MCTP_DEMUX_PREFIX;
 
     auto nvidiaMsgType = request->hdr.nvidia_msg_type;
     auto command = request->payload[0];
 
-    lg2::error("nsm msg type={TYPE} command code={COMMAND}", "TYPE",
-               nvidiaMsgType, "COMMAND", command);
+    lg2::info("nsm msg type={TYPE} command code={COMMAND}", "TYPE",
+              nvidiaMsgType, "COMMAND", command);
     switch (nvidiaMsgType)
     {
         case NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY:
@@ -202,6 +238,12 @@ std::optional<std::vector<uint8_t>>
                 case NSM_QUERY_DEVICE_IDENTIFICATION:
                     return queryDeviceIdentificationHandler(request,
                                                             requestLen);
+                case NSM_SET_EVENT_SUBSCRIPTION:
+                    return setEventSubscription(request, requestLen);
+                case NSM_SET_CURRENT_EVENT_SOURCES:
+                    return setCurrentEventSources(request, requestLen);
+                case NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT:
+                    return configureEventAcknowledgement(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -797,6 +839,209 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     return response;
+}
+
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setEventSubscription(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    lg2::info("setEventSubscription: request length={LEN}", "LEN", requestLen);
+
+    uint8_t globalSetting = 0;
+    uint8_t receiverEid = 0;
+    auto rc = decode_nsm_set_event_subscription_req(
+        requestMsg, requestLen, &globalSetting, &receiverEid);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_set_event_subscription_req failed RC={RC}", "RC",
+                   rc);
+    }
+
+    globalEventGenerationSetting = globalSetting;
+    eventReceiverEid = receiverEid;
+    lg2::info("setEventSubscription: setting={SETTING} ReceiverEID={EID}",
+              "SETTING", globalEventGenerationSetting, "EID", eventReceiverEid);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN, 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_cc_only_resp(
+        requestMsg->hdr.instance_id, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+        NSM_SET_EVENT_SUBSCRIPTION, NSM_SUCCESS, ERR_NULL, responseMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_cc_only_resp failed RC={RC}", "RC", rc);
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setCurrentEventSources(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    lg2::info("setCurrentEventSources: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t nvidiaMessageType = 0;
+    bitfield8_t* event_sources;
+
+    auto rc = decode_nsm_set_current_event_source_req(
+        requestMsg, requestLen, &nvidiaMessageType, &event_sources);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_set_current_event_source_req failed RC={RC}",
+                   "RC", rc);
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN, 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_cc_only_resp(
+        requestMsg->hdr.instance_id, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+        NSM_SET_CURRENT_EVENT_SOURCES, NSM_SUCCESS, ERR_NULL, responseMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("encode_cc_only_resp failed RC={RC}", "RC", rc);
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::configureEventAcknowledgement(const nsm_msg* requestMsg,
+                                                   size_t requestLen)
+{
+    lg2::info("configureEventAcknowledgement: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t nvidiaMessageType = 0;
+    bitfield8_t* currentEventSourcesAcknowledgementMask;
+
+    auto rc = decode_nsm_configure_event_acknowledgement_req(
+        requestMsg, requestLen, &nvidiaMessageType,
+        &currentEventSourcesAcknowledgementMask);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "decode_nsm_configure_event_acknowledgement_req failed RC={RC}",
+            "RC", rc);
+    }
+
+    lg2::info(
+        "receive configureEventAcknowledgement request, nvidiaMessageType={MSGTYPE} mask[0]={M0} mask[1]={M1}",
+        "MSGTYPE", nvidiaMessageType, "M0",
+        currentEventSourcesAcknowledgementMask[0].byte, "M1",
+        currentEventSourcesAcknowledgementMask[1].byte);
+
+    std::vector<bitfield8_t> newEventSourcesAcknowledgementMask(8);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_configure_event_acknowledgement_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_configure_event_acknowledgement_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS,
+        newEventSourcesAcknowledgementMask.data(), responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+
+template <class T>
+void Logger(bool verbose, const char* msg, const T& data)
+{
+    if (verbose)
+    {
+        std::stringstream s;
+        s << data;
+        std::cout << msg << s.str() << std::endl;
+    }
+}
+
+int MockupResponder::mctpSockSend(uint8_t dest_eid,
+                                  std::vector<uint8_t>& requestMsg,
+                                  bool verbose)
+{
+    if (sockFd < 0)
+    {
+        lg2::error("mctpSockSend failed, invalid sockFd");
+        return NSM_ERROR;
+    }
+
+    msghdr msg{};
+    iovec iov[2]{};
+
+    uint8_t prefix[3];
+    prefix[0] = MCTP_MSG_TAG_REQ;
+    prefix[1] = dest_eid;
+    prefix[2] = MCTP_MSG_TYPE_VDM;
+
+    iov[0].iov_base = &prefix[0];
+    iov[0].iov_len = sizeof(prefix);
+    iov[1].iov_base = requestMsg.data();
+    iov[1].iov_len = requestMsg.size();
+
+    msg.msg_iov = iov;
+    msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
+
+    if (verbose)
+    {
+        utils::printBuffer(utils::Tx, requestMsg);
+    }
+
+    auto rc = sendmsg(sockFd, &msg, 0);
+    if (rc < 0)
+    {
+        lg2::error("sendmsg system call failed rc={RC}", "RC", rc);
+        return NSM_ERROR;
+    }
+
+    return NSM_SUCCESS;
+}
+
+void MockupResponder::sendRediscoveryEvent(uint8_t dest, bool ackr)
+{
+    lg2::info("sendRediscoveryEvent dest eid={EID}", "EID", dest);
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_rediscovery_event(instanceId, ackr, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendRediscoveryEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg, true);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendNsmEvent(uint8_t dest, uint8_t nsmType, bool ackr,
+                                   uint8_t ver, uint8_t eventId,
+                                   uint8_t eventClass, uint16_t eventState,
+                                   uint8_t dataSize, uint8_t* data)
+{
+    lg2::info("sendNsmEvent dest eid={EID}", "EID", dest);
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  dataSize);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_event(instanceId, nsmType, ackr, ver, eventId,
+                               eventClass, eventState, dataSize, data, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendNsmEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg, true);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
 }
 
 } // namespace MockupResponder

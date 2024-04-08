@@ -2,9 +2,12 @@
 
 #include "sensorManager.hpp"
 
+#include "libnsm/device-capability-discovery.h"
 #include "libnsm/platform-environmental.h"
 
+#include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <chrono>
@@ -18,15 +21,14 @@ SensorManager::SensorManager(
     requester::Handler<requester::Request>& handler,
     nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
-    NsmDeviceTable& nsmDevices) :
-    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
+    NsmDeviceTable& nsmDevices, eid_t localEid) :
+    bus(bus),
+    event(event), handler(handler), instanceIdDb(instanceIdDb),
+    objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices),
+    localEid(localEid)
 {
-    scanInventory();
-
-    newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(std::mem_fn(&SensorManager::_startPolling), this,
-                         std::placeholders::_1));
+    deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
+        event, std::bind(std::mem_fn(&SensorManager::scanInventory), this));
 
     inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
         bus,
@@ -37,6 +39,7 @@ SensorManager::SensorManager(
 
 void SensorManager::scanInventory()
 {
+    deferScanInventory.reset();
     try
     {
         std::vector<std::string> ifaceList;
@@ -65,8 +68,8 @@ void SensorManager::scanInventory()
             {
                 for (const auto& interface : interfaces)
                 {
-                    NsmObjectFactory::instance().createObjects(
-                        interface, objPath, nsmDevices);
+                    NsmObjectFactory::instance().createObjects(*this, interface,
+                                                               objPath);
                 }
             }
         }
@@ -78,6 +81,10 @@ void SensorManager::scanInventory()
             "ERROR", e);
         return;
     }
+
+    newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
+        event, std::bind(std::mem_fn(&SensorManager::_startPolling), this,
+                         std::placeholders::_1));
 }
 
 void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
@@ -88,8 +95,7 @@ void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
     msg.read(objPath, interfaces);
     for (const auto& [interface, _] : interfaces)
     {
-        NsmObjectFactory::instance().createObjects(interface, objPath,
-                                                   nsmDevices);
+        NsmObjectFactory::instance().createObjects(*this, interface, objPath);
     }
 
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
@@ -157,11 +163,19 @@ requester::Coroutine
     uint64_t t0 = 0;
     uint64_t t1 = 0;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
-    eid_t eid = utils::getEidFromUUID(eidTable, nsmDevice->uuid);
+    eid_t eid = getEid(nsmDevice);
     do
     {
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
+#if false
+//place holder: to be implemented once related specification is available
+        if (nsmDevice->getEventMode() == GLOBAL_EVENT_GENERATION_ENABLE_POLLING)
+        {
+            // poll event from device
+            co_await pollEvents(eid);
+        }
+#endif
         // update all priority sensors
         auto& sensors = nsmDevice->prioritySensors;
         for (auto& sensor : sensors)
@@ -207,9 +221,7 @@ requester::Coroutine
     SensorManager::getSensorReading(eid_t eid,
                                     std::shared_ptr<NsmSensor> sensor)
 {
-
-    uint8_t instanceId = instanceIdDb.next(eid);
-    auto requestMsg = sensor->genRequestMsg(eid, instanceId);
+    auto requestMsg = sensor->genRequestMsg(eid, 0);
     if (!requestMsg.has_value())
     {
         lg2::error(
@@ -244,6 +256,8 @@ requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
                                                    const nsm_msg** responseMsg,
                                                    size_t* responseLen)
 {
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    requestMsg->hdr.instance_id = instanceIdDb.next(eid);
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
         handler, eid, request, responseMsg, responseLen);
     if (rc)
@@ -252,6 +266,22 @@ requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
                    rc);
     }
     co_return rc;
+}
+
+requester::Coroutine SensorManager::pollEvents([[maybe_unused]] eid_t eid)
+{
+    // placeholder
+    co_return NSM_SW_SUCCESS;
+}
+
+std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
+{
+    return findNsmDeviceByUUID(nsmDevices, uuid);
+}
+
+eid_t SensorManager::getEid(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
 }
 
 } // namespace nsm

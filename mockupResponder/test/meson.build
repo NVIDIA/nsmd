@@ -3,6 +3,7 @@ dep_src_files = [
   '../../common/utils.cpp',
   '../../libnsm/base.c',
   '../../libnsm/network-ports.c',
+  '../../libnsm/device-capability-discovery.c',
   '../../libnsm/platform-environmental.c',
   '../../libnsm/requester/mctp.c',
 ]

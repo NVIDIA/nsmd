@@ -2,10 +2,12 @@ dep_src_files = [
   '../nsmProcessor.cpp',
   '../../nsmDevice.cpp',
   '../../nsmObjectFactory.cpp',
+  '../../sensorManager.cpp',
   '../../../common/utils.cpp',
   '../../../libnsm/base.c',
   '../../../libnsm/platform-environmental.c',
   '../../../libnsm/requester/mctp.c',
+  '../../../libnsm/instance-id.c',
 ]
 
 dep_src_headers = [

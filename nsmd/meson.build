@@ -2,6 +2,7 @@
 sources = [
   '../common/utils.cpp',
   '../libnsm/base.c',
+  '../libnsm/device-capability-discovery.c',
   '../libnsm/platform-environmental.c',
   '../libnsm/instance-id.c',
   '../requester/mctp_endpoint_discovery.cpp',
@@ -21,6 +22,7 @@ subdir('nsmTemp')
 subdir('nsmPower')
 subdir('nsmFwSwInventory')
 subdir('nsmProcessor')
+subdir('nsmEventConfig')
 
 executable(
   'nsmd',

@@ -3,11 +3,11 @@
 #include <err.h>
 #include <getopt.h>
 
+#include <boost/algorithm/string.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <phosphor-logging/log.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/asio/object_server.hpp>
-#include <boost/algorithm/string.hpp>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
@@ -20,10 +20,11 @@ void optionUsage(void)
 {
     std::cerr << "Usage: nsmMockupResponder [options]\n";
     std::cerr << "Options:\n";
-    std::cerr << " [--verbose] - would enable verbosity\n"
-              << " [--eid <EID>] - assign EID to mockup responder\n"
-              << " [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]\n"
-              << " [--deviceType <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge and Baseboard]\n";
+    std::cerr
+        << " [--verbose] - would enable verbosity\n"
+        << " [--eid <EID>] - assign EID to mockup responder\n"
+        << " [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]\n"
+        << " [--device <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge and Baseboard]\n";
 }
 
 int main(int argc, char** argv)
@@ -34,15 +35,16 @@ int main(int argc, char** argv)
     int deviceType = 0;
     int instanceId = 0;
     int argflag;
-    static struct option long_options[] = {{"help", no_argument, 0, 'h'},
-                                           {"verbose", no_argument, 0, 'v'},
-                                           {"eid", required_argument, 0, 'e'},
-                                           {"device", required_argument, 0, 'd'},
-                                           {"instanceId", required_argument, 0, 'i'},
-                                           {0, 0, 0, 0}};
+    static struct option long_options[] = {
+        {"help", no_argument, 0, 'h'},
+        {"verbose", no_argument, 0, 'v'},
+        {"eid", required_argument, 0, 'e'},
+        {"device", required_argument, 0, 'd'},
+        {"instanceId", required_argument, 0, 'i'},
+        {0, 0, 0, 0}};
 
-    while ((argflag = getopt_long(argc, argv, "hve:d:i:", long_options, nullptr)) >=
-           0)
+    while ((argflag = getopt_long(argc, argv, "hve:d:i:", long_options,
+                                  nullptr)) >= 0)
     {
         switch (argflag)
         {
@@ -117,12 +119,12 @@ int main(int argc, char** argv)
         sdbusplus::server::manager::manager objManager(bus, "/");
 
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
-        std::string serviceName = "xyz.openbmc_project.NSM.eid_" + std::to_string(eid);
+        std::string serviceName =
+            "xyz.openbmc_project.NSM.eid_" + std::to_string(eid);
         bus.request_name(serviceName.c_str());
 
-        MockupResponder::MockupResponder mockupResponder(verbose, event);
-        mockupResponder.connectMockupEID(eid, deviceType, instanceId);
-
+        MockupResponder::MockupResponder mockupResponder(
+            verbose, event, objServer, eid, deviceType, instanceId);
         return event.loop();
     }
     catch (const std::exception& e)

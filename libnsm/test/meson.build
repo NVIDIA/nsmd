@@ -1,5 +1,6 @@
 dep_src_files = [
   '../base.c',
+  '../device-capability-discovery.c',
   '../platform-environmental.c',
   '../network-ports.c',
 ]
@@ -16,6 +17,7 @@ test_src = declare_dependency(sources: dep_src_files,
 
 tests = [
   'libnsm_base_test',
+  'libnsm_device_capability_discovery_test',
   'libnsm_platform_environmental_test',
   'libnsm_network_ports_test'
 ]

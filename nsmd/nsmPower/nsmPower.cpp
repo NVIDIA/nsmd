@@ -69,9 +69,9 @@ uint8_t NsmPower::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
-static void createNsmPowerSensor([[maybe_unused]] const std::string& interface,
-                                 [[maybe_unused]] const std::string& objPath,
-                                 [[maybe_unused]] NsmDeviceTable& nsmDevices)
+static void createNsmPowerSensor(SensorManager& manager,
+                                 const std::string& interface,
+                                 const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto name = utils::DBusHandler().getDbusProperty<std::string>(
@@ -86,7 +86,7 @@ static void createNsmPowerSensor([[maybe_unused]] const std::string& interface,
         objPath.c_str(), "UUID", interface.c_str());
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor
