@@ -26,6 +26,9 @@
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
@@ -62,6 +65,53 @@ class NsmUuidIntf : public NsmObject
 
   private:
     std::unique_ptr<UuidIntf> uuidIntf = nullptr;
+};
+
+using AssetIntfProcessor = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
+
+class NsmAssetIntfProcessor : public NsmObject
+{
+  public:
+    NsmAssetIntfProcessor(const std::string& name, const std::string& type,
+                          const std::string& manufacturer,
+                          const std::string& partNumber,
+                          const std::string& serialNumber,
+                          const std::string& model,
+                          std::shared_ptr<AssetIntfProcessor> assetIntf);
+
+  private:
+    std::shared_ptr<AssetIntfProcessor> assetIntf;
+};
+
+using LocationIntfProcessor = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Location>;
+using LocationTypes = sdbusplus::xyz::openbmc_project::Inventory::Decorator::
+    server::Location::LocationTypes;
+class NsmLocationIntfProcessor : public NsmObject
+{
+  public:
+    NsmLocationIntfProcessor(sdbusplus::bus::bus& bus, std::string& name,
+                             std::string& type, std::string& inventoryObjPath,
+                             std::string& locationType);
+
+  private:
+    std::unique_ptr<LocationIntfProcessor> locationIntf;
+};
+
+using LocationCodeIntfProcessor =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Decorator::server::LocationCode>;
+class NsmLocationCodeIntfProcessor : public NsmObject
+{
+  public:
+    NsmLocationCodeIntfProcessor(sdbusplus::bus::bus& bus, std::string& name,
+                                 std::string& type,
+                                 std::string& inventoryObjPath,
+                                 std::string& locationCode);
+
+  private:
+    std::unique_ptr<LocationCodeIntfProcessor> locationCodeIntf;
 };
 
 using MigModeIntf =
