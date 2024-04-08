@@ -5,6 +5,7 @@ sources = [
   'nsm_telemetry_cmd.cpp',
   'nsmtool.cpp',
   '../libnsm/platform-environmental.c',
+  '../libnsm/pci-links.c',
   '../libnsm/network-ports.c',
   '../libnsm/base.c',
   '../libnsm/device-capability-discovery.c',

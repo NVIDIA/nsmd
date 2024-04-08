@@ -6,6 +6,7 @@ sources = [
   '../libnsm/base.c',
   '../libnsm/device-capability-discovery.c',
   '../libnsm/platform-environmental.c',
+  '../libnsm/pci-links.c',
   '../libnsm/network-ports.c',
 ]
 

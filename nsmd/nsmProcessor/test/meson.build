@@ -6,6 +6,7 @@ dep_src_files = [
   '../../../common/utils.cpp',
   '../../../libnsm/base.c',
   '../../../libnsm/platform-environmental.c',
+  '../../../libnsm/pci-links.c',
   '../../../libnsm/requester/mctp.c',
   '../../../libnsm/instance-id.c',
 ]
