@@ -47,7 +47,15 @@ enum nsm_inventory_property_identifiers {
 	MAXMUM_MODULE_POWER_LIMIT = 19,
 	RATED_MODULE_POWER_LIMIT = 20,
 	DEFAULT_BOOST_CLOCKS = 21,
-	DEFAULT_BASE_CLOCKS = 22
+	DEFAULT_BASE_CLOCKS = 22,
+	PCIERETIMER_0_EEPROM_VERSION = 144,
+	PCIERETIMER_1_EEPROM_VERSION = 145,
+	PCIERETIMER_2_EEPROM_VERSION = 146,
+	PCIERETIMER_3_EEPROM_VERSION = 147,
+	PCIERETIMER_4_EEPROM_VERSION = 148,
+	PCIERETIMER_5_EEPROM_VERSION = 149,
+	PCIERETIMER_6_EEPROM_VERSION = 150,
+	PCIERETIMER_7_EEPROM_VERSION = 151
 };
 
 enum nsm_data_type {
@@ -69,9 +77,9 @@ typedef uint8_t enum8;
 
 // Driver states as specified in your documentation.
 typedef enum {
-    DriverStateUnknown = 0,
-    DriverNotLoaded = 1,
-    DriverLoaded = 2
+	DriverStateUnknown = 0,
+	DriverNotLoaded = 1,
+	DriverLoaded = 2
 } DriverStateEnum;
 
 struct nsm_inventory_property_record {
@@ -234,9 +242,10 @@ int decode_get_driver_info_req(const struct nsm_msg *msg, size_t msg_len);
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_driver_info_resp(uint8_t instance_id,  uint8_t cc,
-			     uint16_t reason_code, const uint16_t data_size,
-					  const uint8_t *driver_info_data, struct nsm_msg *msg);
+int encode_get_driver_info_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, const uint16_t data_size,
+				const uint8_t *driver_info_data,
+				struct nsm_msg *msg);
 
 /** @brief Decode a Get Driver Information response message
  *
@@ -261,7 +270,6 @@ struct nsm_get_MIG_mode_resp {
 	bitfield8_t flags;
 } __attribute__((packed));
 
-
 /** @struct nsm_get_ECC_mode_resp
  *
  *  Structure representing NSM get ECC Mode response.
@@ -283,7 +291,6 @@ struct nsm_ECC_error_counts {
 	uint32_t dram_corrected;
 	uint32_t dram_uncorrected;
 } __attribute__((packed));
-
 
 /** @struct nsm_get_ECC_error_counts_resp
  *

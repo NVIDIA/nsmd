@@ -437,6 +437,62 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             memcpy(property.data(), data.data(), data.size());
             break;
         }
+        case PCIERETIMER_0_EEPROM_VERSION:
+        {
+            uint32_t data = 100000;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_1_EEPROM_VERSION:
+        {
+            uint32_t data = 100001;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_2_EEPROM_VERSION:
+        {
+            uint32_t data = 100002;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_3_EEPROM_VERSION:
+        {
+            uint32_t data = 100003;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_4_EEPROM_VERSION:
+        {
+            uint32_t data = 100004;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_5_EEPROM_VERSION:
+        {
+            uint32_t data = 100005;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_6_EEPROM_VERSION:
+        {
+            uint32_t data = 100006;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
+        case PCIERETIMER_7_EEPROM_VERSION:
+        {
+            uint32_t data = 100007;
+            property.resize(sizeof(data));
+            memcpy(property.data(), &data, sizeof(data));
+            break;
+        }
         default:
             break;
     }
@@ -858,7 +914,6 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
-
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::setEventSubscription(const nsm_msg* requestMsg,

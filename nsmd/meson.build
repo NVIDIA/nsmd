@@ -1,4 +1,3 @@
-
 sources = [
   '../common/utils.cpp',
   '../libnsm/base.c',
@@ -16,18 +15,14 @@ sources = [
   'nsmSensorAggregator.cpp',
 ]
 
-nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common']
+    nsmd_headers = [ '.', '..', '../libnsm', '../requester', '../common' ]
 
-subdir('nsmNumericSensor')
-subdir('nsmFwSwInventory')
-subdir('nsmProcessor')
-subdir('nsmEventConfig')
+    subdir('nsmNumericSensor') subdir('nsmFwSwInventory') subdir('nsmProcessor')
+        subdir('nsmEventConfig') subdir('nsmChassis')
 
-executable(
-  'nsmd',
-  sources,
-  implicit_include_directories: false,
-  include_directories: include_directories(nsmd_headers),
-  dependencies: deps,
-  install: true,
-  install_dir: get_option('bindir'))
+            executable('nsmd', sources, implicit_include_directories
+                       : false, include_directories
+                       : include_directories(nsmd_headers), dependencies
+                       : deps, install
+                       : true, install_dir
+                       : get_option('bindir'))
