@@ -293,31 +293,31 @@ class GetPortTelemetryCounter : public CommandInterface
     uint8_t portNumber;
 };
 
-class GetInvectoryInformation : public CommandInterface
+class GetInventoryInformation : public CommandInterface
 {
   public:
-    ~GetInvectoryInformation() = default;
-    GetInvectoryInformation() = delete;
-    GetInvectoryInformation(const GetInvectoryInformation&) = delete;
-    GetInvectoryInformation(GetInvectoryInformation&&) = default;
-    GetInvectoryInformation& operator=(const GetInvectoryInformation&) = delete;
-    GetInvectoryInformation& operator=(GetInvectoryInformation&&) = default;
+    ~GetInventoryInformation() = default;
+    GetInventoryInformation() = delete;
+    GetInventoryInformation(const GetInventoryInformation&) = delete;
+    GetInventoryInformation(GetInventoryInformation&&) = default;
+    GetInventoryInformation& operator=(const GetInventoryInformation&) = delete;
+    GetInventoryInformation& operator=(GetInventoryInformation&&) = default;
 
     using CommandInterface::CommandInterface;
 
-    explicit GetInvectoryInformation(const char* type, const char* name,
+    explicit GetInventoryInformation(const char* type, const char* name,
                                      CLI::App* app) :
         CommandInterface(type, name, app)
     {
-        auto getInvectoryInformationOptionGroup = app->add_option_group(
+        auto getInventoryInformationOptionGroup = app->add_option_group(
             "Required",
             "Property Id for which Inventory Information is to be retrieved.");
 
         propertyId = 0;
-        getInvectoryInformationOptionGroup->add_option(
+        getInventoryInformationOptionGroup->add_option(
             "-p, --propertyId", propertyId,
             "retrieve inventory information for propertyId");
-        getInvectoryInformationOptionGroup->require_option(1);
+        getInventoryInformationOptionGroup->require_option(1);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -367,6 +367,8 @@ class GetInvectoryInformation : public CommandInterface
             (nsm_inventory_property_record*)inventoryInformation->data();
         propRecordResult["Property ID"] = propertyIdentifier;
         propRecordResult["Data Length"] = static_cast<uint16_t>(dataSize);
+        std::stringstream iss;
+        std::string firmwareVersion;
 
         union Data
         {
@@ -413,6 +415,24 @@ class GetInvectoryInformation : public CommandInterface
             case INFO_ROM_VERSION:
                 propRecordResult["Data"] =
                     reinterpret_cast<char*>(propertyRecord->data);
+                break;
+            case PCIERETIMER_0_EEPROM_VERSION:
+            case PCIERETIMER_1_EEPROM_VERSION:
+            case PCIERETIMER_2_EEPROM_VERSION:
+            case PCIERETIMER_3_EEPROM_VERSION:
+            case PCIERETIMER_4_EEPROM_VERSION:
+            case PCIERETIMER_5_EEPROM_VERSION:
+            case PCIERETIMER_6_EEPROM_VERSION:
+            case PCIERETIMER_7_EEPROM_VERSION:
+                iss << int(propertyRecord->data[0]); // Major version number
+                iss << '.'
+                    << int(propertyRecord->data[2]); // Minor version number
+                iss << '.'
+                    << int((propertyRecord->data[4] << 8) |
+                           propertyRecord->data[6]); // Patch number
+
+                firmwareVersion = iss.str();
+                propRecordResult["Data"] = firmwareVersion;
                 break;
             default:
                 std::cerr
@@ -1383,10 +1403,10 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<GetPortTelemetryCounter>(
         "telemetry", "GetPortTelemetryCounter", getPortTelemetryCounter));
 
-    auto getInvectoryInformation = telemetry->add_subcommand(
-        "GetInvectoryInformation", "get inventory information");
-    commands.push_back(std::make_unique<GetInvectoryInformation>(
-        "telemetry", "GetInvectoryInformation", getInvectoryInformation));
+    auto getInventoryInformation = telemetry->add_subcommand(
+        "GetInventoryInformation", "get inventory information");
+    commands.push_back(std::make_unique<GetInventoryInformation>(
+        "telemetry", "GetInventoryInformation", getInventoryInformation));
 
     auto getTemperatureReading = telemetry->add_subcommand(
         "GetTemperatureReading", "get temperature reading of a sensor");

@@ -13,12 +13,16 @@ sources = [
   'nsmObjectFactory.cpp',
   'nsmd.cpp',
   'nsmSensorAggregator.cpp',
+  'nsmSensor.cpp',
 ]
 
     nsmd_headers = [ '.', '..', '../libnsm', '../requester', '../common' ]
 
-    subdir('nsmNumericSensor') subdir('nsmFwSwInventory') subdir('nsmProcessor')
-        subdir('nsmEventConfig') subdir('nsmChassis')
+    subdir('nsmNumericSensor')
+    subdir('nsmFwSwInventory')
+    subdir('nsmProcessor')
+    subdir('nsmEventConfig')
+    subdir('nsmChassis')
 
             executable('nsmd', sources, implicit_include_directories
                        : false, include_directories
