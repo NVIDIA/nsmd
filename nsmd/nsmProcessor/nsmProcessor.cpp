@@ -215,14 +215,14 @@ static void createNsmProcessorSensor(SensorManager& manager,
             objPath.c_str(), "Name", PROCESSOR_INTERFACE);
 
         auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
+            objPath.c_str(), "UUID", PROCESSOR_INTERFACE);
 
         auto type = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
         auto inventoryObjPath =
             utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", interface.c_str());
+                objPath.c_str(), "InventoryObjPath", PROCESSOR_INTERFACE);
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
