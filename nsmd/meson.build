@@ -33,6 +33,7 @@ subdir('nsmChassis')
 subdir('nsmGpuChassis')
 subdir('nsmPort')
 subdir('nsmDbusIfaceOverride')
+subdir('nsmMemory')
 
 executable(
     'nsmd',

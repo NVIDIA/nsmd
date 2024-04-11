@@ -2742,12 +2742,13 @@ TEST(getClockLimit, testBadDecodeResponse)
 TEST(getCurrClockFreq, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
-					sizeof(nsm_common_req));
-
+					sizeof(nsm_get_curr_clock_freq_req));
+	uint8_t clock_id = GRAPHICS_CLOCK;
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
-	auto rc = encode_get_curr_clock_freq_req(0, request);
-	struct nsm_common_req *req =
-	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+	auto rc = encode_get_curr_clock_freq_req(0, clock_id, request);
+	struct nsm_get_curr_clock_freq_req *req =
+	    reinterpret_cast<struct nsm_get_curr_clock_freq_req *>(
+		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
@@ -2756,8 +2757,28 @@ TEST(getCurrClockFreq, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_CURRENT_CLOCK_FREQUENCY, req->command);
-	EXPECT_EQ(0, req->data_size);
+	EXPECT_EQ(NSM_GET_CURRENT_CLOCK_FREQUENCY, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+}
+
+TEST(getCurrClockFreq, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CURRENT_CLOCK_FREQUENCY, // command
+	    1,				     // data size
+	    1				     // clock_id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t clock_id;
+	auto rc = decode_get_curr_clock_freq_req(request, msg_len, &clock_id);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
 TEST(getCurrClockFreq, testGoodEncodeResponse)
@@ -3056,5 +3077,505 @@ TEST(getAccumGpuUtilTime, testBadDecodeResponse)
 	rc = decode_get_accum_GPU_util_time_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, &contextUtil_test,
 	    &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getRowRemapState, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_row_remap_state_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAP_STATE_FLAGS, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getRowRemapState, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ROW_REMAP_STATE_FLAGS,   // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_row_remap_state_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getRowRemapState, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remap_state_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	bitfield8_t flags;
+	flags.byte = 1;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_row_remap_state_resp(0, NSM_SUCCESS, reason_code,
+						  &flags, response);
+
+	struct nsm_get_row_remap_state_resp *resp =
+	    reinterpret_cast<struct nsm_get_row_remap_state_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAP_STATE_FLAGS, resp->hdr.command);
+	EXPECT_EQ(sizeof(bitfield8_t), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(1, resp->flags.byte);
+}
+
+TEST(getRowRemapState, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ROW_REMAP_STATE_FLAGS,   // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    1,
+	    0, // data size
+	    1};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	bitfield8_t flags;
+
+	auto rc = decode_get_row_remap_state_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &flags);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(1, data_size);
+	EXPECT_EQ(1, flags.byte);
+}
+
+TEST(getRowRemapState, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ROW_REMAP_STATE_FLAGS,   // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0, // data size. Here it should not be 0. Negative case
+	    0, // data size
+	    1};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	bitfield8_t flags;
+
+	auto rc = decode_get_row_remap_state_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_state_resp(response, msg_len, NULL,
+					     &data_size, &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_state_resp(response, msg_len, &cc, NULL,
+					     &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_state_resp(response, msg_len - 1, &cc,
+					     &data_size, &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_row_remap_state_resp(response, msg_len, &cc, &data_size,
+					     &reason_code, &flags);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getRowRemappingCounts, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_row_remapping_counts_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAPPING_COUNTS, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getRowRemappingCounts, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ROW_REMAPPING_COUNTS,    // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_row_remapping_counts_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getRowRemappingCounts, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_row_remapping_counts_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t correctable_error = 4987;
+	uint32_t uncorrectable_error = 2564;
+	uint32_t correctable_error_test = correctable_error;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_row_remapping_counts_resp(
+	    0, NSM_SUCCESS, reason_code, correctable_error, uncorrectable_error,
+	    response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_row_remapping_counts_resp *resp =
+	    reinterpret_cast<struct nsm_get_row_remapping_counts_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAPPING_COUNTS, resp->hdr.command);
+	EXPECT_EQ(2 * sizeof(uint32_t), le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(le32toh(correctable_error_test), correctable_error);
+}
+
+TEST(getRowRemappingCounts, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> correctable_error_byte{0x01, 0x0A, 0x00, 0x01};
+	std::vector<uint8_t> uncorrectable_error_byte{
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ECC_ERROR_COUNTS,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    8,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), correctable_error_byte.begin(),
+			   correctable_error_byte.end());
+	responseMsg.insert(responseMsg.end(), uncorrectable_error_byte.begin(),
+			   uncorrectable_error_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t correctable_error;
+	uint32_t uncorrectable_error;
+
+	auto rc = decode_get_row_remapping_counts_resp(
+	    response, msg_len, &cc, &data_size, &reason_code,
+	    &correctable_error, &uncorrectable_error);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(8, data_size);
+}
+
+TEST(getRowRemappingCounts, testBadDecodeResponse)
+{
+	std::vector<uint8_t> correctable_error_byte{0x01, 0x0A, 0x00, 0x01};
+	std::vector<uint8_t> uncorrectable_error_byte{
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ECC_ERROR_COUNTS,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    5,				     // incorrect data size
+	    0				     // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), correctable_error_byte.begin(),
+			   correctable_error_byte.end());
+	responseMsg.insert(responseMsg.end(), uncorrectable_error_byte.begin(),
+			   uncorrectable_error_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t correctable_error;
+	uint32_t uncorrectable_error;
+
+	auto rc = decode_get_row_remapping_counts_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &correctable_error,
+	    &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remapping_counts_resp(
+	    response, msg_len, NULL, &data_size, &reason_code,
+	    &correctable_error, &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remapping_counts_resp(
+	    response, msg_len, &cc, NULL, &reason_code, &correctable_error,
+	    &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remapping_counts_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code,
+	    &correctable_error, &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_row_remapping_counts_resp(
+	    response, msg_len, &cc, &data_size, &reason_code,
+	    &correctable_error, &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getMemCapacityUtil, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_memory_capacity_util_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_MEMORY_CAPACITY_UTILIZATION, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getMemCapacityUtil, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, // command
+	    0					 // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_memory_capacity_util_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getMemCapacityUtil, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_memory_capacity_util_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	struct nsm_memory_capacity_utilization data;
+	data.reserved_memory = 200;
+	data.used_memory = 150;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_memory_capacity_util_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_memory_capacity_util_resp *resp =
+	    reinterpret_cast<struct nsm_get_memory_capacity_util_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_MEMORY_CAPACITY_UTILIZATION, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_memory_capacity_utilization),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(le32toh(resp->data.reserved_memory), data.reserved_memory);
+}
+
+TEST(getMemCapacityUtil, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	};
+
+	struct nsm_memory_capacity_utilization *data =
+	    reinterpret_cast<struct nsm_memory_capacity_utilization *>(
+		data_byte.data());
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, // command
+	    0,					 // completion code
+	    0,					 // reserved
+	    0,					 // reserved
+	    8,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_memory_capacity_utilization data_test;
+
+	auto rc = decode_get_memory_capacity_util_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data_test);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(8, data_size);
+	EXPECT_EQ(le32toh(data->reserved_memory), data_test.reserved_memory);
+}
+
+TEST(getMemCapacityUtil, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, // command
+	    0,					 // completion code
+	    0,					 // reserved
+	    0,					 // reserved
+	    9,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_memory_capacity_utilization data;
+
+	auto rc = decode_get_memory_capacity_util_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_memory_capacity_util_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_memory_capacity_util_resp(response, msg_len, &cc, NULL,
+						  &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_memory_capacity_util_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_memory_capacity_util_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }

@@ -2073,7 +2073,8 @@ int decode_get_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
 }
 
 // Get Current Clock Frequency command, NSM T3 spec
-int encode_get_curr_clock_freq_req(uint8_t instance_id, struct nsm_msg *msg)
+int encode_get_curr_clock_freq_req(uint8_t instance_id, uint8_t clock_id,
+				   struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -2084,15 +2085,42 @@ int encode_get_curr_clock_freq_req(uint8_t instance_id, struct nsm_msg *msg)
 	header.instance_id = instance_id;
 	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
 
-	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
 
-	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+	struct nsm_get_curr_clock_freq_req *request =
+	    (struct nsm_get_curr_clock_freq_req *)msg->payload;
 
-	request->command = NSM_GET_CURRENT_CLOCK_FREQUENCY;
-	request->data_size = 0;
+	request->hdr.command = NSM_GET_CURRENT_CLOCK_FREQUENCY;
+	request->hdr.data_size = sizeof(clock_id);
+	request->clock_id = clock_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_curr_clock_freq_req(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *clock_id)
+{
+	if (msg == NULL || clock_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_curr_clock_freq_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_curr_clock_freq_req *request =
+	    (struct nsm_get_curr_clock_freq_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->clock_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*clock_id = request->clock_id;
+
 	return NSM_SW_SUCCESS;
 }
 
@@ -2257,6 +2285,307 @@ int decode_get_accum_GPU_util_time_resp(
 	}
 	*context_util_time = le32toh(resp->context_util_time);
 	*SM_util_time = le32toh(resp->SM_util_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remap State command, NSM T3 spec
+int encode_get_row_remap_state_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ROW_REMAP_STATE_FLAGS;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remap State command, NSM T3 spec
+int decode_get_row_remap_state_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+// Get Row Remap State command, NSM T3 spec
+int encode_get_row_remap_state_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, bitfield8_t *flags,
+				    struct nsm_msg *msg)
+{
+	if (msg == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_ROW_REMAP_STATE_FLAGS, msg);
+	}
+
+	struct nsm_get_row_remap_state_resp *resp =
+	    (struct nsm_get_row_remap_state_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ROW_REMAP_STATE_FLAGS;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(bitfield8_t);
+	resp->hdr.data_size = htole16(data_size);
+
+	memcpy(&(resp->flags), flags, data_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remap State command, NSM T3 spec
+int decode_get_row_remap_state_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *data_size,
+				    uint16_t *reason_code, bitfield8_t *flags)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_row_remap_state_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_row_remap_state_resp *resp =
+	    (struct nsm_get_row_remap_state_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < sizeof(bitfield8_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	memcpy(flags, &(resp->flags), sizeof(bitfield8_t));
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remapping Counts, NSM T3 spec
+int encode_get_row_remapping_counts_req(uint8_t instance_id,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ROW_REMAPPING_COUNTS;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remapping Counts, NSM T3 spec
+int decode_get_row_remapping_counts_req(const struct nsm_msg *msg,
+					size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+// Get Row Remapping Counts, NSM T3 spec
+int encode_get_row_remapping_counts_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint32_t correctable_error,
+					 uint32_t uncorrectable_error,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_ROW_REMAPPING_COUNTS, msg);
+	}
+
+	struct nsm_get_row_remapping_counts_resp *resp =
+	    (struct nsm_get_row_remapping_counts_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ROW_REMAPPING_COUNTS;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = 2 * sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+
+	resp->correctable_error = htole32(correctable_error);
+	resp->uncorrectable_error = htole32(uncorrectable_error);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Row Remapping Counts, NSM T3 spec
+int decode_get_row_remapping_counts_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *data_size,
+					 uint16_t *reason_code,
+					 uint32_t *correctable_error,
+					 uint32_t *uncorrectable_error)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    correctable_error == NULL || uncorrectable_error == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_row_remapping_counts_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_row_remapping_counts_resp *resp =
+	    (struct nsm_get_row_remapping_counts_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < 2 * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*correctable_error = le16toh(resp->correctable_error);
+	*uncorrectable_error = le16toh(resp->uncorrectable_error);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_memory_capacity_util_req(uint8_t instance_id,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_MEMORY_CAPACITY_UTILIZATION;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_memory_capacity_util_req(const struct nsm_msg *msg,
+					size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_memory_capacity_util_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_memory_capacity_utilization *data, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_MEMORY_CAPACITY_UTILIZATION, msg);
+	}
+
+	struct nsm_get_memory_capacity_util_resp *resp =
+	    (struct nsm_get_memory_capacity_util_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_MEMORY_CAPACITY_UTILIZATION;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_memory_capacity_utilization));
+
+	resp->data.reserved_memory = htole32(data->reserved_memory);
+	resp->data.used_memory = htole32(data->used_memory);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_memory_capacity_util_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_memory_capacity_utilization *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_memory_capacity_util_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_memory_capacity_util_resp *resp =
+	    (struct nsm_get_memory_capacity_util_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if (*data_size != sizeof(struct nsm_memory_capacity_utilization)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	data->reserved_memory = le32toh(resp->data.reserved_memory);
+	data->used_memory = le32toh(resp->data.used_memory);
 
 	return NSM_SW_SUCCESS;
 }

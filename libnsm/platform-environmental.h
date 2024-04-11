@@ -48,6 +48,9 @@ enum nsm_platform_environmental_commands {
 	NSM_SET_ECC_MODE = 0x7c,
 	NSM_GET_POWER_SUPPLY_STATUS = 0x63,
 	NSM_GET_GPU_PRESENCE_POWER_STATUS = 0x64,
+	NSM_GET_MEMORY_CAPACITY_UTILIZATION = 0xAD,
+	NSM_GET_ROW_REMAP_STATE_FLAGS = 0x7F,
+	NSM_GET_ROW_REMAPPING_COUNTS = 0x7E
 };
 
 enum nsm_inventory_property_identifiers {
@@ -283,11 +286,12 @@ struct nsm_get_clock_limit_resp {
 
 /** @struct nsm_get_curr_clock_freq_req
  *
- *  Structure representing NSM get current clock freq request.
+ *  Structure representing NSM get curr clock freq request.
  */
-// struct nsm_get_curr_clock_freq_req {
-// 	struct nsm_common_req hdr;
-// } __attribute__((packed));
+struct nsm_get_curr_clock_freq_req {
+	struct nsm_common_req hdr;
+	uint8_t clock_id;
+} __attribute__((packed));
 
 /** @struct nsm_get_curr_clock_freq_resp
  *
@@ -298,13 +302,23 @@ struct nsm_get_curr_clock_freq_resp {
 	uint32_t clockFreq;
 } __attribute__((packed));
 
-/** @struct nsm_get_accum_GPU_util_time_req
+/** @struct nsm_memory_capacity_utilization
  *
- *  Structure representing Get Accumulated GPU Utilization time request.
+ *  Structure representing Memory Capacity Utilization.
  */
-// struct nsm_get_accum_GPU_util_time_req {
-// 	struct nsm_common_req hdr;
-// } __attribute__((packed));
+struct nsm_memory_capacity_utilization {
+	uint32_t reserved_memory;
+	uint32_t used_memory;
+} __attribute__((packed));
+
+/** @struct nsm_get_memory_capacity_util_resp
+ *
+ *  Structure representing Get Memory Capacity Utilization response.
+ */
+struct nsm_get_memory_capacity_util_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_memory_capacity_utilization data;
+} __attribute__((packed));
 
 /** @struct nsm_get_accum_GPU_util_time_resp
  *
@@ -478,6 +492,25 @@ struct nsm_EDPp_scaling_factors {
 struct nsm_get_programmable_EDPp_scaling_factor_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_EDPp_scaling_factors scaling_factors;
+} __attribute__((packed));
+
+/** @struct nsm_get_row_remap_state_resp
+ *
+ *  Structure representing NSM get row remap state response.
+ */
+struct nsm_get_row_remap_state_resp {
+	struct nsm_common_resp hdr;
+	bitfield8_t flags;
+} __attribute__((packed));
+
+/** @struct nsm_get_row_remapping_counts_resp
+ *
+ *  Structure representing Get Row Remapping counts response.
+ */
+struct nsm_get_row_remapping_counts_resp {
+	struct nsm_common_resp hdr;
+	uint32_t correctable_error;
+	uint32_t uncorrectable_error;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
@@ -1193,13 +1226,25 @@ int decode_get_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint16_t *reason_code,
 				struct nsm_clock_limit *clock_limit);
 
-/** @brief Encode a Get Current Clock Frequency request message
+/** @brief Encode a Get Current Clock Frequency req message
  *
  *  @param[in] instance_id - NSM instance ID
+ *  @param[in] clock_id - clock id, Graphics(0)/Memory(1) clock
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_curr_clock_freq_req(uint8_t instance_id, struct nsm_msg *msg);
+int encode_get_curr_clock_freq_req(uint8_t instance, uint8_t clock_id,
+				   struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Clock Frequency request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] clock_id - clock id, Graphics(0)/Memory(1) clock
+ *  @return nsm_completion_codes
+ */
+int decode_get_curr_clock_freq_req(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *clock_id);
 
 /** @brief Encode a Get Current Clock Frequency response message
  *
@@ -1356,6 +1401,137 @@ int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
 						  uint16_t *reason_code,
 						  uint8_t *presence,
 						  uint8_t *power_status);
+
+/** @brief Encode a Get Row Remap State request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remap_state_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get row remap state request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remap_state_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get row remap state response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating row remap state flags
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remap_state_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, bitfield8_t *flags,
+				    struct nsm_msg *msg);
+
+/** @brief Decode a Get row remap state response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] flags - flags indicating row remap state
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remap_state_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *data_size,
+				    uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Get Row Remapping Counts request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remapping_counts_req(uint8_t instance_id,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Get row remapping counts request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remapping_counts_req(const struct nsm_msg *msg,
+					size_t msg_len);
+
+/** @brief Encode a Get Row Remapping Counts response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] correctable_error - Correctable error count
+ *  @param[in] uncorrectabale_error - Uncorrectable error count
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remapping_counts_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint32_t correctable_error,
+					 uint32_t uncorrectable_error,
+					 struct nsm_msg *msg);
+
+/** @brief Dncode a Get Row Remapping Counts response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] correctable_error - Correctable error count
+ *  @param[out] uncorrectabale_error - Uncorrectable error count
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remapping_counts_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *data_size,
+					 uint16_t *reason_code,
+					 uint32_t *correctable_error,
+					 uint32_t *uncorrectable_error);
+/** @brief Encode a Get Memory Capacity Utilization request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_memory_capacity_util_req(uint8_t instance_id,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Get Memory Capacity Utilization request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_memory_capacity_util_req(const struct nsm_msg *msg,
+					size_t msg_len);
+
+/** @brief Encode a Get Memory Capacity Utilization response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct representing memory capacity Utilization
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_memory_capacity_util_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_memory_capacity_utilization *data, struct nsm_msg *msg);
+
+/** @brief Dncode a Get Memory Capacity Utilization response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] data - struct representing memory capacity Utilization
+ *  @return nsm_completion_codes
+ */
+int decode_get_memory_capacity_util_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_memory_capacity_utilization *data);
 
 #ifdef __cplusplus
 }
