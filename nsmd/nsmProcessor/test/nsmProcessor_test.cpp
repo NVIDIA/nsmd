@@ -489,6 +489,86 @@ TEST(NsmPCIeGroup4, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 
+TEST(NsmPCIeGroup5, GoodGenReq)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    uint8_t deviceId = 0;
+    nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
+                             deviceId);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const struct nsm_query_scalar_group_telemetry_v1_req*>(
+            msg->payload);
+    EXPECT_EQ(command->hdr.command, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1);
+    EXPECT_EQ(command->hdr.data_size, 2);
+    EXPECT_EQ(command->device_id, deviceId);
+    EXPECT_EQ(command->group_index, 5);
+}
+
+TEST(NsmPCIeGroup5, GoodHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    uint8_t deviceId = 0;
+    nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
+                             deviceId);
+
+    struct nsm_query_scalar_group_telemetry_group_5 data;
+    data.PCIeRXBytes = 100;
+    data.PCIeTXBytes = 200;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_5_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group5_resp(
+        0, NSM_SUCCESS, reason_code, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmPCIeGroup5, BadHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    uint8_t deviceId = 0;
+    nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
+                             deviceId);
+
+    struct nsm_query_scalar_group_telemetry_group_5 data;
+    data.PCIeRXBytes = 100;
+    data.PCIeTXBytes = 200;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_5_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_query_scalar_group_telemetry_v1_group5_resp(
+        0, NSM_SUCCESS, reason_code, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(responseMsg, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
 TEST(nsmEDPpScalingFactor, GoodGenReq)
 {
     nsm::NsmEDPpScalingFactor sensor(bus, sensorName, sensorType,
@@ -574,5 +654,214 @@ TEST(nsmEDPpScalingFactor, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 
     rc = sensor.handleResponseMsg(responseMsg, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(NsmClockLimitGraphics, GoodGenReq)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
+                                      cpuOperatingConfigIntf);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_CLOCK_LIMIT);
+    EXPECT_EQ(command->data_size, 1);
+}
+
+TEST(NsmClockLimitGraphics, GoodHandleResp)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
+                                      cpuOperatingConfigIntf);
+
+    struct nsm_clock_limit clockLimit;
+    clockLimit.requested_limit_min = 800;
+    clockLimit.requested_limit_max = 1800;
+    clockLimit.present_limit_min = 200;
+    clockLimit.present_limit_max = 2000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_limit_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_clock_limit_resp(0, NSM_SUCCESS, reason_code,
+                                             &clockLimit, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmClockLimitGraphics, BadHandleResp)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
+                                      cpuOperatingConfigIntf);
+
+    struct nsm_clock_limit clockLimit;
+    clockLimit.requested_limit_min = 800;
+    clockLimit.requested_limit_max = 1800;
+    clockLimit.present_limit_min = 200;
+    clockLimit.present_limit_max = 2000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_limit_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_clock_limit_resp(0, NSM_SUCCESS, reason_code,
+                                             &clockLimit, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(responseMsg, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(NsmCurrClockFreq, GoodGenReq)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
+                                 cpuOperatingConfigIntf);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_CURRENT_CLOCK_FREQUENCY);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(NsmCurrClockFreq, GoodHandleResp)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
+                                 cpuOperatingConfigIntf);
+
+    uint32_t clockFreq = 3000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_curr_clock_freq_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_curr_clock_freq_resp(0, NSM_SUCCESS, reason_code,
+                                                 &clockFreq, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmCurrClockFreq, BadHandleResp)
+{
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
+                                 cpuOperatingConfigIntf);
+
+    uint32_t clockFreq = 3000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_curr_clock_freq_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_curr_clock_freq_resp(0, NSM_SUCCESS, reason_code,
+                                                 &clockFreq, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(responseMsg, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(NsmAccumGpuUtilTime, GoodGenReq)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
+                                    processorPerformanceIntf);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(NsmAccumGpuUtilTime, GoodHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
+                                    processorPerformanceIntf);
+
+    uint32_t context_util_time = 100;
+    uint32_t SM_util_time = 200;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_accum_GPU_util_time_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_accum_GPU_util_time_resp(
+        0, NSM_SUCCESS, reason_code, &context_util_time, &SM_util_time,
+        responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(responseMsg, msg_len);
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(NsmAccumGpuUtilTime, BadHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
+                                    processorPerformanceIntf);
+
+    uint32_t context_util_time = 100;
+    uint32_t SM_util_time = 200;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_accum_GPU_util_time_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_accum_GPU_util_time_resp(
+        0, NSM_SUCCESS, reason_code, &context_util_time, &SM_util_time,
+        responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(responseMsg, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }

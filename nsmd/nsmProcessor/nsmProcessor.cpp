@@ -374,6 +374,52 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
+NsmPciGroup5::NsmPciGroup5(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+    uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, 5)
+
+{
+    lg2::info("NsmPciGroup5: create sensor:{NAME}", "NAME", name.c_str());
+    processorPerformanceIntf = processorPerfIntf;
+    ;
+}
+
+void NsmPciGroup5::updateReading(
+    const nsm_query_scalar_group_telemetry_group_5& data)
+{
+    processorPerformanceIntf->pcIeRXBytes(data.PCIeRXBytes);
+    processorPerformanceIntf->pcIeTXBytes(data.PCIeTXBytes);
+}
+
+uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                        size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_query_scalar_group_telemetry_group_5 data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_query_scalar_group_telemetry_v1_group5_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group5_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
 NsmEDPpScalingFactor::NsmEDPpScalingFactor(sdbusplus::bus::bus& bus,
                                            std::string& name, std::string& type,
                                            std::string& inventoryObjPath) :
@@ -406,7 +452,6 @@ std::optional<std::vector<uint8_t>>
                    "EID", eid, "RC", rc);
         return std::nullopt;
     }
-
     return request;
 }
 
@@ -435,7 +480,212 @@ uint8_t
             "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    return cc;
+}
 
+NsmClockLimitGraphics::NsmClockLimitGraphics(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmClockLimitGraphics: create sensor:{NAME}", "NAME",
+              name.c_str());
+    cpuOperatingConfigIntf = cpuConfigIntf;
+    updateStaticProp = true;
+}
+
+void NsmClockLimitGraphics::updateReading(
+    const struct nsm_clock_limit& clockLimit)
+{
+    if (updateStaticProp)
+    {
+        cpuOperatingConfigIntf->maxSpeed(clockLimit.present_limit_max);
+        cpuOperatingConfigIntf->minSpeed(clockLimit.present_limit_min);
+        updateStaticProp = false;
+    }
+    cpuOperatingConfigIntf->speedLimit(clockLimit.requested_limit_max);
+    if (clockLimit.requested_limit_max == clockLimit.requested_limit_min)
+    {
+        cpuOperatingConfigIntf->speedLocked(true);
+        cpuOperatingConfigIntf->speedConfig(
+            std::make_tuple(true, (uint32_t)clockLimit.requested_limit_max));
+    }
+    else
+    {
+        cpuOperatingConfigIntf->speedLocked(false);
+        cpuOperatingConfigIntf->speedConfig(
+            std::make_tuple(false, (uint32_t)clockLimit.requested_limit_max));
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmClockLimitGraphics::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_clock_limit_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    uint8_t clock_id = GRAPHICS_CLOCK;
+    auto rc = encode_get_clock_limit_req(instanceId, clock_id, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_clock_limit_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t
+    NsmClockLimitGraphics::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_clock_limit clockLimit;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_clock_limit_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockLimit);
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(clockLimit);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_clock_limit_resp  "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
+NsmCurrClockFreq::NsmCurrClockFreq(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmCurrClockFreq: create sensor:{NAME}", "NAME", name.c_str());
+    cpuOperatingConfigIntf = cpuConfigIntf;
+}
+
+void NsmCurrClockFreq::updateReading(const uint32_t& clockFreq)
+{
+    cpuOperatingConfigIntf->operatingSpeed(clockFreq);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmCurrClockFreq::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_curr_clock_freq_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_curr_clock_freq_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    uint32_t clockFreq = 1;
+    uint16_t data_size;
+    uint16_t reason_code;
+
+    auto rc = decode_get_curr_clock_freq_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockFreq);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(clockFreq);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg:  decode_get_curr_clock_freq_resp "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
+NsmAccumGpuUtilTime::NsmAccumGpuUtilTime(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmAccumGpuUtilTime: create sensor:{NAME}", "NAME",
+              name.c_str());
+    processorPerformanceIntf = processorPerfIntf;
+}
+
+void NsmAccumGpuUtilTime::updateReading(const uint32_t& context_util_time,
+                                        const uint32_t& SM_util_time)
+{
+    processorPerformanceIntf->accumulatedGPUContextUtilizationDuration(
+        context_util_time);
+    processorPerformanceIntf->accumulatedSMUtilizationDuration(SM_util_time);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmAccumGpuUtilTime::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_accum_GPU_util_time_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_accum_GPU_util_time_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t
+    NsmAccumGpuUtilTime::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                           size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    uint32_t context_util_time;
+    uint32_t SM_util_time;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_get_accum_GPU_util_time_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        &context_util_time, &SM_util_time);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(context_util_time, SM_util_time);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_accum_GPU_util_time_resp  "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
     return cc;
 }
 
@@ -573,6 +823,55 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
         }
+        else if (type == "NSM_CpuOperatingConfig")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto cpuOperatingConfigIntf =
+                std::make_shared<CpuOperatingConfigIntf>(
+                    bus, inventoryObjPath.c_str());
+
+            auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
+                name, type, cpuOperatingConfigIntf);
+            auto clockLimitSensor = std::make_shared<NsmClockLimitGraphics>(
+                name, type, cpuOperatingConfigIntf);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(clockFreqSensor);
+                nsmDevice->prioritySensors.push_back(clockLimitSensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(clockFreqSensor);
+                nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
+            }
+        }
+        else if (type == "NSM_ProcessorPerformance")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+                objPath.c_str(), "DeviceId", interface.c_str());
+
+            auto processorPerfIntf = std::make_shared<ProcessorPerformanceIntf>(
+                bus, inventoryObjPath.c_str());
+
+            auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
+                name, type, processorPerfIntf);
+            auto pciRxTxSensor = std::make_shared<NsmPciGroup5>(
+                name, type, processorPerfIntf, deviceId);
+
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(gpuUtilSensor);
+                nsmDevice->prioritySensors.push_back(pciRxTxSensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(gpuUtilSensor);
+                nsmDevice->roundRobinSensors.push_back(pciRxTxSensor);
+            }
+        }
     }
 
     catch (const std::exception& e)
@@ -598,5 +897,11 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorPerformance")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig")
 
 } // namespace nsm

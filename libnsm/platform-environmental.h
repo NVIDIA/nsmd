@@ -20,6 +20,9 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_INVENTORY_INFORMATION = 0x0C,
 	NSM_GET_DRIVER_INFO = 0x14,
 	NSM_GET_MIG_MODE = 0x4d,
+	NSM_GET_CLOCK_LIMIT = 0x11,
+	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
+	NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME = 0x46,
 	NSM_GET_ECC_MODE = 0x4f,
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
 	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09
@@ -82,6 +85,8 @@ typedef enum {
 	DriverNotLoaded = 1,
 	DriverLoaded = 2
 } DriverStateEnum;
+
+enum nsm_clock_type { GRAPHICS_CLOCK = 0, MEMORY_CLOCK = 1 };
 
 struct nsm_inventory_property_record {
 	uint8_t property_id;
@@ -215,6 +220,66 @@ struct nsm_aggregate_resp_sample {
 	uint8_t length : 3;
 	uint8_t reserved : 4;
 	uint8_t data[1];
+} __attribute__((packed));
+
+struct nsm_clock_limit {
+	uint32_t requested_limit_min;
+	uint32_t requested_limit_max;
+	uint32_t present_limit_min;
+	uint32_t present_limit_max;
+} __attribute__((packed));
+
+/** @struct nsm_get_clock_limit_req
+ *
+ *  Structure representing NSM get clock limit request.
+ */
+struct nsm_get_clock_limit_req {
+	struct nsm_common_req hdr;
+	uint8_t clock_id;
+} __attribute__((packed));
+
+/** @struct nsm_get_clock_limit_resp
+ *
+ *  Structure representing NSM get clock limit response.
+ */
+struct nsm_get_clock_limit_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_clock_limit clock_limit;
+} __attribute__((packed));
+
+/** @struct nsm_get_curr_clock_freq_req
+ *
+ *  Structure representing NSM get current clock freq request.
+ */
+// struct nsm_get_curr_clock_freq_req {
+// 	struct nsm_common_req hdr;
+// } __attribute__((packed));
+
+/** @struct nsm_get_curr_clock_freq_resp
+ *
+ *  Structure representing NSM get current clock freq response.
+ */
+struct nsm_get_curr_clock_freq_resp {
+	struct nsm_common_resp hdr;
+	uint32_t clockFreq;
+} __attribute__((packed));
+
+/** @struct nsm_get_accum_GPU_util_time_req
+ *
+ *  Structure representing Get Accumulated GPU Utilization time request.
+ */
+// struct nsm_get_accum_GPU_util_time_req {
+// 	struct nsm_common_req hdr;
+// } __attribute__((packed));
+
+/** @struct nsm_get_accum_GPU_util_time_resp
+ *
+ *  Structure representing Get Accumulated GPU Utilization time response.
+ */
+struct nsm_get_accum_GPU_util_time_resp {
+	struct nsm_common_resp hdr;
+	uint32_t context_util_time;
+	uint32_t SM_util_time;
 } __attribute__((packed));
 
 /** @brief Encode a Get Driver Information request message
@@ -860,6 +925,122 @@ int encode_get_programmable_EDPp_scaling_factor_resp(
 int decode_get_programmable_EDPp_scaling_factor_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code, struct nsm_EDPp_scaling_factors *scaling_factors);
+
+/** @brief Encode a Get clock limit request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] clock_id - clock id, Graphics(0)/Memory(1) clock
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_clock_limit_req(uint8_t instance, uint8_t clock_id,
+			       struct nsm_msg *msg);
+
+/** @brief Decode a Get clock limit request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] clock_id - clock id, Graphics(0)/Memory(1) clock
+ *  @return nsm_completion_codes
+ */
+int decode_get_clock_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *clock_id);
+
+/** @brief Encode a Get ECC error counts response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] clock_limit - struct indicating clock limit
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_clock_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code,
+				struct nsm_clock_limit *clock_limit,
+				struct nsm_msg *msg);
+
+/** @brief Dncode a Get ECC error counts response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] errorCounts - struct indicating clock limit
+ *  @return nsm_completion_codes
+ */
+int decode_get_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code,
+				struct nsm_clock_limit *clock_limit);
+
+/** @brief Encode a Get Current Clock Frequency request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_curr_clock_freq_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Encode a Get Current Clock Frequency response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] clockFreq - current clock Freq in MhZ
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_curr_clock_freq_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, uint32_t *clockFreq,
+				    struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Clock Frequency response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] clockFreq - current clock Freq in MhZ
+ *  @return nsm_completion_codes
+ */
+int decode_get_curr_clock_freq_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *data_size,
+				    uint16_t *reason_code, uint32_t *clockFreq);
+
+/** @brief Encode a Get Accumulated GPU Utilization request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_accum_GPU_util_time_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Encode a Get Accumulated GPU Utilization response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] context_util_time - Accumulated context utilization time in
+ * milliseconds
+ *  @param[in] SM_util_time - Accumulated SM utilization time in milliseconds
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_accum_GPU_util_time_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint32_t *context_util_time,
+					uint32_t *SM_util_time,
+					struct nsm_msg *msg);
+
+/** @brief Dncode a Get Accumulated GPU Utilization response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] context_util_time - Accumulated context utilization time in
+ * milliseconds
+ *  @param[out] SM_util_time - Accumulated SM utilization time in milliseconds
+ *  @return nsm_completion_codes
+ */
+int decode_get_accum_GPU_util_time_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint32_t *context_util_time, uint32_t *SM_util_time);
 
 #ifdef __cplusplus
 }

@@ -9,8 +9,10 @@
 #include <com/nvidia/MigMode/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
+#include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
 
 namespace nsm
 {
@@ -197,6 +199,88 @@ class NsmEDPpScalingFactor : public NsmSensor
     void updateReading(struct nsm_EDPp_scaling_factors scaling_factor);
 
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
+};
+
+using CpuOperatingConfigIntf =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Item::Cpu::server::OperatingConfig>;
+
+class NsmClockLimitGraphics : public NsmSensor
+{
+  public:
+    NsmClockLimitGraphics(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    NsmClockLimitGraphics() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(const struct nsm_clock_limit&);
+    bool updateStaticProp;
+
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+};
+
+class NsmCurrClockFreq : public NsmSensor
+{
+  public:
+    NsmCurrClockFreq(const std::string& name, const std::string& type,
+                     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    NsmCurrClockFreq() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(const uint32_t& clockFreq);
+
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+};
+
+using ProcessorPerformanceIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::State::server::ProcessorPerformance>;
+
+class NsmAccumGpuUtilTime : public NsmSensor
+{
+  public:
+    NsmAccumGpuUtilTime(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf);
+    NsmAccumGpuUtilTime() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(const uint32_t& context_util_time,
+                       const uint32_t& SM_util_time);
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
+        nullptr;
+};
+
+class NsmPciGroup5 : public NsmPcieGroup
+{
+  public:
+    NsmPciGroup5(const std::string& name, const std::string& type,
+                 std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+                 uint8_t deviceId);
+    NsmPciGroup5() = default;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(
+        const struct nsm_query_scalar_group_telemetry_group_5& data);
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
+        nullptr;
 };
 
 } // namespace nsm

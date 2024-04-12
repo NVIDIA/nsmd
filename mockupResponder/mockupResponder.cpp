@@ -287,6 +287,13 @@ std::optional<std::vector<uint8_t>>
                     return getEccErrorCountsHandler(request, requestLen);
                 case NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
                     return getEDPpScalingFactorHandler(request, requestLen);
+                case NSM_GET_CLOCK_LIMIT:
+                    return getClockLimitHandler(request, requestLen);
+                case NSM_GET_CURRENT_CLOCK_FREQUENCY:
+                    return getCurrClockFreqHandler(request, requestLen);
+                case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
+                    return getAccumCpuUtilTimeHandler(request, requestLen);
+
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -1489,6 +1496,107 @@ std::optional<std::vector<uint8_t>>
         lg2::error(
             "encode_get_programmable_EDPp_scaling_factor_resp failed: rc={RC}",
             "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getClockLimitHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    uint8_t clock_id;
+    auto rc = decode_get_clock_limit_req(requestMsg, requestLen, &clock_id);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode_get_clock_limit_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    if (clock_id != GRAPHICS_CLOCK && clock_id != MEMORY_CLOCK)
+    {
+        lg2::error("getClockLimitHandler: invalid clock_id = {CLOCK_ID}",
+                   "CLOCKID", clock_id);
+        return std::nullopt;
+    }
+    struct nsm_clock_limit clockLimit;
+    clockLimit.requested_limit_min = 800;
+    clockLimit.requested_limit_max = 1800;
+    clockLimit.present_limit_min = 200;
+    clockLimit.present_limit_max = 2000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_limit_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_clock_limit_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, &clockLimit, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_clock_limit_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrClockFreqHandler(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    auto rc = decode_common_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode req for getCurrClockFreqHandler failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    uint32_t clockFreq = 970;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_curr_clock_freq_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_curr_clock_freq_resp(requestMsg->hdr.instance_id,
+                                         NSM_SUCCESS, reason_code, &clockFreq,
+                                         responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_curr_clock_freq_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getAccumCpuUtilTimeHandler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    auto rc = decode_common_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode req for getAccumCpuUtilTimeHandler failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    uint32_t context_util_time = 4987;
+    uint32_t SM_util_time = 2564;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_accum_GPU_util_time_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_accum_GPU_util_time_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        &context_util_time, &SM_util_time, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_accum_GPU_util_time_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
     return response;
