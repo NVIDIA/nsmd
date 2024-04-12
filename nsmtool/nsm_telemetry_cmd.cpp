@@ -8,6 +8,7 @@
 #include "base.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
+#include "pci-links.h"
 
 #include "cmd_helper.hpp"
 #include "utils.hpp"
@@ -1155,6 +1156,222 @@ class GetEccErrorCounts : public CommandInterface
     }
 };
 
+class QueryScalarGroupTelemetry : public CommandInterface
+{
+  public:
+    ~QueryScalarGroupTelemetry() = default;
+    QueryScalarGroupTelemetry() = delete;
+    QueryScalarGroupTelemetry(const QueryScalarGroupTelemetry&) = delete;
+    QueryScalarGroupTelemetry(QueryScalarGroupTelemetry&&) = default;
+    QueryScalarGroupTelemetry&
+        operator=(const QueryScalarGroupTelemetry&) = delete;
+    QueryScalarGroupTelemetry& operator=(QueryScalarGroupTelemetry&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryScalarGroupTelemetry(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto scalarTelemetryOptionGroup = app->add_option_group(
+            "Required", "Group Id for which data source is to be retrieved.");
+
+        groupId = 9;
+        scalarTelemetryOptionGroup->add_option("-d, --deviceId", deviceId,
+                                          "retrieve deviceId");
+        scalarTelemetryOptionGroup->add_option("-g, --groupId", groupId,
+                                          "retrieve data source for groupId");
+        scalarTelemetryOptionGroup->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_scalar_group_telemetry_v1_req(
+            instanceId, deviceId, groupId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        switch (groupId)
+        {
+            case 1:
+             {
+                struct nsm_query_scalar_group_telemetry_group_1 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_2_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["NegotiatedLinkSpeed"] = (int)data.negotiated_link_speed;
+                result["NegotiatedLinkWidth"] = (int)data.negotiated_link_width;
+                result["maxLinkSpeed"] = (int)data.max_link_speed;
+                result["maxLinkWidth"] = (int)data.max_link_width;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            case 2:
+            {
+                struct nsm_query_scalar_group_telemetry_group_2 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_2_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["nonfeCount"] = (int)data.non_fatal_errors;
+                result["feCount"] = (int)data.fatal_errors;
+                result["ceCount"] = (int)data.correctable_errors;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            case 3:
+            {
+                struct nsm_query_scalar_group_telemetry_group_3 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_3_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["l0ToRecoveryCount"] = (int)data.L0ToRecoveryCount;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            case 4:
+            {
+                struct nsm_query_scalar_group_telemetry_group_4 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_4_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["replayCount"] = (int)data.replay_cnt;
+                result["replayRolloverCount"] = (int)data.replay_rollover_cnt;
+                result["nakSentCount"] = (int)data.NAK_sent_cnt;
+                result["nakRecievedCount"] = (int)data.NAK_recv_cnt;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            case 5:
+            {
+                struct nsm_query_scalar_group_telemetry_group_5 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group5_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_5_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["PCIeTXBytes"] = (int)data.PCIeTXBytes;
+                result["PCIeRXBytes"] = (int)data.PCIeRXBytes;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            default:
+            {
+                std::cerr << "Invalid Group Id \n";
+                break;
+            }
+        }
+    }
+
+  private:
+    uint8_t deviceId;
+    uint8_t groupId;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -1209,6 +1426,11 @@ void registerCommand(CLI::App& app)
         telemetry->add_subcommand("GetEccErrorCounts", "get ECC error counts");
     commands.push_back(std::make_unique<GetEccErrorCounts>(
         "telemetry", "GetEccErrorCounts", getEccErrorCounts));
+
+    auto queryScalarGroupTelemetry = telemetry->add_subcommand(
+        "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");
+    commands.push_back(std::make_unique<QueryScalarGroupTelemetry>(
+        "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
 }
 
 } // namespace telemetry

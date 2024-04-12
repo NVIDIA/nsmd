@@ -102,6 +102,10 @@ class MockupResponder
                       uint8_t eventId, uint8_t eventClass, uint16_t eventState,
                       uint8_t dataSize, uint8_t* data);
 
+    std::optional<std::vector<uint8_t>>
+        queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
+                                         size_t requestLen);
+
     int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg,
                      bool verbose);
     std::optional<std::vector<uint8_t>>

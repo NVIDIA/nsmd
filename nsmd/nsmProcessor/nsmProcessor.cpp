@@ -1,10 +1,9 @@
 #include "nsmProcessor.hpp"
 
 #include "platform-environmental.h"
-
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
-
+#include "pci-links.h"
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -204,6 +203,163 @@ uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
+NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
+                           uint8_t deviceId, uint8_t groupId) :
+    NsmSensor(name, type),
+    deviceId(deviceId), groupId(groupId)
+{}
+
+std::optional<std::vector<uint8_t>>
+    NsmPcieGroup::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_scalar_group_telemetry_v1_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_scalar_group_telemetry_v1_req(instanceId, deviceId,
+                                                         groupId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmPciGroup :: encode_query_scalar_group_telemetry_v1_req failed for"
+            "group = {GROUPID} eid={EID} rc={RC}",
+            "GROUPID", groupId, "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, 2)
+
+{
+    lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
+    pCieEccIntf = pCieECCIntf;
+}
+
+void NsmPciGroup2::updateReading(const nsm_query_scalar_group_telemetry_group_2& data)
+{
+    pCieEccIntf->nonfeCount(data.non_fatal_errors);
+    pCieEccIntf->feCount(data.fatal_errors);
+    pCieEccIntf->ceCount(data.correctable_errors);
+}
+
+uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                        size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_query_scalar_group_telemetry_group_2 data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "NsmPciGroup4 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group2_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
+NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, 3)
+
+{
+    lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
+    pCieEccIntf = pCieECCIntf;
+}
+
+void NsmPciGroup3::updateReading(const nsm_query_scalar_group_telemetry_group_3& data)
+{
+    pCieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
+}
+
+uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                        size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_query_scalar_group_telemetry_group_3 data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "NsmPciGroup3 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group3_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
+NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, 4)
+
+{
+    lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
+    pCieEccIntf = pCieECCIntf;
+}
+
+void NsmPciGroup4::updateReading(const nsm_query_scalar_group_telemetry_group_4& data)
+{
+    pCieEccIntf->replayCount(data.replay_cnt);
+    pCieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
+    pCieEccIntf->nakSentCount(data.NAK_sent_cnt);
+    pCieEccIntf->nakRecievedCount(data.NAK_recv_cnt);
+}
+
+uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                        size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_query_scalar_group_telemetry_group_4 data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group4_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
 static void createNsmProcessorSensor(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath)
@@ -258,6 +414,38 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
         }
+        if (type == "NSM_PCIe")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+                objPath.c_str(), "DeviceId", interface.c_str());
+            auto pCieECCIntf =
+                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+            auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
+                name, type, pCieECCIntf, deviceId);
+            auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
+                name, type, pCieECCIntf, deviceId);
+            auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
+                name, type, pCieECCIntf, deviceId);
+
+            nsmDevice->deviceSensors.push_back(sensorGroup2);
+            nsmDevice->deviceSensors.push_back(sensorGroup3);
+            nsmDevice->deviceSensors.push_back(sensorGroup4);
+
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(sensorGroup2);
+                nsmDevice->prioritySensors.push_back(sensorGroup3);
+                nsmDevice->prioritySensors.push_back(sensorGroup4);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(sensorGroup2);
+                nsmDevice->roundRobinSensors.push_back(sensorGroup3);
+                nsmDevice->roundRobinSensors.push_back(sensorGroup4);
+            }
+        }
         else if (type == "NSM_ECC")
         {
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
@@ -297,13 +485,16 @@ static void createNsmProcessorSensor(SensorManager& manager,
     }
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor, "xyz.openbmc_project.Configuration.NSM_Processor")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
+
+
+REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
+                                "xyz.openbmc_project.Configuration.NSM_Processor")
+REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
+                                "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
+REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
+                                 "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
+REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor,
+                                "xyz.openbmc_project.Configuration.NSM_Processor.PCIe")
+
 
 } // namespace nsm

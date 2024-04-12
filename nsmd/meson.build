@@ -4,6 +4,7 @@ sources = [
   '../libnsm/base.c',
   '../libnsm/device-capability-discovery.c',
   '../libnsm/platform-environmental.c',
+  '../libnsm/pci-links.c',
   '../libnsm/instance-id.c',
   '../requester/mctp_endpoint_discovery.cpp',
   'deviceManager.cpp',
