@@ -8,8 +8,9 @@
 namespace nsm
 {
 NsmSWInventoryDriverVersionAndStatus::NsmSWInventoryDriverVersionAndStatus(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
-    const std::string& manufacturer) :
+    sdbusplus::bus::bus& bus, const std::string& name,
+    const std::vector<utils::Association>& associations,
+    const std::string& type, const std::string& manufacturer) :
     NsmSensor(name, type)
 {
     auto NVLinkManagementNICFWInvBasePath =
@@ -21,9 +22,19 @@ NsmSWInventoryDriverVersionAndStatus::NsmSWInventoryDriverVersionAndStatus(
         bus, NVLinkManagementNICFWInvBasePath.c_str());
     operationalStatus_ = std::make_unique<OperationalStatusIntf>(
         bus, NVLinkManagementNICFWInvBasePath.c_str());
+    // add all interfaces
     associationDef_ = std::make_unique<AssociationDefinitionsInft>(
         bus, NVLinkManagementNICFWInvBasePath.c_str());
-
+    // handle associations
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associations_list;
+    for (const auto& association : associations)
+    {
+        associations_list.emplace_back(association.forward,
+                                       association.backward,
+                                       association.absolutePath);
+    }
+    associationDef_->associations(associations_list);
     asset_ = std::make_unique<AssetIntf>(
         bus, NVLinkManagementNICFWInvBasePath.c_str());
     asset_->manufacturer(manufacturer);
@@ -104,7 +115,9 @@ static void createNsmNVLinkManagerDriverSensor(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
     auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
-        objPath.c_str(), "UUID", interface.c_str());
+        objPath.c_str(), "Manufacturer", interface.c_str());
+    auto associations =
+        utils::getAssociations(objPath, interface + ".Associations");
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -118,7 +131,7 @@ static void createNsmNVLinkManagerDriverSensor(SensorManager& manager,
     }
 
     auto sensor = std::make_shared<NsmSWInventoryDriverVersionAndStatus>(
-        bus, name, type, manufacturer);
+        bus, name, associations, type, manufacturer);
 
     if (priority)
     {

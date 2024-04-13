@@ -7,6 +7,7 @@
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
+#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>
@@ -25,18 +26,15 @@ using OperationalStatusIntf =
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SoftwareIntf = object_t<Software::server::Version>;
 
-class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
+class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
 {
   public:
-    NsmSWInventoryDriverVersionAndStatus(
+    NsmGPUSWInventoryDriverVersionAndStatus(
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& manufacturer);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     void updateValue(enum8 driverState, std::string driverVersion);
@@ -44,7 +42,6 @@ class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
     std::unique_ptr<OperationalStatusIntf> operationalStatus_ = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
     std::unique_ptr<AssetIntf> asset_ = nullptr;
-    std::string assoc;
 
     // to be consumed by unit tests
     enum8 driverState_ = 0;
