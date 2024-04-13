@@ -1,7 +1,7 @@
 #pragma once
 
-#include "types.hpp"
 #include "nsmObject.hpp"
+#include "types.hpp"
 
 struct nsm_msg;
 
@@ -20,6 +20,9 @@ class NsmSensor : public NsmObject
 
     virtual uint8_t handleResponseMsg(const nsm_msg* responseMsg,
                                       size_t responseLen) = 0;
+
+    virtual requester::Coroutine update(SensorManager& manager,
+                                        eid_t eid) override;
 };
 
 } // namespace nsm

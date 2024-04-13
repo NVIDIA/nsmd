@@ -40,8 +40,6 @@ class SensorManager
     void _startPolling(sdeventplus::source::EventBase& /* source */);
     requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
 
-    requester::Coroutine getSensorReading(eid_t eid,
-                                          std::shared_ptr<NsmSensor> sensor);
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,
                                         size_t* responseLen);

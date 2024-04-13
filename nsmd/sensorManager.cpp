@@ -180,7 +180,7 @@ requester::Coroutine
         auto& sensors = nsmDevice->prioritySensors;
         for (auto& sensor : sensors)
         {
-            co_await getSensorReading(eid, sensor);
+            co_await sensor->update(*this, eid);
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
@@ -201,7 +201,7 @@ requester::Coroutine
             nsmDevice->roundRobinSensors.push_back(sensor);
             toBeUpdated--;
 
-            co_await getSensorReading(eid, sensor);
+            co_await sensor->update(*this, eid);
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
@@ -215,41 +215,6 @@ requester::Coroutine
     } while ((t1 - t0) >= pollingTimeInUsec);
 
     co_return NSM_SW_SUCCESS;
-}
-
-requester::Coroutine
-    SensorManager::getSensorReading(eid_t eid,
-                                    std::shared_ptr<NsmSensor> sensor)
-{
-    auto requestMsg = sensor->genRequestMsg(eid, 0);
-    if (!requestMsg.has_value())
-    {
-        lg2::error(
-            "getSensorReading: sensor->genRequestMsg failed, name={NAME}, eid={EID}",
-            "NAME", sensor->getName(), "EID", eid);
-        co_return NSM_SW_ERROR;
-    }
-
-    const struct nsm_msg* responseMsg = NULL;
-    size_t responseLen = 0;
-    auto rc =
-        co_await SendRecvNsmMsg(eid, *requestMsg, &responseMsg, &responseLen);
-    if (rc)
-    {
-        lg2::error(
-            "getSensorReading: SendRecvNsmMsg failed, name={NAME} eid={EID}",
-            "NAME", sensor->getName(), "EID", eid);
-    }
-
-    rc = sensor->handleResponseMsg(responseMsg, responseLen);
-    if (rc)
-    {
-        lg2::error(
-            "getSensorReading: sensor->handleResponseMsg failed, name={NAME} eid={EID}",
-            "NAME", sensor->getName(), "EID", eid);
-    }
-
-    co_return rc;
 }
 
 requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,

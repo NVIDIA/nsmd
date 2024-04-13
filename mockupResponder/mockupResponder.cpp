@@ -437,6 +437,70 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             memcpy(property.data(), data.data(), data.size());
             break;
         }
+        case PCIERETIMER_0_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_1_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_2_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_3_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_4_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_5_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_6_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
+        case PCIERETIMER_7_EEPROM_VERSION:
+        {
+            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
+                                      0x00, 0x00, 0x0a, 0x00};
+            property.resize(data.size());
+            memcpy(property.data(), data.data(), data.size());
+            break;
+        }
         default:
             break;
     }
@@ -858,7 +922,6 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
-
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::setEventSubscription(const nsm_msg* requestMsg,
