@@ -117,6 +117,9 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    
+    std::optional<std::vector<uint8_t>>
+        setEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getEccErrorCountsHandler(const nsm_msg* requestMsg, size_t requestLen);

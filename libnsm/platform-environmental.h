@@ -44,7 +44,8 @@ enum nsm_platform_environmental_commands {
 	NSM_SET_MIG_MODE = 0x4e,
 	NSM_GET_ECC_MODE = 0x4f,
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
-	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09
+	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09,
+	NSM_SET_ECC_MODE = 0x7c
 };
 
 enum nsm_inventory_property_identifiers {
@@ -383,6 +384,15 @@ struct nsm_set_MIG_mode_req {
 struct nsm_get_ECC_mode_resp {
 	struct nsm_common_resp hdr;
 	bitfield8_t flags;
+} __attribute__((packed));
+
+/** @struct nsm_set_ECC_mode_req
+ *
+ *  Structure representing NSM set ECC mode request.
+ */
+struct nsm_set_ECC_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t requested_mode;
 } __attribute__((packed));
 
 /** @struct nsm_ECC_error_counts
@@ -931,6 +941,47 @@ int encode_get_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Set ECC Mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] requested_mode - Requested Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_ECC_mode_req(uint8_t instance, uint8_t requested_mode,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a Set ECC Mode request request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] requested_mode - Requested Mode
+ *  @return nsm_completion_codes
+ */
+int decode_set_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *requested_mode);
+
+/** @brief Encode a Set ECC mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Set ECC mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code);
 
 /** @brief Encode a Get ECC error counts request message
  *
