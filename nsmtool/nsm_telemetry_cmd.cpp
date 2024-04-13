@@ -615,6 +615,12 @@ class GetInventoryInformation : public CommandInterface
             case DEVICE_GUID:
                 propRecordResult["Data"] = utils::convertUUIDToString(data);
                 break;
+            case MINIMUM_GRAPHICS_CLOCK_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
             case PCIERETIMER_0_EEPROM_VERSION:
             case PCIERETIMER_1_EEPROM_VERSION:
             case PCIERETIMER_2_EEPROM_VERSION:
@@ -1775,6 +1781,74 @@ class GetEccErrorCounts : public CommandInterface
     }
 };
 
+class SetClockLimit : public CommandInterface
+{
+  public:
+    ~SetClockLimit() = default;
+    SetClockLimit() = delete;
+    SetClockLimit(const SetClockLimit&) = delete;
+    SetClockLimit(SetClockLimit&&) = default;
+    SetClockLimit& operator=(const SetClockLimit&) = delete;
+    SetClockLimit& operator=(SetClockLimit&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetClockLimit(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto requestedClockLimit =
+            app->add_option_group("Required", "Requested Clock Limit.");
+
+        requestedClockLimit->add_option(
+            "-c, --clockId", clockId,
+            "clock type (0/1) (graphics clock/memory clock)");
+        requestedClockLimit->add_option("-f, --flags", flags, "flags");
+        requestedClockLimit->add_option("-a, --limit_min", limitMin,
+                                        "Minimum Clock frequency");
+        requestedClockLimit->add_option("-b, --limit_max", limitMax,
+                                        "Maximum clock frequency");
+        requestedClockLimit->require_option(4);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_clock_limit_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_clock_limit_req(instanceId, clockId, flags,
+                                             limitMin, limitMax, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_set_clock_limit_resp(responsePtr, payloadLength, &cc,
+                                              &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+    uint32_t limitMin;
+    uint32_t limitMax;
+    uint8_t flags;
+    uint8_t clockId;
+};
+
 class GetEDPpScalingFactors : public CommandInterface
 {
   public:
@@ -2170,20 +2244,22 @@ class GetClockLimit : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["MaxSpeed"] = (int)clockLimit.present_limit_max;
-        result["MinSpeed"] = (int)clockLimit.present_limit_min;
-        result["SpeedLimit"] = (int)clockLimit.requested_limit_max;
-        if (clockLimit.requested_limit_max == clockLimit.requested_limit_min)
+        result["SpeedLimit"] = (int)clockLimit.present_limit_max;
+        result["PresentLimitMin"] = (int)clockLimit.present_limit_min;
+        result["PresentLimitMax"] = (int)clockLimit.present_limit_max;
+        result["RequestedLimitMax"] = (int)clockLimit.requested_limit_max;
+        result["RequestedLimitMin"] = (int)clockLimit.requested_limit_min;
+        if (clockLimit.present_limit_min == clockLimit.present_limit_max)
         {
             result["SpeedLocked"] = true;
             result["SpeedConfig"] =
-                std::make_tuple(true, (uint32_t)clockLimit.requested_limit_max);
+                std::make_tuple(true, (uint32_t)clockLimit.present_limit_max);
         }
         else
         {
             result["SpeedLocked"] = false;
             result["SpeedConfig"] = std::make_tuple(
-                false, (uint32_t)clockLimit.requested_limit_max);
+                false, (uint32_t)clockLimit.present_limit_max);
         }
         nsmtool::helper::DisplayInJson(result);
     }
@@ -3241,6 +3317,11 @@ void registerCommand(CLI::App& app)
                                                        "get ECC error counts");
     commands.push_back(std::make_unique<GetEccErrorCounts>(
         "telemetry", "GetEccErrorCounts", getEccErrorCounts));
+
+    auto setClockLimit =
+        telemetry->add_subcommand("SetClockLimit", "set Clock Limit");
+    commands.push_back(std::make_unique<SetClockLimit>(
+        "telemetry", "SetClockLimit", setClockLimit));
 
     auto getEDPpScalingFactors = telemetry->add_subcommand(
         "GetEDPpScalingFactors", "get programmable EDPp Scaling Factors");

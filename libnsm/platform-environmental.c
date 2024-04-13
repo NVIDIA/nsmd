@@ -3204,3 +3204,101 @@ int decode_get_clock_output_enable_state_resp(const struct nsm_msg *msg,
 
 	return NSM_SW_SUCCESS;
 }
+
+// Set Clock Limit Command, NSM T3 spec
+int encode_set_clock_limit_req(uint8_t instance_id, uint8_t clock_id,
+			       uint8_t flags, uint32_t limit_min,
+			       uint32_t limit_max, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_clock_limit_req *request =
+	    (struct nsm_set_clock_limit_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_CLOCK_LIMIT;
+	request->hdr.data_size = sizeof(struct nsm_set_clock_limit_req) -
+				 sizeof(struct nsm_common_req);
+	request->flags = flags;
+	request->clock_id = clock_id;
+	request->limit_max = htole32(limit_max);
+	request->limit_min = htole32(limit_min);
+	return NSM_SW_SUCCESS;
+}
+
+// Set Clock Limit Command, NSM T3 spec
+int decode_set_clock_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *clock_id, uint8_t *flags,
+			       uint32_t *limit_min, uint32_t *limit_max)
+{
+	if (msg == NULL || clock_id == NULL || flags == NULL ||
+	    limit_min == NULL || limit_max == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_clock_limit_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_clock_limit_req *request =
+	    (struct nsm_set_clock_limit_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(struct nsm_set_clock_limit_req) -
+					  sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*clock_id = request->clock_id;
+	*flags = request->flags;
+	*limit_max = le32toh(request->limit_max);
+	*limit_min = le32toh(request->limit_min);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_clock_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_SET_CLOCK_LIMIT,
+					  msg);
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+	resp->command = NSM_SET_CLOCK_LIMIT;
+	resp->completion_code = cc;
+	resp->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code)
+{
+	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
