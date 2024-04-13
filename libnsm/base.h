@@ -589,6 +589,16 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 
 int decode_common_req(const struct nsm_msg *msg, size_t msg_len);
 
+/** @brief Decode a Common response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - Data Size
+ *  @param[out] reason_code - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+		       uint16_t *data_size, uint16_t *reason_code);
 #ifdef __cplusplus
 }
 #endif

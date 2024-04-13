@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "platform-environmental.h"
 
@@ -1119,6 +1117,93 @@ int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 	memcpy(flags, &(resp->flags), sizeof(bitfield8_t));
 
 	return NSM_SW_SUCCESS;
+}
+
+// Set Mig Mode Command, NSM T3 spec
+int encode_set_MIG_mode_req(uint8_t instance_id, uint8_t requested_mode,
+			    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_MIG_mode_req *request =
+	    (struct nsm_set_MIG_mode_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_MIG_MODE;
+	request->hdr.data_size = sizeof(uint8_t);
+	request->requested_mode = requested_mode;
+	return NSM_SW_SUCCESS;
+}
+
+// Set Mig Mode Command, NSM T3 spec
+int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *requested_mode)
+{
+	if (msg == NULL || requested_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_set_MIG_mode_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_MIG_mode_req *request =
+	    (struct nsm_set_MIG_mode_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(uint8_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*requested_mode = request->requested_mode;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_SET_MIG_MODE,
+					  msg);
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+	resp->command = NSM_SET_MIG_MODE;
+	resp->completion_code = cc;
+	resp->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code)
+{
+	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
 }
 
 // Get ECC Mode Command, NSM T3 spec

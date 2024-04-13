@@ -1446,6 +1446,145 @@ TEST(getMigMode, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
+TEST(setMigMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_set_MIG_mode_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t requested_mode = 1;
+	auto rc = encode_set_MIG_mode_req(0, requested_mode, request);
+	struct nsm_set_MIG_mode_req *req =
+	    reinterpret_cast<struct nsm_set_MIG_mode_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_MIG_MODE, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(requested_mode, req->requested_mode);
+}
+
+TEST(setMigMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_MIG_MODE,		     // command
+	    1,				     // data size
+	    1				     // requested Mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t requested_mode;
+	auto rc = decode_set_MIG_mode_req(request, msg_len, &requested_mode);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, requested_mode);
+}
+
+TEST(setMigMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    encode_set_MIG_mode_resp(0, NSM_SUCCESS, reason_code, response);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_MIG_MODE, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setMigMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_MIG_MODE,		     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,
+		0				     // data size
+		};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_MIG_mode_resp(response, msg_len, &cc, &data_size,
+					   &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}
+
+TEST(setMigMode, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MIG_MODE,		     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,                   // data size
+		0				     // data size
+	    };
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_MIG_mode_resp( NULL, msg_len, &cc, &data_size,
+					   &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_MIG_mode_resp(response, msg_len, NULL, &data_size,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_MIG_mode_resp(response, msg_len, &cc, NULL,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_MIG_mode_resp(response, msg_len - 1, &cc, &data_size,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 TEST(getEccMode, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +

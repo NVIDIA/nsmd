@@ -729,3 +729,73 @@ TEST(decodeCommonReq, testGoodDecodeCommonRequest)
 	auto rc = decode_common_req(request, msg_len);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
+
+TEST(decodeCommonResp, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    24,				     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_common_resp(response, msg_len, &cc, &data_size,
+				     &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}
+
+TEST(decodeCommonResp, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    24,				     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,				     // data size
+	    0				     // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc =
+	    decode_common_resp(NULL, msg_len, &cc, &data_size, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_common_resp(response, msg_len, NULL, &data_size,
+				&reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_common_resp(response, msg_len, &cc, NULL, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_common_resp(response, msg_len - 1, &cc, &data_size,
+				&reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
