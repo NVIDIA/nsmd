@@ -134,6 +134,7 @@ static void createGPUDriverSensor(SensorManager& manager,
     auto sensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
         bus, name, associations, type, manufacturer);
     nsmDevice->deviceSensors.emplace_back(sensor);
+    nsmDevice->staticSensors.emplace_back(sensor);
 
     // update sensor
     sensor->update(manager, manager.getEid(nsmDevice)).detach();

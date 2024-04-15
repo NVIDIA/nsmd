@@ -236,19 +236,44 @@ PropertyValue DBusHandler::getDbusPropertyVariant(
     return value;
 }
 
+// assuming <uuid, eid, mctpMedium, mctpBinding> is unique
+// assuming we only have a single MCTP network id 0
+// its safe to say if we are given a particular eid it will map to a particular
+// uuid. A device can have multiple EIDs
+std::optional<std::string> getUUIDFromEID(
+    const std::multimap<std::string,
+                        std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
+    eid_t eid)
+{
+    for (const auto& entry : eidTable)
+    {
+        // Accessing the EID in the tuple
+        if (std::get<0>(entry.second) == eid)
+        {
+            // Returning the UUID as an optional when found
+            return entry.first;
+        }
+    }
+    // Returning an empty optional if no UUID is found
+    return std::nullopt;
+}
+
 eid_t getEidFromUUID(
-    const std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+        eidTable,
     uuid_t uuid)
 {
     eid_t eid = std::numeric_limits<uint8_t>::max();
-    for (auto itr = eidTable.begin(); itr != eidTable.end(); itr++)
+    for (const auto& entry : eidTable)
     {
         // TODO: as of now it is hard-coded for PCIe meidium, will handle in
         // seperate MR for selecting the fasted bandwidth medium instead of hard
         // coded value
-        if ((itr->first).substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN))
+        // Assuming UUID_LEN is defined correctly and accessible here
+        if (entry.first.substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN))
         {
-            eid = itr->second.first;
+            eid = std::get<0>(
+                entry.second); // Accessing the first element (eid) of the tuple
             break;
         }
     }
@@ -261,6 +286,7 @@ eid_t getEidFromUUID(
     {
         lg2::debug("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
     }
+
     return eid;
 }
 

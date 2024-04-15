@@ -11,6 +11,8 @@
 
 namespace nsm
 {
+// Definition of the static instance pointer
+DeviceManager* DeviceManager::instance = nullptr;
 
 void DeviceManager::discoverNsmDevice(const MctpInfos& mctpInfos)
 {
@@ -87,8 +89,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             }
 
             // update eid table [from UUID from MCTP dbus property]
-            eidTable.insert(
-                std::make_pair(uuid, std::make_pair(eid, mctpMedium)));
+            eidTable.insert(std::make_pair(
+                uuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
 
             // expose inventory information to FruDevice PDI
             nsmDevice->fruDeviceIntf = objServer.add_interface(

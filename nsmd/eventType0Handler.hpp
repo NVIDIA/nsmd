@@ -2,7 +2,13 @@
 
 #include "device-capability-discovery.h"
 
+#include "deviceManager.hpp"
 #include "eventHandler.hpp"
+#include "nsmDevice.hpp"
+#include "sensorManager.hpp"
+#include "utils.hpp"
+
+#include <memory>
 
 namespace nsm
 {
@@ -10,7 +16,12 @@ namespace nsm
 class EventType0Handler : public EventHandler
 {
   public:
-    EventType0Handler()
+    // Member to hold reference to DeviceManager
+    DeviceManager& deviceManager;
+    SensorManager& sensorManager;
+    EventType0Handler() :
+        deviceManager(DeviceManager::getInstance()),
+        sensorManager(SensorManager::getInstance())
     {
         handlers.emplace(
             NSM_REDISCOVERY_EVENT,
@@ -32,6 +43,52 @@ class EventType0Handler : public EventHandler
      */
     void rediscovery(uint8_t eid, const nsm_msg* event, size_t eventLen)
     {
+        // update sensors for capabilities refresh
+        // Get UUID from EID
+        auto uuidOptional =
+            utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+        if (uuidOptional)
+        {
+            std::string uuid = *uuidOptional;
+            // findNSMDevice instance for that eid
+            lg2::info("rediscovery event : UUID found: {UUID}", "UUID", uuid);
+
+            std::shared_ptr<NsmDevice> nsmDevice{};
+            auto nsmDevices = deviceManager.getNsmDevices();
+            for (auto device : nsmDevices)
+            {
+                if ((device->uuid).substr(0, UUID_LEN) ==
+                    uuid.substr(0, UUID_LEN))
+                {
+                    nsmDevice = device;
+                    break;
+                }
+            }
+
+            if (nsmDevice)
+            {
+                lg2::info(
+                    "Rediscovery event : The NSM device has been discovered for , uuid={UUID}",
+                    "UUID", uuid);
+                auto& sensors = nsmDevice->staticSensors;
+                for (auto& sensor : sensors)
+                {
+                    sensor->update(sensorManager, eid).detach();
+                }
+            }
+            else
+            {
+                lg2::error(
+                    "Rediscovery event : The NSM device has not been discovered for , uuid={UUID}",
+                    "UUID", uuid);
+            }
+        }
+        else
+        {
+            lg2::error("Rediscovery event : No UUID found for EID {EID}", "EID",
+                       eid);
+        }
+
         std::string messageId = "Rediscovery";
 
         auto createLog = [&messageId](
