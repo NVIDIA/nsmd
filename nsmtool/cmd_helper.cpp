@@ -90,7 +90,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     result = send(socketFd(), requestMsg.data(), requestMsg.size(), 0);
     if (-1 == result)
     {
-        verbose = -errno;
+        returnCode = -errno;
         std::cerr << "Write to socket failure : RC = " << returnCode << "\n";
         return returnCode;
     }
@@ -153,10 +153,10 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
 }
 
 // parser for bitField variable
-void parseBitfieldVar(ordered_json& res, const std::string& key, const bitfield8_t* value,
-                      uint8_t size)
+void parseBitfieldVar(ordered_json& res, const std::string& key,
+                      const bitfield8_t* value, uint8_t size)
 {
-    for (uint8_t i=0; i<size; i++)
+    for (uint8_t i = 0; i < size; i++)
     {
         if (value[i].bits.bit0)
         {
