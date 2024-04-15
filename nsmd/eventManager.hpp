@@ -37,9 +37,8 @@ class EventManager
      *  @param[in] eventLen - NSM event size
      *  @return NSM response message
      */
-    std::optional<Response> handle(eid_t eid, NsmType nsmType,
-                                   NsmEventId eventId, const nsm_msg* eventMsg,
-                                   size_t eventLen)
+    std::optional<Response> handle(eid_t eid, NsmType nsmType, NsmEventId eventId,
+                                   const nsm_msg* eventMsg, size_t eventLen)
     {
         if (evenTypeHandlers.find(nsmType) == evenTypeHandlers.end())
         {
@@ -89,7 +88,7 @@ class EventManager
     }
 
   private:
-    /** @brief map of NSM type to event handler
+      /** @brief map of NSM type to event handler
      */
     std::map<NsmType, std::unique_ptr<EventHandler>> evenTypeHandlers;
 };

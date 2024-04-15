@@ -25,8 +25,7 @@ class NsmObject
         return type;
     }
 
-    virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
-                                        [[maybe_unused]] eid_t eid)
+    virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager, [[maybe_unused]] eid_t eid)
     {
         co_return NSM_SW_SUCCESS;
     }

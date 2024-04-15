@@ -1,8 +1,8 @@
 #pragma once
 
-#include "eventManager.hpp"
 #include "requester/handler.hpp"
 #include "socket_manager.hpp"
+#include "eventManager.hpp"
 #include "types.hpp"
 
 #include <sdeventplus/event.hpp>
@@ -54,8 +54,7 @@ class Handler
                      nsm::EventManager& eventManager, Manager& manager,
                      bool verbose) :
         event(event),
-        handler(handler), eventManager(eventManager), manager(manager),
-        verbose(verbose)
+        handler(handler), eventManager(eventManager), manager(manager), verbose(verbose)
     {}
 
     int registerMctpEndpoint(eid_t eid, int type, int protocol,
