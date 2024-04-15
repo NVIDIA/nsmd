@@ -1,5 +1,7 @@
 
 sources += [
+    'nsmChassis/nsmNVSwitchAndNVMgmtNICChassis.cpp',
+    'nsmChassis/nsmNVSwitchAndNVMgmtNICChassisAssembly.cpp',
     'nsmChassis/nsmPCIeRetimer.cpp',
 ]
 

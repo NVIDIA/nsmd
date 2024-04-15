@@ -478,6 +478,9 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MARKETING_NAME:
             populateFrom(property, "NV123");
             break;
+        case BUILD_DATE:
+            populateFrom(property, "2024_01_01");
+            break;
         case DEVICE_GUID:
             property = std::vector<uint8_t>{0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                                             0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
