@@ -1,0 +1,613 @@
+[
+  {
+    "Exposes": [
+      {
+        "Name": "HGX_Chassis_0_Inlet_0_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 176,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_Inlet_1_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 177,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_PCB_0_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 144,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_PCB_1_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 145,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_PCB_2_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 146,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_PCB_3_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 147,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_0_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 192,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_1_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 193,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_2_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 194,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_3_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 195,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_4_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 196,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_5_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 197,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_6_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 198,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_7_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 199,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_8_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 200,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_9_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 201,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_StandbyHSC_0_Temp_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 202,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_FPGA_0_TEMP_0",
+        "Type": "NSM_Temp",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_FPGA_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 178,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_0_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 128,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_1_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 129,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_2_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 130,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_3_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 131,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_4_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 132,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_5_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 133,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_6_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 134,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_7_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 135,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_8_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 136,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_HSC_9_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 137,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_Chassis_0_StandbyHSC_0_Power_0",
+        "Type": "NSM_Power",
+        "Associations": [
+          {
+            "Forward": "chassis",
+            "Backward": "all_sensors",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          }
+        ],
+        "UUID": "$UUID",
+        "Aggregated": true,
+        "SensorId": 138,
+        "AveragingInterval": 0,
+        "Priority": true
+      },
+      {
+        "Name": "HGX_PCIeRetimer_0",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 0,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_1",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 1,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_1"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_2",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 2,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_2"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_3",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 3,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_3"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_4",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 4,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_4"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_5",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 5,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_5"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_6",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 6,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_6"
+          }
+        ]
+      },
+      {
+        "Name": "HGX_PCIeRetimer_7",
+        "Type": "NSM_PCIeRetimer",
+        "UUID": "$UUID",
+        "INSTANCE_NUMBER": 7,
+        "Associations": [
+          {
+            "Forward": "parent_chassis",
+            "Backward": "all_chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+          },
+          {
+            "Forward": "fabrics",
+            "Backward": "chassis",
+            "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_7"
+          }
+        ]
+      }
+    ],
+    "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 3})",
+    "Name": "HGX_FPGA_0",
+    "Type": "chassis",
+    "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
+    "xyz.openbmc_project.Inventory.Decorator.Asset":
+        {
+          "Manufacturer": "Nvidia",
+          "Model": "$BOARD_PRODUCT_NAME",
+          "PartNumber": "$BOARD_PART_NUMBER",
+          "SerialNumber": "$BOARD_SERIAL_NUMBER"
+        },
+    "xyz.openbmc_project.Inventory.Item.Chassis": {
+      "Type": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
+    },
+    "xyz.openbmc_project.Inventory.Decorator.Instance": {
+      "InstanceNumber": "$INSTANCE_NUMBER"
+    }
+  }
+]

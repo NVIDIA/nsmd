@@ -259,7 +259,7 @@ eid_t getEidFromUUID(
     }
     else
     {
-        lg2::info("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
+        lg2::debug("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
     }
     return eid;
 }

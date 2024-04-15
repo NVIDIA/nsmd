@@ -282,7 +282,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         case DEVICE_GUID:
         {
             std::vector<uint8_t> nvu8ArrVal(UUID_INT_SIZE, 0);
-            if (dataSize < UUID_INT_SIZE || sizeof(data) < UUID_INT_SIZE)
+            if (dataSize < UUID_INT_SIZE || data.size() < UUID_INT_SIZE)
             {
                 lg2::error(
                     "decode_get_inventory_information_resp invalid property data. eid={EID} porpertyID={PID}",
