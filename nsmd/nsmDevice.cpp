@@ -1,7 +1,8 @@
 #include "nsmDevice.hpp"
 
-#include <phosphor-logging/lg2.hpp>
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
+
+#include <phosphor-logging/lg2.hpp>
 
 namespace nsm
 {

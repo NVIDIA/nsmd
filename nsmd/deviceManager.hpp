@@ -28,32 +28,32 @@ using RequesterHandler = requester::Handler<requester::Request>;
  */
 class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
 {
-public:
-  // Singleton access method that simply returns the instance
-  static DeviceManager& getInstance()
-  {
-      if (!instance)
-      {
-          throw std::runtime_error(
-              "DeviceManager instance is not initialized yet");
-      }
-      return *instance;
-  }
+  public:
+    // Singleton access method that simply returns the instance
+    static DeviceManager& getInstance()
+    {
+        if (!instance)
+        {
+            throw std::runtime_error(
+                "DeviceManager instance is not initialized yet");
+        }
+        return *instance;
+    }
 
-  // Initialization method to create and setup the singleton instance
-  static void initialize(
-      sdeventplus::Event& event,
-      requester::Handler<requester::Request>& handler,
-      nsm::InstanceIdDb& instanceIdDb,
-      sdbusplus::asio::object_server& objServer,
-      std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-          eidTable,
-      NsmDeviceTable& nsmDevices)
-  {
-      static DeviceManager inst(event, handler, instanceIdDb, objServer,
-                                eidTable, nsmDevices);
-      instance = &inst;
-  }
+    // Initialization method to create and setup the singleton instance
+    static void initialize(
+        sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable,
+        NsmDeviceTable& nsmDevices)
+    {
+        static DeviceManager inst(event, handler, instanceIdDb, objServer,
+                                  eidTable, nsmDevices);
+        instance = &inst;
+    }
 
     DeviceManager(const DeviceManager&) = delete;
     DeviceManager& operator=(const DeviceManager&) = delete;
@@ -80,46 +80,47 @@ public:
         return nsmDevices;
     }
 
-private:
-  DeviceManager(
-      sdeventplus::Event& event,
-      requester::Handler<requester::Request>& handler,
-      nsm::InstanceIdDb& instanceIdDb,
-      sdbusplus::asio::object_server& objServer,
-      std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-          eidTable,
-      NsmDeviceTable& nsmDevices) :
-      event(event),
-      handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-      eidTable(eidTable), nsmDevices(nsmDevices)
-  {}
+  private:
+    DeviceManager(
+        sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable,
+        NsmDeviceTable& nsmDevices) :
+        event(event),
+        handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+        eidTable(eidTable), nsmDevices(nsmDevices)
+    {}
 
-  void discoverNsmDevice(const MctpInfos& mctpInfos);
+    void discoverNsmDevice(const MctpInfos& mctpInfos);
 
-  requester::Coroutine discoverNsmDeviceTask();
-  static DeviceManager* instance;
+    requester::Coroutine discoverNsmDeviceTask();
+    static DeviceManager* instance;
 
-  requester::Coroutine ping(eid_t eid);
-  requester::Coroutine
-      getSupportedNvidiaMessageType(eid_t eid,
-                                    std::vector<uint8_t>& supportedTypes);
-  requester::Coroutine getFRU(eid_t eid, nsm::InventoryProperties& properties);
-  requester::Coroutine getInventoryInformation(eid_t eid,
-                                               uint8_t& propertyIdentifier,
-                                               InventoryProperties& properties);
+    requester::Coroutine ping(eid_t eid);
+    requester::Coroutine
+        getSupportedNvidiaMessageType(eid_t eid,
+                                      std::vector<uint8_t>& supportedTypes);
+    requester::Coroutine getFRU(eid_t eid,
+                                nsm::InventoryProperties& properties);
+    requester::Coroutine
+        getInventoryInformation(eid_t eid, uint8_t& propertyIdentifier,
+                                InventoryProperties& properties);
 
-  requester::Coroutine
-      getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
-                                   uint8_t& instanceId);
+    requester::Coroutine
+        getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
+                                     uint8_t& instanceId);
 
-  sdeventplus::Event& event;
-  requester::Handler<requester::Request>& handler;
-  nsm::InstanceIdDb& instanceIdDb;
-  sdbusplus::asio::object_server& objServer;
-  std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable;
+    sdeventplus::Event& event;
+    requester::Handler<requester::Request>& handler;
+    nsm::InstanceIdDb& instanceIdDb;
+    sdbusplus::asio::object_server& objServer;
+    std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable;
 
-  std::queue<MctpInfos> queuedMctpInfos;
-  std::coroutine_handle<> discoverNsmDeviceTaskHandle;
-  NsmDeviceTable& nsmDevices;
+    std::queue<MctpInfos> queuedMctpInfos;
+    std::coroutine_handle<> discoverNsmDeviceTaskHandle;
+    NsmDeviceTable& nsmDevices;
 };
 } // namespace nsm

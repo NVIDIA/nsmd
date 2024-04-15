@@ -20,7 +20,7 @@ using CreationFunction =
                        const std::string& objPath)>;
 
 #define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
-    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)()         \
+    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)() \
     {                                                                          \
         auto& factory = NsmObjectFactory::instance();                          \
         factory.registerCreationFunction(func, interfaceName);                 \
