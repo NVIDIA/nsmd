@@ -1,11 +1,14 @@
 #pragma once
 #include "base.h"
-#include "platform-environmental.h"
 #include "pci-links.h"
+#include "platform-environmental.h"
+
 #include "nsmSensor.hpp"
 
-#include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
+#include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
+#include <xyz/openbmc_project/Common/UUID/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 
@@ -25,6 +28,18 @@ class NsmAcceleratorIntf : public NsmObject
 
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf = nullptr;
+};
+
+using UuidIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Common::server::UUID>;
+class NsmUuidIntf : public NsmObject
+{
+  public:
+    NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+                std::string& inventoryObjPath, uuid_t uuid);
+
+  private:
+    std::unique_ptr<UuidIntf> uuidIntf = nullptr;
 };
 
 using MigModeIntf =
@@ -114,7 +129,8 @@ class NsmPciGroup2 : public NsmPcieGroup
                               size_t responseLen) override;
 
   private:
-    void updateReading(const struct nsm_query_scalar_group_telemetry_group_2& data);
+    void updateReading(
+        const struct nsm_query_scalar_group_telemetry_group_2& data);
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
 };
 
@@ -128,7 +144,8 @@ class NsmPciGroup3 : public NsmPcieGroup
                               size_t responseLen) override;
 
   private:
-    void updateReading(const struct nsm_query_scalar_group_telemetry_group_3& data);
+    void updateReading(
+        const struct nsm_query_scalar_group_telemetry_group_3& data);
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
 };
 
@@ -142,9 +159,44 @@ class NsmPciGroup4 : public NsmPcieGroup
                               size_t responseLen) override;
 
   private:
-    void updateReading(const struct nsm_query_scalar_group_telemetry_group_4& data);
+    void updateReading(
+        const struct nsm_query_scalar_group_telemetry_group_4& data);
 
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
+};
+
+using EDPpIntf =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::server::Edpp>;
+
+class EDPpLocal : public EDPpIntf
+{
+  public:
+    EDPpLocal(sdbusplus::bus::bus& bus, const std::string& objPath) :
+        EDPpIntf(bus, objPath.c_str(), action::emit_interface_added)
+    {}
+
+    void reset()
+    {
+        return;
+    }
+};
+
+class NsmEDPpScalingFactor : public NsmSensor
+{
+  public:
+    NsmEDPpScalingFactor(sdbusplus::bus::bus& bus, std::string& name,
+                         std::string& type, std::string& inventoryObjPath);
+    NsmEDPpScalingFactor() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(struct nsm_EDPp_scaling_factors scaling_factor);
+
+    std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
 };
 
 } // namespace nsm

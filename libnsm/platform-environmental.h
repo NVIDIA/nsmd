@@ -21,7 +21,8 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_DRIVER_INFO = 0x14,
 	NSM_GET_MIG_MODE = 0x4d,
 	NSM_GET_ECC_MODE = 0x4f,
-	NSM_GET_ECC_ERROR_COUNTS = 0x7d
+	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
+	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09
 };
 
 enum nsm_inventory_property_identifiers {
@@ -299,6 +300,25 @@ struct nsm_ECC_error_counts {
 struct nsm_get_ECC_error_counts_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_ECC_error_counts errorCounts;
+} __attribute__((packed));
+
+/** @struct nsm_EDPp_scaling_factors
+ *
+ *  Structure representing All the Programmable EDPp scaling factor.
+ */
+struct nsm_EDPp_scaling_factors {
+	uint8_t default_scaling_factor;
+	uint8_t maximum_scaling_factor;
+	uint8_t minimum_scaling_factor;
+} __attribute__((packed));
+
+/** @struct nsm_get_programmable_EDPp_scaling_factor_resp
+ *
+ *  Structure representing Get Programmable EDPp Scaling Factor response.
+ */
+struct nsm_get_programmable_EDPp_scaling_factor_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_EDPp_scaling_factors scaling_factors;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
@@ -676,14 +696,6 @@ int decode_aggregate_temperature_reading_data(const uint8_t *data,
  */
 int encode_get_MIG_mode_req(uint8_t instance_id, struct nsm_msg *msg);
 
-/** @brief Decode a Get MIG mode request message
- *
- *  @param[in] msg - request message
- *  @param[in] msg_len - Length of request message
- *  @return nsm_completion_codes
- */
-int decode_get_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len);
-
 /** @brief Encode a Get MIG mode response message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -716,14 +728,6 @@ int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
  */
 int encode_get_ECC_mode_req(uint8_t instance_id, struct nsm_msg *msg);
 
-/** @brief Decode a Get ECC mode request message
- *
- *  @param[in] msg - request message
- *  @param[in] msg_len - Length of request message
- *  @return nsm_completion_codes
- */
-int decode_get_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len);
-
 /** @brief Encode a Get ECC mode response message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -755,14 +759,6 @@ int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
  *  @return nsm_completion_codes
  */
 int encode_get_ECC_error_counts_req(uint8_t instance_id, struct nsm_msg *msg);
-
-/** @brief Decode a Get ECC error counts request message
- *
- *  @param[in] msg - request message
- *  @param[in] msg_len - Length of request message
- *  @return nsm_completion_codes
- */
-int decode_get_ECC_error_counts_req(const struct nsm_msg *msg, size_t msg_len);
 
 /** @brief Encode a Get ECC error counts response message
  *
@@ -829,6 +825,42 @@ int encode_aggregate_voltage_data(uint32_t voltage, uint8_t *data,
  */
 int decode_aggregate_voltage_data(const uint8_t *data, size_t data_len,
 				  uint32_t *voltage);
+
+/** @brief Encode a Get Programmable EDPp Scaling Factor request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_programmable_EDPp_scaling_factor_req(uint8_t instance_id,
+						    struct nsm_msg *msg);
+
+/** @brief Encode a Get Programmable EDPp Scaling Factor response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] scaling_factors - struct representing programmable EDPp scaling
+ * factors
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_programmable_EDPp_scaling_factor_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_EDPp_scaling_factors *scaling_factors, struct nsm_msg *msg);
+
+/** @brief Dncode a Get Programmable EDPp Scaling Factor response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] scaling_factors - struct representing programmable EDPp scaling
+ * factors
+ *  @return nsm_completion_codes
+ */
+int decode_get_programmable_EDPp_scaling_factor_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_EDPp_scaling_factors *scaling_factors);
+
 #ifdef __cplusplus
 }
 #endif

@@ -34,6 +34,11 @@ foreach t : tests
                      dependencies: [
                          test_src,
                          gtest,
-                         gmock]),
+                         gmock,
+                         CLI11_dep,
+                         nlohmann_json,
+                         sdbusplus,
+                         sdeventplus,
+                         phosphor_logging]),
        workdir: meson.current_source_dir())
 endforeach
