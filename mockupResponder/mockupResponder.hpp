@@ -147,6 +147,10 @@ class MockupResponder
         getVoltageHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getAltitudePressureHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
 

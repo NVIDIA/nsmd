@@ -34,6 +34,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_POWER = 0x03,
 	NSM_GET_ENERGY_COUNT = 0x06,
 	NSM_GET_VOLTAGE = 0x0F,
+	NSM_GET_ALTITUDE_PRESSURE = 0x6A,
 	NSM_GET_INVENTORY_INFORMATION = 0x0C,
 	NSM_GET_DRIVER_INFO = 0x14,
 	NSM_GET_MIG_MODE = 0x4d,
@@ -152,6 +153,16 @@ struct nsm_get_numeric_sensor_reading_req {
 	uint8_t sensor_id;
 } __attribute__((packed));
 
+/** @struct nsm_get_numeric_sensor_reading_uint32_resp
+ *
+ *  Structure representing NSM response to get reading of certain numeric
+ * sensors.
+ */
+struct nsm_get_numeric_sensor_reading_uint32_resp {
+	struct nsm_common_resp hdr;
+	uint32_t reading;
+} __attribute__((packed));
+
 /** @struct nsm_get_temperature_reading_req
  *
  *  Structure representing NSM get temperature reading request.
@@ -182,10 +193,8 @@ struct nsm_get_current_power_draw_req {
  *
  *  Structure representing NSM get current power draw response.
  */
-struct nsm_get_current_power_draw_resp {
-	struct nsm_common_resp hdr;
-	uint32_t reading;
-} __attribute__((packed));
+typedef struct nsm_get_numeric_sensor_reading_uint32_resp
+    nsm_get_current_power_draw_resp;
 
 /** @struct nsm_get_current_energy_count_req
  *
@@ -213,10 +222,14 @@ typedef struct nsm_get_numeric_sensor_reading_req nsm_get_voltage_req;
  *
  *  Structure representing NSM get voltage response.
  */
-struct nsm_get_voltage_resp {
-	struct nsm_common_resp hdr;
-	uint32_t reading;
-} __attribute__((packed));
+typedef struct nsm_get_numeric_sensor_reading_uint32_resp nsm_get_voltage_resp;
+
+/** @struct nsm_get_altitude_pressure_resp
+ *
+ *  Structure representing NSM get altitude pressure response.
+ */
+typedef struct nsm_get_numeric_sensor_reading_uint32_resp
+    nsm_get_altitude_pressure_resp;
 
 /** @struct nsm_aggregate_resp
  *
@@ -683,6 +696,40 @@ int encode_get_voltage_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_voltage_resp(const struct nsm_msg *msg, size_t msg_len,
 			    uint8_t *cc, uint16_t *reason_code,
 			    uint32_t *voltage);
+
+/** @brief Encode a Get Altitude Pressure request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_altitude_pressure_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Encode a Get Altitude Pressure response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] reading - altitude pressure reading
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_altitude_pressure_resp(uint8_t instance_id, uint8_t cc,
+				      uint16_t reason_code, uint32_t reading,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a Get Altitude Pressure response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] reading - altitude pressure reading
+ *  @return nsm_completion_codes
+ */
+int decode_get_altitude_pressure_resp(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *cc, uint16_t *reason_code,
+				      uint32_t *reading);
 
 /** @brief Encode timestamp of a Get current power draw response message
  *

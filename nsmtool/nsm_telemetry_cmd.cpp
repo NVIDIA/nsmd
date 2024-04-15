@@ -772,7 +772,7 @@ class GetCurrentPowerDraw : public CommandInterface
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
-                          sizeof(struct nsm_get_current_power_draw_resp));
+                          sizeof(nsm_get_current_power_draw_resp));
 
             return;
         }
@@ -964,7 +964,7 @@ class GetVoltage : public CommandInterface
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
-                          sizeof(struct nsm_get_voltage_resp));
+                          sizeof(nsm_get_voltage_resp));
 
             return;
         }
@@ -1022,6 +1022,59 @@ class GetVoltage : public CommandInterface
   private:
     uint8_t sensorId;
     static constexpr uint8_t AggregateSensorId{255};
+};
+
+class GetAltitudePressure : public CommandInterface
+{
+  public:
+    GetAltitudePressure() = delete;
+    GetAltitudePressure(const GetAltitudePressure&) = delete;
+    GetAltitudePressure(GetAltitudePressure&&) = default;
+    GetAltitudePressure& operator=(const GetAltitudePressure&) = delete;
+    GetAltitudePressure& operator=(GetAltitudePressure&&) = delete;
+
+    explicit GetAltitudePressure(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_altitude_pressure_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        uint32_t reading;
+
+        auto rc = decode_get_altitude_pressure_resp(responsePtr, msg_len, &cc,
+                                                    &reason_code, &reading);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(nsm_get_altitude_pressure_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Altitude Pressure"] = reading;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
 };
 
 class GetMigMode : public CommandInterface
@@ -1737,12 +1790,17 @@ void registerCommand(CLI::App& app)
         "GetCurrentEnergyCount",
         "get current energy counter value of a device");
     commands.push_back(std::make_unique<GetCurrentEnergyCount>(
-        "telemetry", "GetCurrentPowerDraw", getCurrentEnergyCount));
+        "telemetry", "GetCurrentEnergyCount", getCurrentEnergyCount));
 
     auto getVoltage =
         telemetry->add_subcommand("GetVoltage", "get voltage of a device");
-    commands.push_back(std::make_unique<GetVoltage>(
-        "telemetry", "GetCurrentPowerDraw", getVoltage));
+    commands.push_back(
+        std::make_unique<GetVoltage>("telemetry", "GetVoltage", getVoltage));
+
+    auto getAltitudePressure = telemetry->add_subcommand(
+        "GetAltitudePressure", "get current power draw of a device");
+    commands.push_back(std::make_unique<GetAltitudePressure>(
+        "telemetry", "GetAltitudePressure", getAltitudePressure));
 
     auto getDriverInfo =
         telemetry->add_subcommand("GetDriverInfo", "get Driver info");

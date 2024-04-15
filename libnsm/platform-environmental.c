@@ -349,8 +349,8 @@ int encode_get_current_power_draw_resp(uint8_t instance_id, uint8_t cc,
 		return encode_reason_code(cc, reason_code, NSM_GET_POWER, msg);
 	}
 
-	struct nsm_get_current_power_draw_resp *response =
-	    (struct nsm_get_current_power_draw_resp *)msg->payload;
+	nsm_get_current_power_draw_resp *response =
+	    (nsm_get_current_power_draw_resp *)msg->payload;
 
 	response->hdr.command = NSM_GET_POWER;
 	response->hdr.completion_code = cc;
@@ -374,12 +374,12 @@ int decode_get_current_power_draw_resp(const struct nsm_msg *msg,
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_current_power_draw_resp)) {
+			  sizeof(nsm_get_current_power_draw_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_get_current_power_draw_resp *response =
-	    (struct nsm_get_current_power_draw_resp *)msg->payload;
+	nsm_get_current_power_draw_resp *response =
+	    (nsm_get_current_power_draw_resp *)msg->payload;
 
 	*cc = response->hdr.completion_code;
 
@@ -737,8 +737,7 @@ int encode_get_voltage_resp(uint8_t instance_id, uint8_t cc,
 					  msg);
 	}
 
-	struct nsm_get_voltage_resp *response =
-	    (struct nsm_get_voltage_resp *)msg->payload;
+	nsm_get_voltage_resp *response = (nsm_get_voltage_resp *)msg->payload;
 
 	response->hdr.command = NSM_GET_VOLTAGE;
 	response->hdr.completion_code = cc;
@@ -762,12 +761,11 @@ int decode_get_voltage_resp(const struct nsm_msg *msg, size_t msg_len,
 	}
 
 	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_get_voltage_resp)) {
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_voltage_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_get_voltage_resp *response =
-	    (struct nsm_get_voltage_resp *)msg->payload;
+	nsm_get_voltage_resp *response = (nsm_get_voltage_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size != sizeof(*voltage)) {
@@ -776,6 +774,96 @@ int decode_get_voltage_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	*voltage = le64toh(response->reading);
 
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_altitude_pressure_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ALTITUDE_PRESSURE;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_altitude_pressure_resp(uint8_t instance_id, uint8_t cc,
+				      uint16_t reason_code, uint32_t reading,
+				      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_ALTITUDE_PRESSURE, msg);
+	}
+
+	nsm_get_altitude_pressure_resp *response =
+	    (nsm_get_altitude_pressure_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_ALTITUDE_PRESSURE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(reading));
+	response->reading = htole32(reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_altitude_pressure_resp(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *cc, uint16_t *reason_code,
+				      uint32_t *reading)
+{
+	if (reading == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_altitude_pressure_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_altitude_pressure_resp *response =
+	    (nsm_get_altitude_pressure_resp *)msg->payload;
+
+	*cc = response->hdr.completion_code;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	if (data_size != sizeof(*reading)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*reading = le32toh(response->reading);
 	return NSM_SW_SUCCESS;
 }
 
