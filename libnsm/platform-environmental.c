@@ -1422,3 +1422,340 @@ int decode_get_programmable_EDPp_scaling_factor_resp(
 
 	return NSM_SW_SUCCESS;
 }
+static void htoleClockLimit(struct nsm_clock_limit *clock_limit)
+{
+	clock_limit->present_limit_max =
+	    htole32(clock_limit->present_limit_max);
+	clock_limit->present_limit_min =
+	    htole32(clock_limit->present_limit_min);
+	clock_limit->requested_limit_max =
+	    htole32(clock_limit->requested_limit_max);
+	clock_limit->requested_limit_min =
+	    htole32(clock_limit->requested_limit_min);
+}
+
+static void letohClockLimit(struct nsm_clock_limit *clock_limit)
+{
+	clock_limit->present_limit_max =
+	    le32toh(clock_limit->present_limit_max);
+	clock_limit->present_limit_min =
+	    le32toh(clock_limit->present_limit_min);
+	clock_limit->requested_limit_max =
+	    le32toh(clock_limit->requested_limit_max);
+	clock_limit->requested_limit_min =
+	    le32toh(clock_limit->requested_limit_min);
+}
+
+// Get Clock Limit, NSM T3 spec
+int encode_get_clock_limit_req(uint8_t instance_id, uint8_t clock_id,
+			       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_clock_limit_req *request =
+	    (struct nsm_get_clock_limit_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_CLOCK_LIMIT;
+	request->hdr.data_size = sizeof(clock_id);
+	request->clock_id = clock_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Clock Limit, NSM T3 spec
+int decode_get_clock_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *clock_id)
+{
+	if (msg == NULL || clock_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_clock_limit_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_clock_limit_req *request =
+	    (struct nsm_get_clock_limit_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->clock_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*clock_id = request->clock_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Clock Limit, NSM T3 spec
+int encode_get_clock_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code,
+				struct nsm_clock_limit *clock_limit,
+				struct nsm_msg *msg)
+{
+	if (msg == NULL || clock_limit == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_CLOCK_LIMIT,
+					  msg);
+	}
+
+	struct nsm_get_clock_limit_resp *resp =
+	    (struct nsm_get_clock_limit_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_CLOCK_LIMIT;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(struct nsm_clock_limit);
+	resp->hdr.data_size = htole16(data_size);
+
+	htoleClockLimit(clock_limit);
+	memcpy(&(resp->clock_limit), clock_limit,
+	       sizeof(struct nsm_clock_limit));
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Clock Limit, NSM T3 spec
+int decode_get_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code,
+				struct nsm_clock_limit *clock_limit)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    clock_limit == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_clock_limit_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_clock_limit_resp *resp =
+	    (struct nsm_get_clock_limit_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	letohClockLimit(&(resp->clock_limit));
+
+	if ((*data_size) < sizeof(struct nsm_clock_limit)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(clock_limit, &(resp->clock_limit),
+	       sizeof(struct nsm_clock_limit));
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Current Clock Frequency command, NSM T3 spec
+int encode_get_curr_clock_freq_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_CURRENT_CLOCK_FREQUENCY;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+// Get Current Clock Frequency command, NSM T3 spec
+int encode_get_curr_clock_freq_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, uint32_t *clockFreq,
+				    struct nsm_msg *msg)
+{
+	if (msg == NULL || clockFreq == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_CURRENT_CLOCK_FREQUENCY, msg);
+	}
+
+	struct nsm_get_curr_clock_freq_resp *resp =
+	    (struct nsm_get_curr_clock_freq_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_CURRENT_CLOCK_FREQUENCY;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+	*clockFreq = htole32(*clockFreq);
+	memcpy(&(resp->clockFreq), clockFreq, data_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Current Clock Frequency command, NSM T3 spec
+int decode_get_curr_clock_freq_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *data_size,
+				    uint16_t *reason_code, uint32_t *clockFreq)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    clockFreq == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_curr_clock_freq_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_curr_clock_freq_resp *resp =
+	    (struct nsm_get_curr_clock_freq_resp *)msg->payload;
+
+	if (resp->hdr.command != NSM_GET_CURRENT_CLOCK_FREQUENCY) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*clockFreq = le32toh(resp->clockFreq);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Accumulated GPU Utilization Command, NSM T3 spec
+int encode_get_accum_GPU_util_time_req(uint8_t instance, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Accumulated GPU Utilization Command, NSM T3 spec
+int encode_get_accum_GPU_util_time_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint32_t *context_util_time,
+					uint32_t *SM_util_time,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME,
+		    msg);
+	}
+
+	struct nsm_get_accum_GPU_util_time_resp *resp =
+	    (struct nsm_get_accum_GPU_util_time_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = 2 * sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+
+	resp->context_util_time = htole32(*context_util_time);
+	resp->SM_util_time = htole32(*SM_util_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+// Get Accumulated GPU Utilization Command, NSM T3 spec
+int decode_get_accum_GPU_util_time_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint32_t *context_util_time, uint32_t *SM_util_time)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    context_util_time == NULL || SM_util_time == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_accum_GPU_util_time_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_accum_GPU_util_time_resp *resp =
+	    (struct nsm_get_accum_GPU_util_time_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < 2 * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*context_util_time = le32toh(resp->context_util_time);
+	*SM_util_time = le32toh(resp->SM_util_time);
+
+	return NSM_SW_SUCCESS;
+}

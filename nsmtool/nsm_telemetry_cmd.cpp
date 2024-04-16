@@ -1466,6 +1466,189 @@ class QueryScalarGroupTelemetry : public CommandInterface
     uint8_t groupId;
 };
 
+class GetClockLimit : public CommandInterface
+{
+  public:
+    ~GetClockLimit() = default;
+    GetClockLimit() = delete;
+    GetClockLimit(const GetClockLimit&) = delete;
+    GetClockLimit(GetClockLimit&&) = default;
+    GetClockLimit& operator=(const GetClockLimit&) = delete;
+    GetClockLimit& operator=(GetClockLimit&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetClockLimit(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto clockLimitOptionGroup = app->add_option_group(
+            "Required",
+            "Clock Id for which Limit is to be retrieved Graphics(0)/Memory(1).");
+
+        clockId = 2;
+        clockLimitOptionGroup->add_option("-c, --clockId", clockId,
+                                          "retrieve clock Limit for clockId");
+        clockLimitOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_clock_limit_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_clock_limit_req(instanceId, clockId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        struct nsm_clock_limit clockLimit;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc =
+            decode_get_clock_limit_resp(responsePtr, payloadLength, &cc,
+                                        &data_size, &reason_code, &clockLimit);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_clock_limit_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["MaxSpeed"] = (int)clockLimit.present_limit_max;
+        result["MinSpeed"] = (int)clockLimit.present_limit_min;
+        result["SpeedLimit"] = (int)clockLimit.requested_limit_max;
+        if (clockLimit.requested_limit_max == clockLimit.requested_limit_min)
+        {
+            result["SpeedLocked"] = true;
+            result["SpeedConfig"] =
+                std::make_tuple(true, (uint32_t)clockLimit.requested_limit_max);
+        }
+        else
+        {
+            result["SpeedLocked"] = false;
+            result["SpeedConfig"] = std::make_tuple(
+                false, (uint32_t)clockLimit.requested_limit_max);
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t clockId;
+};
+
+class GetCurrClockFreq : public CommandInterface
+{
+  public:
+    ~GetCurrClockFreq() = default;
+    GetCurrClockFreq() = delete;
+    GetCurrClockFreq(const GetCurrClockFreq&) = delete;
+    GetCurrClockFreq(GetCurrClockFreq&&) = default;
+    GetCurrClockFreq& operator=(const GetCurrClockFreq&) = delete;
+    GetCurrClockFreq& operator=(GetCurrClockFreq&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_curr_clock_freq_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint32_t clockFreq = 2;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_get_curr_clock_freq_resp(responsePtr, payloadLength,
+                                                  &cc, &data_size, &reason_code,
+                                                  &clockFreq);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_curr_clock_freq_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["OperatingSpeed"] = clockFreq;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class GetAccumGpuUtilTime : public CommandInterface
+{
+  public:
+    ~GetAccumGpuUtilTime() = default;
+    GetAccumGpuUtilTime() = delete;
+    GetAccumGpuUtilTime(const GetAccumGpuUtilTime&) = delete;
+    GetAccumGpuUtilTime(GetAccumGpuUtilTime&&) = default;
+    GetAccumGpuUtilTime& operator=(const GetAccumGpuUtilTime&) = delete;
+    GetAccumGpuUtilTime& operator=(GetAccumGpuUtilTime&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_accum_GPU_util_time_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint32_t context_util_time;
+        uint32_t SM_util_time;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_accum_GPU_util_time_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &context_util_time, &SM_util_time);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_accum_GPU_util_time_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["AccumulatedGPUContextUtilizationDuration"] =
+            (int)context_util_time;
+        result["AccumulatedSMUtilizationDuration"] = (int)SM_util_time;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -1530,6 +1713,21 @@ void registerCommand(CLI::App& app)
         "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");
     commands.push_back(std::make_unique<QueryScalarGroupTelemetry>(
         "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
+    auto getClockLimit = telemetry->add_subcommand(
+        "GetClockLimit", "retrieve clock Limit for clockId");
+    commands.push_back(std::make_unique<GetClockLimit>(
+        "telemetry", "GetClockLimit", getClockLimit));
+
+    auto getCurrClockFreq = telemetry->add_subcommand(
+        "GetCurrClockFreq", "get current clock frequency of GPU");
+    commands.push_back(std::make_unique<GetCurrClockFreq>(
+        "telemetry", "GetCurrClockFreq", getCurrClockFreq));
+
+    auto getAccumGpuUtilTime = telemetry->add_subcommand(
+        "GetAccumGpuUtilTime",
+        "Get Accumulated GPU Utilization Time Context/SM");
+    commands.push_back(std::make_unique<GetAccumGpuUtilTime>(
+        "telemetry", "GetAccumGpuUtilTime", getAccumGpuUtilTime));
 }
 
 } // namespace telemetry

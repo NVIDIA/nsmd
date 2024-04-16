@@ -1881,3 +1881,498 @@ TEST(getEDPpScalingFactor, testBadDecodeResponse)
 	    response, msg_len, &cc, &data_size, &reason_code, &scaling_factors);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+TEST(getClockLimit, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_get_clock_limit_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t clock_id = 0;
+	auto rc = encode_get_clock_limit_req(0, clock_id, request);
+	struct nsm_get_clock_limit_req *req =
+	    reinterpret_cast<struct nsm_get_clock_limit_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CLOCK_LIMIT, req->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), req->hdr.data_size);
+}
+
+TEST(getClockLimit, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_LIMIT,	     // command
+	    1,				     // data size
+	    1				     // clock_id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t clock_id;
+	auto rc = decode_get_clock_limit_req(request, msg_len, &clock_id);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getClockLimit, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_clock_limit_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	struct nsm_clock_limit clock_limit;
+	clock_limit.present_limit_max = 200;
+	clock_limit.present_limit_min = 100;
+	clock_limit.requested_limit_max = 170;
+	clock_limit.requested_limit_min = 120;
+
+	uint16_t reason_code = ERR_NULL;
+	struct nsm_clock_limit clock_limit_test = clock_limit;
+	auto rc = encode_get_clock_limit_resp(0, NSM_SUCCESS, reason_code,
+					      &clock_limit, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_clock_limit_resp *resp =
+	    reinterpret_cast<struct nsm_get_clock_limit_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CLOCK_LIMIT, resp->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_clock_limit), le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(le32toh(resp->clock_limit.present_limit_max),
+		  clock_limit_test.present_limit_max);
+}
+
+TEST(getClockLimit, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	struct nsm_clock_limit *clockLimit =
+	    reinterpret_cast<struct nsm_clock_limit *>(data_byte.data());
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_LIMIT,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    16,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_clock_limit clockLimitTest;
+
+	auto rc = decode_get_clock_limit_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &clockLimitTest);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(16, data_size);
+	EXPECT_EQ(le32toh(clockLimit->present_limit_max),
+		  clockLimitTest.present_limit_max);
+}
+
+TEST(getClockLimit, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_LIMIT,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    14,				     // wrong data size
+	    0				     // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_clock_limit clockLimitTest;
+
+	auto rc = decode_get_clock_limit_resp(NULL, msg_len, &cc, &data_size,
+					      &reason_code, &clockLimitTest);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_limit_resp(response, msg_len, NULL, &data_size,
+					 &reason_code, &clockLimitTest);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_limit_resp(response, msg_len, &cc, NULL,
+					 &reason_code, &clockLimitTest);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_limit_resp(response, msg_len - 1, &cc, &data_size,
+					 &reason_code, &clockLimitTest);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_clock_limit_resp(response, msg_len, &cc, &data_size,
+					 &reason_code, &clockLimitTest);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getCurrClockFreq, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_get_curr_clock_freq_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CURRENT_CLOCK_FREQUENCY, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getCurrClockFreq, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_curr_clock_freq_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint32_t clockFreq = 2000;
+	uint32_t clockFreq_test = clockFreq;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_curr_clock_freq_resp(0, NSM_SUCCESS, reason_code,
+						  &clockFreq, response);
+
+	struct nsm_get_curr_clock_freq_resp *resp =
+	    reinterpret_cast<struct nsm_get_curr_clock_freq_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CURRENT_CLOCK_FREQUENCY, resp->hdr.command);
+	EXPECT_EQ(4, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(clockFreq_test, le32toh(resp->clockFreq));
+}
+
+TEST(getCurrClockFreq, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01,
+	    0x0A,
+	    0x00,
+	    0x01,
+	};
+
+	uint32_t *clockFreq = reinterpret_cast<uint32_t *>(data_byte.data());
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CURRENT_CLOCK_FREQUENCY, // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    4,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t clockFreq_test;
+
+	auto rc = decode_get_curr_clock_freq_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &clockFreq_test);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(4, data_size);
+	EXPECT_EQ(le32toh(*clockFreq), clockFreq_test);
+}
+
+TEST(getCurrClockFreq, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01,
+	    0x0A,
+	    0x00,
+	    0x01,
+	};
+
+	// uint32_t* clockFreq = reinterpret_cast<uint32_t* >(data_byte.data());
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CURRENT_CLOCK_FREQUENCY, // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    2,				     // wrong data size
+	    0				     // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t clockFreq_test;
+
+	auto rc = decode_get_curr_clock_freq_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &clockFreq_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_curr_clock_freq_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &clockFreq_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_curr_clock_freq_resp(response, msg_len, &cc, NULL,
+					     &reason_code, &clockFreq_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_curr_clock_freq_resp(response, msg_len - 1, &cc,
+					     &data_size, &reason_code,
+					     &clockFreq_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_curr_clock_freq_resp(response, msg_len, &cc, &data_size,
+					     &reason_code, &clockFreq_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getAccumGpuUtilTime, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_get_accum_GPU_util_time_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getAccumGpuUtilTime, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_accum_GPU_util_time_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint32_t contextUtilTime = 100;
+	uint32_t smUtilTime = 200;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_accum_GPU_util_time_resp(
+	    0, NSM_SUCCESS, reason_code, &contextUtilTime, &smUtilTime,
+	    response);
+
+	struct nsm_get_accum_GPU_util_time_resp *resp =
+	    reinterpret_cast<struct nsm_get_accum_GPU_util_time_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME, resp->hdr.command);
+	EXPECT_EQ(8, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(contextUtilTime, le32toh(resp->context_util_time));
+	EXPECT_EQ(smUtilTime, le32toh(resp->SM_util_time));
+}
+
+TEST(getAccumGpuUtilTime, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> contextUtilTime_byte{
+	    0x01,
+	    0x0A,
+	    0x00,
+	    0x01,
+	};
+	std::vector<uint8_t> smUtilTime_byte{0x0A, 0x12, 0x1A, 0x00};
+
+	uint32_t *contextUtilTime =
+	    reinterpret_cast<uint32_t *>(contextUtilTime_byte.data());
+	uint32_t *smUtilTime =
+	    reinterpret_cast<uint32_t *>(smUtilTime_byte.data());
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME, // command
+	    0,					      // completion code
+	    0,					      // reserved
+	    0,					      // reserved
+	    8,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), contextUtilTime_byte.begin(),
+			   contextUtilTime_byte.end());
+	responseMsg.insert(responseMsg.end(), smUtilTime_byte.begin(),
+			   smUtilTime_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t contextUtil_test;
+	uint32_t smUtil_test;
+
+	auto rc = decode_get_accum_GPU_util_time_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &contextUtil_test,
+	    &smUtil_test);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(8, data_size);
+	EXPECT_EQ(le32toh(*contextUtilTime), contextUtil_test);
+	EXPECT_EQ(le32toh(*smUtilTime), smUtil_test);
+}
+
+TEST(getAccumGpuUtilTime, testBadDecodeResponse)
+{
+	std::vector<uint8_t> contextUtilTime_byte{
+	    0x01,
+	    0x0A,
+	    0x00,
+	    0x01,
+	};
+	std::vector<uint8_t> smUtilTime_byte{0x0A, 0x12, 0x1A, 0x00};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME, // command
+	    0,					      // completion code
+	    0,					      // reserved
+	    0,					      // reserved
+	    7,					      // wrong data size
+	    0					      // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), contextUtilTime_byte.begin(),
+			   contextUtilTime_byte.end());
+	responseMsg.insert(responseMsg.end(), smUtilTime_byte.begin(),
+			   smUtilTime_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t contextUtil_test;
+	uint32_t smUtil_test;
+
+	auto rc = decode_get_accum_GPU_util_time_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &contextUtil_test,
+	    &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_get_accum_GPU_util_time_resp(
+	    response, msg_len, NULL, &data_size, &reason_code,
+	    &contextUtil_test, &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_accum_GPU_util_time_resp(
+	    response, msg_len, &cc, NULL, &reason_code, &contextUtil_test,
+	    &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_accum_GPU_util_time_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code,
+	    &contextUtil_test, &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_accum_GPU_util_time_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &contextUtil_test,
+	    &smUtil_test);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
