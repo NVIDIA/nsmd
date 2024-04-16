@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "base.h"
 #include "device-capability-discovery.h"
@@ -41,8 +39,9 @@ TEST(encode_nsm_get_supported_event_source_req, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES, req->command);
-	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE, req->data_size);
+	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES, req->hdr.command);
+	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE,
+		  req->hdr.data_size);
 }
 
 TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
@@ -55,6 +54,8 @@ TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_GET_CURRENT_EVENT_SOURCES,	  // command
 	    NSM_SUCCESS,			  // completion code
+	    0,
+	    0, // reserved
 	    8,
 	    0, // data size
 	    1,
@@ -88,7 +89,6 @@ TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
 	EXPECT_EQ(event_sources[7].byte, 8);
 }
 
-
 TEST(encode_nsm_set_event_subscription_req, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
@@ -112,8 +112,8 @@ TEST(encode_nsm_set_event_subscription_req, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_SET_EVENT_SUBSCRIPTION, req->command);
-	EXPECT_EQ(NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE, req->data_size);
+	EXPECT_EQ(NSM_SET_EVENT_SUBSCRIPTION, req->hdr.command);
+	EXPECT_EQ(NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE, req->hdr.data_size);
 	EXPECT_EQ(globalSetting, req->global_event_generation_setting);
 	EXPECT_EQ(receiverEid, req->receiver_endpoint_id);
 }
@@ -157,6 +157,8 @@ TEST(decode_nsm_set_event_subscription_resp, testGoodDecodeResponse)
 	    NSM_SET_EVENT_SUBSCRIPTION,		  // command
 	    NSM_SUCCESS,			  // completion code
 	    0,
+	    0, // reserved
+	    0,
 	    0 // data size
 	};
 
@@ -170,7 +172,6 @@ TEST(decode_nsm_set_event_subscription_resp, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 }
-
 
 TEST(encode_nsm_configure_event_acknowledgement_req, testGoodEncodeRequest)
 {
@@ -195,9 +196,9 @@ TEST(encode_nsm_configure_event_acknowledgement_req, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT, req->command);
+	EXPECT_EQ(NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT, req->hdr.command);
 	EXPECT_EQ(NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE,
-		  req->data_size);
+		  req->hdr.data_size);
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  req->nvidia_message_type);
 	EXPECT_EQ(event_sources[0],
@@ -277,8 +278,8 @@ TEST(encode_nsm_configure_event_acknowledgement_resp, testGoodEncoderesponse)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT, resp->command);
-	EXPECT_EQ(EVENT_ACKNOWLEDGEMENT_MASK_LENGTH, resp->data_size);
+	EXPECT_EQ(NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT, resp->hdr.command);
+	EXPECT_EQ(EVENT_ACKNOWLEDGEMENT_MASK_LENGTH, resp->hdr.data_size);
 	EXPECT_EQ(acknowledgement_mask[0],
 		  resp->new_event_sources_acknowledgement_mask[0].byte);
 	EXPECT_EQ(acknowledgement_mask[1],
@@ -307,6 +308,8 @@ TEST(decode_nsm_configure_event_acknowledgement_resp, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT,  // command
 	    NSM_SUCCESS,			  // completion code
+	    0,
+	    0, // reserved
 	    0,
 	    8, // data size
 	    1,
@@ -361,8 +364,9 @@ TEST(encode_nsm_set_current_event_sources_req, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 		  request->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_SET_CURRENT_EVENT_SOURCES, req->command);
-	EXPECT_EQ(NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE, req->data_size);
+	EXPECT_EQ(NSM_SET_CURRENT_EVENT_SOURCES, req->hdr.command);
+	EXPECT_EQ(NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE,
+		  req->hdr.data_size);
 }
 
 TEST(decode_nsm_set_current_event_source_req, testGoodDecodeRequest)
@@ -419,6 +423,8 @@ TEST(decode_nsm_set_current_event_sources_resp, testGoodDecodeResponse)
 	    NSM_SET_CURRENT_EVENT_SOURCES,	  // command
 	    NSM_SUCCESS,			  // completion code
 	    0,
+	    0, // reserved
+	    0,
 	    0 // data size
 	};
 
@@ -443,6 +449,8 @@ TEST(decode_nsm_get_event_log_record_resp, testGoodDecodeResponse)
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
 	    NSM_GET_EVENT_LOG_RECORD,		  // command
 	    0,					  // completion code
+	    0,
+	    0, // reserved
 	    14,
 	    0,					  // data size
 	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // nvidia_message_type

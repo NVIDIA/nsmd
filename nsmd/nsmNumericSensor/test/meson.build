@@ -45,25 +45,25 @@ tests_files = [
     'nsmNumericAggregatorSensors_test.cpp',
 ]
 
-test(
-    'nsmNumericSensors_test',
-    executable(
-        'nsmNumericSensors_test',
-        tests_files,
-        implicit_include_directories: false,
-        link_args: dynamic_linker,
-        build_rpath: '',
-        dependencies: [
-            test_src,
-            CLI11_dep,
-            nlohmann_json,
-            sdbusplus,
-            sdeventplus,
-            phosphor_logging,
-            nvidia_shmem,
-            gtest,
-            gmock,
-        ],
-    ),
-    workdir: meson.current_source_dir(),
+tests_deps = [
+  test_src,
+  CLI11_dep,
+  nlohmann_json,
+  sdbusplus,
+  sdeventplus,
+  phosphor_logging,
+  gtest,
+  gmock
+]
+
+if get_option('shmem').enabled()
+  tests_deps += nvidia_shmem
+endif
+
+test('nsmNumericSensors_test', executable('nsmNumericSensors_test', tests_files,
+                   implicit_include_directories: false,
+                   link_args: dynamic_linker,
+                   build_rpath: '',
+                   dependencies: tests_deps),
+                   workdir: meson.current_source_dir()
 )

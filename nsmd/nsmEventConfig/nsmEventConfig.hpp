@@ -28,16 +28,21 @@ class NsmEventConfig : public NsmObject
                    uint8_t messageType, std::vector<uint64_t>& srcEventIds,
                    std::vector<uint64_t>& ackEventIds);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override
+    {
+        updateSync(manager, eid);
+        co_return NSM_SW_SUCCESS;
+    }
+
+    uint8_t updateSync(SensorManager& manager, eid_t eid);
 
   private:
     void convertIdsToMask(std::vector<uint64_t>& eventIds,
                           std::vector<bitfield8_t>& bitfields);
-    requester::Coroutine
-        setCurrentEventSources(SensorManager& manager, eid_t eid,
-                               uint8_t nvidiaMessageType,
-                               std::vector<bitfield8_t>& eventIdMasks);
-    requester::Coroutine
+    uint8_t setCurrentEventSources(SensorManager& manager, eid_t eid,
+                                   uint8_t nvidiaMessageType,
+                                   std::vector<bitfield8_t>& eventIdMasks);
+    uint8_t
         configureEventAcknowledgement(SensorManager& manager, eid_t eid,
                                       uint8_t nvidiaMessageType,
                                       std::vector<bitfield8_t>& eventIdMasks);

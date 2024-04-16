@@ -131,7 +131,7 @@ int main(int argc, char** argv)
         // Initialize the SensorManager before getting its instance
         nsm::SensorManager::initialize(bus, event, reqHandler, instanceIdDb,
                                        objServer, eidTable, nsmDevices,
-                                       localEid);
+                                       localEid, sockManager);
 
         auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
         eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,

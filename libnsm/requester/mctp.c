@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,6 @@
  * limitations under the License.
  */
 
-
-
-
 #include "mctp.h"
 #include "base.h"
 
@@ -28,6 +25,8 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
+
+#define MCTP_PREFIX_LEN 3 // tag, eid, mctp_type
 
 nsm_requester_rc_t nsm_open()
 {
@@ -63,10 +62,7 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 				    uint8_t **nsm_resp_msg,
 				    size_t *resp_msg_len)
 {
-	uint8_t msgTag = 0;
-	uint8_t mctpMsgType = MCTP_MSG_TYPE_PCI_VDM;
-	ssize_t min_len = sizeof(msgTag) + sizeof(eid) + sizeof(mctpMsgType) +
-			  sizeof(struct nsm_msg_hdr);
+	ssize_t min_len = MCTP_PREFIX_LEN + sizeof(struct nsm_msg_hdr);
 	ssize_t length = recv(mctp_fd, NULL, 0, MSG_PEEK | MSG_TRUNC);
 	if (length <= 0) {
 		return NSM_REQUESTER_RECV_FAIL;
@@ -77,11 +73,9 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 		return NSM_REQUESTER_INVALID_RECV_LEN;
 	} else {
 		struct iovec iov[2];
-		size_t mctp_prefix_len =
-		    sizeof(msgTag) + sizeof(eid) + sizeof(mctpMsgType);
-		uint8_t mctp_prefix[mctp_prefix_len];
-		size_t nsm_len = length - mctp_prefix_len;
-		iov[0].iov_len = mctp_prefix_len;
+		uint8_t mctp_prefix[MCTP_PREFIX_LEN] = {0, 0, 0};
+		size_t nsm_len = length - MCTP_PREFIX_LEN;
+		iov[0].iov_len = sizeof(mctp_prefix);
 		iov[0].iov_base = mctp_prefix;
 		*nsm_resp_msg = malloc(nsm_len);
 		iov[1].iov_len = nsm_len;
@@ -97,7 +91,7 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 		}
 
 		if ((mctp_prefix[1] != eid) ||
-		    (mctp_prefix[2] != mctpMsgType)) {
+		    (mctp_prefix[2] != MCTP_MSG_TYPE_PCI_VDM)) {
 			free(*nsm_resp_msg);
 			return NSM_REQUESTER_NOT_NSM_MSG;
 		}
@@ -121,8 +115,8 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 		return NSM_REQUESTER_NOT_RESP_MSG;
 	}
 
-	uint8_t cc = 0;
-	if (*resp_msg_len < (sizeof(struct nsm_msg_hdr) + sizeof(cc))) {
+	if (*resp_msg_len <
+	    (sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp))) {
 		free(*nsm_resp_msg);
 		return NSM_REQUESTER_RESP_MSG_TOO_SMALL;
 	}

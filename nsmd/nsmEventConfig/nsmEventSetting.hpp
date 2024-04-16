@@ -29,7 +29,13 @@ class NsmEventSetting : public NsmObject
                     uint8_t eventGenerationSetting,
                     std::shared_ptr<NsmDevice> nsmDevice);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override
+    {
+        updateSync(manager, eid);
+        co_return NSM_SW_SUCCESS;
+    }
+
+    uint8_t updateSync(SensorManager& manager, eid_t eid);
 
     uint8_t getEventGenerationSetting()
     {
@@ -37,9 +43,8 @@ class NsmEventSetting : public NsmObject
     }
 
   private:
-    requester::Coroutine setEventSubscription(SensorManager& manager, eid_t eid,
-                                              uint8_t globalSettting,
-                                              eid_t receiverEid);
+    uint8_t setEventSubscription(SensorManager& manager, eid_t eid,
+                                 uint8_t globalSettting, eid_t receiverEid);
     uint8_t eventGenerationSetting;
     std::shared_ptr<NsmDevice> nsmDevice;
 };

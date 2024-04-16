@@ -51,8 +51,7 @@ typedef enum {
  *  Structure representing NSM get supported event source request
  */
 struct nsm_get_supported_event_source_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 } __attribute__((packed));
 
@@ -61,9 +60,7 @@ struct nsm_get_supported_event_source_req {
  *  Structure representing NSM get supported event source respones
  */
 struct nsm_get_supported_event_source_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH];
 } __attribute__((packed));
 
@@ -72,8 +69,7 @@ struct nsm_get_supported_event_source_resp {
  *  Structure representing NSM get current event source request
  */
 struct nsm_get_current_event_source_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 } __attribute__((packed));
 
@@ -82,9 +78,7 @@ struct nsm_get_current_event_source_req {
  *  Structure representing NSM get current event source respones
  */
 struct nsm_get_current_event_source_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 } __attribute__((packed));
 
 /** @struct nsm_set_supported_event_source_req
@@ -92,8 +86,7 @@ struct nsm_get_current_event_source_resp {
  *  Structure representing NSM set current event source request
  */
 struct nsm_set_current_event_source_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 	bitfield8_t event_sources[EVENT_SOURCES_LENGTH];
 } __attribute__((packed));
@@ -103,9 +96,7 @@ struct nsm_set_current_event_source_req {
  *  Structure representing NSM set current event source respones
  */
 struct nsm_set_current_event_source_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 } __attribute__((packed));
 
 /** @struct nsm_set_event_subscription_req
@@ -113,8 +104,7 @@ struct nsm_set_current_event_source_resp {
  *  Structure representing NSM set event subscription request
  */
 struct nsm_set_event_subscription_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t global_event_generation_setting;
 	uint8_t receiver_endpoint_id;
 } __attribute__((packed));
@@ -124,9 +114,7 @@ struct nsm_set_event_subscription_req {
  *  Structure representing NSM set event subscription respones
  */
 struct nsm_set_event_subscription_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 } __attribute__((packed));
 
 /** @struct nsm_get_event_log_record_req
@@ -134,8 +122,7 @@ struct nsm_set_event_subscription_resp {
  *  Structure representing NSM get event log record request
  */
 struct nsm_get_event_log_record_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t selector_type;
 	uint32_t selector;
 } __attribute__((packed));
@@ -145,9 +132,7 @@ struct nsm_get_event_log_record_req {
  *  Structure representing NSM get event log record response
  */
 struct nsm_get_event_log_record_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	uint8_t nvidia_message_type;
 	uint8_t event_id;
 	uint32_t event_handle;
@@ -160,8 +145,7 @@ struct nsm_get_event_log_record_resp {
  *  Structure representing NSM set event subscription request
  */
 struct nsm_configure_event_acknowledgement_req {
-	uint8_t command;
-	uint8_t data_size;
+	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 	bitfield8_t current_event_sources_acknowledgement_mask
 	    [EVENT_ACKNOWLEDGEMENT_MASK_LENGTH];
@@ -172,9 +156,7 @@ struct nsm_configure_event_acknowledgement_req {
  *  Structure representing NSM set event subscription respones
  */
 struct nsm_configure_event_acknowledgement_resp {
-	uint8_t command;
-	uint8_t completion_code;
-	uint16_t data_size;
+	struct nsm_common_resp hdr;
 	bitfield8_t new_event_sources_acknowledgement_mask
 	    [EVENT_ACKNOWLEDGEMENT_MASK_LENGTH];
 } __attribute__((packed));

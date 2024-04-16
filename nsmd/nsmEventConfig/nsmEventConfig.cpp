@@ -56,35 +56,33 @@ void NsmEventConfig::convertIdsToMask(std::vector<uint64_t>& eventIds,
     }
 }
 
-requester::Coroutine NsmEventConfig::update(SensorManager& manager, eid_t eid)
+uint8_t NsmEventConfig::updateSync(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    rc = co_await setCurrentEventSources(manager, eid, messageType,
-                                         srcEventMask);
+    rc = setCurrentEventSources(manager, eid, messageType, srcEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("setCurrentEventSources failed, eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
-        co_return rc;
+        return rc;
     }
-    rc = co_await configureEventAcknowledgement(manager, eid, messageType,
-                                                ackEventMask);
+    rc = configureEventAcknowledgement(manager, eid, messageType, ackEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("configureEventAcknowledgement failed, eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-        co_return rc;
+        return rc;
     }
-    co_return rc;
+    return rc;
 }
 
-requester::Coroutine NsmEventConfig::setCurrentEventSources(
+uint8_t NsmEventConfig::setCurrentEventSources(
     SensorManager& manager, eid_t eid, uint8_t nvidiaMessageType,
     std::vector<bitfield8_t>& eventIdMasks)
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
-        co_return NSM_ERR_INVALID_DATA_LENGTH;
+        return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
     Request request(sizeof(nsm_msg_hdr) +
@@ -98,16 +96,16 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
         lg2::error(
             "encode_nsm_set_current_event_sources_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        return rc;
     }
 
     const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        co_return rc;
+        free((void*)responseMsg);
+        return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
@@ -118,19 +116,18 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
         lg2::error(
             "decode_nsm_set_current_event_sources_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
     }
-
-    co_return cc;
+    free((void*)responseMsg);
+    return cc;
 }
 
-requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
+uint8_t NsmEventConfig::configureEventAcknowledgement(
     SensorManager& manager, eid_t eid, uint8_t nvidiaMessageType,
     std::vector<bitfield8_t>& eventIdMasks)
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
-        co_return NSM_ERR_INVALID_DATA_LENGTH;
+        return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
     Request request(sizeof(nsm_msg_hdr) +
@@ -144,16 +141,16 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
         lg2::error(
             "encode_nsm_configure_event_acknowledgement_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        return rc;
     }
 
     const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        co_return rc;
+        free((void*)responseMsg);
+        return rc;
     }
 
     bitfield8_t* newEventIdMasks;
@@ -166,10 +163,9 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
         lg2::error(
             "decode_nsm_configure_event_acknowledgement_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
     }
-
-    co_return cc;
+    free((void*)responseMsg);
+    return cc;
 }
 
 static void createNsmEventConfig(SensorManager& manager,
@@ -210,7 +206,7 @@ static void createNsmEventConfig(SensorManager& manager,
 
     // update sensor
     auto eid = manager.getEid(nsmDevice);
-    sensor->update(manager, eid).detach();
+    sensor->update(manager, eid);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

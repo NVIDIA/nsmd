@@ -5,6 +5,7 @@ sources = [
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
     '../libnsm/instance-id.c',
+    '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',
     'deviceManager.cpp',
     'sensorManager.cpp',
