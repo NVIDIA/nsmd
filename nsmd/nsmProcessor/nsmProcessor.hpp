@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
 
 namespace nsm
@@ -121,6 +122,19 @@ class NsmEccErrorCounts : public NsmSensor
     std::shared_ptr<EccModeIntf> eccErrorCountIntf = nullptr;
 };
 
+using PciePortIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Port>;
+
+class NsmPciePortIntf : public NsmObject
+{
+  public:
+    NsmPciePortIntf(sdbusplus::bus::bus& bus, const std::string& name,
+                    const std::string& type, std::string& inventoryObjPath);
+
+  private:
+    std::shared_ptr<PciePortIntf> pciePortIntf = nullptr;
+};
+
 class NsmPcieGroup : public NsmSensor
 {
   public:
@@ -141,7 +155,8 @@ class NsmPciGroup2 : public NsmPcieGroup
 {
   public:
     NsmPciGroup2(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
     NsmPciGroup2() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -150,6 +165,7 @@ class NsmPciGroup2 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_2& data);
+    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
 };
 
@@ -157,7 +173,8 @@ class NsmPciGroup3 : public NsmPcieGroup
 {
   public:
     NsmPciGroup3(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
     NsmPciGroup3() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
@@ -165,6 +182,7 @@ class NsmPciGroup3 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_3& data);
+    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
 };
 
@@ -172,7 +190,8 @@ class NsmPciGroup4 : public NsmPcieGroup
 {
   public:
     NsmPciGroup4(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
     NsmPciGroup4() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
@@ -180,7 +199,7 @@ class NsmPciGroup4 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_4& data);
-
+    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
 };
 
