@@ -53,6 +53,11 @@ class SensorManager
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid)
     {
+        if (instance)
+        {
+            throw std::logic_error(
+                "Initialize called on an already initialized SensorManager");
+        }
         static SensorManager inst(bus, event, handler, instanceIdDb, objServer,
                                   eidTable, nsmDevices, localEid);
         instance = &inst;

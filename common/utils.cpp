@@ -240,7 +240,7 @@ PropertyValue DBusHandler::getDbusPropertyVariant(
 // assuming we only have a single MCTP network id 0
 // its safe to say if we are given a particular eid it will map to a particular
 // uuid. A device can have multiple EIDs
-std::optional<std::string> getUUIDFromEID(
+std::optional<uuid_t> getUUIDFromEID(
     const std::multimap<std::string,
                         std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     eid_t eid)

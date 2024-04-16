@@ -38,13 +38,13 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
 
   private:
     void updateValue(enum8 driverState, std::string driverVersion);
-    std::unique_ptr<SoftwareIntf> softwareVer_ = nullptr;
-    std::unique_ptr<OperationalStatusIntf> operationalStatus_ = nullptr;
-    std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
-    std::unique_ptr<AssetIntf> asset_ = nullptr;
+    std::unique_ptr<SoftwareIntf> softwareVer = nullptr;
+    std::unique_ptr<OperationalStatusIntf> operationalStatus = nullptr;
+    std::unique_ptr<AssociationDefinitionsInft> associationDef = nullptr;
+    std::unique_ptr<AssetIntf> asset = nullptr;
 
     // to be consumed by unit tests
-    enum8 driverState_ = 0;
-    std::string driverVersion_ = "";
+    enum8 driverState = 0;
+    std::string driverVersion = "";
 };
 } // namespace nsm

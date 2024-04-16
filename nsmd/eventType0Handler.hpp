@@ -16,12 +16,7 @@ namespace nsm
 class EventType0Handler : public EventHandler
 {
   public:
-    // Member to hold reference to DeviceManager
-    DeviceManager& deviceManager;
-    SensorManager& sensorManager;
-    EventType0Handler() :
-        deviceManager(DeviceManager::getInstance()),
-        sensorManager(SensorManager::getInstance())
+    EventType0Handler()
     {
         handlers.emplace(
             NSM_REDISCOVERY_EVENT,
@@ -43,28 +38,19 @@ class EventType0Handler : public EventHandler
      */
     void rediscovery(uint8_t eid, const nsm_msg* event, size_t eventLen)
     {
+        // Member to hold reference to DeviceManager and sensor manager
+        DeviceManager& deviceManager = DeviceManager::getInstance();
+        SensorManager& sensorManager = SensorManager::getInstance();
         // update sensors for capabilities refresh
         // Get UUID from EID
         auto uuidOptional =
             utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
         if (uuidOptional)
         {
-            std::string uuid = *uuidOptional;
+            uuid_t uuid = *uuidOptional;
             // findNSMDevice instance for that eid
             lg2::info("rediscovery event : UUID found: {UUID}", "UUID", uuid);
-
-            std::shared_ptr<NsmDevice> nsmDevice{};
-            auto nsmDevices = deviceManager.getNsmDevices();
-            for (auto device : nsmDevices)
-            {
-                if ((device->uuid).substr(0, UUID_LEN) ==
-                    uuid.substr(0, UUID_LEN))
-                {
-                    nsmDevice = device;
-                    break;
-                }
-            }
-
+            auto nsmDevice = sensorManager.getNsmDevice(uuid);
             if (nsmDevice)
             {
                 lg2::info(

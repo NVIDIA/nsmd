@@ -2,9 +2,9 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <vector>
-
 namespace nsm
 {
 NsmGPUSWInventoryDriverVersionAndStatus::
@@ -18,12 +18,11 @@ NsmGPUSWInventoryDriverVersionAndStatus::
 
     lg2::info("NsmGPUSWInventoryDriverVersionAndStatus: create sensor:{NAME}",
               "NAME", name.c_str());
-    softwareVer_ =
-        std::make_unique<SoftwareIntf>(bus, GPUFWInvBasePath.c_str());
-    operationalStatus_ =
+    softwareVer = std::make_unique<SoftwareIntf>(bus, GPUFWInvBasePath.c_str());
+    operationalStatus =
         std::make_unique<OperationalStatusIntf>(bus, GPUFWInvBasePath.c_str());
     // add all interfaces
-    associationDef_ = std::make_unique<AssociationDefinitionsInft>(
+    associationDef = std::make_unique<AssociationDefinitionsInft>(
         bus, GPUFWInvBasePath.c_str());
     // handle associations
     std::vector<std::tuple<std::string, std::string, std::string>>
@@ -34,28 +33,28 @@ NsmGPUSWInventoryDriverVersionAndStatus::
                                        association.backward,
                                        association.absolutePath);
     }
-    associationDef_->associations(associations_list);
-    asset_ = std::make_unique<AssetIntf>(bus, GPUFWInvBasePath.c_str());
-    asset_->manufacturer(manufacturer);
+    associationDef->associations(associations_list);
+    asset = std::make_unique<AssetIntf>(bus, GPUFWInvBasePath.c_str());
+    asset->manufacturer(manufacturer);
 }
 
 void NsmGPUSWInventoryDriverVersionAndStatus::updateValue(
     enum8 driverState, std::string driverVersion)
 {
-    softwareVer_->version(driverVersion);
-    switch (static_cast<int>(driverState))
+    softwareVer->version(driverVersion);
+    switch (static_cast<DriverStateEnum>(driverState))
     {
-        case 2:
-            operationalStatus_->functional(true);
+        case DriverLoaded:
+            operationalStatus->functional(true);
             break;
         default:
-            operationalStatus_->functional(false);
+            operationalStatus->functional(false);
             break;
     }
 
     // to be consumed by unit tests
-    driverState_ = driverState;
-    driverVersion_ = driverVersion;
+    this->driverState = driverState;
+    this->driverVersion = driverVersion;
 }
 
 requester::Coroutine

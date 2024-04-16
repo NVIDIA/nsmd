@@ -50,6 +50,11 @@ public:
           eidTable,
       NsmDeviceTable& nsmDevices)
   {
+      if (instance)
+      {
+          throw std::logic_error(
+              "Initialize called on an already initialized DeviceManager");
+      }
       static DeviceManager inst(event, handler, instanceIdDb, objServer,
                                 eidTable, nsmDevices);
       instance = &inst;
