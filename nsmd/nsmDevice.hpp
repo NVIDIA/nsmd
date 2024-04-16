@@ -37,6 +37,7 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
     std::deque<std::shared_ptr<NsmSensor>> roundRobinSensors;
+    std::vector<std::shared_ptr<NsmObject>> staticSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
 
     std::shared_ptr<NsmNumericAggregator>

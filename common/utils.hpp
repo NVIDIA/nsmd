@@ -259,12 +259,22 @@ std::vector<std::string> split(std::string_view srcStr, std::string_view delim,
  */
 std::string getCurrentSystemTime();
 
+/** @brief Get UUID from the eid
+ *
+ *  @return - uuid_t uuid for corresponding eid
+ */
+std::optional<std::string> getUUIDFromEID(
+    const std::multimap<std::string,
+                        std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
+    eid_t eid);
+
 /** @brief Get eid from the UUID
  *
  *  @return - eid_t eid for corresponding UUID
  */
 eid_t getEidFromUUID(
-    const std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+        eidTable,
     uuid_t uuid);
 
 /** @brief UUID conversion from integer array to std::string.

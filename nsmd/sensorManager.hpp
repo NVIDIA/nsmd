@@ -9,6 +9,8 @@
 #include <sdbusplus/bus/match.hpp>
 #include <sdbusplus/timer.hpp>
 
+#include <memory>
+
 namespace nsm
 {
 
@@ -26,13 +28,42 @@ using RequesterHandler = requester::Handler<requester::Request>;
 class SensorManager
 {
   public:
-    SensorManager(sdbusplus::bus::bus& bus, sdeventplus::Event& event,
-                  requester::Handler<requester::Request>& handler,
-                  nsm::InstanceIdDb& instanceIdDb,
-                  sdbusplus::asio::object_server& objServer,
-                  std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
-                  NsmDeviceTable& nsmDevices, eid_t localEid);
+    // Delete copy constructor and copy assignment operator
+    SensorManager(const SensorManager&) = delete;
+    SensorManager& operator=(const SensorManager&) = delete;
 
+    // Static method to access the instance of the class
+    static SensorManager& getInstance()
+    {
+        if (!instance)
+        {
+            throw std::runtime_error(
+                "SensorManager instance not initialized yet");
+        }
+        return *instance;
+    }
+
+    // Static method to initialize the instance
+    static void initialize(
+        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable,
+        NsmDeviceTable& nsmDevices, eid_t localEid)
+    {
+        if (instance)
+        {
+            throw std::logic_error(
+                "Initialize called on an already initialized SensorManager");
+        }
+        static SensorManager inst(bus, event, handler, instanceIdDb, objServer,
+                                  eidTable, nsmDevices, localEid);
+        instance = &inst;
+    }
+
+    // Regular methods as before
     void startPolling();
     void stopPolling();
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
@@ -50,17 +81,28 @@ class SensorManager
     {
         return localEid;
     }
-
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice);
     std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
 
   private:
+    // Private constructor
+    SensorManager(
+        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable,
+        NsmDeviceTable& nsmDevices, eid_t localEid);
+
+    // Instance variables as before
+    static SensorManager* instance;
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
     nsm::InstanceIdDb& instanceIdDb;
     sdbusplus::asio::object_server& objServer;
-    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable;
+    std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable;
 
     std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
     std::unique_ptr<sdeventplus::source::Defer> deferScanInventory;
@@ -69,5 +111,4 @@ class SensorManager
     NsmDeviceTable& nsmDevices;
     eid_t localEid;
 };
-
 } // namespace nsm

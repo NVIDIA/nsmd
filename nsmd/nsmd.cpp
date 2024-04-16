@@ -88,15 +88,11 @@ int main(int argc, char** argv)
         bus.request_name("xyz.openbmc_project.NSM");
         nsm::InstanceIdDb instanceIdDb;
         mctp_socket::Manager sockManager;
+        nsm::EventManager eventManager;
         // corresponding to a UUID there could be multiple occurance of same eid
         // with different medium types.
-        std::multimap<uuid_t, std::pair<eid_t, MctpMedium>> eidTable;
-
-        nsm::EventManager eventManager;
-
-        auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
-        eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-                                     std::move(eventType0Handler));
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>
+            eidTable;
 
         requester::Handler<requester::Request> reqHandler(event, instanceIdDb,
                                                           sockManager, verbose);
@@ -104,20 +100,25 @@ int main(int argc, char** argv)
                                          sockManager, verbose);
 
         nsm::NsmDeviceTable nsmDevices;
-        std::unique_ptr<nsm::DeviceManager> deviceManager =
-            std::make_unique<nsm::DeviceManager>(event, reqHandler,
-                                                 instanceIdDb, objServer,
-                                                 eidTable, nsmDevices);
+
+        // Initialize the DeviceManager before getting its instance
+        nsm::DeviceManager::initialize(event, reqHandler, instanceIdDb,
+                                       objServer, eidTable, nsmDevices);
+        nsm::DeviceManager& deviceManager = nsm::DeviceManager::getInstance();
         std::unique_ptr<mctp::MctpDiscovery> mctpDiscoveryHandler =
             std::make_unique<mctp::MctpDiscovery>(
                 bus, sockHandler,
                 std::initializer_list<mctp::MctpDiscoveryHandlerIntf*>{
-                    deviceManager.get()});
+                    &deviceManager});
 
-        std::unique_ptr<nsm::SensorManager> sensorManager =
-            std::make_unique<nsm::SensorManager>(
-                bus, event, reqHandler, instanceIdDb, objServer, eidTable,
-                nsmDevices, localEid);
+        // Initialize the SensorManager before getting its instance
+        nsm::SensorManager::initialize(bus, event, reqHandler, instanceIdDb,
+                                       objServer, eidTable, nsmDevices,
+                                       localEid);
+
+        auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
+        eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                                     std::move(eventType0Handler));
 
 #ifdef NVIDIA_SHMEM
         // Initializing shared memory

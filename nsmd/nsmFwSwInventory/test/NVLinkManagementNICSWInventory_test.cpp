@@ -12,14 +12,18 @@ using ::testing::ElementsAre;
 
 #include "NVLinkManagementNICSWInventory.hpp"
 
+static auto& bus = utils::DBusHandler::getBus();
+static const std::string sensorName("dummy_sensor");
+static const std::string sensorType("dummy_type");
+static const std::string manufacturer("dummy_manufacturer");
+static const std::vector<utils::Association>
+    associations({{"chassis", "all_sensors",
+                   "/xyz/openbmc_project/inventory/dummy_device"}});
+
 TEST(NsmSWInventoryDriverVersionAndStatus, GoodTest)
 {
-    auto bus = sdbusplus::bus::new_default();
-    std::string sensorName("dummy_sensor");
-    std::string sensorType("dummy_type");
-    std::string manufacturer("dummy_manufacturer");
     nsm::NsmSWInventoryDriverVersionAndStatus FWSensor(
-        bus, sensorName, sensorType, manufacturer);
+        bus, sensorName, associations, sensorType, manufacturer);
 
     EXPECT_EQ(FWSensor.name, sensorName);
     EXPECT_EQ(FWSensor.type, sensorType);
@@ -34,7 +38,7 @@ TEST(NsmSWInventoryDriverVersionAndStatus, HandleResponseMsgSuccess)
 {
     auto bus = sdbusplus::bus::new_default();
     nsm::NsmSWInventoryDriverVersionAndStatus sensor(
-        bus, "sensorName", "sensorType", "manufacturer");
+        bus, sensorName, associations, sensorType, manufacturer);
 
     std::vector<uint8_t> responseMsg{
         0x10,
@@ -65,9 +69,8 @@ TEST(NsmSWInventoryDriverVersionAndStatus, HandleResponseMsgSuccess)
 
 TEST(NsmSWInventoryDriverVersionAndStatus, HandleNullResponseMsg)
 {
-    auto bus = sdbusplus::bus::new_default();
     nsm::NsmSWInventoryDriverVersionAndStatus sensor(
-        bus, "sensorName", "sensorType", "manufacturer");
+        bus, sensorName, associations, sensorType, manufacturer);
 
     uint8_t result = sensor.handleResponseMsg(nullptr, 0);
 
@@ -76,9 +79,8 @@ TEST(NsmSWInventoryDriverVersionAndStatus, HandleNullResponseMsg)
 
 TEST(NsmSWInventoryDriverVersionAndStatus, NonNullTerminatedDriverVersion)
 {
-    auto bus = sdbusplus::bus::new_default();
     nsm::NsmSWInventoryDriverVersionAndStatus sensor(
-        bus, "sensorName", "sensorType", "manufacturer");
+        bus, sensorName, associations, sensorType, manufacturer);
 
     std::vector<uint8_t> responseMsg{
         0x10,
@@ -107,9 +109,8 @@ TEST(NsmSWInventoryDriverVersionAndStatus, NonNullTerminatedDriverVersion)
 
 TEST(NsmSWInventoryDriverVersionAndStatus, ExceedinglyLongDriverVersion)
 {
-    auto bus = sdbusplus::bus::new_default();
     nsm::NsmSWInventoryDriverVersionAndStatus sensor(
-        bus, "sensorName", "sensorType", "manufacturer");
+        bus, sensorName, associations, sensorType, manufacturer);
 
     // Initialize a response message vector with enough space for headers
     // and a too-long driver version string

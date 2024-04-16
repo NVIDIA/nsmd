@@ -16,11 +16,16 @@
 namespace nsm
 {
 
+// Static instance definition
+SensorManager* SensorManager::instance = nullptr;
+
+// Ensuring the constructor remains private and defined here if not explicitly
+// declared in the header
 SensorManager::SensorManager(
     sdbusplus::bus::bus& bus, sdeventplus::Event& event,
-    requester::Handler<requester::Request>& handler,
-    nsm::InstanceIdDb& instanceIdDb, sdbusplus::asio::object_server& objServer,
-    std::multimap<uuid_t, std::pair<eid_t, MctpMedium>>& eidTable,
+    requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
+    sdbusplus::asio::object_server& objServer,
+    std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid) :
     bus(bus),
     event(event), handler(handler), instanceIdDb(instanceIdDb),
@@ -28,13 +33,14 @@ SensorManager::SensorManager(
     localEid(localEid)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(std::mem_fn(&SensorManager::scanInventory), this));
-
+        event, std::bind(&SensorManager::scanInventory, this));
     inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
             "/xyz/openbmc_project/inventory"),
-        std::bind_front(&SensorManager::interfaceAddedhandler, this));
+        [this](sdbusplus::message::message& msg) {
+            this->interfaceAddedhandler(msg);
+        });
 }
 
 void SensorManager::scanInventory()

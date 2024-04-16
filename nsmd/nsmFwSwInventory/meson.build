@@ -1,7 +1,8 @@
 
 sources += [
   'nsmFwSwInventory/NVLinkManagementNICSWInventory.cpp',
-  'nsmFwSwInventory/PCIeRetimerFWInventory.cpp'
+  'nsmFwSwInventory/PCIeRetimerFWInventory.cpp',
+  'nsmFwSwInventory/GPUSWInventory.cpp',
 ]
 
 nsmd_headers += ['.', '..']
