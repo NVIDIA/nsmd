@@ -235,7 +235,6 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
             lg2::error(
                 "getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
                 "PID", propertyId, "EID", eid, "RC", rc);
-            co_return rc;
         }
     }
 
