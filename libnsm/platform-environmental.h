@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_CLOCK_LIMIT = 0x11,
 	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
 	NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME = 0x46,
+	NSM_SET_MIG_MODE = 0x4e,
 	NSM_GET_ECC_MODE = 0x4f,
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
 	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09
@@ -351,6 +352,15 @@ int decode_get_driver_info_resp(const struct nsm_msg *msg, size_t msg_len,
 struct nsm_get_MIG_mode_resp {
 	struct nsm_common_resp hdr;
 	bitfield8_t flags;
+} __attribute__((packed));
+
+/** @struct nsm_set_mig_mode_req
+ *
+ *  Structure representing NSM set mig mode request.
+ */
+struct nsm_set_MIG_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t requested_mode;
 } __attribute__((packed));
 
 /** @struct nsm_get_ECC_mode_resp
@@ -801,6 +811,47 @@ int encode_get_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Set Mig Mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] requested_mode - Requested Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_MIG_mode_req(uint8_t instance, uint8_t requested_mode,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a Set Mig Mode request request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] requested_mode - Requested Mode
+ *  @return nsm_completion_codes
+ */
+int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *requested_mode);
+
+/** @brief Encode a Get MIG mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Get MIG mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code);
 
 /** @brief Encode a Get ECC mode request message
  *

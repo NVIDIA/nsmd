@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 // NSM: Nvidia Message type
 //           - Network Ports            [Type 1]
@@ -1081,6 +1079,66 @@ class GetMigMode : public CommandInterface
     }
 };
 
+class SetMigMode : public CommandInterface
+{
+  public:
+    ~SetMigMode() = default;
+    SetMigMode() = delete;
+    SetMigMode(const SetMigMode&) = delete;
+    SetMigMode(SetMigMode&&) = default;
+    SetMigMode& operator=(const SetMigMode&) = delete;
+    SetMigMode& operator=(SetMigMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetMigMode(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto requestedMode =
+            app->add_option_group("Required", "Requested Mig Mode can be 0/1.");
+
+        requestedMode->add_option("-r, --mode", requested_mode,
+                                  "retrieve requested mig mode");
+
+        requestedMode->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_MIG_mode_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_MIG_mode_req(instanceId, requested_mode, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_set_MIG_mode_resp(responsePtr, payloadLength, &cc,
+                                           &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint8_t requested_mode;
+};
+
 class GetEccMode : public CommandInterface
 {
   public:
@@ -1694,6 +1752,10 @@ void registerCommand(CLI::App& app)
     auto getMigMode = telemetry->add_subcommand("GetMigModes", "get MIG modes");
     commands.push_back(
         std::make_unique<GetMigMode>("telemetry", "GetMigMode", getMigMode));
+
+    auto setMigMode = telemetry->add_subcommand("SetMigModes", "set MIG mode");
+    commands.push_back(
+        std::make_unique<SetMigMode>("telemetry", "SetMigMode", setMigMode));
 
     auto getEccMode = telemetry->add_subcommand("GetEccMode", "get ECC modes");
     commands.push_back(

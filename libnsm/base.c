@@ -594,3 +594,27 @@ int decode_common_req(const struct nsm_msg *msg, size_t msg_len)
 	}
 	return NSM_SW_SUCCESS;
 }
+
+int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+		       uint16_t *data_size, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len !=
+	    (sizeof(struct nsm_msg_hdr)) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+
+	*data_size = le16toh(resp->data_size);
+
+	return NSM_SW_SUCCESS;
+}
