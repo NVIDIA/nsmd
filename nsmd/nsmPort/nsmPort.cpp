@@ -10,26 +10,196 @@
 namespace nsm
 {
 
-NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
-                 uint8_t portNum, const std::string& type,
-                 std::string& parentObjPath, std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum)
+NsmPortStatus::NsmPortStatus(
+    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    const std::string& type,
+    std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
+    std::string& inventoryObjPath) :
+    NsmSensor(portName, type),
+    portName(portName), portNumber(portNum)
 {
-    std::string objPath = inventoryObjPath + "/Ports/" + portName;
-    lg2::debug("NsmPort: create port: {NAME}", "NAME", portName.c_str());
+    lg2::debug("NsmPortStatus: {NAME}", "NAME", portName.c_str());
 
-    iBPortIntf = std::make_unique<IBPortIntf>(bus, objPath.c_str());
+    portStateIntf =
+        std::make_unique<PortStateIntf>(bus, inventoryObjPath.c_str());
+    portMetricsOem3Intf = portMetricsOem3Interface;
+
+    portStateIntf->linkStatus(PortLinkStatus::Starting);
+    portStateIntf->linkState(PortLinkStates::Unknown);
+    portMetricsOem3Intf->trainingError(false);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPortStatus::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_port_status_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_port_status_req(instanceId, portNumber, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                         size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint8_t portState = NSM_PORTSTATE_DOWN;
+    uint8_t portStatus = NSM_PORTSTATUS_DISABLED;
+
+    auto rc = decode_query_port_status_resp(responseMsg, responseLen, &cc,
+                                            &reasonCode, &dataSize, &portState,
+                                            &portStatus);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        switch (portState)
+        {
+            case NSM_PORTSTATE_DOWN:
+            case NSM_PORTSTATE_DOWN_LOCK:
+            case NSM_PORTSTATE_SLEEP:
+                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
+                break;
+            case NSM_PORTSTATE_UP:
+            case NSM_PORTSTATE_POLLING:
+            case NSM_PORTSTATE_RESERVED:
+                portStateIntf->linkStatus(PortLinkStatus::LinkUp);
+                break;
+            case NSM_PORTSTATE_TRAINING:
+                portStateIntf->linkStatus(PortLinkStatus::Training);
+                break;
+            case NSM_PORTSTATE_TRAINING_FAILURE:
+                portStateIntf->linkStatus(PortLinkStatus::Training);
+                portMetricsOem3Intf->trainingError(true);
+                break;
+            default:
+                portStateIntf->linkStatus(PortLinkStatus::NoLink);
+                break;
+        }
+
+        switch (portStatus)
+        {
+            case NSM_PORTSTATUS_DISABLED:
+                portStateIntf->linkState(PortLinkStates::Disabled);
+                break;
+            case NSM_PORTSTATUS_ENABLED:
+                portStateIntf->linkState(PortLinkStates::Enabled);
+                break;
+            default:
+                portStateIntf->linkState(PortLinkStates::Unknown);
+                break;
+        }
+    }
+    else
+    {
+        lg2::error(
+            "responseHandler: decode_query_port_status_resp unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return NSM_SW_SUCCESS;
+}
+
+NsmPortCharacteristics::NsmPortCharacteristics(
+    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    const std::string& type,
+    std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
+    std::string& inventoryObjPath) :
+    NsmSensor(portName, type),
+    portName(portName), portNumber(portNum)
+{
+    lg2::debug("NsmPortCharacteristics: {NAME}", "NAME", portName.c_str());
+
+    portInfoIntf =
+        std::make_unique<PortInfoIntf>(bus, inventoryObjPath.c_str());
+    portMetricsOem3Intf = portMetricsOem3Interface;
+
+    portInfoIntf->type(PortType::BidirectionalPort);
+    portInfoIntf->protocol(PortProtocol::NVLink);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPortCharacteristics::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_port_characteristics_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_port_characteristics_req(instanceId, portNumber,
+                                                    requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmPortCharacteristics::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                              size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    struct nsm_port_characteristics_data data;
+
+    auto rc = decode_query_port_characteristics_resp(
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        auto speedGbps = (data.nv_port_line_rate_mbps) / 1000;
+        portInfoIntf->currentSpeed(speedGbps);
+        portInfoIntf->maxSpeed(speedGbps);
+
+        // not yet clear from spec raised as concern
+        portMetricsOem3Intf->txNoProtocolBytes(data.nv_port_data_rate_kbps);
+        portMetricsOem3Intf->rxNoProtocolBytes(data.nv_port_data_rate_kbps);
+        portMetricsOem3Intf->txWidth(data.status_lane_info);
+        portMetricsOem3Intf->rxWidth(data.status_lane_info);
+    }
+    else
+    {
+        lg2::error(
+            "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return NSM_SW_SUCCESS;
+}
+
+NsmPortMetrics::NsmPortMetrics(sdbusplus::bus::bus& bus, std::string& portName,
+                               uint8_t portNum, const std::string& type,
+                               std::string& parentObjPath,
+                               std::string& inventoryObjPath) :
+    NsmSensor(portName, type),
+    portName(portName), portNumber(portNum)
+{
+    lg2::debug("NsmPortMetrics: {NAME}", "NAME", portName.c_str());
+
+    iBPortIntf = std::make_unique<IBPortIntf>(bus, inventoryObjPath.c_str());
 
     portMetricsOem2Intf =
-        std::make_unique<PortMetricsOem2Intf>(bus, objPath.c_str());
+        std::make_unique<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
 
     associationDefinitionsIntf =
-        std::make_unique<AssociationDefinitionsInft>(bus, objPath.c_str());
+        std::make_unique<AssociationDefInft>(bus, inventoryObjPath.c_str());
     associationDefinitionsIntf->associations(
         {{"parent_device", "all_states", parentObjPath.c_str()}});
 }
 
-void NsmPort::updateCounterValues(struct nsm_port_counter_data* portData)
+void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
 {
     if (portData)
     {
@@ -156,7 +326,7 @@ void NsmPort::updateCounterValues(struct nsm_port_counter_data* portData)
         else
         {
             lg2::error(
-                "NsmPort: updating counter value failed: iBPortIntf is NULL");
+                "NsmPortMetrics: updating counter value failed: iBPortIntf is NULL");
         }
 
         if (portMetricsOem2Intf)
@@ -174,18 +344,18 @@ void NsmPort::updateCounterValues(struct nsm_port_counter_data* portData)
         else
         {
             lg2::error(
-                "NsmPort: updating counter value failed: portMetricsOem2Intf is NULL");
+                "NsmPortMetrics: updating counter value failed: portMetricsOem2Intf is NULL");
         }
     }
     else
     {
         lg2::error(
-            "NsmPort: updating counter value failed: portCounterInfo is NULL");
+            "NsmPortMetrics: updating counter value failed: portCounterInfo is NULL");
     }
 }
 
-std::optional<std::vector<uint8_t>> NsmPort::genRequestMsg(eid_t eid,
-                                                           uint8_t instanceId)
+std::optional<std::vector<uint8_t>>
+    NsmPortMetrics::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_port_telemetry_counter_req));
@@ -203,16 +373,16 @@ std::optional<std::vector<uint8_t>> NsmPort::genRequestMsg(eid_t eid,
     return request;
 }
 
-uint8_t NsmPort::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                   size_t responseLen)
+uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                          size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     struct nsm_port_counter_data data;
 
     auto rc = decode_get_port_telemetry_counter_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -222,7 +392,7 @@ uint8_t NsmPort::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         lg2::error(
             "responseHandler: get_port_telemetry_counter unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NUM", portNumber, "RSNCOD", reason_code, "CC", cc, "RC", rc);
+            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -241,6 +411,8 @@ static void createNsmPortSensor(SensorManager& manager,
         objPath.c_str(), "Priority", interface.c_str());
     auto count = utils::DBusHandler().getDbusProperty<uint64_t>(
         objPath.c_str(), "Count", interface.c_str());
+    auto deviceType = utils::DBusHandler().getDbusProperty<uint64_t>(
+        objPath.c_str(), "DeviceType", interface.c_str());
     auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
@@ -261,26 +433,82 @@ static void createNsmPortSensor(SensorManager& manager,
     for (uint64_t i = 1; i <= count; i++)
     {
         std::string portName = name + '_' + std::to_string(i);
-        auto portSensor = std::make_shared<NsmPort>(
-            bus, portName, i, type, parentObjPath, inventoryObjPath);
-        if (!portSensor)
-        {
-            lg2::error(
-                "Failed to create NSM Port : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
+        std::string objPath = inventoryObjPath + "/Ports/" + portName;
 
-            return;
+        if (deviceType == NSM_DEV_ID_GPU)
+        {
+            std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf =
+                std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
+
+            auto portStatusSensor = std::make_shared<NsmPortStatus>(
+                bus, portName, i, type, portMetricsOem3Intf, objPath);
+            if (!portStatusSensor)
+            {
+                lg2::error(
+                    "Failed to create NSM Port status sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                    objPath);
+            }
+            else
+            {
+                nsmDevice->deviceSensors.emplace_back(portStatusSensor);
+                if (priority)
+                {
+                    nsmDevice->prioritySensors.emplace_back(portStatusSensor);
+                }
+                else
+                {
+                    nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
+                }
+            }
+
+            auto portCharacteristicsSensor =
+                std::make_shared<NsmPortCharacteristics>(
+                    bus, portName, i, type, portMetricsOem3Intf, objPath);
+            if (!portCharacteristicsSensor)
+            {
+                lg2::error(
+                    "Failed to create NSM Port characteristics sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                    objPath);
+            }
+            else
+            {
+                nsmDevice->deviceSensors.emplace_back(
+                    portCharacteristicsSensor);
+                if (priority)
+                {
+                    nsmDevice->prioritySensors.emplace_back(
+                        portCharacteristicsSensor);
+                }
+                else
+                {
+                    nsmDevice->roundRobinSensors.emplace_back(
+                        portCharacteristicsSensor);
+                }
+            }
         }
 
-        nsmDevice->deviceSensors.emplace_back(portSensor);
-        if (priority)
+        auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
+            bus, portName, i, type, parentObjPath, objPath);
+        if (!portMetricsSensor)
         {
-            nsmDevice->prioritySensors.emplace_back(portSensor);
+            lg2::error(
+                "Failed to create NSM Port Metric sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                objPath);
         }
         else
         {
-            nsmDevice->roundRobinSensors.emplace_back(portSensor);
+            nsmDevice->deviceSensors.emplace_back(portMetricsSensor);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.emplace_back(portMetricsSensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.emplace_back(portMetricsSensor);
+            }
         }
     }
 }

@@ -273,6 +273,10 @@ std::optional<std::vector<uint8_t>>
             {
                 case NSM_GET_PORT_TELEMETRY_COUNTER:
                     return getPortTelemetryCounterHandler(request, requestLen);
+                case NSM_QUERY_PORT_CHARACTERISTICS:
+                    return queryPortCharacteristicsHandler(request, requestLen);
+                case NSM_QUERY_PORT_STATUS:
+                    return queryPortStatusHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -591,6 +595,85 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_get_port_telemetry_counter_resp failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    lg2::info("queryPortCharacteristicsHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t portNumber = 0;
+    auto rc = decode_query_port_characteristics_req(requestMsg, requestLen,
+                                                    &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_characteristics_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // mock data to send
+    std::vector<uint8_t> data{0x09, 0x00, 0x00, 0x00, 0x67, 0x00, 0x00, 0x00,
+                              0x13, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00};
+
+    auto portCharData =
+        reinterpret_cast<nsm_port_characteristics_data*>(data.data());
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_characteristics_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_query_port_characteristics_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, reason_code,
+                                                portCharData, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_characteristics_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortStatusHandler(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    lg2::info("queryPortStatusHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t portNumber = 0;
+    auto rc = decode_query_port_status_req(requestMsg, requestLen, &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_port_status_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    uint8_t port_state = NSM_PORTSTATE_UP;
+    uint8_t port_status = NSM_PORTSTATUS_ENABLED;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_status_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_query_port_status_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                       reason_code, port_state, port_status,
+                                       responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_port_status_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
     return response;

@@ -103,7 +103,7 @@ class GetPortTelemetryCounter : public CommandInterface
         else
         {
             std::cerr
-                << "Response message error: decode_get_port_telemetry_resp fail"
+                << "Response message error: decode_get_port_telemetry_resp fail "
                 << "rc=" << rc << ", cc=" << (int)cc
                 << ", reasonCode=" << (int)reason_code << "\n";
             return;
@@ -304,6 +304,156 @@ class GetPortTelemetryCounter : public CommandInterface
         result["Port Counter Information"] = countersResult;
 
         nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t portNumber;
+};
+
+class QueryPortCharacteristics : public CommandInterface
+{
+  public:
+    ~QueryPortCharacteristics() = default;
+    QueryPortCharacteristics() = delete;
+    QueryPortCharacteristics(const QueryPortCharacteristics&) = delete;
+    QueryPortCharacteristics(QueryPortCharacteristics&&) = default;
+    QueryPortCharacteristics&
+        operator=(const QueryPortCharacteristics&) = delete;
+    QueryPortCharacteristics& operator=(QueryPortCharacteristics&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryPortCharacteristics(const char* type, const char* name,
+                                      CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portTeleOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which counter value is to be retrieved.");
+
+        portNumber = 00;
+        portTeleOptionGroup->add_option(
+            "-p, --portNum", portNumber,
+            "retrieve counter values for Port number");
+        portTeleOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_port_characteristics_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_port_characteristics_req(instanceId, portNumber,
+                                                        request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataLen = 0;
+        struct nsm_port_characteristics_data portCharData;
+
+        auto rc = decode_query_port_characteristics_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &dataLen,
+            &portCharData);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Port Number"] = portNumber;
+            result["Data Length"] = dataLen;
+            result["Status"] = static_cast<uint32_t>(portCharData.status);
+            result["NV Port Line Rate Mbps"] =
+                static_cast<uint32_t>(portCharData.nv_port_line_rate_mbps);
+            result["NV Port Data Rate Kbps"] =
+                static_cast<uint32_t>(portCharData.nv_port_data_rate_kbps);
+            result["Lane Info Status"] =
+                static_cast<uint32_t>(portCharData.status_lane_info);
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_query_port_characteristics_resp fail "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
+    }
+
+  private:
+    uint8_t portNumber;
+};
+
+class QueryPortStatus : public CommandInterface
+{
+  public:
+    ~QueryPortStatus() = default;
+    QueryPortStatus() = delete;
+    QueryPortStatus(const QueryPortStatus&) = delete;
+    QueryPortStatus(QueryPortStatus&&) = default;
+    QueryPortStatus& operator=(const QueryPortStatus&) = delete;
+    QueryPortStatus& operator=(QueryPortStatus&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryPortStatus(const char* type, const char* name,
+                             CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portStatusOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which counter value is to be retrieved.");
+
+        portNumber = 00;
+        portStatusOptionGroup->add_option(
+            "-p, --portNum", portNumber,
+            "retrieve counter values for Port number");
+        portStatusOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_query_port_status_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_port_status_req(instanceId, portNumber, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataLen = 0;
+        uint8_t portState = NSM_PORTSTATE_UP;
+        uint8_t portStatus = NSM_PORTSTATUS_ENABLED;
+
+        auto rc = decode_query_port_status_resp(responsePtr, payloadLength, &cc,
+                                                &reasonCode, &dataLen,
+                                                &portState, &portStatus);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Port Number"] = portNumber;
+            result["Data Length"] = dataLen;
+            result["Port State"] = portState;
+            result["Port Status"] = portStatus;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_query_port_status_resp fail "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
     }
 
   private:
@@ -1770,6 +1920,16 @@ void registerCommand(CLI::App& app)
         "GetPortTelemetryCounter", "get port telemetry counter");
     commands.push_back(std::make_unique<GetPortTelemetryCounter>(
         "telemetry", "GetPortTelemetryCounter", getPortTelemetryCounter));
+
+    auto queryPortCharacteristics = telemetry->add_subcommand(
+        "QueryPortCharacteristics", "query port characteristics");
+    commands.push_back(std::make_unique<QueryPortCharacteristics>(
+        "telemetry", "QueryPortCharacteristics", queryPortCharacteristics));
+
+    auto queryPortStatus =
+        telemetry->add_subcommand("QueryPortStatus", "query port status");
+    commands.push_back(std::make_unique<QueryPortStatus>(
+        "telemetry", "QueryPortStatus", queryPortStatus));
 
     auto getInventoryInformation = telemetry->add_subcommand(
         "GetInventoryInformation", "get inventory information");
