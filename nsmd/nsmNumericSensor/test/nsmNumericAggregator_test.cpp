@@ -80,6 +80,7 @@ TEST(nsmSensorAggregator, GoodTest)
 
     auto rc = encode_aggregate_resp(instance_id, 0x01, NSM_SUCCESS, tags.size(),
                                     responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     const uint8_t reading[2][data_len]{{0x23, 0x44, 0x45, 0x00},
                                        {0x98, 0x78, 0x90, 0x46}};
@@ -91,7 +92,7 @@ TEST(nsmSensorAggregator, GoodTest)
     // add sample 1
     rc = encode_aggregate_resp_sample(tags[0], true, reading[0], 4, nsm_sample,
                                       &consumed_len);
-    assert(rc == NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     response.insert(response.end(), sample.begin(),
                     std::next(sample.begin(), consumed_len));
@@ -99,7 +100,7 @@ TEST(nsmSensorAggregator, GoodTest)
     // add sample 2
     rc = encode_aggregate_resp_sample(tags[1], true, reading[1], 4, nsm_sample,
                                       &consumed_len);
-    assert(rc == NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     response.insert(response.end(), sample.begin(),
                     std::next(sample.begin(), consumed_len));

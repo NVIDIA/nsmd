@@ -355,7 +355,7 @@ std::optional<std::vector<uint8_t>>
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
-    auto rc = encode_cc_only_resp(
+    [[maybe_unused]] auto rc = encode_cc_only_resp(
         requestMsg->hdr.instance_id, requestMsg->hdr.nvidia_msg_type,
         requestMsg->payload[0], NSM_ERR_UNSUPPORTED_COMMAND_CODE, reason_code,
         responseMsg);
@@ -372,7 +372,7 @@ std::optional<std::vector<uint8_t>>
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = 0;
-    auto rc =
+    [[maybe_unused]] auto rc =
         encode_ping_resp(requestMsg->hdr.instance_id, reason_code, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     return response;
@@ -399,7 +399,7 @@ std::optional<std::vector<uint8_t>>
     uint16_t reason_code = ERR_NULL;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_supported_nvidia_message_types_resp(
+    [[maybe_unused]] auto rc = encode_get_supported_nvidia_message_types_resp(
         requestMsg->hdr.instance_id, cc, reason_code, types, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     return response;
@@ -425,7 +425,7 @@ std::optional<std::vector<uint8_t>>
     uint16_t reason_code = ERR_NULL;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_supported_command_codes_resp(
+    [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
         requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     return response;
@@ -648,7 +648,7 @@ std::optional<std::vector<uint8_t>>
     uint8_t mockupDeviceInstance = mockInstanceId;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_query_device_identification_resp(
+    [[maybe_unused]] auto rc = encode_query_device_identification_resp(
         requestMsg->hdr.instance_id, cc, reason_code,
         mockupDeviceIdentification, mockupDeviceInstance, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
@@ -673,9 +673,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
-        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                                        request->hdr.command, NSM_SUCCESS, 2,
-                                        responseMsg);
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 2,
+            responseMsg);
 
         uint8_t reading[4]{};
         size_t consumed_len;
@@ -716,7 +716,7 @@ std::optional<std::vector<uint8_t>>
 
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
         uint16_t reason_code = ERR_NULL;
-        auto rc = encode_get_temperature_reading_resp(
+        [[maybe_unused]] auto rc = encode_get_temperature_reading_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, 78,
             responseMsg);
         assert(rc == NSM_SW_SUCCESS);
@@ -741,9 +741,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
-        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                                        request->hdr.command, NSM_SUCCESS, 3,
-                                        responseMsg);
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 3,
+            responseMsg);
 
         auto const now = std::chrono::system_clock::now();
         std::time_t newt = std::chrono::system_clock::to_time_t(now);
@@ -800,7 +800,7 @@ std::optional<std::vector<uint8_t>>
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
         uint16_t reason_code = ERR_NULL;
         uint32_t power{15870};
-        auto rc = encode_get_current_power_draw_resp(
+        [[maybe_unused]] auto rc = encode_get_current_power_draw_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, power,
             responseMsg);
         assert(rc == NSM_SW_SUCCESS);
@@ -1204,9 +1204,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
-        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                                        request->hdr.command, NSM_SUCCESS, 2,
-                                        responseMsg);
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 2,
+            responseMsg);
 
         const uint64_t energy[2]{25890, 17023};
         uint8_t reading[8]{};
@@ -1249,7 +1249,7 @@ std::optional<std::vector<uint8_t>>
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
         uint16_t reason_code = ERR_NULL;
         uint32_t energy{15870};
-        auto rc = encode_get_current_energy_count_resp(
+        [[maybe_unused]] auto rc = encode_get_current_energy_count_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, energy,
             responseMsg);
         assert(rc == NSM_SW_SUCCESS);
@@ -1273,9 +1273,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
-        auto rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
-                                        request->hdr.command, NSM_SUCCESS, 2,
-                                        responseMsg);
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 2,
+            responseMsg);
 
         const uint32_t voltage[2]{32438470, 57978897};
         uint8_t reading[8]{};
@@ -1316,7 +1316,7 @@ std::optional<std::vector<uint8_t>>
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
         uint16_t reason_code = ERR_NULL;
         uint32_t voltage{25347808};
-        auto rc =
+        [[maybe_unused]] auto rc =
             encode_get_voltage_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
                                     reason_code, voltage, responseMsg);
         assert(rc == NSM_SW_SUCCESS);
@@ -1376,7 +1376,7 @@ std::optional<std::vector<uint8_t>>
               requestLen);
     uint8_t device_id;
     uint8_t group_index;
-    auto rc = decode_query_scalar_group_telemetry_v1_req(
+    [[maybe_unused]] auto rc = decode_query_scalar_group_telemetry_v1_req(
         requestMsg, requestLen, &device_id, &group_index);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
@@ -1516,7 +1516,7 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
-    auto rc = decode_common_req(requestMsg, requestLen);
+    [[maybe_unused]] auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
