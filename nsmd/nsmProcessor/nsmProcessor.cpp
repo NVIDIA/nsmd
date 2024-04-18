@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "nsmProcessor.hpp"
 
@@ -233,6 +231,16 @@ uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
+NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
+                                 const std::string& name,
+                                 const std::string& type,
+                                 std::string& inventoryObjPath) :
+    NsmObject(name, type)
+{
+    lg2::info("NsmPciePortIntf: create sensor:{NAME}", "NAME", name.c_str());
+    pciePortIntf =
+        std::make_shared<PciePortIntf>(bus, inventoryObjPath.c_str());
+}
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
     NsmSensor(name, type),
@@ -261,12 +269,13 @@ std::optional<std::vector<uint8_t>>
 
 NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, 2)
+    NsmPcieGroup(name, type, deviceId, 2),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
-    pCieEccIntf = pCieECCIntf;
 }
 
 void NsmPciGroup2::updateReading(
@@ -275,6 +284,10 @@ void NsmPciGroup2::updateReading(
     pCieEccIntf->nonfeCount(data.non_fatal_errors);
     pCieEccIntf->feCount(data.fatal_errors);
     pCieEccIntf->ceCount(data.correctable_errors);
+    // pcie port metrics
+    pCiePortIntf->nonfeCount(data.non_fatal_errors);
+    pCiePortIntf->feCount(data.fatal_errors);
+    pCiePortIntf->ceCount(data.correctable_errors);
 }
 
 uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -295,7 +308,7 @@ uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
     else
     {
         lg2::error(
-            "NsmPciGroup4 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group2_resp"
+            "NsmPciGroup2 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group2_resp"
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
@@ -306,18 +319,21 @@ uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
 
 NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, 3)
+    NsmPcieGroup(name, type, deviceId, 3),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
-    pCieEccIntf = pCieECCIntf;
 }
 
 void NsmPciGroup3::updateReading(
     const nsm_query_scalar_group_telemetry_group_3& data)
 {
     pCieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
+    // pcie port metrics
+    pCiePortIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
 }
 
 uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -349,12 +365,13 @@ uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
 
 NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, 4)
+    NsmPcieGroup(name, type, deviceId, 4),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
-    pCieEccIntf = pCieECCIntf;
 }
 
 void NsmPciGroup4::updateReading(
@@ -363,7 +380,12 @@ void NsmPciGroup4::updateReading(
     pCieEccIntf->replayCount(data.replay_cnt);
     pCieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
     pCieEccIntf->nakSentCount(data.NAK_sent_cnt);
-    pCieEccIntf->nakRecievedCount(data.NAK_recv_cnt);
+    pCieEccIntf->nakReceivedCount(data.NAK_recv_cnt);
+    // pcie port metrics
+    pCiePortIntf->replayCount(data.replay_cnt);
+    pCiePortIntf->replayRolloverCount(data.replay_rollover_cnt);
+    pCiePortIntf->nakSentCount(data.NAK_sent_cnt);
+    pCiePortIntf->nakReceivedCount(data.NAK_recv_cnt);
 }
 
 uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -772,30 +794,42 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
             auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
                 objPath.c_str(), "DeviceId", interface.c_str());
-            auto pCieECCIntf =
-                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
-            auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
-                name, type, pCieECCIntf, deviceId);
-            auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
-                name, type, pCieECCIntf, deviceId);
-            auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
-                name, type, pCieECCIntf, deviceId);
-
-            nsmDevice->deviceSensors.push_back(sensorGroup2);
-            nsmDevice->deviceSensors.push_back(sensorGroup3);
-            nsmDevice->deviceSensors.push_back(sensorGroup4);
-
-            if (priority)
+            int count = utils::DBusHandler().getDbusProperty<uint64_t>(
+                objPath.c_str(), "Count", interface.c_str());
+            for (auto idx = 0; idx < count; idx++)
             {
-                nsmDevice->prioritySensors.push_back(sensorGroup2);
-                nsmDevice->prioritySensors.push_back(sensorGroup3);
-                nsmDevice->prioritySensors.push_back(sensorGroup4);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensorGroup2);
-                nsmDevice->roundRobinSensors.push_back(sensorGroup3);
-                nsmDevice->roundRobinSensors.push_back(sensorGroup4);
+                auto pcieObjPath =
+                    inventoryObjPath + "/Ports/PCIe_" +
+                    std::to_string(idx); // port metrics dbus path
+                auto pCieECCIntf = std::make_shared<PCieEccIntf>(
+                    bus, inventoryObjPath.c_str());
+                auto pCiePortIntf =
+                    std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+                auto pciPortSensor = std::make_shared<NsmPciePortIntf>(
+                    bus, name, type, pcieObjPath);
+                auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
+                    name, type, pCieECCIntf, pCiePortIntf, deviceId);
+                auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
+                    name, type, pCieECCIntf, pCiePortIntf, deviceId);
+                auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
+                    name, type, pCieECCIntf, pCiePortIntf, deviceId);
+                nsmDevice->deviceSensors.push_back(pciPortSensor);
+                nsmDevice->deviceSensors.push_back(sensorGroup2);
+                nsmDevice->deviceSensors.push_back(sensorGroup3);
+                nsmDevice->deviceSensors.push_back(sensorGroup4);
+
+                if (priority)
+                {
+                    nsmDevice->prioritySensors.push_back(sensorGroup2);
+                    nsmDevice->prioritySensors.push_back(sensorGroup3);
+                    nsmDevice->prioritySensors.push_back(sensorGroup4);
+                }
+                else
+                {
+                    nsmDevice->roundRobinSensors.push_back(sensorGroup2);
+                    nsmDevice->roundRobinSensors.push_back(sensorGroup3);
+                    nsmDevice->roundRobinSensors.push_back(sensorGroup4);
+                }
             }
         }
         else if (type == "NSM_ECC")

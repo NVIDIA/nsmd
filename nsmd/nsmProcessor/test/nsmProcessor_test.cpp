@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -270,8 +268,11 @@ TEST(NsmPCIeGroup2, GoodGenReq)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -293,8 +294,11 @@ TEST(NsmPCIeGroup2, GoodHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
     data.non_fatal_errors = 1111;
@@ -321,8 +325,11 @@ TEST(NsmPCIeGroup2, BadHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
     data.non_fatal_errors = 1111;
@@ -351,9 +358,12 @@ TEST(NsmPCIeGroup3, GoodGenReq)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
 
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -375,8 +385,11 @@ TEST(NsmPCIeGroup3, GoodHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
     data.L0ToRecoveryCount = 8769;
@@ -399,8 +412,11 @@ TEST(NsmPCIeGroup3, BadHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
     data.L0ToRecoveryCount = 8769;
@@ -425,8 +441,11 @@ TEST(NsmPCIeGroup4, GoodGenReq)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -448,8 +467,11 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
     data.recv_err_cnt = 100;
@@ -479,8 +501,11 @@ TEST(NsmPCIeGroup4, BadHandleResp)
 {
     auto pCieECCIntf =
         std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
+    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, deviceId);
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+                             deviceId);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
     data.recv_err_cnt = 100;
