@@ -18,6 +18,7 @@
 #include "utils.hpp"
 
 #include <sdbusplus/bus.hpp>
+#include <tal.hpp>
 
 #include <memory>
 #include <string>
@@ -63,10 +64,68 @@ TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
     EXPECT_EQ(value.valueIntf.unit(), nsm::SensorUnit::DegreesC);
 }
 
+TEST(SMBPBIPowerSMBusSensorBytesConverter, GoodTest)
+{
+    nsm::SMBPBIPowerSMBusSensorBytesConverter converter;
+
+    const std::vector<double> sensorVals{780.383, 100.004};
+
+    for (const auto& sensorVal : sensorVals)
+    {
+        std::vector<uint8_t> data = converter.convert(sensorVal);
+
+        uint32_t val;
+        std::memcpy(&val, data.data(), 4);
+        val = le32toh(val);
+
+        const double power = val / 1000.0;
+        EXPECT_DOUBLE_EQ(sensorVal, power);
+    }
+}
+
+TEST(Uint64SMBusSensorBytesConverter, GoodTest)
+{
+    nsm::Uint64SMBusSensorBytesConverter converter;
+
+    const std::vector<double> sensorVals{3494028, 89};
+
+    for (const auto& sensorVal : sensorVals)
+    {
+        std::vector<uint8_t> data = converter.convert(sensorVal);
+
+        uint64_t val;
+        std::memcpy(&val, data.data(), 8);
+        val = le64toh(val);
+
+        const double energy = val;
+        EXPECT_DOUBLE_EQ(sensorVal, energy);
+    }
+}
+
+TEST(SFxP24F8SMBusSensorBytesConverter, GoodTest)
+{
+    nsm::SFxP24F8SMBusSensorBytesConverter converter;
+
+    const std::vector<double> sensorVals{35.470, -8.347};
+
+    for (const auto& sensorVal : sensorVals)
+    {
+        std::vector<uint8_t> data = converter.convert(sensorVal);
+
+        int32_t val;
+        std::memcpy(&val, data.data(), 4);
+        val = le32toh(val);
+
+        const double temp = val / static_cast<double>(1 << 8);
+        EXPECT_NEAR(sensorVal, temp, 0.01);
+    }
+}
+
 TEST(NsmNumericSensorShmem, GoodTest)
 {
-    nsm::NsmNumericSensorShmem value{sensorName, sensorType,
-                                     associations[0].absolutePath};
+    nsm::NsmNumericSensorShmem value{
+        sensorName, sensorType, associations[0].absolutePath,
+        std::make_unique<nsm::SMBPBITempSMBusSensorBytesConverter>()};
 
     EXPECT_EQ(value.objPath,
               "/xyz/openbmc_project/sensors/dummy_type/dummy_sensor");

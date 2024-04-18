@@ -44,8 +44,9 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
                 bus, name, sensor_type, SensorUnit::Watts, association)
 #ifdef NVIDIA_SHMEM
                 ,
-            std::make_unique<NsmNumericSensorShmem>(name, sensor_type,
-                                                    chassis_association)
+            std::make_unique<NsmNumericSensorShmem>(
+                name, sensor_type, chassis_association,
+                std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>())
 #endif
                 )),
     averagingInterval(averagingInterval)

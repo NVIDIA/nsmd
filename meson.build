@@ -56,7 +56,7 @@ deps = [
 ]
 
 if get_option('shmem').enabled()
-    nvidia_shmem = dependency('nvidia-shmem', required: true)
+    nvidia_shmem = dependency('nvidia-tal', required : true)
     deps += nvidia_shmem
 endif
 

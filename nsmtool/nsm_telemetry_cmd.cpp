@@ -821,7 +821,7 @@ class AggregateResponseParser
         std::vector<ordered_json> samples;
         while (telemetry_count--)
         {
-            uint8_t tag;
+            uint8_t tag{};
             bool valid;
             const uint8_t* data;
             size_t data_len;
@@ -840,7 +840,7 @@ class AggregateResponseParser
             {
                 std::cerr
                     << "Response message error while parsing sample header: "
-                    << "tag=" << tag << ", rc=" << rc << "\n";
+                    << "tag=" << static_cast<int>(tag) << ", rc=" << rc << "\n";
 
                 continue;
             }

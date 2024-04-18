@@ -54,7 +54,8 @@ class NsmNumericSensor : public NsmSensor
     NsmNumericSensor(const std::string& name, const std::string& type,
                      uint8_t sensorId,
                      std::shared_ptr<NsmNumericSensorValue> sensorValue) :
-        NsmSensor(name, type), sensorId(sensorId), sensorValue(sensorValue){};
+        NsmSensor(name, type),
+        sensorId(sensorId), sensorValue(sensorValue){};
 
     std::shared_ptr<NsmNumericSensorValue> getSensorValueObject()
     {
@@ -142,12 +143,41 @@ class NsmNumericSensorDbusStatus : public NsmNumericSensorStatus
     OperationalStatusIntf operationalStatusIntf;
 };
 
+class SMBusSensorBytesConverter
+{
+  public:
+    virtual ~SMBusSensorBytesConverter() = default;
+    virtual std::vector<uint8_t> convert(double val) = 0;
+};
+
+class SMBPBIPowerSMBusSensorBytesConverter : public SMBusSensorBytesConverter
+{
+  public:
+    std::vector<uint8_t> convert(double val) final;
+};
+
+class Uint64SMBusSensorBytesConverter : public SMBusSensorBytesConverter
+{
+  public:
+    std::vector<uint8_t> convert(double val) final;
+};
+
+class SFxP24F8SMBusSensorBytesConverter : public SMBusSensorBytesConverter
+{
+  public:
+    std::vector<uint8_t> convert(double val) final;
+};
+
+using SMBPBITempSMBusSensorBytesConverter = SFxP24F8SMBusSensorBytesConverter;
+using SMBPBIEnergySMBusSensorBytesConverter = Uint64SMBusSensorBytesConverter;
+
 class NsmNumericSensorShmem : public NsmNumericSensorValue
 {
   public:
-    NsmNumericSensorShmem(const std::string& name,
-                          const std::string& sensor_type,
-                          const std::string& association);
+    NsmNumericSensorShmem(
+        const std::string& name, const std::string& sensor_type,
+        const std::string& association,
+        std::unique_ptr<SMBusSensorBytesConverter> smbusSensorBytesConverter);
     void updateReading(double value, uint64_t timestamp = 0) final;
 
   private:
@@ -156,6 +186,7 @@ class NsmNumericSensorShmem : public NsmNumericSensorValue
 
     const std::string objPath;
     const std::string association;
+    std::unique_ptr<SMBusSensorBytesConverter> smbusSensorBytesConverter;
 };
 
 } // namespace nsm
