@@ -278,6 +278,8 @@ std::optional<std::vector<uint8_t>>
                     return queryPortCharacteristicsHandler(request, requestLen);
                 case NSM_QUERY_PORT_STATUS:
                     return queryPortStatusHandler(request, requestLen);
+                case NSM_QUERY_PORTS_AVAILABLE:
+                    return queryPortsAvailableHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -708,6 +710,43 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_query_port_status_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPortsAvailableHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    lg2::info("queryPortsAvailableHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    auto rc = decode_query_ports_available_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_ports_available_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // mock data to send
+    uint16_t reason_code = ERR_NULL;
+    uint8_t number_of_ports = 6;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_query_ports_available_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_query_ports_available_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, reason_code,
+                                                number_of_ports, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_ports_available_resp failed: rc={RC}",
+                   "RC", rc);
         return std::nullopt;
     }
     return response;

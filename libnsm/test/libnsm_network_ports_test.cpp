@@ -1206,3 +1206,271 @@ TEST(queryPortStatus, testBadDecodeResponseWithPayload)
 					   &port_status);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+TEST(queryPortsAvailable, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_query_ports_available_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc =
+	    encode_query_ports_available_req(0, request);
+
+	nsm_query_ports_available_req *req =
+	    reinterpret_cast<nsm_query_ports_available_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_PORTS_AVAILABLE, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(queryPortsAvailable, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_query_ports_available_req));
+
+	auto rc = encode_query_ports_available_req(0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(queryPortsAvailable, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x80,			    // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_QUERY_PORTS_AVAILABLE, // command
+	    0				    // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+
+	auto rc = decode_query_ports_available_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(queryPortsAvailable, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x80,			    // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_QUERY_PORTS_AVAILABLE, // command
+	    1				    // data size [it should not be 1]
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	size_t msg_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(nsm_query_ports_available_req);
+
+	auto rc = decode_query_ports_available_req(nullptr, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_req(request, msg_len - 2);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_query_ports_available_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(queryPortsAvailable, testGoodEncodeResponseCCSuccess)
+{
+	uint16_t reason_code = ERR_NULL;
+	uint8_t number_of_ports = 0;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_query_ports_available_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x0 [NSM_SUCCESS]
+	auto rc = encode_query_ports_available_resp(
+	    0, NSM_SUCCESS, reason_code, number_of_ports, response);
+
+	struct nsm_query_ports_available_resp *resp =
+	    reinterpret_cast<struct nsm_query_ports_available_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_PORTS_AVAILABLE, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(htole16(sizeof(number_of_ports)), resp->hdr.data_size);
+}
+
+TEST(queryPortsAvailable, testGoodEncodeResponseCCError)
+{
+	uint8_t number_of_ports = 0;
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x1 [NSM_ERROR]
+	auto rc = encode_query_ports_available_resp(
+	    0, NSM_ERROR, reason_code, number_of_ports, response);
+
+	struct nsm_common_non_success_resp *resp =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_PORTS_AVAILABLE, resp->command);
+	EXPECT_EQ(NSM_ERROR, resp->completion_code);
+	EXPECT_EQ(htole16(reason_code), resp->reason_code);
+}
+
+TEST(queryPortsAvailable, testBadEncodeResponse)
+{
+	uint8_t number_of_ports = 0;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_query_ports_available_resp(
+	    0, NSM_SUCCESS, reason_code, number_of_ports, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(queryPortsAvailable, testGoodDecodeResponseCCSuccess)
+{
+	// test when CC is NSM_SUCCESS and data payload is correct
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x00,			    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_QUERY_PORTS_AVAILABLE, // command
+	    0x00,			    // completion code
+	    0x00,			    // reserved
+	    0x00,
+	    0x01, // data size
+	    0x00,
+		0x02 // number of ports
+		};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t number_of_ports = 0;
+
+	auto rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &number_of_ports);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 0x0001);
+	EXPECT_EQ(number_of_ports, 0x02);
+}
+
+TEST(queryPortsAvailable, testGoodDecodeResponseCCError)
+{
+	// test when CC is NSM_ERROR and data payload is empty
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x00,			    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_QUERY_PORTS_AVAILABLE, // command
+	    0x01,			    // completion code
+	    0x00,			    // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t number_of_ports = 0;
+
+	auto rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &number_of_ports);
+
+	EXPECT_EQ(cc, NSM_ERROR);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, 0x0000);
+}
+
+TEST(queryPortsAvailable, testBadDecodeResponseWithPayload)
+{
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x00,			    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_TELEMETRY_COUNTER, // command
+	    0x01, // completion code [0x01 - NSM_ERROR]
+	    0x00, // reserved
+	    0x00,
+	    0x00, // data size [it should not 00]
+	    0x00,
+	    0x04
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t number_of_ports = 0;
+
+	auto rc = decode_query_ports_available_resp(
+	    nullptr, msg_len, &cc, &reason_code, &data_size, &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_resp(response, msg_len, nullptr,
+						    &reason_code, &data_size,
+						    &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, nullptr, &data_size, &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_ERROR);
+
+	response_msg[6] = 0x00; // making CC - NSM_SUCCESS
+	rc = decode_query_ports_available_resp(
+	    response, msg_len - 4, &cc, &reason_code, &data_size,
+	    &number_of_ports); //-4 from total size which means we should get
+			     // error
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_query_ports_available_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &number_of_ports);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
