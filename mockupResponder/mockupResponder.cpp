@@ -293,6 +293,8 @@ std::optional<std::vector<uint8_t>>
                     return getCurrentEnergyCountHandler(request, requestLen);
                 case NSM_GET_VOLTAGE:
                     return getVoltageHandler(request, requestLen);
+                case NSM_GET_ALTITUDE_PRESSURE:
+                    return getAltitudePressureHandler(request, requestLen);
                 case NSM_GET_DRIVER_INFO:
                     return getDriverInfoHandler(request, requestLen);
                 case NSM_GET_MIG_MODE:
@@ -1319,6 +1321,26 @@ std::optional<std::vector<uint8_t>>
         assert(rc == NSM_SW_SUCCESS);
         return response;
     }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getAltitudePressureHandler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    lg2::info("getAltitudePressureHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    uint32_t pressure{943730};
+    auto rc = encode_get_altitude_pressure_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, reason_code,
+                                                pressure, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    return response;
 }
 
 void getScalarTelemetryGroup1Data(

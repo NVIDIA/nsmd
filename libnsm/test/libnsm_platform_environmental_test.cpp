@@ -451,8 +451,8 @@ TEST(getCurrentPowerDraw, testGoodEncodeResponse)
 	auto rc = encode_get_current_power_draw_resp(0, NSM_SUCCESS, reasonCode,
 						     reading, response);
 
-	struct nsm_get_current_power_draw_resp *resp =
-	    reinterpret_cast<struct nsm_get_current_power_draw_resp *>(
+	nsm_get_current_power_draw_resp *resp =
+	    reinterpret_cast<nsm_get_current_power_draw_resp *>(
 		response->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -896,8 +896,8 @@ TEST(getVoltage, testGoodEncodeResponse)
 	auto rc = encode_get_voltage_resp(0, NSM_SUCCESS, reasonCode, reading,
 					  response);
 
-	struct nsm_get_voltage_resp *resp =
-	    reinterpret_cast<struct nsm_get_voltage_resp *>(response->payload);
+	nsm_get_voltage_resp *resp =
+	    reinterpret_cast<nsm_get_voltage_resp *>(response->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
@@ -1042,6 +1042,193 @@ TEST(getVoltage, testBadDecodeResponseDataLength)
 
 	auto rc = decode_get_voltage_resp(response, msg_len, &cc, &reasonCode,
 					  &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getAltitudePressure, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_altitude_pressure_req(0, request);
+
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ALTITUDE_PRESSURE, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getAltitudePressure, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t reading = 38380;
+	uint16_t reasonCode = 0;
+
+	auto rc = encode_get_altitude_pressure_resp(0, NSM_SUCCESS, reasonCode,
+						    reading, response);
+
+	nsm_get_altitude_pressure_resp *resp =
+	    reinterpret_cast<nsm_get_altitude_pressure_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ALTITUDE_PRESSURE, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(reading, resp->reading);
+}
+
+TEST(getAltitudePressure, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ALTITUDE_PRESSURE,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_altitude_pressure_resp(response, msg_len, &cc,
+						    &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 4203351);
+}
+
+TEST(getAltitudePressure, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ALTITUDE_PRESSURE,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_altitude_pressure_resp(response, msg_len, &cc,
+						    &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getAltitudePressure, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ALTITUDE_PRESSURE,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_altitude_pressure_resp(response, msg_len, &cc,
+						    &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getAltitudePressure, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ALTITUDE_PRESSURE,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    3,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_altitude_pressure_resp(response, msg_len, &cc,
+						    &reasonCode, &reading);
 
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 	EXPECT_EQ(cc, NSM_SUCCESS);

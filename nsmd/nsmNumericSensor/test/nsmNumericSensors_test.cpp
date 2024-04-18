@@ -28,6 +28,7 @@
 #define private public
 #define protected public
 
+#include "nsmAltitudePressure.hpp"
 #include "nsmEnergy.hpp"
 #include "nsmNumericSensorValue_mock.hpp"
 #include "nsmPower.hpp"
@@ -376,6 +377,80 @@ TEST(nsmVoltage, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 
     rc = encode_get_voltage_resp(instance_id, cc, reason_code, reading, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmAltitudePressure, GoodGenReq)
+{
+    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations};
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+
+    EXPECT_EQ(command->command, NSM_GET_ALTITUDE_PRESSURE);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmAltitudePressure, GoodHandleResp)
+{
+    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations};
+
+    auto value = std::make_shared<MockNsmNumericSensorValue>();
+
+    sensor.sensorValue = value;
+
+    static constexpr size_t msg_size =
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp);
+    std::array<char, msg_size> request;
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    const uint8_t instance_id{30};
+    const uint8_t cc = NSM_SUCCESS;
+    const uint16_t reason_code = ERR_NULL;
+    const uint32_t reading{9834};
+
+    auto rc = encode_get_altitude_pressure_resp(instance_id, cc, reason_code,
+                                                reading, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*value, updateReading(reading * 100.0, 0)).Times(1);
+
+    sensor.handleResponseMsg(msg, msg_size);
+}
+
+TEST(nsmAltitudePressure, BadHandleResp)
+{
+    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations};
+
+    auto value = std::make_shared<MockNsmNumericSensorValue>();
+
+    sensor.sensorValue = value;
+
+    static constexpr size_t msg_size =
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp);
+    std::array<char, msg_size> request;
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    const uint8_t instance_id{30};
+    const uint8_t cc = NSM_ERR_NOT_READY;
+    const uint16_t reason_code = ERR_TIMEOUT;
+    const uint32_t reading{9380};
+    uint8_t rc = NSM_SW_SUCCESS;
+
+    rc = sensor.handleResponseMsg(nullptr, msg_size);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = sensor.handleResponseMsg(msg, msg_size - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = encode_get_altitude_pressure_resp(instance_id, cc, reason_code,
+                                           reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = sensor.handleResponseMsg(msg, msg_size);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
