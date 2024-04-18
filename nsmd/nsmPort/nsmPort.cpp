@@ -13,8 +13,7 @@ namespace nsm
 NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
                  uint8_t portNum, const std::string& type,
                  std::string& parentObjPath, std::string& inventoryObjPath) :
-    NsmSensor(portName, type),
-    portName(portName), portNumber(portNum)
+    NsmSensor(portName, type), portName(portName), portNumber(portNum)
 {
     std::string objPath = inventoryObjPath + "/Ports/" + portName;
     lg2::debug("NsmPort: create port: {NAME}", "NAME", portName.c_str());
@@ -268,7 +267,8 @@ static void createNsmPortSensor(SensorManager& manager,
         {
             lg2::error(
                 "Failed to create NSM Port : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH", objPath);
+                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                objPath);
 
             return;
         }

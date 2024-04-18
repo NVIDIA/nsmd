@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ using CreationFunction =
                        const std::string& objPath)>;
 
 #define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
-    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)()         \
+    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)() \
     {                                                                          \
         auto& factory = NsmObjectFactory::instance();                          \
         factory.registerCreationFunction(func, interfaceName);                 \

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,8 +34,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
   public:
     NsmNumericAggregator(const std::string& name, const std::string& type,
                          bool priority) :
-        NsmSensorAggregator(name, type),
-        priority(priority){};
+        NsmSensorAggregator(name, type), priority(priority){};
     virtual ~NsmNumericAggregator() = default;
 
     int addSensor(uint8_t tag, std::shared_ptr<NsmNumericSensorValue> sensor);

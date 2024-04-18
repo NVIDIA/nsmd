@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,8 @@ class NsmObject
         return type;
     }
 
-    virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager, [[maybe_unused]] eid_t eid)
+    virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
+                                        [[maybe_unused]] eid_t eid)
     {
         co_return NSM_SW_SUCCESS;
     }

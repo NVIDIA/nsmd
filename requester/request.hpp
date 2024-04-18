@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,8 +66,7 @@ class RequestRetryTimer
     explicit RequestRetryTimer(sdeventplus::Event& event, uint8_t numRetries,
                                std::chrono::milliseconds timeout) :
 
-        event(event),
-        numRetries(numRetries), timeout(timeout),
+        event(event), numRetries(numRetries), timeout(timeout),
         timer(event.get(), std::bind_front(&RequestRetryTimer::callback, this))
     {}
 
@@ -170,8 +169,8 @@ class Request final : public RequestRetryTimer
     explicit Request(int fd, eid_t eid, sdeventplus::Event& event,
                      std::vector<uint8_t>&& requestMsg, uint8_t numRetries,
                      std::chrono::milliseconds timeout, bool verbose) :
-        RequestRetryTimer(event, numRetries, timeout),
-        fd(fd), eid(eid), requestMsg(std::move(requestMsg)), verbose(verbose)
+        RequestRetryTimer(event, numRetries, timeout), fd(fd), eid(eid),
+        requestMsg(std::move(requestMsg)), verbose(verbose)
     {}
 
   private:

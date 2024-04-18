@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,8 +94,8 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
  *
  *  @return - None
  */
-void parseBitfieldVar(ordered_json& res, const std::string& key, const bitfield8_t* value,
-                      uint8_t size);
+void parseBitfieldVar(ordered_json& res, const std::string& key,
+                      const bitfield8_t* value, uint8_t size);
 
 class CommandInterface
 {
@@ -103,9 +103,8 @@ class CommandInterface
   public:
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :
-        nsmType(type),
-        commandName(name), mctp_eid(NSM_ENTITY_ID), verbose(false),
-        instanceId(0)
+        nsmType(type), commandName(name), mctp_eid(NSM_ENTITY_ID),
+        verbose(false), instanceId(0)
     {
         app->add_option("-m,--mctp_eid", mctp_eid, "MCTP endpoint ID");
         app->add_flag("-v, --verbose", verbose);

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,8 +54,7 @@ class NsmNumericSensor : public NsmSensor
     NsmNumericSensor(const std::string& name, const std::string& type,
                      uint8_t sensorId,
                      std::shared_ptr<NsmNumericSensorValue> sensorValue) :
-        NsmSensor(name, type),
-        sensorId(sensorId), sensorValue(sensorValue){};
+        NsmSensor(name, type), sensorId(sensorId), sensorValue(sensorValue){};
 
     std::shared_ptr<NsmNumericSensorValue> getSensorValueObject()
     {
