@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,9 +123,8 @@ class Handler
         uint8_t numRetries = static_cast<uint8_t>(NUMBER_OF_REQUEST_RETRIES),
         std::chrono::milliseconds responseTimeOut =
             std::chrono::milliseconds(RESPONSE_TIME_OUT)) :
-        event(event),
-        instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
-        instanceIdExpiryInterval(instanceIdExpiryInterval),
+        event(event), instanceIdDb(instanceIdDb), sockManager(sockManager),
+        verbose(verbose), instanceIdExpiryInterval(instanceIdExpiryInterval),
         numRetries(numRetries), responseTimeOut(responseTimeOut)
     {}
 
@@ -434,8 +433,7 @@ struct SendRecvNsmMsg
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
                    size_t* responseLen) :
-        handler(handler),
-        eid(eid), request(request), responseMsg(responseMsg),
+        handler(handler), eid(eid), request(request), responseMsg(responseMsg),
         responseLen(responseLen), rc(NSM_ERROR)
     {}
 

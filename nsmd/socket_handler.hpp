@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@
 
 #pragma once
 
+#include "eventManager.hpp"
 #include "requester/handler.hpp"
 #include "socket_manager.hpp"
-#include "eventManager.hpp"
 #include "types.hpp"
 
 #include <sdeventplus/event.hpp>
@@ -70,8 +70,8 @@ class Handler
                      requester::Handler<requester::Request>& handler,
                      nsm::EventManager& eventManager, Manager& manager,
                      bool verbose) :
-        event(event),
-        handler(handler), eventManager(eventManager), manager(manager), verbose(verbose)
+        event(event), handler(handler), eventManager(eventManager),
+        manager(manager), verbose(verbose)
     {}
 
     int registerMctpEndpoint(eid_t eid, int type, int protocol,

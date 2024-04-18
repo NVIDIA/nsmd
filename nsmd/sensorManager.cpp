@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "config.h"
 
@@ -46,8 +44,7 @@ SensorManager::SensorManager(
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid) :
-    bus(bus),
-    event(event), handler(handler), instanceIdDb(instanceIdDb),
+    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
     objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices),
     localEid(localEid)
 {

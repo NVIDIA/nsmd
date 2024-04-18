@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "nsm_discovery_cmd.hpp"
 
@@ -63,8 +61,8 @@ class Ping : public CommandInterface
             decode_ping_resp(responsePtr, payloadLength, &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -110,8 +108,8 @@ class GetSupportedMessageTypes : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &supportedTypes[0]);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -174,8 +172,8 @@ class GetSupportedCommandCodes : public CommandInterface
             &supportedCommandCodes[0]);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -229,8 +227,8 @@ class QueryDeviceIdentification : public CommandInterface
             &device_identification, &device_instanceID);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }

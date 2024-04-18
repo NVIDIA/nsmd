@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,8 @@ namespace nsm
 class NsmEventConfig : public NsmObject
 {
   public:
-    NsmEventConfig(const std::string& name,
-                   const std::string& type, uint8_t messageType,
-                   std::vector<uint64_t>& srcEventIds,
+    NsmEventConfig(const std::string& name, const std::string& type,
+                   uint8_t messageType, std::vector<uint64_t>& srcEventIds,
                    std::vector<uint64_t>& ackEventIds);
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;

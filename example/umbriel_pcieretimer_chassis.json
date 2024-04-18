@@ -1,44 +1,44 @@
 [
-  {
-    "Exposes": [
-      {
-        "Name": "HGX_PCIeRetimer_$INSTANCE_NUMBER_TEMP_0",
-        "Type": "NSM_Temp",
-        "Associations": [
-          {
-            "Forward": "chassis",
-            "Backward": "all_sensors",
-            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_PCIeRetimer_$INSTANCE_NUMBER"
-          }
+    {
+        "Exposes": [
+            {
+                "Name": "HGX_PCIeRetimer_$INSTANCE_NUMBER_TEMP_0",
+                "Type": "NSM_Temp",
+                "Associations": [
+                    {
+                        "Forward": "chassis",
+                        "Backward": "all_sensors",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_PCIeRetimer_$INSTANCE_NUMBER"
+                    }
+                ],
+                "UUID": "$UUID",
+                "Aggregated": true,
+                "SensorId": "$INSTANCE_NUMBER + 208",
+                "Priority": true
+            },
+            {
+                "Name": "HGX_FW_PCIeRetimer_$INSTANCE_NUMBER",
+                "Type": "NSM_PCIeRetimer_FWInventory",
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_PCIeRetimer_$INSTANCE_NUMBER"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ],
+                "UUID": "$UUID",
+                "Manufacturer": "Nvidia",
+                "INSTANCE_NUMBER": "$INSTANCE_NUMBER"
+            }
         ],
-        "UUID": "$UUID",
-        "Aggregated": true,
-        "SensorId": "$INSTANCE_NUMBER + 208",
-        "Priority": true
-      },
-      {
-        "Name": "HGX_FW_PCIeRetimer_$INSTANCE_NUMBER",
-        "Type": "NSM_PCIeRetimer_FWInventory",
-        "Associations": [
-          {
-            "Forward": "inventory",
-            "Backward": "activation",
-            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_PCIeRetimer_$INSTANCE_NUMBER"
-          },
-          {
-            "Forward": "software_version",
-            "Backward": "updateable",
-            "AbsolutePath": "/xyz/openbmc_project/software"
-          }
-        ],
-        "UUID": "$UUID",
-        "Manufacturer": "Nvidia",
-        "INSTANCE_NUMBER": "$INSTANCE_NUMBER"
-      }
-    ],
-    "Probe": "xyz.openbmc_project.Configuration.NSM_PCIeRetimer({})",
-    "Name": "PCIeRetimer_$INSTANCE_NUMBER",
-    "Type": "chassis",
-    "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
-  }
+        "Probe": "xyz.openbmc_project.Configuration.NSM_PCIeRetimer({})",
+        "Name": "PCIeRetimer_$INSTANCE_NUMBER",
+        "Type": "chassis",
+        "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0"
+    }
 ]

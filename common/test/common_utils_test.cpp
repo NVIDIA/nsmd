@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,13 +15,12 @@
  * limitations under the License.
  */
 
-
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 using ::testing::ElementsAre;
 
 #include "utils.hpp"
+
 #include <sdbusplus/bus.hpp>
 
 TEST(ConvertUUIDToString, testGoodConversionToString)
@@ -38,8 +37,7 @@ TEST(ConvertUUIDToString, testGoodConversionToString)
 
 TEST(ConvertUUIDToString, testGBadConversionToString)
 {
-    std::vector<uint8_t> intUUID{0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
-                                 0x06};
+    std::vector<uint8_t> intUUID{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
 
     // convert intUUID to stringUUID
     uuid_t stringUUID = utils::convertUUIDToString(intUUID);

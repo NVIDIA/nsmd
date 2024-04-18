@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "nsmEventSetting.hpp"
 
@@ -33,8 +31,8 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
                                  const std::string& type,
                                  uint8_t eventGenerationSetting,
                                  std::shared_ptr<NsmDevice> nsmDevice) :
-    NsmObject(name, type),
-    eventGenerationSetting(eventGenerationSetting), nsmDevice(nsmDevice)
+    NsmObject(name, type), eventGenerationSetting(eventGenerationSetting),
+    nsmDevice(nsmDevice)
 {}
 
 requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)

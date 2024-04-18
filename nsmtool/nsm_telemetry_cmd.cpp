@@ -359,8 +359,8 @@ class GetInventoryInformation : public CommandInterface
             inventoryInformation.data());
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -502,8 +502,8 @@ class GetDriverInfo : public CommandInterface
 
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
                       << ", reasonCode=" << static_cast<int>(reasonCode) << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) + sizeof(driverState) +
@@ -542,8 +542,8 @@ class AggregateResponseParser
 
         if (rc != NSM_SW_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc << "\n";
 
             return;
         }
@@ -670,8 +670,8 @@ class GetTemperatureReading : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &temperatureReading);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -767,8 +767,8 @@ class GetCurrentPowerDraw : public CommandInterface
                                                      &reason_code, &reading);
         if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -864,8 +864,8 @@ class GetCurrentEnergyCount : public CommandInterface
             responsePtr, msg_len, &cc, &reason_code, &reading);
         if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -959,8 +959,8 @@ class GetVoltage : public CommandInterface
                                           &reason_code, &reading);
         if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1055,8 +1055,8 @@ class GetMigMode : public CommandInterface
                                            &data_size, &reason_code, &flags);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1121,8 +1121,8 @@ class SetMigMode : public CommandInterface
                                            &data_size, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1170,8 +1170,8 @@ class GetEccMode : public CommandInterface
                                            &data_size, &reason_code, &flags);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1234,8 +1234,8 @@ class GetEccErrorCounts : public CommandInterface
                                                    &reason_code, &errorCounts);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1288,9 +1288,9 @@ class GetEDPpScalingFactors : public CommandInterface
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr
-                << "Response message error: "
-                << "rc=" << rc << ", cc=" << (int)cc
-                << ", reasonCode=" << (int)reason_code << "\n"
+                << "Response message error: " << "rc=" << rc
+                << ", cc=" << (int)cc << ", reasonCode=" << (int)reason_code
+                << "\n"
                 << payloadLength << "...."
                 << (sizeof(struct nsm_msg_hdr) +
                     sizeof(
@@ -1364,8 +1364,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: "
-                        << "rc=" << rc << ", cc=" << (int)cc
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -1397,8 +1397,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: "
-                        << "rc=" << rc << ", cc=" << (int)cc
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -1429,8 +1429,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: "
-                        << "rc=" << rc << ", cc=" << (int)cc
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -1459,8 +1459,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: "
-                        << "rc=" << rc << ", cc=" << (int)cc
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -1492,8 +1492,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: "
-                        << "rc=" << rc << ", cc=" << (int)cc
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -1570,8 +1570,8 @@ class GetClockLimit : public CommandInterface
                                         &data_size, &reason_code, &clockLimit);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1637,8 +1637,8 @@ class GetCurrClockFreq : public CommandInterface
                                                   &clockFreq);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -1687,8 +1687,8 @@ class GetAccumGpuUtilTime : public CommandInterface
             &context_util_time, &SM_util_time);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: "
-                      << "rc=" << rc << ", cc=" << (int)cc
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +

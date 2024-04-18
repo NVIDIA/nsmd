@@ -12,8 +12,7 @@ NsmPCIeRetimerFirmwareVersion::NsmPCIeRetimerFirmwareVersion(
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& manufacturer,
     const uint8_t instanceNumber) :
-    NsmObject(name, type),
-    instanceNumber(instanceNumber)
+    NsmObject(name, type), instanceNumber(instanceNumber)
 {
     auto pcieRetimerFWInvBasePath =
         std::string(firmwareInventoryBasePath) + "/" + name;

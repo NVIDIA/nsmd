@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,8 +54,9 @@ class EventManager
      *  @param[in] eventLen - NSM event size
      *  @return NSM response message
      */
-    std::optional<Response> handle(eid_t eid, NsmType nsmType, NsmEventId eventId,
-                                   const nsm_msg* eventMsg, size_t eventLen)
+    std::optional<Response> handle(eid_t eid, NsmType nsmType,
+                                   NsmEventId eventId, const nsm_msg* eventMsg,
+                                   size_t eventLen)
     {
         if (evenTypeHandlers.find(nsmType) == evenTypeHandlers.end())
         {
@@ -105,7 +106,7 @@ class EventManager
     }
 
   private:
-      /** @brief map of NSM type to event handler
+    /** @brief map of NSM type to event handler
      */
     std::map<NsmType, std::unique_ptr<EventHandler>> evenTypeHandlers;
 };
