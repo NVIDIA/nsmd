@@ -2161,6 +2161,91 @@ class GetCurrClockFreq : public CommandInterface
     uint8_t clockId;
 };
 
+class GetProcessorThrottleReason : public CommandInterface
+{
+  public:
+    ~GetProcessorThrottleReason() = default;
+    GetProcessorThrottleReason() = delete;
+    GetProcessorThrottleReason(const GetMigMode&) = delete;
+    GetProcessorThrottleReason(GetProcessorThrottleReason&&) = default;
+    GetProcessorThrottleReason&
+        operator=(const GetProcessorThrottleReason&) = delete;
+    GetProcessorThrottleReason&
+        operator=(GetProcessorThrottleReason&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc =
+            encode_get_current_clock_event_reason_code_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        bitfield32_t flags;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_current_clock_event_reason_code_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code, &flags);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr
+                << "Response message error: "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n"
+                << payloadLength << "...."
+                << (sizeof(struct nsm_msg_hdr) +
+                    sizeof(
+                        struct nsm_get_current_clock_event_reason_code_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        std::vector<std::string> throttleReasons;
+        if (flags.bits.bit1)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.ClockOptimizedForPower");
+        }
+        if (flags.bits.bit1)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.HWSlowdown");
+        }
+        if (flags.bits.bit2)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.HWThermalSlowdown");
+        }
+        if (flags.bits.bit3)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.HWPowerBrakeSlowdown");
+        }
+        if (flags.bits.bit4)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.SyncBoost");
+        }
+        if (flags.bits.bit5)
+        {
+            throttleReasons.push_back(
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.ClockOptimizedForThermalEngage");
+        }
+
+        result["ThrottleReasons"] = throttleReasons;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class GetAccumGpuUtilTime : public CommandInterface
 {
   public:
@@ -2674,6 +2759,12 @@ void registerCommand(CLI::App& app)
         "Get Accumulated GPU Utilization Time Context/SM");
     commands.push_back(std::make_unique<GetAccumGpuUtilTime>(
         "telemetry", "GetAccumGpuUtilTime", getAccumGpuUtilTime));
+
+    auto getProcessorThrottleReason = telemetry->add_subcommand(
+        "GetProcessorThrottleReason",
+        "Get Processor Throttle Reason");
+    commands.push_back(std::make_unique<GetProcessorThrottleReason>(
+        "telemetry", "GetProcessorThrottleReason", getProcessorThrottleReason));
 
     auto getRowRemapState =
         telemetry->add_subcommand("GetRowRemapState", "get Row Remap State");

@@ -325,6 +325,10 @@ std::optional<std::vector<uint8_t>>
                     return getClockLimitHandler(request, requestLen);
                 case NSM_GET_CURRENT_CLOCK_FREQUENCY:
                     return getCurrClockFreqHandler(request, requestLen);
+                case NSM_GET_CLOCK_EVENT_REASON_CODES:
+                    return getProcessorThrottleReasonHandler(request,
+                                                             requestLen);
+
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
                 case NSM_GET_CLOCK_OUTPUT_ENABLE_STATE:
@@ -1918,6 +1922,47 @@ std::optional<std::vector<uint8_t>>
     if (rc)
     {
         lg2::error("encode_get_curr_clock_freq_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getProcessorThrottleReasonHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    lg2::info("getProcessorThrottleReasonHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    auto rc =
+        decode_get_current_clock_event_reason_code_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_get_current_clock_event_reason_code_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    bitfield32_t flags;
+    flags.byte = 63;
+    lg2::error("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_current_clock_event_reason_code_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_current_clock_event_reason_code_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &flags,
+        responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "encode_get_current_clock_event_reason_code_resp failed: rc={RC}",
+            "RC", rc);
         return std::nullopt;
     }
     return response;

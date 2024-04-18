@@ -818,6 +818,76 @@ TEST(NsmCurrClockFreq, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 
+TEST(nsmProcessorThrottleReason, GoodGenReq)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
+                                           processorPerformanceIntf);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_CLOCK_EVENT_REASON_CODES);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmProcessorThrottleReason, GoodHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
+                                           processorPerformanceIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_get_current_clock_event_reason_code_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    bitfield32_t flags;
+    flags.byte = 1;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_current_clock_event_reason_code_resp(
+        0, NSM_SUCCESS, reason_code, &flags, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmProcessorThrottleReason, BadHandleResp)
+{
+    auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
+                                           processorPerformanceIntf);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_get_current_clock_event_reason_code_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    bitfield32_t flags;
+    flags.byte = 1;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_current_clock_event_reason_code_resp(
+        0, NSM_SUCCESS, reason_code, &flags, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = sensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
 TEST(NsmAccumGpuUtilTime, GoodGenReq)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(

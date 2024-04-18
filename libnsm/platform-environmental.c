@@ -2194,6 +2194,105 @@ int decode_get_curr_clock_freq_resp(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_current_clock_event_reason_code_req(uint8_t instance_id,
+						   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_CLOCK_EVENT_REASON_CODES;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_clock_event_reason_code_req(const struct nsm_msg *msg,
+						   size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_current_clock_event_reason_code_resp(uint8_t instance_id,
+						    uint8_t cc,
+						    uint16_t reason_code,
+						    bitfield32_t *flags,
+						    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_CLOCK_EVENT_REASON_CODES, msg);
+	}
+
+	struct nsm_get_current_clock_event_reason_code_resp *resp =
+	    (struct nsm_get_current_clock_event_reason_code_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_CLOCK_EVENT_REASON_CODES;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size = htole16(sizeof(bitfield32_t));
+
+	resp->flags.byte = htole32(flags->byte);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_clock_event_reason_code_resp(const struct nsm_msg *msg,
+						    size_t msg_len, uint8_t *cc,
+						    uint16_t *data_size,
+						    uint16_t *reason_code,
+						    bitfield32_t *flags)
+{
+	if (data_size == NULL || flags == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_current_clock_event_reason_code_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_current_clock_event_reason_code_resp *resp =
+	    (struct nsm_get_current_clock_event_reason_code_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if ((*data_size) < sizeof(bitfield32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	flags->byte = le32toh(resp->flags.byte);
+	return NSM_SW_SUCCESS;
+}
+
 // Get Accumulated GPU Utilization Command, NSM T3 spec
 int encode_get_accum_GPU_util_time_req(uint8_t instance, struct nsm_msg *msg)
 {

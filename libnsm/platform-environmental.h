@@ -44,6 +44,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_MIG_MODE = 0x4d,
 	NSM_GET_CLOCK_LIMIT = 0x11,
 	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
+	NSM_GET_CLOCK_EVENT_REASON_CODES = 0x44,
 	NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME = 0x46,
 	NSM_SET_MIG_MODE = 0x4e,
 	NSM_GET_ECC_MODE = 0x4f,
@@ -413,6 +414,16 @@ struct nsm_get_memory_capacity_util_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_memory_capacity_utilization data;
 } __attribute__((packed));
+
+/** @struct nsm_get_current_clock_event_reason_code_resp
+ *
+ *  Structure representing Get Current Clock Event Reason Code response.
+ */
+struct nsm_get_current_clock_event_reason_code_resp {
+	struct nsm_common_resp hdr;
+	bitfield32_t flags;
+} __attribute__((packed));
+
 
 /** @struct nsm_get_accum_GPU_util_time_resp
  *
@@ -1363,6 +1374,53 @@ int encode_get_curr_clock_freq_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_curr_clock_freq_resp(const struct nsm_msg *msg, size_t msg_len,
 				    uint8_t *cc, uint16_t *data_size,
 				    uint16_t *reason_code, uint32_t *clockFreq);
+
+/** @brief Encode a Get Current Clock Event Reason Code request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_clock_event_reason_code_req(uint8_t instance_id,
+						   struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Clock Event Reason Code request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_clock_event_reason_code_req(const struct nsm_msg *msg,
+						   size_t msg_len);
+
+/** @brief Encode a Get Current Clock Event Reason Code response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits representing throttle reason
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_clock_event_reason_code_resp(uint8_t instance_id,
+						    uint8_t cc,
+						    uint16_t reason_code,
+						    bitfield32_t *flags,
+						    struct nsm_msg *msg);
+
+/** @brief Dncode a Get Current Clock Event Reason Code response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] flags - bits representing throttle reason
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_clock_event_reason_code_resp(const struct nsm_msg *msg,
+						    size_t msg_len, uint8_t *cc,
+						    uint16_t *data_size,
+						    uint16_t *reason_code,
+						    bitfield32_t *flags);
 
 /** @brief Encode a Get Accumulated GPU Utilization request message
  *

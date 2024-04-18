@@ -25,6 +25,7 @@
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
@@ -53,6 +54,21 @@ class NsmAcceleratorIntf : public NsmObject
 
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf = nullptr;
+};
+
+using AssociationDefinitionsIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
+
+class NsmProcessorAssociation : public NsmObject
+{
+  public:
+    NsmProcessorAssociation(
+        sdbusplus::bus::bus& bus, const std::string& name,
+        const std::string& type, const std::string& inventoryObjPath,
+        const std::vector<utils::Association>& associations);
+
+  private:
+    std::unique_ptr<AssociationDefinitionsIntf> associationDef = nullptr;
 };
 
 using UuidIntf = sdbusplus::server::object_t<
@@ -333,6 +349,27 @@ class NsmCurrClockFreq : public NsmSensor
 
 using ProcessorPerformanceIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::State::server::ProcessorPerformance>;
+
+using ThrottleReasons = sdbusplus::xyz::openbmc_project::State::server::
+    ProcessorPerformance::ThrottleReasons;
+class NsmProcessorThrottleReason : public NsmSensor
+{
+  public:
+    NsmProcessorThrottleReason(
+        std::string& name, std::string& type,
+        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf);
+    NsmProcessorThrottleReason() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(bitfield32_t flags);
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
+        nullptr;
+};
 
 class NsmAccumGpuUtilTime : public NsmSensor
 {
