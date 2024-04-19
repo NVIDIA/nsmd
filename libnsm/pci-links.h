@@ -19,6 +19,31 @@ struct nsm_query_scalar_group_telemetry_v1_req {
 	uint8_t group_index;
 } __attribute__((packed));
 
+struct nsm_query_scalar_group_telemetry_v1_resp {
+	struct nsm_common_resp hdr;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_query_scalar_group_telemetry_group_0
+ *
+ *  Structure representing Scalar Group Telemetry Data for Group 0.
+ */
+struct nsm_query_scalar_group_telemetry_group_0 {
+	uint32_t pci_vendor_id;
+	uint32_t pci_device_id;
+	uint32_t pci_subsystem_vendor_id;
+	uint32_t pci_subsystem_device_id;
+} __attribute__((packed));
+
+/** @struct nsm_query_scalar_group_telemetry_v1_group_0_resp
+ *
+ *  Structure representing Query Scalar Group Telemetry v1 response for group 0.
+ */
+struct nsm_query_scalar_group_telemetry_v1_group_0_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_query_scalar_group_telemetry_group_0 data;
+} __attribute__((packed));
+
 /** @struct nsm_query_scalar_group_telemetry_group_1
  *
  *  Structure representing Scalar Group Telemetry Data for Group 1.
@@ -35,10 +60,10 @@ struct nsm_query_scalar_group_telemetry_group_1 {
  *
  *  Structure representing Query Scalar Group Telemetry v1 response for group 1.
  */
- struct nsm_query_scalar_group_telemetry_v1_group_1_resp {
- 	struct nsm_common_resp hdr;
- 	struct nsm_query_scalar_group_telemetry_group_1 data;
- } __attribute__((packed));
+struct nsm_query_scalar_group_telemetry_v1_group_1_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_query_scalar_group_telemetry_group_1 data;
+} __attribute__((packed));
 
 /** @struct nsm_query_scalar_group_telemetry_group_2
  *
@@ -119,6 +144,52 @@ struct nsm_query_scalar_group_telemetry_v1_group_5_resp {
 	struct nsm_query_scalar_group_telemetry_group_5 data;
 } __attribute__((packed));
 
+/** @struct nsm_query_scalar_group_telemetry_group_6
+ *
+ *  Structure representing Scalar Group Telemetry Data for Group 6.
+ */
+struct nsm_query_scalar_group_telemetry_group_6 {
+	/**
+	 * @brief Current LTSSM state. The value is encoded as follows:
+	 *      0x0 – Detect
+	 *      0x1 – Polling
+	 *      0x2 – Configuration
+	 *      0x3 – Recovery
+	 *      0x4 – Recovery.EQ
+	 *      0x5 – L0
+	 *      0x6 – L0s
+	 *      0x7 – L1
+	 *      0x8 – L1_PLL_PD
+	 *      0x9 – L2
+	 *      0xA – L1 CPM
+	 *      0xB – L1.1
+	 *      0xC – L1.2
+	 *      0xD – Hot Reset
+	 *      0xE – Loopback
+	 *      0xF – Disabled
+	 *      0x10 – Link down
+	 *      0x11 – Link ready
+	 *      0x12 – Lanes in sleep
+	 *      0xFF – Illegal state
+	 *
+	 */
+	uint32_t ltssm_state;
+	/**
+	 * @brief Invalid FLIT counter
+	 *
+	 */
+	uint32_t invalid_flit_counter;
+} __attribute__((packed));
+
+/** @struct nsm_query_scalar_group_telemetry_v1_group_6_resp
+ *
+ *  Structure representing Query Scalar Group Telemetry v1 response for group 6.
+ */
+struct nsm_query_scalar_group_telemetry_v1_group_6_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_query_scalar_group_telemetry_group_6 data;
+} __attribute__((packed));
+
 /** @brief Encode a Query Scalar Group Telemetry v1 request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -145,9 +216,68 @@ int decode_query_scalar_group_telemetry_v1_req(const struct nsm_msg *msg,
 					       uint8_t *device_id,
 					       uint8_t *group_index);
 
+//---------------------------------------------------------------------------------------------------------------------------
 
-/** @brief Encode a Query Scalar Group Telemetry v1 response message of GroupID
- * 1
+/** @brief Encode a Query Scalar Group Telemetry v1 of  response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating row remap state flags
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_scalar_group_telemetry_v1_resp(uint8_t instance_id, uint8_t cc,
+						uint16_t reason_code,
+						const uint16_t data_size,
+						uint8_t *data,
+						struct nsm_msg *msg);
+
+/** @brief Decode a Get row remap state response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] data_size - data size
+ *  @param[out] data  - pointer to the array of data
+ *  @return nsm_completion_codes
+ */
+
+int decode_query_scalar_group_telemetry_v1_resp(const struct nsm_msg *msg,
+						size_t msg_len, uint8_t *cc,
+						uint16_t *data_size,
+						uint16_t *reason_code,
+						uint8_t *data);
+//----------------------------------------------------------------------------------------------------------------------
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 0
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct pointer group 0 data source
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_query_scalar_group_telemetry_v1_group0_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_query_scalar_group_telemetry_group_0 *data, struct nsm_msg *msg);
+
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 0
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] data_size - data size
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] data  - struct pointer group 0 data source
+ * @return nsm_completion_codes
+ */
+
+int decode_query_scalar_group_telemetry_v1_group0_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_0 *data);
+
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 1
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
@@ -160,8 +290,7 @@ int encode_query_scalar_group_telemetry_v1_group1_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_1 *data, struct nsm_msg *msg);
 
-/** @brief Decode a Query Scalar Group Telemetry v1 response message of GroupID
- * 1
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 1
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
@@ -177,22 +306,20 @@ int decode_query_scalar_group_telemetry_v1_group1_resp(
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_1 *data);
 
-/** @brief Encode a Query Scalar Group Telemetry v1 response message of Group ID
- * 2
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 2
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
  *  @param[in] data - struct pointer group 2 data source
  *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 int encode_query_scalar_group_telemetry_v1_group2_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_2 *data, struct nsm_msg *msg);
 
-/** @brief Decode a Query Scalar Group Telemetry v1 response message of GroupID
- * 2
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 2
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
@@ -200,7 +327,7 @@ int encode_query_scalar_group_telemetry_v1_group2_resp(
  *  @param[in] data_size - data size
  *  @param[in] reason_code - NSM reason code
  *  @param[out] data  - struct pointer group 2 data source
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 
 int decode_query_scalar_group_telemetry_v1_group2_resp(
@@ -208,22 +335,20 @@ int decode_query_scalar_group_telemetry_v1_group2_resp(
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_2 *data);
 
-/** @brief Encode a Query Scalar Group Telemetry v1 response message of Group ID
- * 3
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 3
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
  *  @param[in] data - struct pointer group 3 data source
  *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 int encode_query_scalar_group_telemetry_v1_group3_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_3 *data, struct nsm_msg *msg);
 
-/** @brief Decode a Query Scalar Group Telemetry v1 response message of GroupID
- * 3
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 3
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
@@ -231,7 +356,7 @@ int encode_query_scalar_group_telemetry_v1_group3_resp(
  *  @param[in] data_size - data size
  *  @param[in] reason_code - NSM reason code
  *  @param[out] data  - struct pointer group 3 data source
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 
 int decode_query_scalar_group_telemetry_v1_group3_resp(
@@ -239,23 +364,20 @@ int decode_query_scalar_group_telemetry_v1_group3_resp(
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_3 *data);
 
-/** @brief Encode a Query Scalar Group Telemetry v1 response message of Group ID
- * 4
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 4
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
  *  @param[in] data - struct pointer group 4 data source
  *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
-
 int encode_query_scalar_group_telemetry_v1_group4_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_4 *data, struct nsm_msg *msg);
 
-/** @brief Decode a Query Scalar Group Telemetry v1 response message of GroupID
- * 4
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 4
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
@@ -263,7 +385,7 @@ int encode_query_scalar_group_telemetry_v1_group4_resp(
  *  @param[in] data_size - data size
  *  @param[in] reason_code - NSM reason code
  *  @param[out] data  - struct pointer group 4 data source
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 
 int decode_query_scalar_group_telemetry_v1_group4_resp(
@@ -271,23 +393,20 @@ int decode_query_scalar_group_telemetry_v1_group4_resp(
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_4 *data);
 
-/** @brief Encode a Query Scalar Group Telemetry v1 response message of Group ID
- * 5
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 5
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
  *  @param[in] data - struct pointer group 5 data source
  *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
-
 int encode_query_scalar_group_telemetry_v1_group5_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_query_scalar_group_telemetry_group_5 *data, struct nsm_msg *msg);
 
-/** @brief Decode a Query Scalar Group Telemetry v1 response message of GroupID
- * 5
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 5
  *
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
@@ -295,13 +414,42 @@ int encode_query_scalar_group_telemetry_v1_group5_resp(
  *  @param[in] data_size - data size
  *  @param[in] reason_code - NSM reason code
  *  @param[out] data  - struct pointer group 5 data source
- *  @return nsm_completion_codes
+ * @return nsm_completion_codes
  */
 
 int decode_query_scalar_group_telemetry_v1_group5_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_5 *data);
+
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 6
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct pointer group 6 data source
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_query_scalar_group_telemetry_v1_group6_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_query_scalar_group_telemetry_group_6 *data, struct nsm_msg *msg);
+
+/** @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 6
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] data_size - data size
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] data  - struct pointer group 6 data source
+ * @return nsm_completion_codes
+ */
+
+int decode_query_scalar_group_telemetry_v1_group6_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_6 *data);
 
 #ifdef __cplusplus
 }

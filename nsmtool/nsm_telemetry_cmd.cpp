@@ -1405,6 +1405,41 @@ class QueryScalarGroupTelemetry : public CommandInterface
         uint8_t cc = NSM_ERROR;
         switch (groupId)
         {
+            case 0:
+            {
+                struct nsm_query_scalar_group_telemetry_group_0 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_2_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["PciVendorId"] = (int)data.pci_vendor_id;
+                result["PciDeviceId"] = (int)data.pci_device_id;
+                result["PciSubsystemVendorId"] =
+                    (int)data.pci_subsystem_vendor_id;
+                result["PciSubsystemDeviceId"] =
+                    (int)data.pci_subsystem_device_id;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
             case 1:
             {
                 struct nsm_query_scalar_group_telemetry_group_1 data;

@@ -31,13 +31,14 @@ class NsmObject
     NsmObject(const std::string& name, const std::string& type) :
         name(name), type(type)
     {}
+    NsmObject(const NsmObject& copy) : name(copy.name), type(copy.type)
+    {}
     virtual ~NsmObject() = default;
-    const std::string& getName()
+    const std::string& getName() const
     {
         return name;
     }
-
-    const std::string& getType()
+    const std::string& getType() const
     {
         return type;
     }

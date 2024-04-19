@@ -31,6 +31,8 @@ class NsmSensor : public NsmObject
     NsmSensor(const std::string& name, const std::string& type) :
         NsmObject(name, type)
     {}
+    NsmSensor(const NsmObject& copy) : NsmObject(copy)
+    {}
 
     virtual std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) = 0;

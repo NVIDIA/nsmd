@@ -1342,7 +1342,14 @@ std::optional<std::vector<uint8_t>>
     assert(rc == NSM_SW_SUCCESS);
     return response;
 }
-
+void getScalarTelemetryGroup0Data(
+    struct nsm_query_scalar_group_telemetry_group_0* data)
+{
+    data->pci_vendor_id = 3;
+    data->pci_device_id = 3;
+    data->pci_subsystem_vendor_id = 3;
+    data->pci_subsystem_device_id = 3;
+}
 void getScalarTelemetryGroup1Data(
     struct nsm_query_scalar_group_telemetry_group_1* data)
 {
@@ -1407,6 +1414,29 @@ std::optional<std::vector<uint8_t>>
 
     switch (group_index)
     {
+        case 0:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_query_scalar_group_telemetry_group_0 data;
+            getScalarTelemetryGroup0Data(&data);
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_query_scalar_group_telemetry_v1_group0_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_scalar_group_telemetry_v1_group0_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
         case 1:
         {
             std::vector<uint8_t> response(
