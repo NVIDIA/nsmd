@@ -80,6 +80,12 @@ class MockupResponder
         getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryPortStatusHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>

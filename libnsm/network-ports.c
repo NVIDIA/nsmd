@@ -114,6 +114,24 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	portData->xmit_wait = le64toh(portData->xmit_wait);
 }
 
+static void
+htolePortCharacteristicsData(struct nsm_port_characteristics_data *data)
+{
+	data->status = htole32(data->status);
+	data->nv_port_line_rate_mbps = htole32(data->nv_port_line_rate_mbps);
+	data->nv_port_data_rate_kbps = htole32(data->nv_port_data_rate_kbps);
+	data->status_lane_info = htole32(data->status_lane_info);
+}
+
+static void
+letohPortCharacteristicsData(struct nsm_port_characteristics_data *data)
+{
+	data->status = le32toh(data->status);
+	data->nv_port_line_rate_mbps = le32toh(data->nv_port_line_rate_mbps);
+	data->nv_port_data_rate_kbps = le32toh(data->nv_port_data_rate_kbps);
+	data->status_lane_info = le32toh(data->status_lane_info);
+}
+
 int encode_get_port_telemetry_counter_req(uint8_t instance_id,
 					  uint8_t port_number,
 					  struct nsm_msg *msg)
@@ -132,8 +150,8 @@ int encode_get_port_telemetry_counter_req(uint8_t instance_id,
 		return rc;
 	}
 
-	struct nsm_get_port_telemetry_counter_req *request =
-	    (struct nsm_get_port_telemetry_counter_req *)msg->payload;
+	nsm_get_port_telemetry_counter_req *request =
+	    (nsm_get_port_telemetry_counter_req *)msg->payload;
 
 	request->hdr.command = NSM_GET_PORT_TELEMETRY_COUNTER;
 	request->hdr.data_size = sizeof(port_number);
@@ -150,12 +168,12 @@ int decode_get_port_telemetry_counter_req(const struct nsm_msg *msg,
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_port_telemetry_counter_req)) {
+			  sizeof(nsm_get_port_telemetry_counter_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_get_port_telemetry_counter_req *request =
-	    (struct nsm_get_port_telemetry_counter_req *)msg->payload;
+	nsm_get_port_telemetry_counter_req *request =
+	    (nsm_get_port_telemetry_counter_req *)msg->payload;
 
 	if (request->hdr.data_size < sizeof(request->port_number)) {
 		return NSM_SW_ERROR_DATA;
@@ -238,6 +256,255 @@ int decode_get_port_telemetry_counter_resp(const struct nsm_msg *msg,
 
 	// conversion le64toh for each counter data
 	letohPortCounterData(data);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_status_req(uint8_t instance_id, uint8_t port_number,
+				 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_query_port_status_req *request =
+	    (nsm_query_port_status_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_PORT_STATUS;
+	request->hdr.data_size = sizeof(port_number);
+	request->port_number = port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_status_req(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_query_port_status_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_query_port_status_req *request =
+	    (nsm_query_port_status_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->port_number)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_status_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code, uint8_t port_state,
+				  uint8_t port_status, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_QUERY_PORT_STATUS, msg);
+	}
+
+	struct nsm_query_port_status_resp *response =
+	    (struct nsm_query_port_status_resp *)msg->payload;
+
+	response->hdr.command = NSM_QUERY_PORT_STATUS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(port_state) + sizeof(port_status));
+	response->port_state = port_state;
+	response->port_status = port_status;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code,
+				  uint16_t *data_size, uint8_t *port_state,
+				  uint8_t *port_status)
+{
+	if (data_size == NULL || port_state == NULL || port_status == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_query_port_status_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_port_status_resp *resp =
+	    (struct nsm_query_port_status_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < (sizeof(*port_state) + sizeof(*port_status))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_state = resp->port_state;
+	*port_status = resp->port_status;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_characteristics_req(uint8_t instance_id,
+					  uint8_t port_number,
+					  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_query_port_characteristics_req *request =
+	    (nsm_query_port_characteristics_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_PORT_CHARACTERISTICS;
+	request->hdr.data_size = sizeof(port_number);
+	request->port_number = port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_characteristics_req(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_query_port_characteristics_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_query_port_characteristics_req *request =
+	    (nsm_query_port_characteristics_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->port_number)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_port_characteristics_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_port_characteristics_data *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_QUERY_PORT_CHARACTERISTICS, msg);
+	}
+
+	struct nsm_query_port_characteristics_resp *response =
+	    (struct nsm_query_port_characteristics_resp *)msg->payload;
+
+	response->hdr.command = NSM_QUERY_PORT_CHARACTERISTICS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_port_characteristics_data));
+
+	// conversion htole32 for each characteristics data
+	htolePortCharacteristicsData(data);
+
+	memcpy(&(response->data), data,
+	       sizeof(struct nsm_port_characteristics_data));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_port_characteristics_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_port_characteristics_data *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_query_port_characteristics_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_port_characteristics_resp *resp =
+	    (struct nsm_query_port_characteristics_resp *)msg->payload;
+	size_t characteristics_data_len =
+	    sizeof(struct nsm_port_characteristics_data);
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < characteristics_data_len) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(data, &(resp->data), characteristics_data_len);
+
+	// conversion le32toh for each characteristics data
+	letohPortCharacteristicsData(data);
 
 	return NSM_SW_SUCCESS;
 }

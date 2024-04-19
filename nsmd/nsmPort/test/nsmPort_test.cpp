@@ -12,7 +12,7 @@ using ::testing::ElementsAre;
 
 #include "nsmPort.hpp"
 
-TEST(nsmPort, GoodTest)
+TEST(NsmPortMetrics, GoodTest)
 {
     auto bus = sdbusplus::bus::new_default();
     std::string pName("dummy_port");
@@ -23,8 +23,7 @@ TEST(nsmPort, GoodTest)
     std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device/Ports";
 
-    nsm::NsmPort portTel(bus, pName, portNum, type, association,
-                         inventoryObjPath);
+    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, association, inventoryObjPath);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
