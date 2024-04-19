@@ -16,13 +16,22 @@ sources = [
     'nsmSensor.cpp',
 ]
 
-nsmd_headers = ['.', '..', '../libnsm', '../requester', '../common']
+nsmd_headers = [
+    '.',
+    '..',
+    'nsmSensors',
+    '../libnsm',
+    '../requester',
+    '../common',
+]
 
 subdir('nsmNumericSensor')
 subdir('nsmFwSwInventory')
 subdir('nsmProcessor')
 subdir('nsmEventConfig')
 subdir('nsmChassis')
+subdir('nsmSensors')
+subdir('nsmGpuChassis')
 subdir('nsmPort')
 
 executable(
