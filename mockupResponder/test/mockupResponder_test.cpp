@@ -19,6 +19,7 @@
 #include "platform-environmental.h"
 
 #include "mockupResponder.hpp"
+#include "utils.hpp"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -43,29 +44,101 @@ class MockupResponderTest : public testing::Test
     std::shared_ptr<sdbusplus::asio::connection> systemBus;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::shared_ptr<MockupResponder::MockupResponder> mockupResponder;
+
+    void testProperty(uint8_t propertyIdentifier,
+                      const std::string& expectedValue)
+    {
+        // get property
+        auto res = mockupResponder->getProperty(propertyIdentifier);
+        EXPECT_NE(res.size(), 0);
+
+        // verify property value
+        std::string returnedValue((char*)res.data(), res.size());
+        EXPECT_STREQ(returnedValue.c_str(), expectedValue.c_str());
+    }
+    void testProperty(uint8_t propertyIdentifier, uint32_t expectedValue)
+    {
+        // get property
+        auto res = mockupResponder->getProperty(propertyIdentifier);
+        EXPECT_EQ(res.size(), sizeof(uint32_t));
+
+        // verify property value
+        uint32_t returnedValue = htole32(*(uint32_t*)res.data());
+        EXPECT_FLOAT_EQ(returnedValue, expectedValue);
+    }
 };
 
-TEST_F(MockupResponderTest, getPropertyTest)
+TEST_F(MockupResponderTest, goodTestGetPropertyTest)
 {
-    std::string expectedBoardPartNumber("MCX750500B-0D00_DK");
-    std::string expectedSerialNumber("SN123456789");
+    testProperty(BOARD_PART_NUMBER, "MCX750500B-0D00_DK");
+    testProperty(SERIAL_NUMBER, "SN123456789");
+    testProperty(MARKETING_NAME, "NV123");
+    testProperty(PRODUCT_LENGTH, 850);
+    testProperty(PRODUCT_WIDTH, 730);
+    testProperty(PRODUCT_HEIGHT, 2600);
+    testProperty(MINIMUM_DEVICE_POWER_LIMIT, 100);
+    testProperty(MAXIMUM_DEVICE_POWER_LIMIT, 1800);
+}
 
-    uint32_t propertyIdentifier = BOARD_PART_NUMBER;
+TEST_F(MockupResponderTest, goodTestUuidPropertyTest)
+{
+    uuid_t expectedUuid("72000000-0000-0000-0000-000000000000");
 
-    // get first property
-    auto res = mockupResponder->getProperty(propertyIdentifier);
-    EXPECT_NE(res.size(), 0);
+    // get Uuid property
+    auto res = mockupResponder->getProperty(DEVICE_GUID);
+    EXPECT_EQ(res.size(), 16);
+    // verify Uuid property value
+    auto uuidProperty = utils::convertUUIDToString(res);
+    EXPECT_STREQ(uuidProperty.substr(2).c_str(),
+                 expectedUuid.substr(2).c_str());
+}
 
-    // verify board part number property
-    std::string returnedBoardPartNumber((char*)res.data(), res.size());
-    EXPECT_EQ(returnedBoardPartNumber, expectedBoardPartNumber);
+TEST_F(MockupResponderTest, goodTestPowerSupplyStatusTest)
+{
+    uint8_t expectedStatus = 0x01;
+    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+                                     sizeof(nsm_get_power_supply_status_resp));
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
-    // get second property
-    propertyIdentifier = SERIAL_NUMBER;
-    res = mockupResponder->getProperty(propertyIdentifier);
-    EXPECT_NE(res.size(), 0);
+    encode_get_power_supply_status_resp(0, NSM_SUCCESS, ERR_NULL,
+                                        expectedStatus, response);
+    auto res = mockupResponder->getPowerSupplyStatusHandler(response,
+                                                            responseMsg.size());
 
-    // verify serial number property
-    std::string returnedSerialNumber((char*)res.data(), res.size());
-    EXPECT_EQ(returnedSerialNumber, expectedSerialNumber);
+    EXPECT_TRUE(res.has_value());
+    EXPECT_EQ(res.value().size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp));
+
+    response = reinterpret_cast<nsm_msg*>(res.value().data());
+    auto resp = (nsm_get_power_supply_status_resp*)response->payload;
+
+    EXPECT_EQ(NSM_GET_POWER_SUPPLY_STATUS, resp->hdr.command);
+    EXPECT_EQ(expectedStatus, resp->power_supply_status);
+}
+
+TEST_F(MockupResponderTest, goodTestGpuPresenceAndPowerStatusTest)
+{
+    uint32_t expectedPresence = 0x01;
+    uint32_t expectedPower = 0x01;
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_get_gpu_presence_and_power_status_resp));
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    encode_get_gpu_presence_and_power_status_resp(
+        0, NSM_SUCCESS, ERR_NULL, expectedPresence, expectedPower, response);
+    auto res = mockupResponder->getGpuPresenceAndPowerStatusHandler(
+        response, responseMsg.size());
+
+    EXPECT_TRUE(res.has_value());
+    EXPECT_EQ(res.value().size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_get_gpu_presence_and_power_status_resp));
+
+    response = reinterpret_cast<nsm_msg*>(res.value().data());
+    auto resp = (nsm_get_gpu_presence_and_power_status_resp*)response->payload;
+
+    EXPECT_EQ(NSM_GET_GPU_PRESENCE_POWER_STATUS, resp->hdr.command);
+    EXPECT_EQ(expectedPresence, resp->presence);
+    EXPECT_EQ(expectedPower, resp->power_status);
 }

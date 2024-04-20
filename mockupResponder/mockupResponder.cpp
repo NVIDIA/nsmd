@@ -291,6 +291,11 @@ std::optional<std::vector<uint8_t>>
                     return getInventoryInformationHandler(request, requestLen);
                 case NSM_GET_TEMPERATURE_READING:
                     return getTemperatureReadingHandler(request, requestLen);
+                case NSM_GET_POWER_SUPPLY_STATUS:
+                    return getPowerSupplyStatusHandler(request, requestLen);
+                case NSM_GET_GPU_PRESENCE_POWER_STATUS:
+                    return getGpuPresenceAndPowerStatusHandler(request,
+                                                               requestLen);
                 case NSM_GET_POWER:
                     return getCurrentPowerDrawHandler(request, requestLen);
                 case NSM_GET_ENERGY_COUNT:
@@ -436,6 +441,16 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+void populateFrom(std::vector<uint8_t>& property, const std::string& data)
+{
+    property.resize(data.length());
+    std::copy(data.data(), data.data() + data.length(), property.data());
+}
+void populateFrom(std::vector<uint8_t>& property, const uint32_t& data)
+{
+    property.resize(sizeof(data));
+    std::copy((uint8_t*)&data, (uint8_t*)&data + sizeof(data), property.data());
+}
 void MockupResponder::generateDummyGUID(const uint8_t eid, uint8_t* data)
 {
     // just adding eid for first byte and rest is zero
@@ -448,30 +463,35 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
     switch (propertyIdentifier)
     {
         case BOARD_PART_NUMBER:
-        {
-            std::string data = "MCX750500B-0D00_DK";
-            property.resize(data.length());
-            memcpy(property.data(), data.data(), data.length());
+            populateFrom(property, "MCX750500B-0D00_DK");
             break;
-        }
         case SERIAL_NUMBER:
-        {
-            std::string data = "SN123456789";
-            property.resize(data.length());
-            memcpy(property.data(), data.data(), data.length());
+            populateFrom(property, "SN123456789");
             break;
-        }
+        case MARKETING_NAME:
+            populateFrom(property, "NV123");
+            break;
         case DEVICE_GUID:
-        {
-            std::vector<uint8_t> data{0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                      0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                      0x00, 0x00, 0x00, 0x00};
-            generateDummyGUID(mockEid, data.data());
-
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
+            property = std::vector<uint8_t>{0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00};
+            generateDummyGUID(mockEid, property.data());
             break;
-        }
+        case PRODUCT_LENGTH:
+            populateFrom(property, 850);
+            break;
+        case PRODUCT_WIDTH:
+            populateFrom(property, 730);
+            break;
+        case PRODUCT_HEIGHT:
+            populateFrom(property, 2600);
+            break;
+        case MINIMUM_DEVICE_POWER_LIMIT:
+            populateFrom(property, 100);
+            break;
+        case MAXIMUM_DEVICE_POWER_LIMIT:
+            populateFrom(property, 1800);
+            break;
         case PCIERETIMER_0_EEPROM_VERSION:
         {
             std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
@@ -1094,6 +1114,42 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPowerSupplyStatusHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    lg2::info("getPowerSupplyStatusHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_get_power_supply_status_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, 0x01, responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getGpuPresenceAndPowerStatusHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+
+    lg2::info("getGpuPresenceAndPowerStatusHandler: request length={LEN}",
+              "LEN", requestLen);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_gpu_presence_and_power_status_resp),
+        0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_get_gpu_presence_and_power_status_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, 0x01, 0x01,
+        responseMsg);
+    assert(rc == NSM_SUCCESS);
     return response;
 }
 
