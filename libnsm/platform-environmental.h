@@ -25,6 +25,10 @@ extern "C" {
 #include "base.h"
 #include <stdbool.h>
 
+#define PCIE_CLKBUF_INDEX 0x80
+#define NVHS_CLKBUF_INDEX 0x81
+#define IBLINK_CLKBUF_INDEX 0x82
+
 const uint8_t MAX_VERSION_STRING_SIZE = 100;
 
 /** @brief NSM Type3 platform environmental commands
@@ -46,6 +50,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
 	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09,
 	NSM_SET_ECC_MODE = 0x7c,
+	NSM_GET_CLOCK_OUTPUT_ENABLE_STATE = 0x61,
 	NSM_GET_POWER_SUPPLY_STATUS = 0x63,
 	NSM_GET_GPU_PRESENCE_POWER_STATUS = 0x64,
 	NSM_GET_MEMORY_CAPACITY_UTILIZATION = 0xAD,
@@ -119,6 +124,77 @@ struct nsm_inventory_property_record {
 	uint8_t reserved : 4;
 	uint16_t data_length;
 	uint8_t data[1];
+} __attribute__((packed));
+
+struct nsm_pcie_clock_buffer_data {
+	// 7:0 GPU PCIe clocks
+	uint8_t clk_buf_gpu1 : 1;
+	uint8_t clk_buf_gpu2 : 1;
+	uint8_t clk_buf_gpu3 : 1;
+	uint8_t clk_buf_gpu4 : 1;
+	uint8_t clk_buf_gpu5 : 1;
+	uint8_t clk_buf_gpu6 : 1;
+	uint8_t clk_buf_gpu7 : 1;
+	uint8_t clk_buf_gpu8 : 1;
+
+	// 15:8 retimer PCIe clocks
+	uint8_t clk_buf_retimer1 : 1;
+	uint8_t clk_buf_retimer2 : 1;
+	uint8_t clk_buf_retimer3 : 1;
+	uint8_t clk_buf_retimer4 : 1;
+	uint8_t clk_buf_retimer5 : 1;
+	uint8_t clk_buf_retimer6 : 1;
+	uint8_t clk_buf_retimer7 : 1;
+	uint8_t clk_buf_retimer8 : 1;
+
+	// 17:16 NVSwitch PCIe clocks
+	uint8_t clk_buf_nvSwitch_1 : 1;
+	uint8_t clk_buf_nvSwitch_2 : 1;
+	// 21:18 Reserved
+	uint8_t clk_buf_reserved18_21 : 4;
+	// 22 NVLink Mgmt Nic
+	uint8_t clk_buf_nvlinkMgmt_nic : 1;
+	uint8_t clk_buf_reserved23 : 1;
+
+	// 31:23 reserved
+	uint8_t clk_buf_reserved24_31;
+} __attribute__((packed));
+
+struct nsm_nvhs_clock_buffer_data {
+	// 7:0 SXM NVHS
+	uint8_t clk_buf_sxm_nvhs1 : 1;
+	uint8_t clk_buf_sxm_nvhs2 : 1;
+	uint8_t clk_buf_sxm_nvhs3 : 1;
+	uint8_t clk_buf_sxm_nvhs4 : 1;
+	uint8_t clk_buf_sxm_nvhs5 : 1;
+	uint8_t clk_buf_sxm_nvhs6 : 1;
+	uint8_t clk_buf_sxm_nvhs7 : 1;
+	uint8_t clk_buf_sxm_nvhs8 : 1;
+
+	// 11:8 NVSwitch NVHS
+	uint8_t clk_buf_nvSwitch_nvhs1 : 1;
+	uint8_t clk_buf_nvSwitch_nvhs2 : 1;
+	uint8_t clk_buf_nvSwitch_nvhs3 : 1;
+	uint8_t clk_buf_nvSwitch_nvhs4 : 1;
+	// 31:12 reserved
+	uint8_t clk_buf_reserved12_15 : 4;
+
+	uint8_t clk_buf_reserved16_23;
+	uint8_t clk_buf_reserved24_31;
+} __attribute__((packed));
+
+struct nsm_iblink_clock_buffer_data {
+	// 1:0 NVSwitch IBlink clocks
+	uint8_t clk_buf_nvSwitch_1 : 1;
+	uint8_t clk_buf_nvSwitch_2 : 1;
+	// Bit 2 NVLink Mgmt Nic Iblink
+	uint8_t clk_buf_nvlinkMgmt_nic : 1;
+	// Bits 31:3 reserved
+	uint8_t clk_buf_reserved4_7 : 5;
+
+	uint8_t clk_buf_reserved8_15;
+	uint8_t clk_buf_reserved16_23;
+	uint8_t clk_buf_reserved24_31;
 } __attribute__((packed));
 
 /** @struct nsm_get_driver_info_resp
@@ -264,6 +340,24 @@ struct nsm_clock_limit {
 	uint32_t requested_limit_max;
 	uint32_t present_limit_min;
 	uint32_t present_limit_max;
+} __attribute__((packed));
+
+/** @struct nsm_get_clock_output_enabled_state_req
+ *
+ *  Structure representing NSM get clock output enabled state request.
+ */
+struct nsm_get_clock_output_enabled_state_req {
+	struct nsm_common_req hdr;
+	uint8_t index;
+} __attribute__((packed));
+
+/** @struct nsm_get_clock_output_enabled_state_resp
+ *
+ *  Structure representing NSM get clock output enabled state response.
+ */
+struct nsm_get_clock_output_enabled_state_resp {
+	struct nsm_common_resp hdr;
+	uint32_t clk_buf_data;
 } __attribute__((packed));
 
 /** @struct nsm_get_clock_limit_req
@@ -1327,7 +1421,7 @@ int decode_get_power_supply_status_req(const struct nsm_msg *msg,
 				       size_t msg_len);
 
 /** @brief Encode a Get power supply status response message
- *
+ *  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
@@ -1401,6 +1495,53 @@ int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
 						  uint16_t *reason_code,
 						  uint8_t *presence,
 						  uint8_t *power_status);
+/** @brief Encode a Get Clock Output Enabled State request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] index - index, PCIe(0x80)/NVHS(0x81)/IBLink(0x82)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_clock_output_enable_state_req(uint8_t instance_id, uint8_t index,
+					     struct nsm_msg *msg);
+
+/** @brief Decode a Get Clock Output Enabled State request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] index - index, PCIe(0x80)/NVHS(0x81)/IBLink(0x82)
+ *  @return nsm_completion_codes
+ */
+int decode_get_clock_output_enable_state_req(const struct nsm_msg *msg,
+					     size_t msg_len, uint8_t *index);
+/** @brief Encode a Get Clock Output Enabled State response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] clk_buf - clock buffer data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_clock_output_enable_state_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      uint32_t clk_buf,
+					      struct nsm_msg *msg);
+
+/** @brief Decode a Clock Output Enabled State response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - pointer to response message data size
+ *  @param[out] reason_code - pointer to response message reason code
+ *  @param[out] clk_buf - pointer to response message clock buffer data
+ *  @return nsm_completion_codes
+ */
+int decode_get_clock_output_enable_state_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code,
+					      uint16_t *data_size,
+					      uint32_t *clk_buf);
 
 /** @brief Encode a Get Row Remap State request message
  *

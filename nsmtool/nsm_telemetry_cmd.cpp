@@ -1726,7 +1726,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
         uint8_t cc = NSM_ERROR;
         switch (groupId)
         {
-            case 0:
+            case GROUP_ID_0:
             {
                 struct nsm_query_scalar_group_telemetry_group_0 data;
                 uint16_t data_size;
@@ -1761,7 +1761,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 1:
+            case GROUP_ID_1:
             {
                 struct nsm_query_scalar_group_telemetry_group_1 data;
                 uint16_t data_size;
@@ -1794,7 +1794,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 2:
+            case GROUP_ID_2:
             {
                 struct nsm_query_scalar_group_telemetry_group_2 data;
                 uint16_t data_size;
@@ -1826,7 +1826,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 3:
+            case GROUP_ID_3:
             {
                 struct nsm_query_scalar_group_telemetry_group_3 data;
                 uint16_t data_size;
@@ -1856,7 +1856,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 4:
+            case GROUP_ID_4:
             {
                 struct nsm_query_scalar_group_telemetry_group_4 data;
                 uint16_t data_size;
@@ -1889,7 +1889,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 5:
+            case GROUP_ID_5:
             {
                 struct nsm_query_scalar_group_telemetry_group_5 data;
                 uint16_t data_size;
@@ -1920,7 +1920,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            case 6:
+            case GROUP_ID_6:
             {
                 struct nsm_query_scalar_group_telemetry_group_6 data;
                 uint16_t data_size;
@@ -1939,7 +1939,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                         << (sizeof(struct nsm_msg_hdr) +
                             sizeof(
                                 struct
-                                nsm_query_scalar_group_telemetry_v1_group_5_resp));
+                                nsm_query_scalar_group_telemetry_v1_group_6_resp));
 
                     return;
                 }
@@ -2330,6 +2330,182 @@ class GetMemoryCapacityUtil : public CommandInterface
     }
 };
 
+class GetClockOutputEnableState : public CommandInterface
+{
+  public:
+    ~GetClockOutputEnableState() = default;
+    GetClockOutputEnableState() = delete;
+    GetClockOutputEnableState(const GetClockOutputEnableState&) = delete;
+    GetClockOutputEnableState(GetClockOutputEnableState&&) = default;
+    GetClockOutputEnableState&
+        operator=(const GetClockOutputEnableState&) = delete;
+    GetClockOutputEnableState& operator=(GetClockOutputEnableState&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetClockOutputEnableState(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto clockBufOptionGroup = app->add_option_group(
+            "Required",
+            "Index for which clock buffer is to be retrieved [PCIe(0x80)/NVHS(0x81)/IBLink(0x82)]");
+
+        index = 00;
+        clockBufOptionGroup->add_option("-i, --index", index,
+                                        "retrieve clock buffer for Index");
+        clockBufOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_clock_output_enabled_state_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_clock_output_enable_state_req(instanceId, index,
+                                                           request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataLen = 0;
+        uint32_t clkBuf = 0;
+
+        auto rc = decode_get_clock_output_enable_state_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &dataLen, &clkBuf);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            printClockBufferData(clkBuf);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_clock_output_enable_state_resp fail"
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
+    }
+
+    void printClockBufferData(uint32_t& data)
+    {
+        ordered_json result;
+        result["Index"] = index;
+        ordered_json clockBufferResult;
+
+        switch (index)
+        {
+            case PCIE_CLKBUF_INDEX:
+            {
+                auto clockBuffer =
+                    reinterpret_cast<nsm_pcie_clock_buffer_data*>(&data);
+                clockBufferResult["GPU PCIe Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu1);
+                clockBufferResult["GPU PCIe Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu2);
+                clockBufferResult["GPU PCIe Clock 3"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu3);
+                clockBufferResult["GPU PCIe Clock 4"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu4);
+                clockBufferResult["GPU PCIe Clock 5"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu5);
+                clockBufferResult["GPU PCIe Clock 6"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu6);
+                clockBufferResult["GPU PCIe Clock 7"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu7);
+                clockBufferResult["GPU PCIe Clock 8"] =
+                    static_cast<int>(clockBuffer->clk_buf_gpu8);
+
+                clockBufferResult["Retimer PCIe Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer1);
+                clockBufferResult["Retimer PCIe Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer2);
+                clockBufferResult["Retimer PCIe Clock 3"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer3);
+                clockBufferResult["Retimer PCIe Clock 4"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer4);
+                clockBufferResult["Retimer PCIe Clock 5"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer5);
+                clockBufferResult["Retimer PCIe Clock 6"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer6);
+                clockBufferResult["Retimer PCIe Clock 7"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer7);
+                clockBufferResult["Retimer PCIe Clock 8"] =
+                    static_cast<int>(clockBuffer->clk_buf_retimer8);
+
+                clockBufferResult["NvSwitch PCIe Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_1);
+                clockBufferResult["NvSwitch PCIe Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_2);
+
+                clockBufferResult["NvLink Mgmt NIC PCIe Clock"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvlinkMgmt_nic);
+            }
+            break;
+            case NVHS_CLKBUF_INDEX:
+            {
+                auto clockBuffer =
+                    reinterpret_cast<nsm_nvhs_clock_buffer_data*>(&data);
+                clockBufferResult["SXM NVHS Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs1);
+                clockBufferResult["SXM NVHS Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs2);
+                clockBufferResult["SXM NVHS Clock 3"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs3);
+                clockBufferResult["SXM NVHS Clock 4"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs4);
+                clockBufferResult["SXM NVHS Clock 5"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs5);
+                clockBufferResult["SXM NVHS Clock 6"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs6);
+                clockBufferResult["SXM NVHS Clock 7"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs7);
+                clockBufferResult["SXM NVHS Clock 8"] =
+                    static_cast<int>(clockBuffer->clk_buf_sxm_nvhs8);
+
+                clockBufferResult["NvSwitch NVHS Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_nvhs1);
+                clockBufferResult["NvSwitch NVHS Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_nvhs2);
+                clockBufferResult["NvSwitch NVHS Clock 3"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_nvhs3);
+                clockBufferResult["NvSwitch NVHS Clock 4"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_nvhs4);
+            }
+            break;
+            case IBLINK_CLKBUF_INDEX:
+            {
+                auto clockBuffer =
+                    reinterpret_cast<nsm_iblink_clock_buffer_data*>(
+                        &data);
+                clockBufferResult["NvSwitch IBLink Clock 1"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_1);
+                clockBufferResult["NvSwitch IBLink Clock 2"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvSwitch_2);
+
+                clockBufferResult["NvLink Mgmt NIC IBLink Clock"] =
+                    static_cast<int>(clockBuffer->clk_buf_nvlinkMgmt_nic);
+            }
+            break;
+            default:
+            clockBufferResult["Error"] = "Unsupported index in request";
+                break;
+        }
+        result["Clock Enable State Information"] = clockBufferResult;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t index;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -2458,6 +2634,11 @@ void registerCommand(CLI::App& app)
         "GetMemoryCapacityUtil", "Get memory Capacity Capacity Utilization");
     commands.push_back(std::make_unique<GetMemoryCapacityUtil>(
         "telemetry", "GetMemoryCapacityUtil", getMemoryCapacityUtil));
+
+    auto getClockOutputEnableState = telemetry->add_subcommand(
+        "GetClockOutputEnableState", "get clock output enable state");
+    commands.push_back(std::make_unique<GetClockOutputEnableState>(
+        "telemetry", "GetClockOutputEnableState", getClockOutputEnableState));
 }
 
 } // namespace telemetry

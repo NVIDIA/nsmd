@@ -3579,3 +3579,291 @@ TEST(getMemCapacityUtil, testBadDecodeResponse)
 	    response, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+TEST(getClockOutputEnableState, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_clock_output_enabled_state_req));
+
+	uint8_t index = PCIE_CLKBUF_INDEX;
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_get_clock_output_enable_state_req(0, index, request);
+
+	struct nsm_get_clock_output_enabled_state_req *req =
+	    reinterpret_cast<nsm_get_clock_output_enabled_state_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_CLOCK_OUTPUT_ENABLE_STATE, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(PCIE_CLKBUF_INDEX, req->index);
+}
+
+TEST(getClockOutputEnableState, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_clock_output_enabled_state_req));
+
+	auto rc = encode_get_clock_output_enable_state_req(0, 0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getClockOutputEnableState, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_OUTPUT_ENABLE_STATE, // command
+	    1,				       // data size
+	    4				       // index
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	size_t msg_len = request_msg.size();
+
+	uint8_t index = 0;
+	auto rc =
+	    decode_get_clock_output_enable_state_req(request, msg_len, &index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(4, index);
+}
+
+TEST(getClockOutputEnableState, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_OUTPUT_ENABLE_STATE,  // command
+	    0,				     // data size [it should be 1]
+	    4				     // index
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	uint8_t index = 0;
+	size_t msg_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(struct nsm_get_clock_output_enabled_state_req);
+
+	auto rc = decode_get_clock_output_enable_state_req(nullptr, 0, &index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_req(request, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_req(request, msg_len - 6,
+						      &index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_clock_output_enable_state_req(request, msg_len, &index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getClockOutputEnableState, testGoodEncodeResponseCCSuccess)
+{
+	uint32_t clk_buf = 0xFFFFFFFF;
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_get_clock_output_enabled_state_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x0 [NSM_SUCCESS]
+	auto rc = encode_get_clock_output_enable_state_resp(
+	    0, NSM_SUCCESS, reason_code, clk_buf, response);
+
+	struct nsm_get_clock_output_enabled_state_resp *resp =
+	    reinterpret_cast<struct nsm_get_clock_output_enabled_state_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_CLOCK_OUTPUT_ENABLE_STATE, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(htole16(sizeof(clk_buf)), resp->hdr.data_size);
+	EXPECT_EQ(htole32(clk_buf), resp->clk_buf_data);
+}
+
+TEST(getClockOutputEnableState, testGoodEncodeResponseCCError)
+{
+	uint32_t clk_buf = 0xFFFFFFFF;
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x1 [NSM_ERROR]
+	auto rc = encode_get_clock_output_enable_state_resp(
+	    0, NSM_ERROR, reason_code, clk_buf, response);
+
+	struct nsm_common_non_success_resp *resp =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_CLOCK_OUTPUT_ENABLE_STATE, resp->command);
+	EXPECT_EQ(NSM_ERROR, resp->completion_code);
+	EXPECT_EQ(htole16(reason_code), resp->reason_code);
+}
+
+TEST(getClockOutputEnableState, testBadEncodeResponse)
+{
+	uint32_t clk_buf = 0xFFFFFFFF;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_clock_output_enable_state_resp(
+	    0, NSM_SUCCESS, reason_code, clk_buf, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getClockOutputEnableState, testGoodDecodeResponseCCSuccess)
+{
+	// test when CC is NSM_SUCCESS and data payload is correct
+	std::vector<uint8_t> response_msg{
+	    0x10, // PCI VID: NVIDIA 0x10DE
+	    0xDE,
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_OUTPUT_ENABLE_STATE,  // command
+	    0x00,			     // completion code
+	    0x00,			     // reserved
+	    0x00,
+	    0x04, // data size
+	    0x00,
+	    0xFF, // clock buffer data
+	    0xFF,
+	    0xFF,
+	    0xFF};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint32_t clk_buf = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &clk_buf);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 0x0004);
+	EXPECT_EQ(clk_buf, 0xFFFFFFFF);
+}
+
+TEST(getClockOutputEnableState, testGoodDecodeResponseCCError)
+{
+	// test when CC is NSM_ERROR and data payload is empty
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_OUTPUT_ENABLE_STATE,  // command
+	    0x01,			     // completion code
+	    0x00,			     // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint32_t clk_buf = 0;
+	uint16_t data_size = 0;
+
+	auto rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &clk_buf);
+
+	EXPECT_EQ(cc, NSM_ERROR);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, 0x0000);
+}
+
+TEST(getClockOutputEnableState, testBadDecodeResponseWithPayload)
+{
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CLOCK_OUTPUT_ENABLE_STATE,  // command
+	    0x01, // completion code [0x01 - NSM_ERROR]
+	    0x00, // reserved
+	    0x00,
+	    0x00, // data size [should not be zero]
+	    0x00,
+	    0xFF, // clock buffer data
+	    0xFF,
+	    0xFF,
+	    0xFF};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint32_t clk_buf = 0;
+
+	auto rc = decode_get_clock_output_enable_state_resp(
+	    nullptr, msg_len, &cc, &reason_code, &data_size, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, nullptr, &reason_code, &data_size, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, nullptr, &data_size, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_ERROR);
+
+	response_msg[6] = 0x00; // making CC - NSM_SUCCESS
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len - 4, &cc, &reason_code, &data_size, &clk_buf);
+	//-4 from total size which means we should get error
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_clock_output_enable_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &clk_buf);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

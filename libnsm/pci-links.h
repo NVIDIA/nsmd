@@ -7,7 +7,21 @@ extern "C" {
 
 #include "base.h"
 
+// GPU device_index 0 [as per spec]
+#define GPU_DEVICE_INDEX 0
+// Retimer device_index 1-8 [as per spec]
 #define PCIE_RETIMER_DEVICE_INDEX_START 1
+
+#define GROUP_ID_0 0
+#define GROUP_ID_1 1
+#define GROUP_ID_2 2
+#define GROUP_ID_3 3
+#define GROUP_ID_4 4
+#define GROUP_ID_5 5
+#define GROUP_ID_6 6
+#define GROUP_ID_7 7
+#define GROUP_ID_8 8
+#define GROUP_ID_9 9
 
 enum pci_links_command { NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04 };
 
