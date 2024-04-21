@@ -1,5 +1,10 @@
 
-sources += ['../libnsm/network-ports.c', 'nsmPort/nsmPort.cpp']
+sources += [
+    '../libnsm/network-ports.c',
+    '../libnsm/pci-links.c',
+    'nsmPort/nsmPort.cpp',
+    'nsmPort/nsmRetimerPort.cpp'
+]
 
 nsmd_headers += ['.', '..']
 

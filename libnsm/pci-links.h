@@ -7,6 +7,8 @@ extern "C" {
 
 #include "base.h"
 
+#define PCIE_RETIMER_DEVICE_INDEX_START 1
+
 enum pci_links_command { NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04 };
 
 /** @struct nsm_query_scalar_group_telemetry_v1_req
