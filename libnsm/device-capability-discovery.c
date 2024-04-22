@@ -44,8 +44,8 @@ int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
 	struct nsm_get_supported_event_source_req *request =
 	    (struct nsm_get_supported_event_source_req *)msg->payload;
 
-	request->command = NSM_GET_CURRENT_EVENT_SOURCES;
-	request->data_size = NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE;
+	request->hdr.command = NSM_GET_CURRENT_EVENT_SOURCES;
+	request->hdr.data_size = NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE;
 	request->nvidia_message_type = nvidia_message_type;
 
 	return NSM_SUCCESS;
@@ -67,7 +67,7 @@ int decode_nsm_get_supported_event_source_resp(
 	struct nsm_get_supported_event_source_resp *response =
 	    (struct nsm_get_supported_event_source_resp *)msg->payload;
 
-	*cc = response->completion_code;
+	*cc = response->hdr.completion_code;
 	if (NSM_SUCCESS != *cc) {
 		return NSM_SUCCESS;
 	}
@@ -99,8 +99,8 @@ int encode_nsm_set_event_subscription_req(uint8_t instance_id,
 	struct nsm_set_event_subscription_req *request =
 	    (struct nsm_set_event_subscription_req *)msg->payload;
 
-	request->command = NSM_SET_EVENT_SUBSCRIPTION;
-	request->data_size = NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE;
+	request->hdr.command = NSM_SET_EVENT_SUBSCRIPTION;
+	request->hdr.data_size = NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE;
 	request->global_event_generation_setting = global_setting;
 	request->receiver_endpoint_id = receiver_eid;
 
@@ -124,7 +124,7 @@ int decode_nsm_set_event_subscription_req(const struct nsm_msg *msg,
 	struct nsm_set_event_subscription_req *request =
 	    (struct nsm_set_event_subscription_req *)msg->payload;
 
-	if (request->data_size < NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE) {
+	if (request->hdr.data_size < NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 
@@ -149,7 +149,7 @@ int decode_nsm_set_event_subscription_resp(const struct nsm_msg *msg,
 	struct nsm_set_event_subscription_resp *response =
 	    (struct nsm_set_event_subscription_resp *)msg->payload;
 
-	*cc = response->completion_code;
+	*cc = response->hdr.completion_code;
 
 	return NSM_SUCCESS;
 }
@@ -176,8 +176,8 @@ int encode_nsm_configure_event_acknowledgement_req(
 	struct nsm_configure_event_acknowledgement_req *request =
 	    (struct nsm_configure_event_acknowledgement_req *)msg->payload;
 
-	request->command = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT;
-	request->data_size = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE;
+	request->hdr.command = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT;
+	request->hdr.data_size = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE;
 	request->nvidia_message_type = nvidia_message_type;
 	memcpy(request->current_event_sources_acknowledgement_mask,
 	       current_event_sources_acknowledgement_mask,
@@ -204,7 +204,7 @@ int decode_nsm_configure_event_acknowledgement_req(
 	struct nsm_configure_event_acknowledgement_req *request =
 	    (struct nsm_configure_event_acknowledgement_req *)msg->payload;
 
-	if (request->data_size <
+	if (request->hdr.data_size <
 	    NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
@@ -237,9 +237,10 @@ int encode_nsm_configure_event_acknowledgement_resp(
 	struct nsm_configure_event_acknowledgement_resp *response =
 	    (struct nsm_configure_event_acknowledgement_resp *)msg->payload;
 
-	response->command = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT;
-	response->completion_code = cc;
-	response->data_size = htole16(EVENT_ACKNOWLEDGEMENT_MASK_LENGTH);
+	response->hdr.command = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT;
+	response->hdr.completion_code = cc;
+	response->hdr.reserved = 0;
+	response->hdr.data_size = htole16(EVENT_ACKNOWLEDGEMENT_MASK_LENGTH);
 	memcpy(response->new_event_sources_acknowledgement_mask,
 	       new_event_sources_acknowledgement_mask,
 	       EVENT_ACKNOWLEDGEMENT_MASK_LENGTH);
@@ -263,7 +264,7 @@ int decode_nsm_configure_event_acknowledgement_resp(
 	struct nsm_configure_event_acknowledgement_resp *response =
 	    (struct nsm_configure_event_acknowledgement_resp *)msg->payload;
 
-	*cc = response->completion_code;
+	*cc = response->hdr.completion_code;
 	*new_event_sources_acknowledgement_mask =
 	    response->new_event_sources_acknowledgement_mask;
 
@@ -292,8 +293,8 @@ int encode_nsm_set_current_event_sources_req(uint8_t instance_id,
 	struct nsm_set_current_event_source_req *request =
 	    (struct nsm_set_current_event_source_req *)msg->payload;
 
-	request->command = NSM_SET_CURRENT_EVENT_SOURCES;
-	request->data_size = NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE;
+	request->hdr.command = NSM_SET_CURRENT_EVENT_SOURCES;
+	request->hdr.data_size = NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE;
 	request->nvidia_message_type = nvidia_message_type;
 	memcpy(request->event_sources, event_sources, EVENT_SOURCES_LENGTH);
 
@@ -318,7 +319,7 @@ int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
 	struct nsm_set_current_event_source_req *request =
 	    (struct nsm_set_current_event_source_req *)msg->payload;
 
-	if (request->data_size != NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE) {
+	if (request->hdr.data_size != NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 
@@ -343,7 +344,7 @@ int decode_nsm_set_current_event_sources_resp(const struct nsm_msg *msg,
 	struct nsm_set_current_event_source_resp *response =
 	    (struct nsm_set_current_event_source_resp *)msg->payload;
 
-	*cc = response->completion_code;
+	*cc = response->hdr.completion_code;
 
 	return NSM_SUCCESS;
 }
@@ -369,8 +370,8 @@ int encode_nsm_get_event_log_record_req(uint8_t instance_id,
 	struct nsm_get_event_log_record_req *request =
 	    (struct nsm_get_event_log_record_req *)msg->payload;
 
-	request->command = NSM_GET_EVENT_LOG_RECORD;
-	request->data_size = 5;
+	request->hdr.command = NSM_GET_EVENT_LOG_RECORD;
+	request->hdr.data_size = 5;
 	request->selector_type = selector_type;
 	request->selector = htole32(selector);
 
@@ -394,12 +395,12 @@ int decode_nsm_get_event_log_record_resp(
 	struct nsm_get_event_log_record_resp *response =
 	    (struct nsm_get_event_log_record_resp *)msg->payload;
 
-	*cc = response->completion_code;
+	*cc = response->hdr.completion_code;
 	*nvidia_message_type = response->nvidia_message_type;
 	*event_id = response->event_id;
 	*event_handle = le32toh(response->event_handle);
 	*timestamp = le64toh(response->timestamp);
-	uint16_t data_size = le16toh(response->data_size);
+	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size > NSM_GET_EVENT_LOG_RECORD_RESP_MIN_DATA_SIZE) {
 		*payload = response->payload;
 		*payload_len =

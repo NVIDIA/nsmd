@@ -25,9 +25,11 @@
 
 namespace nsm
 {
+#ifdef NVIDIA_SHMEM
 const std::string NsmNumericSensorShmem::valueInterface{
     "xyz.openbmc_project.Sensor.Value"};
 const std::string NsmNumericSensorShmem::valueProperty{"Value"};
+#endif
 
 using namespace std::string_literals;
 
@@ -107,6 +109,7 @@ void NsmNumericSensorDbusStatus::updateStatus(bool available, bool functional)
     operationalStatusIntf.functional(functional);
 }
 
+#ifdef NVIDIA_SHMEM
 NsmNumericSensorShmem::NsmNumericSensorShmem(const std::string& name,
                                              const std::string& sensor_type,
                                              const std::string& association) :
@@ -133,5 +136,6 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
                                                    valueProperty, valueVariant,
                                                    timestamp, 0, association);
 }
+#endif
 
 } // namespace nsm

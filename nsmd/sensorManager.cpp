@@ -21,6 +21,7 @@
 
 #include "libnsm/device-capability-discovery.h"
 #include "libnsm/platform-environmental.h"
+#include "libnsm/requester/mctp.h"
 
 #include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
@@ -43,10 +44,12 @@ SensorManager::SensorManager(
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
-    NsmDeviceTable& nsmDevices, eid_t localEid) :
-    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
+    NsmDeviceTable& nsmDevices, eid_t localEid,
+    mctp_socket::Manager& sockManager) :
+    bus(bus),
+    event(event), handler(handler), instanceIdDb(instanceIdDb),
     objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices),
-    localEid(localEid)
+    localEid(localEid), sockManager(sockManager)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManager::scanInventory, this));
@@ -269,6 +272,71 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 eid_t SensorManager::getEid(std::shared_ptr<NsmDevice> nsmDevice)
 {
     return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
+}
+
+uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
+                                          const nsm_msg** responseMsg,
+                                          size_t* responseLen)
+{
+    auto mctpFd = sockManager.getSocket(eid);
+    uint8_t rc = NSM_REQUESTER_SUCCESS;
+    struct pollfd pollSet[1];
+
+    int timeout = RESPONSE_TIME_OUT;
+    int numFds = 1;
+    pollSet[0].fd = mctpFd;
+    pollSet[0].events = POLLIN;
+
+    // check if there is request in progress.
+    if (handler.hasInProgressRequest(eid))
+    {
+        lg2::info(
+            "SendRecvNsmMsgSync: waiting response for in progress request. EID={EID}",
+            "EID", eid);
+        // waiting for response
+        while (1)
+        {
+            int ret = poll(pollSet, numFds, timeout);
+            if (ret <= 0)
+            {
+                // poll timeout
+                lg2::error(
+                    "SendRecvNsmMsgSync: timeout, no response. EID={EID}",
+                    "EID", eid);
+                break;
+            }
+            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)responseMsg, responseLen);
+            if (rc == NSM_REQUESTER_SUCCESS)
+            {
+                lg2::info(
+                    "SendRecvNsmMsgSync: received response and discard it. EID={EID}",
+                    "EID", eid);
+                // discard the response
+                free((void*)*responseMsg);
+                // timeout the request timer
+                handler.invalidInProgressRequest(eid);
+                break;
+            }
+            else
+            {
+                lg2::info(
+                    "SendRecvNsmMsgSync: received data but is not response. EID={EID}",
+                    "EID", eid);
+            }
+        }
+    }
+
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    requestMsg->hdr.instance_id = instanceIdDb.next(eid);
+    rc = nsm_send_recv(eid, mctpFd, request.data(), request.size(),
+                       (uint8_t**)responseMsg, responseLen);
+    if (rc)
+    {
+        lg2::error("SendRecvNsmMsgSync failed. eid={EID} rc={RC}", "EID", eid,
+                   "RC", rc);
+    }
+    instanceIdDb.free(eid, requestMsg->hdr.instance_id);
+    return rc;
 }
 
 } // namespace nsm

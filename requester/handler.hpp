@@ -20,6 +20,7 @@
 #include "config.h"
 
 #include "libnsm/base.h"
+#include "libnsm/requester/mctp.h"
 
 #include "common/types.hpp"
 #include "nsmd/instance_id.hpp"
@@ -149,8 +150,8 @@ class Handler
             if (this->handlers.contains(key.eid) &&
                 !this->handlers[key.eid].empty())
             {
-                auto& [request, responseHandler, timerInstance, requestKey] =
-                    handlers[key.eid].front();
+                auto& [request, responseHandler, timerInstance, requestKey,
+                       valid] = handlers[key.eid].front();
                 if (key == requestKey)
                 {
                     lg2::error(
@@ -200,7 +201,7 @@ class Handler
 
         handlers[eid].emplace(
             std::make_tuple(std::move(request), std::move(responseHandler),
-                            std::move(timer), std::move(key)));
+                            std::move(timer), std::move(key), true));
         return runRegisteredRequest(eid);
     }
 
@@ -211,7 +212,7 @@ class Handler
             return NSM_SUCCESS;
         }
 
-        auto& [request, responseHandler, timerInstance, key] =
+        auto& [request, responseHandler, timerInstance, key, valid] =
             handlers[eid].front();
 
         if (timerInstance->isRunning())
@@ -261,7 +262,7 @@ class Handler
 
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
-            auto& [request, responseHandler, timerInstance, requestKey] =
+            auto& [request, responseHandler, timerInstance, requestKey, valid] =
                 handlers[eid].front();
             if (key == requestKey)
             {
@@ -285,6 +286,26 @@ class Handler
         runRegisteredRequest(eid);
     }
 
+    bool hasInProgressRequest(eid_t eid)
+    {
+        if (handlers.contains(eid) && !handlers[eid].empty())
+        {
+            auto& valid = std::get<4>(handlers[eid].front());
+            return valid;
+        }
+        return false;
+    }
+
+    void invalidInProgressRequest(eid_t eid)
+    {
+        // force timer timeout
+        auto& timerInstance = std::get<2>(handlers[eid].front());
+        timerInstance->start(std::chrono::microseconds(1));
+
+        auto& valid = std::get<4>(handlers[eid].front());
+        valid = false;
+    }
+
   private:
     int fd; //!< file descriptor of MCTP communications socket
     sdeventplus::Event& event; //!< reference to NSM daemon's main event loop
@@ -304,7 +325,7 @@ class Handler
      */
     using RequestValue =
         std::tuple<std::unique_ptr<RequestInterface>, ResponseHandler,
-                   std::unique_ptr<phosphor::Timer>, RequestKey>;
+                   std::unique_ptr<phosphor::Timer>, RequestKey, bool>;
     using RequestQueue = std::queue<RequestValue>;
 
     /** @brief Container for storing the NSM request entries */
@@ -329,8 +350,8 @@ class Handler
             instanceIdDb.free(key.eid, key.instanceId);
             if (!handlers[key.eid].empty())
             {
-                auto& [request, responseHandler, timerInstance, requestKey] =
-                    handlers[key.eid].front();
+                auto& [request, responseHandler, timerInstance, requestKey,
+                       valid] = handlers[key.eid].front();
                 if (key == requestKey)
                 {
                     handlers[key.eid].pop();

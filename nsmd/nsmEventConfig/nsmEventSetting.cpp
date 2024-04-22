@@ -35,26 +35,24 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
     nsmDevice(nsmDevice)
 {}
 
-requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
+uint8_t NsmEventSetting::updateSync(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
     auto localEid = manager.getLocalEid();
-    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting,
-                                       localEid);
+    rc = setEventSubscription(manager, eid, eventGenerationSetting, localEid);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID", eid,
                    "RC", rc);
-        co_return rc;
+        return rc;
     }
     nsmDevice->setEventMode(eventGenerationSetting);
-    co_return rc;
+    return rc;
 }
 
-requester::Coroutine
-    NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
-                                          uint8_t globalSettting,
-                                          eid_t receiverEid)
+uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
+                                              uint8_t globalSettting,
+                                              eid_t receiverEid)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_event_subscription_req));
@@ -67,16 +65,16 @@ requester::Coroutine
         lg2::error(
             "encode_nsm_set_event_subscription_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        return rc;
     }
 
     const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        co_return rc;
+        free((void*)responseMsg);
+        return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
@@ -86,10 +84,9 @@ requester::Coroutine
         lg2::error(
             "decode_nsm_set_event_subscription_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
     }
-
-    co_return cc;
+    free((void*)responseMsg);
+    return cc;
 }
 
 static void createNsmEventSetting(SensorManager& manager,
@@ -131,7 +128,7 @@ static void createNsmEventSetting(SensorManager& manager,
 
     // update sensor
     auto eid = manager.getEid(nsmDevice);
-    sensor->update(manager, eid).detach();
+    sensor->update(manager, eid);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

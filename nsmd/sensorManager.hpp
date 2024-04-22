@@ -68,7 +68,8 @@ class SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices, eid_t localEid)
+        NsmDeviceTable& nsmDevices, eid_t localEid,
+        mctp_socket::Manager& sockManager)
     {
         if (instance)
         {
@@ -76,7 +77,7 @@ class SensorManager
                 "Initialize called on an already initialized SensorManager");
         }
         static SensorManager inst(bus, event, handler, instanceIdDb, objServer,
-                                  eidTable, nsmDevices, localEid);
+                                  eidTable, nsmDevices, localEid, sockManager);
         instance = &inst;
     }
 
@@ -88,9 +89,33 @@ class SensorManager
     void _startPolling(sdeventplus::source::EventBase& /* source */);
     requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
 
+    /** @brief Send request NSM message to eid. The function will
+     *         return when received the response message from NSM device.
+     *
+     *  @param[in] eid - eid
+     *  @param[in] request - request NSM message
+     *  @param[out] responseMsg - response NSM message
+     *  @param[out] responseLen - length of response NSM message
+     *  @return coroutine return_value - NSM completion code
+     */
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,
                                         size_t* responseLen);
+
+    /** @brief Send request NSM message to eid by blocking socket API directly.
+     *         The function will return when received the response message from
+     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
+     *         request.
+     *
+     *  @param[in] eid - eid
+     *  @param[in] request - request NSM message
+     *  @param[out] responseMsg - response NSM message
+     *  @param[out] responseLen - length of response NSM message
+     *  @return return_value - nsm_requester_error_codes
+     */
+    uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
+                               const nsm_msg** responseMsg,
+                               size_t* responseLen);
     void scanInventory();
 
     requester::Coroutine pollEvents(eid_t eid);
@@ -110,7 +135,8 @@ class SensorManager
         sdbusplus::asio::object_server& objServer,
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
-        NsmDeviceTable& nsmDevices, eid_t localEid);
+        NsmDeviceTable& nsmDevices, eid_t localEid,
+        mctp_socket::Manager& sockManager);
 
     // Instance variables as before
     static SensorManager* instance;
@@ -127,5 +153,7 @@ class SensorManager
 
     NsmDeviceTable& nsmDevices;
     eid_t localEid;
+
+    mctp_socket::Manager& sockManager;
 };
 } // namespace nsm
