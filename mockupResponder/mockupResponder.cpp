@@ -307,6 +307,8 @@ std::optional<std::vector<uint8_t>>
                     return setMigModeHandler(request, requestLen);
                 case NSM_GET_ECC_MODE:
                     return getEccModeHandler(request, requestLen);
+                case NSM_SET_ECC_MODE:
+                    return setEccModeHandler(request, requestLen);
                 case NSM_GET_ECC_ERROR_COUNTS:
                     return getEccErrorCountsHandler(request, requestLen);
                 case NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
@@ -1022,6 +1024,34 @@ std::optional<std::vector<uint8_t>>
                                   reason_code, &flags, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
 
+    if (rc)
+    {
+        lg2::error("encode_get_ECC_mode_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setEccModeHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    uint8_t requested_mode;
+    auto rc = decode_set_ECC_mode_req(requestMsg, requestLen, &requested_mode);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_ECC_mode_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_ECC_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                  reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
         lg2::error("encode_get_ECC_mode_resp failed: rc={RC}", "RC", rc);

@@ -1405,6 +1405,66 @@ class GetEccMode : public CommandInterface
     }
 };
 
+class SetEccMode : public CommandInterface
+{
+  public:
+    ~SetEccMode() = default;
+    SetEccMode() = delete;
+    SetEccMode(const SetEccMode&) = delete;
+    SetEccMode(SetEccMode&&) = default;
+    SetEccMode& operator=(const SetEccMode&) = delete;
+    SetEccMode& operator=(SetEccMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetEccMode(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto requestedMode =
+            app->add_option_group("Required", "Requested ECC Mode.");
+
+        requestedMode->add_option("-r, --mode", requested_mode,
+                                  "requested ECC mode");
+
+        requestedMode->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_ECC_mode_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_ECC_mode_req(instanceId, requested_mode, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_set_ECC_mode_resp(responsePtr, payloadLength, &cc,
+                                           &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint8_t requested_mode;
+};
+
 class GetEccErrorCounts : public CommandInterface
 {
   public:
@@ -2013,6 +2073,10 @@ void registerCommand(CLI::App& app)
     auto getEccMode = telemetry->add_subcommand("GetEccMode", "get ECC modes");
     commands.push_back(
         std::make_unique<GetEccMode>("telemetry", "GetEccMode", getEccMode));
+
+    auto setEccMode = telemetry->add_subcommand("SetEccMode", "set ECC modes");
+    commands.push_back(
+        std::make_unique<SetEccMode>("telemetry", "SetEccMode", setEccMode));
 
     auto getEccErrorCounts =
         telemetry->add_subcommand("GetEccErrorCounts", "get ECC error counts");
