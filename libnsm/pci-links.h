@@ -23,7 +23,8 @@ extern "C" {
 #define GROUP_ID_8 8
 #define GROUP_ID_9 9
 
-enum pci_links_command { NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04 };
+enum pci_links_command { NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04,
+                         NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60 };
 
 /** @struct nsm_query_scalar_group_telemetry_v1_req
  *
@@ -466,6 +467,60 @@ int decode_query_scalar_group_telemetry_v1_group6_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_6 *data);
+
+/** @struct nsm_assert_pcie_fundamental_reset_req
+ *
+ *  Structure representing NSM Assert PCIe Fundamental Reset Request.
+ */
+struct nsm_assert_pcie_fundamental_reset_req {
+	struct nsm_common_req hdr;
+	uint8_t device_index;
+	uint8_t action;
+} __attribute__((packed));
+
+enum action {NOT_RESET, RESET};
+/** @brief Encode a Assert PCIe Fundamental Reset Request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_index - Device Index
+ *  @param[in] action - Action to be performed 0/1 (not reset/ reset)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_assert_pcie_fundamental_reset_req(uint8_t instance, uint8_t device_index, uint8_t action,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a Assert PCIe Fundamental Reset request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[in] device_index - Device Index
+ *  @param[in] action - Action to be performed 0/1 (not reset/ reset)
+ *  @return nsm_completion_codes
+ */
+int decode_assert_pcie_fundamental_reset_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *device_index, uint8_t *action);
+
+/** @brief Encode a Assert PCIe Fundamental Reset response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_assert_pcie_fundamental_reset_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Assert PCIe Fundamental Reset response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_assert_pcie_fundamental_reset_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

@@ -2186,6 +2186,65 @@ class QueryScalarGroupTelemetry : public CommandInterface
     uint8_t groupId;
 };
 
+class PcieFundamentalReset : public CommandInterface
+{
+  public:
+    ~PcieFundamentalReset() = default;
+    PcieFundamentalReset() = delete;
+    PcieFundamentalReset(const PcieFundamentalReset&) = delete;
+    PcieFundamentalReset(PcieFundamentalReset&&) = default;
+    PcieFundamentalReset& operator=(const PcieFundamentalReset&) = delete;
+    PcieFundamentalReset& operator=(PcieFundamentalReset&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit PcieFundamentalReset(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-d, --device_index", device_index,
+                                  "Device Index for which reset is performed")->required();
+        app->add_option("-a, --action", action,
+                                  "Action to be performed 0-Not reset 1-reset")->required();
+      
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_assert_pcie_fundamental_reset_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_assert_pcie_fundamental_reset_req(instanceId, device_index, action, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_assert_pcie_fundamental_reset_resp(responsePtr, payloadLength, &cc,
+                                           &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint8_t device_index;
+    uint8_t action;
+};
+
 class GetClockLimit : public CommandInterface
 {
   public:
@@ -3332,6 +3391,10 @@ void registerCommand(CLI::App& app)
         "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");
     commands.push_back(std::make_unique<QueryScalarGroupTelemetry>(
         "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
+
+    auto pcieFundamentalReset = telemetry->add_subcommand("PcieFundamentalReset", "Assert PCIe Fundamental Reset action");
+    commands.push_back(
+        std::make_unique<PcieFundamentalReset>("telemetry", "PcieFundamentalReset", pcieFundamentalReset));
     auto getClockLimit = telemetry->add_subcommand(
         "GetClockLimit", "retrieve clock Limit for clockId");
     commands.push_back(std::make_unique<GetClockLimit>(
