@@ -1,6 +1,7 @@
 
 sources += [
     'nsmGpuChassis/nsmGpuChassis.cpp',
+    'nsmGpuChassis/nsmGpuChassisAssembly.cpp',
     'nsmGpuChassis/nsmGpuChassisPCIeDevice.cpp',
     'nsmGpuChassis/nsmInventoryProperty.cpp',
     'nsmGpuChassis/nsmPowerSupplyStatus.cpp',

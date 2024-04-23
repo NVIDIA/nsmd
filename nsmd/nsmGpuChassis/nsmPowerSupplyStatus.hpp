@@ -10,7 +10,9 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 using PowerStateIntf = object_t<State::server::Chassis>;
 
-class NsmPowerSupplyStatus : public NsmSensor, public NsmInterfaceContainer<PowerStateIntf>
+class NsmPowerSupplyStatus :
+    public NsmSensor,
+    public NsmInterfaceContainer<PowerStateIntf>
 {
   public:
     NsmPowerSupplyStatus(

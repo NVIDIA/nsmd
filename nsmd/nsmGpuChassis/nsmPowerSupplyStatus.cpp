@@ -50,15 +50,13 @@ uint8_t
 
     if (cc == NSM_SUCCESS)
     {
-        pdi->currentPowerState(
-            ((status >> gpuInstanceId) & 0x01) != 0
-                ? PowerStateIntf::PowerState::On
-                : PowerStateIntf::PowerState::Off);
+        pdi->currentPowerState(((status >> gpuInstanceId) & 0x01) != 0
+                                   ? PowerStateIntf::PowerState::On
+                                   : PowerStateIntf::PowerState::Off);
     }
     else
     {
-        pdi->currentPowerState(
-            PowerStateIntf::PowerState::Unknown);
+        pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
         lg2::error(
             "responseHandler: decode_get_power_supply_status_resp is not success CC. rc={RC}",
             "RC", rc);

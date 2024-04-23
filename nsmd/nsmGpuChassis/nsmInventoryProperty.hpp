@@ -53,7 +53,8 @@ class NsmInventoryProperty :
 };
 
 template <>
-inline void NsmInventoryProperty<AssetIntf>::handleResponse(const Response& data)
+inline void
+    NsmInventoryProperty<AssetIntf>::handleResponse(const Response& data)
 {
     switch (property)
     {
@@ -73,7 +74,8 @@ inline void NsmInventoryProperty<AssetIntf>::handleResponse(const Response& data
 }
 
 template <>
-inline void NsmInventoryProperty<DimensionIntf>::handleResponse(const Response& data)
+inline void
+    NsmInventoryProperty<DimensionIntf>::handleResponse(const Response& data)
 {
     switch (property)
     {
@@ -96,7 +98,8 @@ inline void NsmInventoryProperty<DimensionIntf>::handleResponse(const Response& 
 }
 
 template <>
-inline void NsmInventoryProperty<PowerLimitIntf>::handleResponse(const Response& data)
+inline void
+    NsmInventoryProperty<PowerLimitIntf>::handleResponse(const Response& data)
 {
     switch (property)
     {

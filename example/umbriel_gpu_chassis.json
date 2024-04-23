@@ -30,18 +30,18 @@
                 },
                 "PowerLimit": {
                     "Type": "NSM_PowerLimit",
-                    "UUID": "$UUID",
+                    "UUID": "$FPGA_UUID",
                     "Priority": false
                 },
                 "OperationalStatus": {
                     "Type": "NSM_OperationalStatus",
-                    "UUID": "$UUID",
+                    "UUID": "$FPGA_UUID",
                     "InstanceNumber": "$INSTANCE_NUMBER",
                     "Priority": false
                 },
                 "PowerState": {
                     "Type": "NSM_PowerState",
-                    "UUID": "$UUID",
+                    "UUID": "$FPGA_UUID",
                     "InstanceNumber": "$INSTANCE_NUMBER",
                     "Priority": false
                 }
@@ -85,7 +85,7 @@
                 },
                 "OperationalStatus": {
                     "Type": "NSM_OperationalStatus",
-                    "UUID": "$UUID",
+                    "UUID": "$FPGA_UUID",
                     "InstanceNumber": "$INSTANCE_NUMBER",
                     "Priority": false
                 },
