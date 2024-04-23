@@ -60,18 +60,18 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
         bool power = ((gpus_power >> (gpuInstanceId)) & 0x1) != 0;
         bool presence = ((gpus_presence >> (gpuInstanceId)) & 0x1) != 0;
         if (power && presence)
-            cast<OperationalStatusIntf>().state(
+            pdi->state(
                 OperationalStatusIntf::StateType::Enabled);
         else if (presence)
-            cast<OperationalStatusIntf>().state(
+            pdi->state(
                 OperationalStatusIntf::StateType::UnavailableOffline);
         else
-            cast<OperationalStatusIntf>().state(
+            pdi->state(
                 OperationalStatusIntf::StateType::Absent);
     }
     else
     {
-        cast<OperationalStatusIntf>().state(
+        pdi->state(
             OperationalStatusIntf::StateType::Fault);
         lg2::error(
             "responseHandler: decode_get_gpu_presence_and_power_status_resp is not success CC. rc={RC}",

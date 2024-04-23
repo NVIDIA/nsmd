@@ -29,7 +29,8 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "UUID", interface.c_str());
         auto chassisUuid = std::make_shared<NsmGpuChassis<UuidIntf>>(name);
         chassisUuid->uuid(uuid);
-        addDeviceSensor(manager, chassisUuid, objPath, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(device, chassisUuid);
     }
     else if (type == "NSM_Asset")
     {
@@ -37,19 +38,17 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset->manufacturer(manufacturer);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
         // create sensor
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(chassisAsset,
-                                                         BOARD_PART_NUMBER),
-                  objPath, interface, baseInterface);
-        addSensor(
-            manager,
-            std::make_shared<NsmInventoryProperty>(chassisAsset, SERIAL_NUMBER),
-            objPath, interface, baseInterface);
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(chassisAsset,
-                                                         MARKETING_NAME),
-                  objPath, interface, baseInterface);
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
+                      chassisAsset, BOARD_PART_NUMBER));
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
+                      chassisAsset, SERIAL_NUMBER));
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
+                      chassisAsset, MARKETING_NAME));
     }
     else if (type == "NSM_Chassis")
     {
@@ -58,25 +57,24 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto chassis = std::make_shared<NsmGpuChassis<ChassisIntf>>(name);
         chassis->ChassisIntf::type(
             ChassisIntf::convertChassisTypeFromString(chassisType));
-        addDeviceSensor(manager, chassis, objPath, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(device, chassis);
     }
     else if (type == "NSM_Dimension")
     {
         auto chassisDimension =
             std::make_shared<NsmGpuChassis<DimensionIntf>>(name);
 
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(chassisDimension,
-                                                         PRODUCT_LENGTH),
-                  objPath, interface, baseInterface);
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(chassisDimension,
-                                                         PRODUCT_WIDTH),
-                  objPath, interface, baseInterface);
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(chassisDimension,
-                                                         PRODUCT_HEIGHT),
-                  objPath, interface, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+                      chassisDimension, PRODUCT_LENGTH));
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+                      chassisDimension, PRODUCT_WIDTH));
+        addSensor(manager, device,
+                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+                      chassisDimension, PRODUCT_HEIGHT));
     }
     else if (type == "NSM_Health")
     {
@@ -84,7 +82,8 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "Health", interface.c_str());
         auto chassisHealth = std::make_shared<NsmGpuChassis<HealthIntf>>(name);
         chassisHealth->health(HealthIntf::convertHealthTypeFromString(health));
-        addDeviceSensor(manager, chassisHealth, objPath, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(device, chassisHealth);
     }
     else if (type == "NSM_Location")
     {
@@ -94,7 +93,8 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             std::make_shared<NsmGpuChassis<LocationIntf>>(name);
         chassisLocation->locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        addDeviceSensor(manager, chassisLocation, objPath, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(device, chassisLocation);
     }
     else if (type == "NSM_LocationCode")
     {
@@ -103,20 +103,22 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto chassisLocationCode =
             std::make_shared<NsmGpuChassis<LocationCodeIntf>>(name);
         chassisLocationCode->locationCode(locationCode);
-        addDeviceSensor(manager, chassisLocationCode, objPath, baseInterface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        addSensor(device, chassisLocationCode);
     }
     else if (type == "NSM_PowerLimit")
     {
         auto chassisPowerLimit =
             std::make_shared<NsmGpuChassis<PowerLimitIntf>>(name);
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(
+        auto device = getNsmDevice(manager, objPath, interface);
+        addSensor(device,
+                  std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface, interface, false);
-        addSensor(manager,
-                  std::make_shared<NsmInventoryProperty>(
+                  objPath, interface);
+        addSensor(device,
+                  std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface, interface, false);
+                  objPath, interface);
     }
     else if (type == "NSM_OperationalStatus")
     {
@@ -124,10 +126,11 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "InstanceNumber", interface.c_str());
         auto chassisOperationalStatus =
             std::make_shared<NsmGpuChassis<OperationalStatusIntf>>(name);
-        addSensor(manager,
+        auto device = getNsmDevice(manager, objPath, interface);
+        addSensor(device,
                   std::make_shared<NsmGpuPresenceAndPowerStatus>(
                       chassisOperationalStatus, instanceId),
-                  objPath, interface, interface, false);
+                  objPath, interface);
     }
     else if (type == "NSM_PowerState")
     {
@@ -135,10 +138,11 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "InstanceNumber", interface.c_str());
         auto chassisPowerState =
             std::make_shared<NsmGpuChassis<PowerStateIntf>>(name);
-        addSensor(manager,
+        auto device = getNsmDevice(manager, objPath, interface);
+        addSensor(device,
                   std::make_shared<NsmPowerSupplyStatus>(chassisPowerState,
                                                          instanceId),
-                  objPath, interface, interface, false);
+                  objPath, interface);
     }
 }
 

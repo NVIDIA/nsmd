@@ -11,7 +11,7 @@ using namespace sdbusplus::server;
 
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
 
-class NsmPCIeFunction : public NsmSensor, public NsmInterfaceContainer
+class NsmPCIeFunction : public NsmSensor, public NsmInterfaceContainer<PCIeDeviceIntf>
 {
   public:
     NsmPCIeFunction(std::shared_ptr<NsmInterfaceProvider<PCIeDeviceIntf>> pdi,

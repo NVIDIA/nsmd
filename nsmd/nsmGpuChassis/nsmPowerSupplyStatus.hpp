@@ -2,24 +2,21 @@
 
 #include "nsmInterface.hpp"
 
-#include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
+#include <xyz/openbmc_project/State/Chassis/server.hpp>
 
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-using OperationalStatusIntf =
-    object_t<State::Decorator::server::OperationalStatus>;
+using PowerStateIntf = object_t<State::server::Chassis>;
 
-class NsmGpuPresenceAndPowerStatus :
-    public NsmSensor,
-    public NsmInterfaceContainer
+class NsmPowerSupplyStatus : public NsmSensor, public NsmInterfaceContainer<PowerStateIntf>
 {
   public:
-    NsmGpuPresenceAndPowerStatus(
-        std::shared_ptr<NsmInterfaceProvider<OperationalStatusIntf>> pdi,
+    NsmPowerSupplyStatus(
+        std::shared_ptr<NsmInterfaceProvider<PowerStateIntf>> pdi,
         uint8_t gpuInstanceId);
-    NsmGpuPresenceAndPowerStatus() = delete;
+    NsmPowerSupplyStatus() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;

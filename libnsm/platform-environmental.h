@@ -330,8 +330,10 @@ struct nsm_get_power_supply_status_req {
  */
 struct nsm_get_power_supply_status_resp {
 	struct nsm_common_resp hdr;
-	uint32_t power_supply_status : 8;
-	uint32_t reserved : 24;
+	uint8_t power_supply_status;
+	uint8_t reserved1;
+	uint8_t reserved2;
+	uint8_t reserved3;
 } __attribute__((packed));
 
 /** @struct nsm_get_gpu_presence_and_power_status_req
@@ -350,9 +352,10 @@ struct nsm_get_gpu_presence_and_power_status_req {
  */
 struct nsm_get_gpu_presence_and_power_status_resp {
 	struct nsm_common_resp hdr;
-	uint32_t presence : 8;
-	uint32_t power_status : 8;
-	uint32_t reserved : 16;
+	uint8_t presence;
+	uint8_t power_status;
+	uint8_t reserved1;
+	uint8_t reserved2;
 } __attribute__((packed));
 
 /** @brief Encode a Get Driver Information request message
@@ -537,9 +540,12 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
  * @brief Decode a Get Inventory Information response message payload as uint32
  *
  * @param[in] inventory_information - Inventory Information
+ * @param[in] data_size - data size in bytes
  * @return uint32_t Decoded uint32_t
  */
-uint32_t decode_inventory_information_as_uint(uint8_t *inventory_information);
+uint32_t
+decode_inventory_information_as_uint32(const uint8_t *inventory_information,
+				       const uint16_t data_size);
 
 /** @brief Encode a Get temperature readings request message
  *

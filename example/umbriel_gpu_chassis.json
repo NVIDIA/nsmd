@@ -2,6 +2,109 @@
     {
         "Exposes": [
             {
+                "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                "Type": "NSM_GPU_Chassis",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Dimension": {
+                    "Type": "NSM_Dimension"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                },
+                "LocationCode": {
+                    "Type": "NSM_LocationCode",
+                    "LocationCode": "SXM$INSTANCE_NUMBER + 1"
+                },
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "PowerLimit": {
+                    "Type": "NSM_PowerLimit",
+                    "UUID": "$UUID",
+                    "Priority": false
+                },
+                "OperationalStatus": {
+                    "Type": "NSM_OperationalStatus",
+                    "UUID": "$UUID",
+                    "InstanceNumber": "$INSTANCE_NUMBER",
+                    "Priority": false
+                },
+                "PowerState": {
+                    "Type": "NSM_PowerState",
+                    "UUID": "$UUID",
+                    "InstanceNumber": "$INSTANCE_NUMBER",
+                    "Priority": false
+                }
+            },
+            {
+                "ChassisName": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                "Name": "Assembly$INSTANCE_NUMBER + 1",
+                "Type": "NSM_GPU_ChassisAssembly",
+                "UUID": "$UUID",
+                "Area": {
+                    "Type": "NSM_Area",
+                    "PhysicalContext": "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU"
+                },
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                    "Vendor": "NVIDIA"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                }
+            },
+            {
+                "ChassisName": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                "Name": "GPU_SXM_$INSTANCE_NUMBER + 1",
+                "Type": "NSM_GPU_ChassisPCIeDevice",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "OperationalStatus": {
+                    "Type": "NSM_OperationalStatus",
+                    "UUID": "$UUID",
+                    "InstanceNumber": "$INSTANCE_NUMBER",
+                    "Priority": false
+                },
+                "PCIeDevice": {
+                    "Type": "NSM_PCIeDevice",
+                    "DeviceType": "SingleFunction",
+                    "InstanceNumber": "$INSTANCE_NUMBER + 1",
+                    "Priority": false,
+                    "Functions": [
+                        0
+                    ]
+                },
+                "LTSSMState": {
+                    "Type": "NSM_LTSSMState",
+                    "DeviceId": "$INSTANCE_NUMBER + 1",
+                    "Priority": false
+                }
+            },
+            {
                 "Name": "HGX_GPU_SXM $INSTANCE_NUMBER + 1 TEMP_0",
                 "Type": "NSM_Temp",
                 "Associations": [

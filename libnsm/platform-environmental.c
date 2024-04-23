@@ -150,8 +150,12 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
-uint32_t decode_inventory_information_as_uint(uint8_t *inventory_information)
+uint32_t
+decode_inventory_information_as_uint32(const uint8_t *inventory_information,
+				       const uint16_t data_size)
 {
+	if (data_size < sizeof(uint32_t))
+		return UINT32_MAX;
 	return le32toh(*(uint32_t *)inventory_information);
 }
 
@@ -385,8 +389,6 @@ int decode_get_current_power_draw_resp(const struct nsm_msg *msg,
 
 	nsm_get_current_power_draw_resp *response =
 	    (nsm_get_current_power_draw_resp *)msg->payload;
-
-	*cc = response->hdr.completion_code;
 
 	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size != sizeof(*reading)) {
@@ -860,8 +862,6 @@ int decode_get_altitude_pressure_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	nsm_get_altitude_pressure_resp *response =
 	    (nsm_get_altitude_pressure_resp *)msg->payload;
-
-	*cc = response->hdr.completion_code;
 
 	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size != sizeof(*reading)) {
@@ -1764,7 +1764,9 @@ int encode_get_power_supply_status_resp(uint8_t instance_id, uint8_t cc,
 	response->hdr.completion_code = cc;
 	response->hdr.data_size = htole16(sizeof(uint32_t));
 	response->power_supply_status = power_supply_status;
-	response->reserved = 0;
+	response->reserved1 = 0;
+	response->reserved2 = 0;
+	response->reserved3 = 0;
 
 	return NSM_SW_SUCCESS;
 }
@@ -1791,7 +1793,6 @@ int decode_get_power_supply_status_resp(const struct nsm_msg *msg,
 	struct nsm_get_power_supply_status_resp *response =
 	    (struct nsm_get_power_supply_status_resp *)msg->payload;
 
-	*cc = response->hdr.completion_code;
 	uint16_t data_size = le16toh(response->hdr.data_size);
 
 	if (data_size != sizeof(uint32_t)) {
@@ -1878,9 +1879,11 @@ int encode_get_gpu_presence_and_power_status_resp(
 	response->hdr.command = NSM_GET_GPU_PRESENCE_POWER_STATUS;
 	response->hdr.completion_code = cc;
 	response->hdr.data_size = htole16(sizeof(uint32_t));
+
 	response->presence = presence;
 	response->power_status = power_status;
-	response->reserved = 0;
+	response->reserved1 = 0;
+	response->reserved2 = 0;
 
 	return NSM_SW_SUCCESS;
 }
@@ -1909,7 +1912,6 @@ int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
 	struct nsm_get_gpu_presence_and_power_status_resp *response =
 	    (struct nsm_get_gpu_presence_and_power_status_resp *)msg->payload;
 
-	*cc = response->hdr.completion_code;
 	uint16_t data_size = le16toh(response->hdr.data_size);
 
 	if (data_size != sizeof(uint32_t)) {

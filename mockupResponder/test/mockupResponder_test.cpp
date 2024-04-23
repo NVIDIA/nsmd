@@ -64,7 +64,7 @@ class MockupResponderTest : public testing::Test
 
         // verify property value
         uint32_t returnedValue = htole32(*(uint32_t*)res.data());
-        EXPECT_FLOAT_EQ(returnedValue, expectedValue);
+        EXPECT_EQ(returnedValue, expectedValue);
     }
 };
 

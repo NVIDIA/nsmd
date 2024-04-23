@@ -46,7 +46,7 @@ struct NsmInventoryPropertyTest : public NsmGpuChassisTest
         EXPECT_EQ(chassisPowerLimit->getType(), "NSM_GPU_Chassis");
     }
 
-    std::shared_ptr<NsmInventoryProperty> sensor;
+    std::shared_ptr<NsmInventoryPropertyBase> sensor;
     void testRequest()
     {
         auto request = sensor->genRequestMsg(eid, instanceId);
@@ -77,91 +77,91 @@ struct NsmInventoryPropertyTest : public NsmGpuChassisTest
 
 TEST_F(NsmInventoryPropertyTest, goodTestPartNumberRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestPartNumberResponse)
 {
     std::string partNumber = "PN12345";
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
     testResponse((uint8_t*)partNumber.c_str(), partNumber.size());
     EXPECT_EQ(chassisAsset->partNumber(), partNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::SERIAL_NUMBER);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberResponse)
 {
     std::string serialNumber = "SN12345";
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::SERIAL_NUMBER);
     testResponse((uint8_t*)serialNumber.c_str(), serialNumber.size());
     EXPECT_EQ(chassisAsset->serialNumber(), serialNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestModelRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::MARKETING_NAME);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestModelResponse)
 {
     std::string model = "NV123";
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::MARKETING_NAME);
     testResponse((uint8_t*)model.c_str(), model.size());
     EXPECT_EQ(chassisAsset->model(), model);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestDepthRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_LENGTH);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestDepthResponse)
 {
     uint32_t depth = 850;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_LENGTH);
     testResponse((uint8_t*)&depth, sizeof(depth));
     EXPECT_EQ(chassisDimension->depth(), (double)depth);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestHeightRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_HEIGHT);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestHeightResponse)
 {
     uint32_t height = 2100;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_HEIGHT);
     testResponse((uint8_t*)&height, sizeof(height));
     EXPECT_EQ(chassisDimension->height(), (double)height);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestWidthRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_WIDTH);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestWidthResponse)
 {
     uint32_t width = 712;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, nsm_inventory_property_identifiers::PRODUCT_WIDTH);
     testResponse((uint8_t*)&width, sizeof(width));
     EXPECT_EQ(chassisDimension->width(), (double)width);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit,
         nsm_inventory_property_identifiers::MINIMUM_DEVICE_POWER_LIMIT);
     testRequest();
@@ -169,7 +169,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsRequest)
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsResponse)
 {
     uint32_t minPowerWatts = 100;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit,
         nsm_inventory_property_identifiers::MINIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&minPowerWatts, sizeof(minPowerWatts));
@@ -177,7 +177,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsResponse)
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit,
         nsm_inventory_property_identifiers::MAXIMUM_DEVICE_POWER_LIMIT);
     testRequest();
@@ -185,7 +185,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsResponse)
 {
     uint32_t maxPowerWatts = 100;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit,
         nsm_inventory_property_identifiers::MAXIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&maxPowerWatts, sizeof(maxPowerWatts));
@@ -193,14 +193,14 @@ TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsResponse)
 }
 TEST_F(NsmInventoryPropertyTest, badTestRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
     auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
 TEST_F(NsmInventoryPropertyTest, badTestResponseSize)
 {
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) - 1);
@@ -214,7 +214,7 @@ TEST_F(NsmInventoryPropertyTest, badTestResponseSize)
 TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
 {
     uint8_t value = 0;
-    sensor = std::make_shared<NsmInventoryProperty>(
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
         chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                   NSM_RESPONSE_CONVENTION_LEN + sizeof(value));
@@ -235,7 +235,7 @@ TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
     try
     {
         uint8_t value = 0;
-        sensor = std::make_shared<NsmInventoryProperty>(
+        sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             chassisAsset, nsm_inventory_property_identifiers::MEMORY_VENDOR);
         testResponse(&value, sizeof(value));
         FAIL() << "Expected std::runtime_error";

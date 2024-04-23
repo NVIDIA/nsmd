@@ -2273,6 +2273,7 @@ TEST(encode_get_power_supply_status_resp, testGoodEncodeResponse)
 
 TEST(decode_get_power_supply_status_resp, testGoodDecodeResponse)
 {
+#define EXPECTED_STATUS_LSB 0x02
 	std::vector<uint8_t> responseMsg{
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
@@ -2284,8 +2285,8 @@ TEST(decode_get_power_supply_status_resp, testGoodDecodeResponse)
 	    0,
 	    0,
 	    4,
-	    0,	  // data size
-	    0x02, // status
+	    0,			 // data size
+	    EXPECTED_STATUS_LSB, // status
 	    0x00,
 	    0x00,
 	    0x00};
@@ -2302,7 +2303,7 @@ TEST(decode_get_power_supply_status_resp, testGoodDecodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(status, 0x02);
+	EXPECT_EQ(status, EXPECTED_STATUS_LSB);
 }
 
 TEST(encode_get_gpu_presence_and_power_status_req, testGoodEncodeRequest)
@@ -2383,6 +2384,8 @@ TEST(encode_get_gpu_presence_and_power_status_resp, testGoodEncodeResponse)
 
 TEST(decode_get_gpu_presence_and_power_status_resp, testGoodDecodeResponse)
 {
+#define EXPECTED_PRESENCE 0x01
+#define EXPECTED_POWER 0x08
 	std::vector<uint8_t> responseMsg{
 	    0x10,
 	    0xDE,			     // PCI VID: NVIDIA 0x10DE
@@ -2394,9 +2397,9 @@ TEST(decode_get_gpu_presence_and_power_status_resp, testGoodDecodeResponse)
 	    0,
 	    0,
 	    4,
-	    0,	  // data size
-	    0x01, // presence
-	    0x08, // power
+	    0,		       // data size
+	    EXPECTED_PRESENCE, // presence
+	    EXPECTED_POWER,    // power
 	    0x00,
 	    0x00};
 
@@ -2413,8 +2416,8 @@ TEST(decode_get_gpu_presence_and_power_status_resp, testGoodDecodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(presence, 0x01);
-	EXPECT_EQ(power, 0x08);
+	EXPECT_EQ(presence, EXPECTED_PRESENCE);
+	EXPECT_EQ(power, EXPECTED_POWER);
 }
 TEST(getEDPpScalingFactor, testGoodEncodeRequest)
 {

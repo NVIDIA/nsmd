@@ -36,12 +36,12 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
             std::make_shared<NsmGpuChassisPCIeDevice<PCIeDeviceIntf>>(
                 chassisName, name);
         pcieDeviceObejct->deviceType(deviceType);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
         for (auto& id : functionIds)
         {
-            addSensor(manager,
+            addSensor(manager, device,
                       std::make_shared<NsmPCIeFunction>(pcieDeviceObejct,
-                                                        deviceId, id),
-                      objPath, interface, baseInterface);
+                                                        deviceId, id));
         }
     }
 }
