@@ -110,39 +110,51 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
     {
         auto chassisPowerLimit =
             std::make_shared<NsmGpuChassis<PowerLimitIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
+        auto device = getNsmDevice(manager, objPath, baseInterface);
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         addSensor(device,
                   std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface);
+                  priority);
         addSensor(device,
                   std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface);
+                  priority);
     }
     else if (type == "NSM_OperationalStatus")
     {
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto chassisOperationalStatus =
-            std::make_shared<NsmGpuChassis<OperationalStatusIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
+        auto inventoryObjPath =
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "InventoryObjPath", interface.c_str());
+        auto gpuOperationalStatus =
+            std::make_shared<NsmInterfaceProvider<OperationalStatusIntf>>(
+                name, type, inventoryObjPath);
+        auto device = getNsmDevice(manager, inventoryObjPath,
+                                   "xyz.openbmc_project.FruDevice");
         addSensor(device,
                   std::make_shared<NsmGpuPresenceAndPowerStatus>(
-                      chassisOperationalStatus, instanceId),
+                      gpuOperationalStatus, instanceId),
                   objPath, interface);
     }
     else if (type == "NSM_PowerState")
     {
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto chassisPowerState =
-            std::make_shared<NsmGpuChassis<PowerStateIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
-        addSensor(device,
-                  std::make_shared<NsmPowerSupplyStatus>(chassisPowerState,
-                                                         instanceId),
-                  objPath, interface);
+        auto inventoryObjPath =
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "InventoryObjPath", interface.c_str());
+        auto gpuPowerState =
+            std::make_shared<NsmInterfaceProvider<PowerStateIntf>>(
+                name, type, inventoryObjPath);
+        auto device = getNsmDevice(manager, inventoryObjPath,
+                                   "xyz.openbmc_project.FruDevice");
+        addSensor(
+            device,
+            std::make_shared<NsmPowerSupplyStatus>(gpuPowerState, instanceId),
+            objPath, interface);
     }
 }
 

@@ -33,14 +33,9 @@ void addSensor(std::shared_ptr<NsmDevice>& device,
 }
 
 void addSensor(std::shared_ptr<NsmDevice>& device,
-               std::shared_ptr<NsmSensor> sensor, const std::string& objPath,
-               const std::string& interface)
+               std::shared_ptr<NsmSensor> sensor, bool priority)
 {
-    if (!device)
-        return;
-    auto isPriority = utils::DBusHandler().getDbusProperty<bool>(
-        objPath.c_str(), "Priority", interface.c_str());
-    if (isPriority)
+    if (priority)
     {
         device->prioritySensors.emplace_back(sensor);
     }
@@ -48,6 +43,16 @@ void addSensor(std::shared_ptr<NsmDevice>& device,
     {
         device->roundRobinSensors.emplace_back(sensor);
     }
+}
+void addSensor(std::shared_ptr<NsmDevice>& device,
+               std::shared_ptr<NsmSensor> sensor, const std::string& objPath,
+               const std::string& interface)
+{
+    if (!device)
+        return;
+    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        objPath.c_str(), "Priority", interface.c_str());
+    addSensor(device, sensor, priority);
 }
 
 void addSensor(SensorManager& manager, std::shared_ptr<NsmDevice>& device,

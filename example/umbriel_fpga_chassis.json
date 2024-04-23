@@ -590,6 +590,34 @@
                         "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_7"
                     }
                 ]
+            },
+            {
+                "Name": "HGX_GPU_SXM_1",
+                "Type": "NSM_GPU_Chassis",
+                "UUID": "$UUID",
+                "OperationalStatus": {
+                    "Type": "NSM_OperationalStatus",
+                    "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_1",
+                    "InstanceNumber": 1,
+                    "Priority": false
+                },
+                "PowerState": {
+                    "Type": "NSM_PowerState",
+                    "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_1",
+                    "InstanceNumber": 1,
+                    "Priority": false
+                }
+            },
+            {
+                "Name": "GPU_SXM_1",
+                "Type": "NSM_GPU_ChassisPCIeDevice",
+                "UUID": "$UUID",
+                "OperationalStatus": {
+                    "Type": "NSM_OperationalStatus",
+                    "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_1/PCIeDevices/GPU_SXM_1",
+                    "InstanceNumber": 1,
+                    "Priority": false
+                }
             }
         ],
         "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 3})",
