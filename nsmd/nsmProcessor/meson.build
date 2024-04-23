@@ -1,5 +1,6 @@
 sources += [
     'nsmProcessor/nsmProcessor.cpp',
+    'nsmProcessor/nsmFpgaProcessor.cpp',
 ]
 
 nsmd_headers += ['.', '..']
