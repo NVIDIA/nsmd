@@ -20,7 +20,6 @@ sources = [
 nsmd_headers = [
     '.',
     '..',
-    'nsmSensors',
     '../libnsm',
     '../requester',
     '../common',
@@ -31,7 +30,6 @@ subdir('nsmFwSwInventory')
 subdir('nsmProcessor')
 subdir('nsmEventConfig')
 subdir('nsmChassis')
-subdir('nsmSensors')
 subdir('nsmGpuChassis')
 subdir('nsmPort')
 

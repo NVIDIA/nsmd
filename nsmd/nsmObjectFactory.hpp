@@ -36,11 +36,12 @@ using CreationFunction =
     std::function<void(SensorManager& manager, const std::string& interface,
                        const std::string& objPath)>;
 
-#define REGISTER_NSM_CREATION_FUNCTION(func, interfaceName)                    \
+#define REGISTER_NSM_CREATION_FUNCTION(func, interfaceNameOrInterfacesVector)  \
     static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)() \
     {                                                                          \
         auto& factory = NsmObjectFactory::instance();                          \
-        factory.registerCreationFunction(func, interfaceName);                 \
+        factory.registerCreationFunction(func,                                 \
+                                         interfaceNameOrInterfacesVector);     \
     }
 
 class NsmObjectFactory
@@ -56,6 +57,9 @@ class NsmObjectFactory
 
     void registerCreationFunction(const CreationFunction& func,
                                   const std::string interfaceName);
+
+    void registerCreationFunction(const CreationFunction& func,
+                                  const std::vector<std::string>& interfaces);
 
     std::map<std::string, CreationFunction> creationFunctions;
 

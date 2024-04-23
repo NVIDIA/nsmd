@@ -60,13 +60,13 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
 
 #define pcieFunction(X)                                                        \
-    cast<PCIeDeviceIntf>().function##X##VendorId(                              \
+    pdi->function##X##VendorId(                              \
         std::to_string(data.pci_vendor_id));                                   \
-    cast<PCIeDeviceIntf>().function##X##DeviceId(                              \
+    pdi->function##X##DeviceId(                              \
         std::to_string(data.pci_device_id));                                   \
-    cast<PCIeDeviceIntf>().function##X##SubsystemVendorId(                     \
+    pdi->function##X##SubsystemVendorId(                     \
         std::to_string(data.pci_subsystem_vendor_id));                         \
-    cast<PCIeDeviceIntf>().function##X##SubsystemId(                           \
+    pdi->function##X##SubsystemId(                           \
         std::to_string(data.pci_subsystem_device_id));
 
     switch (functionId)

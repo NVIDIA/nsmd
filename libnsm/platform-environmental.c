@@ -150,6 +150,15 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
+uint32_t
+decode_inventory_information_as_uint32(const uint8_t *inventory_information,
+				       const uint16_t data_size)
+{
+	if (data_size < sizeof(uint32_t))
+		return UINT32_MAX;
+	return le32toh(*(uint32_t *)inventory_information);
+}
+
 int encode_get_temperature_reading_req(uint8_t instance_id, uint8_t sensor_id,
 				       struct nsm_msg *msg)
 {
@@ -380,8 +389,6 @@ int decode_get_current_power_draw_resp(const struct nsm_msg *msg,
 
 	nsm_get_current_power_draw_resp *response =
 	    (nsm_get_current_power_draw_resp *)msg->payload;
-
-	*cc = response->hdr.completion_code;
 
 	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size != sizeof(*reading)) {
@@ -855,8 +862,6 @@ int decode_get_altitude_pressure_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	nsm_get_altitude_pressure_resp *response =
 	    (nsm_get_altitude_pressure_resp *)msg->payload;
-
-	*cc = response->hdr.completion_code;
 
 	uint16_t data_size = le16toh(response->hdr.data_size);
 	if (data_size != sizeof(*reading)) {
@@ -1679,6 +1684,242 @@ int decode_get_programmable_EDPp_scaling_factor_resp(
 		return NSM_SW_ERROR_DATA;
 	}
 	*scaling_factors = resp->scaling_factors;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_power_supply_status_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_POWER_SUPPLY_STATUS;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_supply_status_req(const struct nsm_msg *msg,
+				       size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_power_supply_status_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint8_t power_supply_status,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_POWER_SUPPLY_STATUS, msg);
+	}
+
+	struct nsm_get_power_supply_status_resp *response =
+	    (struct nsm_get_power_supply_status_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_POWER_SUPPLY_STATUS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(uint32_t));
+	response->power_supply_status = power_supply_status;
+	response->reserved1 = 0;
+	response->reserved2 = 0;
+	response->reserved3 = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_supply_status_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint8_t *power_supply_status)
+{
+	if (power_supply_status == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_power_supply_status_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_power_supply_status_resp *response =
+	    (struct nsm_get_power_supply_status_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+
+	if (data_size != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*power_supply_status = response->power_supply_status;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_gpu_presence_and_power_status_req(uint8_t instance_id,
+						 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_GPU_PRESENCE_POWER_STATUS;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_gpu_presence_and_power_status_req(const struct nsm_msg *msg,
+						 size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_gpu_presence_and_power_status_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t presence,
+    uint8_t power_status, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_GPU_PRESENCE_POWER_STATUS, msg);
+	}
+
+	struct nsm_get_gpu_presence_and_power_status_resp *response =
+	    (struct nsm_get_gpu_presence_and_power_status_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_GPU_PRESENCE_POWER_STATUS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(uint32_t));
+
+	response->presence = presence;
+	response->power_status = power_status;
+	response->reserved1 = 0;
+	response->reserved2 = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
+						  size_t msg_len, uint8_t *cc,
+						  uint16_t *reason_code,
+						  uint8_t *presence,
+						  uint8_t *power_status)
+{
+	if (presence == NULL || power_status == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_gpu_presence_and_power_status_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_gpu_presence_and_power_status_resp *response =
+	    (struct nsm_get_gpu_presence_and_power_status_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+
+	if (data_size != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*presence = response->presence;
+	*power_status = response->power_status;
 
 	return NSM_SW_SUCCESS;
 }

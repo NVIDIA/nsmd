@@ -502,11 +502,11 @@ class GetInventoryInformation : public CommandInterface
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t dataSize = 0;
-        std::vector<uint8_t> inventoryInformation(65535, 0);
+        std::vector<uint8_t> data(65535, 0);
 
         auto rc = decode_get_inventory_information_resp(
             responsePtr, payloadLength, &cc, &reason_code, &dataSize,
-            inventoryInformation.data());
+            data.data());
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: " << "rc=" << rc
@@ -515,41 +515,19 @@ class GetInventoryInformation : public CommandInterface
             return;
         }
 
-        printInventoryInfo(propertyId, dataSize, &inventoryInformation);
+        printInventoryInfo(propertyId, dataSize, data);
     }
 
     void printInventoryInfo(uint8_t& propertyIdentifier,
                             const uint16_t dataSize,
-                            const std::vector<uint8_t>* inventoryInformation)
+                            const std::vector<uint8_t>& data)
     {
-        if (inventoryInformation == NULL)
-        {
-            std::cerr << "Failed to get inventory information" << std::endl;
-            return;
-        }
-
         ordered_json result;
         ordered_json propRecordResult;
-        nsm_inventory_property_record* propertyRecord =
-            (nsm_inventory_property_record*)inventoryInformation->data();
         propRecordResult["Property ID"] = propertyIdentifier;
         propRecordResult["Data Length"] = static_cast<uint16_t>(dataSize);
         std::stringstream iss;
         std::string firmwareVersion;
-
-        union Data
-        {
-            int8_t bool8Val;
-            uint8_t nvu8Val;
-            int8_t nvs8Val;
-            uint16_t nvu16Val;
-            int16_t nvs16Val;
-            uint32_t nvu32Val;
-            int32_t nvs32Val;
-            uint64_t nvu64Val;
-            int64_t nvs64Val;
-            int32_t nvs24_8Val;
-        } dataPayload;
 
         // todo: display aggregate data
         switch (propertyIdentifier)
@@ -566,9 +544,7 @@ class GetInventoryInformation : public CommandInterface
             case RATED_MODULE_POWER_LIMIT:
             case DEFAULT_BOOST_CLOCKS:
             case DEFAULT_BASE_CLOCKS:
-                std::memcpy(&(dataPayload.nvs32Val), propertyRecord->data,
-                            sizeof(int32_t));
-                propRecordResult["Data"] = dataPayload.nvs32Val;
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;
             case BOARD_PART_NUMBER:
             case SERIAL_NUMBER:
@@ -581,7 +557,10 @@ class GetInventoryInformation : public CommandInterface
             case FIRMWARE_VERSION:
             case INFO_ROM_VERSION:
                 propRecordResult["Data"] =
-                    reinterpret_cast<char*>(propertyRecord->data);
+                    std::string((char*)data.data(), dataSize);
+                break;
+            case DEVICE_GUID:
+                propRecordResult["Data"] = utils::convertUUIDToString(data);
                 break;
             case PCIERETIMER_0_EEPROM_VERSION:
             case PCIERETIMER_1_EEPROM_VERSION:
@@ -591,12 +570,9 @@ class GetInventoryInformation : public CommandInterface
             case PCIERETIMER_5_EEPROM_VERSION:
             case PCIERETIMER_6_EEPROM_VERSION:
             case PCIERETIMER_7_EEPROM_VERSION:
-                iss << int(propertyRecord->data[0]); // Major version number
-                iss << '.'
-                    << int(propertyRecord->data[2]); // Minor version number
-                iss << '.'
-                    << int((propertyRecord->data[4] << 8) |
-                           propertyRecord->data[6]); // Patch number
+                iss << int(data[0]);        // Major version number
+                iss << '.' << int(data[2]); // Minor version number
+                iss << '.' << int((data[4] << 8) | data[6]); // Patch number
 
                 firmwareVersion = iss.str();
                 propRecordResult["Data"] = firmwareVersion;
@@ -614,6 +590,141 @@ class GetInventoryInformation : public CommandInterface
 
   private:
     uint8_t propertyId;
+};
+
+class GetGpuPresenceAndPowerStatus : public CommandInterface
+{
+  private:
+    uint8_t gpuInstanceId = 0;
+
+  public:
+    ~GetGpuPresenceAndPowerStatus() = default;
+    GetGpuPresenceAndPowerStatus() = delete;
+    GetGpuPresenceAndPowerStatus(const GetGpuPresenceAndPowerStatus&) = delete;
+    GetGpuPresenceAndPowerStatus(GetGpuPresenceAndPowerStatus&&) = default;
+    GetGpuPresenceAndPowerStatus&
+        operator=(const GetGpuPresenceAndPowerStatus&) = delete;
+    GetGpuPresenceAndPowerStatus&
+        operator=(GetGpuPresenceAndPowerStatus&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetGpuPresenceAndPowerStatus(const char* type, const char* name,
+                                          CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto optionGroup = app->add_option_group(
+            "Required",
+            "GPU Instance Id for which presence and power status is to be retrieved.");
+
+        gpuInstanceId = 0;
+        optionGroup->add_option(
+            "-g, --gpuInstanceId", gpuInstanceId,
+            "retrieve presence and power status for gpuInstanceId");
+        optionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        Request requestMsg(sizeof(nsm_msg_hdr) +
+                           sizeof(nsm_get_gpu_presence_and_power_status_req));
+        auto request = reinterpret_cast<struct nsm_msg*>(requestMsg.data());
+        auto rc =
+            encode_get_gpu_presence_and_power_status_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t gpus_presence = 0;
+        uint8_t gpus_power = 0;
+
+        auto rc = decode_get_gpu_presence_and_power_status_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &gpus_presence,
+            &gpus_power);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Power Status"] = ((gpus_power >> (gpuInstanceId)) & 0x1) != 0;
+        result["Presence"] = ((gpus_presence >> (gpuInstanceId)) & 0x1) != 0;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class GetPowerSupplyStatus : public CommandInterface
+{
+  private:
+    uint8_t gpuInstanceId = 0;
+
+  public:
+    ~GetPowerSupplyStatus() = default;
+    GetPowerSupplyStatus() = delete;
+    GetPowerSupplyStatus(const GetPowerSupplyStatus&) = delete;
+    GetPowerSupplyStatus(GetPowerSupplyStatus&&) = default;
+    GetPowerSupplyStatus& operator=(const GetPowerSupplyStatus&) = delete;
+    GetPowerSupplyStatus& operator=(GetPowerSupplyStatus&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerSupplyStatus(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto optionGroup = app->add_option_group(
+            "Required",
+            "GPU Instance Id for which power supply status is to be retrieved.");
+
+        gpuInstanceId = 0;
+        optionGroup->add_option(
+            "-g, --gpuInstanceId", gpuInstanceId,
+            "retrieve power supply status for gpuInstanceId");
+        optionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        Request requestMsg(sizeof(nsm_msg_hdr) +
+                           sizeof(nsm_get_power_supply_status_req));
+        auto request = reinterpret_cast<struct nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_power_supply_status_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t status = 0;
+
+        auto rc = decode_get_power_supply_status_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &status);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reasonCode)
+                      << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Power Supply"] =
+            ((status >> gpuInstanceId) & 0x01) != 0 ? "On" : "Off";
+        nsmtool::helper::DisplayInJson(result);
+    }
 };
 
 class GetDriverInfo : public CommandInterface
@@ -2030,6 +2141,17 @@ void registerCommand(CLI::App& app)
         "GetInventoryInformation", "get inventory information");
     commands.push_back(std::make_unique<GetInventoryInformation>(
         "telemetry", "GetInventoryInformation", getInventoryInformation));
+
+    auto getGpuPresenceAndPowerStatus = telemetry->add_subcommand(
+        "GetGpuPresenceAndPowerStatus", "get gpu presence and power status");
+    commands.push_back(std::make_unique<GetGpuPresenceAndPowerStatus>(
+        "telemetry", "GetGpuPresenceAndPowerStatus",
+        getGpuPresenceAndPowerStatus));
+
+    auto getPowerSupplyStatus = telemetry->add_subcommand(
+        "GetPowerSupplyStatus", "get power supply status");
+    commands.push_back(std::make_unique<GetPowerSupplyStatus>(
+        "telemetry", "GetPowerSupplyStatus", getPowerSupplyStatus));
 
     auto getTemperatureReading = telemetry->add_subcommand(
         "GetTemperatureReading", "get temperature reading of a sensor");

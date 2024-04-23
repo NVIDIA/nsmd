@@ -55,4 +55,13 @@ void NsmObjectFactory::registerCreationFunction(const CreationFunction& func,
     creationFunctions[interfaceName] = func;
 }
 
+void NsmObjectFactory::registerCreationFunction(
+    const CreationFunction& func, const std::vector<std::string>& interfaces)
+{
+    for (const auto& interface : interfaces)
+    {
+        registerCreationFunction(func, interface);
+    }
+}
+
 } // namespace nsm
