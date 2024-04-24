@@ -142,7 +142,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
 
 requester::Coroutine DeviceManager::ping(eid_t eid)
 {
-    Request request(sizeof(nsm_msg_hdr) + 4);
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     uint8_t instanceId = instanceIdDb.next(eid);
 
@@ -183,7 +183,8 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
         co_return NSM_SW_ERROR_LENGTH;
     }
 
-    Request request(sizeof(nsm_msg_hdr) + 4);
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_supported_nvidia_message_types_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     uint8_t instanceId = instanceIdDb.next(eid);
     auto rc =
