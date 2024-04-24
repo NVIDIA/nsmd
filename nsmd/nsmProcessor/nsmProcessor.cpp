@@ -24,8 +24,11 @@
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
 
+#include <stdint.h>
+
 #include <phosphor-logging/lg2.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -929,6 +932,200 @@ uint8_t
     return cc;
 }
 
+NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
+                         std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf)
+{}
+
+NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
+                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf)
+{}
+
+void NsmMaxPowerCap::updateValue(uint32_t value)
+{
+    powerCapIntf->maxPowerCapValue(value);
+    lg2::error("NsmMaxPowerCap::updateValue ${VALUE}", "VALUE", value);
+}
+
+requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAX_DEVICE_POWER_LIMIT;
+    auto rc =
+        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        updateValue(value);
+    }
+    else
+    {
+        lg2::error(
+            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
+                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf)
+{}
+
+void NsmMinPowerCap::updateValue(uint32_t value)
+{
+    powerCapIntf->minPowerCapValue(value);
+    lg2::error("NsmMinPowerCap::updateValue ${VALUE}", "VALUE", value);
+}
+
+requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MIN_DEVICE_POWER_LIMIT;
+    auto rc =
+        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        updateValue(value);
+    }
+    else
+    {
+        lg2::error(
+            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmDefaultPowerCap::NsmDefaultPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf)
+{}
+
+void NsmDefaultPowerCap::updateValue(uint32_t value)
+{
+    // powerCapIntf->defaultPowerCap(firmwareVersion);
+    lg2::error("NsmDefaultPowerCap::updateValue ${VALUE}", "VALUE", value);
+}
+
+requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
+                                                eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = DEFAULT_DEVICE_POWER_LIMIT;
+    auto rc =
+        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        updateValue(value);
+    }
+    else
+    {
+        lg2::error(
+            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
 static void createNsmProcessorSensor(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath)
@@ -975,6 +1172,30 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, associations);
 
             nsmDevice->deviceSensors.push_back(associationSensor);
+            // create power cap interface
+            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+                bus, inventoryObjPath.c_str(), uuid);
+
+            // create sensors for power cap properties
+            auto powerCap =
+                std::make_shared<NsmPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(powerCap);
+
+            auto defaultPowerCap =
+                std::make_shared<NsmDefaultPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
+            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
+                .detach();
+
+            auto maxPowerCap =
+                std::make_shared<NsmMaxPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
+            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+
+            auto minPowerCap =
+                std::make_shared<NsmMinPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(minPowerCap);
+            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
         }
         else if (type == "NSM_Location")
         {
