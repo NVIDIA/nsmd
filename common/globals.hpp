@@ -18,6 +18,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 constexpr auto chassisInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/chassis";
@@ -26,3 +27,5 @@ constexpr auto sotwareInventoryBasePath =
     "/xyz/openbmc_project/inventory_software";
 
 const uint8_t PCIeRetimerEEPROMIdentifier = 144;
+
+const std::vector<uint8_t> supportedMessageTypes = {0, 1, 2, 3, 4, 5};

@@ -318,4 +318,13 @@ std::string makeDBusNameValid(const std::string& name);
  */
 std::vector<Association> getAssociations(const std::string& objPath,
                                          const std::string& interfaceSubStr);
+
+/** @brief Parse bitfield response for nsm command
+ *
+ * @param[in] data - std::vector<uint8_t>
+ * @param[in] const bitfield8_t* value - pointer to bitfield data
+ * @param[in] size - uint_8 varuable to hold bitfield data
+ */
+void convertBitMaskToVector(std::vector<uint8_t>& data,
+                            const bitfield8_t* value, uint8_t size);
 } // namespace utils

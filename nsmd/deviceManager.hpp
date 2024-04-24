@@ -18,6 +18,8 @@
 #pragma once
 
 #include "common/types.hpp"
+#include "common/utils.hpp"
+#include "globals.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
 #include "requester/handler.hpp"
@@ -124,6 +126,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     requester::Coroutine
         getSupportedNvidiaMessageType(eid_t eid,
                                       std::vector<uint8_t>& supportedTypes);
+    requester::Coroutine
+        getSupportedCommandCodes(eid_t eid, uint8_t nvidia_message_type,
+                                 std::vector<uint8_t>& supportedCommandCodes);
     requester::Coroutine getFRU(eid_t eid,
                                 nsm::InventoryProperties& properties);
     requester::Coroutine
