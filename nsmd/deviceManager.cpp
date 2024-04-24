@@ -82,6 +82,36 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             nsmDevice = std::make_shared<NsmDevice>(uuid);
             nsmDevices.emplace_back(nsmDevice);
 
+            // get supported commands for device for each message type
+            for (uint8_t messageType : supportedMessageTypes)
+            {
+                std::vector<uint8_t> supportedCommands;
+                rc = co_await getSupportedCommandCodes(eid, messageType,
+                                                       supportedCommands);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error(
+                        "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
+                        "MT", messageType, "RC", rc, "EID", eid);
+                    continue;
+                }
+                std::vector<uint8_t> supportedCommandCodes;
+                utils::convertBitMaskToVector(
+                    supportedCommandCodes,
+                    reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
+                    SUPPORTED_COMMAND_CODE_DATA_SIZE);
+                std::stringstream ss;
+                for (uint8_t commandCode : supportedCommandCodes)
+                {
+                    nsmDevice->messageTypesToCommandCodeMatrix[messageType]
+                                                              [commandCode] =
+                        true;
+                    ss << int(commandCode) << " ";
+                }
+                lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}",
+                          "ROW_NUM", messageType, "ROW_VALUES", ss.str());
+            }
+
             // get inventory information from device
             InventoryProperties properties{};
             rc = co_await getFRU(eid, properties);
@@ -178,11 +208,6 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
 requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     eid_t eid, std::vector<uint8_t>& supportedTypes)
 {
-    if (supportedTypes.size() != SUPPORTED_MSG_TYPE_DATA_SIZE)
-    {
-        co_return NSM_SW_ERROR_LENGTH;
-    }
-
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_supported_nvidia_message_types_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -194,6 +219,7 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     {
         lg2::error("getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
+        instanceIdDb.free(eid, instanceId);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -218,6 +244,57 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
+    // copy contents of types into supportedTypes
+    supportedTypes.resize(SUPPORTED_MSG_TYPE_DATA_SIZE);
+    std::memcpy(supportedTypes.data(), types,
+                SUPPORTED_MSG_TYPE_DATA_SIZE * sizeof(bitfield8_t));
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine DeviceManager::getSupportedCommandCodes(
+    eid_t eid, uint8_t nvidia_message_type,
+    std::vector<uint8_t>& supportedCommands)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_supported_command_codes_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    uint8_t instanceId = instanceIdDb.next(eid);
+    auto rc = encode_get_supported_command_codes_req(
+        instanceId, nvidia_message_type, requestMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("getSupportedCommandCodes failed. eid={EID} rc={RC}", "EID",
+                   eid, "RC", rc);
+        instanceIdDb.free(eid, instanceId);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t supportedCommandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
+    rc = decode_get_supported_command_codes_resp(
+        responseMsg, responseLen, &cc, &reason_code, &supportedCommandCodes[0]);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "get supported command code decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    // copy supportedCommandCodes into supportedCommands
+    supportedCommands.resize(SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    std::memcpy(supportedCommands.data(), supportedCommandCodes,
+                SUPPORTED_COMMAND_CODE_DATA_SIZE * sizeof(bitfield8_t));
     co_return NSM_SW_SUCCESS;
 }
 

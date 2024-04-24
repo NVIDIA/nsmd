@@ -54,6 +54,8 @@ extern "C" {
 #define NSM_EVENT_ACK_LEN 1
 // eventId(1byte)
 
+#define NUM_NSM_TYPES 6
+#define NUM_COMMAND_CODES 256
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,

@@ -21,6 +21,7 @@
 
 #include "deviceManager.hpp"
 #include "eventHandler.hpp"
+#include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"

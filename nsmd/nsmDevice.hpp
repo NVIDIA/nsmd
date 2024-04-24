@@ -43,7 +43,11 @@ class NsmDevice
 {
   public:
     NsmDevice(uuid_t uuid) :
-        uuid(uuid), eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
+        uuid(uuid),
+        messageTypesToCommandCodeMatrix(
+            NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
+        eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
+
     {}
 
     std::shared_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
@@ -62,6 +66,7 @@ class NsmDevice
 
     void setEventMode(uint8_t mode);
     uint8_t getEventMode();
+    std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
 
   private:
     std::vector<std::vector<bitfield8_t>> commands;

@@ -356,4 +356,44 @@ std::vector<Association> getAssociations(const std::string& objPath,
     return associations;
 }
 
+void convertBitMaskToVector(std::vector<uint8_t>& data,
+                            const bitfield8_t* value, uint8_t size)
+{
+    for (uint8_t i = 0; i < size; i++)
+    {
+        if (value[i].bits.bit0)
+        {
+            data.push_back((i * 8) + 0);
+        }
+        if (value[i].bits.bit1)
+        {
+            data.push_back((i * 8) + 1);
+        }
+        if (value[i].bits.bit2)
+        {
+            data.push_back((i * 8) + 2);
+        }
+        if (value[i].bits.bit3)
+        {
+            data.push_back((i * 8) + 3);
+        }
+        if (value[i].bits.bit4)
+        {
+            data.push_back((i * 8) + 4);
+        }
+        if (value[i].bits.bit5)
+        {
+            data.push_back((i * 8) + 5);
+        }
+        if (value[i].bits.bit6)
+        {
+            data.push_back((i * 8) + 6);
+        }
+        if (value[i].bits.bit7)
+        {
+            data.push_back((i * 8) + 7);
+        }
+    }
+}
+
 } // namespace utils
