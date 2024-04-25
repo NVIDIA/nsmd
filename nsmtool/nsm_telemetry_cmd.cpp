@@ -1920,6 +1920,37 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
+            case 6:
+            {
+                struct nsm_query_scalar_group_telemetry_group_6 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group6_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_5_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["InvalidFlitCounter"] = (int)data.invalid_flit_counter;
+                result["LTSSMState"] = (int)data.ltssm_state;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
             default:
             {
                 std::cerr << "Invalid Group Id \n";

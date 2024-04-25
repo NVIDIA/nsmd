@@ -1,10 +1,13 @@
 dep_src_files = [
     '../nsmGpuChassis.cpp',
     '../nsmGpuChassisAssembly.cpp',
+    '../nsmGpuChassisPCIeDevice.cpp',
     '../nsmInventoryProperty.cpp',
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',
     '../nsmPCIeFunction.cpp',
+    '../nsmPCIeDevice.cpp',
+    '../nsmPCIeLTSSMState.cpp',
     '../nsmSensorHelper.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
@@ -35,6 +38,7 @@ test_src = declare_dependency(
 
 tests = [
     'nsmGpuChassis_test',
+    'nsmGpuChassisPCIeDevice_test',
 ]
 
 foreach t : tests

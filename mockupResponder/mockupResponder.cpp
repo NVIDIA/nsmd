@@ -1562,6 +1562,12 @@ void getScalarTelemetryGroup5Data(
     data->PCIeTXBytes = 8769000;
     data->PCIeRXBytes = 876654;
 }
+void getScalarTelemetryGroup6Data(
+    struct nsm_query_scalar_group_telemetry_group_6* data)
+{
+    data->ltssm_state = 0x02;
+    data->invalid_flit_counter = 111;
+}
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
@@ -1718,6 +1724,29 @@ std::optional<std::vector<uint8_t>>
             {
                 lg2::error(
                     "encode_query_scalar_group_telemetry_v1_group5_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case 6:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_query_scalar_group_telemetry_group_6 data;
+            getScalarTelemetryGroup6Data(&data);
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_scalar_group_telemetry_v1_group6_resp failed: rc={RC}",
                     "RC", rc);
                 return std::nullopt;
             }
