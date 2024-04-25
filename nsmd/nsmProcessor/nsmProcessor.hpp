@@ -20,6 +20,7 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
 #include "nsmSensor.hpp"
 
 #include <com/nvidia/Edpp/server.hpp>
@@ -27,9 +28,9 @@
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
 
 namespace nsm

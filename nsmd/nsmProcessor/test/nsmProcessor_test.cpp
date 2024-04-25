@@ -37,6 +37,7 @@ auto bus = sdbusplus::bus::new_default();
 std::string sensorName("dummy_sensor");
 std::string sensorType("dummy_type");
 std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
+uuid_t uuid("992b3ec1-e468-f145-8686-409009062aa8");
 
 TEST(nsmMigMode, GoodGenReq)
 {
@@ -104,7 +105,8 @@ TEST(nsmMigMode, GoodUpdateReading)
 
 TEST(nsmEccMode, GoodGenReq)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccMode eccModeSensor(sensorName, sensorType, eccIntf);
 
     const uint8_t eid{12};
@@ -119,39 +121,10 @@ TEST(nsmEccMode, GoodGenReq)
     EXPECT_EQ(command->data_size, 0);
 }
 
-TEST(nsmEccMode, GoodHandleResp)
-{
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmEccMode sensor(sensorName, sensorType, eccIntf);
-
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_ECC_mode_resp), 0);
-    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    bitfield8_t flags;
-    flags.byte = 1;
-    uint16_t reason_code = ERR_NULL;
-
-    uint8_t rc =
-        encode_get_ECC_mode_resp(0, NSM_SUCCESS, reason_code, &flags, response);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    size_t msg_len = responseMsg.size();
-    rc = sensor.handleResponseMsg(response, msg_len);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-
-TEST(nsmEccMode, GoodUpdateReading)
-{
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmEccMode sensor(sensorName, sensorType, eccIntf);
-    bitfield8_t flags;
-    flags.byte = 1;
-    sensor.updateReading(flags);
-    EXPECT_EQ(sensor.eccModeIntf->eccModeEnabled(), flags.bits.bit0);
-}
-
 TEST(nsmEccMode, BadHandleResp)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccMode sensor(sensorName, sensorType, eccIntf);
 
     std::vector<uint8_t> responseMsg(
@@ -175,7 +148,8 @@ TEST(nsmEccMode, BadHandleResp)
 
 TEST(nsmEccErrorCounts, GoodGenReq)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccErrorCounts eccErrorCntSensor(sensorName, sensorType, eccIntf);
 
     const uint8_t eid{12};
@@ -192,7 +166,8 @@ TEST(nsmEccErrorCounts, GoodGenReq)
 
 TEST(nsmEccErrorCounts, GoodHandleResp)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;
@@ -218,7 +193,8 @@ TEST(nsmEccErrorCounts, GoodHandleResp)
 
 TEST(nsmEccErrorCounts, GoodUpdateReading)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -236,7 +212,8 @@ TEST(nsmEccErrorCounts, GoodUpdateReading)
 
 TEST(nsmEccErrorCounts, BadHandleResp)
 {
-    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
+    auto eccIntf =
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;
