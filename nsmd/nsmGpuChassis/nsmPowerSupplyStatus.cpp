@@ -7,9 +7,10 @@
 namespace nsm
 {
 NsmPowerSupplyStatus::NsmPowerSupplyStatus(
-    std::shared_ptr<NsmInterfaceProvider<PowerStateIntf>> pdi,
+    const NsmInterfaceProvider<PowerStateIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmSensor(*pdi), NsmInterfaceContainer(pdi), gpuInstanceId(gpuInstanceId)
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    gpuInstanceId(gpuInstanceId)
 {}
 
 std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,
@@ -50,15 +51,19 @@ uint8_t
 
     if (cc == NSM_SUCCESS)
     {
-        pdi->currentPowerState(
-            ((status >> gpuInstanceId) & 0x01) != 0
-                ? PowerStateIntf::PowerState::On
-                : PowerStateIntf::PowerState::Off);
+        for (auto pdi : interfaces)
+        {
+            pdi->currentPowerState(((status >> gpuInstanceId) & 0x01) != 0
+                                       ? PowerStateIntf::PowerState::On
+                                       : PowerStateIntf::PowerState::Off);
+        }
     }
     else
     {
-        pdi->currentPowerState(
-            PowerStateIntf::PowerState::Unknown);
+        for (auto pdi : interfaces)
+        {
+            pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
+        }
         lg2::error(
             "responseHandler: decode_get_power_supply_status_resp is not success CC. rc={RC}",
             "RC", rc);

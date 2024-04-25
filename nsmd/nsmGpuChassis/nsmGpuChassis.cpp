@@ -22,23 +22,22 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         objPath.c_str(), "Name", baseInterface.c_str());
     auto type = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
+    auto device = getNsmDevice(manager, objPath, baseInterface);
 
     if (type == "NSM_GPU_Chassis")
     {
         auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", interface.c_str());
         auto chassisUuid = std::make_shared<NsmGpuChassis<UuidIntf>>(name);
-        chassisUuid->uuid(uuid);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        chassisUuid->pdi().uuid(uuid);
         addSensor(device, chassisUuid);
     }
     else if (type == "NSM_Asset")
     {
-        auto chassisAsset = std::make_shared<NsmGpuChassis<AssetIntf>>(name);
+        auto chassisAsset = NsmGpuChassis<AssetIntf>(name);
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        chassisAsset->manufacturer(manufacturer);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        chassisAsset.pdi().manufacturer(manufacturer);
         // create sensor
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<AssetIntf>>(
@@ -55,17 +54,13 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto chassisType = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "ChassisType", interface.c_str());
         auto chassis = std::make_shared<NsmGpuChassis<ChassisIntf>>(name);
-        chassis->ChassisIntf::type(
+        chassis->pdi().type(
             ChassisIntf::convertChassisTypeFromString(chassisType));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, chassis);
     }
     else if (type == "NSM_Dimension")
     {
-        auto chassisDimension =
-            std::make_shared<NsmGpuChassis<DimensionIntf>>(name);
-
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        auto chassisDimension = NsmGpuChassis<DimensionIntf>(name);
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<DimensionIntf>>(
                       chassisDimension, PRODUCT_LENGTH));
@@ -81,8 +76,8 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto health = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
         auto chassisHealth = std::make_shared<NsmGpuChassis<HealthIntf>>(name);
-        chassisHealth->health(HealthIntf::convertHealthTypeFromString(health));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        chassisHealth->pdi().health(
+            HealthIntf::convertHealthTypeFromString(health));
         addSensor(device, chassisHealth);
     }
     else if (type == "NSM_Location")
@@ -91,9 +86,8 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "LocationType", interface.c_str());
         auto chassisLocation =
             std::make_shared<NsmGpuChassis<LocationIntf>>(name);
-        chassisLocation->locationType(
+        chassisLocation->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, chassisLocation);
     }
     else if (type == "NSM_LocationCode")
@@ -102,47 +96,50 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "LocationCode", interface.c_str());
         auto chassisLocationCode =
             std::make_shared<NsmGpuChassis<LocationCodeIntf>>(name);
-        chassisLocationCode->locationCode(locationCode);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        chassisLocationCode->pdi().locationCode(locationCode);
         addSensor(device, chassisLocationCode);
     }
     else if (type == "NSM_PowerLimit")
     {
-        auto chassisPowerLimit =
-            std::make_shared<NsmGpuChassis<PowerLimitIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
+        auto chassisPowerLimit = NsmGpuChassis<PowerLimitIntf>(name);
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         addSensor(device,
                   std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface);
+                  priority);
         addSensor(device,
                   std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                       chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT),
-                  objPath, interface);
+                  priority);
     }
     else if (type == "NSM_OperationalStatus")
     {
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto chassisOperationalStatus =
-            std::make_shared<NsmGpuChassis<OperationalStatusIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
+            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+        auto inventoryObjPaths =
+            utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
+                objPath.c_str(), "InventoryObjPaths", interface.c_str());
+        auto gpuOperationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
+            name, type, inventoryObjPaths);
         addSensor(device,
                   std::make_shared<NsmGpuPresenceAndPowerStatus>(
-                      chassisOperationalStatus, instanceId),
+                      gpuOperationalStatus, instanceId),
                   objPath, interface);
     }
     else if (type == "NSM_PowerState")
     {
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto chassisPowerState =
-            std::make_shared<NsmGpuChassis<PowerStateIntf>>(name);
-        auto device = getNsmDevice(manager, objPath, interface);
-        addSensor(device,
-                  std::make_shared<NsmPowerSupplyStatus>(chassisPowerState,
-                                                         instanceId),
-                  objPath, interface);
+            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+        auto inventoryObjPaths =
+            utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
+                objPath.c_str(), "InventoryObjPaths", interface.c_str());
+        auto gpuPowerState =
+            NsmInterfaceProvider<PowerStateIntf>(name, type, inventoryObjPaths);
+        addSensor(
+            device,
+            std::make_shared<NsmPowerSupplyStatus>(gpuPowerState, instanceId),
+            objPath, interface);
     }
 }
 

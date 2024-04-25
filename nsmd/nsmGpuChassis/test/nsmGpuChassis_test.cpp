@@ -29,21 +29,17 @@ struct NsmGpuChassisTest : public testing::Test
 
 struct NsmInventoryPropertyTest : public NsmGpuChassisTest
 {
-    std::shared_ptr<NsmGpuChassis<AssetIntf>> chassisAsset =
-        std::make_shared<NsmGpuChassis<AssetIntf>>(name);
-    std::shared_ptr<NsmGpuChassis<DimensionIntf>> chassisDimension =
-        std::make_shared<NsmGpuChassis<DimensionIntf>>(name);
-    std::shared_ptr<NsmGpuChassis<PowerLimitIntf>> chassisPowerLimit =
-        std::make_shared<NsmGpuChassis<PowerLimitIntf>>(name);
-
+    NsmGpuChassis<AssetIntf> chassisAsset{name};
+    NsmGpuChassis<DimensionIntf> chassisDimension{name};
+    NsmGpuChassis<PowerLimitIntf> chassisPowerLimit{name};
     void SetUp() override
     {
-        EXPECT_EQ(chassisAsset->getName(), name);
-        EXPECT_EQ(chassisAsset->getType(), "NSM_GPU_Chassis");
-        EXPECT_EQ(chassisDimension->getName(), name);
-        EXPECT_EQ(chassisDimension->getType(), "NSM_GPU_Chassis");
-        EXPECT_EQ(chassisPowerLimit->getName(), name);
-        EXPECT_EQ(chassisPowerLimit->getType(), "NSM_GPU_Chassis");
+        EXPECT_EQ(chassisAsset.getName(), name);
+        EXPECT_EQ(chassisAsset.getType(), "NSM_GPU_Chassis");
+        EXPECT_EQ(chassisDimension.getName(), name);
+        EXPECT_EQ(chassisDimension.getType(), "NSM_GPU_Chassis");
+        EXPECT_EQ(chassisPowerLimit.getName(), name);
+        EXPECT_EQ(chassisPowerLimit.getType(), "NSM_GPU_Chassis");
     }
 
     std::shared_ptr<NsmInventoryPropertyBase> sensor;
@@ -78,130 +74,126 @@ struct NsmInventoryPropertyTest : public NsmGpuChassisTest
 TEST_F(NsmInventoryPropertyTest, goodTestPartNumberRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
+        chassisAsset, BOARD_PART_NUMBER);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestPartNumberResponse)
 {
     std::string partNumber = "PN12345";
     sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
+        chassisAsset, BOARD_PART_NUMBER);
     testResponse((uint8_t*)partNumber.c_str(), partNumber.size());
-    EXPECT_EQ(chassisAsset->partNumber(), partNumber);
+    EXPECT_EQ(chassisAsset.pdi().partNumber(), partNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::SERIAL_NUMBER);
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(chassisAsset,
+                                                               SERIAL_NUMBER);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberResponse)
 {
     std::string serialNumber = "SN12345";
-    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::SERIAL_NUMBER);
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(chassisAsset,
+                                                               SERIAL_NUMBER);
     testResponse((uint8_t*)serialNumber.c_str(), serialNumber.size());
-    EXPECT_EQ(chassisAsset->serialNumber(), serialNumber);
+    EXPECT_EQ(chassisAsset.pdi().serialNumber(), serialNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestModelRequest)
 {
-    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::MARKETING_NAME);
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(chassisAsset,
+                                                               MARKETING_NAME);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestModelResponse)
 {
     std::string model = "NV123";
-    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::MARKETING_NAME);
+    sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(chassisAsset,
+                                                               MARKETING_NAME);
     testResponse((uint8_t*)model.c_str(), model.size());
-    EXPECT_EQ(chassisAsset->model(), model);
+    EXPECT_EQ(chassisAsset.pdi().model(), model);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestDepthRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_LENGTH);
+        chassisDimension, PRODUCT_LENGTH);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestDepthResponse)
 {
     uint32_t depth = 850;
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_LENGTH);
+        chassisDimension, PRODUCT_LENGTH);
     testResponse((uint8_t*)&depth, sizeof(depth));
-    EXPECT_EQ(chassisDimension->depth(), (double)depth);
+    EXPECT_EQ(chassisDimension.pdi().depth(), (double)depth);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestHeightRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_HEIGHT);
+        chassisDimension, PRODUCT_HEIGHT);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestHeightResponse)
 {
     uint32_t height = 2100;
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_HEIGHT);
+        chassisDimension, PRODUCT_HEIGHT);
     testResponse((uint8_t*)&height, sizeof(height));
-    EXPECT_EQ(chassisDimension->height(), (double)height);
+    EXPECT_EQ(chassisDimension.pdi().height(), (double)height);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestWidthRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_WIDTH);
+        chassisDimension, PRODUCT_WIDTH);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestWidthResponse)
 {
     uint32_t width = 712;
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-        chassisDimension, nsm_inventory_property_identifiers::PRODUCT_WIDTH);
+        chassisDimension, PRODUCT_WIDTH);
     testResponse((uint8_t*)&width, sizeof(width));
-    EXPECT_EQ(chassisDimension->width(), (double)width);
+    EXPECT_EQ(chassisDimension.pdi().width(), (double)width);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-        chassisPowerLimit,
-        nsm_inventory_property_identifiers::MINIMUM_DEVICE_POWER_LIMIT);
+        chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsResponse)
 {
     uint32_t minPowerWatts = 100;
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-        chassisPowerLimit,
-        nsm_inventory_property_identifiers::MINIMUM_DEVICE_POWER_LIMIT);
+        chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&minPowerWatts, sizeof(minPowerWatts));
-    EXPECT_EQ(chassisPowerLimit->minPowerWatts(), (size_t)minPowerWatts);
+    EXPECT_EQ(chassisPowerLimit.pdi().minPowerWatts(), (size_t)minPowerWatts);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-        chassisPowerLimit,
-        nsm_inventory_property_identifiers::MAXIMUM_DEVICE_POWER_LIMIT);
+        chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT);
     testRequest();
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsResponse)
 {
     uint32_t maxPowerWatts = 100;
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-        chassisPowerLimit,
-        nsm_inventory_property_identifiers::MAXIMUM_DEVICE_POWER_LIMIT);
+        chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&maxPowerWatts, sizeof(maxPowerWatts));
-    EXPECT_EQ(chassisPowerLimit->maxPowerWatts(), (size_t)maxPowerWatts);
+    EXPECT_EQ(chassisPowerLimit.pdi().maxPowerWatts(), (size_t)maxPowerWatts);
 }
 TEST_F(NsmInventoryPropertyTest, badTestRequest)
 {
     sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
+        chassisAsset, BOARD_PART_NUMBER);
     auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
 TEST_F(NsmInventoryPropertyTest, badTestResponseSize)
 {
     sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
+        chassisAsset, BOARD_PART_NUMBER);
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_inventory_information_resp) - 1);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -215,7 +207,7 @@ TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
 {
     uint8_t value = 0;
     sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-        chassisAsset, nsm_inventory_property_identifiers::BOARD_PART_NUMBER);
+        chassisAsset, BOARD_PART_NUMBER);
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                   NSM_RESPONSE_CONVENTION_LEN + sizeof(value));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -236,7 +228,7 @@ TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
     {
         uint8_t value = 0;
         sensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            chassisAsset, nsm_inventory_property_identifiers::MEMORY_VENDOR);
+            chassisAsset, MEMORY_VENDOR);
         testResponse(&value, sizeof(value));
         FAIL() << "Expected std::runtime_error";
     }
@@ -252,20 +244,19 @@ TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
 
 struct NsmPowerSupplyStatusTest : public NsmGpuChassisTest
 {
-    std::shared_ptr<NsmGpuChassis<PowerStateIntf>> chassisPowerState =
-        std::make_shared<NsmGpuChassis<PowerStateIntf>>(name);
+    NsmGpuChassis<PowerStateIntf> chassisPowerState{name};
 
     void SetUp() override
     {
-        EXPECT_EQ(chassisPowerState->getName(), name);
-        EXPECT_EQ(chassisPowerState->getType(), "NSM_GPU_Chassis");
+        EXPECT_EQ(chassisPowerState.getName(), name);
+        EXPECT_EQ(chassisPowerState.getType(), "NSM_GPU_Chassis");
     }
     std::shared_ptr<NsmPowerSupplyStatus> sensor;
-    void init(std::shared_ptr<NsmInterfaceProvider<PowerStateIntf>> pdi,
-              uint8_t gpuInstanceId)
+    void init(uint8_t gpuInstanceId)
     {
         eid = 12;
-        sensor = std::make_shared<NsmPowerSupplyStatus>(pdi, gpuInstanceId);
+        sensor = std::make_shared<NsmPowerSupplyStatus>(chassisPowerState,
+                                                        gpuInstanceId);
         EXPECT_NE(sensor, nullptr);
         EXPECT_EQ(sensor->getName(), name);
         EXPECT_EQ(sensor->getType(), "NSM_GPU_Chassis");
@@ -286,7 +277,7 @@ struct NsmPowerSupplyStatusTest : public NsmGpuChassisTest
 
 TEST_F(NsmPowerSupplyStatusTest, goodTestRequest)
 {
-    init(chassisPowerState, 0);
+    init(0);
     auto request = sensor->genRequestMsg(eid, instanceId);
     EXPECT_TRUE(request.has_value());
     EXPECT_EQ(request.value().size(),
@@ -300,26 +291,26 @@ TEST_F(NsmPowerSupplyStatusTest, goodTestResponse)
 {
     for (uint8_t i = 0; i < 8; i++)
     {
-        init(chassisPowerState, i);
+        init(i);
         using PowerState =
             sdbusplus::xyz::openbmc_project::State::server::Chassis::PowerState;
         for (auto state : {PowerState::Off, PowerState::On})
         {
             uint8_t status = (state == PowerState::On) << i;
             testResponse(status);
-            EXPECT_EQ(chassisPowerState->currentPowerState(), state);
+            EXPECT_EQ(chassisPowerState.pdi().currentPowerState(), state);
         }
     }
 }
 TEST_F(NsmPowerSupplyStatusTest, badTestRequest)
 {
-    init(chassisPowerState, 0);
+    init(0);
     auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
 TEST_F(NsmPowerSupplyStatusTest, badTestResponseSize)
 {
-    init(chassisPowerState, 0);
+    init(0);
     uint8_t status = 0;
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                   sizeof(nsm_get_power_supply_status_resp));
@@ -332,7 +323,7 @@ TEST_F(NsmPowerSupplyStatusTest, badTestResponseSize)
 }
 TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
 {
-    init(chassisPowerState, 0);
+    init(0);
     uint8_t status = 0;
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                   sizeof(nsm_get_power_supply_status_resp));
@@ -351,22 +342,18 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
 
 struct NsmGpuPresenceAndPowerStatusTest : public NsmGpuChassisTest
 {
-    std::shared_ptr<NsmGpuChassis<OperationalStatusIntf>>
-        chassisOperationalStatus =
-            std::make_shared<NsmGpuChassis<OperationalStatusIntf>>(name);
-
+    NsmGpuChassis<OperationalStatusIntf> chassisOperationalStatus{name};
     void SetUp() override
     {
-        EXPECT_EQ(chassisOperationalStatus->getName(), name);
-        EXPECT_EQ(chassisOperationalStatus->getType(), "NSM_GPU_Chassis");
+        EXPECT_EQ(chassisOperationalStatus.getName(), name);
+        EXPECT_EQ(chassisOperationalStatus.getType(), "NSM_GPU_Chassis");
     }
     std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor;
-    void init(std::shared_ptr<NsmInterfaceProvider<OperationalStatusIntf>> pdi,
-              uint8_t gpuInstanceId)
+    void init(uint8_t gpuInstanceId)
     {
         eid = 12;
-        sensor =
-            std::make_shared<NsmGpuPresenceAndPowerStatus>(pdi, gpuInstanceId);
+        sensor = std::make_shared<NsmGpuPresenceAndPowerStatus>(
+            chassisOperationalStatus, gpuInstanceId);
         EXPECT_NE(sensor, nullptr);
         EXPECT_EQ(sensor->getName(), name);
         EXPECT_EQ(sensor->getType(), "NSM_GPU_Chassis");
@@ -389,7 +376,7 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmGpuChassisTest
 
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestRequest)
 {
-    init(chassisOperationalStatus, 0);
+    init(0);
     auto request = sensor->genRequestMsg(eid, instanceId);
     EXPECT_TRUE(request.has_value());
     EXPECT_EQ(request.value().size(),
@@ -405,11 +392,11 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
     // "State": "Enabled" if presence=active, power=active
     for (uint8_t i = 0; i < 8; i++)
     {
-        init(chassisOperationalStatus, i);
+        init(i);
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x01 << i);
-        EXPECT_EQ(chassisOperationalStatus->state(), StateType::Enabled);
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Enabled);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest,
@@ -418,11 +405,11 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
     //"State": "UnavailableOffline" if presence=active,
     for (uint8_t i = 0; i < 8; i++)
     {
-        init(chassisOperationalStatus, i);
+        init(i);
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x00);
-        EXPECT_EQ(chassisOperationalStatus->state(),
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(),
                   StateType::UnavailableOffline);
     }
 }
@@ -431,22 +418,22 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
     // power=inactive "State": "Absent" if presence=inactive
     for (uint8_t i = 0; i < 8; i++)
     {
-        init(chassisOperationalStatus, i);
+        init(i);
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0, 0);
-        EXPECT_EQ(chassisOperationalStatus->state(), StateType::Absent);
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Absent);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestRequest)
 {
-    init(chassisOperationalStatus, 0);
+    init(0);
     auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestResponseSize)
 {
-    init(chassisOperationalStatus, 0);
+    init(0);
     uint8_t presence = 0;
     uint8_t power_status = 0;
     std::vector<uint8_t> response(
@@ -461,7 +448,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestResponseSize)
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestCompletionErrorResponse)
 {
-    init(chassisOperationalStatus, 0);
+    init(0);
     uint8_t presence = 0;
     uint8_t power_status = 0;
     std::vector<uint8_t> response(

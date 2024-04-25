@@ -8,9 +8,10 @@ namespace nsm
 {
 
 NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
-    std::shared_ptr<NsmInterfaceProvider<OperationalStatusIntf>> pdi,
+    const NsmInterfaceProvider<OperationalStatusIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmSensor(*pdi), NsmInterfaceContainer(pdi), gpuInstanceId(gpuInstanceId)
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    gpuInstanceId(gpuInstanceId)
 {}
 
 std::optional<Request>
@@ -60,19 +61,15 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
         bool power = ((gpus_power >> (gpuInstanceId)) & 0x1) != 0;
         bool presence = ((gpus_presence >> (gpuInstanceId)) & 0x1) != 0;
         if (power && presence)
-            pdi->state(
-                OperationalStatusIntf::StateType::Enabled);
+            pdi().state(OperationalStatusIntf::StateType::Enabled);
         else if (presence)
-            pdi->state(
-                OperationalStatusIntf::StateType::UnavailableOffline);
+            pdi().state(OperationalStatusIntf::StateType::UnavailableOffline);
         else
-            pdi->state(
-                OperationalStatusIntf::StateType::Absent);
+            pdi().state(OperationalStatusIntf::StateType::Absent);
     }
     else
     {
-        pdi->state(
-            OperationalStatusIntf::StateType::Fault);
+        pdi().state(OperationalStatusIntf::StateType::Fault);
         lg2::error(
             "responseHandler: decode_get_gpu_presence_and_power_status_resp is not success CC. rc={RC}",
             "RC", rc);

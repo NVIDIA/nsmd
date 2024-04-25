@@ -1,5 +1,6 @@
 dep_src_files = [
     '../nsmGpuChassis.cpp',
+    '../nsmGpuChassisAssembly.cpp',
     '../nsmInventoryProperty.cpp',
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',

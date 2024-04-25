@@ -35,6 +35,17 @@ void addSensor(std::shared_ptr<NsmDevice>& device,
  *
  * @param device[in,out] Pointer to shared NsmDevice
  * @param sensor[in] Pointer to dynamic sensor
+ * @param priority[in] Flag to add sensor as priority sensor
+ */
+void addSensor(std::shared_ptr<NsmDevice>& device,
+               std::shared_ptr<NsmSensor> sensor, bool priority);
+
+/**
+ * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority' for
+ * the provided interface
+ *
+ * @param device[in,out] Pointer to shared NsmDevice
+ * @param sensor[in] Pointer to dynamic sensor
  * @param objPath[in] Dbus object path
  * @param interface[in] Interface name for finding Priority property
  */
