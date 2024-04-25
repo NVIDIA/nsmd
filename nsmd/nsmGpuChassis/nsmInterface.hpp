@@ -20,23 +20,23 @@ using Interfaces = std::vector<std::shared_ptr<IntfType>>;
  * @tparam IntfType type of the PDI (i.e. Asset, Dimension ect.)
  */
 template <typename IntfType>
-struct NsmInterfaceContainerBase
+struct NsmInterfaces
 {
     Interfaces<IntfType> interfaces;
-    NsmInterfaceContainerBase() = default;
-    NsmInterfaceContainerBase(const Interfaces<IntfType>& interfaces) :
+    NsmInterfaces() = delete;
+    NsmInterfaces(const Interfaces<IntfType>& interfaces) :
         interfaces(interfaces)
     {
         if (interfaces.empty())
         {
             throw std::runtime_error(
-                "NsmInterfaceContainerBase::NsmInterfaceContainerBase - interfaces cannot be empty");
+                "NsmInterfaces::NsmInterfaces - interfaces cannot be empty");
         }
     }
     /**
      * @brief Returns first pdi pointer from interfaces collection
      *
-     * @return std::shared_ptr<IntfType> First PDI in interfaces collection
+     * @return Reference to IntfType First PDI in interfaces collection
      */
     IntfType& pdi()
     {
@@ -50,43 +50,40 @@ struct NsmInterfaceContainerBase
  * @tparam IntfType type of the PDI (i.e. Asset, Dimension ect.)
  */
 template <typename IntfType>
-class NsmInterfaceProvider :
-    public NsmObject,
-    public NsmInterfaceContainerBase<IntfType>
+class NsmInterfaceProvider : public NsmObject, public NsmInterfaces<IntfType>
 {
+  private:
+    static auto createInterfaces(const dbus::Interfaces& objectsPaths)
+    {
+        Interfaces<IntfType> interfaces;
+        for (const auto& path : objectsPaths)
+        {
+            interfaces.emplace_back(std::make_shared<IntfType>(
+                utils::DBusHandler::getBus(), path.c_str()));
+        }
+        return interfaces;
+    }
+
   public:
     NsmInterfaceProvider() = delete;
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          const dbus::Interfaces& objectsPaths) :
-        NsmObject(name, type)
-    {
-        if (objectsPaths.empty())
-        {
-            throw std::runtime_error(
-                "NsmInterfaceProvider::NsmInterfaceProvider - objectsPaths cannot be empty");
-        }
-        for (const auto& path : objectsPaths)
-        {
-            NsmInterfaceContainerBase<IntfType>::interfaces.emplace_back(
-                std::make_shared<IntfType>(utils::DBusHandler::getBus(),
-                                           path.c_str()));
-        }
-    }
+        NsmObject(name, type),
+        NsmInterfaces<IntfType>(createInterfaces(objectsPaths))
+    {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          const std::string& basePath) :
         NsmObject(name, type),
-        NsmInterfaceContainerBase<IntfType>(
-            Interfaces<IntfType>{std::make_shared<IntfType>(
-                utils::DBusHandler::getBus(), (basePath + name).c_str())})
+        NsmInterfaces<IntfType>(createInterfaces({basePath + name}))
     {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          const Interfaces<IntfType>& interfaces) :
-        NsmObject(name, type), NsmInterfaceContainerBase<IntfType>(interfaces)
+        NsmObject(name, type), NsmInterfaces<IntfType>(interfaces)
     {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          std::shared_ptr<IntfType> pdi) :
         NsmObject(name, type),
-        NsmInterfaceContainerBase<IntfType>(Interfaces<IntfType>{pdi})
+        NsmInterfaces<IntfType>(Interfaces<IntfType>{pdi})
     {}
 };
 
@@ -95,18 +92,18 @@ class NsmInterfaceProvider :
  *
  */
 template <typename IntfType>
-class NsmInterfaceContainer : protected NsmInterfaceContainerBase<IntfType>
+class NsmInterfaceContainer : protected NsmInterfaces<IntfType>
 {
   public:
     NsmInterfaceContainer() = delete;
     NsmInterfaceContainer(const NsmInterfaceProvider<IntfType>& provider) :
-        NsmInterfaceContainerBase<IntfType>(provider.interfaces)
+        NsmInterfaces<IntfType>(provider.interfaces)
     {}
     NsmInterfaceContainer(const Interfaces<IntfType>& interfaces) :
-        NsmInterfaceContainerBase<IntfType>(interfaces)
+        NsmInterfaces<IntfType>(interfaces)
     {}
     NsmInterfaceContainer(const std::shared_ptr<IntfType>& pdi) :
-        NsmInterfaceContainerBase<IntfType>(Interfaces<IntfType>{pdi})
+        NsmInterfaces<IntfType>(Interfaces<IntfType>{pdi})
     {}
 };
 

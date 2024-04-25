@@ -7,6 +7,8 @@ sources += [
     'nsmGpuChassis/nsmPowerSupplyStatus.cpp',
     'nsmGpuChassis/nsmGpuPresenceAndPowerStatus.cpp',
     'nsmGpuChassis/nsmPCIeFunction.cpp',
+    'nsmGpuChassis/nsmPCIeDevice.cpp',
+    'nsmGpuChassis/nsmPCIeLTSSMState.cpp',
     'nsmGpuChassis/nsmSensorHelper.cpp',
 ]
 
