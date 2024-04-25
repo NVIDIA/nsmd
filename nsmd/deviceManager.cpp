@@ -316,6 +316,47 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
     co_return NSM_SW_SUCCESS;
 }
 
+requester::Coroutine
+    DeviceManager::updateNsmDevice(const std::shared_ptr<NsmDevice>& nsmDevice,
+                                   uint8_t eid)
+{
+    // Reset messageTypesToCommandCodeMatrix to all false entries
+    nsmDevice->messageTypesToCommandCodeMatrix.assign(
+        NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false));
+
+    // Loop through supported message types
+    for (uint8_t messageType : supportedMessageTypes)
+    {
+        std::vector<uint8_t> supportedCommands;
+        auto rc = co_await getSupportedCommandCodes(eid, messageType,
+                                                    supportedCommands);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
+                "MT", messageType, "RC", rc, "EID", eid);
+            continue;
+        }
+
+        std::vector<uint8_t> supportedCommandCodes;
+        utils::convertBitMaskToVector(
+            supportedCommandCodes,
+            reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
+            SUPPORTED_COMMAND_CODE_DATA_SIZE);
+        std::stringstream ss;
+        for (uint8_t commandCode : supportedCommandCodes)
+        {
+            nsmDevice
+                ->messageTypesToCommandCodeMatrix[messageType][commandCode] =
+                true;
+            ss << int(commandCode) << " ";
+        }
+        lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "ROW_NUM",
+                  messageType, "ROW_VALUES", ss.str());
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine DeviceManager::getInventoryInformation(
     eid_t eid, uint8_t& propertyIdentifier, InventoryProperties& properties)
 {
