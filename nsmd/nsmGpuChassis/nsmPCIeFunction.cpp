@@ -8,9 +8,9 @@ namespace nsm
 {
 
 NsmPCIeFunction::NsmPCIeFunction(
-    std::shared_ptr<NsmInterfaceProvider<PCIeDeviceIntf>> pdi, uint8_t deviceId,
+    const NsmInterfaceProvider<PCIeDeviceIntf>& provider, uint8_t deviceId,
     uint8_t functionId) :
-    NsmSensor(*pdi), NsmInterfaceContainer(pdi), deviceId(deviceId),
+    NsmSensor(provider), NsmInterfaceContainer(provider), deviceId(deviceId),
     functionId(functionId)
 {}
 
@@ -60,13 +60,11 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
 
 #define pcieFunction(X)                                                        \
-    pdi->function##X##VendorId(                              \
-        std::to_string(data.pci_vendor_id));                                   \
-    pdi->function##X##DeviceId(                              \
-        std::to_string(data.pci_device_id));                                   \
-    pdi->function##X##SubsystemVendorId(                     \
+    pdi().function##X##VendorId(std::to_string(data.pci_vendor_id));           \
+    pdi().function##X##DeviceId(std::to_string(data.pci_device_id));           \
+    pdi().function##X##SubsystemVendorId(                                      \
         std::to_string(data.pci_subsystem_vendor_id));                         \
-    pdi->function##X##SubsystemId(                           \
+    pdi().function##X##SubsystemId(                                            \
         std::to_string(data.pci_subsystem_device_id));
 
     switch (functionId)

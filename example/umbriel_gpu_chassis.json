@@ -70,12 +70,6 @@
                     "Type": "NSM_Health",
                     "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
                 },
-                "OperationalStatus": {
-                    "Type": "NSM_OperationalStatus",
-                    "UUID": "$FPGA_UUID",
-                    "InstanceNumber": "$INSTANCE_NUMBER",
-                    "Priority": false
-                },
                 "PCIeDevice": {
                     "Type": "NSM_PCIeDevice",
                     "DeviceType": "SingleFunction",

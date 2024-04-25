@@ -45,10 +45,10 @@ class NsmInventoryProperty :
 
   public:
     NsmInventoryProperty() = delete;
-    NsmInventoryProperty(std::shared_ptr<NsmInterfaceProvider<IntfType>> pdi,
+    NsmInventoryProperty(const NsmInterfaceProvider<IntfType>& provider,
                          nsm_inventory_property_identifiers property) :
-        NsmInventoryPropertyBase(*pdi, property),
-        NsmInterfaceContainer<IntfType>(pdi)
+        NsmInventoryPropertyBase(provider, property),
+        NsmInterfaceContainer<IntfType>(provider)
     {}
 };
 
@@ -59,13 +59,13 @@ inline void
     switch (property)
     {
         case BOARD_PART_NUMBER:
-            pdi->partNumber(std::string((char*)data.data(), data.size()));
+            pdi().partNumber(std::string((char*)data.data(), data.size()));
             break;
         case SERIAL_NUMBER:
-            pdi->serialNumber(std::string((char*)data.data(), data.size()));
+            pdi().serialNumber(std::string((char*)data.data(), data.size()));
             break;
         case MARKETING_NAME:
-            pdi->model(std::string((char*)data.data(), data.size()));
+            pdi().model(std::string((char*)data.data(), data.size()));
             break;
         default:
             throw std::runtime_error("Not implemented PDI");
@@ -80,16 +80,16 @@ inline void
     switch (property)
     {
         case PRODUCT_LENGTH:
-            pdi->depth(decode_inventory_information_as_uint32(data.data(),
-                                                              data.size()));
-            break;
-        case PRODUCT_HEIGHT:
-            pdi->height(decode_inventory_information_as_uint32(data.data(),
+            pdi().depth(decode_inventory_information_as_uint32(data.data(),
                                                                data.size()));
             break;
+        case PRODUCT_HEIGHT:
+            pdi().height(decode_inventory_information_as_uint32(data.data(),
+                                                                data.size()));
+            break;
         case PRODUCT_WIDTH:
-            pdi->width(decode_inventory_information_as_uint32(data.data(),
-                                                              data.size()));
+            pdi().width(decode_inventory_information_as_uint32(data.data(),
+                                                               data.size()));
             break;
         default:
             throw std::runtime_error("Not implemented PDI");
@@ -104,11 +104,11 @@ inline void
     switch (property)
     {
         case MINIMUM_DEVICE_POWER_LIMIT:
-            pdi->minPowerWatts(decode_inventory_information_as_uint32(
+            pdi().minPowerWatts(decode_inventory_information_as_uint32(
                 data.data(), data.size()));
             break;
         case MAXIMUM_DEVICE_POWER_LIMIT:
-            pdi->maxPowerWatts(decode_inventory_information_as_uint32(
+            pdi().maxPowerWatts(decode_inventory_information_as_uint32(
                 data.data(), data.size()));
             break;
         default:

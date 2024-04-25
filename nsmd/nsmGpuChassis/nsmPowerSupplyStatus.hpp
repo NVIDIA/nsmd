@@ -15,9 +15,8 @@ class NsmPowerSupplyStatus :
     public NsmInterfaceContainer<PowerStateIntf>
 {
   public:
-    NsmPowerSupplyStatus(
-        std::shared_ptr<NsmInterfaceProvider<PowerStateIntf>> pdi,
-        uint8_t gpuInstanceId);
+    NsmPowerSupplyStatus(const NsmInterfaceProvider<PowerStateIntf>& provider,
+                         uint8_t gpuInstanceId);
     NsmPowerSupplyStatus() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,

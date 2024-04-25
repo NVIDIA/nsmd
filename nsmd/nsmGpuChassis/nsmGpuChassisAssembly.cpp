@@ -22,13 +22,13 @@ void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
         objPath.c_str(), "Name", baseInterface.c_str());
     auto type = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
+    auto device = getNsmDevice(manager, objPath, baseInterface);
 
     if (type == "NSM_GPU_ChassisAssembly")
     {
         auto assemblyObject =
             std::make_shared<NsmGpuChassisAssembly<AssemblyIntf>>(chassisName,
                                                                   name);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, assemblyObject);
     }
     else if (type == "NSM_Area")
@@ -38,9 +38,8 @@ void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
                 objPath.c_str(), "PhysicalContext", interface.c_str());
         auto chassisArea = std::make_shared<NsmGpuChassisAssembly<AreaIntf>>(
             chassisName, name);
-        chassisArea->physicalContext(
+        chassisArea->pdi().physicalContext(
             AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, chassisArea);
     }
     else if (type == "NSM_Asset")
@@ -49,11 +48,9 @@ void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
             objPath.c_str(), "Vendor", interface.c_str());
         auto assetsName = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
-        auto assetObject = std::make_shared<NsmGpuChassisAssembly<AssetIntf>>(
-            chassisName, name);
-        assetObject->manufacturer(vendor);
-        assetObject->AssetIntf::name(assetsName);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        auto assetObject = NsmGpuChassisAssembly<AssetIntf>(chassisName, name);
+        assetObject.pdi().manufacturer(vendor);
+        assetObject.pdi().name(assetsName);
         // create sensor
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<AssetIntf>>(
@@ -74,8 +71,8 @@ void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
             objPath.c_str(), "Health", interface.c_str());
         auto healthObject = std::make_shared<NsmGpuChassisAssembly<HealthIntf>>(
             chassisName, name);
-        healthObject->health(HealthIntf::convertHealthTypeFromString(health));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        healthObject->pdi().health(
+            HealthIntf::convertHealthTypeFromString(health));
         addSensor(device, healthObject);
     }
     else if (type == "NSM_Location")
@@ -85,9 +82,8 @@ void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
         auto locationObject =
             std::make_shared<NsmGpuChassisAssembly<LocationIntf>>(chassisName,
                                                                   name);
-        locationObject->locationType(
+        locationObject->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, locationObject);
     }
 }

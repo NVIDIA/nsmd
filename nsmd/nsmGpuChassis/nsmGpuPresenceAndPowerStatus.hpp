@@ -17,7 +17,7 @@ class NsmGpuPresenceAndPowerStatus :
 {
   public:
     NsmGpuPresenceAndPowerStatus(
-        std::shared_ptr<NsmInterfaceProvider<OperationalStatusIntf>> pdi,
+        const NsmInterfaceProvider<OperationalStatusIntf>& provider,
         uint8_t gpuInstanceId);
     NsmGpuPresenceAndPowerStatus() = delete;
 

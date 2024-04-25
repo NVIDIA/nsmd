@@ -22,6 +22,7 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
         objPath.c_str(), "Name", baseInterface.c_str());
     auto type = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
+    auto device = getNsmDevice(manager, objPath, baseInterface);
 
     if (type == "NSM_PCIeDevice")
     {
@@ -32,15 +33,13 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
         auto functionIds =
             utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
                 objPath.c_str(), "Functions", interface.c_str());
-        auto pcieDeviceObejct =
-            std::make_shared<NsmGpuChassisPCIeDevice<PCIeDeviceIntf>>(
-                chassisName, name);
-        pcieDeviceObejct->deviceType(deviceType);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
+        auto pcieDeviceObject =
+            NsmGpuChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
+        pcieDeviceObject.pdi().deviceType(deviceType);
         for (auto& id : functionIds)
         {
             addSensor(manager, device,
-                      std::make_shared<NsmPCIeFunction>(pcieDeviceObejct,
+                      std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
                                                         deviceId, id));
         }
     }
