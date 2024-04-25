@@ -21,7 +21,9 @@
 
 #include "utils.hpp"
 
-#include <telemetry_mrd_producer.hpp>
+#include <endian.h>
+
+#include <tal.hpp>
 
 namespace nsm
 {
@@ -109,18 +111,48 @@ void NsmNumericSensorDbusStatus::updateStatus(bool available, bool functional)
     operationalStatusIntf.functional(functional);
 }
 
-#ifdef NVIDIA_SHMEM
-NsmNumericSensorShmem::NsmNumericSensorShmem(const std::string& name,
-                                             const std::string& sensor_type,
-                                             const std::string& association) :
-    objPath("/xyz/openbmc_project/sensors/" + sensor_type + '/' + name),
-    association(association)
+std::vector<uint8_t> SMBPBIPowerSMBusSensorBytesConverter::convert(double val)
 {
-    DbusVariantType valueVariant{double{0}};
+    std::vector<uint8_t> data(4);
+    // unit of power is milliwatt in SMBus Sensors and selected unit
+    // in SensorValue PDI is Watts. Hence it is converted to milliwatts.
+    auto smbusVal = static_cast<uint32_t>(val * 1000.0);
+    smbusVal = htole32(smbusVal);
+    std::memcpy(data.data(), &smbusVal, 4);
 
-    nv::shmem::AggregationService::updateTelemetry(objPath, valueInterface,
-                                                   valueProperty, valueVariant,
-                                                   0, -1, association);
+    return data;
+}
+
+std::vector<uint8_t> SFxP24F8SMBusSensorBytesConverter::convert(double val)
+{
+    std::vector<uint8_t> data(4);
+    auto smbusVal = static_cast<int32_t>(val * (1 << 8));
+    smbusVal = htole32(smbusVal);
+    std::memcpy(data.data(), &smbusVal, 4);
+
+    return data;
+}
+
+std::vector<uint8_t> Uint64SMBusSensorBytesConverter::convert(double val)
+{
+    std::vector<uint8_t> data(8);
+    auto smbusVal = static_cast<uint64_t>(val);
+    smbusVal = htole64(smbusVal);
+    std::memcpy(data.data(), &smbusVal, 8);
+
+    return data;
+}
+
+#ifdef NVIDIA_SHMEM
+NsmNumericSensorShmem::NsmNumericSensorShmem(
+    const std::string& name, const std::string& sensor_type,
+    const std::string& association,
+    std::unique_ptr<SMBusSensorBytesConverter> smbusSensorBytesConverter) :
+    objPath("/xyz/openbmc_project/sensors/" + sensor_type + '/' + name),
+    association(association),
+    smbusSensorBytesConverter(std::move(smbusSensorBytesConverter))
+{
+    updateReading(std::numeric_limits<double>::quiet_NaN());
 }
 
 void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
@@ -130,11 +162,13 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
             std::chrono::steady_clock::now().time_since_epoch())
             .count());
 
-    DbusVariantType valueVariant{value};
+    nv::sensor_aggregation::DbusVariantType valueVariant{value};
 
-    nv::shmem::AggregationService::updateTelemetry(objPath, valueInterface,
-                                                   valueProperty, valueVariant,
-                                                   timestamp, 0, association);
+    std::vector<uint8_t> smbusData = smbusSensorBytesConverter->convert(value);
+
+    tal::TelemetryAggregator::updateTelemetry(
+        objPath, valueInterface, valueProperty, smbusData, timestamp, 0,
+        valueVariant, association);
 }
 #endif
 

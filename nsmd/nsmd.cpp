@@ -37,7 +37,7 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
-#include <telemetry_mrd_producer.hpp>
+#include <tal.hpp>
 
 #include <iostream>
 
@@ -138,10 +138,11 @@ int main(int argc, char** argv)
                                      std::move(eventType0Handler));
 
 #ifdef NVIDIA_SHMEM
-        // Initializing shared memory
-        if (nv::shmem::AggregationService::namespaceInit("nsmd"))
+        // Initialize TAL
+        if (tal::TelemetryAggregator::namespaceInit(tal::ProcessType::Producer,
+                                                    "nsmd"))
         {
-            lg2::info("Initialized shared memory nsmd");
+            lg2::info("Initialized tal from nsmd.");
         }
 #endif
 
