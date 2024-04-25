@@ -74,6 +74,7 @@ class EventType0Handler : public EventHandler
                 lg2::info(
                     "Rediscovery event : The NSM device has been discovered for , uuid={UUID}",
                     "UUID", uuid);
+                deviceManager.updateNsmDevice(nsmDevice, eid).detach();
                 auto& sensors = nsmDevice->staticSensors;
                 for (auto& sensor : sensors)
                 {

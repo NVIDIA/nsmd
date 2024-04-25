@@ -104,6 +104,10 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         return nsmDevices;
     }
 
+    requester::Coroutine
+        updateNsmDevice(const std::shared_ptr<NsmDevice>& nsmDevice,
+                        uint8_t eid);
+
   private:
     DeviceManager(
         sdeventplus::Event& event,
