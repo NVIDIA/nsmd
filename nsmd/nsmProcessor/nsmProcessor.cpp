@@ -624,9 +624,12 @@ void NsmCurrClockFreq::updateReading(const uint32_t& clockFreq)
 std::optional<std::vector<uint8_t>>
     NsmCurrClockFreq::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_curr_clock_freq_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_curr_clock_freq_req(instanceId, requestPtr);
+    uint8_t clock_id = GRAPHICS_CLOCK;
+    auto rc = encode_get_curr_clock_freq_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_curr_clock_freq_req failed. "
@@ -727,6 +730,73 @@ uint8_t
             "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    return cc;
+}
+
+NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus,
+                                             const std::string& name,
+                                             const std::string& type,
+                                             std::string& inventoryObjPath) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
+              name.c_str());
+    dimmMemoryMetricsIntf =
+        std::make_unique<DimmMemoryMetricsIntf>(bus, inventoryObjPath.c_str());
+}
+
+void NsmMemoryCapacityUtil::updateReading(
+    const struct nsm_memory_capacity_utilization& data)
+{
+    uint8_t usedMemoryPercent =
+        (data.used_memory * 100) / (data.used_memory + data.reserved_memory);
+    dimmMemoryMetricsIntf->capacityUtilizationPercent(usedMemoryPercent);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmMemoryCapacityUtil::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_memory_capacity_util_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_memory_capacity_util_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmMemoryCapacityUtil::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_memory_capacity_utilization data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_memory_capacity_util_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_memory_capacity_util_resp "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
     return cc;
 }
 
@@ -924,6 +994,22 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(pciRxTxSensor);
             }
         }
+        else if (type == "NSM_MemCapacityUtil")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
+                bus, name, type, inventoryObjPath);
+            nsmDevice->deviceSensors.push_back(sensor);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(sensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(sensor);
+            }
+        }
     }
 
     catch (const std::exception& e)
@@ -955,5 +1041,8 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
 
 } // namespace nsm

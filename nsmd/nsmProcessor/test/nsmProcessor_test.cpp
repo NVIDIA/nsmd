@@ -764,9 +764,10 @@ TEST(NsmCurrClockFreq, GoodGenReq)
     EXPECT_EQ(request.has_value(), true);
 
     auto msg = reinterpret_cast<const nsm_msg*>(request->data());
-    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
-    EXPECT_EQ(command->command, NSM_GET_CURRENT_CLOCK_FREQUENCY);
-    EXPECT_EQ(command->data_size, 0);
+    auto command =
+        reinterpret_cast<const nsm_get_curr_clock_freq_req*>(msg->payload);
+    EXPECT_EQ(command->hdr.command, NSM_GET_CURRENT_CLOCK_FREQUENCY);
+    EXPECT_EQ(command->hdr.data_size, 1);
 }
 
 TEST(NsmCurrClockFreq, GoodHandleResp)
@@ -884,5 +885,70 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
 
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmMemCapacityUtil, GoodGenReq)
+{
+
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_MEMORY_CAPACITY_UTILIZATION);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmMemCapacityUtil, GoodHandleResp)
+{
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_memory_capacity_utilization data;
+    data.reserved_memory = 100;
+    data.used_memory = 50;
+
+    uint8_t rc = encode_get_memory_capacity_util_resp(
+        0, NSM_SUCCESS, reason_code, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmMemCapacityUtil, BadHandleResp)
+{
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_memory_capacity_utilization data;
+    data.reserved_memory = 100;
+    data.used_memory = 50;
+
+    uint8_t rc = encode_get_memory_capacity_util_resp(
+        0, NSM_SUCCESS, reason_code, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(response, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }

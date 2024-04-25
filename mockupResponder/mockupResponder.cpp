@@ -41,7 +41,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -325,6 +326,12 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
 
+                case NSM_GET_ROW_REMAP_STATE_FLAGS:
+                    return getRowRemapStateHandler(request, requestLen);
+                case NSM_GET_ROW_REMAPPING_COUNTS:
+                    return getRowRemappingCountsHandler(request, requestLen);
+                case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
+                    return getMemoryCapacityUtilHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -1840,12 +1847,19 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getCurrClockFreqHandler(const nsm_msg* requestMsg,
                                              size_t requestLen)
 {
-    auto rc = decode_common_req(requestMsg, requestLen);
+    uint8_t clock_id;
+    auto rc = decode_get_curr_clock_freq_req(requestMsg, requestLen, &clock_id);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
         lg2::error("decode req for getCurrClockFreqHandler failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    if (clock_id != GRAPHICS_CLOCK && clock_id != MEMORY_CLOCK)
+    {
+        lg2::error("getCurrClockFreqHandler: invalid clock_id = {CLOCK_ID}",
+                   "CLOCKID", clock_id);
         return std::nullopt;
     }
 
@@ -1898,4 +1912,101 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getRowRemapStateHandler(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    auto rc = decode_get_row_remap_state_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_row_remap_state_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    bitfield8_t flags;
+    flags.byte = 13;
+    lg2::error("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_row_remap_state_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_row_remap_state_resp(requestMsg->hdr.instance_id,
+                                         NSM_SUCCESS, reason_code, &flags,
+                                         responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_row_remap_state_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getRowRemappingCountsHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    auto rc = decode_get_row_remapping_counts_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode_get_row_remapping_counts_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    uint32_t correctable_error = 4987;
+    uint32_t uncorrectable_error = 2564;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_row_remapping_counts_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_row_remapping_counts_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        correctable_error, uncorrectable_error, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_row_remapping_counts_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getMemoryCapacityUtilHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    lg2::info("getMemoryCapacityUtilHandler: request length={LEN}", "LEN",
+              requestLen);
+
+    auto rc = decode_get_memory_capacity_util_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_memory_capacity_util_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    struct nsm_memory_capacity_utilization data;
+    data.reserved_memory = 2345567;
+    data.used_memory = 128888;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_memory_capacity_util_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_memory_capacity_util_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code, &data,
+                                              responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_memory_capacity_util_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
 } // namespace MockupResponder

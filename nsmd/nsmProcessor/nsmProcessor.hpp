@@ -28,6 +28,7 @@
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
@@ -318,6 +319,28 @@ class NsmPciGroup5 : public NsmPcieGroup
         const struct nsm_query_scalar_group_telemetry_group_5& data);
     std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
         nullptr;
+};
+
+using DimmMemoryMetricsIntf =
+    sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
+                                    Item::Dimm::server::MemoryMetrics>;
+
+class NsmMemoryCapacityUtil : public NsmSensor
+{
+  public:
+    NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
+                          const std::string& type,
+                          std::string& inventoryObjPath);
+    NsmMemoryCapacityUtil() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    void updateReading(const struct nsm_memory_capacity_utilization& data);
+    std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
 };
 
 } // namespace nsm

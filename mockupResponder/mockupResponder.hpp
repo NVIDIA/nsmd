@@ -135,6 +135,9 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getCurrClockFreqHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getMemoryCapacityUtilHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getAccumCpuUtilTimeHandler(const nsm_msg* requestMsg,
@@ -160,6 +163,13 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getVoltageHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getRowRemapStateHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getRowRemappingCountsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getAltitudePressureHandler(const nsm_msg* requestMsg,
