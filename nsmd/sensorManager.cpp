@@ -247,7 +247,40 @@ requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
                                                    size_t* responseLen)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    uint8_t messageType = requestMsg->hdr.nvidia_msg_type;
+    uint8_t commandCode = requestMsg->payload[0];
+
+    auto uuid = utils::getUUIDFromEID(eidTable, eid);
+    if (!uuid)
+    {
+        lg2::error(
+            "SensorManager::SendRecvNsmMsg  : No UUID found for EID {EID}",
+            "EID", eid);
+        co_return NSM_ERROR;
+    }
+
+    auto nsmDevice = getNsmDevice(*uuid);
+    if (!nsmDevice)
+    {
+        lg2::error(
+            "SensorManager::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
+            "EID", eid, "UUID", *uuid);
+        co_return NSM_ERROR;
+    }
+
+    if (!nsmDevice->isCommandSupported(messageType, commandCode))
+    {
+        lg2::debug(
+            "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} : commandCode={COMAMNDCODE} not supported for eid={EID} ,uuid={UUID}",
+            "MESSAGETYPE", messageType, "COMAMNDCODE", commandCode, "EID", eid,
+            "UUID", *uuid);
+        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    // if it is supported then only assign instance_id
     requestMsg->hdr.instance_id = instanceIdDb.next(eid);
+
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
         handler, eid, request, responseMsg, responseLen);
     if (rc)
@@ -327,7 +360,40 @@ uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
     }
 
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    uint8_t messageType = requestMsg->hdr.nvidia_msg_type;
+    uint8_t commandCode = requestMsg->payload[0];
+
+    auto uuid = utils::getUUIDFromEID(eidTable, eid);
+    if (!uuid)
+    {
+        lg2::error(
+            "SensorManager::SendRecvNsmMsg  : No UUID found for EID {EID}",
+            "EID", eid);
+        return NSM_ERROR;
+    }
+
+    auto nsmDevice = getNsmDevice(*uuid);
+    if (!nsmDevice)
+    {
+        lg2::error(
+            "SensorManager::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
+            "EID", eid, "UUID", *uuid);
+        return NSM_ERROR;
+    }
+
+    if (!nsmDevice->isCommandSupported(messageType, commandCode))
+    {
+        lg2::debug(
+            "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} : commandCode={COMAMNDCODE} not supported for eid={EID} ,uuid={UUID}",
+            "MESSAGETYPE", messageType, "COMAMNDCODE", commandCode, "EID", eid,
+            "UUID", *uuid);
+        return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    // if it is supported then only assign instance_id
     requestMsg->hdr.instance_id = instanceIdDb.next(eid);
+
     rc = nsm_send_recv(eid, mctpFd, request.data(), request.size(),
                        (uint8_t**)responseMsg, responseLen);
     if (rc)

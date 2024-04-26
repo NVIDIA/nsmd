@@ -30,7 +30,6 @@
 
 namespace nsm
 {
-
 using RequesterHandler = requester::Handler<requester::Request>;
 
 /**

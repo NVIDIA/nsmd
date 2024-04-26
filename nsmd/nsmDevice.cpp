@@ -72,4 +72,14 @@ uint8_t NsmDevice::getEventMode()
     return eventMode;
 }
 
+bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
+{
+    bool supported = false;
+    if (messageTypesToCommandCodeMatrix[messageType][commandCode])
+    {
+        supported = true;
+    }
+    return supported;
+}
+
 } // namespace nsm
