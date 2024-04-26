@@ -317,7 +317,7 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
 }
 
 requester::Coroutine
-    DeviceManager::updateNsmDevice(const std::shared_ptr<NsmDevice>& nsmDevice,
+    DeviceManager::updateNsmDevice(std::shared_ptr<NsmDevice> nsmDevice,
                                    uint8_t eid)
 {
     // Reset messageTypesToCommandCodeMatrix to all false entries
