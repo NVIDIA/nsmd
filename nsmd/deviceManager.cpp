@@ -59,7 +59,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
         for (auto& mctpInfo : mctpInfos)
         {
             // try ping
-            auto& [eid, uuid, mctpMedium, networkdId, mctpBinding] = mctpInfo;
+            auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding] =
+                mctpInfo;
             auto rc = co_await ping(eid);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -69,18 +70,18 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             }
 
             lg2::info("found NSM device, eid={EID} uuid={UUID}", "EID", eid,
-                      "UUID", uuid);
+                      "UUID", mctpUuid);
 
-            auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+            auto nsmDevice = findNsmDeviceByUUID(nsmDevices, mctpUuid);
             if (nsmDevice)
             {
                 lg2::info(
                     "The NSM device has been discovered before, uuid={UUID}",
-                    "UUID", uuid);
+                    "UUID", mctpUuid);
                 continue;
             }
 
-            nsmDevice = std::make_shared<NsmDevice>(uuid);
+            nsmDevice = std::make_shared<NsmDevice>(mctpUuid);
             nsmDevices.emplace_back(nsmDevice);
 
             // get supported commands for device for each message type
@@ -123,6 +124,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
+            // get device identification from device
             uint8_t deviceIdentification = 0;
             uint8_t deviceInstance = 0;
             rc = co_await getQueryDeviceIdentification(
@@ -137,7 +139,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
 
             // update eid table [from UUID from MCTP dbus property]
             eidTable.insert(std::make_pair(
-                uuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
+                mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
 
             // expose inventory information to FruDevice PDI
             nsmDevice->fruDeviceIntf = objServer.add_interface(
@@ -172,11 +174,18 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                     std::get<std::string>(properties[BUILD_DATE]));
             }
 
+            if (properties.find(DEVICE_GUID) != properties.end())
+            {
+                nsmDevice->fruDeviceIntf->register_property(
+                    "DEVICE_UUID",
+                    std::get<uuid_t>(properties[DEVICE_GUID]));
+            }
+
             nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
                                                         deviceIdentification);
             nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
                                                         deviceInstance);
-            nsmDevice->fruDeviceIntf->register_property("UUID", uuid);
+            nsmDevice->fruDeviceIntf->register_property("UUID", mctpUuid);
 
             nsmDevice->fruDeviceIntf->initialize();
         }
@@ -317,7 +326,8 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
                                            nsm::InventoryProperties& properties)
 {
     std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER,
-                                        MARKETING_NAME, BUILD_DATE};
+                                        DEVICE_GUID, MARKETING_NAME,
+                                        BUILD_DATE};
     for (auto propertyId : propertyIds)
     {
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);
@@ -456,7 +466,16 @@ requester::Coroutine DeviceManager::getInventoryInformation(
             memcpy(nvu8ArrVal.data(), data.data(), dataSize);
 
             uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal);
-            properties.emplace(propertyIdentifier, uuidStr);
+            if (uuidStr.empty())
+            {
+                lg2::error(
+                    "getInventoryInformation id={ID} received incorrect GUID",
+                    "ID", propertyIdentifier);
+            }
+            else
+            {
+                properties.emplace(propertyIdentifier, uuidStr);
+            }
         }
         break;
         default:
