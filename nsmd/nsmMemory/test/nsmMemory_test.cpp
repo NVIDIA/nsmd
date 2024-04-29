@@ -366,3 +366,66 @@ TEST(nsmClockLimitMemory, BadHandleResp)
     rc = sensor.handleResponseMsg(responseMsg, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
+
+TEST(nsmMemCapacity, GoodGenReq)
+{
+    std::shared_ptr<DimmIntf> dimmIntf =
+        std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmMemCapacity sensor(sensorName, sensorType, dimmIntf);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_get_inventory_information_req*>(
+        msg->payload);
+
+    EXPECT_EQ(command->hdr.command, NSM_GET_INVENTORY_INFORMATION);
+    EXPECT_EQ(command->property_identifier, MAXIMUM_MEMORY_CAPACITY);
+}
+
+TEST(nsmMemCapacity, GoodHandleResponse)
+{
+    std::shared_ptr<DimmIntf> dimmIntf =
+        std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmMemCapacity sensor(sensorName, sensorType, dimmIntf);
+    std::vector<uint8_t> data{0, 0, 1, 2};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, reason_code, data.size(), (uint8_t*)data.data(),
+        response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmMemCapacity, BadHandleResponse)
+{
+    std::shared_ptr<DimmIntf> dimmIntf =
+        std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmMemCapacity sensor(sensorName, sensorType, dimmIntf);
+    std::vector<uint8_t> data{0, 0, 1, 2};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, reason_code, data.size(), (uint8_t*)data.data(),
+        response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(response, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
