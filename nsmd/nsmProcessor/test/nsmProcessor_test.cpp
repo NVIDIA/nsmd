@@ -41,7 +41,7 @@ uuid_t uuid("992b3ec1-e468-f145-8686-409009062aa8");
 
 TEST(nsmMigMode, GoodGenReq)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -57,7 +57,7 @@ TEST(nsmMigMode, GoodGenReq)
 
 TEST(nsmMigMode, GoodHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,uuid);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -75,7 +75,7 @@ TEST(nsmMigMode, GoodHandleResp)
 
 TEST(nsmMigMode, BadHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -96,7 +96,7 @@ TEST(nsmMigMode, BadHandleResp)
 
 TEST(nsmMigMode, GoodUpdateReading)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
     bitfield8_t flags;
     flags.byte = 1;
     migSensor.updateReading(flags);
