@@ -64,7 +64,6 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
                                                                   name);
         healthObject->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
-        auto device = getNsmDevice(manager, objPath, baseInterface);
         addSensor(device, healthObject);
     }
     else if (type == "NSM_PCIeDevice")
@@ -80,7 +79,8 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
             NsmGpuChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
         pcieDeviceObject.pdi().deviceType(deviceType);
         addSensor(device,
-                  std::make_shared<NsmPCIeDevice>(pcieDeviceObject, deviceId));
+                  std::make_shared<NsmPCIeDevice>(pcieDeviceObject, deviceId),
+                  objPath, interface);
         for (auto& id : functionIds)
         {
             addSensor(manager, device,
@@ -94,9 +94,10 @@ void nsmGpuChassisPCIeDeviceCreateSensors(SensorManager& manager,
             objPath.c_str(), "DeviceId", interface.c_str());
         auto ltssmStateObject =
             NsmGpuChassisPCIeDevice<LTSSMStateIntf>(chassisName, name);
-        auto device = getNsmDevice(manager, objPath, baseInterface);
-        addSensor(device, std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject,
-                                                              deviceId));
+        addSensor(
+            device,
+            std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceId),
+            objPath, interface);
     }
 }
 
