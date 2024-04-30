@@ -325,6 +325,8 @@ std::optional<std::vector<uint8_t>>
                     return getCurrClockFreqHandler(request, requestLen);
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
+                case NSM_GET_CLOCK_OUTPUT_ENABLE_STATE:
+                    return getClockOutputEnableStateHandler(request, requestLen);
 
                 case NSM_GET_ROW_REMAP_STATE_FLAGS:
                     return getRowRemapStateHandler(request, requestLen);
@@ -1532,8 +1534,8 @@ void getScalarTelemetryGroup1Data(
     data->negotiated_link_speed = 3;
     data->negotiated_link_width = 3;
     data->target_link_speed = 3;
-    data->max_link_speed = 3;
-    data->max_link_width = 3;
+    data->max_link_speed = 4;
+    data->max_link_width = 5;
 }
 
 void getScalarTelemetryGroup2Data(
@@ -1572,7 +1574,7 @@ void getScalarTelemetryGroup5Data(
 void getScalarTelemetryGroup6Data(
     struct nsm_query_scalar_group_telemetry_group_6* data)
 {
-    data->ltssm_state = 0x02;
+    data->ltssm_state = 0x11;
     data->invalid_flit_counter = 111;
 }
 
@@ -1596,7 +1598,7 @@ std::optional<std::vector<uint8_t>>
 
     switch (group_index)
     {
-        case 0:
+        case GROUP_ID_0:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1619,7 +1621,7 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
-        case 1:
+        case GROUP_ID_1:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1642,7 +1644,7 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
-        case 2:
+        case GROUP_ID_2:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1666,7 +1668,7 @@ std::optional<std::vector<uint8_t>>
             return response;
         }
 
-        case 3:
+        case GROUP_ID_3:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1690,7 +1692,7 @@ std::optional<std::vector<uint8_t>>
             return response;
         }
 
-        case 4:
+        case GROUP_ID_4:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1713,7 +1715,7 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
-        case 5:
+        case GROUP_ID_5:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1736,7 +1738,7 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
-        case 6:
+        case GROUP_ID_6:
         {
             std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
@@ -1759,7 +1761,6 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
-
         default:
             break;
     }
@@ -2009,4 +2010,47 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
+                                                      size_t requestLen)
+{
+    lg2::info("getClockOutputEnableStateHandler: request length={LEN}", "LEN",
+              requestLen);
+    uint8_t index = 0;
+    auto rc = decode_get_clock_output_enable_state_req(requestMsg, requestLen,
+                                                       &index);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode_get_clock_output_enable_state_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    if (index != PCIE_CLKBUF_INDEX && index != NVHS_CLKBUF_INDEX &&
+        index != IBLINK_CLKBUF_INDEX)
+    {
+        lg2::error("getClockOutputEnableStateHandler: invalid index = {INDEX}",
+                   "INDEX", index);
+        return std::nullopt;
+    }
+    uint32_t clk_buf_data = 0xABABABAB;
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_clock_output_enabled_state_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_clock_output_enable_state_resp(requestMsg->hdr.instance_id,
+                                                   NSM_SUCCESS, reason_code,
+                                                   clk_buf_data, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_clock_output_enable_state_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
 } // namespace MockupResponder

@@ -38,7 +38,7 @@ NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& type,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, 2),
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2),
     pcieEccIntf(pcieEccIntf)
 
 {
@@ -78,7 +78,7 @@ NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
                                    const std::string& type,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, 3),
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3),
     pcieEccIntf(pcieEccIntf)
 
 {
@@ -115,7 +115,7 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
                                    const std::string& type,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, 4),
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4),
     pcieEccIntf(pcieEccIntf)
 
 {
