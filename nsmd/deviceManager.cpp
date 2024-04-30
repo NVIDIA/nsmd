@@ -157,6 +157,20 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                     std::get<std::string>(properties[SERIAL_NUMBER]));
             }
 
+            if (properties.find(MARKETING_NAME) != properties.end())
+            {
+                nsmDevice->fruDeviceIntf->register_property(
+                    "MARKETING_NAME",
+                    std::get<std::string>(properties[MARKETING_NAME]));
+            }
+
+            if (properties.find(BUILD_DATE) != properties.end())
+            {
+                nsmDevice->fruDeviceIntf->register_property(
+                    "BUILD_DATE",
+                    std::get<std::string>(properties[BUILD_DATE]));
+            }
+
             nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
                                                         deviceIdentification);
             nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
@@ -301,7 +315,7 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
 requester::Coroutine DeviceManager::getFRU(eid_t eid,
                                            nsm::InventoryProperties& properties)
 {
-    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER};
+    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME, BUILD_DATE};
     for (auto propertyId : propertyIds)
     {
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);

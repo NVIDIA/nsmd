@@ -67,6 +67,9 @@ inline void
         case MARKETING_NAME:
             pdi().model(std::string((char*)data.data(), data.size()));
             break;
+        case BUILD_DATE:
+            pdi().buildDate(std::string((char*)data.data(), data.size()));
+            break;
         default:
             throw std::runtime_error("Not implemented PDI");
             break;
