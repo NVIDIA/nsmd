@@ -82,4 +82,46 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
     return supported;
 }
 
+// Function to handle unsupported commands and aggregate logs for the NSM device
+void NsmDevice::handleUnsupportedCommand(uint8_t eid, uint8_t messageType,
+                                         uint8_t commandCode)
+{
+    auto it = aggregatedLogs.find({eid, {messageType, commandCode}});
+    if (it != aggregatedLogs.end())
+    {
+        auto& aggregatedLog = it->second;
+
+        // Check if the log was last logged more than 10 minutes ago
+        if (aggregatedLog.first.time_since_epoch().count() == 0 ||
+            std::chrono::steady_clock::now() - aggregatedLog.first >=
+                std::chrono::minutes(10))
+        {
+            logAggregatedMessages();
+            aggregatedLogs.erase(it); // Remove only the specific entry
+        }
+
+        // Update the aggregated log
+        aggregatedLog.first = std::chrono::steady_clock::now();
+        aggregatedLog.second++;
+    }
+}
+
+// Function to log aggregated messages for the NSM device
+void NsmDevice::logAggregatedMessages()
+{
+    for (const auto& entry : aggregatedLogs)
+    {
+        const auto& key = entry.first;
+        const auto& aggregatedLog = entry.second;
+
+        log2::info(
+            "Unsupported command (EID={}, messageType={}, commandCode={}) occurred {} times. Last logged at {} seconds ago.",
+            static_cast<int>(key.first), static_cast<int>(key.second.first),
+            static_cast<int>(key.second.second), aggregatedLog.second,
+            std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::steady_clock::now() - aggregatedLog.first)
+                .count());
+    }
+}
+
 } // namespace nsm

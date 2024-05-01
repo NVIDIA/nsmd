@@ -271,10 +271,12 @@ requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
 
     if (!nsmDevice->isCommandSupported(messageType, commandCode))
     {
-        lg2::debug(
-            "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} : commandCode={COMAMNDCODE} not supported for eid={EID} ,uuid={UUID}",
-            "MESSAGETYPE", messageType, "COMAMNDCODE", commandCode, "EID", eid,
-            "UUID", *uuid);
+        nsmDevice->handleUnsupportedCommand(eid, messageType, commandCode);
+        // lg2::debug(
+        //     "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} :
+        //     commandCode={COMAMNDCODE} not supported for eid={EID}
+        //     ,uuid={UUID}", "MESSAGETYPE", messageType, "COMAMNDCODE",
+        //     commandCode, "EID", eid, "UUID", *uuid);
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
@@ -384,10 +386,12 @@ uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
 
     if (!nsmDevice->isCommandSupported(messageType, commandCode))
     {
-        lg2::debug(
-            "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} : commandCode={COMAMNDCODE} not supported for eid={EID} ,uuid={UUID}",
-            "MESSAGETYPE", messageType, "COMAMNDCODE", commandCode, "EID", eid,
-            "UUID", *uuid);
+        nsmDevice->handleUnsupportedCommand(eid, messageType, commandCode);
+        // lg2::debug(
+        //     "SensorManager::SendRecvNsmMsg : messageType={MESSAGETYPE} :
+        //     commandCode={COMAMNDCODE} not supported for eid={EID}
+        //     ,uuid={UUID}", "MESSAGETYPE", messageType, "COMAMNDCODE",
+        //     commandCode, "EID", eid, "UUID", *uuid);
         return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 

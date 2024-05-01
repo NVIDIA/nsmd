@@ -19,7 +19,7 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
     size_t responseLen = 0;
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, &responseMsg,
                                               &responseLen);
-    if (rc)
+    if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
     {
         lg2::error(
             "NsmSensor::update: manager.SendRecvNsmMsg failed, name={NAME} eid={EID}",
