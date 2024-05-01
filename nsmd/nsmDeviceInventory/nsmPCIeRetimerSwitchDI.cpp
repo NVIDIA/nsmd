@@ -11,8 +11,8 @@ namespace nsm
 NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
-    const std::string& type, std::string& inventoryObjPath) :
-    NsmObject(name, type)
+    const std::string& type, std::string& inventoryObjPath, uint8_t deviceIdx) :
+    NsmObject(name, type), deviceIndex(deviceIdx)
 {
     auto objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeRetimerSwitchDI: {NAME}", "NAME", name.c_str());
@@ -26,16 +26,69 @@ NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
         associationsList;
     for (const auto& association : associations)
     {
-        associationsList.emplace_back(association.forward,
-                                       association.backward,
-                                       association.absolutePath);
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
     }
     associationDefIntf->associations(associationsList);
-    switchIntf->type(SwitchIntf::SwitchType::PCIe);
 
     std::vector<SwitchIntf::SwitchType> supported_protocols;
     supported_protocols.emplace_back(SwitchIntf::SwitchType::PCIe);
+
+    switchIntf->type(SwitchIntf::SwitchType::PCIe);
     switchIntf->supportedProtocols(supported_protocols);
+    switchIntf->deviceId("");
+    switchIntf->vendorId("");
+}
+
+requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
+                                                    eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        0, deviceIndex, GROUP_ID_0, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    struct nsm_query_scalar_group_telemetry_group_0 data;
+
+    rc = decode_query_scalar_group_telemetry_v1_group0_resp(
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        // update values
+        switchIntf->deviceId(std::to_string(data.pci_device_id));
+        switchIntf->vendorId(std::to_string(data.pci_vendor_id));
+    }
+    else
+    {
+        lg2::error(
+            "responseHandler: query_scalar_group_telemetry_v1_group0 unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return cc;
 }
 
 NsmPCIeRetimerSwitchGetClockState::NsmPCIeRetimerSwitchGetClockState(
@@ -149,6 +202,11 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
 
+    // device_index are between [1 to 8] for retimers, which is
+    // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
+    uint8_t deviceIndex =
+        static_cast<uint8_t>(deviceInstance) + PCIE_RETIMER_DEVICE_INDEX_START;
+
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor
@@ -159,7 +217,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
     }
 
     auto retimerSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
-        bus, name, associations, type, inventoryObjPath);
+        bus, name, associations, type, inventoryObjPath, deviceIndex);
     if (!retimerSwitchDi)
     {
         lg2::error(
@@ -169,6 +227,10 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
         return;
     }
     nsmDevice->deviceSensors.emplace_back(retimerSwitchDi);
+    nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
+
+    // update sensor
+    retimerSwitchDi->update(manager, manager.getEid(nsmDevice)).detach();
 
     auto retimerSwitchRefClock =
         std::make_shared<NsmPCIeRetimerSwitchGetClockState>(

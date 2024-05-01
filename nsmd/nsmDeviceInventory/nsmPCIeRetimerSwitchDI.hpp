@@ -31,12 +31,14 @@ class NsmPCIeRetimerSwitchDI : public NsmObject
     NsmPCIeRetimerSwitchDI(sdbusplus::bus::bus& bus, const std::string& name,
                            const std::vector<utils::Association>& associations,
                            const std::string& type,
-                           std::string& inventoryObjPath);
-    NsmPCIeRetimerSwitchDI() = default;
+                           std::string& inventoryObjPath, uint8_t deviceIdx);
+
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefIntf = nullptr;
     std::unique_ptr<SwitchIntf> switchIntf = nullptr;
+    uint8_t deviceIndex;
 };
 
 class NsmPCIeRetimerSwitchGetClockState : public NsmSensor
