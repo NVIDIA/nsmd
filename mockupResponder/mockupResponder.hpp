@@ -190,6 +190,10 @@ class MockupResponder
         getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        readThermalParameterHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;

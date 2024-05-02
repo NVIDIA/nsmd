@@ -294,6 +294,8 @@ std::optional<std::vector<uint8_t>>
                     return getInventoryInformationHandler(request, requestLen);
                 case NSM_GET_TEMPERATURE_READING:
                     return getTemperatureReadingHandler(request, requestLen);
+                case NSM_READ_THERMAL_PARAMETER:
+                    return readThermalParameterHandler(request, requestLen);
                 case NSM_GET_POWER_SUPPLY_STATUS:
                     return getPowerSupplyStatusHandler(request, requestLen);
                 case NSM_GET_GPU_PRESENCE_POWER_STATUS:
@@ -877,6 +879,77 @@ std::optional<std::vector<uint8_t>>
         uint16_t reason_code = ERR_NULL;
         [[maybe_unused]] auto rc = encode_get_temperature_reading_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, 78,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        return response;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::readThermalParameterHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    auto request = reinterpret_cast<const nsm_read_thermal_parameter_req*>(
+        requestMsg->payload);
+    uint8_t parameter_id{request->sensor_id};
+    lg2::info(
+        "readThermalParameterHandler: Parameter_Id={ID}, request length={LEN}",
+        "LEN", requestLen, "ID", parameter_id);
+
+    if (parameter_id == 255)
+    {
+
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 2,
+            responseMsg);
+
+        uint8_t reading[4]{};
+        size_t consumed_len;
+        std::array<uint8_t, 50> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        // add sample 1
+        rc = encode_aggregate_thermal_parameter_data(110, reading,
+                                                     &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0, true, reading, 4, nsm_sample,
+                                          &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 2
+        rc = encode_aggregate_thermal_parameter_data(-40, reading,
+                                                     &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(39, true, reading, 4, nsm_sample,
+                                          &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        return response;
+    }
+    else
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+                sizeof(struct nsm_read_thermal_parameter_resp),
+            0);
+
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        uint16_t reason_code = ERR_NULL;
+        [[maybe_unused]] auto rc = encode_read_thermal_parameter_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, -10,
             responseMsg);
         assert(rc == NSM_SW_SUCCESS);
         return response;

@@ -1046,6 +1046,101 @@ class GetTemperatureReading : public CommandInterface
     static constexpr uint8_t AggregateSensorId{255};
 };
 
+class ReadThermalParameter : public CommandInterface
+{
+  public:
+    ReadThermalParameter() = delete;
+    ReadThermalParameter(const ReadThermalParameter&) = delete;
+    ReadThermalParameter(ReadThermalParameter&&) = default;
+    ReadThermalParameter& operator=(const ReadThermalParameter&) = delete;
+    ReadThermalParameter& operator=(ReadThermalParameter&&) = delete;
+
+    explicit ReadThermalParameter(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
+    }
+
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        int32_t threshold;
+
+        auto rc = decode_read_thermal_parameter_resp(responsePtr, msg_len, &cc,
+                                                     &reason_code, &threshold);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(nsm_get_current_power_draw_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sensor Id"] = sensorId;
+        result["Thermal Parameter"] = threshold;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    class ReadThermalParameterAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            int32_t threshold;
+            auto rc = decode_aggregate_thermal_parameter_data(data, data_len,
+                                                              &threshold);
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Thermal Parameter"] = threshold;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_read_thermal_parameter_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc =
+            encode_read_thermal_parameter_req(instanceId, sensorId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (sensorId == AggregateSensorId)
+        {
+            ReadThermalParameterAggregateResponseParser{}
+                .parseAggregateResponse(responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
+    }
+
+  private:
+    uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+};
+
 class GetCurrentPowerDraw : public CommandInterface
 {
   public:
@@ -2684,6 +2779,11 @@ void registerCommand(CLI::App& app)
         "GetTemperatureReading", "get temperature reading of a sensor");
     commands.push_back(std::make_unique<GetTemperatureReading>(
         "telemetry", "GetTemperatureReading", getTemperatureReading));
+
+    auto readThermalParameter = telemetry->add_subcommand(
+        "ReadThermalParameter", "read thermal parameter a device");
+    commands.push_back(std::make_unique<ReadThermalParameter>(
+        "telemetry", "ReadThermalParameter", readThermalParameter));
 
     auto getCurrentPowerDraw = telemetry->add_subcommand(
         "GetCurrentPowerDraw", "get current power draw of a device");
