@@ -29,12 +29,8 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/timer.hpp>
 
-#include <chrono>
 #include <coroutine>
 #include <deque>
-#include <tuple>
-#include <unordered_map>
-#include <utility>
 
 namespace nsm
 {
@@ -42,8 +38,6 @@ namespace nsm
 class NsmNumericAggregator;
 class NsmDevice;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
-using AggregatedLogKey = std::pair<eid_t, std::pair<uint8_t, uint8_t>>;
-using AggregatedLog = std::pair<std::chrono::steady_clock::time_point, int>;
 
 class NsmDevice
 {
@@ -52,7 +46,8 @@ class NsmDevice
         uuid(uuid),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
-        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), aggregatedLogs()
+        eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
+
     {}
 
     std::shared_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
@@ -73,14 +68,10 @@ class NsmDevice
     uint8_t getEventMode();
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
-    void handleUnsupportedCommand(uint8_t eid, uint8_t messageType,
-                                  uint8_t commandCode);
-    void logAggregatedMessages();
 
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     uint8_t eventMode;
-    std::unordered_map<AggregatedLogKey, AggregatedLog> aggregatedLogs;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
