@@ -374,10 +374,13 @@ requester::Coroutine
     // update sensors that needs to be refreshed after rediscovery event/change
     // of device capabilities
     SensorManager& sensorManager = SensorManager::getInstance();
+    size_t sensorIndex{0};
     auto& sensors = nsmDevice->capabilityRefreshSensors;
-    for (auto& sensor : sensors)
+    while (sensorIndex < sensors.size())
     {
+        auto sensor = sensors[sensorIndex];
         co_await sensor->update(sensorManager, eid);
+        ++sensorIndex;
     }
     co_return NSM_SW_SUCCESS;
 }
