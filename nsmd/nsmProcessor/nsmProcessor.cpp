@@ -52,6 +52,41 @@ NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
     uuidIntf->uuid(uuid);
 }
 
+NsmAssetIntfProcessor::NsmAssetIntfProcessor(
+    const std::string& name, const std::string& type,
+    const std::string& manufacturer, const std::string& partNumber,
+    const std::string& serialNumber, const std::string& model,
+    std::shared_ptr<AssetIntfProcessor> assetIntf) :
+    NsmObject(name, type),
+    assetIntf(assetIntf)
+{
+    assetIntf->manufacturer(manufacturer);
+    assetIntf->partNumber(partNumber);
+    assetIntf->serialNumber(serialNumber);
+    assetIntf->model(model);
+}
+
+NsmLocationIntfProcessor::NsmLocationIntfProcessor(
+    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    std::string& inventoryObjPath, std::string& locationType) :
+    NsmObject(name, type)
+{
+    locationIntf =
+        std::make_unique<LocationIntfProcessor>(bus, inventoryObjPath.c_str());
+    locationIntf->locationType(
+        LocationIntfProcessor::convertLocationTypesFromString(locationType));
+}
+
+NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
+    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    std::string& inventoryObjPath, std::string& locationCode) :
+    NsmObject(name, type)
+{
+    locationCodeIntf = std::make_unique<LocationCodeIntfProcessor>(
+        bus, inventoryObjPath.c_str());
+    locationCodeIntf->locationCode(locationCode);
+}
+
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath) :
     NsmSensor(name, type)
@@ -840,8 +875,46 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, uuid);
             nsmDevice->deviceSensors.push_back(uuidSensor);
         }
+        else if (type == "NSM_Location")
+        {
+            auto locationType =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "LocationType", interface.c_str());
+            auto sensor = std::make_shared<NsmLocationIntfProcessor>(
+                bus, name, type, inventoryObjPath, locationType);
+            nsmDevice->deviceSensors.push_back(sensor);
+        }
+        else if (type == "NSM_LocationCode")
+        {
+            auto locationCode =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "LocationCode", interface.c_str());
+            auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
+                bus, name, type, inventoryObjPath, locationCode);
+            nsmDevice->deviceSensors.push_back(sensor);
+        }
+        else if (type == "NSM_Asset")
+        {
 
-        if (type == "NSM_MIG")
+            auto assetIntf = std::make_shared<AssetIntfProcessor>(
+                bus, inventoryObjPath.c_str());
+            auto manufacturer =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "Manufacturer", interface.c_str());
+            auto partNumber = utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "PartNumber", interface.c_str());
+            auto serialNumber =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "SerialNumber", interface.c_str());
+            auto model = utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "Model", interface.c_str());
+
+            auto sensorManufacturer = std::make_shared<NsmAssetIntfProcessor>(
+                name, type, manufacturer, partNumber, serialNumber, model,
+                assetIntf);
+            nsmDevice->deviceSensors.push_back(sensorManufacturer);
+        }
+        else if (type == "NSM_MIG")
         {
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
@@ -1044,5 +1117,14 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.Location")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.LocationCode")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.Asset")
 
 } // namespace nsm
