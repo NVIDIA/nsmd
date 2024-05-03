@@ -267,8 +267,10 @@ struct nsm_get_temperature_reading_resp {
  *
  *  Structure representing NSM read thermal parameter request.
  */
-typedef struct nsm_get_numeric_sensor_reading_req
-    nsm_read_thermal_parameter_req;
+struct nsm_read_thermal_parameter_req {
+	struct nsm_common_req hdr;
+	uint8_t parameter_id;
+} __attribute__((packed));
 
 /** @struct nsm_read_thermal_parameter_resp
  *

@@ -17,8 +17,10 @@ class NsmAltitudePressure : public NsmNumericSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-  private:
-    static constexpr auto sensor_type = "altitude";
+    std::string getSensorType() override
+    {
+        return "altitude";
+    }
 };
 
 } // namespace nsm

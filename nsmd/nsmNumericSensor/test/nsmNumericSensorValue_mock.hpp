@@ -26,3 +26,11 @@ class MockNsmNumericSensorValue : public nsm::NsmNumericSensorValue
     MOCK_METHOD(void, updateReading, (double value, uint64_t timestamp),
                 (override));
 };
+
+class MockNsmNumericSensorValueAggregate :
+    public nsm::NsmNumericSensorValueAggregate
+{
+  public:
+    MOCK_METHOD(void, updateReading, (double value, uint64_t timestamp),
+                (override));
+};

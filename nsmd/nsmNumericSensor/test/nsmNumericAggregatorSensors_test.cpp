@@ -31,6 +31,7 @@ using ::testing::DoubleNear;
 #include "nsmEnergyAggregator.hpp"
 #include "nsmPowerAggregator.hpp"
 #include "nsmTempAggregator.hpp"
+#include "nsmThresholdAggregator.hpp"
 #include "nsmVoltageAggregator.hpp"
 
 using namespace nsm;
@@ -55,7 +56,7 @@ TEST(nsmTempSensorAggregator, GoodGenReq)
 TEST(nsmTempSensorAggregator, GoodHandleSampleData)
 {
     NsmTempAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true};
-    auto sensor = std::make_shared<MockNsmNumericSensorValue>();
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     aggregator.addSensor(1, sensor);
 
@@ -118,7 +119,7 @@ TEST(nsmPowerSensorAggregator, GoodHandleSampleData)
 {
     NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
                                   0};
-    auto sensor = std::make_shared<MockNsmNumericSensorValue>();
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     aggregator.addSensor(1, sensor);
 
@@ -191,7 +192,7 @@ TEST(nsmEnergySensorAggregator, GoodHandleSampleData)
 {
     NsmEnergyAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
                                    false};
-    auto sensor = std::make_shared<MockNsmNumericSensorValue>();
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     aggregator.addSensor(1, sensor);
 
@@ -253,7 +254,7 @@ TEST(nsmVoltageSensorAggregator, GoodHandleSampleData)
 {
     NsmVoltageAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
                                     false};
-    auto sensor = std::make_shared<MockNsmNumericSensorValue>();
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     aggregator.addSensor(1, sensor);
 
@@ -280,6 +281,69 @@ TEST(nsmVoltageSensorAggregator, BadHandleSampleData)
     size_t data_size;
 
     auto rc = encode_aggregate_voltage_data(reading, sample.data(), &data_size);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = aggregator.handleSamples(
+        {{1, static_cast<uint8_t>(data_size), nullptr}});
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+    rc = aggregator.handleSamples(
+        {{1, static_cast<uint8_t>(data_size - 1), sample.data()}});
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(nsmThresholdAggregator, GoodGenReq)
+{
+    NsmThresholdAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      false};
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = aggregator.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const nsm_read_thermal_parameter_req*>(msg->payload);
+
+    EXPECT_EQ(command->hdr.command, NSM_READ_THERMAL_PARAMETER);
+    EXPECT_EQ(command->hdr.data_size, 1);
+    EXPECT_EQ(command->parameter_id, 255);
+}
+
+TEST(nsmThresholdAggregator, GoodHandleSampleData)
+{
+    NsmThresholdAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      false};
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
+
+    aggregator.addSensor(1, sensor);
+
+    const int32_t reading{110};
+    std::array<uint8_t, sizeof(reading)> sample;
+    size_t data_size;
+
+    auto rc = encode_aggregate_thermal_parameter_data(reading, sample.data(),
+                                                      &data_size);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*sensor, updateReading(reading, 0)).Times(1);
+
+    aggregator.handleSamples(
+        {{1, static_cast<uint8_t>(data_size), sample.data()}});
+}
+
+TEST(nsmThresholdAggregator, BadHandleSampleData)
+{
+    NsmThresholdAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      false};
+
+    const int32_t reading{110};
+    std::array<uint8_t, sizeof(reading)> sample;
+    size_t data_size;
+
+    auto rc = encode_aggregate_thermal_parameter_data(reading, sample.data(),
+                                                      &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     rc = aggregator.handleSamples(

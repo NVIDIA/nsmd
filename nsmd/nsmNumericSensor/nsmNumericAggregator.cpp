@@ -26,7 +26,7 @@
 namespace nsm
 {
 int NsmNumericAggregator::addSensor(
-    uint8_t tag, std::shared_ptr<NsmNumericSensorValue> sensor)
+    uint8_t tag, std::shared_ptr<NsmNumericSensorValueAggregate> sensor)
 {
     if (tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
     {
@@ -66,7 +66,7 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag)
         return NSM_SW_ERROR_DATA;
     }
 
-    sensors[tag]->updateReading(std::numeric_limits<double>::signaling_NaN());
+    sensors[tag]->updateReading(std::numeric_limits<double>::quiet_NaN());
 
     return NSM_SW_SUCCESS;
 }

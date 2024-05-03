@@ -18,7 +18,7 @@ NsmAltitudePressure::NsmAltitudePressure(
         name, type, 0,
         std::make_shared<NsmNumericSensorValueAggregate>(
             std::make_unique<NsmNumericSensorDbusValue>(
-                bus, name, sensor_type, SensorUnit::Pascals, association)))
+                bus, name, getSensorType(), SensorUnit::Pascals, association)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -58,6 +58,8 @@ uint8_t
     }
     else
     {
+        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
+
         lg2::error(
             "handleResponseMsg: decode_get_altitude_pressure_resp failed. "
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",

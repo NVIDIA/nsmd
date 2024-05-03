@@ -120,6 +120,28 @@
                         "AbsolutePath": "/xyz/openbmc_project/inventory/system/processors/GPU_SXM $INSTANCE_NUMBER + 1"
                     }
                 ],
+                "ThermalParameters": [
+                    {
+                        "Name": "LowerCaution",
+                        "Dynamic": false,
+                        "Value": 110.5
+                    },
+                    {
+                        "Name": "LowerCritical",
+                        "Dynamic": true,
+                        "Type": "NSM_ThermalParameter",
+                        "ParameterId": 1,
+                    },
+                    {
+                        "Name": "LowerFatal",
+                        "Dynamic": true,
+                        "Type": "NSM_ThermalParameter",
+                        "ParameterId": 2,
+                        "PeriodicUpdate": true,
+                        "Aggregated": true,
+                        "Priority": true
+                    }
+                ],
                 "UUID": "$UUID",
                 "Aggregated": true,
                 "SensorId": 2,

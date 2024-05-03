@@ -124,8 +124,8 @@ TEST(nsmNumericSensorAggregator, GoodTest)
 
     EXPECT_EQ(aggregator.sensors[12], nullptr);
 
-    auto sensor1 = std::make_shared<MockNsmNumericSensorValue>();
-    auto sensor2 = std::make_shared<MockNsmNumericSensorValue>();
+    auto sensor1 = std::make_shared<MockNsmNumericSensorValueAggregate>();
+    auto sensor2 = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     uint8_t rc;
 

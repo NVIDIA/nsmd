@@ -76,34 +76,6 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     AssociationDefinitionsInft associationDefinitionsIntf;
 };
 
-class NsmNumericSensor : public NsmSensor
-{
-  public:
-    NsmNumericSensor(const std::string& name, const std::string& type,
-                     uint8_t sensorId,
-                     std::shared_ptr<NsmNumericSensorValue> sensorValue) :
-        NsmSensor(name, type),
-        sensorId(sensorId), sensorValue(sensorValue){};
-
-    std::shared_ptr<NsmNumericSensorValue> getSensorValueObject()
-    {
-        return sensorValue;
-    }
-
-    void handleOfflineState() override
-    {
-        if (sensorValue)
-        {
-            sensorValue->updateReading(
-                std::numeric_limits<double>::quiet_NaN());
-        }
-    }
-
-  protected:
-    uint8_t sensorId;
-    std::shared_ptr<NsmNumericSensorValue> sensorValue;
-};
-
 class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
 {
   public:
@@ -126,10 +98,42 @@ class NsmNumericSensorValueAggregate : public NsmNumericSensorValue
         (objects.emplace_back(std::forward<Args>(args)), ...);
     }
 
-    void updateReading(double value, uint64_t timestamp = 0) final;
+    void append(std::unique_ptr<NsmNumericSensorValue> elem);
+
+    void updateReading(double value, uint64_t timestamp = 0) override;
 
   private:
     std::vector<std::unique_ptr<NsmNumericSensorValue>> objects;
+};
+
+class NsmNumericSensor : public NsmSensor
+{
+  public:
+    NsmNumericSensor(
+        const std::string& name, const std::string& type, uint8_t sensorId,
+        std::shared_ptr<NsmNumericSensorValueAggregate> sensorValue) :
+        NsmSensor(name, type),
+        sensorId(sensorId), sensorValue(sensorValue){};
+
+    std::shared_ptr<NsmNumericSensorValueAggregate> getSensorValueObject()
+    {
+        return sensorValue;
+    }
+
+    void handleOfflineState() override
+    {
+        if (sensorValue)
+        {
+            sensorValue->updateReading(
+                std::numeric_limits<double>::quiet_NaN());
+        }
+    }
+
+    virtual std::string getSensorType() = 0;
+
+  protected:
+    uint8_t sensorId;
+    std::shared_ptr<NsmNumericSensorValueAggregate> sensorValue;
 };
 
 class NsmNumericSensorStatus

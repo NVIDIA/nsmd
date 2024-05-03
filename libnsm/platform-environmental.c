@@ -297,12 +297,12 @@ int encode_read_thermal_parameter_req(uint8_t instance, uint8_t parameter_id,
 		return rc;
 	}
 
-	nsm_read_thermal_parameter_req *request =
-	    (nsm_read_thermal_parameter_req *)msg->payload;
+	struct nsm_read_thermal_parameter_req *request =
+	    (struct nsm_read_thermal_parameter_req *)msg->payload;
 
 	request->hdr.command = NSM_READ_THERMAL_PARAMETER;
 	request->hdr.data_size = sizeof(parameter_id);
-	request->sensor_id = parameter_id;
+	request->parameter_id = parameter_id;
 
 	return NSM_SW_SUCCESS;
 }
@@ -315,18 +315,18 @@ int decode_read_thermal_parameter_req(const struct nsm_msg *msg, size_t msg_len,
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(nsm_read_thermal_parameter_req)) {
+			  sizeof(struct nsm_read_thermal_parameter_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	nsm_read_thermal_parameter_req *request =
-	    (nsm_read_thermal_parameter_req *)msg->payload;
+	struct nsm_read_thermal_parameter_req *request =
+	    (struct nsm_read_thermal_parameter_req *)msg->payload;
 
-	if (request->hdr.data_size < sizeof(request->sensor_id)) {
+	if (request->hdr.data_size < sizeof(request->parameter_id)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*parameter_id = request->sensor_id;
+	*parameter_id = request->parameter_id;
 
 	return NSM_SW_SUCCESS;
 }

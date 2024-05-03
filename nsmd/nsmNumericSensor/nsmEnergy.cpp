@@ -37,11 +37,11 @@ NsmEnergy::NsmEnergy(sdbusplus::bus::bus& bus, const std::string& name,
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
             std::make_unique<NsmNumericSensorDbusValue>(
-                bus, name, sensor_type, SensorUnit::Joules, association)
+                bus, name, getSensorType(), SensorUnit::Joules, association)
 #ifdef NVIDIA_SHMEM
                 ,
             std::make_unique<NsmNumericSensorShmem>(
-                name, sensor_type, chassis_association,
+                name, getSensorType(), chassis_association,
                 std::make_unique<SMBPBIEnergySMBusSensorBytesConverter>())
 #endif
                 ))
@@ -73,7 +73,6 @@ uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint64_t reading = 0;
-    std::vector<uint8_t> data(65535, 0);
 
     auto rc = decode_get_current_energy_count_resp(responseMsg, responseLen,
                                                    &cc, &reason_code, &reading);
@@ -83,6 +82,8 @@ uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
     else
     {
+        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
+
         lg2::error(
             "handleResponseMsg: decode_get_current_energy_count_resp "
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",

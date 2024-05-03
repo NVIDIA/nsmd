@@ -891,7 +891,18 @@ std::optional<std::vector<uint8_t>>
 {
     auto request = reinterpret_cast<const nsm_read_thermal_parameter_req*>(
         requestMsg->payload);
-    uint8_t parameter_id{request->sensor_id};
+
+    if (requestLen <
+        sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_req))
+    {
+        lg2::info(
+            "readThermalParameterHandler: invalid command request length of {LEN}.",
+            "LEN", requestLen);
+
+        return std::nullopt;
+    }
+
+    uint8_t parameter_id{request->parameter_id};
     lg2::info(
         "readThermalParameterHandler: Parameter_Id={ID}, request length={LEN}",
         "LEN", requestLen, "ID", parameter_id);

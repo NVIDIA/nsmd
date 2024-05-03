@@ -402,7 +402,7 @@ TEST(readThermalParameter, testGoodEncodeRequest)
 
 	EXPECT_EQ(NSM_READ_THERMAL_PARAMETER, req->hdr.command);
 	EXPECT_EQ(sizeof(sensor_id), req->hdr.data_size);
-	EXPECT_EQ(sensor_id, req->sensor_id);
+	EXPECT_EQ(sensor_id, req->parameter_id);
 }
 
 TEST(readThermalParameter, testGoodDecodeRequest)

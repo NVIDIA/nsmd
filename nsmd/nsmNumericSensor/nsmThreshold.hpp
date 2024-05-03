@@ -18,17 +18,13 @@
 #pragma once
 
 #include "nsmNumericSensor.hpp"
-#include "nsmSensor.hpp"
 
 namespace nsm
 {
-class NsmEnergy : public NsmNumericSensor
+class NsmThreshold : public NsmNumericSensor
 {
   public:
-    NsmEnergy(sdbusplus::bus::bus& bus, const std::string& name,
-              const std::string& type, uint8_t sensorId,
-              const std::vector<utils::Association>& association,
-              const std::string& chassis_association);
+    using NsmNumericSensor::NsmNumericSensor;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -37,7 +33,7 @@ class NsmEnergy : public NsmNumericSensor
 
     std::string getSensorType() override
     {
-        return "energy";
+        return "threshold";
     }
 };
 

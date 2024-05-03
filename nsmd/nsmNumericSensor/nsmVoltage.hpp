@@ -34,8 +34,10 @@ class NsmVoltage : public NsmNumericSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-  private:
-    static constexpr auto sensor_type = "voltage";
+    std::string getSensorType() override
+    {
+        return "voltage";
+    }
 };
 
 } // namespace nsm
