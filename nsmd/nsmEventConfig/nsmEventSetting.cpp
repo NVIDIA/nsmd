@@ -17,6 +17,7 @@
 
 #include "nsmEventSetting.hpp"
 
+#include "base.h"
 #include "device-capability-discovery.h"
 
 #include "nsmObjectFactory.hpp"
@@ -42,8 +43,11 @@ uint8_t NsmEventSetting::updateSync(SensorManager& manager, eid_t eid)
     rc = setEventSubscription(manager, eid, eventGenerationSetting, localEid);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID", eid,
-                   "RC", rc);
+        if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
+                       eid, "RC", rc);
+        }
         return rc;
     }
     nsmDevice->setEventMode(eventGenerationSetting);

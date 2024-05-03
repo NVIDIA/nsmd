@@ -21,6 +21,7 @@
 #include "platform-environmental.h"
 
 #include "nsmDevice.hpp"
+#include "sensorManager.hpp"
 
 #include <cstdint>
 #include <vector>
@@ -315,7 +316,8 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
 requester::Coroutine DeviceManager::getFRU(eid_t eid,
                                            nsm::InventoryProperties& properties)
 {
-    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER, MARKETING_NAME, BUILD_DATE};
+    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER,
+                                        MARKETING_NAME, BUILD_DATE};
     for (auto propertyId : propertyIds)
     {
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);
@@ -367,6 +369,18 @@ requester::Coroutine
         }
         lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "ROW_NUM",
                   messageType, "ROW_VALUES", ss.str());
+    }
+
+    // update sensors that needs to be refreshed after rediscovery event/change
+    // of device capabilities
+    SensorManager& sensorManager = SensorManager::getInstance();
+    size_t sensorIndex{0};
+    auto& sensors = nsmDevice->capabilityRefreshSensors;
+    while (sensorIndex < sensors.size())
+    {
+        auto sensor = sensors[sensorIndex];
+        co_await sensor->update(sensorManager, eid);
+        ++sensorIndex;
     }
     co_return NSM_SW_SUCCESS;
 }
@@ -511,8 +525,8 @@ requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
         handler, eid, request, responseMsg, responseLen);
     if (rc)
     {
-        lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
-                   rc);
+        lg2::error("DeviceManager::SendRecvNsmMsg failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
     }
     co_return rc;
 }

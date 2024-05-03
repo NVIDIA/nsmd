@@ -21,9 +21,7 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
                                               &responseLen);
     if (rc)
     {
-        lg2::error(
-            "NsmSensor::update: manager.SendRecvNsmMsg failed, name={NAME} eid={EID}",
-            "NAME", getName(), "EID", eid);
+        co_return rc;
     }
 
     rc = handleResponseMsg(responseMsg, responseLen);

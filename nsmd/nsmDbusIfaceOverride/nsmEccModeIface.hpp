@@ -45,9 +45,12 @@ class NsmEccModeIntf : public EccModeIntf
                                               &responseLen);
         if (rc_)
         {
-            lg2::error("SendRecvNsmMsgSync failed. "
-                       "eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc_);
+            if (rc_ != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+            {
+                lg2::error("SendRecvNsmMsgSync failed. "
+                           "eid={EID} rc={RC}",
+                           "EID", eid, "RC", rc_);
+            }
             free((void*)responseMsg);
             return;
         }
@@ -102,10 +105,13 @@ class NsmEccModeIntf : public EccModeIntf
                                               &responseLen);
         if (rc_)
         {
-            lg2::error(
-                "setECCModeOnDevice SendRecvNsmMsgSync failed for while setting ECCMode "
-                "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc_);
+            if (rc_ != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+            {
+                lg2::error(
+                    "setECCModeOnDevice SendRecvNsmMsgSync failed for while setting ECCMode "
+                    "eid={EID} rc={RC}",
+                    "EID", eid, "RC", rc_);
+            }
             free((void*)responseMsg);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();

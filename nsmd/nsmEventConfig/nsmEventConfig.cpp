@@ -62,15 +62,22 @@ uint8_t NsmEventConfig::updateSync(SensorManager& manager, eid_t eid)
     rc = setCurrentEventSources(manager, eid, messageType, srcEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("setCurrentEventSources failed, eid={EID} rc={RC}", "EID",
-                   eid, "RC", rc);
+        if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            lg2::error("setCurrentEventSources failed, eid={EID} rc={RC}",
+                       "EID", eid, "RC", rc);
+        }
         return rc;
     }
     rc = configureEventAcknowledgement(manager, eid, messageType, ackEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("configureEventAcknowledgement failed, eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+        if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            lg2::error(
+                "configureEventAcknowledgement failed, eid={EID} rc={RC}",
+                "EID", eid, "RC", rc);
+        }
         return rc;
     }
     return rc;

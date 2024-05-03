@@ -58,7 +58,7 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
     std::deque<std::shared_ptr<NsmSensor>> roundRobinSensors;
-    std::vector<std::shared_ptr<NsmObject>> staticSensors;
+    std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
 
     std::shared_ptr<NsmNumericAggregator>
@@ -67,6 +67,7 @@ class NsmDevice
     void setEventMode(uint8_t mode);
     uint8_t getEventMode();
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
+    bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
 
   private:
     std::vector<std::vector<bitfield8_t>> commands;
