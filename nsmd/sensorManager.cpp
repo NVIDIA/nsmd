@@ -203,14 +203,22 @@ requester::Coroutine
 #endif
         // update all priority sensors
         auto& sensors = nsmDevice->prioritySensors;
-        for (auto& sensor : sensors)
+
+        // Insertion into container NsmDevice::prioritySensors, triggered by
+        // Configuration PDI added event, may invalidate container's
+        // iterators and hence using index based element access.
+        size_t sensorIndex{0};
+        while (sensorIndex < sensors.size())
         {
+            auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
                 co_return NSM_SW_ERROR;
             }
+
+            ++sensorIndex;
         }
 
         // update roundRobin sensors for rest of polling time interval
