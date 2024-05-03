@@ -48,10 +48,6 @@
         "Location": {
           "Type": "NSM_Location",
           "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-        },
-        "Version": {
-          "Type": "NSM_Version",
-          "Version": "$FIRMWARE_VERSION"
         }
       },
       {
@@ -138,7 +134,7 @@
       }
     ],
     "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
-    "Type": "NSM_Configs",
+    "Type": "Chassis",
     "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
     "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 2})",
     "xyz.openbmc_project.Inventory.Decorator.Location": {
@@ -147,6 +143,7 @@
     "xyz.openbmc_project.State.Decorator.Health": {
       "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
     },
+    "xyz.openbmc_project.Inventory.Item.Board": {},
     "xyz.openbmc_project.Inventory.Decorator.Instance": {
       "InstanceNumber": 1
     }

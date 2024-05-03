@@ -8,6 +8,16 @@
     "xyz.openbmc_project.Association.Definitions": {
       "Associations": [
         [
+          "parent_chassis",
+          "fabrics",
+          "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_0"
+        ],
+        [
+          "parent_chassis",
+          "fabrics",
+          "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_1"
+        ],
+        [
           "all_switches",
           "fabrics",
           "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_0"
@@ -72,10 +82,6 @@
         "Location": {
           "Type": "NSM_Location",
           "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-        },
-        "Version": {
-          "Type": "NSM_Version",
-          "Version": "$FIRMWARE_VERSION"
         }
       },
       {
@@ -101,10 +107,6 @@
             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
             "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.PCIe"
           ]
-        },
-        "Version": {
-          "Type": "NSM_Version",
-          "Version": "$FIRMWARE_VERSION"
         }
       },
       {
@@ -132,7 +134,7 @@
       }
     ],
     "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",
-    "Type": "NSM_Configs",
+    "Type": "Chassis",
     "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
     "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 1})",
     "xyz.openbmc_project.Inventory.Decorator.Location": {
@@ -141,6 +143,7 @@
     "xyz.openbmc_project.State.Decorator.Health": {
       "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
     },
+    "xyz.openbmc_project.Inventory.Item.Board": {},
     "xyz.openbmc_project.Inventory.Decorator.Instance": {
       "InstanceNumber": 1
     }

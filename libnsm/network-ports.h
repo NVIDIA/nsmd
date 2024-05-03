@@ -24,6 +24,8 @@ extern "C" {
 
 #include "base.h"
 #define PORT_COUNTER_TELEMETRY_DATA_SIZE 204
+// defined in MBps
+#define MAXLINKBANDWIDTH 50000
 
 /** @brief NSM Type1 network port telemetry commands
  */
@@ -41,6 +43,7 @@ enum nsm_port_telemetry_commands {
 	NSM_GET_POWER_MODE = 0x0b,
 	NSM_SET_POWER_PROFILE = 0x0c,
 	NSM_GET_POWER_PROFILE = 0x0d,
+	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
 	NSM_QUERY_PORT_STATUS = 0x43
 };
@@ -189,6 +192,21 @@ typedef struct nsm_common_port_req
 struct nsm_query_port_characteristics_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_port_characteristics_data data;
+} __attribute__((packed));
+
+/** @struct nsm_query_ports_available_req
+ *
+ *  Structure representing NSM query ports available request.
+ */
+typedef struct nsm_common_req nsm_query_ports_available_req;
+
+/** @struct nsm_query_ports_available_resp
+ *
+ *  Structure representing NSM query ports available response.
+ */
+struct nsm_query_ports_available_resp {
+	struct nsm_common_resp hdr;
+	uint8_t number_of_ports;
 } __attribute__((packed));
 
 /** @brief Encode a Get port telemetry counter request message
@@ -341,6 +359,53 @@ int decode_query_port_characteristics_resp(
     uint16_t *reason_code, uint16_t *data_size,
     struct nsm_port_characteristics_data *data);
 
+/** @brief Encode a query ports available request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_ports_available_req(uint8_t instance_id,
+					  struct nsm_msg *msg);
+
+/** @brief Decode a query ports available request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_query_ports_available_req(const struct nsm_msg *msg,
+					  size_t msg_len);
+
+/** @brief Encode a query ports available response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] number_of_ports - number of ports
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_ports_available_resp(uint8_t instance_id, uint8_t cc,
+					   uint16_t reason_code,
+					   uint8_t number_of_ports,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a query ports available response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] number_of_ports - number of ports
+ *  @return nsm_completion_codes
+ */
+int decode_query_ports_available_resp(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *cc,
+					   uint16_t *reason_code,
+					   uint16_t *data_size,
+					   uint8_t *number_of_ports);
 #ifdef __cplusplus
 }
 #endif

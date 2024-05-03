@@ -460,6 +460,56 @@ class QueryPortStatus : public CommandInterface
     uint8_t portNumber;
 };
 
+class QueryPortsAvailable : public CommandInterface
+{
+  public:
+    ~QueryPortsAvailable() = default;
+    QueryPortsAvailable() = delete;
+    QueryPortsAvailable(const QueryPortsAvailable&) = delete;
+    QueryPortsAvailable(QueryPortsAvailable&&) = default;
+    QueryPortsAvailable& operator=(const QueryPortsAvailable&) = delete;
+    QueryPortsAvailable& operator=(QueryPortsAvailable&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_ports_available_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_ports_available_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t dataLen = 0;
+        uint8_t number_of_ports = 0;
+
+        auto rc = decode_query_ports_available_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &dataLen,
+            &number_of_ports);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Number of Ports"] = number_of_ports;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_query_ports_available_resp fail"
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        return;
+    }
+};
+
 class GetInventoryInformation : public CommandInterface
 {
   public:
@@ -2526,6 +2576,11 @@ void registerCommand(CLI::App& app)
         telemetry->add_subcommand("QueryPortStatus", "query port status");
     commands.push_back(std::make_unique<QueryPortStatus>(
         "telemetry", "QueryPortStatus", queryPortStatus));
+
+    auto queryPortsAvailable = telemetry->add_subcommand(
+        "QueryPortsAvailable", "query ports available");
+    commands.push_back(std::make_unique<QueryPortsAvailable>(
+        "telemetry", "QueryPortsAvailable", queryPortsAvailable));
 
     auto getInventoryInformation = telemetry->add_subcommand(
         "GetInventoryInformation", "get inventory information");
