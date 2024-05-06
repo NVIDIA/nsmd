@@ -60,6 +60,7 @@ class NsmDevice
     std::deque<std::shared_ptr<NsmSensor>> roundRobinSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
+    std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
 
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);
