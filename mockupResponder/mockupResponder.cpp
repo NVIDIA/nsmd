@@ -42,7 +42,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -330,7 +331,6 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_CLOCK_EVENT_REASON_CODES:
                     return getProcessorThrottleReasonHandler(request,
                                                              requestLen);
-
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
                 case NSM_SET_POWER_LIMITS:
@@ -463,7 +463,7 @@ std::optional<std::vector<uint8_t>>
     // this is to mock that 0,1,2,9,17,18,20,C[12],42[66],43[67],61[97]
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
-        0x17, 0x12, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00,
+        0x97, 0x13, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00,
         0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     };
@@ -530,6 +530,9 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             break;
         case MAXIMUM_DEVICE_POWER_LIMIT:
             populateFrom(property, 1800);
+            break;
+        case RATED_DEVICE_POWER_LIMIT:
+            populateFrom(property, 800);
             break;
         case PCIERETIMER_0_EEPROM_VERSION:
         {
@@ -2075,14 +2078,15 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getPowerLimitHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
+    lg2::info("getPowerLimitHandler: request length={LEN}", "LEN", requestLen);
     uint32_t id;
     auto rc = decode_get_power_limit_req(requestMsg, requestLen, &id);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_power_limit_req failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    assert(rc == NSM_SW_SUCCESS);
     uint32_t requested_persistent_limit = 100;
     uint32_t requested_oneshot_limit = 150;
     uint32_t enforced_limit = 125;
@@ -2107,6 +2111,7 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::setPowerLimitHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
+    lg2::info("setPowerLimitHandler: request length={LEN}", "LEN", requestLen);
     uint32_t id;
     uint8_t action;
     uint8_t persistent;

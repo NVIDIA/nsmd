@@ -153,6 +153,9 @@ class MockupResponder
         getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     // send rediscovery event

@@ -938,6 +938,63 @@ NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
     powerCapIntf(powerCapIntf)
 {}
 
+void NsmPowerCap::updateValue(uint32_t value)
+{
+    // calling parent powercap to initialize the value on dbus
+    powerCapIntf->PowerCapIntf::powerCap(value);
+    lg2::error("NsmPowerCap::updateValue {VALUE}", "VALUE", value);
+}
+
+requester::Coroutine NsmPowerCap::update(SensorManager& manager, eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(struct nsm_get_power_limit_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_power_limit_req(0, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_device_power_limit_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        lg2::error("NsmPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+                   "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t requested_persistent_limit = 0;
+    uint32_t requested_oneshot_limit = 0;
+    uint32_t enforced_limit = 0;
+
+    rc = decode_get_power_limit_resp(responseMsg, responseLen, &cc, &dataSize,
+                                     &reason_code, &requested_persistent_limit,
+                                     &requested_oneshot_limit, &enforced_limit);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateValue(requested_oneshot_limit);
+    }
+    else
+    {
+        lg2::error(
+            "decode_get_power_limit_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
 NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
                                std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
     NsmObject(name, type),
@@ -947,7 +1004,7 @@ NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
 void NsmMaxPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->maxPowerCapValue(value);
-    lg2::error("NsmMaxPowerCap::updateValue ${VALUE}", "VALUE", value);
+    lg2::error("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
@@ -956,7 +1013,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
                     sizeof(nsm_get_inventory_information_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
-    uint8_t propertyIdentifier = MAX_DEVICE_POWER_LIMIT;
+    uint8_t propertyIdentifier = MAXIMUM_DEVICE_POWER_LIMIT;
     auto rc =
         encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
     if (rc != NSM_SW_SUCCESS)
@@ -973,6 +1030,9 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
                                          &responseLen);
     if (rc)
     {
+        lg2::error(
+            "NsmMaxPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
         co_return rc;
     }
 
@@ -988,6 +1048,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
         updateValue(value);
     }
     else
@@ -1009,7 +1070,7 @@ NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
 void NsmMinPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->minPowerCapValue(value);
-    lg2::error("NsmMinPowerCap::updateValue ${VALUE}", "VALUE", value);
+    lg2::error("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
@@ -1018,7 +1079,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
                     sizeof(nsm_get_inventory_information_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
-    uint8_t propertyIdentifier = MIN_DEVICE_POWER_LIMIT;
+    uint8_t propertyIdentifier = MINIMUM_DEVICE_POWER_LIMIT;
     auto rc =
         encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
     if (rc != NSM_SW_SUCCESS)
@@ -1035,6 +1096,9 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
                                          &responseLen);
     if (rc)
     {
+        lg2::error(
+            "NsmMinPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
         co_return rc;
     }
 
@@ -1050,6 +1114,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
         updateValue(value);
     }
     else
@@ -1064,15 +1129,15 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
-    std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
     NsmObject(name, type),
-    powerCapIntf(powerCapIntf)
+    clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
 {
-    // powerCapIntf->defaultPowerCap(firmwareVersion);
-    lg2::error("NsmDefaultPowerCap::updateValue ${VALUE}", "VALUE", value);
+    clearPowerCapIntf->defaultPowerCap(value);
+    lg2::info("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
@@ -1082,7 +1147,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
                     sizeof(nsm_get_inventory_information_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
-    uint8_t propertyIdentifier = DEFAULT_DEVICE_POWER_LIMIT;
+    uint8_t propertyIdentifier = RATED_DEVICE_POWER_LIMIT;
     auto rc =
         encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
     if (rc != NSM_SW_SUCCESS)
@@ -1099,6 +1164,9 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
                                          &responseLen);
     if (rc)
     {
+        lg2::error(
+            "NsmDefaultPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
         co_return rc;
     }
 
@@ -1114,6 +1182,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
         updateValue(value);
     }
     else
@@ -1172,30 +1241,6 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, associations);
 
             nsmDevice->deviceSensors.push_back(associationSensor);
-            // create power cap interface
-            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
-                bus, inventoryObjPath.c_str(), uuid);
-
-            // create sensors for power cap properties
-            auto powerCap =
-                std::make_shared<NsmPowerCap>(name, type, powerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(powerCap);
-
-            auto defaultPowerCap =
-                std::make_shared<NsmDefaultPowerCap>(name, type, powerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
-            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
-                .detach();
-
-            auto maxPowerCap =
-                std::make_shared<NsmMaxPowerCap>(name, type, powerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
-            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
-
-            auto minPowerCap =
-                std::make_shared<NsmMinPowerCap>(name, type, powerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(minPowerCap);
-            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
         }
         else if (type == "NSM_Location")
         {
@@ -1418,6 +1463,39 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
         }
+        else if (type == "NSM_PowerCap")
+        {
+            // create power cap and clear power cap interface
+            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+                bus, inventoryObjPath.c_str(), uuid);
+
+            auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
+                bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
+
+            // create sensors for power cap properties
+            auto powerCap =
+                std::make_shared<NsmPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(powerCap);
+            nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+
+            auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
+                name, type, clearPowerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
+
+            auto maxPowerCap =
+                std::make_shared<NsmMaxPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
+
+            auto minPowerCap =
+                std::make_shared<NsmMinPowerCap>(name, type, powerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(minPowerCap);
+
+            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
+                .detach();
+            powerCap->update(manager, manager.getEid(nsmDevice)).detach();
+            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+        }
     }
 
     catch (const std::exception& e)
@@ -1463,5 +1541,8 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.Asset")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap")
 
 } // namespace nsm

@@ -58,7 +58,8 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_MEMORY_CAPACITY_UTILIZATION = 0xAD,
 	NSM_GET_ROW_REMAP_STATE_FLAGS = 0x7F,
 	NSM_GET_ROW_REMAPPING_COUNTS = 0x7E,
-	NSM_SET_POWER_LIMITS = 0x08
+	NSM_SET_POWER_LIMITS = 0x08,
+	NSM_GET_POWER_LIMITS = 0x07
 };
 
 enum nsm_inventory_property_identifiers {
@@ -444,7 +445,6 @@ struct nsm_get_current_clock_event_reason_code_resp {
 	bitfield32_t flags;
 } __attribute__((packed));
 
-
 /** @struct nsm_get_accum_GPU_util_time_resp
  *
  *  Structure representing Get Accumulated GPU Utilization time response.
@@ -637,6 +637,27 @@ struct nsm_get_row_remapping_counts_resp {
 	uint32_t correctable_error;
 	uint32_t uncorrectable_error;
 } __attribute__((packed));
+
+/** @struct nsm_get_power_limit_req
+ *
+ *  Structure representing NSM Get Power limits request.
+ */
+struct nsm_get_power_limit_req {
+	struct nsm_common_req hdr;
+	uint32_t id;
+} __attribute__((packed));
+
+/** @struct nsm_get_power_limit_resp
+ *
+ *  Structure representing NSM Get Power limits request.
+ */
+struct nsm_get_power_limit_resp {
+	struct nsm_common_resp hdr;
+	uint32_t requested_persistent_limit;
+	uint32_t requested_oneshot_limit;
+	uint32_t enforced_limit;
+} __attribute__((packed));
+
 /**
  @brief Power Limit Id
 */
@@ -1689,6 +1710,74 @@ int encode_set_power_limit_resp(uint8_t instance_id, uint8_t cc,
 int decode_set_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint8_t *cc, uint16_t *data_size,
 				uint16_t *reason_code);
+
+/** @brief Encode a Get Power Limits request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] id - Power Limit Id
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_limit_req(uint8_t instance_id, uint32_t id,
+			       struct nsm_msg *msg);
+
+/** @brief Encode a Get Power Limits request for device message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_power_limit_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Encode a Get Power Limits request for module message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_module_power_limit_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Decode a Get Power Limits request message
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[in] id - Power Limit Id
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint32_t *id);
+
+/** @brief Encode a Set Power Limits response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] requested_persistent_limit - Requested Persistent Power Limit
+ *  @param[in] requested_oneshot_limit - Requested One Sshot Power Limit
+ *  @param[in] enforced_limit - Enforced Power Limit
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code,
+				uint32_t requested_persistent_limit,
+				uint32_t requested_oneshot_limit,
+				uint32_t enforced_limit, struct nsm_msg *msg);
+
+/** @brief Decode a Set Power Limits response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] requested_persistent_limit - Requested Persistent Power Limit
+ *  @param[out] requested_oneshot_limit - Requested One Sshot Power Limit
+ *  @param[out] enforced_limit - Enforced Power Limit
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code,
+				uint32_t *requested_persistent_limit,
+				uint32_t *requested_oneshot_limit,
+				uint32_t *enforced_limit);
 
 /** @brief Encode a Get gpu presence and power status request message
  *
