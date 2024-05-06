@@ -18,13 +18,14 @@ TEST(NsmPortMetrics, GoodTest)
     std::string pName("dummy_port");
     uint8_t portNum = 1;
     std::string type = "DummyType";
-    std::string association =
+    std::string parentObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device";
     std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device/Ports";
+    std::vector<utils::Association> associations;
 
-    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, association,
-                                inventoryObjPath);
+    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, associations,
+                                parentObjPath, inventoryObjPath);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
