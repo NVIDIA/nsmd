@@ -350,6 +350,7 @@ uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
                     "EID", eid);
                 // discard the response
                 free((void*)*responseMsg);
+                *responseMsg = NULL;
                 // timeout the request timer
                 handler.invalidInProgressRequest(eid);
                 break;
