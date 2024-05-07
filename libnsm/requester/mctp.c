@@ -115,8 +115,9 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 		return NSM_REQUESTER_NOT_RESP_MSG;
 	}
 
+	// Check if nsmd receives enough data for response
 	if (*resp_msg_len <
-	    (sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp))) {
+	    (sizeof(struct nsm_msg_hdr) + NSM_RESPONSE_MIN_LEN)) {
 		free(*nsm_resp_msg);
 		return NSM_REQUESTER_RESP_MSG_TOO_SMALL;
 	}

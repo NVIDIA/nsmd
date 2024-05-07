@@ -171,6 +171,10 @@ typedef union {
 // command(1byte) + completion code(1byte) + reserved(2bytes) +
 // data_size(2bytes)
 #define NSM_RESPONSE_CONVENTION_LEN 6
+// command(1byte) + error completion code(1byte) + reason code(2bytes)
+#define NSM_RESPONSE_ERROR_LEN 4
+// The minimum size of NSM response message is the case response with error CC.
+#define NSM_RESPONSE_MIN_LEN NSM_RESPONSE_ERROR_LEN
 
 typedef float real32_t;
 
