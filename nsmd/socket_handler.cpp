@@ -220,9 +220,8 @@ std::optional<Response>
         return std::nullopt;
     }
 
-    const size_t nsmRespMinimusLen = MCTP_DEMUX_PREFIX +
-                                     sizeof(struct nsm_msg_hdr) +
-                                     NSM_RESPONSE_CONVENTION_LEN;
+    const size_t nsmRespMinimusLen =
+        MCTP_DEMUX_PREFIX + sizeof(struct nsm_msg_hdr) + NSM_RESPONSE_MIN_LEN;
     const size_t nsmEventMinimusLen =
         MCTP_DEMUX_PREFIX + sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN;
 
