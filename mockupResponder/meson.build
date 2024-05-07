@@ -3,6 +3,7 @@ sources = [
     'nsmMockupResponder.cpp',
     'mockupResponder.cpp',
     '../common/utils.cpp',
+    '../common/dBusHandler.cpp',
     '../libnsm/base.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/platform-environmental.c',

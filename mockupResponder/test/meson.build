@@ -1,6 +1,7 @@
 dep_src_files = [
     '../mockupResponder.cpp',
     '../../common/utils.cpp',
+    '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
     '../../libnsm/network-ports.c',
     '../../libnsm/device-capability-discovery.c',
