@@ -39,6 +39,7 @@ test_src = declare_dependency(
 
 tests = [
     'nsmGpuChassis_test',
+    'nsmGpuChassisAssembly_test',
     'nsmGpuChassisPCIeDevice_test',
 ]
 
