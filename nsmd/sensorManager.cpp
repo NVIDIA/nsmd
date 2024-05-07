@@ -140,7 +140,7 @@ void SensorManager::startPolling()
     {
         if (!nsmDevice->pollingTimer)
         {
-            nsmDevice->pollingTimer = std::make_unique<phosphor::Timer>(
+            nsmDevice->pollingTimer = std::make_unique<sdbusplus::Timer>(
                 event.get(),
                 std::bind_front(&SensorManager::doPolling, this, nsmDevice));
         }

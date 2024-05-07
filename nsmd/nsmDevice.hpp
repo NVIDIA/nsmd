@@ -53,7 +53,7 @@ class NsmDevice
     std::shared_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
     uuid_t uuid;
-    std::unique_ptr<phosphor::Timer> pollingTimer;
+    std::unique_ptr<sdbusplus::Timer> pollingTimer;
     std::coroutine_handle<> doPollingTaskHandle;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
