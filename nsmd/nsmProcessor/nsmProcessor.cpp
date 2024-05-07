@@ -43,6 +43,24 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
     acceleratorIntf->type(accelaratorType::GPU);
 }
 
+NsmProcessorAssociation::NsmProcessorAssociation(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath,
+    const std::vector<utils::Association>& associations) :
+    NsmObject(name, type)
+{
+    associationDef = std::make_unique<AssociationDefinitionsIntf>(
+        bus, inventoryObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associations_list;
+    for (const auto& association : associations)
+    {
+        associations_list.emplace_back(association.forward,
+                                       association.backward,
+                                       association.absolutePath);
+    }
+    associationDef->associations(associations_list);
+}
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
                          uuid_t uuid) :
@@ -703,6 +721,93 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
+NsmProcessorThrottleReason::NsmProcessorThrottleReason(
+    std::string& name, std::string& type,
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmProcessorThrottleReason: create sensor:{NAME}", "NAME",
+              name.c_str());
+    processorPerformanceIntf = processorPerfIntf;
+}
+
+void NsmProcessorThrottleReason::updateReading(bitfield32_t flags)
+{
+    std::vector<ThrottleReasons> throttleReasons;
+
+    if (flags.bits.bit0)
+    {
+        throttleReasons.push_back(ThrottleReasons::ClockOptimizedForPower);
+    }
+    if (flags.bits.bit1)
+    {
+        throttleReasons.push_back(ThrottleReasons::HWSlowdown);
+    }
+    if (flags.bits.bit2)
+    {
+        throttleReasons.push_back(ThrottleReasons::HWThermalSlowdown);
+    }
+    if (flags.bits.bit3)
+    {
+        throttleReasons.push_back(ThrottleReasons::HWPowerBrakeSlowdown);
+    }
+    if (flags.bits.bit4)
+    {
+        throttleReasons.push_back(ThrottleReasons::SyncBoost);
+    }
+    if (flags.bits.bit5)
+    {
+        throttleReasons.push_back(
+            ThrottleReasons::ClockOptimizedForThermalEngage);
+    }
+    processorPerformanceIntf->throttleReason(throttleReasons);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmProcessorThrottleReason::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc =
+        encode_get_current_clock_event_reason_code_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_current_clock_event_reason_code_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmProcessorThrottleReason::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    bitfield32_t data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_get_current_clock_event_reason_code_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_current_clock_event_reason_code_resp  "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
 NsmAccumGpuUtilTime::NsmAccumGpuUtilTime(
     const std::string& name, const std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf) :
@@ -874,6 +979,13 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto uuidSensor = std::make_shared<NsmUuidIntf>(
                 bus, name, type, inventoryObjPath, uuid);
             nsmDevice->deviceSensors.push_back(uuidSensor);
+
+            auto associations =
+                utils::getAssociations(objPath, interface + ".Associations");
+            auto associationSensor = std::make_shared<NsmProcessorAssociation>(
+                bus, name, type, inventoryObjPath, associations);
+
+            nsmDevice->deviceSensors.push_back(associationSensor);
         }
         else if (type == "NSM_Location")
         {
@@ -1051,6 +1163,10 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto processorPerfIntf = std::make_shared<ProcessorPerformanceIntf>(
                 bus, inventoryObjPath.c_str());
 
+            auto throttleReasonSensor =
+                std::make_shared<NsmProcessorThrottleReason>(name, type,
+                                                             processorPerfIntf);
+
             auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
                 name, type, processorPerfIntf);
             auto pciRxTxSensor = std::make_shared<NsmPciGroup5>(
@@ -1060,11 +1176,13 @@ static void createNsmProcessorSensor(SensorManager& manager,
             {
                 nsmDevice->prioritySensors.push_back(gpuUtilSensor);
                 nsmDevice->prioritySensors.push_back(pciRxTxSensor);
+                nsmDevice->prioritySensors.push_back(throttleReasonSensor);
             }
             else
             {
                 nsmDevice->roundRobinSensors.push_back(gpuUtilSensor);
                 nsmDevice->roundRobinSensors.push_back(pciRxTxSensor);
+                nsmDevice->roundRobinSensors.push_back(throttleReasonSensor);
             }
         }
         else if (type == "NSM_MemCapacityUtil")

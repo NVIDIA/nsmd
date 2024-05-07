@@ -143,6 +143,10 @@ class MockupResponder
                                      size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getProcessorThrottleReasonHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getAccumCpuUtilTimeHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
 
