@@ -83,6 +83,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             }
 
             nsmDevice = std::make_shared<NsmDevice>(mctpUuid);
+            nsmDevice->isDeviceActive = true;
             nsmDevices.emplace_back(nsmDevice);
 
             // get supported commands for device for each message type
@@ -556,6 +557,24 @@ requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
                    "EID", eid, "RC", rc);
     }
     co_return rc;
+}
+
+void DeviceManager::onlineMctpEndpoint(const uuid_t& uuid)
+{
+    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    if (nsmDevice)
+    {
+        nsmDevice->setOnline();
+    }
+}
+
+void DeviceManager::offlineMctpEndpoint(const uuid_t& uuid)
+{
+    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    if (nsmDevice)
+    {
+        nsmDevice->setOffline();
+    }
 }
 
 } // namespace nsm

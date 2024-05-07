@@ -54,6 +54,7 @@ class NsmDevice
     std::shared_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
     uuid_t uuid;
+    bool isDeviceActive;
     std::unique_ptr<sdbusplus::Timer> pollingTimer;
     std::coroutine_handle<> doPollingTaskHandle;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
@@ -70,6 +71,11 @@ class NsmDevice
     uint8_t getEventMode();
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
+    /** @brief set the nsmDevice to online state */
+    void setOnline();
+
+    /** @brief set the nsmDevice to offline state */
+    void setOffline();
 
   private:
     std::vector<std::vector<bitfield8_t>> commands;

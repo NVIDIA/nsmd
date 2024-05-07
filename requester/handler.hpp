@@ -560,7 +560,17 @@ struct Coroutine
          * coroutine body.
          */
         void unhandled_exception()
-        {}
+        {
+            try
+            {
+                throw; // Rethrow the current exception to handle it
+            }
+            catch (const std::exception& e)
+            {
+                lg2::error("Caught exception:: {HANDLER_EXCEPTION}",
+                           "HANDLER_EXCEPTION", e.what());
+            }
+        }
 
         /** @brief Keeping the value returned by co_return operator
          */
