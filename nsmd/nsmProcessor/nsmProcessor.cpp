@@ -63,8 +63,7 @@ NsmProcessorAssociation::NsmProcessorAssociation(
 }
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
-                         uuid_t uuid) :
-    NsmObject(name, type)
+                         uuid_t uuid) : NsmObject(name, type)
 {
     uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
     uuidIntf->uuid(uuid);
@@ -75,8 +74,7 @@ NsmAssetIntfProcessor::NsmAssetIntfProcessor(
     const std::string& manufacturer, const std::string& partNumber,
     const std::string& serialNumber, const std::string& model,
     std::shared_ptr<AssetIntfProcessor> assetIntf) :
-    NsmObject(name, type),
-    assetIntf(assetIntf)
+    NsmObject(name, type), assetIntf(assetIntf)
 {
     assetIntf->manufacturer(manufacturer);
     assetIntf->partNumber(partNumber);
@@ -296,8 +294,7 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
 }
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
-    NsmSensor(name, type),
-    deviceId(deviceId), groupId(groupId)
+    NsmSensor(name, type), deviceId(deviceId), groupId(groupId)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -324,8 +321,8 @@ NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_2),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_2), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -374,8 +371,8 @@ NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_3),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_3), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -420,8 +417,8 @@ NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_4),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_4), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
@@ -471,8 +468,7 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmPciGroup5::NsmPciGroup5(
     const std::string& name, const std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-    uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
+    uint8_t deviceId) : NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
 
 {
     lg2::info("NsmPciGroup5: create sensor:{NAME}", "NAME", name.c_str());

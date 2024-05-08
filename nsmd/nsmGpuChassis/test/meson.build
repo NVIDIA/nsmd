@@ -14,6 +14,7 @@ dep_src_files = [
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../../common/utils.cpp',
+    '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/pci-links.c',
@@ -38,6 +39,7 @@ test_src = declare_dependency(
 
 tests = [
     'nsmGpuChassis_test',
+    'nsmGpuChassisAssembly_test',
     'nsmGpuChassisPCIeDevice_test',
 ]
 

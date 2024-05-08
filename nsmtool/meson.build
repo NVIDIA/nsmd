@@ -12,6 +12,7 @@ sources = [
     '../libnsm/platform-environmental.c',
     '../libnsm/requester/mctp.c',
     '../common/utils.cpp',
+    '../common/dBusHandler.cpp',
 ]
 
 nsmtool_headers = ['.', '..', '../libnsm', '../common']

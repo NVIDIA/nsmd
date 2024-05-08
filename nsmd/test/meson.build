@@ -2,6 +2,7 @@ dep_src_files = [
     '../nsmDevice.cpp',
     '../nsmObjectFactory.cpp',
     '../../common/utils.cpp',
+    '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
     '../../libnsm/platform-environmental.c',
     '../../libnsm/device-capability-discovery.c',

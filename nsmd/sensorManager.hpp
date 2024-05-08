@@ -33,21 +33,52 @@ namespace nsm
 using RequesterHandler = requester::Handler<requester::Request>;
 
 /**
- * @brief SensorManager
- *
- * This class manages the NSM sensors defined by EM configuration PDI.
- * SensorManager register callback function to create sensor when there is new
- * NSM device inventory added to D-Bus and provides function calls for other
- * classes to start/stop sensor monitoring.
+ * @brief Sensor manager abstraction class
  *
  */
 class SensorManager
 {
   public:
-    // Delete copy constructor and copy assignment operator
-    SensorManager(const SensorManager&) = delete;
-    SensorManager& operator=(const SensorManager&) = delete;
+    SensorManager(NsmDeviceTable& nsmDevices, eid_t localEid) :
+        nsmDevices(nsmDevices), localEid(localEid)
+    {}
+    virtual ~SensorManager() = default;
 
+    /** @brief Send request NSM message to eid by blocking socket API directly.
+     *         The function will return when received the response message from
+     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
+     *         request.
+     *
+     *  @param[in] eid endpoint ID
+     *  @param[in] request request NSM message
+     *  @param[out] responseMsg response NSM message
+     *  @param[out] responseLen length of response NSM message
+     *  @return return_value - nsm_requester_error_codes
+     */
+    virtual requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
+                                                const nsm_msg** responseMsg,
+                                                size_t* responseLen) = 0;
+
+    /** @brief Send request NSM message to eid by blocking socket API directly.
+     *         The function will return when received the response message from
+     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
+     *         request.
+     *
+     *  @param[in] eid endpoint ID
+     *  @param[in] request request NSM message
+     *  @param[out] responseMsg response NSM message
+     *  @param[out] responseLen length of response NSM message
+     *  @return return_value - nsm_requester_error_codes
+     */
+    virtual uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
+                                       const nsm_msg** responseMsg,
+                                       size_t* responseLen) = 0;
+    virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
+    eid_t getLocalEid()
+    {
+        return localEid;
+    }
+    std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
     // Static method to access the instance of the class
     static SensorManager& getInstance()
     {
@@ -58,6 +89,28 @@ class SensorManager
         }
         return *instance;
     }
+
+  protected:
+    static std::unique_ptr<SensorManager> instance;
+    NsmDeviceTable& nsmDevices;
+    const eid_t localEid;
+};
+
+/**
+ * @brief SensorManagerImpl
+ *
+ * This class manages the NSM sensors defined by EM configuration PDI.
+ * SensorManagerImpl register callback function to create sensor when there is
+ * new NSM device inventory added to D-Bus and provides function calls for other
+ * classes to start/stop sensor monitoring.
+ *
+ */
+class SensorManagerImpl : public SensorManager
+{
+  public:
+    // Delete copy constructor and copy assignment operator
+    SensorManagerImpl(const SensorManagerImpl&) = delete;
+    SensorManagerImpl& operator=(const SensorManagerImpl&) = delete;
 
     // Static method to initialize the instance
     static void initialize(
@@ -75,11 +128,13 @@ class SensorManager
             throw std::logic_error(
                 "Initialize called on an already initialized SensorManager");
         }
-        static SensorManager inst(bus, event, handler, instanceIdDb, objServer,
-                                  eidTable, nsmDevices, localEid, sockManager);
-        instance = &inst;
+        static SensorManagerImpl inst(bus, event, handler, instanceIdDb,
+                                      objServer, eidTable, nsmDevices, localEid,
+                                      sockManager);
+        instance.reset(&inst);
     }
 
+  private:
     // Regular methods as before
     void startPolling();
     void stopPolling();
@@ -87,47 +142,17 @@ class SensorManager
     void interfaceAddedhandler(sdbusplus::message::message& msg);
     void _startPolling(sdeventplus::source::EventBase& /* source */);
     requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
-
-    /** @brief Send request NSM message to eid. The function will
-     *         return when received the response message from NSM device.
-     *
-     *  @param[in] eid - eid
-     *  @param[in] request - request NSM message
-     *  @param[out] responseMsg - response NSM message
-     *  @param[out] responseLen - length of response NSM message
-     *  @return coroutine return_value - NSM completion code
-     */
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,
-                                        size_t* responseLen);
-
-    /** @brief Send request NSM message to eid by blocking socket API directly.
-     *         The function will return when received the response message from
-     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
-     *         request.
-     *
-     *  @param[in] eid - eid
-     *  @param[in] request - request NSM message
-     *  @param[out] responseMsg - response NSM message
-     *  @param[out] responseLen - length of response NSM message
-     *  @return return_value - nsm_requester_error_codes
-     */
+                                        size_t* responseLen) override;
     uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
                                const nsm_msg** responseMsg,
-                               size_t* responseLen);
+                               size_t* responseLen) override;
     void scanInventory();
-
     requester::Coroutine pollEvents(eid_t eid);
-    eid_t getLocalEid()
-    {
-        return localEid;
-    }
-    eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice);
-    std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
-
-  private:
+    eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
     // Private constructor
-    SensorManager(
+    SensorManagerImpl(
         sdbusplus::bus::bus& bus, sdeventplus::Event& event,
         requester::Handler<requester::Request>& handler,
         nsm::InstanceIdDb& instanceIdDb,
@@ -137,8 +162,6 @@ class SensorManager
         NsmDeviceTable& nsmDevices, eid_t localEid,
         mctp_socket::Manager& sockManager);
 
-    // Instance variables as before
-    static SensorManager* instance;
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
@@ -149,9 +172,6 @@ class SensorManager
     std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
     std::unique_ptr<sdeventplus::source::Defer> deferScanInventory;
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
-
-    NsmDeviceTable& nsmDevices;
-    eid_t localEid;
 
     mctp_socket::Manager& sockManager;
 };

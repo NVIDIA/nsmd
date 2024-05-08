@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,8 @@ using ServiceName = std::string;
 using Interfaces = std::vector<std::string>;
 using MapperServiceMap = std::vector<std::pair<ServiceName, Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
+using PropertyValuesCollection =
+    std::vector<std::pair<std::string, PropertyValue>>;
 
 #define UUID_INT_SIZE 16
 #define UUID_LEN 36
@@ -111,10 +113,10 @@ struct CustomFD
 /**
  * @brief The interface for DBusHandler
  */
-class DBusHandlerInterface
+class IDBusHandler
 {
   public:
-    virtual ~DBusHandlerInterface() = default;
+    virtual ~IDBusHandler() = default;
 
     virtual std::string getService(const char* path,
                                    const char* interface) const = 0;
@@ -128,6 +130,34 @@ class DBusHandlerInterface
     virtual PropertyValue
         getDbusPropertyVariant(const char* objPath, const char* dbusProp,
                                const char* dbusInterface) const = 0;
+
+    virtual PropertyValuesCollection
+        getDbusProperties(const char* objPath,
+                          const char* dbusInterface) const = 0;
+
+    /** @brief The template function to get property from the requested dbus
+     *         path
+     *
+     *  @tparam Property - Excepted type of the property on dbus
+     *
+     *  @param[in] objPath - The Dbus object path
+     *  @param[in] dbusProp - The property name to get
+     *  @param[in] dbusInterface - The Dbus interface
+     *
+     *  @return The value of the property
+     *
+     *  @throw sdbusplus::exception::exception when dbus request fails
+     *         std::bad_variant_access when \p Property and property on dbus do
+     *         not match
+     */
+    template <typename Property>
+    auto getDbusProperty(const char* objPath, const char* dbusProp,
+                         const char* dbusInterface)
+    {
+        auto VariantValue =
+            getDbusPropertyVariant(objPath, dbusProp, dbusInterface);
+        return std::get<Property>(VariantValue);
+    }
 };
 
 /**
@@ -139,7 +169,7 @@ class DBusHandlerInterface
  *  to cater the request from nsm requester.
  *  A class is created to mock the apis in the test cases
  */
-class DBusHandler : public DBusHandlerInterface
+class DBusHandler : public IDBusHandler
 {
   public:
     /** @brief Get the bus connection. */
@@ -155,6 +185,13 @@ class DBusHandler : public DBusHandlerInterface
         static boost::asio::io_context io;
         static auto conn = std::make_shared<sdbusplus::asio::connection>(io);
         return conn;
+    }
+
+    /** @brief Get the DBusHandler instance. */
+    static DBusHandler& instance()
+    {
+        static DBusHandler dBusHandler;
+        return dBusHandler;
     }
 
     /**
@@ -200,30 +237,6 @@ class DBusHandler : public DBusHandlerInterface
         getDbusPropertyVariant(const char* objPath, const char* dbusProp,
                                const char* dbusInterface) const override;
 
-    /** @brief The template function to get property from the requested dbus
-     *         path
-     *
-     *  @tparam Property - Excepted type of the property on dbus
-     *
-     *  @param[in] objPath - The Dbus object path
-     *  @param[in] dbusProp - The property name to get
-     *  @param[in] dbusInterface - The Dbus interface
-     *
-     *  @return The value of the property
-     *
-     *  @throw sdbusplus::exception::exception when dbus request fails
-     *         std::bad_variant_access when \p Property and property on dbus do
-     *         not match
-     */
-    template <typename Property>
-    auto getDbusProperty(const char* objPath, const char* dbusProp,
-                         const char* dbusInterface)
-    {
-        auto VariantValue =
-            getDbusPropertyVariant(objPath, dbusProp, dbusInterface);
-        return std::get<Property>(VariantValue);
-    }
-
     /** @brief Set Dbus property
      *
      *  @param[in] dBusMap - Object path, property name, interface and property
@@ -234,7 +247,22 @@ class DBusHandler : public DBusHandlerInterface
      */
     void setDbusProperty(const DBusMapping& dBusMap,
                          const PropertyValue& value) const override;
+
+    /** @brief Get properties(type: variant) from the requested dbus
+     *
+     *  @param[in] objPath - The Dbus object path
+     *  @param[in] dbusInterface - The Dbus interface
+     *
+     *  @return The collection of the properties (type: variant)
+     *
+     *  @throw sdbusplus::exception::exception when it fails
+     */
+    PropertyValuesCollection
+        getDbusProperties(const char* objPath,
+                          const char* dbusInterface) const override;
 };
+
+IDBusHandler& DBusHandler();
 
 /** @brief Print the buffer
  *

@@ -35,24 +35,23 @@ namespace nsm
 {
 
 // Static instance definition
-SensorManager* SensorManager::instance = nullptr;
+std::unique_ptr<SensorManager> SensorManager::instance;
 
 // Ensuring the constructor remains private and defined here if not explicitly
 // declared in the header
-SensorManager::SensorManager(
+SensorManagerImpl::SensorManagerImpl(
     sdbusplus::bus::bus& bus, sdeventplus::Event& event,
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
     mctp_socket::Manager& sockManager) :
-    bus(bus),
-    event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices),
-    localEid(localEid), sockManager(sockManager)
+    SensorManager(nsmDevices, localEid), bus(bus), event(event),
+    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+    eidTable(eidTable), sockManager(sockManager)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(&SensorManager::scanInventory, this));
+        event, std::bind(&SensorManagerImpl::scanInventory, this));
     inventoryAddedSignal = std::make_unique<sdbusplus::bus::match_t>(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
@@ -62,7 +61,7 @@ SensorManager::SensorManager(
         });
 }
 
-void SensorManager::scanInventory()
+void SensorManagerImpl::scanInventory()
 {
     deferScanInventory.reset();
     try
@@ -108,11 +107,11 @@ void SensorManager::scanInventory()
     }
 
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(std::mem_fn(&SensorManager::_startPolling), this,
+        event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
                          std::placeholders::_1));
 }
 
-void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
+void SensorManagerImpl::interfaceAddedhandler(sdbusplus::message::message& msg)
 {
     sdbusplus::message::object_path objPath;
     dbus::InterfaceMap interfaces;
@@ -124,25 +123,26 @@ void SensorManager::interfaceAddedhandler(sdbusplus::message::message& msg)
     }
 
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(std::mem_fn(&SensorManager::_startPolling), this,
+        event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
                          std::placeholders::_1));
 }
 
-void SensorManager::_startPolling(sdeventplus::source::EventBase& /* source */)
+void SensorManagerImpl::_startPolling(
+    sdeventplus::source::EventBase& /* source */)
 {
     newSensorEvent.reset();
     startPolling();
 }
 
-void SensorManager::startPolling()
+void SensorManagerImpl::startPolling()
 {
     for (auto& nsmDevice : nsmDevices)
     {
         if (!nsmDevice->pollingTimer)
         {
             nsmDevice->pollingTimer = std::make_unique<sdbusplus::Timer>(
-                event.get(),
-                std::bind_front(&SensorManager::doPolling, this, nsmDevice));
+                event.get(), std::bind_front(&SensorManagerImpl::doPolling,
+                                             this, nsmDevice));
         }
 
         if (!(nsmDevice->pollingTimer->isRunning()))
@@ -155,7 +155,7 @@ void SensorManager::startPolling()
     }
 }
 
-void SensorManager::stopPolling()
+void SensorManagerImpl::stopPolling()
 {
     for (auto& nsmDevice : nsmDevices)
     {
@@ -163,7 +163,7 @@ void SensorManager::stopPolling()
     }
 }
 
-void SensorManager::doPolling(std::shared_ptr<NsmDevice> nsmDevice)
+void SensorManagerImpl::doPolling(std::shared_ptr<NsmDevice> nsmDevice)
 {
     if (nsmDevice->doPollingTaskHandle)
     {
@@ -183,7 +183,7 @@ void SensorManager::doPolling(std::shared_ptr<NsmDevice> nsmDevice)
 }
 
 requester::Coroutine
-    SensorManager::doPollingTask(std::shared_ptr<NsmDevice> nsmDevice)
+    SensorManagerImpl::doPollingTask(std::shared_ptr<NsmDevice> nsmDevice)
 {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
@@ -250,9 +250,10 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
-                                                   const nsm_msg** responseMsg,
-                                                   size_t* responseLen)
+requester::Coroutine
+    SensorManagerImpl::SendRecvNsmMsg(eid_t eid, Request& request,
+                                      const nsm_msg** responseMsg,
+                                      size_t* responseLen)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -295,7 +296,7 @@ requester::Coroutine SensorManager::SendRecvNsmMsg(eid_t eid, Request& request,
     co_return rc;
 }
 
-requester::Coroutine SensorManager::pollEvents([[maybe_unused]] eid_t eid)
+requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 {
     // placeholder
     co_return NSM_SW_SUCCESS;
@@ -306,14 +307,14 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
     return findNsmDeviceByUUID(nsmDevices, uuid);
 }
 
-eid_t SensorManager::getEid(std::shared_ptr<NsmDevice> nsmDevice)
+eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
 {
     return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
 }
 
-uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
-                                          const nsm_msg** responseMsg,
-                                          size_t* responseLen)
+uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
+                                              const nsm_msg** responseMsg,
+                                              size_t* responseLen)
 {
     auto mctpFd = sockManager.getSocket(eid);
     uint8_t rc = NSM_REQUESTER_SUCCESS;
@@ -373,7 +374,7 @@ uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
     if (!uuid)
     {
         lg2::error(
-            "SensorManager::SendRecvNsmMsg  : No UUID found for EID {EID}",
+            "SensorManagerImpl::SendRecvNsmMsg  : No UUID found for EID {EID}",
             "EID", eid);
         return NSM_ERROR;
     }
@@ -382,7 +383,7 @@ uint8_t SensorManager::SendRecvNsmMsgSync(eid_t eid, Request& request,
     if (!nsmDevice)
     {
         lg2::error(
-            "SensorManager::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
+            "SensorManagerImpl::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
             "EID", eid, "UUID", *uuid);
         return NSM_ERROR;
     }

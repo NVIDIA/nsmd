@@ -129,7 +129,7 @@ int main(int argc, char** argv)
                     &deviceManager});
 
         // Initialize the SensorManager before getting its instance
-        nsm::SensorManager::initialize(bus, event, reqHandler, instanceIdDb,
+        nsm::SensorManagerImpl::initialize(bus, event, reqHandler, instanceIdDb,
                                        objServer, eidTable, nsmDevices,
                                        localEid, sockManager);
 

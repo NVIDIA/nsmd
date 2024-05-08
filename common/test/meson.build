@@ -1,4 +1,7 @@
-dep_src_files = ['../utils.cpp']
+dep_src_files = [
+    '../utils.cpp',
+    '../dBusHandler.cpp',
+]
 
 dep_src_headers = [
     '.',

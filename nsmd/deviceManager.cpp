@@ -24,6 +24,7 @@
 #include "sensorManager.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace nsm
@@ -436,6 +437,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
+    std::optional<InventoryPropertyData> property;
     switch (propertyIdentifier)
     {
         case BOARD_PART_NUMBER:
@@ -449,8 +451,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         case FIRMWARE_VERSION:
         case INFO_ROM_VERSION:
         {
-            std::string property((char*)data.data(), dataSize);
-            properties.emplace(propertyIdentifier, property);
+            property = std::string((char*)data.data(), dataSize);
         }
         break;
         case DEVICE_GUID:
@@ -486,10 +487,17 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         break;
     }
 
-    for (auto& p : properties)
+    if (property.has_value())
     {
-        lg2::info("id={ID} value={VALUE}", "ID", p.first, "VALUE",
-                  std::get<std::string>(p.second).c_str());
+        auto& propertyValue = property.value();
+        properties.emplace(propertyIdentifier, propertyValue);
+
+        if (const auto* propertyStringPtr =
+                std::get_if<std::string>(&propertyValue))
+        {
+            lg2::info("id={ID} value={VALUE}", "ID", propertyIdentifier,
+                      "VALUE", (*propertyStringPtr).c_str());
+        }
     }
 
     co_return NSM_SW_SUCCESS;
