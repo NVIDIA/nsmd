@@ -30,6 +30,7 @@
 #include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <utility>
 
 namespace nsmtool
@@ -59,6 +60,26 @@ void Logger(bool verbose, const char* msg, const T& data)
         s << data;
         std::cout << msg << s.str() << std::endl;
     }
+}
+
+/** @brief Convert byte input into a hexadecimal string.
+ *
+ *  @param[in]  data - binary data to be converted
+ *  @param[in]  len - length of data to be converted
+ *
+ *  @return - Hexadecimal string representation of the input data.
+ */
+static inline std::string bytesToHexString(const uint8_t* data, size_t len)
+{
+    std::stringstream ss;
+    ss << std::hex;
+
+    for (size_t i = 0; i < len; ++i)
+    {
+        ss << std::setw(2) << std::setfill('0') << (int)data[i];
+    }
+
+    return ss.str();
 }
 
 /** @brief Display in JSON format.
@@ -102,8 +123,9 @@ class CommandInterface
   public:
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :
-        nsmType(type), commandName(name), mctp_eid(NSM_ENTITY_ID),
-        verbose(false), instanceId(0)
+        nsmType(type),
+        commandName(name), mctp_eid(NSM_ENTITY_ID), verbose(false),
+        instanceId(0)
     {
         app->add_option("-m,--mctp_eid", mctp_eid, "MCTP endpoint ID");
         app->add_flag("-v, --verbose", verbose);

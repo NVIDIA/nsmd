@@ -476,6 +476,16 @@ std::optional<std::vector<uint8_t>>
         case NSM_TYPE_DIAGNOSTIC:
             switch (command)
             {
+                case NSM_QUERY_TOKEN_PARAMETERS:
+                    return queryTokenParametersHandler(request, requestLen);
+                case NSM_PROVIDE_TOKEN:
+                    return provideTokenHandler(request, requestLen);
+                case NSM_DISABLE_TOKENS:
+                    return disableTokensHandler(request, requestLen);
+                case NSM_QUERY_TOKEN_STATUS:
+                    return queryTokenStatusHandler(request, requestLen);
+                case NSM_QUERY_DEVICE_IDS:
+                    return queryDeviceIdsHandler(request, requestLen);
                 case NSM_ENABLE_DISABLE_WP:
                     return enableDisableWriteProtectedHandler(request,
                                                               requestLen);
@@ -639,7 +649,10 @@ std::optional<std::vector<uint8_t>>
                  {1, {1}},
                  {2, {4}},
                  {3, {12}},
-                 {4, {}},
+                 {4,
+                  {NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
+                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
+                   NSM_QUERY_DEVICE_IDS}},
                  {5, {}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
@@ -648,7 +661,10 @@ std::optional<std::vector<uint8_t>>
                  {1, {1}},
                  {2, {4}},
                  {3, {12, 14}},
-                 {4, {}},
+                 {4,
+                  {NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
+                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
+                   NSM_QUERY_DEVICE_IDS}},
                  {5, {}},
              }},
             {NSM_DEV_ID_GPU,
@@ -671,7 +687,6 @@ std::optional<std::vector<uint8_t>>
              }},
         };
 
-    ;
     bitfield8_t commandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};
     for (auto command : supportedCommands[mockDeviceType][nvidiaMsgType])
     {

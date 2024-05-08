@@ -1,9 +1,11 @@
 dep_src_files = [
+    '../debugToken.cpp',
     '../mockupResponder.cpp',
     '../firmwareUtils.cpp',
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
+    '../../libnsm/debug-token.c',
     '../../libnsm/network-ports.c',
     '../../libnsm/device-capability-discovery.c',
     '../../libnsm/device-configuration.c',

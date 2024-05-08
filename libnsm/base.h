@@ -32,6 +32,7 @@ extern "C" {
 
 #define OCP_TYPE 8
 #define OCP_VERSION 9
+#define OCP_VERSION_V2 10
 
 #define SUPPORTED_MSG_TYPE_DATA_SIZE 32
 #define SUPPORTED_COMMAND_CODE_DATA_SIZE 32
@@ -88,6 +89,16 @@ enum nsm_device_capability_discovery_commands {
 	NSM_QUERY_DEVICE_IDENTIFICATION = 0x09,
 	NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT = 0x0A,
 	NSM_GET_DEVICE_CAPABILITIES = 0x0B
+};
+
+/** @brief NSM Debug Token Commands
+ */
+enum nsm_debug_token_commands {
+	NSM_QUERY_TOKEN_PARAMETERS = 0x54,
+	NSM_PROVIDE_TOKEN = 0x55,
+	NSM_DISABLE_TOKENS = 0x56,
+	NSM_QUERY_TOKEN_STATUS = 0x57,
+	NSM_QUERY_DEVICE_IDS = 0x58
 };
 
 /** @brief NSM completion codes
@@ -354,11 +365,22 @@ struct nsm_header_info {
 
 /** @struct nsm_common_req
  *
- *  Structure representing NSM request without data
+ *  Structure representing NSM request without data (OCP version 1).
  */
 struct nsm_common_req {
 	uint8_t command;
 	uint8_t data_size;
+} __attribute__((packed));
+
+/** @struct nsm_common_req_v2
+ *
+ *  Structure representing NSM request without data (OCP version 2).
+ */
+struct nsm_common_req_v2 {
+	uint8_t command;
+	uint8_t reserved1;
+	uint16_t data_size;
+	uint16_t reserved2;
 } __attribute__((packed));
 
 /** @struct nsm_common_resp
@@ -484,6 +506,9 @@ struct nsm_query_device_identification_resp {
  */
 uint8_t pack_nsm_header(const struct nsm_header_info *hdr,
 			struct nsm_msg_hdr *msg);
+
+uint8_t pack_nsm_header_v2(const struct nsm_header_info *hdr,
+			   struct nsm_msg_hdr *msg);
 
 /**
  * @brief Unpack the NSM header from the NSM message.

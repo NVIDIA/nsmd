@@ -232,7 +232,6 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         queryAggregatedGPMMetrics(const nsm_msg* requestMsg, size_t requestLen);
-
     std::optional<std::vector<uint8_t>>
         queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
                                    size_t requestLen);
@@ -275,6 +274,18 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         queryFirmwareType(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        queryTokenParametersHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        provideTokenHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        disableTokensHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryTokenStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryDeviceIdsHandler(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     sdeventplus::Event& event;

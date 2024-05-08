@@ -1,10 +1,12 @@
 sources = [
     'nsmMockupResponder.cpp',
+    'debugToken.cpp',
     'mockupResponder.cpp',
     'firmwareUtils.cpp',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
+    '../libnsm/debug-token.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
     '../libnsm/diagnostics.c',

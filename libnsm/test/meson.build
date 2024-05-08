@@ -1,5 +1,6 @@
 dep_src_files = [
     '../base.c',
+    '../debug-token.c',
     '../device-capability-discovery.c',
     '../device-configuration.c',
     '../diagnostics.c',
@@ -20,6 +21,7 @@ test_src = declare_dependency(sources: dep_src_files, include_directories: dep_s
 
 tests = [
     'libnsm_base_test',
+    'libnsm_debug_token_test',
     'libnsm_device_configuration_test',
     'libnsm_device_capability_discovery_test',
     'libnsm_diagnostics_test',
