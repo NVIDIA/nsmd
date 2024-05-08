@@ -2455,12 +2455,9 @@ class GetMemoryCapacityUtil : public CommandInterface
         }
 
         ordered_json result;
-        uint8_t usedMemoryPercent = (data.used_memory * 100) /
-                                    (data.used_memory + data.reserved_memory);
         result["Completion Code"] = cc;
         result["UsedMemory"] = static_cast<uint32_t>(data.used_memory);
         result["ReservedMemory"] = static_cast<uint32_t>(data.reserved_memory);
-        result["CapacityUtilizationPercent"] = usedMemoryPercent;
         nsmtool::helper::DisplayInJson(result);
     }
 };

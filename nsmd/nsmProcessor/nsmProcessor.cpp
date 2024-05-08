@@ -1232,9 +1232,11 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
+/*  Disbale Memory Capacity Utilization Sensor to avoid nsmd crash, will be
+  enabled once many to one mapping is available */
+// REGISTER_NSM_CREATION_FUNCTION(
+//     createNsmProcessorSensor,
+//     "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.Location")
