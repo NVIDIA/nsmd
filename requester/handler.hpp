@@ -291,7 +291,8 @@ class Handler
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
             auto& valid = std::get<4>(handlers[eid].front());
-            return valid;
+            auto& timerInstance = std::get<2>(handlers[eid].front());
+            return valid && timerInstance->isRunning();
         }
         return false;
     }
