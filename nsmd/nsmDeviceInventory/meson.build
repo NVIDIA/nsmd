@@ -6,4 +6,4 @@ sources += [
     'nsmDeviceInventory/nsmSwitch.cpp',
 ]
 
-nsmd_headers += ['.', '..']
+nsmd_headers += ['.', '..', 'nsmDebugToken']
