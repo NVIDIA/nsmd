@@ -16,46 +16,38 @@
  */
 
 #pragma once
-#include "platform-environmental.h"
 
 #include "globals.hpp"
-#include "nsmDevice.hpp"
-#include "nsmObjectFactory.hpp"
-#include "nsmSensor.hpp"
-#include "utils.hpp"
+#include "nsmInterface.hpp"
 
-#include <sdbusplus/asio/object_server.hpp>
-#include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
-#include <xyz/openbmc_project/Software/Version/server.hpp>
-#include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
-
-#include <iostream>
+#include <xyz/openbmc_project/Inventory/Item/Assembly/server.hpp>
+#include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 
 namespace nsm
 {
 
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-
-using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
+using AreaIntf = object_t<Inventory::Decorator::server::Area>;
+using AssemblyIntf = object_t<Inventory::Item::server::Assembly>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
-using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
+using HealthIntf = object_t<State::Decorator::server::Health>;
 
-class NsmPCIeRetimerChassis : public NsmObject
+template <typename IntfType>
+class NsmChassisAssembly : public NsmInterfaceProvider<IntfType>
 {
   public:
-    NsmPCIeRetimerChassis(sdbusplus::bus::bus& bus, const std::string& name,
-                          const std::vector<utils::Association>& associations,
-                          const std::string& type);
-
-  private:
-    std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
-    std::unique_ptr<AssetIntf> asset_ = nullptr;
-    std::unique_ptr<LocationIntf> location_ = nullptr;
-    std::unique_ptr<ChassisIntf> chassis_ = nullptr;
+    NsmChassisAssembly() = delete;
+    NsmChassisAssembly(const std::string& chassisName,
+                       const std::string& name) :
+        NsmInterfaceProvider<IntfType>(name, "NSM_ChassisAssembly",
+                                       chassisInventoryBasePath /
+                                           chassisName)
+    {}
 };
+
 } // namespace nsm

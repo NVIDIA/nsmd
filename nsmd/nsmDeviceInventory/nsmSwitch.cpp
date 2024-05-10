@@ -1,8 +1,7 @@
 #include "nsmSwitch.hpp"
 
+#include "nsmChassis/nsmInventoryProperty.hpp"
 #include "nsmDevice.hpp"
-#include "nsmGpuChassis/nsmInventoryProperty.hpp"
-#include "nsmGpuChassis/nsmSensorHelper.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
@@ -21,7 +20,9 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
         objPath.c_str(), "InventoryObjPath", baseInterface.c_str());
     auto type = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto device = getNsmDevice(manager, objPath, baseInterface);
+    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        objPath.c_str(), "UUID", baseInterface.c_str());
+    auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_NVSwitch")
     {
@@ -31,8 +32,6 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
             std::make_shared<NsmSwitchDI<AssociationDefinitionsInft>>(
                 name, inventoryObjPath);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
         auto associations =
             utils::getAssociations(objPath, interface + ".Associations");
 
@@ -76,7 +75,8 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     }
     else if (type == "NSM_Asset")
     {
-        auto nvSwitchAsset = std::make_shared<NsmSwitchDI<AssetIntf>>(name, inventoryObjPath);
+        auto nvSwitchAsset =
+            std::make_shared<NsmSwitchDI<AssetIntf>>(name, inventoryObjPath);
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
 

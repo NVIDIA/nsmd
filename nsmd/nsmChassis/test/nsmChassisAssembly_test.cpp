@@ -22,29 +22,27 @@ using namespace ::testing;
 #define private public
 #define protected public
 
-#include "nsmGpuChassisAssembly.hpp"
+#include "nsmChassisAssembly.hpp"
 #include "nsmInventoryProperty.hpp"
 
 namespace nsm
 {
-void nsmGpuChassisAssemblyCreateSensors(SensorManager& manager,
-                                        const std::string& interface,
-                                        const std::string& objPath);
+void nsmChassisAssemblyCreateSensors(SensorManager& manager,
+                                     const std::string& interface,
+                                     const std::string& objPath);
 };
 
 using namespace nsm;
 
-struct NsmGpuChassisAssemblyTest : public testing::Test, public utils::DBusTest
+struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
     const std::string basicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_GPU_ChassisAssembly";
+        "xyz.openbmc_project.Configuration.NSM_ChassisAssembly";
     const std::string chassisName = "HGX_GPU_SXM_1";
     const std::string name = "Assembly1";
-    const std::string objPath =
-        "/xyz/openbmc_project/inventory/system/chassis/" + chassisName + "/" +
-        name;
+    const std::string objPath = chassisInventoryBasePath / chassisName / name;
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
@@ -65,7 +63,7 @@ struct NsmGpuChassisAssemblyTest : public testing::Test, public utils::DBusTest
     const PropertyValuesCollection basic = {
         {"ChassisName", chassisName},
         {"Name", name},
-        {"Type", "NSM_GPU_ChassisAssembly"},
+        {"Type", "NSM_ChassisAssembly"},
         {"UUID", gpuUuid},
     };
     const PropertyValuesCollection area = {
@@ -89,15 +87,15 @@ struct NsmGpuChassisAssemblyTest : public testing::Test, public utils::DBusTest
     };
 };
 
-TEST_F(NsmGpuChassisAssemblyTest, badTestCreateDeviceSensors)
+TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 {
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(error, "Type")))
         .WillOnce(Return(get(basic, "UUID")));
-    EXPECT_NO_THROW(nsmGpuChassisAssemblyCreateSensors(mockManager,
-                                                       basicIntfName, objPath));
+    EXPECT_NO_THROW(
+        nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath));
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
@@ -105,38 +103,38 @@ TEST_F(NsmGpuChassisAssemblyTest, badTestCreateDeviceSensors)
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(0, gpu.deviceSensors.size());
 }
-TEST_F(NsmGpuChassisAssemblyTest, goodTestCreateDeviceSensors)
+TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 {
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(basic, "Type")))
         .WillOnce(Return(get(basic, "UUID")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(area, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(area, "PhysicalContext")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Area",
-                                       objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Area",
+                                    objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(health, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(health, "Health")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Health",
-                                       objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Health",
+                                    objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(location, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(location, "LocationType")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Location",
-                                       objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Location",
+                                    objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
@@ -169,7 +167,7 @@ TEST_F(NsmGpuChassisAssemblyTest, goodTestCreateDeviceSensors)
                   .locationType());
 }
 
-TEST_F(NsmGpuChassisAssemblyTest, goodTestCreateStaticSensors)
+TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
 {
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .Times(4)
@@ -183,8 +181,8 @@ TEST_F(NsmGpuChassisAssemblyTest, goodTestCreateStaticSensors)
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(asset, "Vendor")))
         .WillOnce(Return(get(asset, "Name")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
-                                       objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
+                                    objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
@@ -204,7 +202,7 @@ TEST_F(NsmGpuChassisAssemblyTest, goodTestCreateStaticSensors)
     EXPECT_EQ(get<std::string>(asset, "Name"), sensor->pdi().name());
 }
 
-TEST_F(NsmGpuChassisAssemblyTest, badTestNoDevideFound)
+TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
 {
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
@@ -213,8 +211,8 @@ TEST_F(NsmGpuChassisAssemblyTest, badTestNoDevideFound)
         .WillOnce(Return(get(error, "UUID")))
         .WillOnce(Return(get(asset, "Vendor")))
         .WillOnce(Return(get(asset, "Name")));
-    nsmGpuChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
-                                       objPath);
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
+                                    objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());

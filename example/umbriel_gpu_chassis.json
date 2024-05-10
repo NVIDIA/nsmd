@@ -3,7 +3,7 @@
         "Exposes": [
             {
                 "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
-                "Type": "NSM_GPU_Chassis",
+                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
                 "Asset": {
                     "Type": "NSM_Asset",
@@ -20,8 +20,8 @@
                     "Type": "NSM_LocationCode",
                     "LocationCode": "SXM$INSTANCE_NUMBER + 1"
                 },
-                "Chassis": {
-                    "Type": "NSM_Chassis",
+                "ChassisType": {
+                    "Type": "NSM_ChassisType",
                     "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
                 },
                 "Health": {
@@ -36,7 +36,7 @@
             {
                 "ChassisName": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
                 "Name": "Assembly$INSTANCE_NUMBER + 1",
-                "Type": "NSM_GPU_ChassisAssembly",
+                "Type": "NSM_ChassisAssembly",
                 "UUID": "$UUID",
                 "Area": {
                     "Type": "NSM_Area",
@@ -59,7 +59,7 @@
             {
                 "ChassisName": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
                 "Name": "GPU_SXM_$INSTANCE_NUMBER + 1",
-                "Type": "NSM_GPU_ChassisPCIeDevice",
+                "Type": "NSM_ChassisPCIeDevice",
                 "UUID": "$UUID",
                 "Asset": {
                     "Type": "NSM_Asset",

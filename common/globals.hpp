@@ -17,16 +17,18 @@
 
 #pragma once
 
-#include <string>
+#include <cstdint>
+#include <filesystem>
 #include <vector>
 
-constexpr auto chassisInventoryBasePath =
+using std::filesystem::path;
+
+const path chassisInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/chassis";
-constexpr auto fabricsInventoryBasePath =
+const path fabricsInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/fabrics";
-constexpr auto firmwareInventoryBasePath = "/xyz/openbmc_project/software";
-constexpr auto sotwareInventoryBasePath =
-    "/xyz/openbmc_project/inventory_software";
+const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";
+const path sotwareInventoryBasePath = "/xyz/openbmc_project/inventory_software";
 
 const uint8_t PCIeRetimerEEPROMIdentifier = 144;
 
