@@ -33,6 +33,78 @@ NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
     associationDefIntf->associations(associations_list);
 }
 
+NsmPCIeECCGroup1::NsmPCIeECCGroup1(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<PortInfoIntf> portInfoIntf,
+    std::shared_ptr<PortWidthIntf> portWidthIntf,
+    uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, 1),
+    portInfoIntf(portInfoIntf), portWidthIntf(portWidthIntf)
+
+{
+    lg2::info("NsmPCIeECCGroup1: {NAME}", "NAME", name.c_str());
+}
+
+double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
+{
+    switch (speed)
+    {
+        case 1:
+        {
+            return 2.5;
+        }
+        case 2:
+        {
+            return 5.0;
+        }
+        case 3:
+        {
+            return 8.0;
+        }
+        case 4:
+        {
+            return 16.0;
+        }
+        case 5:
+        {
+            return 32.0;
+        }
+        default:
+        {
+            return 0;
+        }
+    }
+}
+uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_query_scalar_group_telemetry_group_1 data;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        portInfoIntf->maxSpeed(convertEncodedSpeedToGbps(data.max_link_speed));
+        portInfoIntf->currentSpeed(
+            convertEncodedSpeedToGbps(data.negotiated_link_speed));
+        portWidthIntf->width(data.max_link_width);
+        portWidthIntf->activeWidth(data.negotiated_link_width);
+    }
+    else
+    {
+        lg2::error(
+            "NsmPCIeECCGroup1: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group1_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return NSM_SW_SUCCESS;
+}
+
 NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& type,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
