@@ -1,7 +1,8 @@
 #pragma once
 
-#include "nsmGpuChassis/nsmInterface.hpp"
 #include "libnsm/network-ports.h"
+
+#include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>

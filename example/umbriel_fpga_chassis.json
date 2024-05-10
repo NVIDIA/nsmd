@@ -593,7 +593,7 @@
             },
             {
                 "Name": "HGX_GPU_SXM_1",
-                "Type": "NSM_GPU_Chassis",
+                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
                 "InstanceNumber": 1,
                 "OperationalStatus": {

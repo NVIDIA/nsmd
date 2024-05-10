@@ -1,40 +1,55 @@
-#include "nsmGpuChassis.hpp"
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "nsmChassis.hpp"
 
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
-#include "nsmSensorHelper.hpp"
 #include "utils.hpp"
 
 namespace nsm
 {
 
-void nsmGpuChassisCreateSensors(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+void nsmChassisCreateSensors(SensorManager& manager,
+                             const std::string& interface,
+                             const std::string& objPath)
 {
-    std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_GPU_Chassis";
+    std::string baseInterface = "xyz.openbmc_project.Configuration.NSM_Chassis";
 
     auto name = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
     auto type = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto device = getNsmDevice(manager, objPath, baseInterface);
+    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        objPath.c_str(), "UUID", baseInterface.c_str());
+    auto device = manager.getNsmDevice(uuid);
 
-    if (type == "NSM_GPU_Chassis")
+    if (type == "NSM_Chassis")
     {
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
-        auto chassisUuid = std::make_shared<NsmGpuChassis<UuidIntf>>(name);
+        auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         chassisUuid->pdi().uuid(uuid);
         addSensor(device, chassisUuid);
     }
     else if (type == "NSM_Asset")
     {
-        auto chassisAsset = NsmGpuChassis<AssetIntf>(name);
+        auto chassisAsset = NsmChassis<AssetIntf>(name);
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.pdi().manufacturer(manufacturer);
@@ -49,18 +64,18 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
                   std::make_shared<NsmInventoryProperty<AssetIntf>>(
                       chassisAsset, MARKETING_NAME));
     }
-    else if (type == "NSM_Chassis")
+    else if (type == "NSM_ChassisType")
     {
         auto chassisType = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "ChassisType", interface.c_str());
-        auto chassis = std::make_shared<NsmGpuChassis<ChassisIntf>>(name);
+        auto chassis = std::make_shared<NsmChassis<ChassisIntf>>(name);
         chassis->pdi().type(
             ChassisIntf::convertChassisTypeFromString(chassisType));
         addSensor(device, chassis);
     }
     else if (type == "NSM_Dimension")
     {
-        auto chassisDimension = NsmGpuChassis<DimensionIntf>(name);
+        auto chassisDimension = NsmChassis<DimensionIntf>(name);
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<DimensionIntf>>(
                       chassisDimension, PRODUCT_LENGTH));
@@ -75,7 +90,7 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
     {
         auto health = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
-        auto chassisHealth = std::make_shared<NsmGpuChassis<HealthIntf>>(name);
+        auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
         chassisHealth->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
         addSensor(device, chassisHealth);
@@ -84,8 +99,7 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
     {
         auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
-        auto chassisLocation =
-            std::make_shared<NsmGpuChassis<LocationIntf>>(name);
+        auto chassisLocation = std::make_shared<NsmChassis<LocationIntf>>(name);
         chassisLocation->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
         addSensor(device, chassisLocation);
@@ -95,13 +109,13 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
         auto locationCode = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "LocationCode", interface.c_str());
         auto chassisLocationCode =
-            std::make_shared<NsmGpuChassis<LocationCodeIntf>>(name);
+            std::make_shared<NsmChassis<LocationCodeIntf>>(name);
         chassisLocationCode->pdi().locationCode(locationCode);
         addSensor(device, chassisLocationCode);
     }
     else if (type == "NSM_PowerLimit")
     {
-        auto chassisPowerLimit = NsmGpuChassis<PowerLimitIntf>(name);
+        auto chassisPowerLimit = NsmChassis<PowerLimitIntf>(name);
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         addSensor(device,
@@ -143,18 +157,18 @@ void nsmGpuChassisCreateSensors(SensorManager& manager,
     }
 }
 
-std::vector<std::string> gpuChassisInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.Asset",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.Chassis",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.Dimension",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.Health",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.Location",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.LocationCode",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.PowerLimit",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.OperationalStatus",
-    "xyz.openbmc_project.Configuration.NSM_GPU_Chassis.PowerState"};
+std::vector<std::string> chassisInterfaces{
+    "xyz.openbmc_project.Configuration.NSM_Chassis",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Asset",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Chassis",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Dimension",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Health",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Location",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.LocationCode",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.PowerLimit",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState"};
 
-REGISTER_NSM_CREATION_FUNCTION(nsmGpuChassisCreateSensors, gpuChassisInterfaces)
+REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
 
 } // namespace nsm

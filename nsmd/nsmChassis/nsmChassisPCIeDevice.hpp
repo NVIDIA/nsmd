@@ -20,32 +20,36 @@
 #include "globals.hpp"
 #include "nsmInterface.hpp"
 
+#include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
-#include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Assembly/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
+#include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
+#include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
 namespace nsm
 {
 
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-
-using AssemblyIntf = object_t<Inventory::Item::server::Assembly>;
+using UuidIntf = object_t<Common::server::UUID>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
-using LocationIntf = object_t<Inventory::Decorator::server::Location>;
+using OperationalStatusIntf =
+    object_t<State::Decorator::server::OperationalStatus>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
+using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
+using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
 
 template <typename IntfType>
-class NsmNVSwitchAndNicChassisAssembly : public NsmInterfaceProvider<IntfType>
+class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
 {
   public:
-    NsmNVSwitchAndNicChassisAssembly() = delete;
-    NsmNVSwitchAndNicChassisAssembly(const std::string& chassisName,
-                                     const std::string& name,
-                                     const std::string& type) :
-        NsmInterfaceProvider<IntfType>(name, type,
-                                       chassisInventoryBasePath / chassisName)
+    NsmChassisPCIeDevice() = delete;
+    NsmChassisPCIeDevice(const std::string& chassisName,
+                         const std::string& name) :
+        NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
+                                       chassisInventoryBasePath / chassisName /
+                                           "PCIeDevices")
     {}
 };
 
