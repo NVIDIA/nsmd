@@ -3862,6 +3862,19 @@ TEST(getRowRemapState, testGoodEncodeRequest)
 	EXPECT_EQ(0, req->data_size);
 }
 
+TEST(getRowRemapState, testBadEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_row_remap_state_req(0, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = encode_get_row_remap_state_req(0, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
 TEST(getRowRemapState, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
@@ -4168,6 +4181,217 @@ TEST(getRowRemappingCounts, testBadDecodeResponse)
 	rc = decode_get_row_remapping_counts_resp(
 	    response, msg_len, &cc, &data_size, &reason_code,
 	    &correctable_error, &uncorrectable_error);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getRowRemapAvailability, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_row_remap_availability_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAP_AVAILABILITY, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getRowRemapAvailability, testBadEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_row_remap_availability_req(0, NULL);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = encode_get_row_remap_availability_req(0, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getRowRemapAvailability, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ROW_REMAP_AVAILABILITY,  // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_row_remap_availability_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getRowRemapAvailability, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_row_remap_availability_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	struct nsm_row_remap_availability data;
+	data.high_remapping = 100;
+	data.low_remapping = 200;
+	data.max_remapping = 300;
+	data.no_remapping = 400;
+	data.partial_remapping = 500;
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_row_remap_availability_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_row_remap_availability_resp *resp =
+	    reinterpret_cast<struct nsm_get_row_remap_availability_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_ROW_REMAP_AVAILABILITY, resp->hdr.command);
+	EXPECT_EQ(5 * sizeof(uint16_t), le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(htole16(data.low_remapping), resp->data.low_remapping);
+}
+
+TEST(getRowRemapAvailability, testBadEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_row_remap_availability_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	struct nsm_row_remap_availability data;
+	data.high_remapping = 100;
+	data.low_remapping = 200;
+	data.max_remapping = 300;
+	data.no_remapping = 400;
+	data.partial_remapping = 500;
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_row_remap_availability_resp(
+	    0, NSM_SUCCESS, reason_code, &data, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	encode_get_row_remap_availability_resp(0, NSM_SUCCESS, reason_code,
+					       NULL, response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getRowRemapAvailability, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ECC_ERROR_COUNTS,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    10,
+	    0, // data size
+	    100,
+	    0,
+	    200,
+	    0,
+	    150,
+	    0,
+	    160,
+	    0,
+	    170,
+	    0,};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_row_remap_availability data;
+	auto rc = decode_get_row_remap_availability_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(10, data_size);
+	EXPECT_EQ(100, data.no_remapping);
+}
+
+TEST(getRowRemapAvailability, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_ECC_ERROR_COUNTS,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    9,
+	    0, // data size
+	    100,
+	    0,
+	    200,
+	    0,
+	    150,
+	    0,
+	    160,
+	    0,
+	    170,
+	    0};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_row_remap_availability data;
+
+	auto rc = decode_get_row_remap_availability_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_availability_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_availability_resp(response, msg_len, &cc,
+						    NULL, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_row_remap_availability_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_row_remap_availability_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 

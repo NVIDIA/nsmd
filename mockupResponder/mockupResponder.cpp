@@ -408,6 +408,8 @@ std::optional<std::vector<uint8_t>>
                     return getRowRemapStateHandler(request, requestLen);
                 case NSM_GET_ROW_REMAPPING_COUNTS:
                     return getRowRemappingCountsHandler(request, requestLen);
+                case NSM_GET_ROW_REMAP_AVAILABILITY:
+                    return getRowRemapAvailabilityHandler(request, requestLen);
                 case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
                     return getMemoryCapacityUtilHandler(request, requestLen);
                 case NSM_QUERY_AGGREGATE_GPM_METRICS:
@@ -657,7 +659,7 @@ std::optional<std::vector<uint8_t>>
                  {3,
                   {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,  16,
                    17,  69, 70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
-                   116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 173}},
+                   116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 172, 173}},
                  {4, {}},
                  {5, {}},
                  {6, {1}},
@@ -3285,6 +3287,41 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_get_row_remapping_counts_resp failed: rc={RC}", "RC",
                    rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getRowRemapAvailabilityHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    auto rc = decode_get_row_remap_availability_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode_get_row_remap_availability_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    struct nsm_row_remap_availability data;
+    data.high_remapping = 100;
+    data.low_remapping = 200;
+    data.max_remapping = 300;
+    data.no_remapping = 400;
+    data.partial_remapping = 500;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_row_remap_availability_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_row_remap_availability_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, reason_code, &data,
+                                                responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_row_remap_availability_resp failed: rc={RC}",
+                   "RC", rc);
         return std::nullopt;
     }
     return response;

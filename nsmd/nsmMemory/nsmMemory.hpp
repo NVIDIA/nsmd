@@ -144,6 +144,28 @@ class NsmRowRemappingCounts : public NsmSensor
     std::string inventoryObjPath;
 };
 
+class NsmRemappingAvailabilityBankCount : public NsmSensor
+{
+  public:
+    NsmRemappingAvailabilityBankCount(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<MemoryRowRemappingIntf> rowRemapIntf,
+        const std::string& inventoryObjPath);
+    NsmRemappingAvailabilityBankCount() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
+
+  private:
+    void updateReading(const nsm_row_remap_availability& data);
+
+    std::shared_ptr<MemoryRowRemappingIntf> rowRemapIntf = nullptr;
+    std::string inventoryObjPath;
+};
+
 using EccModeIntfDram = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Memory::server::MemoryECC>;
 

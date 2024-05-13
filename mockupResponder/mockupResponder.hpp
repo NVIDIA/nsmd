@@ -206,6 +206,10 @@ class MockupResponder
                                      size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getRowRemapAvailabilityHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getAltitudePressureHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
 

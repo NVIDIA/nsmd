@@ -76,7 +76,8 @@ enum nsm_platform_environmental_commands {
 	NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE = 0x71,
 	NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE = 0x72,
 	NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE = 0x73,
-	NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN = 0x74
+	NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN = 0x74,
+	NSM_GET_ROW_REMAP_AVAILABILITY = 0xAC
 };
 
 /** @brief NSM Type3 platform environmental events
@@ -566,6 +567,27 @@ struct nsm_pwr_smoothing_featureinfo_data {
 struct nsm_get_power_smoothing_feat_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_pwr_smoothing_featureinfo_data data;
+} __attribute__((packed));
+
+/** @struct nsm_row_remap_availability
+ *
+ *  Structure representing Row Remapping Availability.
+ */
+struct nsm_row_remap_availability {
+	uint16_t no_remapping;
+	uint16_t low_remapping;
+	uint16_t partial_remapping;
+	uint16_t high_remapping;
+	uint16_t max_remapping;
+} __attribute__((packed));
+
+/** @struct nsm_get_row_remap_availability_resp
+ *
+ *  Structure representing NSM get row remap availability response.
+ */
+struct nsm_get_row_remap_availability_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_row_remap_availability data;
 } __attribute__((packed));
 
 /** @brief Encode a platform env metric request that doesnt have any request
@@ -2698,6 +2720,54 @@ double NvUFXP4_12ToDouble(uint16_t reading);
 uint16_t doubleToNvUFXP4_12(double reading);
 double NvUFXP8_24ToDouble(uint32_t reading);
 uint32_t doubleToNvUFXP8_24(double reading);
+
+/** @brief Encode a Get Row Remap Availability request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remap_availability_req(uint8_t instance_id,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Get Row Remap Availability request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remap_availability_req(const struct nsm_msg *msg,
+					size_t msg_len);
+
+/** @brief Encode a Get Row Remap Availability response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct representing row remap availability data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_row_remap_availability_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 struct nsm_row_remap_availability* data,
+					 struct nsm_msg *msg);
+
+/** @brief Dncode a Get Row Remap Availability response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size
+ *  @param[out] reason_code - reason code
+ *  @param[out] data - struct representing row remap availability data
+ *  @return nsm_completion_codes
+ */
+int decode_get_row_remap_availability_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *data_size,
+					 uint16_t *reason_code,
+					 struct nsm_row_remap_availability* data);
+					 
 #ifdef __cplusplus
 }
 #endif

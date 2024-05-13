@@ -2886,6 +2886,107 @@ int decode_get_row_remapping_counts_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_row_remap_availability_req(uint8_t instance_id,
+					  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_ROW_REMAP_AVAILABILITY;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_row_remap_availability_req(const struct nsm_msg *msg,
+					  size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_row_remap_availability_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_row_remap_availability *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_ROW_REMAP_AVAILABILITY, msg);
+	}
+
+	struct nsm_get_row_remap_availability_resp *resp =
+	    (struct nsm_get_row_remap_availability_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_ROW_REMAP_AVAILABILITY;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = sizeof(struct nsm_row_remap_availability);
+	resp->hdr.data_size = htole16(data_size);
+	resp->data.high_remapping = htole16(data->high_remapping);
+	resp->data.low_remapping = htole16(data->low_remapping);
+	resp->data.max_remapping = htole16(data->max_remapping);
+	resp->data.no_remapping = htole16(data->no_remapping);
+	resp->data.partial_remapping = htole16(data->partial_remapping);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_row_remap_availability_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_row_remap_availability *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_row_remap_availability_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_row_remap_availability_resp *resp =
+	    (struct nsm_get_row_remap_availability_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < sizeof(struct nsm_row_remap_availability)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	data->high_remapping = le16toh(resp->data.high_remapping);
+	data->low_remapping = le16toh(resp->data.low_remapping);
+	data->max_remapping = le16toh(resp->data.max_remapping);
+	data->no_remapping = le16toh(resp->data.no_remapping);
+	data->partial_remapping = le16toh(resp->data.partial_remapping);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_get_memory_capacity_util_req(uint8_t instance_id,
 					struct nsm_msg *msg)
 {

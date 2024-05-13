@@ -279,6 +279,114 @@ uint8_t
     return cc;
 }
 
+NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<MemoryRowRemappingIntf> rowRemapIntf,
+    const std::string& inventoryObjPath) :
+    NsmSensor(name, type), rowRemapIntf(rowRemapIntf),
+    inventoryObjPath(inventoryObjPath)
+
+{
+    lg2::info("NsmRemappingAvailabilityBankCount: create sensor:{NAME}", "NAME",
+              name.c_str());
+    updateMetricOnSharedMemory();
+}
+
+void NsmRemappingAvailabilityBankCount::updateReading(const nsm_row_remap_availability& data)
+{
+    rowRemapIntf->highRemappingAvailablityBankCount(data.high_remapping);
+    rowRemapIntf->maxRemappingAvailablityBankCount(data.max_remapping);
+    rowRemapIntf->lowRemappingAvailablityBankCount(data.low_remapping);
+    rowRemapIntf->noRemappingAvailablityBankCount(data.no_remapping);
+    rowRemapIntf->partialRemappingAvailablityBankCount(data.partial_remapping);
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmRemappingAvailabilityBankCount::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_row_remap_availability_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_row_remap_availability_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmRemappingAvailabilityBankCount::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+
+    uint8_t cc = NSM_ERROR;
+    struct nsm_row_remap_availability data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_get_row_remap_availability_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+        updateMetricOnSharedMemory();
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg:  decode_get_row_remap_availability_resp"
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
+void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(rowRemapIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType maxRemappingAvailablityBankCount{
+        rowRemapIntf->maxRemappingAvailablityBankCount()};
+    std::string propName = "MaxRemappingAvailablityBankCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        maxRemappingAvailablityBankCount);
+
+    propName = "HighRemappingAvailablityBankCount";
+    nv::sensor_aggregation::DbusVariantType highRemappingAvailablityBankCount{
+        rowRemapIntf->highRemappingAvailablityBankCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, highRemappingAvailablityBankCount);
+
+    propName = "LowRemappingAvailablityBankCount";
+    nv::sensor_aggregation::DbusVariantType lowRemappingAvailablityBankCount{
+        rowRemapIntf->lowRemappingAvailablityBankCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, lowRemappingAvailablityBankCount);
+
+    propName = "PartialRemappingAvailablityBankCount";
+    nv::sensor_aggregation::DbusVariantType partialRemappingAvailablityBankCount{
+        rowRemapIntf->partialRemappingAvailablityBankCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, partialRemappingAvailablityBankCount);
+
+    propName = "NoRemappingAvailablityBankCount";
+    nv::sensor_aggregation::DbusVariantType noRemappingAvailablityBankCount{
+        rowRemapIntf->noRemappingAvailablityBankCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, noRemappingAvailablityBankCount);
+
+#endif
+}
+
 NsmEccErrorCountsDram::NsmEccErrorCountsDram(
     std::string& name, std::string& type,
     std::shared_ptr<EccModeIntfDram> eccIntf, std::string& inventoryObjPath) :
@@ -632,17 +740,13 @@ static void createNsmMemorySensor(SensorManager& manager,
             auto sensorRowRemappingCounts =
                 std::make_shared<NsmRowRemappingCounts>(
                     name, type, rowRemapIntf, inventoryObjPath);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensorRowRemapState);
-                nsmDevice->prioritySensors.push_back(sensorRowRemappingCounts);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensorRowRemapState);
-                nsmDevice->roundRobinSensors.push_back(
-                    sensorRowRemappingCounts);
-            }
+             auto remappingAvailabilitySensor =
+                std::make_shared<NsmRemappingAvailabilityBankCount>(
+                    name, type, rowRemapIntf, inventoryObjPath);
+
+            nsmDevice->addSensor(sensorRowRemapState, priority);
+            nsmDevice->addSensor(sensorRowRemappingCounts, priority);
+            nsmDevice->addSensor(remappingAvailabilitySensor, priority);        
         }
         else if (type == "NSM_ECC")
         {
