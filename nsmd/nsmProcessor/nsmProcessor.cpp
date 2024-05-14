@@ -22,6 +22,7 @@
 
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmInterface.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -67,19 +68,6 @@ NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
 {
     uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
     uuidIntf->uuid(uuid);
-}
-
-NsmAssetIntfProcessor::NsmAssetIntfProcessor(
-    const std::string& name, const std::string& type,
-    const std::string& manufacturer, const std::string& partNumber,
-    const std::string& serialNumber, const std::string& model,
-    std::shared_ptr<AssetIntfProcessor> assetIntf) :
-    NsmObject(name, type), assetIntf(assetIntf)
-{
-    assetIntf->manufacturer(manufacturer);
-    assetIntf->partNumber(partNumber);
-    assetIntf->serialNumber(serialNumber);
-    assetIntf->model(model);
 }
 
 NsmLocationIntfProcessor::NsmLocationIntfProcessor(
@@ -1009,18 +997,20 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto manufacturer =
                 utils::DBusHandler().getDbusProperty<std::string>(
                     objPath.c_str(), "Manufacturer", interface.c_str());
-            auto partNumber = utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "PartNumber", interface.c_str());
-            auto serialNumber =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "SerialNumber", interface.c_str());
-            auto model = utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Model", interface.c_str());
 
-            auto sensorManufacturer = std::make_shared<NsmAssetIntfProcessor>(
-                name, type, manufacturer, partNumber, serialNumber, model,
-                assetIntf);
-            nsmDevice->deviceSensors.push_back(sensorManufacturer);
+            auto assetObject =
+                NsmAssetIntfProcessor<AssetIntfProcessor>(name, type, assetIntf);
+            assetObject.pdi().manufacturer(manufacturer);
+            // create sensor
+            addSensor(manager, nsmDevice,
+                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                          assetObject, BOARD_PART_NUMBER));
+            addSensor(manager, nsmDevice,
+                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                          assetObject, SERIAL_NUMBER));
+            addSensor(manager, nsmDevice,
+                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                          assetObject, MARKETING_NAME));
         }
         else if (type == "NSM_MIG")
         {

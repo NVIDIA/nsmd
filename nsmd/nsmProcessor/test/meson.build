@@ -11,6 +11,7 @@ dep_src_files = [
     '../../../libnsm/pci-links.c',
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
+    '../../nsmChassis/nsmInventoryProperty.cpp',
 ]
 
 dep_src_headers = [

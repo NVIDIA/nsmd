@@ -22,6 +22,8 @@
 
 #include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
 #include "nsmSensor.hpp"
+#include "nsmInterface.hpp"
+#include "nsmChassis/nsmInventoryProperty.hpp"
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
@@ -86,18 +88,14 @@ class NsmUuidIntf : public NsmObject
 using AssetIntfProcessor = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 
-class NsmAssetIntfProcessor : public NsmObject
+template <typename IntfType>
+class NsmAssetIntfProcessor : public NsmInterfaceProvider<IntfType>
 {
   public:
     NsmAssetIntfProcessor(const std::string& name, const std::string& type,
-                          const std::string& manufacturer,
-                          const std::string& partNumber,
-                          const std::string& serialNumber,
-                          const std::string& model,
-                          std::shared_ptr<AssetIntfProcessor> assetIntf);
-
-  private:
-    std::shared_ptr<AssetIntfProcessor> assetIntf;
+                          const std::shared_ptr<AssetIntfProcessor>assetIntf) :
+        NsmInterfaceProvider<IntfType>(name, type, assetIntf)
+    {}
 };
 
 using LocationIntfProcessor = sdbusplus::server::object_t<
