@@ -57,6 +57,8 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
                                        association.absolutePath);
     }
     associationDefinitionsIntf.associations(associations_list);
+
+    updateReading(std::numeric_limits<double>::quiet_NaN());
 }
 
 void NsmNumericSensorDbusValue::updateReading(double value,
@@ -80,6 +82,12 @@ void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
 {
     timestampIntf.elapsed(timestamp);
     NsmNumericSensorDbusValue::updateReading(value);
+}
+
+void NsmNumericSensorValueAggregate::append(
+    std::unique_ptr<NsmNumericSensorValue> elem)
+{
+    objects.push_back(std::move(elem));
 }
 
 void NsmNumericSensorValueAggregate::updateReading(double value,

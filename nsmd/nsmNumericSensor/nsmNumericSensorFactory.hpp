@@ -39,7 +39,16 @@ struct NumericSensorInfo
     bool aggregated;
 };
 
-class NumericSensorBuilder
+class NumericSensorAggregatorBuilder
+{
+  public:
+    virtual ~NumericSensorAggregatorBuilder() = default;
+
+    virtual std::shared_ptr<NsmNumericAggregator>
+        makeAggregator(const NumericSensorInfo& info) = 0;
+};
+
+class NumericSensorBuilder : public NumericSensorAggregatorBuilder
 {
   public:
     virtual ~NumericSensorBuilder() = default;
@@ -62,6 +71,12 @@ class NumericSensorFactory
 
     void make(SensorManager& manager, const std::string& interface,
               const std::string& objPath);
+
+    static void
+        makeAggregatorAndAddSensor(NumericSensorAggregatorBuilder* builder,
+                                   const NumericSensorInfo& info,
+                                   std::shared_ptr<NsmNumericSensor> sensor,
+                                   const uuid_t& uuid, NsmDevice* nsmDevice);
 
   private:
     std::unique_ptr<NumericSensorBuilder> builder;

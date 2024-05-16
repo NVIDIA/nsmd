@@ -32,8 +32,9 @@ NsmVoltage::NsmVoltage(sdbusplus::bus::bus& bus, const std::string& name,
                        const std::vector<utils::Association>& association) :
     NsmNumericSensor(
         name, type, sensorId,
-        std::make_unique<NsmNumericSensorDbusValue>(
-            bus, name, sensor_type, SensorUnit::Volts, association))
+        std::make_shared<NsmNumericSensorValueAggregate>(
+            std::make_unique<NsmNumericSensorDbusValue>(
+                bus, name, getSensorType(), SensorUnit::Volts, association)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -60,7 +61,6 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint32_t reading = 0;
-    std::vector<uint8_t> data(65535, 0);
 
     auto rc = decode_get_voltage_resp(responseMsg, responseLen, &cc,
                                       &reason_code, &reading);
@@ -73,6 +73,8 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
     else
     {
+        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
+
         lg2::error(
             "handleResponseMsg: decode_get_voltage_resp "
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",

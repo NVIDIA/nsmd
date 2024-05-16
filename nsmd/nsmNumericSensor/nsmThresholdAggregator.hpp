@@ -17,28 +17,21 @@
 
 #pragma once
 
-#include "nsmNumericSensor.hpp"
-#include "nsmSensor.hpp"
+#include "nsmNumericAggregator.hpp"
 
 namespace nsm
 {
-class NsmEnergy : public NsmNumericSensor
+class NsmThresholdAggregator : public NsmNumericAggregator
 {
   public:
-    NsmEnergy(sdbusplus::bus::bus& bus, const std::string& name,
-              const std::string& type, uint8_t sensorId,
-              const std::vector<utils::Association>& association,
-              const std::string& chassis_association);
-
+    NsmThresholdAggregator(const std::string& name, const std::string& type,
+                           bool priority);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
 
-    std::string getSensorType() override
-    {
-        return "energy";
-    }
+  private:
+    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+
+    static constexpr uint8_t sensorId = 255;
 };
-
 } // namespace nsm

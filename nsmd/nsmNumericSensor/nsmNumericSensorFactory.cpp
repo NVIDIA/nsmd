@@ -19,6 +19,7 @@
 
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmThresholdFactory.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -92,6 +93,21 @@ void NumericSensorFactory::make(SensorManager& manager,
         return;
     }
 
+    auto sensor = builder->makeSensor(interface, objPath, bus, info);
+    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+              "UUID", uuid, "NAME", info.name, "TYPE", info.type);
+
+    makeAggregatorAndAddSensor(builder.get(), info, sensor, uuid,
+                               nsmDevice.get());
+
+    NsmThresholdFactory{manager, interface, objPath, sensor, info, uuid}.make();
+}
+
+void NumericSensorFactory::makeAggregatorAndAddSensor(
+    NumericSensorAggregatorBuilder* builder, const NumericSensorInfo& info,
+    std::shared_ptr<NsmNumericSensor> sensor, const uuid_t& uuid,
+    NsmDevice* nsmDevice)
+{
     std::shared_ptr<NsmNumericAggregator> aggregator{};
     // Check if Aggregator object for the NSM Command already exists.
     if (info.aggregated)
@@ -99,10 +115,10 @@ void NumericSensorFactory::make(SensorManager& manager,
         aggregator = nsmDevice->findAggregatorByType(info.type);
         if (aggregator)
         {
-            // If existing Aggregator has low priority and this NSM Command has
-            // high priority, update the existing Aggregator's priority to
-            // high, remove it from round-robin queue, and place it in priority
-            // queue.
+            // If existing Aggregator has low priority and this NSM
+            // Command has high priority, update the existing
+            // Aggregator's priority to high, remove it from round-robin
+            // queue, and place it in priority queue.
             if (info.priority && !aggregator->priority)
             {
                 aggregator->priority = true;
@@ -128,10 +144,6 @@ void NumericSensorFactory::make(SensorManager& manager,
             }
         }
     }
-
-    auto sensor = builder->makeSensor(interface, objPath, bus, info);
-    lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
-              "UUID", uuid, "NAME", info.name, "TYPE", info.type);
 
     nsmDevice->deviceSensors.emplace_back(sensor);
 
@@ -164,4 +176,5 @@ void NumericSensorFactory::make(SensorManager& manager,
         }
     }
 }
+
 }; // namespace nsm

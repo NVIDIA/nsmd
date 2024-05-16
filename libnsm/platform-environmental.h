@@ -35,6 +35,7 @@ const uint8_t MAX_VERSION_STRING_SIZE = 100;
  */
 enum nsm_platform_environmental_commands {
 	NSM_GET_TEMPERATURE_READING = 0x00,
+	NSM_READ_THERMAL_PARAMETER = 0x02,
 	NSM_GET_POWER = 0x03,
 	NSM_GET_ENERGY_COUNT = 0x06,
 	NSM_GET_VOLTAGE = 0x0F,
@@ -260,6 +261,24 @@ typedef struct nsm_get_numeric_sensor_reading_req
 struct nsm_get_temperature_reading_resp {
 	struct nsm_common_resp hdr;
 	int32_t reading;
+} __attribute__((packed));
+
+/** @struct nsm_read_thermal_parameter_req
+ *
+ *  Structure representing NSM read thermal parameter request.
+ */
+struct nsm_read_thermal_parameter_req {
+	struct nsm_common_req hdr;
+	uint8_t parameter_id;
+} __attribute__((packed));
+
+/** @struct nsm_read_thermal_parameter_resp
+ *
+ *  Structure representing NSM get temperature reading response.
+ */
+struct nsm_read_thermal_parameter_resp {
+	struct nsm_common_resp hdr;
+	int32_t threshold;
 } __attribute__((packed));
 
 /** @struct nsm_get_current_power_draw_req
@@ -732,6 +751,74 @@ int decode_get_temperature_reading_resp(const struct nsm_msg *msg,
 					size_t msg_len, uint8_t *cc,
 					uint16_t *reason_code,
 					double *temperature_reading);
+
+/** @brief Encode a read thermal parameter request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] parameter_id - parameter id
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_read_thermal_parameter_req(uint8_t instance, uint8_t parameter_id,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a read thermal parameter request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] parameter_id - parameter id
+ *  @return nsm_completion_codes
+ */
+int decode_read_thermal_parameter_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *parameter_id);
+
+/** @brief Encode a read thermal parameter response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] threshold - threshold value
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_read_thermal_parameter_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code, int32_t threshold,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a read thermal parameter response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] threshold - threshold value
+ *  @return nsm_completion_codes
+ */
+int decode_read_thermal_parameter_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code,
+				       int32_t *threshold);
+
+/** @brief Encode data of a read thermal parameter response message
+ *
+ *  @param[in] threshold - threshold
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_thermal_parameter_data(int32_t threshold, uint8_t *data,
+					    size_t *data_len);
+
+/** @brief Decode data of a read thermal parameter response message
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data
+ *  @param[out] threshold - threshold
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_thermal_parameter_data(const uint8_t *data,
+					    size_t data_len,
+					    int32_t *threshold);
 
 /** @brief Encode a Get current power draw request message
  *

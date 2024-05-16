@@ -36,8 +36,12 @@ class NsmPower : public NsmNumericSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    std::string getSensorType() override
+    {
+        return "power";
+    }
+
   private:
-    static constexpr auto sensor_type = "power";
     uint8_t averagingInterval;
 };
 

@@ -35,7 +35,9 @@ class NsmTemp : public NsmNumericSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-  private:
-    static constexpr auto sensor_type = "temperature";
+    std::string getSensorType() override
+    {
+        return "temperature";
+    }
 };
 } // namespace nsm

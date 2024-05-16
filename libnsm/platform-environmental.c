@@ -280,6 +280,156 @@ int decode_get_temperature_reading_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_read_thermal_parameter_req(uint8_t instance, uint8_t parameter_id,
+				      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_read_thermal_parameter_req *request =
+	    (struct nsm_read_thermal_parameter_req *)msg->payload;
+
+	request->hdr.command = NSM_READ_THERMAL_PARAMETER;
+	request->hdr.data_size = sizeof(parameter_id);
+	request->parameter_id = parameter_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_read_thermal_parameter_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *parameter_id)
+{
+	if (msg == NULL || parameter_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_read_thermal_parameter_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_read_thermal_parameter_req *request =
+	    (struct nsm_read_thermal_parameter_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->parameter_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*parameter_id = request->parameter_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_read_thermal_parameter_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code, int32_t threshold,
+				       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_READ_THERMAL_PARAMETER, msg);
+	}
+
+	struct nsm_read_thermal_parameter_resp *response =
+	    (struct nsm_read_thermal_parameter_resp *)msg->payload;
+
+	response->hdr.command = NSM_READ_THERMAL_PARAMETER;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(threshold));
+	response->threshold = htole32(threshold);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_read_thermal_parameter_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code,
+				       int32_t *threshold)
+{
+	if (threshold == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_read_thermal_parameter_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_read_thermal_parameter_resp *response =
+	    (struct nsm_read_thermal_parameter_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	if (data_size != sizeof(*threshold)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*threshold = le32toh(response->threshold);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_thermal_parameter_data(int32_t threshold, uint8_t *data,
+					    size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int32_t le_reading = htole32(threshold);
+
+	memcpy(data, &le_reading, sizeof(int32_t));
+	*data_len = sizeof(int32_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_thermal_parameter_data(const uint8_t *data,
+					    size_t data_len, int32_t *threshold)
+{
+	if (data == NULL || threshold == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(int32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int32_t le_reading;
+	memcpy(&le_reading, data, sizeof(int32_t));
+
+	*threshold = le32toh(le_reading);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_get_current_power_draw_req(uint8_t instance_id, uint8_t sensor_id,
 				      uint8_t averaging_interval,
 				      struct nsm_msg *msg)

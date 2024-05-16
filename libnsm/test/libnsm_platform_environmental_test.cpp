@@ -379,6 +379,222 @@ TEST(getTemperature, testBadDecodeResponseDataLength)
 	EXPECT_DOUBLE_EQ(temperature_reading, 0);
 }
 
+TEST(readThermalParameter, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_read_thermal_parameter_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t sensor_id = 0;
+
+	auto rc = encode_read_thermal_parameter_req(0, sensor_id, request);
+
+	nsm_read_thermal_parameter_req *req =
+	    reinterpret_cast<nsm_read_thermal_parameter_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_READ_THERMAL_PARAMETER, req->hdr.command);
+	EXPECT_EQ(sizeof(sensor_id), req->hdr.data_size);
+	EXPECT_EQ(sensor_id, req->parameter_id);
+}
+
+TEST(readThermalParameter, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_READ_THERMAL_PARAMETER,	     // command
+	    2,				     // data size
+	    6,				     // sensor_id
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t sensor_id = 0;
+
+	auto rc =
+	    decode_read_thermal_parameter_req(request, msg_len, &sensor_id);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sensor_id, 6);
+}
+
+TEST(readThermalParameter, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(struct nsm_read_thermal_parameter_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	int32_t threshold = -20;
+	uint16_t reasonCode = 0;
+
+	auto rc = encode_read_thermal_parameter_resp(0, NSM_SUCCESS, reasonCode,
+						     threshold, response);
+
+	struct nsm_read_thermal_parameter_resp *resp =
+	    reinterpret_cast<struct nsm_read_thermal_parameter_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_READ_THERMAL_PARAMETER, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->threshold), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(threshold, resp->threshold);
+}
+
+TEST(readThermalParameter, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_READ_THERMAL_PARAMETER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x45,
+	    0x01,
+	    0x00,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	int32_t reading = 0;
+
+	auto rc = decode_read_thermal_parameter_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 325);
+}
+
+TEST(readThermalParameter, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_READ_THERMAL_PARAMETER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	int32_t reading = 0;
+
+	auto rc = decode_read_thermal_parameter_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(readThermalParameter, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_read_thermal_parameter_resp(response, msg_len, &cc,
+						     &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(readThermalParameter, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_TEMPERATURE_READING,     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    3,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	int32_t reading = 0;
+
+	auto rc = decode_read_thermal_parameter_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
 TEST(getCurrentPowerDraw, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +

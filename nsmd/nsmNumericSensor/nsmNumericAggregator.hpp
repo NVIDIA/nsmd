@@ -27,19 +27,21 @@
 
 namespace nsm
 {
-class NsmNumericSensorValue;
+class NsmNumericSensorValueAggregate;
 
 class NsmNumericAggregator : public NsmSensorAggregator
 {
   public:
     NsmNumericAggregator(const std::string& name, const std::string& type,
                          bool priority) :
-        NsmSensorAggregator(name, type), priority(priority){};
+        NsmSensorAggregator(name, type),
+        priority(priority){};
     virtual ~NsmNumericAggregator() = default;
 
-    int addSensor(uint8_t tag, std::shared_ptr<NsmNumericSensorValue> sensor);
+    int addSensor(uint8_t tag,
+                  std::shared_ptr<NsmNumericSensorValueAggregate> sensor);
 
-    const NsmNumericSensorValue* getSensor(uint8_t tag)
+    const NsmNumericSensorValueAggregate* getSensor(uint8_t tag)
     {
         return sensors[tag].get();
     };
@@ -52,7 +54,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
     int updateSensorNotWorking(uint8_t tag);
 
   private:
-    std::array<std::shared_ptr<NsmNumericSensorValue>,
+    std::array<std::shared_ptr<NsmNumericSensorValueAggregate>,
                NSM_AGGREGATE_MAX_SAMPLE_TAG_VALUE>
         sensors{};
 };

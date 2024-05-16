@@ -33,6 +33,7 @@
 #include "nsmNumericSensorValue_mock.hpp"
 #include "nsmPower.hpp"
 #include "nsmTemp.hpp"
+#include "nsmThreshold.hpp"
 #include "nsmVoltage.hpp"
 
 static auto& bus = utils::DBusHandler::getBus();
@@ -68,7 +69,7 @@ TEST(nsmTemp, GoodHandleResp)
     nsm::NsmTemp sensor{bus, sensorName,   sensorType,
                         1,   associations, associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -96,7 +97,7 @@ TEST(nsmTemp, BadHandleResp)
     nsm::NsmTemp sensor{bus, sensorName,   sensorType,
                         1,   associations, associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -162,7 +163,7 @@ TEST(nsmPower, GoodHandleResp)
                          associations,
                          associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -194,7 +195,7 @@ TEST(nsmPower, BadHandleResp)
                          associations,
                          associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -248,10 +249,9 @@ TEST(nsmEnergy, GoodHandleResp)
     nsm::NsmEnergy sensor{bus, sensorName,   sensorType,
                           1,   associations, associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
-    const_cast<std::shared_ptr<nsm::NsmNumericSensorValue>&>(
-        sensor.sensorValue) = value;
+    sensor.sensorValue = value;
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_resp);
@@ -276,10 +276,9 @@ TEST(nsmEnergy, BadHandleResp)
     nsm::NsmEnergy sensor{bus, sensorName,   sensorType,
                           1,   associations, associations[0].absolutePath};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
-    const_cast<std::shared_ptr<nsm::NsmNumericSensorValue>&>(
-        sensor.sensorValue) = value;
+    sensor.sensorValue = value;
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_resp);
@@ -328,10 +327,9 @@ TEST(nsmVoltage, GoodHandleResp)
 {
     nsm::NsmVoltage sensor{bus, sensorName, sensorType, 1, associations};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
-    const_cast<std::shared_ptr<nsm::NsmNumericSensorValue>&>(
-        sensor.sensorValue) = value;
+    sensor.sensorValue = value;
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_voltage_resp);
@@ -355,10 +353,9 @@ TEST(nsmVoltage, BadHandleResp)
 {
     nsm::NsmVoltage sensor{bus, sensorName, sensorType, 1, associations};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
-    const_cast<std::shared_ptr<nsm::NsmNumericSensorValue>&>(
-        sensor.sensorValue) = value;
+    sensor.sensorValue = value;
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_voltage_resp);
@@ -403,7 +400,7 @@ TEST(nsmAltitudePressure, GoodHandleResp)
 {
     nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -429,7 +426,7 @@ TEST(nsmAltitudePressure, BadHandleResp)
 {
     nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations};
 
-    auto value = std::make_shared<MockNsmNumericSensorValue>();
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
     sensor.sensorValue = value;
 
@@ -454,4 +451,77 @@ TEST(nsmAltitudePressure, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = sensor.handleResponseMsg(msg, msg_size);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmThreshold, GoodGenReq)
+{
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
+    nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
+
+    EXPECT_EQ(sensor.sensorId, 1);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{15};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const nsm_read_thermal_parameter_req*>(msg->payload);
+
+    EXPECT_EQ(command->hdr.command, NSM_READ_THERMAL_PARAMETER);
+    EXPECT_EQ(command->hdr.data_size, 1);
+    EXPECT_EQ(command->parameter_id, 1);
+}
+
+TEST(nsmThreshold, GoodHandleResp)
+{
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
+    nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
+
+    static constexpr size_t msg_size =
+        sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_resp);
+    std::array<char, msg_size> request;
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    const uint8_t instance_id{30};
+    const uint8_t cc = NSM_SUCCESS;
+    const uint16_t reason_code = ERR_NULL;
+    const int32_t reading{-40};
+
+    auto rc = encode_read_thermal_parameter_resp(instance_id, cc, reason_code,
+                                                 reading, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    EXPECT_CALL(*value, updateReading(reading, 0)).Times(1);
+
+    sensor.handleResponseMsg(msg, msg_size);
+}
+
+TEST(nsmThreshold, BadHandleResp)
+{
+    auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
+    nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
+
+    static constexpr size_t msg_size =
+        sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_resp);
+    std::array<char, msg_size> request;
+    auto msg = reinterpret_cast<nsm_msg*>(request.data());
+    const uint8_t instance_id{30};
+    const uint8_t cc = NSM_ERR_NOT_READY;
+    const uint16_t reason_code = ERR_TIMEOUT;
+    const int32_t reading{85};
+    uint8_t rc = NSM_SW_SUCCESS;
+
+    rc = sensor.handleResponseMsg(nullptr, msg_size);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+    rc = sensor.handleResponseMsg(msg, msg_size - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+    rc = encode_read_thermal_parameter_resp(instance_id, cc, reason_code,
+                                            reading, msg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

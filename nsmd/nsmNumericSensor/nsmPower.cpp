@@ -41,11 +41,11 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
             std::make_unique<NsmNumericSensorDbusValueTimestamp>(
-                bus, name, sensor_type, SensorUnit::Watts, association)
+                bus, name, getSensorType(), SensorUnit::Watts, association)
 #ifdef NVIDIA_SHMEM
                 ,
             std::make_unique<NsmNumericSensorShmem>(
-                name, sensor_type, chassis_association,
+                name, getSensorType(), chassis_association,
                 std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>())
 #endif
                 )),
@@ -90,6 +90,8 @@ uint8_t NsmPower::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
     else
     {
+        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
+
         lg2::error(
             "handleResponseMsg: decode_get_temperature_reading_resp "
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
