@@ -69,17 +69,6 @@ uint8_t NsmEventConfig::updateSync(SensorManager& manager, eid_t eid)
         }
         return rc;
     }
-    rc = configureEventAcknowledgement(manager, eid, messageType, ackEventMask);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
-        {
-            lg2::error(
-                "configureEventAcknowledgement failed, eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
-        }
-        return rc;
-    }
     return rc;
 }
 
@@ -193,10 +182,6 @@ static void createNsmEventConfig(SensorManager& manager,
         utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
             objPath.c_str(), "SubscribedEventIDs",
             "xyz.openbmc_project.Configuration.NSM_EventConfig");
-    auto acknowledgementEventIds =
-        utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
-            objPath.c_str(), "AcknowledgementEventIds",
-            "xyz.openbmc_project.Configuration.NSM_EventConfig");
 
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
@@ -207,8 +192,11 @@ static void createNsmEventConfig(SensorManager& manager,
         return;
     }
 
-    auto sensor = std::make_shared<NsmEventConfig>(
-        name, type, messageType, subscribedEventIds, acknowledgementEventIds);
+    // ack support to be added in future. JIRA
+    // https://jirasw.nvidia.com/browse/DGXOPENBMC-11623
+    std::vector<uint64_t> ackIds{};
+    auto sensor = std::make_shared<NsmEventConfig>(name, type, messageType,
+                                                   subscribedEventIds, ackIds);
     nsmDevice->deviceSensors.emplace_back(sensor);
 
     // update sensor
