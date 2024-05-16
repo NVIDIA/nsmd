@@ -38,7 +38,8 @@ const std::string emptyUUID = "00000000-0000-0000-0000-000000000000";
 MctpDiscovery::MctpDiscovery(
     sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
     std::initializer_list<MctpDiscoveryHandlerIntf*> list) :
-    bus(bus), handler(handler),
+    bus(bus),
+    handler(handler),
     mctpEndpointAddedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
@@ -48,7 +49,7 @@ MctpDiscovery::MctpDiscovery(
         bus,
         sdbusplus::bus::match::rules::interfacesRemoved(
             "/xyz/openbmc_project/mctp"),
-        std::bind_front(&MctpDiscovery::discoverEndpoints, this)),
+        std::bind_front(&MctpDiscovery::cleanEndpoints, this)),
     handlers(list)
 {
     dbus::ObjectValueTree objects;
@@ -87,6 +88,14 @@ MctpDiscovery::MctpDiscovery(
             for (const auto& [objectPath, interfaces] : objects)
             {
                 populateMctpInfo(interfaces, mctpInfos);
+
+                // watch PropertiesChanged signal from
+                // xyz.openbmc_project.Object.Enable PDI
+                enableMatches.emplace_back(
+                    bus,
+                    sdbusplus::bus::match::rules::propertiesChanged(
+                        objectPath.str, "xyz.openbmc_project.Object.Enable"),
+                    std::bind_front(&MctpDiscovery::refreshEndpoints, this));
             }
         }
         catch (const std::exception& e)
@@ -179,6 +188,12 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 
     populateMctpInfo(interfaces, mctpInfos);
 
+    // watch PropertiesChanged signal from xyz.openbmc_project.Object.Enable PDI
+    enableMatches.emplace_back(
+        bus,
+        sdbusplus::bus::match::rules::propertiesChanged(
+            objPath.str, "xyz.openbmc_project.Object.Enable"),
+        std::bind_front(&MctpDiscovery::refreshEndpoints, this));
     handleMctpEndpoints(mctpInfos);
 }
 
@@ -191,6 +206,57 @@ void MctpDiscovery::handleMctpEndpoints(const MctpInfos& mctpInfos)
             handler->handleMctpEndpoints(mctpInfos);
         }
     }
+}
+
+void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
+{
+    std::string interface;
+    dbus::PropertyMap properties;
+    std::string objPath = msg.get_path();
+    std::string service = msg.get_sender();
+
+    msg.read(interface, properties);
+    auto prop = properties.find("Enabled");
+    if (prop != properties.end())
+    {
+        auto enabled = std::get<bool>(prop->second);
+        lg2::info(
+            "Received xyz.openbmc_poject.Object.Enabled propertiesChanged signal for "
+            "Enabled=={ENABLED} at PATH={OBJ_PATH} from {SERVICE}",
+            "ENABLED", enabled, "OBJ_PATH", objPath, "SERVICE", service);
+
+        for (MctpDiscoveryHandlerIntf* handler : handlers)
+        {
+            try
+            {
+                const auto uuid =
+                    utils::DBusHandler().getDbusProperty<std::string>(
+                        objPath.c_str(), "UUID",
+                        "xyz.openbmc_project.Common.UUID");
+
+                if (enabled)
+                {
+                    handler->onlineMctpEndpoint(uuid);
+                }
+                else
+                {
+                    handler->offlineMctpEndpoint(uuid);
+                }
+            }
+            catch (const std::exception& e)
+            {
+                lg2::error("refreshEndpoints: failed to get UUID,  {ERROR}",
+                           "ERROR", e);
+            }
+        }
+    }
+}
+
+void MctpDiscovery::cleanEndpoints(
+    [[maybe_unused]] sdbusplus::message::message& msg)
+{
+    // place holder: implement the function once mctp-ctrl service support the
+    // InterfacesRemoved signal
 }
 
 } // namespace mctp

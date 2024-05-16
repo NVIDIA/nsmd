@@ -49,6 +49,11 @@ class NsmObject
         co_return NSM_SW_SUCCESS;
     }
 
+    virtual void handleOfflineState()
+    {
+        return;
+    }
+
   private:
     const std::string name;
     const std::string type;

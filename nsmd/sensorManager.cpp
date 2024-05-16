@@ -46,9 +46,9 @@ SensorManagerImpl::SensorManagerImpl(
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
     mctp_socket::Manager& sockManager) :
-    SensorManager(nsmDevices, localEid), bus(bus), event(event),
-    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-    eidTable(eidTable), sockManager(sockManager)
+    SensorManager(nsmDevices, localEid),
+    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
+    objServer(objServer), eidTable(eidTable), sockManager(sockManager)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -134,6 +134,28 @@ void SensorManagerImpl::_startPolling(
     startPolling();
 }
 
+void SensorManagerImpl::startPolling(uuid_t uuid)
+{
+    auto nsmDevice = getNsmDevice(uuid);
+    if (nsmDevice)
+    {
+        if (!nsmDevice->pollingTimer)
+        {
+            nsmDevice->pollingTimer = std::make_unique<sdbusplus::Timer>(
+                event.get(), std::bind_front(&SensorManagerImpl::doPolling,
+                                             this, nsmDevice));
+        }
+
+        if (!(nsmDevice->pollingTimer->isRunning()))
+        {
+            nsmDevice->pollingTimer->start(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::milliseconds(SENSOR_POLLING_TIME)),
+                true);
+        }
+    }
+}
+
 void SensorManagerImpl::startPolling()
 {
     for (auto& nsmDevice : nsmDevices)
@@ -152,6 +174,15 @@ void SensorManagerImpl::startPolling()
                     std::chrono::milliseconds(SENSOR_POLLING_TIME)),
                 true);
         }
+    }
+}
+
+void SensorManagerImpl::stopPolling(uuid_t uuid)
+{
+    auto nsmDevice = getNsmDevice(uuid);
+    if (nsmDevice)
+    {
+        nsmDevice->pollingTimer->stop();
     }
 }
 
@@ -278,7 +309,8 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    if (!nsmDevice->isCommandSupported(messageType, commandCode))
+    if (!nsmDevice->isDeviceActive ||
+        !nsmDevice->isCommandSupported(messageType, commandCode))
     {
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
@@ -388,7 +420,8 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
         return NSM_ERROR;
     }
 
-    if (!nsmDevice->isCommandSupported(messageType, commandCode))
+    if (!nsmDevice->isDeviceActive ||
+        !nsmDevice->isCommandSupported(messageType, commandCode))
     {
         return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }

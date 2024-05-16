@@ -74,6 +74,8 @@ class SensorManager
                                        const nsm_msg** responseMsg,
                                        size_t* responseLen) = 0;
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
+    virtual void startPolling(uuid_t uuid) = 0;
+    virtual void stopPolling(uuid_t uuid) = 0;
     eid_t getLocalEid()
     {
         return localEid;
@@ -138,6 +140,8 @@ class SensorManagerImpl : public SensorManager
     // Regular methods as before
     void startPolling();
     void stopPolling();
+    void startPolling(uuid_t uuid) override;
+    void stopPolling(uuid_t uuid) override;
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedhandler(sdbusplus::message::message& msg);
     void _startPolling(sdeventplus::source::EventBase& /* source */);

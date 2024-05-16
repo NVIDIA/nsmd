@@ -25,6 +25,8 @@
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
+#include <limits>
+
 namespace utils
 {
 struct Association;
@@ -45,27 +47,6 @@ using AssociationDefinitionsInft = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
 using TimestampIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Time::server::EpochTime>;
-
-class NsmNumericSensorValue;
-
-class NsmNumericSensor : public NsmSensor
-{
-  public:
-    NsmNumericSensor(const std::string& name, const std::string& type,
-                     uint8_t sensorId,
-                     std::shared_ptr<NsmNumericSensorValue> sensorValue) :
-        NsmSensor(name, type),
-        sensorId(sensorId), sensorValue(sensorValue){};
-
-    std::shared_ptr<NsmNumericSensorValue> getSensorValueObject()
-    {
-        return sensorValue;
-    }
-
-  protected:
-    uint8_t sensorId;
-    std::shared_ptr<NsmNumericSensorValue> sensorValue;
-};
 
 /** @class NsmNumericSensorValue
  *
@@ -93,6 +74,34 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
   private:
     ValueIntf valueIntf;
     AssociationDefinitionsInft associationDefinitionsIntf;
+};
+
+class NsmNumericSensor : public NsmSensor
+{
+  public:
+    NsmNumericSensor(const std::string& name, const std::string& type,
+                     uint8_t sensorId,
+                     std::shared_ptr<NsmNumericSensorValue> sensorValue) :
+        NsmSensor(name, type),
+        sensorId(sensorId), sensorValue(sensorValue){};
+
+    std::shared_ptr<NsmNumericSensorValue> getSensorValueObject()
+    {
+        return sensorValue;
+    }
+
+    void handleOfflineState() override
+    {
+        if (sensorValue)
+        {
+            sensorValue->updateReading(
+                std::numeric_limits<double>::quiet_NaN());
+        }
+    }
+
+  protected:
+    uint8_t sensorId;
+    std::shared_ptr<NsmNumericSensorValue> sensorValue;
 };
 
 class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue

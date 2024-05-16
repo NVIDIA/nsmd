@@ -128,4 +128,27 @@ void addSensor(SensorManager& manager, std::shared_ptr<NsmDevice>& device,
     sensor->update(manager, manager.getEid(device)).detach();
 }
 
+void NsmDevice::setOnline()
+{
+    isDeviceActive = true;
+    SensorManager& sensorManager = SensorManager::getInstance();
+    sensorManager.startPolling(uuid);
+}
+
+void NsmDevice::setOffline()
+{
+    isDeviceActive = false;
+    SensorManager& sensorManager = SensorManager::getInstance();
+    sensorManager.stopPolling(uuid);
+
+    size_t sensorIndex{0};
+    auto& sensors = deviceSensors;
+    while (sensorIndex < sensors.size())
+    {
+        auto sensor = sensors[sensorIndex];
+        sensor->handleOfflineState();
+        ++sensorIndex;
+    }
+}
+
 } // namespace nsm

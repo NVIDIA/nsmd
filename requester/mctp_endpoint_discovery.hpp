@@ -25,7 +25,6 @@
 #include <filesystem>
 #include <initializer_list>
 #include <vector>
-
 namespace mctp
 {
 
@@ -38,6 +37,10 @@ class MctpDiscoveryHandlerIntf
 {
   public:
     virtual void handleMctpEndpoints(const MctpInfos& mctpInfos) = 0;
+    virtual void onlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid)
+    {}
+    virtual void offlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid)
+    {}
     virtual ~MctpDiscoveryHandlerIntf()
     {}
 };
@@ -74,6 +77,21 @@ class MctpDiscovery
     sdbusplus::bus::match_t mctpEndpointRemovedSignal;
 
     void discoverEndpoints(sdbusplus::message::message& msg);
+
+    /**
+     * @brief matcher rule for property changes of
+     * xyz.openbmc_project.Object.Enable dbus object
+     */
+    std::vector<sdbusplus::bus::match_t> enableMatches;
+
+    /** @brief handler for mctpEndpointRemovedSignal */
+    void cleanEndpoints(sdbusplus::message::message& msg);
+
+    /**
+     * @brief A callback for propertiesChanges signal enabled matches matcher
+     * rule to invoke registered handlers (online/offline mctp endpoint)
+     */
+    void refreshEndpoints(sdbusplus::message::message& msg);
 
     /** @brief Process the D-Bus MCTP endpoint info and prepare data to be used
      *         for NSM discovery.
