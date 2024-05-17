@@ -5,6 +5,7 @@ sources += [
   'nsmNumericSensor/nsmThresholdValue.cpp',
   'nsmNumericSensor/nsmPower.cpp',
   'nsmNumericSensor/nsmEnergy.cpp',
+  'nsmNumericSensor/nsmNumericSensorComposite.cpp',
   'nsmNumericSensor/nsmVoltage.cpp',
   'nsmNumericSensor/nsmAltitudePressure.cpp',
   'nsmNumericSensor/nsmTempAggregator.cpp',

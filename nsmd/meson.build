@@ -17,6 +17,7 @@ sources = [
     'nsmd.cpp',
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
+    'nsmNumericSensor/nsmNumericSensorComposite.cpp'
 ]
 
 nsmd_headers = [

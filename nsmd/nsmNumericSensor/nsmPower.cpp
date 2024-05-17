@@ -25,6 +25,7 @@
 #include "nsmNumericSensorFactory.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerAggregator.hpp"
+#include "sensorManager.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -114,9 +115,30 @@ class PowerSensorFactory : public NumericSensorBuilder
         auto averagingInterval = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "AveragingInterval", interface.c_str());
 
-        return std::make_shared<NsmPower>(
+        std::vector<std::string> candidateForList;
+        try
+        {
+            candidateForList =
+                utils::DBusHandler().getDbusProperty<std::vector<std::string>>(
+                    objPath.c_str(), "CompositeNumericSensors",
+                    interface.c_str());
+        }
+        catch (const sdbusplus::exception::SdBusError& e)
+        {}
+
+        auto sensor = std::make_shared<NsmPower>(
             bus, info.name, info.type, info.sensorId, averagingInterval,
             info.associations, info.chassis_association);
+
+        if (!candidateForList.empty())
+        {
+            auto compositeChildValueSensor =
+                std::make_unique<NsmNumericSensorCompositeChildValue>(
+                    info.name, info.type, candidateForList);
+            sensor->getSensorValueObject()->append(
+                std::move(compositeChildValueSensor));
+        }
+        return sensor;
     };
 
     std::shared_ptr<NsmNumericAggregator>
