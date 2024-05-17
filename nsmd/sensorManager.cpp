@@ -45,10 +45,10 @@ SensorManagerImpl::SensorManagerImpl(
     sdbusplus::asio::object_server& objServer,
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
-    mctp_socket::Manager& sockManager) :
-    SensorManager(nsmDevices, localEid),
-    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable), sockManager(sockManager)
+    mctp_socket::Manager& sockManager, bool verbose) :
+    SensorManager(nsmDevices, localEid), bus(bus), event(event),
+    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -429,6 +429,11 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
     // if it is supported then only assign instance_id
     requestMsg->hdr.instance_id = instanceIdDb.next(eid);
 
+    if (verbose)
+    {
+        utils::printBuffer(utils::Tx, request);
+    }
+
     rc = nsm_send_recv(eid, mctpFd, request.data(), request.size(),
                        (uint8_t**)responseMsg, responseLen);
     if (rc)
@@ -436,6 +441,12 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
         lg2::error("SendRecvNsmMsgSync failed. eid={EID} rc={RC}", "EID", eid,
                    "RC", rc);
     }
+
+    if (verbose && rc == NSM_REQUESTER_SUCCESS)
+    {
+        utils::printBuffer(utils::Rx, *responseMsg, *responseLen);
+    }
+
     instanceIdDb.free(eid, requestMsg->hdr.instance_id);
     return rc;
 }

@@ -123,7 +123,7 @@ class SensorManagerImpl : public SensorManager
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
-        mctp_socket::Manager& sockManager)
+        mctp_socket::Manager& sockManager, bool verbose = false)
     {
         if (instance)
         {
@@ -132,7 +132,7 @@ class SensorManagerImpl : public SensorManager
         }
         static SensorManagerImpl inst(bus, event, handler, instanceIdDb,
                                       objServer, eidTable, nsmDevices, localEid,
-                                      sockManager);
+                                      sockManager, verbose);
         instance.reset(&inst);
     }
 
@@ -164,7 +164,7 @@ class SensorManagerImpl : public SensorManager
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
-        mctp_socket::Manager& sockManager);
+        mctp_socket::Manager& sockManager, bool verbose);
 
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
@@ -178,5 +178,7 @@ class SensorManagerImpl : public SensorManager
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
 
     mctp_socket::Manager& sockManager;
+
+    bool verbose;
 };
 } // namespace nsm
