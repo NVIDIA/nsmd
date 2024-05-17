@@ -37,8 +37,8 @@ std::optional<Request> NsmPCIeFunction::genRequestMsg(eid_t eid,
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_query_scalar_group_telemetry_v1_req(instanceId, deviceId,
-                                                         0, requestPtr);
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        instanceId, deviceId, GROUP_ID_0, requestPtr);
     if (rc)
     {
         lg2::error(

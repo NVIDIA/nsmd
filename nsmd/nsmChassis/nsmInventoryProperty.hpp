@@ -38,7 +38,7 @@ using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 class NsmInventoryPropertyBase : public NsmSensor
 {
   public:
-    NsmInventoryPropertyBase(const NsmObject& pdi,
+    NsmInventoryPropertyBase(const NsmObject& provider,
                              nsm_inventory_property_identifiers property);
     NsmInventoryPropertyBase() = delete;
 

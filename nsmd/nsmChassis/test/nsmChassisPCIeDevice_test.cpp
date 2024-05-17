@@ -27,9 +27,9 @@ using namespace ::testing;
 #include "nsmChassisPCIeDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
-#include "nsmPCIeDevice.hpp"
 #include "nsmPCIeFunction.hpp"
 #include "nsmPCIeLTSSMState.hpp"
+#include "nsmPCIeLinkSpeed.hpp"
 
 namespace nsm
 {
@@ -209,15 +209,17 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         auto functionSensor = dynamic_pointer_cast<NsmPCIeFunction>(sensor);
         EXPECT_NE(nullptr, functionSensor);
     }
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmPCIeDevice>(gpu.roundRobinSensors[0]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                           gpu.roundRobinSensors[0]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLTSSMState>(
                            gpu.roundRobinSensors[1]));
     EXPECT_EQ(get<uint64_t>(pcieDevice, "InstanceNumber"),
-              dynamic_pointer_cast<NsmPCIeDevice>(gpu.roundRobinSensors[0])
+              dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                  gpu.roundRobinSensors[0])
                   ->deviceId);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
-              dynamic_pointer_cast<NsmPCIeDevice>(gpu.roundRobinSensors[0])
+              dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                  gpu.roundRobinSensors[0])
                   ->pdi()
                   .deviceType());
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceId"),
@@ -232,8 +234,9 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
     NsmChassisPCIeDevice<PCIeDeviceIntf> pcieDevice{chassisName, name};
 
   private:
-    std::shared_ptr<NsmPCIeDevice> sensor =
-        std::make_shared<NsmPCIeDevice>(pcieDevice, deviceId);
+    std::shared_ptr<NsmPCIeLinkSpeed<PCIeDeviceIntf>> sensor =
+        std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(pcieDevice,
+                                                           deviceId);
 
   protected:
     void SetUp() override

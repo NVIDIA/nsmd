@@ -65,11 +65,11 @@ struct nsm_query_scalar_group_telemetry_v1_group_0_resp {
  *  Structure representing Scalar Group Telemetry Data for Group 1.
  */
 struct nsm_query_scalar_group_telemetry_group_1 {
-	uint32_t negotiated_link_speed;
-	uint32_t negotiated_link_width;
-	uint32_t target_link_speed;
-	uint32_t max_link_speed;
-	uint32_t max_link_width;
+	uint32_t negotiated_link_speed; // dsid 0
+	uint32_t negotiated_link_width; // dsid 1
+	uint32_t target_link_speed;	// dsid 2
+	uint32_t max_link_speed;	// dsid 3
+	uint32_t max_link_width;	// dsid 4
 } __attribute__((packed));
 
 /** @struct nsm_query_scalar_group_telemetry_v1_group_1_resp

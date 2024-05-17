@@ -21,9 +21,9 @@
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
-#include "nsmPCIeDevice.hpp"
 #include "nsmPCIeFunction.hpp"
 #include "nsmPCIeLTSSMState.hpp"
+#include "nsmPCIeLinkSpeed.hpp"
 #include "utils.hpp"
 
 namespace nsm
@@ -95,7 +95,8 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
         pcieDeviceObject.pdi().deviceType(deviceType);
         addSensor(device,
-                  std::make_shared<NsmPCIeDevice>(pcieDeviceObject, deviceId),
+                  std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                      pcieDeviceObject, deviceId),
                   objPath, interface);
         for (auto& id : functionIds)
         {

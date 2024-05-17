@@ -35,7 +35,7 @@
             },
             {
                 "ChassisName": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
-                "Name": "Assembly$INSTANCE_NUMBER + 1",
+                "Name": "Assembly0",
                 "Type": "NSM_ChassisAssembly",
                 "UUID": "$UUID",
                 "Area": {

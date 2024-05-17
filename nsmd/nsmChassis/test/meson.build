@@ -6,7 +6,7 @@ dep_src_files = [
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',
     '../nsmPCIeFunction.cpp',
-    '../nsmPCIeDevice.cpp',
+    '../nsmPCIeLinkSpeed.cpp',
     '../nsmPCIeLTSSMState.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
