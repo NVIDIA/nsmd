@@ -103,49 +103,6 @@ TEST(nsmMigMode, GoodUpdateReading)
     EXPECT_EQ(migSensor.migModeIntf->migModeEnabled(), flags.bits.bit0);
 }
 
-TEST(nsmEccMode, GoodGenReq)
-{
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
-    nsm::NsmEccMode eccModeSensor(sensorName, sensorType, eccIntf);
-
-    const uint8_t eid{12};
-    const uint8_t instance_id{30};
-
-    auto request = eccModeSensor.genRequestMsg(eid, instance_id);
-    EXPECT_EQ(request.has_value(), true);
-
-    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
-    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
-    EXPECT_EQ(command->command, NSM_GET_ECC_MODE);
-    EXPECT_EQ(command->data_size, 0);
-}
-
-TEST(nsmEccMode, BadHandleResp)
-{
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
-    nsm::NsmEccMode sensor(sensorName, sensorType, eccIntf);
-
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_ECC_mode_resp), 0);
-    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    bitfield8_t flags;
-    flags.byte = 1;
-    uint16_t reason_code = ERR_NULL;
-
-    uint8_t rc =
-        encode_get_ECC_mode_resp(0, NSM_SUCCESS, reason_code, &flags, response);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    size_t msg_len = responseMsg.size();
-
-    rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
-    rc = sensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-}
-
 TEST(nsmEccErrorCounts, GoodGenReq)
 {
     auto eccIntf =

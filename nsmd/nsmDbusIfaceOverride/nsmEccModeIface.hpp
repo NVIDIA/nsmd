@@ -61,6 +61,7 @@ class NsmEccModeIntf : public EccModeIntf
 
         rc = decode_get_ECC_mode_resp(responseMsg, responseLen, &cc, &data_size,
                                       &reason_code, &flags);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             EccModeIntf::eccModeEnabled(flags.bits.bit0);
@@ -123,6 +124,7 @@ class NsmEccModeIntf : public EccModeIntf
         uint16_t data_size = 0;
         rc = decode_set_ECC_mode_resp(responseMsg, responseLen, &cc,
                                       &reason_code, &data_size);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device

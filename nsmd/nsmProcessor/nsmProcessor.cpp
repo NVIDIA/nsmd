@@ -21,8 +21,8 @@
 #include "platform-environmental.h"
 
 #include "nsmDevice.hpp"
-#include "nsmObjectFactory.hpp"
 #include "nsmInterface.hpp"
+#include "nsmObjectFactory.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -64,7 +64,8 @@ NsmProcessorAssociation::NsmProcessorAssociation(
 }
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
-                         uuid_t uuid) : NsmObject(name, type)
+                         uuid_t uuid) :
+    NsmObject(name, type)
 {
     uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
     uuidIntf->uuid(uuid);
@@ -151,47 +152,43 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
-                       std::shared_ptr<EccModeIntf> eccIntf) :
-    NsmSensor(name, type)
+                       std::shared_ptr<NsmEccModeIntf> eccIntf) :
+    NsmObject(name, type)
 
 {
-    lg2::info("NsmEccMode: create sensor:{NAME}", "NAME", name.c_str());
     eccModeIntf = eccIntf;
 }
 
-void NsmEccMode::updateReading(bitfield8_t flags)
-{
-    eccModeIntf->eccModeEnabled(flags.bits.bit0);
-    eccModeIntf->pendingECCState(flags.bits.bit1);
-}
-
-std::optional<std::vector<uint8_t>>
-    NsmEccMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+requester::Coroutine NsmEccMode::update(SensorManager& manager, eid_t eid)
 {
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_ECC_mode_req(instanceId, requestPtr);
+    auto rc = encode_get_ECC_mode_req(0, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_ECC_mode_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-        return std::nullopt;
+        co_return rc;
     }
-    return request;
-}
-
-uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                      size_t responseLen)
-{
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        lg2::error("NsmEccMode SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+                   "RC", rc, "EID", eid);
+        co_return rc;
+    }
 
     uint8_t cc = NSM_ERROR;
     bitfield8_t flags;
     uint16_t data_size;
     uint16_t reason_code = ERR_NULL;
 
-    auto rc = decode_get_ECC_mode_resp(responseMsg, responseLen, &cc,
-                                       &data_size, &reason_code, &flags);
+    rc = decode_get_ECC_mode_resp(responseMsg, responseLen, &cc, &data_size,
+                                  &reason_code, &flags);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -204,14 +201,20 @@ uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
             "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
 
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    co_return cc;
+}
+
+void NsmEccMode::updateReading(bitfield8_t flags)
+{
+    eccModeIntf->EccModeIntf::eccModeEnabled(flags.bits.bit0);
+    eccModeIntf->EccModeIntf::pendingECCState(flags.bits.bit1);
 }
 
 NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
-                                     std::shared_ptr<EccModeIntf> eccIntf) :
+                                     std::shared_ptr<NsmEccModeIntf> eccIntf) :
     NsmSensor(name, type)
 
 {
@@ -282,7 +285,8 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
 }
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
-    NsmSensor(name, type), deviceId(deviceId), groupId(groupId)
+    NsmSensor(name, type),
+    deviceId(deviceId), groupId(groupId)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -309,8 +313,8 @@ NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_2), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_2),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -359,8 +363,8 @@ NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_3), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_3),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -405,8 +409,8 @@ NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_4), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_4),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
@@ -456,7 +460,8 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmPciGroup5::NsmPciGroup5(
     const std::string& name, const std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-    uint8_t deviceId) : NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
+    uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
 
 {
     lg2::info("NsmPciGroup5: create sensor:{NAME}", "NAME", name.c_str());
@@ -998,19 +1003,22 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 utils::DBusHandler().getDbusProperty<std::string>(
                     objPath.c_str(), "Manufacturer", interface.c_str());
 
-            auto assetObject =
-                NsmAssetIntfProcessor<AssetIntfProcessor>(name, type, assetIntf);
+            auto assetObject = NsmAssetIntfProcessor<AssetIntfProcessor>(
+                name, type, assetIntf);
             assetObject.pdi().manufacturer(manufacturer);
             // create sensor
-            addSensor(manager, nsmDevice,
-                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                          assetObject, BOARD_PART_NUMBER));
-            addSensor(manager, nsmDevice,
-                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                          assetObject, SERIAL_NUMBER));
-            addSensor(manager, nsmDevice,
-                      std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                          assetObject, MARKETING_NAME));
+            addSensor(
+                manager, nsmDevice,
+                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                    assetObject, BOARD_PART_NUMBER));
+            addSensor(
+                manager, nsmDevice,
+                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                    assetObject, SERIAL_NUMBER));
+            addSensor(
+                manager, nsmDevice,
+                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                    assetObject, MARKETING_NAME));
         }
         else if (type == "NSM_MIG")
         {
@@ -1080,9 +1088,11 @@ static void createNsmProcessorSensor(SensorManager& manager,
 
             auto eccIntf = std::make_shared<NsmEccModeIntf>(
                 bus, inventoryObjPath.c_str(), uuid);
-            eccIntf->getECCModeFromDevice();
+
             auto eccModeSensor =
                 std::make_shared<NsmEccMode>(name, type, eccIntf);
+
+            eccModeSensor->update(manager, manager.getEid(nsmDevice)).detach();
 
             nsmDevice->deviceSensors.push_back(eccModeSensor);
 
