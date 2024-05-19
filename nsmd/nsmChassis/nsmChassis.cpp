@@ -167,6 +167,7 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.LocationCode",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerLimit",
     "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ChassisType",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
