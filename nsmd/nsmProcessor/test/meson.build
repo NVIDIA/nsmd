@@ -3,6 +3,7 @@ dep_src_files = [
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
+    '../../deviceManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../../common/utils.cpp',

@@ -17,6 +17,7 @@
 
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
 
+#include "deviceManager.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -24,6 +25,33 @@
 
 namespace nsm
 {
+template <typename IntfType>
+requester::Coroutine
+    NsmNVSwitchAndNicChassis<IntfType>::update(SensorManager& manager,
+                                               eid_t eid)
+{
+    DeviceManager& deviceManager = DeviceManager::getInstance();
+    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+    if (uuid)
+    {
+        if constexpr (std::is_same_v<IntfType, UuidIntf>)
+        {
+            auto nsmDevice = manager.getNsmDevice(*uuid);
+            if (nsmDevice)
+            {
+                this->pdi().uuid(nsmDevice->deviceUuid);
+            }
+            nsmDeviceAssociationIntf =
+                manager.getObjServer().add_unique_interface(
+                    chassisInventoryBasePath / this->getName() /
+                        "NsmDeviceAssociation",
+                    "xyz.openbmc_project.Configuration.NsmDeviceAssociation");
+            nsmDeviceAssociationIntf->register_property("UUID", *uuid);
+            nsmDeviceAssociationIntf->initialize();
+        }
+    }
+    co_return NSM_SUCCESS;
+}
 
 void createNsmChassis(SensorManager& manager, const std::string& interface,
                       const std::string& objPath, const std::string baseType)
@@ -46,16 +74,17 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
             name, baseType);
         auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", interface.c_str());
+        auto eid = manager.getEid(device);
 
         // initial value update
         chassisUuid->pdi().uuid(uuid);
 
         // add sensor
-        device->addStaticSensor(chassisUuid);
+        device->addStaticSensor(chassisUuid).update(manager, eid).detach();
     }
     else if (type == "NSM_Chassis")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<ChassisIntf>>(
@@ -71,7 +100,7 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
     }
     else if (type == "NSM_Asset")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto chassisAsset = NsmNVSwitchAndNicChassis<AssetIntf>(name, baseType);
@@ -109,7 +138,7 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
     }
     else if (type == "NSM_Health")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto chassisHealth =
@@ -125,7 +154,7 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
     }
     else if (type == "NSM_Location")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto chassisLocation =

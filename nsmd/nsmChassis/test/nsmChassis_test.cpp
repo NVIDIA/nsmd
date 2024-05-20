@@ -635,12 +635,13 @@ TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
 
 struct NsmPowerSupplyStatusTest : public NsmChassisTest
 {
-    NsmChassis<PowerStateIntf> chassisPowerState{name};
+    NsmInterfaceProvider<PowerStateIntf> chassisPowerState{
+        name, "NSM_PowerState", "/xyz/openbmc_project/dummy"};
 
     void SetUp() override
     {
         EXPECT_EQ(chassisPowerState.getName(), name);
-        EXPECT_EQ(chassisPowerState.getType(), "NSM_Chassis");
+        EXPECT_EQ(chassisPowerState.getType(), "NSM_PowerState");
     }
     std::shared_ptr<NsmPowerSupplyStatus> sensor;
     void init(uint8_t gpuInstanceId)
@@ -650,7 +651,7 @@ struct NsmPowerSupplyStatusTest : public NsmChassisTest
                                                         gpuInstanceId);
         EXPECT_NE(sensor, nullptr);
         EXPECT_EQ(sensor->getName(), name);
-        EXPECT_EQ(sensor->getType(), "NSM_Chassis");
+        EXPECT_EQ(sensor->getType(), "NSM_PowerState");
         EXPECT_EQ(sensor->gpuInstanceId, gpuInstanceId);
     }
     void testResponse(uint8_t status)
@@ -733,11 +734,12 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
 
 struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
 {
-    NsmChassis<OperationalStatusIntf> chassisOperationalStatus{name};
+    NsmInterfaceProvider<OperationalStatusIntf> chassisOperationalStatus{
+        name, "NSM_OperationalStatus", "/xyz/openbmc_project/dummy"};
     void SetUp() override
     {
         EXPECT_EQ(chassisOperationalStatus.getName(), name);
-        EXPECT_EQ(chassisOperationalStatus.getType(), "NSM_Chassis");
+        EXPECT_EQ(chassisOperationalStatus.getType(), "NSM_OperationalStatus");
     }
     std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor;
     void init(uint8_t gpuInstanceId)
@@ -747,7 +749,7 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
             chassisOperationalStatus, gpuInstanceId);
         EXPECT_NE(sensor, nullptr);
         EXPECT_EQ(sensor->getName(), name);
-        EXPECT_EQ(sensor->getType(), "NSM_Chassis");
+        EXPECT_EQ(sensor->getType(), "NSM_OperationalStatus");
         EXPECT_EQ(sensor->gpuInstanceId, gpuInstanceId);
     }
     void testResponse(uint8_t presence, uint8_t power_status)

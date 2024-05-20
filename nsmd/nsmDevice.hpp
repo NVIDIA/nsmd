@@ -44,16 +44,26 @@ class NsmDevice
 {
   public:
     NsmDevice(uuid_t uuid) :
-        uuid(uuid),
+        uuid(uuid), isDeviceActive(false),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
 
     {}
 
-    std::shared_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
+    NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
+        isDeviceActive(false),
+        messageTypesToCommandCodeMatrix(
+            NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
+        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
+        instanceNumber(instanceNumber)
+
+    {}
+
+    std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
     uuid_t uuid;
+    uuid_t deviceUuid;
     bool isDeviceActive;
     std::unique_ptr<sdbusplus::Timer> pollingTimer;
     std::coroutine_handle<> doPollingTaskHandle;
@@ -94,12 +104,32 @@ class NsmDevice
      */
     void addSensor(const std::shared_ptr<NsmSensor>& sensor, bool priority);
 
+    /** @brief getter of deviceType */
+    uint8_t getDeviceType()
+    {
+        return deviceType;
+    }
+
+    /** @brief getter of instanceNumber */
+    uint8_t getInstanceNumber()
+    {
+        return instanceNumber;
+    }
+
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     uint8_t eventMode;
+    uint8_t deviceType;
+    uint8_t instanceNumber;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
                                                const uuid_t& uuid);
+
+std::shared_ptr<NsmDevice>
+    findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
+                                  uint8_t deviceType, uint8_t instanceNumber);
+
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber);
 
 } // namespace nsm

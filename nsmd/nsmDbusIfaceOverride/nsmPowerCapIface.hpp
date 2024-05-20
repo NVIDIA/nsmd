@@ -36,14 +36,13 @@ class NsmPowerCapIntf : public PowerCapIntf
 {
   public:
     NsmPowerCapIntf(sdbusplus::bus::bus &bus, const char *path,
-		    std::string &name, const std::vector<std::string> &parents, uuid_t uuid)
-	: PowerCapIntf(bus, path), name(name), parents(parents), uuid(uuid)
+		    std::string &name, const std::vector<std::string> &parents, std::shared_ptr<NsmDevice> device)
+	: PowerCapIntf(bus, path), name(name), parents(parents), device(device)
     {}
 
     void getPowerCapFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
 
         std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
@@ -97,7 +96,6 @@ class NsmPowerCapIntf : public PowerCapIntf
     void setPowerCapOnDevice(uint32_t power_limit)
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("setPowerCapOnDevice for EID: {EID}", "EID", eid);
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
@@ -188,6 +186,6 @@ class NsmPowerCapIntf : public PowerCapIntf
     std::vector<std::string> parents;
     std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
   private:
-    uuid_t uuid;
+    std::shared_ptr<NsmDevice> device;
 };
 } // namespace nsm

@@ -17,6 +17,7 @@
 
 #include "nsmChassis.hpp"
 
+#include "deviceManager.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -28,6 +29,27 @@
 
 namespace nsm
 {
+
+template <typename IntfType>
+requester::Coroutine
+    NsmChassis<IntfType>::update([[maybe_unused]] SensorManager& manager,
+                                 [[maybe_unused]] eid_t eid)
+{
+    DeviceManager& deviceManager = DeviceManager::getInstance();
+    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+    if (uuid)
+    {
+        if constexpr (std::is_same_v<IntfType, UuidIntf>)
+        {
+            auto nsmDevice = manager.getNsmDevice(*uuid);
+            if (nsmDevice)
+            {
+                this->pdi().uuid(nsmDevice->deviceUuid);
+            }
+        }
+    }
+    co_return NSM_SUCCESS;
+}
 
 void nsmChassisCreateSensors(SensorManager& manager,
                              const std::string& interface,

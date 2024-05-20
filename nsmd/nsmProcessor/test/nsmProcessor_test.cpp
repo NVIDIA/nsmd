@@ -37,11 +37,10 @@ auto bus = sdbusplus::bus::new_default();
 std::string sensorName("dummy_sensor");
 std::string sensorType("dummy_type");
 std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
-uuid_t uuid("992b3ec1-e468-f145-8686-409009062aa8");
 
 TEST(nsmMigMode, GoodGenReq)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -57,7 +56,7 @@ TEST(nsmMigMode, GoodGenReq)
 
 TEST(nsmMigMode, GoodHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,uuid);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -75,7 +74,7 @@ TEST(nsmMigMode, GoodHandleResp)
 
 TEST(nsmMigMode, BadHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -96,7 +95,7 @@ TEST(nsmMigMode, BadHandleResp)
 
 TEST(nsmMigMode, GoodUpdateReading)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, uuid);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
     bitfield8_t flags;
     flags.byte = 1;
     migSensor.updateReading(flags);
@@ -106,7 +105,7 @@ TEST(nsmMigMode, GoodUpdateReading)
 TEST(nsmEccErrorCounts, GoodGenReq)
 {
     auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEccErrorCounts eccErrorCntSensor(sensorName, sensorType, eccIntf);
 
     const uint8_t eid{12};
@@ -124,7 +123,7 @@ TEST(nsmEccErrorCounts, GoodGenReq)
 TEST(nsmEccErrorCounts, GoodHandleResp)
 {
     auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;
@@ -151,7 +150,7 @@ TEST(nsmEccErrorCounts, GoodHandleResp)
 TEST(nsmEccErrorCounts, GoodUpdateReading)
 {
     auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -170,7 +169,7 @@ TEST(nsmEccErrorCounts, GoodUpdateReading)
 TEST(nsmEccErrorCounts, BadHandleResp)
 {
     auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), uuid);
+        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;

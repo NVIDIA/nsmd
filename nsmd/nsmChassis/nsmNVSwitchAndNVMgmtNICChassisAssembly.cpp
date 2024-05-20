@@ -54,7 +54,7 @@ void createNsmChassisAssembly(SensorManager& manager,
     }
     else if (type == "NSM_Asset")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto assetObject = NsmNVSwitchAndNicChassisAssembly<AssetIntf>(
@@ -103,7 +103,7 @@ void createNsmChassisAssembly(SensorManager& manager,
     }
     else if (type == "NSM_Health")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto healthObject =
@@ -118,7 +118,7 @@ void createNsmChassisAssembly(SensorManager& manager,
     }
     else if (type == "NSM_Location")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{Type}", "NAME",
+        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
                    name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
                    type.c_str());
         auto locationObject =

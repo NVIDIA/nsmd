@@ -20,6 +20,7 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "deviceManager.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
@@ -74,6 +75,21 @@ NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
     uuidIntf->uuid(uuid);
 }
 
+requester::Coroutine NsmUuidIntf::update(SensorManager& manager, eid_t eid)
+{
+    DeviceManager& deviceManager = DeviceManager::getInstance();
+    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+    if (uuid)
+    {
+        auto nsmDevice = manager.getNsmDevice(*uuid);
+        if (nsmDevice)
+        {
+            uuidIntf->uuid(nsmDevice->deviceUuid);
+        }
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 NsmLocationIntfProcessor::NsmLocationIntfProcessor(
     sdbusplus::bus::bus& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath, std::string& locationType) :
@@ -96,12 +112,12 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 }
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath, const uuid_t& uuid) :
+                       std::string& type, std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
-    migModeIntf = std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(),uuid);
+    migModeIntf = std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(), device);
 }
 
 void NsmMigMode::updateReading(bitfield8_t flags)
@@ -1309,7 +1325,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
 
             auto sensor = std::make_shared<NsmMigMode>(bus, name, type, inventoryObjPath,
-                                         uuid);
+                                         nsmDevice);
             nsmDevice->deviceSensors.push_back(sensor);
             if (priority)
             {
@@ -1370,7 +1386,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
 
             auto eccIntf = std::make_shared<NsmEccModeIntf>(
-                bus, inventoryObjPath.c_str(), uuid);
+                bus, inventoryObjPath.c_str(), nsmDevice);
 
             auto eccModeSensor = std::make_shared<NsmEccMode>(name, type,
                                                               eccIntf);
@@ -1496,10 +1512,10 @@ static void createNsmProcessorSensor(SensorManager& manager,
 		// create power cap , clear power cap and power limit interface
 		auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
 		    bus, inventoryObjPath.c_str(), name,
-		    candidateForList, uuid);
+		    candidateForList, nsmDevice);
 
 		auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
-		    bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
+		    bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
 
 		auto powerLimitIntf = std::make_shared<PowerLimitIface>(
 		    bus, inventoryObjPath.c_str());

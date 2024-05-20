@@ -38,15 +38,15 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
 {
   public:
     NsmClearPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
-                         uuid_t uuid,
+                         std::shared_ptr<NsmDevice> device,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-        ClearPowerCapIntf(bus, path), uuid(uuid), powerCapIntf(powerCapIntf)
+        ClearPowerCapIntf(bus, path), device(device),
+        powerCapIntf(powerCapIntf)
     {}
 
     void getPowerCapFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("getPowerCapFromDevice for EID: {EID}", "EID", eid);
         std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
@@ -98,7 +98,6 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
     void clearPowerCapOnDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -180,7 +179,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
     }
 
   private:
-    uuid_t uuid;
+    std::shared_ptr<NsmDevice> device;
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
 };
 } // namespace nsm
