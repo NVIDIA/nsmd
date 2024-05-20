@@ -20,10 +20,10 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
-#include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
-#include "nsmSensor.hpp"
-#include "nsmInterface.hpp"
 #include "nsmChassis/nsmInventoryProperty.hpp"
+#include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
+#include "nsmInterface.hpp"
+#include "nsmSensor.hpp"
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
@@ -93,7 +93,7 @@ class NsmAssetIntfProcessor : public NsmInterfaceProvider<IntfType>
 {
   public:
     NsmAssetIntfProcessor(const std::string& name, const std::string& type,
-                          const std::shared_ptr<AssetIntfProcessor>assetIntf) :
+                          const std::shared_ptr<AssetIntfProcessor> assetIntf) :
         NsmInterfaceProvider<IntfType>(name, type, assetIntf)
     {}
 };
@@ -152,29 +152,24 @@ class NsmMigMode : public NsmSensor
 using EccModeIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Memory::server::MemoryECC>;
 
-class NsmEccMode : public NsmSensor
+class NsmEccMode : public NsmObject
 {
   public:
     NsmEccMode(std::string& name, std::string& type,
-               std::shared_ptr<EccModeIntf> eccIntf);
-    NsmEccMode() = default;
+               std::shared_ptr<NsmEccModeIntf> eccIntf);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     void updateReading(bitfield8_t flags);
-
-    std::shared_ptr<EccModeIntf> eccModeIntf = nullptr;
+    std::shared_ptr<NsmEccModeIntf> eccModeIntf = nullptr;
 };
 
 class NsmEccErrorCounts : public NsmSensor
 {
   public:
     NsmEccErrorCounts(std::string& name, std::string& type,
-                      std::shared_ptr<EccModeIntf> eccIntf);
+                      std::shared_ptr<NsmEccModeIntf> eccIntf);
     NsmEccErrorCounts() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -185,7 +180,7 @@ class NsmEccErrorCounts : public NsmSensor
   private:
     void updateReading(struct nsm_ECC_error_counts);
 
-    std::shared_ptr<EccModeIntf> eccErrorCountIntf = nullptr;
+    std::shared_ptr<NsmEccModeIntf> eccErrorCountIntf = nullptr;
 };
 
 using PciePortIntf = sdbusplus::server::object_t<
