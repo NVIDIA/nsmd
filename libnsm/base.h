@@ -41,6 +41,7 @@ extern "C" {
 // NSM Aggregate sample size is represented in 3 bits as power of 2
 #define NSM_AGGREGATE_MAX_SAMPLE_SIZE_AS_POWER_OF_2 7
 
+#define DEFAULT_INSTANCE_ID 0
 #define INSTANCEID_MASK 0x1f
 #define NSM_EVENT_VERSION 0
 

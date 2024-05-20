@@ -43,6 +43,7 @@ typedef enum nsm_requester_error_codes {
 	NSM_REQUESTER_SEND_FAIL = -7,
 	NSM_REQUESTER_RECV_FAIL = -8,
 	NSM_REQUESTER_INVALID_RECV_LEN = -9,
+	NSM_REQUESTER_RECV_TIMEOUT = -10,
 } nsm_requester_rc_t;
 
 /**

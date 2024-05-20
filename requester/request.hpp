@@ -114,7 +114,7 @@ class RequestRetryTimer
     sdeventplus::Event& event; //!< reference to NSM daemon's main event loop
     uint8_t numRetries;        //!< number of request retries
     std::chrono::milliseconds
-        timeout;           //!< time to wait between each retry in milliseconds
+        timeout;            //!< time to wait between each retry in milliseconds
     sdbusplus::Timer timer; //!< manages starting timers and handling timeouts
 
     /** @brief Sends the NSM request message
@@ -172,6 +172,18 @@ class Request final : public RequestRetryTimer
         RequestRetryTimer(event, numRetries, timeout), fd(fd), eid(eid),
         requestMsg(std::move(requestMsg)), verbose(verbose)
     {}
+
+    uint8_t getInstanceId()
+    {
+        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        return nsmMsg->hdr.instance_id;
+    }
+
+    void setInstanceId(uint8_t instanceId)
+    {
+        auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        nsmMsg->hdr.instance_id = instanceId;
+    }
 
   private:
     int fd;    //!< file descriptor of MCTP communications socket
