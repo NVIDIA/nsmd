@@ -1848,8 +1848,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
             "Required", "Group Id for which data source is to be retrieved.");
 
         groupId = 9;
-        scalarTelemetryOptionGroup->add_option("-d, --deviceId", deviceId,
-                                               "retrieve deviceId");
+        scalarTelemetryOptionGroup->add_option("-d, --deviceIndex", deviceIndex,
+                                               "retrieve deviceIndex");
         scalarTelemetryOptionGroup->add_option(
             "-g, --groupId", groupId, "retrieve data source for groupId");
         scalarTelemetryOptionGroup->require_option(2);
@@ -1862,7 +1862,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
             sizeof(nsm_query_scalar_group_telemetry_v1_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_query_scalar_group_telemetry_v1_req(
-            instanceId, deviceId, groupId, request);
+            instanceId, deviceIndex, groupId, request);
         return {rc, requestMsg};
     }
 
@@ -2105,7 +2105,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
     }
 
   private:
-    uint8_t deviceId;
+    uint8_t deviceIndex;
     uint8_t groupId;
 };
 

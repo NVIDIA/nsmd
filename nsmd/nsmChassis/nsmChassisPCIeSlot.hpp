@@ -17,33 +17,27 @@
 
 #pragma once
 
+#include "globals.hpp"
 #include "nsmInterface.hpp"
 
-#include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
 
 namespace nsm
 {
+
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
+using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
 
-using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
-
-class NsmPCIeLTSSMState :
-    public NsmSensor,
-    public NsmInterfaceContainer<LTSSMStateIntf>
+class NsmChassisPCIeSlot : public NsmInterfaceProvider<PCIeSlotIntf>
 {
   public:
-    NsmPCIeLTSSMState(const NsmInterfaceProvider<LTSSMStateIntf>& provider,
-                      uint8_t deviceIndex);
-    NsmPCIeLTSSMState() = delete;
-
-    std::optional<Request> genRequestMsg(eid_t eid,
-                                         uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
-
-  private:
-    uint8_t deviceIndex;
+    NsmChassisPCIeSlot() = delete;
+    NsmChassisPCIeSlot(const std::string& chassisName,
+                       const std::string& name) :
+        NsmInterfaceProvider<PCIeSlotIntf>(
+            name, "NSM_ChassisPCIeSlot", chassisInventoryBasePath / chassisName)
+    {}
 };
 
 } // namespace nsm

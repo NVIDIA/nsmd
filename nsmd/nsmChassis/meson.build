@@ -5,11 +5,12 @@ sources += [
     'nsmChassis/nsmChassis.cpp',
     'nsmChassis/nsmChassisAssembly.cpp',
     'nsmChassis/nsmChassisPCIeDevice.cpp',
+    'nsmChassis/nsmChassisPCIeSlot.cpp',
     'nsmChassis/nsmInventoryProperty.cpp',
     'nsmChassis/nsmPowerSupplyStatus.cpp',
     'nsmChassis/nsmGpuPresenceAndPowerStatus.cpp',
     'nsmChassis/nsmPCIeFunction.cpp',
-    'nsmChassis/nsmPCIeDevice.cpp',
+    'nsmChassis/nsmPCIeLinkSpeed.cpp',
     'nsmChassis/nsmPCIeLTSSMState.cpp',
 ]
 

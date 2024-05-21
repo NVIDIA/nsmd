@@ -34,7 +34,7 @@ class NsmPCIeFunction :
 {
   public:
     NsmPCIeFunction(const NsmInterfaceProvider<PCIeDeviceIntf>& provider,
-                    uint8_t deviceId, uint8_t functionId);
+                    uint8_t deviceIndex, uint8_t functionId);
     NsmPCIeFunction() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -43,7 +43,7 @@ class NsmPCIeFunction :
                               size_t responseLen) override;
 
   private:
-    const uint8_t deviceId;
+    const uint8_t deviceIndex;
     const uint8_t functionId;
 };
 

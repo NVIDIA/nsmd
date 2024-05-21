@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "nsmPCIeDevice.hpp"
+#include "nsmPCIeSlot.hpp"
 
 #include "libnsm/pci-links.h"
 
@@ -24,19 +24,19 @@
 namespace nsm
 {
 
-NsmPCIeDevice::NsmPCIeDevice(
-    const NsmInterfaceProvider<PCIeDeviceIntf>& provider, uint8_t deviceId) :
-    NsmSensor(provider), NsmInterfaceContainer(provider), deviceId(deviceId)
+NsmPCIeSlot::NsmPCIeSlot(const NsmInterfaceProvider<PCIeSlotIntf>& provider,
+                         uint8_t deviceIndex) :
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    deviceIndex(deviceIndex)
 {}
 
-std::optional<Request> NsmPCIeDevice::genRequestMsg(eid_t eid,
-                                                    uint8_t instanceId)
+std::optional<Request> NsmPCIeSlot::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_query_scalar_group_telemetry_v1_req(instanceId, deviceId,
-                                                         1, requestPtr);
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        instanceId, deviceIndex, 1, requestPtr);
     if (rc)
     {
         lg2::error(
@@ -48,8 +48,8 @@ std::optional<Request> NsmPCIeDevice::genRequestMsg(eid_t eid,
     return request;
 }
 
-uint8_t NsmPCIeDevice::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                         size_t responseLen)
+uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                       size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
@@ -68,21 +68,15 @@ uint8_t NsmPCIeDevice::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     if (cc == NSM_SUCCESS)
     {
-        auto pcieType = [](uint32_t value) -> PCIeDeviceIntf::PCIeTypes {
-            return value == 0 ? PCIeDeviceIntf::PCIeTypes::Unknown
-                              : PCIeDeviceIntf::PCIeTypes(value - 1);
+        auto slotType = [](uint32_t value) -> PCIeSlotIntf::SlotTypes {
+            return value == 0 ? PCIeSlotIntf::SlotTypes::Unknown
+                              : PCIeSlotIntf::SlotTypes(value - 1);
         };
-        pdi().pcIeType(pcieType(data.negotiated_link_speed));
-        pdi().maxPCIeType(pcieType(data.max_link_speed));
-        pdi().lanesInUse(data.negotiated_link_width);
-        pdi().maxLanes(data.max_link_width);
+        pdi().slotType(slotType(data.negotiated_link_speed));
     }
     else
     {
-        pdi().pcIeType(PCIeDeviceIntf::PCIeTypes::Unknown);
-        pdi().maxPCIeType(PCIeDeviceIntf::PCIeTypes::Unknown);
-        pdi().lanesInUse(0);
-        pdi().maxLanes(0);
+        pdi().slotType(PCIeSlotIntf::SlotTypes::Unknown);
 
         lg2::error(
             "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp is not success CC. rc={RC}",

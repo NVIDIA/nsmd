@@ -2,6 +2,66 @@
     {
         "Exposes": [
             {
+                "Name": "HGX_Chassis_$INSTANCE_NUMBER",
+                "Type": "NSM_Chassis",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Dimension": {
+                    "Type": "NSM_Dimension"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                },
+                "ChassisType": {
+                    "Type": "NSM_ChassisType",
+                    "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "PowerLimit": {
+                    "Type": "NSM_PowerLimit",
+                    "Priority": false
+                }
+            },
+            {
+                "ChassisName": "HGX_Chassis_$INSTANCE_NUMBER",
+                "Name": "Assembly0",
+                "Type": "NSM_ChassisAssembly",
+                "UUID": "$UUID",
+                "Area": {
+                    "Type": "NSM_Area",
+                    "PhysicalContext": "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU"
+                },
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "HGX_Chassis_$INSTANCE_NUMBER + 1",
+                    "Vendor": "NVIDIA"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                }
+            },
+            {
+                "ChassisName": "HGX_Chassis_$INSTANCE_NUMBER",
+                "Name": "PCIeSlots0",
+                "Type": "NSM_ChassisPCIeSlot",
+                "Priority": false,
+                "UUID": "$UUID",
+                "DeviceIndex": 0,
+                "SlotType": "xyz.openbmc_project.Inventory.Item.PCIeSlot.SlotTypes.OEM"
+            },
+            {
                 "Name": "HGX_Chassis_0_Inlet_0_Temp_0",
                 "Type": "NSM_Temp",
                 "Associations": [
@@ -255,6 +315,34 @@
                 "Aggregated": true,
                 "SensorId": 202,
                 "Priority": true
+            },
+            {
+                "Name": "HGX_FPGA_$INSTANCE_NUMBER",
+                "Type": "NSM_Chassis",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Dimension": {
+                    "Type": "NSM_Dimension"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                },
+                "ChassisType": {
+                    "Type": "NSM_ChassisType",
+                    "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "PowerLimit": {
+                    "Type": "NSM_PowerLimit",
+                    "Priority": false
+                }
             },
             {
                 "Name": "HGX_FPGA_0_TEMP_0",
@@ -622,9 +710,6 @@
             "Model": "$BOARD_PRODUCT_NAME",
             "PartNumber": "$BOARD_PART_NUMBER",
             "SerialNumber": "$BOARD_SERIAL_NUMBER"
-        },
-        "xyz.openbmc_project.Inventory.Item.Chassis": {
-            "Type": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"
         },
         "xyz.openbmc_project.Inventory.Decorator.Instance": {
             "InstanceNumber": "$INSTANCE_NUMBER"
