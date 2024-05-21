@@ -25,8 +25,9 @@ namespace nsm
 {
 
 NsmPCIeLTSSMState::NsmPCIeLTSSMState(
-    const NsmInterfaceProvider<LTSSMStateIntf>& provider, uint8_t deviceId) :
-    NsmSensor(provider), NsmInterfaceContainer(provider), deviceId(deviceId)
+    const NsmInterfaceProvider<LTSSMStateIntf>& provider, uint8_t deviceIndex) :
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeLTSSMState::genRequestMsg(eid_t eid,
@@ -35,8 +36,8 @@ std::optional<Request> NsmPCIeLTSSMState::genRequestMsg(eid_t eid,
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_query_scalar_group_telemetry_v1_req(instanceId, deviceId,
-                                                         GROUP_ID_6, requestPtr);
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        instanceId, deviceIndex, GROUP_ID_6, requestPtr);
     if (rc)
     {
         lg2::error(

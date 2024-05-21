@@ -23,8 +23,8 @@ namespace nsm
 {
 
 NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(const NsmObject& provider,
-                                           uint8_t deviceId) :
-    NsmSensor(provider), deviceId(deviceId)
+                                           uint8_t deviceIndex) :
+    NsmSensor(provider), deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
@@ -34,7 +34,7 @@ std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_query_scalar_group_telemetry_v1_req(
-        instanceId, deviceId, GROUP_ID_1, requestPtr);
+        instanceId, deviceIndex, GROUP_ID_1, requestPtr);
     if (rc)
     {
         lg2::error(

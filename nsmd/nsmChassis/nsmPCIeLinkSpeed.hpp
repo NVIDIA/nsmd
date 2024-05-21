@@ -34,7 +34,7 @@ using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
 class NsmPCIeLinkSpeedBase : public NsmSensor
 {
   public:
-    NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t deviceId);
+    NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t deviceIndex);
     NsmPCIeLinkSpeedBase() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -45,7 +45,7 @@ class NsmPCIeLinkSpeedBase : public NsmSensor
   protected:
     virtual void handleResponse(
         const nsm_query_scalar_group_telemetry_group_1& data) = 0;
-    const uint8_t deviceId;
+    const uint8_t deviceIndex;
 };
 
 template <typename IntfType>
@@ -60,8 +60,8 @@ class NsmPCIeLinkSpeed :
   public:
     NsmPCIeLinkSpeed() = delete;
     NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
-                     uint8_t deviceId) :
-        NsmPCIeLinkSpeedBase(provider, deviceId),
+                     uint8_t deviceIndex) :
+        NsmPCIeLinkSpeedBase(provider, deviceIndex),
         NsmInterfaceContainer<IntfType>(provider)
     {}
 };

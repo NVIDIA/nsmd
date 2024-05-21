@@ -31,7 +31,7 @@ class NsmPCIeSlot : public NsmSensor, public NsmInterfaceContainer<PCIeSlotIntf>
 {
   public:
     NsmPCIeSlot(const NsmInterfaceProvider<PCIeSlotIntf>& provider,
-                uint8_t deviceId);
+                uint8_t deviceIndex);
     NsmPCIeSlot() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -40,7 +40,7 @@ class NsmPCIeSlot : public NsmSensor, public NsmInterfaceContainer<PCIeSlotIntf>
                               size_t responseLen) override;
 
   private:
-    const uint8_t deviceId;
+    const uint8_t deviceIndex;
 };
 
 } // namespace nsm

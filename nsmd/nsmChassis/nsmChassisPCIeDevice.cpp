@@ -86,8 +86,8 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     {
         auto deviceType = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "DeviceType", interface.c_str());
-        auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", interface.c_str());
+        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceIndex", interface.c_str());
         auto functionIds =
             utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
                 objPath.c_str(), "Functions", interface.c_str());
@@ -96,24 +96,24 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         pcieDeviceObject.pdi().deviceType(deviceType);
         addSensor(device,
                   std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                      pcieDeviceObject, deviceId),
+                      pcieDeviceObject, deviceIndex),
                   objPath, interface);
         for (auto& id : functionIds)
         {
             addSensor(manager, device,
                       std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
-                                                        deviceId, id));
+                                                        deviceIndex, id));
         }
     }
     else if (type == "NSM_LTSSMState")
     {
-        auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceId", interface.c_str());
+        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceIndex", interface.c_str());
         auto ltssmStateObject =
             NsmChassisPCIeDevice<LTSSMStateIntf>(chassisName, name);
         addSensor(
             device,
-            std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceId),
+            std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
             objPath, interface);
     }
 }

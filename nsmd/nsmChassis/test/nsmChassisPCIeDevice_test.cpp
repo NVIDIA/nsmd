@@ -83,13 +83,13 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
     const PropertyValuesCollection pcieDevice = {
         {"Type", "NSM_PCIeDevice"},
         {"DeviceType", "GPU"},
-        {"InstanceNumber", uint64_t(1)},
+        {"DeviceIndex", uint64_t(1)},
         {"Priority", false},
         {"Functions", std::vector<uint64_t>{0, 1}},
     };
     const PropertyValuesCollection ltssmState = {
         {"Type", "NSM_LTSSMState"},
-        {"DeviceId", uint64_t(1)},
+        {"DeviceIndex", uint64_t(1)},
         {"Priority", false},
     };
 };
@@ -170,7 +170,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(pcieDevice, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(pcieDevice, "DeviceType")))
-        .WillOnce(Return(get(pcieDevice, "InstanceNumber")))
+        .WillOnce(Return(get(pcieDevice, "DeviceIndex")))
         .WillOnce(Return(get(pcieDevice, "Functions")))
         .WillOnce(Return(get(pcieDevice, "Priority")));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
@@ -180,7 +180,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(ltssmState, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(ltssmState, "DeviceId")))
+        .WillOnce(Return(get(ltssmState, "DeviceIndex")))
         .WillOnce(Return(get(ltssmState, "Priority")));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
@@ -213,30 +213,30 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
                            gpu.roundRobinSensors[0]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLTSSMState>(
                            gpu.roundRobinSensors[1]));
-    EXPECT_EQ(get<uint64_t>(pcieDevice, "InstanceNumber"),
+    EXPECT_EQ(get<uint64_t>(pcieDevice, "DeviceIndex"),
               dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
                   gpu.roundRobinSensors[0])
-                  ->deviceId);
+                  ->deviceIndex);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
               dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
                   gpu.roundRobinSensors[0])
                   ->pdi()
                   .deviceType());
-    EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceId"),
+    EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.roundRobinSensors[1])
-                  ->deviceId);
+                  ->deviceIndex);
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
 {
   protected:
-    uint8_t deviceId = 1;
+    uint8_t deviceIndex = 1;
     NsmChassisPCIeDevice<PCIeDeviceIntf> pcieDevice{chassisName, name};
 
   private:
     std::shared_ptr<NsmPCIeLinkSpeed<PCIeDeviceIntf>> sensor =
         std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(pcieDevice,
-                                                           deviceId);
+                                                           deviceIndex);
 
   protected:
     void SetUp() override
@@ -245,7 +245,7 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
         EXPECT_EQ(pcieDevice.getType(), "NSM_ChassisPCIeDevice");
         EXPECT_NE(sensor, nullptr);
         EXPECT_EQ(sensor->getName(), name);
-        EXPECT_EQ(sensor->deviceId, deviceId);
+        EXPECT_EQ(sensor->deviceIndex, deviceIndex);
     }
 };
 
@@ -263,7 +263,7 @@ TEST_F(NsmPCIeDeviceTest, goodTestRequest)
         requestPtr, request.value().size(), &deviceIndex, &groupIndex);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(1, groupIndex);
-    EXPECT_EQ(deviceId, deviceIndex);
+    EXPECT_EQ(deviceIndex, deviceIndex);
 }
 TEST_F(NsmPCIeDeviceTest, badTestRequest)
 {
@@ -318,8 +318,8 @@ struct NsmPCIeFunctionTest : public NsmPCIeDeviceTest
     std::shared_ptr<NsmPCIeFunction> sensor;
     void init(uint8_t functionId)
     {
-        sensor =
-            std::make_shared<NsmPCIeFunction>(pcieDevice, deviceId, functionId);
+        sensor = std::make_shared<NsmPCIeFunction>(pcieDevice, deviceIndex,
+                                                   functionId);
         EXPECT_EQ(functionId, sensor->functionId);
     }
 };
@@ -339,7 +339,7 @@ TEST_F(NsmPCIeFunctionTest, goodTestRequest)
         requestPtr, request.value().size(), &deviceIndex, &groupIndex);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(0, groupIndex);
-    EXPECT_EQ(deviceId, deviceIndex);
+    EXPECT_EQ(deviceIndex, deviceIndex);
 }
 TEST_F(NsmPCIeFunctionTest, badTestRequest)
 {
@@ -400,7 +400,7 @@ struct NsmPCIeLTSSMStateTest : public NsmPCIeDeviceTest
 {
     NsmChassisPCIeDevice<LTSSMStateIntf> ltssmDevice{chassisName, name};
     std::shared_ptr<NsmPCIeLTSSMState> sensor =
-        std::make_shared<NsmPCIeLTSSMState>(ltssmDevice, deviceId);
+        std::make_shared<NsmPCIeLTSSMState>(ltssmDevice, deviceIndex);
 };
 
 TEST_F(NsmPCIeLTSSMStateTest, goodTestRequest)
@@ -417,7 +417,7 @@ TEST_F(NsmPCIeLTSSMStateTest, goodTestRequest)
         requestPtr, request.value().size(), &deviceIndex, &groupIndex);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(6, groupIndex);
-    EXPECT_EQ(deviceId, deviceIndex);
+    EXPECT_EQ(deviceIndex, deviceIndex);
 }
 TEST_F(NsmPCIeLTSSMStateTest, badTestRequest)
 {

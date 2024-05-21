@@ -38,8 +38,8 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
         objPath.c_str(), "Name", interface.c_str());
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-        objPath.c_str(), "InstanceNumber", interface.c_str());
+    auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+        objPath.c_str(), "DeviceIndex", interface.c_str());
     auto slotType = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "SlotType", interface.c_str());
     auto device = manager.getNsmDevice(uuid);
@@ -49,7 +49,7 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
         PCIeSlotIntf::convertSlotTypesFromString(slotType));
     addSensor(device,
               std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(pcieSlotProvider,
-                                                               deviceId),
+                                                               deviceIndex),
               objPath, interface);
 }
 

@@ -2,6 +2,7 @@ dep_src_files = [
     '../nsmChassis.cpp',
     '../nsmChassisAssembly.cpp',
     '../nsmChassisPCIeDevice.cpp',
+    '../nsmChassisPCIeSlot.cpp',
     '../nsmInventoryProperty.cpp',
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',
@@ -40,6 +41,7 @@ tests = [
     'nsmChassis_test',
     'nsmChassisAssembly_test',
     'nsmChassisPCIeDevice_test',
+    'nsmChassisPCIeSlot_test',
 ]
 
 foreach t : tests

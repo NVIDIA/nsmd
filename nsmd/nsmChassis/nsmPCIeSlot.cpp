@@ -25,8 +25,9 @@ namespace nsm
 {
 
 NsmPCIeSlot::NsmPCIeSlot(const NsmInterfaceProvider<PCIeSlotIntf>& provider,
-                         uint8_t deviceId) :
-    NsmSensor(provider), NsmInterfaceContainer(provider), deviceId(deviceId)
+                         uint8_t deviceIndex) :
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeSlot::genRequestMsg(eid_t eid, uint8_t instanceId)
@@ -34,8 +35,8 @@ std::optional<Request> NsmPCIeSlot::genRequestMsg(eid_t eid, uint8_t instanceId)
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_query_scalar_group_telemetry_v1_req(instanceId, deviceId,
-                                                         1, requestPtr);
+    auto rc = encode_query_scalar_group_telemetry_v1_req(
+        instanceId, deviceIndex, 1, requestPtr);
     if (rc)
     {
         lg2::error(

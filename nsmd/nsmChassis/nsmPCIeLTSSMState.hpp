@@ -34,7 +34,7 @@ class NsmPCIeLTSSMState :
 {
   public:
     NsmPCIeLTSSMState(const NsmInterfaceProvider<LTSSMStateIntf>& provider,
-                      uint8_t deviceId);
+                      uint8_t deviceIndex);
     NsmPCIeLTSSMState() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -43,7 +43,7 @@ class NsmPCIeLTSSMState :
                               size_t responseLen) override;
 
   private:
-    uint8_t deviceId;
+    uint8_t deviceIndex;
 };
 
 } // namespace nsm
