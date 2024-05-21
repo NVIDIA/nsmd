@@ -84,6 +84,9 @@ inline void
         case MARKETING_NAME:
             pdi().model(std::string((char*)data.data(), data.size()));
             break;
+        case DEVICE_PART_NUMBER:
+            pdi().partNumber(std::string((char*)data.data(), data.size()));
+            break;
         case BUILD_DATE:
             pdi().buildDate(std::string((char*)data.data(), data.size()));
             break;

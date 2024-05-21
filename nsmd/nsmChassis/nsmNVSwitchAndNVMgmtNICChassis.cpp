@@ -84,20 +84,17 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
             objPath.c_str(), "SKU", interface.c_str());
         auto serialNumber = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "SerialNumber", interface.c_str());
-        auto partNumber = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "PartNumber", interface.c_str());
 
         // initial value update
         chassisAsset.pdi().sku(sku);
         chassisAsset.pdi().model(model);
         chassisAsset.pdi().manufacturer(manufacturer);
         chassisAsset.pdi().serialNumber(serialNumber);
-        chassisAsset.pdi().partNumber(partNumber);
 
         // create sensor
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      chassisAsset, BOARD_PART_NUMBER));
+                      chassisAsset, DEVICE_PART_NUMBER));
         addSensor(manager, device,
                   std::make_shared<NsmInventoryProperty<AssetIntf>>(
                       chassisAsset, SERIAL_NUMBER));
