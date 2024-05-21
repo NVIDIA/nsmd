@@ -1,151 +1,159 @@
 [
-  {
-    "Exposes": [
-      {
+    {
+        "Exposes": [
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "Type": "NSM_NVLinkMgmtNic_Chassis",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA",
+                    "Model": "$MARKETING_NAME",
+                    "SKU": "SKU_000123",
+                    "SerialNumber": "$SERIAL_NUMBER",
+                    "PartNumber": "$BOARD_PART_NUMBER"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                },
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                }
+            },
+            {
+                "ChassisName": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "Name": "Assembly$INSTANCE_NUMBER + 1",
+                "Type": "NSM_NVLinkMgmtNic_ChassisAssembly",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "NVLinkManagementNIC Board Assembly",
+                    "Model": "$MARKETING_NAME",
+                    "Vendor": "NVIDIA",
+                    "SKU": "SKU_000123",
+                    "SerialNumber": "$SERIAL_NUMBER",
+                    "PartNumber": "$BOARD_PART_NUMBER",
+                    "ProductionDate": "$BUILD_DATE"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                }
+            },
+            {
+                "Name": "NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "Type": "NSM_NetworkAdapter",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/",
+                "UUID": "$UUID",
+                "Associations": [
+                    {
+                        "Forward": "chassis",
+                        "Backward": "network_adapters",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Association",
+                "Type": "NsmDeviceAssociation",
+                "UUID": "$UUID"
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Temp_0",
+                "Type": "SensorAuxName",
+                "SensorId": 1,
+                "AuxNames": [
+                    "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Temp_0"
+                ]
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0",
+                "Type": "SensorAuxName",
+                "SensorId": 4,
+                "AuxNames": [
+                    "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0"
+                ]
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0_Temp_0",
+                "Type": "SensorAuxName",
+                "SensorId": 8,
+                "AuxNames": [
+                    "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0_Temp_0"
+                ]
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1",
+                "Type": "SensorAuxName",
+                "SensorId": 5,
+                "AuxNames": [
+                    "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1"
+                ]
+            },
+            {
+                "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1_Temp_0",
+                "Type": "SensorAuxName",
+                "SensorId": 9,
+                "AuxNames": [
+                    "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1_Temp_0"
+                ]
+            },
+            {
+                "Name": "HGX_Driver_NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "Type": "NSM_NVLinkManagementSWInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "Nvidia",
+                "Priority": false,
+                "Associations": [
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "NVLinkManagement",
+                "Type": "NSM_NVLink",
+                "ParentObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "DeviceType": "$DEVICE_TYPE",
+                "UUID": "$UUID",
+                "Count": 9,
+                "Priority": true
+            },
+            {
+                "Name": "HGX_FW_NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": "$DEVICE_TYPE",
+                "InstanceNumber": "$INSTANCE_NUMBER"
+            }
+        ],
         "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "Type": "NSM_NVLinkMgmtNic_Chassis",
-        "UUID": "$UUID",
-        "Asset": {
-          "Type": "NSM_Asset",
-          "Manufacturer": "NVIDIA",
-          "Model": "$MARKETING_NAME",
-          "SKU": "SKU_000123",
-          "SerialNumber": "$SERIAL_NUMBER",
-          "PartNumber": "$BOARD_PART_NUMBER"
+        "Type": "Chassis",
+        "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
+        "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 2})",
+        "xyz.openbmc_project.Inventory.Decorator.Location": {
+            "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
         },
-        "Location": {
-          "Type": "NSM_Location",
-          "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+        "xyz.openbmc_project.State.Decorator.Health": {
+            "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
         },
-        "Chassis": {
-          "Type": "NSM_Chassis",
-          "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"
-        },
-        "Health": {
-          "Type": "NSM_Health",
-          "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+        "xyz.openbmc_project.Inventory.Item.Board": {},
+        "xyz.openbmc_project.Inventory.Decorator.Instance": {
+            "InstanceNumber": 1
         }
-      },
-      {
-        "ChassisName": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "Name": "Assembly$INSTANCE_NUMBER + 1",
-        "Type": "NSM_NVLinkMgmtNic_ChassisAssembly",
-        "UUID": "$UUID",
-        "Asset": {
-          "Type": "NSM_Asset",
-          "Name": "NVLinkManagementNIC Board Assembly",
-          "Model": "$MARKETING_NAME",
-          "Vendor": "NVIDIA",
-          "SKU": "SKU_000123",
-          "SerialNumber": "$SERIAL_NUMBER",
-          "PartNumber": "$BOARD_PART_NUMBER",
-          "ProductionDate": "$BUILD_DATE"
-        },
-        "Health": {
-          "Type": "NSM_Health",
-          "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
-        },
-        "Location": {
-          "Type": "NSM_Location",
-          "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-        }
-      },
-      {
-        "Name": "NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "Type": "NSM_NetworkAdapter",
-        "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/",
-        "UUID": "$UUID",
-        "Associations": [
-          {
-            "Forward": "chassis",
-            "Backward": "network_adapters",
-            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER"
-          }
-        ]
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Association",
-        "Type": "NsmDeviceAssociation",
-        "UUID": "$UUID"
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Temp_0",
-        "Type": "SensorAuxName",
-        "SensorId": 1,
-        "AuxNames": [
-          "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Temp_0"
-        ]
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0",
-        "Type": "SensorAuxName",
-        "SensorId": 4,
-        "AuxNames": [
-          "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0"
-        ]
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0_Temp_0",
-        "Type": "SensorAuxName",
-        "SensorId": 8,
-        "AuxNames": [
-          "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0_Temp_0"
-        ]
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1",
-        "Type": "SensorAuxName",
-        "SensorId": 5,
-        "AuxNames": [
-          "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1"
-        ]
-      },
-      {
-        "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1_Temp_0",
-        "Type": "SensorAuxName",
-        "SensorId": 9,
-        "AuxNames": [
-          "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1_Temp_0"
-        ]
-      },
-      {
-        "Name": "HGX_Driver_NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "Type": "NSM_NVLinkManagementSWInventory",
-        "UUID": "$UUID",
-        "Manufacturer": "Nvidia",
-        "Priority": false,
-        "Associations": [
-          {
-            "Forward": "software_version",
-            "Backward": "updateable",
-            "AbsolutePath": "/xyz/openbmc_project/software"
-          }
-        ]
-      },
-      {
-        "Name": "NVLinkManagement",
-        "Type" : "NSM_NVLink",
-        "ParentObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER",
-        "DeviceType": "$DEVICE_TYPE",
-        "UUID": "$UUID",
-        "Count": 9,
-        "Priority": true
-      }
-    ],
-    "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
-    "Type": "Chassis",
-    "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
-    "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 2})",
-    "xyz.openbmc_project.Inventory.Decorator.Location": {
-      "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-    },
-    "xyz.openbmc_project.State.Decorator.Health": {
-      "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
-    },
-    "xyz.openbmc_project.Inventory.Item.Board": {},
-    "xyz.openbmc_project.Inventory.Decorator.Instance": {
-      "InstanceNumber": 1
     }
-  }
 ]

@@ -194,15 +194,7 @@ std::string makeDBusNameValid(const std::string& name)
 std::vector<Association> getAssociations(const std::string& objPath,
                                          const std::string& interfaceSubStr)
 {
-    std::map<std::string, std::vector<std::string>> mapperResponse;
-    auto& bus = DBusHandler::getBus();
-
-    auto mapper = bus.new_method_call(mapperService, mapperPath,
-                                      mapperInterface, "GetObject");
-    mapper.append(objPath, std::vector<std::string>{});
-
-    auto mapperResponseMsg = bus.call(mapper);
-    mapperResponseMsg.read(mapperResponse);
+    auto mapperResponse = DBusHandler().getServiceMap(objPath.c_str());
 
     std::vector<Association> associations;
 

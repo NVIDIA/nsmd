@@ -21,7 +21,6 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
 ]
 
-
 dep_src_headers = [
     '.',
     '..',
@@ -42,6 +41,18 @@ tests = [
     'nsmChassisPCIeDevice_test',
 ]
 
+tests_deps = [
+    test_src,
+    CLI11_dep,
+    nlohmann_json,
+    sdbusplus,
+    sdeventplus,
+    phosphor_logging,
+    nvidia_shmem,
+    gtest,
+    gmock,
+]
+
 foreach t : tests
     test(
         t,
@@ -51,17 +62,7 @@ foreach t : tests
             implicit_include_directories: false,
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [
-                test_src,
-                CLI11_dep,
-                nlohmann_json,
-                sdbusplus,
-                sdeventplus,
-                phosphor_logging,
-                nvidia_shmem,
-                gtest,
-                gmock,
-            ],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

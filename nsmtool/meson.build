@@ -1,4 +1,3 @@
-
 sources = [
     'cmd_helper.cpp',
     'nsm_discovery_cmd.cpp',
@@ -9,7 +8,7 @@ sources = [
     '../libnsm/network-ports.c',
     '../libnsm/base.c',
     '../libnsm/device-capability-discovery.c',
-    '../libnsm/platform-environmental.c',
+    '../libnsm/device-configuration.c',
     '../libnsm/requester/mctp.c',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',

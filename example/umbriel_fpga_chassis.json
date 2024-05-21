@@ -611,6 +611,14 @@
                     ],
                     "Priority": false
                 }
+            },
+            {
+                "Name": "HGX_FW_FPGA_$INSTANCE_NUMBER",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": "$DEVICE_TYPE",
+                "InstanceNumber": "$INSTANCE_NUMBER"
             }
         ],
         "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 3})",

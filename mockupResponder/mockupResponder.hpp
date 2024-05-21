@@ -81,13 +81,12 @@ class MockupResponder
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen);
+                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
-        queryPortStatusHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen);
+        queryPortStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryPortsAvailableHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen);
+                                   size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
@@ -126,7 +125,7 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
-    
+
     std::optional<std::vector<uint8_t>>
         setEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
 
@@ -152,7 +151,7 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
-                                   size_t requestLen);
+                                         size_t requestLen);
 
     // send rediscovery event
     void sendRediscoveryEvent(uint8_t eid, bool ackr);
@@ -189,6 +188,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getFpgaDiagnosticsSettingsHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         readThermalParameterHandler(const nsm_msg* requestMsg,
