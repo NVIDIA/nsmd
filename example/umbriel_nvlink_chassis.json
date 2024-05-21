@@ -1,151 +1,159 @@
 [
-  {
-    "Exposes": [],
-    "Name": "HGX_NVLinkFabric_0",
-    "Probe": "TRUE",
-    "Type": "NSM_Configs",
-    "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
-    "xyz.openbmc_project.Association.Definitions": {
-      "Associations": [
-        [
-          "parent_chassis",
-          "fabrics",
-          "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_0"
-        ],
-        [
-          "parent_chassis",
-          "fabrics",
-          "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_1"
-        ],
-        [
-          "all_switches",
-          "fabrics",
-          "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_0"
-        ],
-        [
-          "all_switches",
-          "fabrics",
-          "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_1"
-        ]
-      ]
+    {
+        "Exposes": [],
+        "Name": "HGX_NVLinkFabric_0",
+        "Probe": "TRUE",
+        "Type": "NSM_Configs",
+        "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
+        "xyz.openbmc_project.Association.Definitions": {
+            "Associations": [
+                [
+                    "parent_chassis",
+                    "fabrics",
+                    "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_0"
+                ],
+                [
+                    "parent_chassis",
+                    "fabrics",
+                    "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_1"
+                ],
+                [
+                    "all_switches",
+                    "fabrics",
+                    "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_0"
+                ],
+                [
+                    "all_switches",
+                    "fabrics",
+                    "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_1"
+                ]
+            ]
+        },
+        "xyz.openbmc_project.Inventory.Item.Fabric": {
+            "Type": "xyz.openbmc_project.Inventory.Item.Fabric.FabricType.NVLink"
+        }
     },
-    "xyz.openbmc_project.Inventory.Item.Fabric": {
-      "Type": "xyz.openbmc_project.Inventory.Item.Fabric.FabricType.NVLink"
-    }
-  },
-  {
-    "Exposes": [
-      {
+    {
+        "Exposes": [
+            {
+                "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",
+                "Type": "NSM_NVSwitch_Chassis",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA",
+                    "Model": "$MARKETING_NAME",
+                    "SKU": "SKU_000123",
+                    "SerialNumber": "$SERIAL_NUMBER",
+                    "PartNumber": "$BOARD_PART_NUMBER"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                },
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                }
+            },
+            {
+                "Name": "Assembly$INSTANCE_NUMBER + 1",
+                "Type": "NSM_NVSwitch_ChassisAssembly",
+                "ChassisName": "HGX_NVSwitch_$INSTANCE_NUMBER",
+                "UUID": "$UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "NVSwitch Board Assembly",
+                    "Model": "$MARKETING_NAME",
+                    "Vendor": "NVIDIA",
+                    "SKU": "SKU_000123",
+                    "SerialNumber": "$SERIAL_NUMBER",
+                    "PartNumber": "$BOARD_PART_NUMBER",
+                    "ProductionDate": "$BUILD_DATE"
+                },
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "Location": {
+                    "Type": "NSM_Location",
+                    "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+                }
+            },
+            {
+                "Name": "NVSwitch_$INSTANCE_NUMBER",
+                "Type": "NSM_NVSwitch",
+                "UUID": "$UUID",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/",
+                "Associations": [
+                    {
+                        "Forward": "parent_chassis",
+                        "Backward": "all_switches",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_$INSTANCE_NUMBER"
+                    }
+                ],
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Switch": {
+                    "Type": "NSM_Switch",
+                    "SwitchType": "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
+                    "SwitchSupportedProtocols": [
+                        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
+                        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.PCIe"
+                    ]
+                }
+            },
+            {
+                "Name": "HGX_NVSwitch_$INSTANCE_NUMBER_Association",
+                "Type": "NsmDeviceAssociation",
+                "UUID": "$UUID"
+            },
+            {
+                "Name": "HGX_NVSwitch_$INSTANCE_NUMBER_Temp_0",
+                "Type": "SensorAuxName",
+                "SensorId": 1,
+                "AuxNames": [
+                    "HGX_NVSwitch_$INSTANCE_NUMBER_Temp_0"
+                ]
+            },
+            {
+                "Name": "NVLink",
+                "Type": "NSM_NVLink",
+                "ParentObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER",
+                "DeviceType": "$DEVICE_TYPE",
+                "UUID": "$UUID",
+                "Priority": false,
+                "Count": 74
+            },
+            {
+                "Name": "HGX_FW_NVSwitch_$INSTANCE_NUMBER",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": "$DEVICE_TYPE",
+                "InstanceNumber": "$INSTANCE_NUMBER"
+            }
+        ],
         "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",
-        "Type": "NSM_NVSwitch_Chassis",
-        "UUID": "$UUID",
-        "Asset": {
-          "Type": "NSM_Asset",
-          "Manufacturer": "NVIDIA",
-          "Model": "$MARKETING_NAME",
-          "SKU": "SKU_000123",
-          "SerialNumber": "$SERIAL_NUMBER",
-          "PartNumber": "$BOARD_PART_NUMBER"
+        "Type": "Chassis",
+        "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
+        "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 1})",
+        "xyz.openbmc_project.Inventory.Decorator.Location": {
+            "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
         },
-        "Location": {
-          "Type": "NSM_Location",
-          "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
+        "xyz.openbmc_project.State.Decorator.Health": {
+            "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
         },
-        "Chassis": {
-          "Type": "NSM_Chassis",
-          "ChassisType": "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"
-        },
-        "Health": {
-          "Type": "NSM_Health",
-          "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+        "xyz.openbmc_project.Inventory.Item.Board": {},
+        "xyz.openbmc_project.Inventory.Decorator.Instance": {
+            "InstanceNumber": 1
         }
-      },
-      {
-        "Name": "Assembly$INSTANCE_NUMBER + 1",
-        "Type": "NSM_NVSwitch_ChassisAssembly",
-        "ChassisName": "HGX_NVSwitch_$INSTANCE_NUMBER",
-        "UUID": "$UUID",
-        "Asset": {
-          "Type": "NSM_Asset",
-          "Name": "NVSwitch Board Assembly",
-          "Model": "$MARKETING_NAME",
-          "Vendor": "NVIDIA",
-          "SKU": "SKU_000123",
-          "SerialNumber": "$SERIAL_NUMBER",
-          "PartNumber": "$BOARD_PART_NUMBER",
-          "ProductionDate": "$BUILD_DATE"
-        },
-        "Health": {
-          "Type": "NSM_Health",
-          "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
-        },
-        "Location": {
-          "Type": "NSM_Location",
-          "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-        }
-      },
-      {
-        "Name": "NVSwitch_$INSTANCE_NUMBER",
-        "Type": "NSM_NVSwitch",
-        "UUID": "$UUID",
-        "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/",
-        "Associations": [
-          {
-            "Forward": "parent_chassis",
-            "Backward": "all_switches",
-            "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_$INSTANCE_NUMBER"
-          }
-        ],
-        "Asset": {
-          "Type": "NSM_Asset",
-          "Manufacturer": "NVIDIA"
-        },
-        "Switch": {
-          "Type": "NSM_Switch",
-          "SwitchType": "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
-          "SwitchSupportedProtocols": [
-            "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
-            "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.PCIe"
-          ]
-        }
-      },
-      {
-        "Name": "HGX_NVSwitch_$INSTANCE_NUMBER_Association",
-        "Type": "NsmDeviceAssociation",
-        "UUID": "$UUID"
-      },
-      {
-        "Name": "HGX_NVSwitch_$INSTANCE_NUMBER_Temp_0",
-        "Type": "SensorAuxName",
-        "SensorId": 1,
-        "AuxNames": [
-          "HGX_NVSwitch_$INSTANCE_NUMBER_Temp_0"
-        ]
-      },
-      {
-        "Name": "NVLink",
-        "Type": "NSM_NVLink",
-        "ParentObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER",
-        "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER",
-        "DeviceType": "$DEVICE_TYPE",
-        "UUID": "$UUID",
-        "Priority": false,
-        "Count": 74
-      }
-    ],
-    "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",
-    "Type": "Chassis",
-    "Parent_Chassis": "/xyz/openbmc_project/inventory/system/chassis/HGX_Chassis_0",
-    "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 1})",
-    "xyz.openbmc_project.Inventory.Decorator.Location": {
-      "LocationType": "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"
-    },
-    "xyz.openbmc_project.State.Decorator.Health": {
-      "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
-    },
-    "xyz.openbmc_project.Inventory.Item.Board": {},
-    "xyz.openbmc_project.Inventory.Decorator.Instance": {
-      "InstanceNumber": 1
     }
-  }
 ]

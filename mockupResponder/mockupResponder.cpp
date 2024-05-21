@@ -19,6 +19,7 @@
 
 #include "base.h"
 #include "device-capability-discovery.h"
+#include "device-configuration.h"
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
@@ -41,8 +42,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -334,7 +334,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
                 case NSM_GET_CLOCK_OUTPUT_ENABLE_STATE:
-                    return getClockOutputEnableStateHandler(request, requestLen);
+                    return getClockOutputEnableStateHandler(request,
+                                                            requestLen);
 
                 case NSM_GET_ROW_REMAP_STATE_FLAGS:
                     return getRowRemapStateHandler(request, requestLen);
@@ -355,6 +356,19 @@ std::optional<std::vector<uint8_t>>
                 case NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1:
                     return queryScalarGroupTelemetryHandler(request,
                                                             requestLen);
+                default:
+                    lg2::error("unsupported Command:{CMD} request length={LEN}",
+                               "CMD", command, "LEN", requestLen);
+                    return unsupportedCommandHandler(request, requestLen);
+            }
+            break;
+        case NSM_TYPE_DEVICE_CONFIGURATION:
+            switch (command)
+            {
+                case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
+                    return getFpgaDiagnosticsSettingsHandler(request,
+                                                             requestLen);
+                    break;
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -420,8 +434,8 @@ std::optional<std::vector<uint8_t>>
     // this is to mock that type-0, 1, 2, 3, 4 and 5 are supported
     bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE] = {
         0x3F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-        0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
-        0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+        0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
 
@@ -442,7 +456,8 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
-    // this is to mock that 0,1,2,9,17,18,20,C[12],42[66],43[67],61[97] commandCodes are supported
+    // this is to mock that 0,1,2,9,17,18,20,C[12],42[66],43[67],61[97]
+    // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
         0x17, 0x12, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0x00, 0x00,
         0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -723,7 +738,7 @@ std::optional<std::vector<uint8_t>>
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::queryPortsAvailableHandler(const nsm_msg* requestMsg,
-                                                    size_t requestLen)
+                                                size_t requestLen)
 {
     lg2::info("queryPortsAvailableHandler: request length={LEN}", "LEN",
               requestLen);
@@ -731,8 +746,8 @@ std::optional<std::vector<uint8_t>>
     auto rc = decode_query_ports_available_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_query_ports_available_req failed: rc={RC}",
-                   "RC", rc);
+        lg2::error("decode_query_ports_available_req failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
 
@@ -746,13 +761,13 @@ std::optional<std::vector<uint8_t>>
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     rc = encode_query_ports_available_resp(requestMsg->hdr.instance_id,
-                                                NSM_SUCCESS, reason_code,
-                                                number_of_ports, responseMsg);
+                                           NSM_SUCCESS, reason_code,
+                                           number_of_ports, responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_query_ports_available_resp failed: rc={RC}",
-                   "RC", rc);
+        lg2::error("encode_query_ports_available_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
     return response;
@@ -2222,6 +2237,79 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getFpgaDiagnosticsSettingsHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    lg2::info("getFpgaDiagnosticsSettingsHandler: request length={LEN}", "LEN",
+              requestLen);
+    fpga_diagnostics_settings_data_index data_index;
+    [[maybe_unused]] auto rc = decode_get_fpga_diagnostics_settings_req(
+        requestMsg, requestLen, &data_index);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_scalar_group_telemetry_v1_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    switch (data_index)
+    {
+        case GET_WP_SETTINGS:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_fpga_diagnostics_settings_wp_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_fpga_diagnostics_settings_wp data = {};
+
+            data.gpu5_8 = 1;
+            data.nvSwitch1 = 1;
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_fpga_diagnostics_settings_wp_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_get_fpga_diagnostics_settings_wp_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GET_WP_JUMPER_PRESENCE:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_fpga_diagnostics_settings_wp_jumper_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_fpga_diagnostics_settings_wp_jumper data = {0, 1};
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_fpga_diagnostics_settings_wp_jumper_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_get_fpga_diagnostics_settings_wp_jumper_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        default:
+            break;
+    }
+    return std::nullopt;
 }
 
 } // namespace MockupResponder

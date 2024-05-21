@@ -23,22 +23,28 @@ namespace utils
 std::string DBusHandler::getService(const char* path,
                                     const char* interface) const
 {
-    using DbusInterfaceList = std::vector<std::string>;
-    std::map<std::string, std::vector<std::string>> mapperResponse;
+    return getServiceMap(path, {interface}).begin()->first;
+}
+
+MapperServiceMap
+    DBusHandler::getServiceMap(const char* path,
+                               const dbus::Interfaces& ifaceList) const
+{
+    MapperServiceMap mapperResponse;
     auto& bus = DBusHandler::getBus();
 
     auto mapper = bus.new_method_call(mapperService, mapperPath,
                                       mapperInterface, "GetObject");
-    mapper.append(path, DbusInterfaceList({interface}));
+    mapper.append(path, ifaceList);
 
     auto mapperResponseMsg = bus.call(mapper);
     mapperResponseMsg.read(mapperResponse);
-    return mapperResponse.begin()->first;
+    return mapperResponse;
 }
 
 GetSubTreeResponse
     DBusHandler::getSubtree(const std::string& searchPath, int depth,
-                            const std::vector<std::string>& ifaceList) const
+                            const dbus::Interfaces& ifaceList) const
 {
 
     auto& bus = utils::DBusHandler::getBus();

@@ -54,8 +54,7 @@ using DbusProp = std::string;
 using DbusChangedProps = std::map<DbusProp, PropertyValue>;
 using ObjectPath = std::string;
 using ServiceName = std::string;
-using Interfaces = std::vector<std::string>;
-using MapperServiceMap = std::vector<std::pair<ServiceName, Interfaces>>;
+using MapperServiceMap = std::vector<std::pair<ServiceName, dbus::Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
 using PropertyValuesCollection =
     std::vector<std::pair<std::string, PropertyValue>>;
@@ -120,9 +119,14 @@ class IDBusHandler
 
     virtual std::string getService(const char* path,
                                    const char* interface) const = 0;
+
+    virtual MapperServiceMap getServiceMap(
+        const char* path,
+        const dbus::Interfaces& ifaceList = dbus::Interfaces()) const = 0;
+
     virtual GetSubTreeResponse
         getSubtree(const std::string& path, int depth,
-                   const std::vector<std::string>& ifaceList) const = 0;
+                   const dbus::Interfaces& ifaceList) const = 0;
 
     virtual void setDbusProperty(const DBusMapping& dBusMap,
                                  const PropertyValue& value) const = 0;
@@ -208,6 +212,21 @@ class DBusHandler : public IDBusHandler
                            const char* interface) const override;
 
     /**
+     *  @brief Get the DBUS ServiceMap for the input dbus path
+     *
+     *  @param[in] path - DBUS object path
+     *  @param[in] ifaceList - list of the interface that are being
+     *                         queried from the mapper
+     *
+     *  @return MapperServiceMap - the dbus services map
+     *
+     *  @throw sdbusplus::exception::exception when it fails
+     */
+    MapperServiceMap
+        getServiceMap(const char* path,
+                      const dbus::Interfaces& ifaceList) const override;
+
+    /**
      *  @brief Get the Subtree response from the mapper
      *
      *  @param[in] path - DBUS object path
@@ -219,9 +238,8 @@ class DBusHandler : public IDBusHandler
      *
      *  @throw sdbusplus::exception::exception when it fails
      */
-    GetSubTreeResponse
-        getSubtree(const std::string& path, int depth,
-                   const std::vector<std::string>& ifaceList) const override;
+    GetSubTreeResponse getSubtree(const std::string& path, int depth,
+                                  const dbus::Interfaces& ifaceList) const override;
 
     /** @brief Get property(type: variant) from the requested dbus
      *

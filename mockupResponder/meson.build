@@ -1,4 +1,3 @@
-
 sources = [
     'nsmMockupResponder.cpp',
     'mockupResponder.cpp',
@@ -6,6 +5,7 @@ sources = [
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
     '../libnsm/device-capability-discovery.c',
+    '../libnsm/device-configuration.c',
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
     '../libnsm/network-ports.c',
