@@ -40,12 +40,18 @@ namespace nsm
 
 NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
                                        std::string& name, std::string& type,
-                                       std::string& inventoryObjPath) :
+                                       std::string& inventoryObjPath,
+                                       std::string& chassisObjPath) :
     NsmObject(name, type)
 {
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::GPU);
+    if (!chassisObjPath.empty())
+    {
+        spdmResponderIntf =
+            std::make_unique<SpdmResponderIntf>(bus, chassisObjPath.c_str());
+    }
 }
 
 NsmProcessorAssociation::NsmProcessorAssociation(
@@ -1251,8 +1257,25 @@ static void createNsmProcessorSensor(SensorManager& manager,
 
         if (type == "NSM_Processor")
         {
+            auto associations =
+                utils::getAssociations(objPath, interface + ".Associations");
+            auto associationSensor = std::make_shared<NsmProcessorAssociation>(
+                bus, name, type, inventoryObjPath, associations);
+            nsmDevice->deviceSensors.push_back(associationSensor);
+
+            std::string chassisObjPath;
+            for (const auto& assoc : associations)
+            {
+                if (assoc.forward == "parent_chassis")
+                {
+                    chassisObjPath = assoc.absolutePath;
+                    std::replace(chassisObjPath.begin(), chassisObjPath.end(),
+                                 ' ', '_');
+                    break;
+                }
+            }
             auto sensor = std::make_shared<NsmAcceleratorIntf>(
-                bus, name, type, inventoryObjPath);
+                bus, name, type, inventoryObjPath, chassisObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
 
             auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
@@ -1261,13 +1284,6 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto uuidSensor = std::make_shared<NsmUuidIntf>(
                 bus, name, type, inventoryObjPath, deviceUuid);
             nsmDevice->deviceSensors.push_back(uuidSensor);
-
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
-            auto associationSensor = std::make_shared<NsmProcessorAssociation>(
-                bus, name, type, inventoryObjPath, associations);
-
-            nsmDevice->deviceSensors.push_back(associationSensor);
         }
         else if (type == "NSM_Location")
         {
