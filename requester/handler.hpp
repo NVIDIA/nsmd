@@ -44,41 +44,6 @@
 namespace requester
 {
 
-/** @struct RequestKey
- *
- *  RequestKey uniquely identifies the NSM request message to match it with the
- *  response and a combination of MCTP endpoint ID, NSM instance ID, NSM type
- *  and NSM command is the key.
- */
-struct RequestKey
-{
-    eid_t eid;          //!< MCTP endpoint ID
-    uint8_t instanceId; //!< NSM instance ID
-    uint8_t type;       //!< NSM type
-    uint8_t command;    //!< NSM command
-
-    bool operator==(const RequestKey& e) const
-    {
-        return ((eid == e.eid) && (instanceId == e.instanceId) &&
-                (type == e.type) && (command == e.command));
-    }
-};
-
-/** @struct RequestKeyHasher
- *
- *  This is a simple hash function, since the instance ID generator API
- *  generates unique instance IDs for MCTP endpoint ID.
- */
-struct RequestKeyHasher
-{
-    std::size_t operator()(const RequestKey& key) const
-    {
-        size_t requestKeyHash = (key.eid << 24 | key.instanceId << 16 |
-                                 key.type << 8 | key.command);
-        return requestKeyHash;
-    }
-};
-
 using ResponseHandler = fu2::unique_function<void(
     eid_t eid, const nsm_msg* response, size_t respMsgLen)>;
 
@@ -132,7 +97,6 @@ class Handler
     /** @brief Register a NSM request message
      *
      *  @param[in] eid - endpoint ID of the remote MCTP endpoint
-     *  @param[in] instanceId - instance ID to match request and response
      *  @param[in] type - NSM message type
      *  @param[in] command - NSM command
      *  @param[in] requestMsg - NSM request message
@@ -140,49 +104,44 @@ class Handler
      *
      *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
      */
-    int registerRequest(eid_t eid, uint8_t instanceId, uint8_t type,
-                        uint8_t command, std::vector<uint8_t>&& requestMsg,
+    int registerRequest(eid_t eid, uint8_t type, uint8_t command,
+                        std::vector<uint8_t>&& requestMsg,
                         ResponseHandler&& responseHandler)
     {
-        RequestKey key{eid, instanceId, type, command};
-
-        auto instanceIdExpiryCallBack = [key, this](void) {
-            if (this->handlers.contains(key.eid) &&
-                !this->handlers[key.eid].empty())
+        auto instanceIdExpiryCallBack = [eid, type, command, this](void) {
+            if (this->handlers.contains(eid) && !this->handlers[eid].empty())
             {
-                auto& [request, responseHandler, timerInstance, requestKey,
-                       valid] = handlers[key.eid].front();
-                if (key == requestKey)
+                auto& [request, responseHandler, timerInstance, valid] =
+                    handlers[eid].front();
+                lg2::error("Response not received for the request, instance ID "
+                           "expired. EID={EID}, INSTANCE_ID={INSTANCE_ID} ,"
+                           "TYPE={TYPE}, COMMAND={COMMAND}",
+                           "EID", eid, "INSTANCE_ID", request->getInstanceId(),
+                           "TYPE", type, "COMMAND", command);
+                request->stop();
+                auto rc = timerInstance->stop();
+                if (rc)
                 {
                     lg2::error(
-                        "Response not received for the request, instance ID "
-                        "expired. EID={EID}, INSTANCE_ID={INSTANCE_ID} ,"
-                        "TYPE={TYPE}, COMMAND={COMMAND}",
-                        "EID", key.eid, "INSTANCE_ID", key.instanceId, "TYPE",
-                        key.type, "COMMAND", key.command);
-                    request->stop();
-                    auto rc = timerInstance->stop();
-                    if (rc)
-                    {
-                        lg2::error(
-                            "Failed to stop the instance ID expiry timer. RC={RC}",
-                            "RC", rc);
-                    }
-                    // Call response handler with an empty response to indicate
-                    // no response
-                    responseHandler(key.eid, nullptr, 0);
-                    this->removeRequestContainer.emplace(
-                        key, std::make_unique<sdeventplus::source::Defer>(
-                                 event, std::bind(&Handler::removeRequestEntry,
-                                                  this, key)));
+                        "Failed to stop the instance ID expiry timer. RC={RC}",
+                        "RC", rc);
                 }
-                else
-                {
-                    // This condition is not possible, if a response is received
-                    // before the instance ID expiry, then the response handler
-                    // is executed and the entry will be removed.
-                    assert(false);
-                }
+                // Call response handler with an empty response to indicate
+                // no response
+                responseHandler(eid, nullptr, 0);
+
+                // remove expired request and run queued request
+                this->removeRequestContainer[eid] =
+                    std::make_unique<sdeventplus::source::Defer>(
+                        event,
+                        std::bind(&Handler::removeRequestEntry, this, eid));
+            }
+            else
+            {
+                // This condition is not possible, if a response is received
+                // before the instance ID expiry, then the response handler
+                // is executed and the entry will be removed.
+                assert(false);
             }
         };
 
@@ -199,9 +158,9 @@ class Handler
         auto timer = std::make_unique<sdbusplus::Timer>(
             event.get(), instanceIdExpiryCallBack);
 
-        handlers[eid].emplace(
-            std::make_tuple(std::move(request), std::move(responseHandler),
-                            std::move(timer), std::move(key), true));
+        handlers[eid].emplace(std::make_tuple(std::move(request),
+                                              std::move(responseHandler),
+                                              std::move(timer), true));
         return runRegisteredRequest(eid);
     }
 
@@ -212,7 +171,7 @@ class Handler
             return NSM_SUCCESS;
         }
 
-        auto& [request, responseHandler, timerInstance, key, valid] =
+        auto& [request, responseHandler, timerInstance, valid] =
             handlers[eid].front();
 
         if (timerInstance->isRunning())
@@ -221,10 +180,23 @@ class Handler
             return NSM_SUCCESS;
         }
 
+        try
+        {
+            // get instance_id from pool
+            auto instanceId = instanceIdDb.next(eid);
+            request->setInstanceId(instanceId);
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error("Error while get MCTP instanceId for EID={EID}, {ERROR}",
+                       "EID", eid, "ERROR", e);
+            return NSM_ERROR;
+        }
+
         auto rc = request->start();
         if (rc)
         {
-            instanceIdDb.free(eid, key.instanceId);
+            instanceIdDb.free(eid, request->getInstanceId());
             lg2::error("Failure to send the NSM request message");
             return rc;
         }
@@ -236,7 +208,7 @@ class Handler
         }
         catch (const std::runtime_error& e)
         {
-            instanceIdDb.free(eid, key.instanceId);
+            instanceIdDb.free(eid, request->getInstanceId());
             lg2::error("Failed to start the instance ID expiry timer.", "ERROR",
                        e);
             return NSM_ERROR;
@@ -254,17 +226,16 @@ class Handler
      *  @param[in] response - NSM response message
      *  @param[in] respMsgLen - length of the response message
      */
-    void handleResponse(eid_t eid, uint8_t instanceId, uint8_t type,
-                        uint8_t command, const nsm_msg* response,
-                        size_t respMsgLen)
+    void handleResponse(eid_t eid, uint8_t instanceId,
+                        [[maybe_unused]] uint8_t type,
+                        [[maybe_unused]] uint8_t command,
+                        const nsm_msg* response, size_t respMsgLen)
     {
-        RequestKey key{eid, instanceId, type, command};
-
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
-            auto& [request, responseHandler, timerInstance, requestKey, valid] =
+            auto& [request, responseHandler, timerInstance, valid] =
                 handlers[eid].front();
-            if (key == requestKey)
+            if (request->getInstanceId() == instanceId)
             {
                 request->stop();
                 auto rc = timerInstance->stop();
@@ -277,7 +248,7 @@ class Handler
                 // Call responseHandler after erase it from the handlers to
                 // avoid starting it again in runRegisteredRequest()
                 auto unique_handler = std::move(responseHandler);
-                instanceIdDb.free(eid, instanceId);
+                instanceIdDb.free(eid, request->getInstanceId());
                 handlers[eid].pop();
                 unique_handler(eid, response, respMsgLen);
             }
@@ -290,7 +261,7 @@ class Handler
     {
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
-            auto& valid = std::get<4>(handlers[eid].front());
+            auto& valid = std::get<3>(handlers[eid].front());
             auto& timerInstance = std::get<2>(handlers[eid].front());
             return valid && timerInstance->isRunning();
         }
@@ -303,7 +274,7 @@ class Handler
         auto& timerInstance = std::get<2>(handlers[eid].front());
         timerInstance->start(std::chrono::microseconds(1));
 
-        auto& valid = std::get<4>(handlers[eid].front());
+        auto& valid = std::get<3>(handlers[eid].front());
         valid = false;
     }
 
@@ -322,11 +293,11 @@ class Handler
 
     /** @brief Container for storing the details of the NSM request
      *         message, handler for the corresponding NSM response, the
-     *         timer object for the Instance ID expiration and RequestKey
+     *         timer object for the Instance ID expiration and valid flag
      */
     using RequestValue =
         std::tuple<std::unique_ptr<RequestInterface>, ResponseHandler,
-                   std::unique_ptr<sdbusplus::Timer>, RequestKey, bool>;
+                   std::unique_ptr<sdbusplus::Timer>, bool>;
     using RequestQueue = std::queue<RequestValue>;
 
     /** @brief Container for storing the NSM request entries */
@@ -335,32 +306,24 @@ class Handler
     /** @brief Container to store information about the request entries to be
      *         removed after the instance ID timer expires
      */
-    std::unordered_map<RequestKey, std::unique_ptr<sdeventplus::source::Defer>,
-                       RequestKeyHasher>
+    std::unordered_map<eid_t, std::unique_ptr<sdeventplus::source::Defer>>
         removeRequestContainer;
 
     /** @brief Remove request entry for which the instance ID expired
      *
-     *  @param[in] key - key for the Request
+     *  @param[in] eid - eid for the Request
      */
-    void removeRequestEntry(RequestKey key)
+    void removeRequestEntry(eid_t eid)
     {
-        if (removeRequestContainer.contains(key))
+        if (!handlers[eid].empty())
         {
-            removeRequestContainer[key].reset();
-            instanceIdDb.free(key.eid, key.instanceId);
-            if (!handlers[key.eid].empty())
-            {
-                auto& [request, responseHandler, timerInstance, requestKey,
-                       valid] = handlers[key.eid].front();
-                if (key == requestKey)
-                {
-                    handlers[key.eid].pop();
-                }
-            }
-            removeRequestContainer.erase(key);
+            auto& [request, responseHandler, timerInstance, valid] =
+                handlers[eid].front();
+
+            instanceIdDb.free(eid, request->getInstanceId());
+            handlers[eid].pop();
         }
-        runRegisteredRequest(key.eid);
+        runRegisteredRequest(eid);
     }
 };
 
@@ -427,8 +390,8 @@ struct SendRecvNsmMsg
 
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         rc = handler.registerRequest(
-            eid, requestMsg->hdr.instance_id, requestMsg->hdr.nvidia_msg_type,
-            requestMsg->payload[0], std::move(request),
+            eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
+            std::move(request),
             std::move(std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
         if (rc)
         {

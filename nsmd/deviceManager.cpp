@@ -200,9 +200,8 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
 {
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    uint8_t instanceId = instanceIdDb.next(eid);
 
-    auto rc = encode_ping_req(instanceId, requestMsg);
+    auto rc = encode_ping_req(DEFAULT_INSTANCE_ID, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC", rc);
@@ -237,15 +236,13 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_supported_nvidia_message_types_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    uint8_t instanceId = instanceIdDb.next(eid);
     auto rc =
-        encode_get_supported_nvidia_message_types_req(instanceId, requestMsg);
+        encode_get_supported_nvidia_message_types_req(DEFAULT_INSTANCE_ID, requestMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-        instanceIdDb.free(eid, instanceId);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -284,15 +281,13 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_supported_command_codes_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    uint8_t instanceId = instanceIdDb.next(eid);
     auto rc = encode_get_supported_command_codes_req(
-        instanceId, nvidia_message_type, requestMsg);
+        DEFAULT_INSTANCE_ID, nvidia_message_type, requestMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getSupportedCommandCodes failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
-        instanceIdDb.free(eid, instanceId);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -403,10 +398,8 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    uint8_t instanceId = instanceIdDb.next(eid);
-
     auto rc = encode_get_inventory_information_req(
-        instanceId, propertyIdentifier, requestMsg);
+        DEFAULT_INSTANCE_ID, propertyIdentifier, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -510,9 +503,8 @@ requester::Coroutine DeviceManager::getQueryDeviceIdentification(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_device_identification_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    uint8_t instanceId = instanceIdDb.next(eid);
     auto rc =
-        encode_nsm_query_device_identification_req(instanceId, requestMsg);
+        encode_nsm_query_device_identification_req(DEFAULT_INSTANCE_ID, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(

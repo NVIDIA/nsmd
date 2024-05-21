@@ -315,9 +315,6 @@ requester::Coroutine
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
-    // if it is supported then only assign instance_id
-    requestMsg->hdr.instance_id = instanceIdDb.next(eid);
-
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
         handler, eid, request, responseMsg, responseLen);
     if (rc)
@@ -350,12 +347,6 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
 {
     auto mctpFd = sockManager.getSocket(eid);
     uint8_t rc = NSM_REQUESTER_SUCCESS;
-    struct pollfd pollSet[1];
-
-    int timeout = RESPONSE_TIME_OUT;
-    int numFds = 1;
-    pollSet[0].fd = mctpFd;
-    pollSet[0].events = POLLIN;
 
     // check if there is request in progress.
     if (handler.hasInProgressRequest(eid))
@@ -366,16 +357,9 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
         // waiting for response
         while (1)
         {
-            int ret = poll(pollSet, numFds, timeout);
-            if (ret <= 0)
-            {
-                // poll timeout
-                lg2::error(
-                    "SendRecvNsmMsgSync: timeout, no response. EID={EID}",
-                    "EID", eid);
-                break;
-            }
             rc = nsm_recv_any(eid, mctpFd, (uint8_t**)responseMsg, responseLen);
+
+            handler.invalidInProgressRequest(eid);
             if (rc == NSM_REQUESTER_SUCCESS)
             {
                 lg2::info(
@@ -384,15 +368,14 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
                 // discard the response
                 free((void*)*responseMsg);
                 *responseMsg = NULL;
-                // timeout the request timer
-                handler.invalidInProgressRequest(eid);
                 break;
             }
             else
             {
-                lg2::info(
-                    "SendRecvNsmMsgSync: received data but is not response. EID={EID}",
-                    "EID", eid);
+                lg2::error(
+                    "SendRecvNsmMsgSync: nsm_recv_any failed RC={RC} EID={EID}",
+                    "RC", rc, "EID", eid);
+                break;
             }
         }
     }
@@ -405,9 +388,8 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
     auto uuid = utils::getUUIDFromEID(eidTable, eid);
     if (!uuid)
     {
-        lg2::error(
-            "SensorManagerImpl::SendRecvNsmMsg  : No UUID found for EID {EID}",
-            "EID", eid);
+        lg2::error("SendRecvNsmMsgSync: No UUID found for EID {EID}", "EID",
+                   eid);
         return NSM_ERROR;
     }
 
@@ -415,7 +397,7 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
     if (!nsmDevice)
     {
         lg2::error(
-            "SensorManagerImpl::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
+            "SendRecvNsmMsgSync: No nsmDevice found for eid={EID} , uuid={UUID}",
             "EID", eid, "UUID", *uuid);
         return NSM_ERROR;
     }
@@ -438,8 +420,11 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
                        (uint8_t**)responseMsg, responseLen);
     if (rc)
     {
-        lg2::error("SendRecvNsmMsgSync failed. eid={EID} rc={RC}", "EID", eid,
-                   "RC", rc);
+        lg2::error(
+            "SendRecvNsmMsgSync: nsm_send_recv failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        *responseMsg = NULL;
+        *responseLen = 0;
     }
 
     if (verbose && rc == NSM_REQUESTER_SUCCESS)

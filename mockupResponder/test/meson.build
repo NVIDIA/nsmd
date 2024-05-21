@@ -14,6 +14,7 @@ dep_src_files = [
 dep_src_headers = [
     '.',
     '..',
+    '../../',
     '../../common',
     '../../libnsm',
 ]

@@ -17,9 +17,10 @@
 
 #include "mctp.h"
 #include "base.h"
+#include "config.h"
 
-#include "stdio.h"
 #include <errno.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -62,6 +63,19 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 				    uint8_t **nsm_resp_msg,
 				    size_t *resp_msg_len)
 {
+	struct pollfd pollSet[1];
+	pollSet[0].fd = mctp_fd;
+	pollSet[0].events = POLLIN;
+	int numFds = 1;
+	int timeout = RESPONSE_TIME_OUT;
+
+	// recv() is a block syscall, so use poll() with timeout to avoid
+	// waiting forever
+	int ret = poll(pollSet, numFds, timeout);
+	if (ret <= 0) {
+		return NSM_REQUESTER_RECV_TIMEOUT;
+	}
+
 	ssize_t min_len = MCTP_PREFIX_LEN + sizeof(struct nsm_msg_hdr);
 	ssize_t length = recv(mctp_fd, NULL, 0, MSG_PEEK | MSG_TRUNC);
 	if (length <= 0) {
@@ -162,7 +176,8 @@ nsm_requester_rc_t nsm_send_recv(mctp_eid_t eid, int mctp_fd,
 	while (1) {
 		rc = nsm_recv(eid, mctp_fd, hdr->instance_id, nsm_resp_msg,
 			      resp_msg_len);
-		if (rc == NSM_REQUESTER_SUCCESS) {
+		if (rc == NSM_REQUESTER_SUCCESS ||
+		    rc == NSM_REQUESTER_RECV_TIMEOUT) {
 			break;
 		}
 	}
