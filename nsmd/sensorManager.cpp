@@ -333,7 +333,14 @@ requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 {
-    return findNsmDeviceByUUID(nsmDevices, uuid);
+    auto device = findNsmDeviceByUUID(nsmDevices, uuid);
+    if (!device)
+    {
+        throw std::runtime_error(
+            "SensorManager::getNsmDevice - Couldn't find device with uuid " +
+            uuid);
+    }
+    return device;
 }
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)

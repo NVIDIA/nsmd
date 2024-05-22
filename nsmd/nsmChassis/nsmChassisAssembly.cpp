@@ -47,7 +47,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
         auto assemblyObject =
             std::make_shared<NsmChassisAssembly<AssemblyIntf>>(chassisName,
                                                                name);
-        addSensor(device, assemblyObject);
+        device->addStaticSensor(assemblyObject);
     }
     else if (type == "NSM_Area")
     {
@@ -58,7 +58,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
             std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
         chassisArea->pdi().physicalContext(
             AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
-        addSensor(device, chassisArea);
+        device->addStaticSensor(chassisArea);
     }
     else if (type == "NSM_Asset")
     {
@@ -69,19 +69,21 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
         auto assetObject = NsmChassisAssembly<AssetIntf>(chassisName, name);
         assetObject.pdi().manufacturer(vendor);
         assetObject.pdi().name(assetsName);
+
         // create sensor
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, BOARD_PART_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, SERIAL_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, MARKETING_NAME));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, BUILD_DATE));
+        auto eid = manager.getEid(device);
+        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, BOARD_PART_NUMBER);
+        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, MARKETING_NAME);
+        auto buildDate = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, BUILD_DATE);
+        device->addStaticSensor(partNumber).update(manager, eid).detach();
+        device->addStaticSensor(serialNumber).update(manager, eid).detach();
+        device->addStaticSensor(model).update(manager, eid).detach();
+        device->addStaticSensor(buildDate).update(manager, eid).detach();
     }
     else if (type == "NSM_Health")
     {
@@ -91,7 +93,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
             std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
         healthObject->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
-        addSensor(device, healthObject);
+        device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_Location")
     {
@@ -102,7 +104,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
                                                                name);
         locationObject->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        addSensor(device, locationObject);
+        device->addStaticSensor(locationObject);
     }
 }
 std::vector<std::string> chassisAssemblyInterfaces{

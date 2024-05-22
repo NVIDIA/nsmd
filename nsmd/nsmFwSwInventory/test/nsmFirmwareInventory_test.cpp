@@ -106,7 +106,9 @@ TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
         .WillOnce(Return(get(basic, "Manufacturer")))
         .WillOnce(Return(get(basic, "DeviceType")))
         .WillOnce(Return(get(basic, "InstanceNumber")));
-    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
+    EXPECT_THROW(
+        nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath),
+        std::runtime_error);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());

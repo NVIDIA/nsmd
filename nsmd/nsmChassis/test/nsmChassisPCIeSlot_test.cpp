@@ -99,8 +99,9 @@ TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
         .WillOnce(Return(get(basic, "DeviceIndex")))
         .WillOnce(Return(get(basic, "SlotType")))
         .WillOnce(Return(get(basic, "Priority")));
-    EXPECT_NO_THROW(
-        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath));
+    EXPECT_THROW(
+        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
+        std::runtime_error);
     EXPECT_EQ(0, baseboard.prioritySensors.size());
     EXPECT_EQ(0, baseboard.roundRobinSensors.size());
     EXPECT_EQ(0, baseboard.deviceSensors.size());

@@ -211,8 +211,9 @@ TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
         .WillOnce(Return(get(error, "UUID")))
         .WillOnce(Return(get(asset, "Vendor")))
         .WillOnce(Return(get(asset, "Name")));
-    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
-                                    objPath);
+    EXPECT_THROW(nsmChassisAssemblyCreateSensors(
+                     mockManager, basicIntfName + ".Asset", objPath),
+                 std::runtime_error);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());

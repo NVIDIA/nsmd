@@ -45,6 +45,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
+    auto eid = manager.getEid(device);
 
     if (type == "NSM_ChassisPCIeDevice")
     {
@@ -53,7 +54,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         auto uuidObject =
             std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(chassisName, name);
         uuidObject->pdi().uuid(uuid);
-        addSensor(device, uuidObject);
+        device->addStaticSensor(uuidObject);
     }
     else if (type == "NSM_Asset")
     {
@@ -62,15 +63,15 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             objPath.c_str(), "Manufacturer", interface.c_str());
         assetObject.pdi().manufacturer(manufacturer);
         // create sensor
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, BOARD_PART_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, SERIAL_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, MARKETING_NAME));
+        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, BOARD_PART_NUMBER);
+        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, MARKETING_NAME);
+        device->addStaticSensor(partNumber).update(manager, eid).detach();
+        device->addStaticSensor(serialNumber).update(manager, eid).detach();
+        device->addStaticSensor(model).update(manager, eid).detach();
     }
     else if (type == "NSM_Health")
     {
@@ -80,7 +81,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             chassisName, name);
         healthObject->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
-        addSensor(device, healthObject);
+        device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_PCIeDevice")
     {
@@ -91,30 +92,33 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         auto functionIds =
             utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
                 objPath.c_str(), "Functions", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         auto pcieDeviceObject =
             NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
         pcieDeviceObject.pdi().deviceType(deviceType);
-        addSensor(device,
-                  std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                      pcieDeviceObject, deviceIndex),
-                  objPath, interface);
+        device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                              pcieDeviceObject, deviceIndex),
+                          priority);
+
         for (auto& id : functionIds)
         {
-            addSensor(manager, device,
-                      std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
-                                                        deviceIndex, id));
+            auto function = std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
+                                                              deviceIndex, id);
+            device->addStaticSensor(function).update(manager, eid).detach();
         }
     }
     else if (type == "NSM_LTSSMState")
     {
         auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "DeviceIndex", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         auto ltssmStateObject =
             NsmChassisPCIeDevice<LTSSMStateIntf>(chassisName, name);
-        addSensor(
-            device,
+        device->addSensor(
             std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
-            objPath, interface);
+            priority);
     }
 }
 
