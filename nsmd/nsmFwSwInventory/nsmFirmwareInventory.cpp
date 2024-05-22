@@ -42,11 +42,13 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
 
     auto asset = std::make_shared<NsmFirmwareInventory<AssetIntf>>(name);
     asset->pdi().manufacturer(manufacturer);
-    addSensor(device, asset);
+    device->addStaticSensor(asset);
     auto settings = NsmFirmwareInventory<SettingsIntf>(name);
     auto softwareSettings = std::make_shared<NsmSoftwareSettings>(
         settings, (NsmDeviceIdentification)deviceType, instanceId);
-    addSensor(manager, device, softwareSettings);
+    device->addStaticSensor(softwareSettings)
+        .update(manager, manager.getEid(device))
+        .detach();
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

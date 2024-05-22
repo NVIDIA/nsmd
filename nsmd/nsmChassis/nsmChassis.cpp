@@ -45,7 +45,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     {
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         chassisUuid->pdi().uuid(uuid);
-        addSensor(device, chassisUuid);
+        device->addStaticSensor(chassisUuid);
     }
     else if (type == "NSM_Asset")
     {
@@ -53,16 +53,17 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.pdi().manufacturer(manufacturer);
+        auto eid = manager.getEid(device);
         // create sensor
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      chassisAsset, BOARD_PART_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      chassisAsset, SERIAL_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      chassisAsset, MARKETING_NAME));
+        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            chassisAsset, BOARD_PART_NUMBER);
+        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            chassisAsset, SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            chassisAsset, MARKETING_NAME);
+        device->addStaticSensor(partNumber).update(manager, eid).detach();
+        device->addStaticSensor(serialNumber).update(manager, eid).detach();
+        device->addStaticSensor(model).update(manager, eid).detach();
     }
     else if (type == "NSM_ChassisType")
     {
@@ -71,20 +72,21 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto chassis = std::make_shared<NsmChassis<ChassisIntf>>(name);
         chassis->pdi().type(
             ChassisIntf::convertChassisTypeFromString(chassisType));
-        addSensor(device, chassis);
+        device->addStaticSensor(chassis);
     }
     else if (type == "NSM_Dimension")
     {
         auto chassisDimension = NsmChassis<DimensionIntf>(name);
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-                      chassisDimension, PRODUCT_LENGTH));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-                      chassisDimension, PRODUCT_WIDTH));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<DimensionIntf>>(
-                      chassisDimension, PRODUCT_HEIGHT));
+        auto eid = manager.getEid(device);
+        auto depth = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+            chassisDimension, PRODUCT_LENGTH);
+        auto width = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+            chassisDimension, PRODUCT_WIDTH);
+        auto height = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
+            chassisDimension, PRODUCT_HEIGHT);
+        device->addStaticSensor(depth).update(manager, eid).detach();
+        device->addStaticSensor(width).update(manager, eid).detach();
+        device->addStaticSensor(height).update(manager, eid).detach();
     }
     else if (type == "NSM_Health")
     {
@@ -93,7 +95,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
         chassisHealth->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
-        addSensor(device, chassisHealth);
+        device->addStaticSensor(chassisHealth);
     }
     else if (type == "NSM_Location")
     {
@@ -102,7 +104,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto chassisLocation = std::make_shared<NsmChassis<LocationIntf>>(name);
         chassisLocation->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        addSensor(device, chassisLocation);
+        device->addStaticSensor(chassisLocation);
     }
     else if (type == "NSM_LocationCode")
     {
@@ -111,21 +113,21 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto chassisLocationCode =
             std::make_shared<NsmChassis<LocationCodeIntf>>(name);
         chassisLocationCode->pdi().locationCode(locationCode);
-        addSensor(device, chassisLocationCode);
+        device->addStaticSensor(chassisLocationCode);
     }
     else if (type == "NSM_PowerLimit")
     {
         auto chassisPowerLimit = NsmChassis<PowerLimitIntf>(name);
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
-        addSensor(device,
-                  std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-                      chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
-                  priority);
-        addSensor(device,
-                  std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
-                      chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT),
-                  priority);
+        device->addSensor(
+            std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
+                chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
+            priority);
+        device->addSensor(
+            std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
+                chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT),
+            priority);
     }
     else if (type == "NSM_OperationalStatus")
     {
@@ -134,12 +136,13 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto inventoryObjPaths =
             utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
                 objPath.c_str(), "InventoryObjPaths", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         auto gpuOperationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
             name, type, inventoryObjPaths);
-        addSensor(device,
-                  std::make_shared<NsmGpuPresenceAndPowerStatus>(
-                      gpuOperationalStatus, instanceId),
-                  objPath, interface);
+        device->addSensor(std::make_shared<NsmGpuPresenceAndPowerStatus>(
+                              gpuOperationalStatus, instanceId),
+                          priority);
     }
     else if (type == "NSM_PowerState")
     {
@@ -148,26 +151,26 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto inventoryObjPaths =
             utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
                 objPath.c_str(), "InventoryObjPaths", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
         auto gpuPowerState =
             NsmInterfaceProvider<PowerStateIntf>(name, type, inventoryObjPaths);
-        addSensor(
-            device,
+        device->addSensor(
             std::make_shared<NsmPowerSupplyStatus>(gpuPowerState, instanceId),
-            objPath, interface);
+            priority);
     }
 }
 
 std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Asset",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.Chassis",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ChassisType",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Dimension",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Health",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Location",
     "xyz.openbmc_project.Configuration.NSM_Chassis.LocationCode",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerLimit",
     "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.ChassisType",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)

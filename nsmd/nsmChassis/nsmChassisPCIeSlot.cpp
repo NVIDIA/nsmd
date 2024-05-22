@@ -42,15 +42,16 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
         objPath.c_str(), "DeviceIndex", interface.c_str());
     auto slotType = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "SlotType", interface.c_str());
+    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        objPath.c_str(), "Priority", interface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
     auto pcieSlotProvider = NsmChassisPCIeSlot(chassisName, name);
     pcieSlotProvider.pdi().slotType(
         PCIeSlotIntf::convertSlotTypesFromString(slotType));
-    addSensor(device,
-              std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(pcieSlotProvider,
-                                                               deviceIndex),
-              objPath, interface);
+    device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
+                          pcieSlotProvider, deviceIndex),
+                      priority);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

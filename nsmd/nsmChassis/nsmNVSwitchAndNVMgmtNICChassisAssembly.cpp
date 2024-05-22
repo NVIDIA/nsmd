@@ -50,7 +50,7 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto assemblyObject =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<AssemblyIntf>>(
                 chassisName, name, baseType);
-        addSensor(device, assemblyObject);
+        device->addStaticSensor(assemblyObject);
     }
     else if (type == "NSM_Asset")
     {
@@ -82,18 +82,24 @@ void createNsmChassisAssembly(SensorManager& manager,
         assetObject.pdi().buildDate(productionDate);
 
         // create sensor
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, DEVICE_PART_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, SERIAL_NUMBER));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, MARKETING_NAME));
-        addSensor(manager, device,
-                  std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                      assetObject, BUILD_DATE));
+        auto eid = manager.getEid(device);
+        auto partNumberSensor =
+            std::make_shared<NsmInventoryProperty<AssetIntf>>(
+                assetObject, BOARD_PART_NUMBER);
+        auto serialNumberSensor =
+            std::make_shared<NsmInventoryProperty<AssetIntf>>(assetObject,
+                                                              SERIAL_NUMBER);
+        auto modelSensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+            assetObject, MARKETING_NAME);
+        auto buildDateSensor =
+            std::make_shared<NsmInventoryProperty<AssetIntf>>(assetObject,
+                                                              BUILD_DATE);
+        device->addStaticSensor(partNumberSensor).update(manager, eid).detach();
+        device->addStaticSensor(serialNumberSensor)
+            .update(manager, eid)
+            .detach();
+        device->addStaticSensor(modelSensor).update(manager, eid).detach();
+        device->addStaticSensor(buildDateSensor).update(manager, eid).detach();
     }
     else if (type == "NSM_Health")
     {
@@ -108,7 +114,7 @@ void createNsmChassisAssembly(SensorManager& manager,
 
         healthObject->pdi().health(
             HealthIntf::convertHealthTypeFromString(health));
-        addSensor(device, healthObject);
+        device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_Location")
     {
@@ -124,7 +130,7 @@ void createNsmChassisAssembly(SensorManager& manager,
 
         locationObject->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
-        addSensor(device, locationObject);
+        device->addStaticSensor(locationObject);
     }
 }
 

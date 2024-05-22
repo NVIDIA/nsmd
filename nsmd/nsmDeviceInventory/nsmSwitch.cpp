@@ -46,8 +46,8 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
         nvSwitchAssociation->pdi().associations(associations_list);
         nvSwitchUuid->pdi().uuid(uuid);
 
-        addSensor(device, nvSwitchUuid);
-        addSensor(device, nvSwitchAssociation);
+        device->addStaticSensor(nvSwitchUuid);
+        device->addStaticSensor(nvSwitchAssociation);
     }
     else if (type == "NSM_Switch")
     {
@@ -71,7 +71,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
 
         // maxSpeed and currentSpeed from PLDM T2
 
-        addSensor(device, nvSwitchObject);
+        device->addStaticSensor(nvSwitchObject);
     }
     else if (type == "NSM_Asset")
     {
@@ -81,7 +81,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
             objPath.c_str(), "Manufacturer", interface.c_str());
 
         nvSwitchAsset->pdi().manufacturer(manufacturer);
-        addSensor(device, nvSwitchAsset);
+        device->addStaticSensor(nvSwitchAsset);
     }
 }
 
