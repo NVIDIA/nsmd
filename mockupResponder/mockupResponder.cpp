@@ -63,6 +63,18 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                      0, NULL);
     });
 
+    iface->register_method("genXIDEvent",
+                           [&](uint8_t eid, bool ackr, uint8_t flag,
+                               uint32_t reason, uint32_t sequence_number,
+                               uint64_t timestamp, std::string message_text) {
+        sendXIDEvent(eid, ackr, flag, reason, sequence_number, timestamp,
+                     message_text);
+    });
+
+    iface->register_method(
+        "genResetRequiredEvent",
+        [&](uint8_t eid, bool ackr) { sendResetRequiredEvent(eid, ackr); });
+
     iface->initialize();
 
     mockEid = eid;
@@ -1487,6 +1499,57 @@ void MockupResponder::sendRediscoveryEvent(uint8_t dest, bool ackr)
     if (rc != NSM_SUCCESS)
     {
         lg2::error("sendRediscoveryEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg, true);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag,
+                                   uint32_t reason, uint32_t sequence_number,
+                                   uint64_t timestamp, std::string message_text)
+{
+    lg2::info("sendXIDEvent dest eid={EID}", "EID", dest);
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  sizeof(nsm_xid_event_payload) +
+                                  message_text.size());
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    const nsm_xid_event_payload payload{.flag = flag,
+                                        .reserved = {},
+                                        .reason = reason,
+                                        .sequence_number = sequence_number,
+                                        .timestamp = timestamp};
+
+    auto rc = encode_nsm_xid_event(instanceId, ackr, payload,
+                                   message_text.data(), message_text.size(),
+                                   msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendXIDEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg, true);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
+{
+    lg2::info("sendResetRequiredEvent dest eid={EID}", "EID", dest);
+    uint8_t instanceId = 23;
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_reset_required_event(instanceId, ackr, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendResetRequiredEvent failed");
     }
 
     rc = mctpSockSend(dest, eventMsg, true);

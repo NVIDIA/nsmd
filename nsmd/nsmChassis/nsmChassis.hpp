@@ -29,6 +29,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/MCTP/UUID/server.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
@@ -49,6 +50,7 @@ using MctpUuidIntf = object_t<MCTP::server::UUID>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
+using ItemIntf = object_t<Inventory::server::Item>;
 using PowerStateIntf = object_t<State::server::Chassis>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;

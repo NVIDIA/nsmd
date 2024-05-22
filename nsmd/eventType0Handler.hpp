@@ -36,9 +36,10 @@ class EventType0Handler : public EventHandler
   public:
     EventType0Handler()
     {
-        handlers.emplace(
-            NSM_REDISCOVERY_EVENT,
-            [this](eid_t eid, const nsm_msg* event, size_t eventLen) {
+        handlers.emplace(NSM_REDISCOVERY_EVENT,
+                         [this](eid_t eid, NsmType /*type*/,
+                                NsmEventId /*eventId*/, const nsm_msg* event,
+                                size_t eventLen) {
             return this->rediscovery(eid, event, eventLen);
         });
     };

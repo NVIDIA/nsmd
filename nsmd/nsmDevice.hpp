@@ -21,6 +21,7 @@
 #include "device-capability-discovery.h"
 
 #include "common/types.hpp"
+#include "nsmEvent.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "types.hpp"
@@ -73,6 +74,9 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
+
+    EventDispatcher eventDispatcher;
+    std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
 
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);

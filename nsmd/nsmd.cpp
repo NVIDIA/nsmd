@@ -20,6 +20,7 @@
 #include "deviceManager.hpp"
 #include "eventManager.hpp"
 #include "eventType0Handler.hpp"
+#include "eventType3Handler.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
@@ -137,6 +138,10 @@ int main(int argc, char** argv)
         auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
         eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
                                      std::move(eventType0Handler));
+
+        auto eventType3Handler = std::make_unique<nsm::EventType3Handler>();
+        eventManager.registerHandler(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                     std::move(eventType3Handler));
 
 #ifdef NVIDIA_SHMEM
         // Initialize TAL
