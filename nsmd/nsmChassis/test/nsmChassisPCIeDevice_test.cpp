@@ -52,6 +52,7 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
+    const uuid_t gpuDeviceUuid = "592b3ec1-e464-f145-8686-409009062aa8";
 
     NsmDeviceTable devices{
         {std::make_shared<NsmDevice>(gpuUuid)},
@@ -70,6 +71,7 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
         {"Name", name},
         {"Type", "NSM_ChassisPCIeDevice"},
         {"UUID", gpuUuid},
+        {"DEVICE_UUID", gpuDeviceUuid},
     };
     const PropertyValuesCollection asset = {
         {"Type", "NSM_Asset"},
@@ -117,7 +119,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(basic, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(basic, "UUID")));
+        .WillOnce(Return(get(basic, "DEVICE_UUID")));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
@@ -138,7 +140,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
                            gpu.deviceSensors[1]));
 
-    EXPECT_EQ(gpuUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+    EXPECT_EQ(gpuDeviceUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
                            gpu.deviceSensors[0])
                            ->pdi()
                            .uuid());

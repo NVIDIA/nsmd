@@ -49,11 +49,11 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
 
     if (type == "NSM_ChassisPCIeDevice")
     {
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
+        auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+            objPath.c_str(), "DEVICE_UUID", interface.c_str());
         auto uuidObject =
             std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(chassisName, name);
-        uuidObject->pdi().uuid(uuid);
+        uuidObject->pdi().uuid(deviceUuid);
         device->addStaticSensor(uuidObject);
     }
     else if (type == "NSM_Asset")

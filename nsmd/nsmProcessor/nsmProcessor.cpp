@@ -961,8 +961,11 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
 
+            auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+            objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
+
             auto uuidSensor = std::make_shared<NsmUuidIntf>(
-                bus, name, type, inventoryObjPath, uuid);
+                bus, name, type, inventoryObjPath, deviceUuid);
             nsmDevice->deviceSensors.push_back(uuidSensor);
 
             auto associations =
