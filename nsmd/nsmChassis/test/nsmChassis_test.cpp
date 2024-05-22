@@ -44,19 +44,20 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
         "xyz.openbmc_project.Configuration.NSM_Chassis";
     const std::string name = "HGX_GPU_SXM_1";
     const std::string objPath = chassisInventoryBasePath / name;
-
+ 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    const uuid_t gpuDeviceUuid = "000b3ec1-0068-0045-0086-000009062aa8";
     const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
-
+ 
     NsmDeviceTable devices{
         {std::make_shared<NsmDevice>(gpuUuid)},
         {std::make_shared<NsmDevice>(fpgaUuid)},
     };
     NsmDevice& gpu = *devices[0];
     NsmDevice& fpga = *devices[1];
-
+ 
     NiceMock<MockSensorManager> mockManager{devices};
-
+ 
     const PropertyValuesCollection error = {
         {"Type", "NSM_GPU_cassis"},
     };
@@ -64,6 +65,7 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
         {"Name", name},
         {"Type", "NSM_Chassis"},
         {"UUID", gpuUuid},
+        {"DEVICE_UUID", gpuDeviceUuid},
     };
     const PropertyValuesCollection fpgaProperties = {
         {"Name", name},
@@ -116,7 +118,7 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
         {"Priority", false},
     };
 };
-
+ 
 TEST_F(NsmChassisTest, badTestCreateDeviceSensors)
 {
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
@@ -137,7 +139,8 @@ TEST_F(NsmChassisTest, goodTestCreateDeviceSensors)
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(basic, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(basic, "DEVICE_UUID")));
     nsmChassisCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "Name")))
@@ -182,8 +185,8 @@ TEST_F(NsmChassisTest, goodTestCreateDeviceSensors)
     EXPECT_NE(nullptr,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
                   gpu.deviceSensors[4]));
-
-    EXPECT_EQ(gpuUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+ 
+    EXPECT_EQ(gpuDeviceUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
                            gpu.deviceSensors[0])
                            ->pdi()
                            .uuid());
