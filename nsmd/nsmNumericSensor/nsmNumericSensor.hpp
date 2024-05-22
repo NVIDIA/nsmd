@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "nsmNumericSensorComposite.hpp"
 #include "nsmSensor.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -34,7 +35,7 @@ struct Association;
 
 namespace nsm
 {
-
+class NsmNumericSensorComposite;
 using SensorUnit = sdbusplus::xyz::openbmc_project::Sensor::server::Value::Unit;
 using ValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Value>;
@@ -202,4 +203,25 @@ class NsmNumericSensorShmem : public NsmNumericSensorValue
     std::unique_ptr<SMBusSensorBytesConverter> smbusSensorBytesConverter;
 };
 
+/** @class NsmNumericSensorCompositeChildValue
+ *
+ *  Class for composite value observers of Numeric sensor reading and timestamp.
+ *  Whenever any senosr value is updated all the parents are notified of the
+ *  change. With this class we do not have to worry about wether parent sensors
+ *  are created or not.
+ */
+class NsmNumericSensorCompositeChildValue : public NsmNumericSensorValue
+{
+  public:
+    NsmNumericSensorCompositeChildValue(
+        const std::string& name, const std::string& sensorType,
+        const std::vector<std::string>& parents);
+    void updateReading(double value, uint64_t timestamp = 0) override;
+
+  private:
+    std::string name;
+    std::string sensorType;
+    std::vector<std::string> parents;
+    std::vector<std::shared_ptr<NsmNumericSensorComposite>> sensorCache;
+};
 } // namespace nsm

@@ -20,6 +20,7 @@
 #include "common/types.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
+#include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
@@ -31,7 +32,7 @@
 namespace nsm
 {
 using RequesterHandler = requester::Handler<requester::Request>;
-
+class NsmNumericSensorComposite;
 /**
  * @brief Sensor manager abstraction class
  *
@@ -91,6 +92,8 @@ class SensorManager
         }
         return *instance;
     }
+    std::unordered_map<std::string, std::shared_ptr<NsmNumericSensorComposite>>
+        objectPathToSensorMap;
 
   protected:
     static std::unique_ptr<SensorManager> instance;
@@ -176,7 +179,6 @@ class SensorManagerImpl : public SensorManager
     std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
     std::unique_ptr<sdeventplus::source::Defer> deferScanInventory;
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
-
     mctp_socket::Manager& sockManager;
 
     bool verbose;

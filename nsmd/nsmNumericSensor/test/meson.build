@@ -12,6 +12,7 @@ dep_src_files = [
     '../nsmVoltageAggregator.cpp',
     '../nsmThresholdAggregator.cpp',
     '../nsmNumericSensorFactory.cpp',
+    '../nsmNumericSensorComposite.cpp',
     '../nsmThresholdFactory.cpp',
     '../nsmNumericSensor.cpp',
     '../nsmNumericAggregator.cpp',

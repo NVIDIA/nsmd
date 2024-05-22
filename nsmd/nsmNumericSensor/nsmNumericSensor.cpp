@@ -19,6 +19,7 @@
 
 #include "nsmNumericSensor.hpp"
 
+#include "sensorManager.hpp"
 #include "utils.hpp"
 
 #include <endian.h>
@@ -179,5 +180,42 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
         valueVariant, association);
 }
 #endif
+
+NsmNumericSensorCompositeChildValue::NsmNumericSensorCompositeChildValue(
+    const std::string& name, const std::string& sensorType,
+    const std::vector<std::string>& parents) :
+    name(name),
+    sensorType(sensorType), parents(parents)
+{}
+
+void NsmNumericSensorCompositeChildValue::updateReading(double value,
+                                                        uint64_t /*timestamp*/)
+{
+    SensorManager& manager = SensorManager::getInstance();
+
+    // Iterate through the parents vector to check if it corresponding sensor is
+    // created. when all sensors are cached parents container wil be empty
+    for (auto it = parents.begin(); it != parents.end();)
+    {
+        auto sensorIt = manager.objectPathToSensorMap.find(*it);
+        if (sensorIt != manager.objectPathToSensorMap.end())
+        {
+            auto sensor = sensorIt->second;
+            if (sensor)
+            {
+                sensorCache.emplace_back(sensor);
+                it = parents.erase(it);
+                continue;
+            }
+        }
+        ++it;
+    }
+
+    // update each cached sensor
+    for (const auto& sensor : sensorCache)
+    {
+        sensor->updateCompositeReading(name, value);
+    }
+}
 
 } // namespace nsm
