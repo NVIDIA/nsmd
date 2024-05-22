@@ -49,5 +49,5 @@ option(
     min: 1,
     max: 254,
     description: 'The default local EID',
-    value: 8,
+    value: 9,
 )
