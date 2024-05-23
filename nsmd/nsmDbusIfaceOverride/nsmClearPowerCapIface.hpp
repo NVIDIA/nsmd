@@ -84,7 +84,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
             &enforced_limit);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            powerCapIntf->PowerCapIntf::powerCap(requested_persistent_limit);
+            powerCapIntf->PowerCapIntf::powerCap(enforced_limit);
             lg2::info("getPowerCapFromDevice for EID: {EID} completed", "EID",
                       eid);
         }
