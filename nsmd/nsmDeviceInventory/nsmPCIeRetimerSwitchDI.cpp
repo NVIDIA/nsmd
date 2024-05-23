@@ -77,8 +77,13 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         // update values
-        switchIntf->deviceId(std::to_string(data.pci_device_id));
-        switchIntf->vendorId(std::to_string(data.pci_vendor_id));
+        std::stringstream hexaDeviceId;
+        std::stringstream hexaVendorId;
+        hexaDeviceId << "0x" << std::setfill('0') << std::setw(4) << std::hex << data.pci_device_id;
+        hexaVendorId << "0x" << std::setfill('0') << std::setw(4) << std::hex << data.pci_vendor_id;
+
+        switchIntf->deviceId(hexaDeviceId.str());
+        switchIntf->vendorId(hexaVendorId.str());
     }
     else
     {
