@@ -22,6 +22,7 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
+#include "nsmSoftwareSettings.hpp"
 #include "utils.hpp"
 
 namespace nsm
@@ -43,11 +44,21 @@ void nsmChassisCreateSensors(SensorManager& manager,
 
     if (type == "NSM_Chassis")
     {
+        auto deviceType =
+            (NsmDeviceIdentification)utils::DBusHandler()
+                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
+                                           baseInterface.c_str());
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "DEVICE_UUID", baseInterface.c_str());
+            objPath.c_str(), "DEVICE_UUID", interface.c_str());
         chassisUuid->pdi().uuid(deviceUuid);
         device->addStaticSensor(chassisUuid);
+        if (deviceType == NSM_DEV_ID_BASEBOARD)
+        {
+            auto pCIeRefClock =
+                std::make_shared<NsmChassis<PCIeRefClockIntf>>(name);
+            device->addStaticSensor(pCIeRefClock);
+        }
     }
     else if (type == "NSM_Asset")
     {
@@ -133,6 +144,15 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_OperationalStatus")
     {
+        auto deviceType =
+            (NsmDeviceIdentification)utils::DBusHandler()
+                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
+                                           baseInterface.c_str());
+        if (deviceType != NSM_DEV_ID_BASEBOARD)
+        {
+            throw std::runtime_error(
+                "Cannot use NSM_OperationalStatus for different device than Baseboard");
+        }
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
@@ -148,6 +168,15 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PowerState")
     {
+        auto deviceType =
+            (NsmDeviceIdentification)utils::DBusHandler()
+                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
+                                           baseInterface.c_str());
+        if (deviceType != NSM_DEV_ID_BASEBOARD)
+        {
+            throw std::runtime_error(
+                "Cannot use NSM_PowerState for different device than Baseboard");
+        }
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
@@ -161,10 +190,27 @@ void nsmChassisCreateSensors(SensorManager& manager,
             std::make_shared<NsmPowerSupplyStatus>(gpuPowerState, instanceId),
             priority);
     }
+    else if (type == "NSM_WriteProtect")
+    {
+        auto deviceType =
+            (NsmDeviceIdentification)utils::DBusHandler()
+                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
+                                           baseInterface.c_str());
+        if (deviceType != NSM_DEV_ID_BASEBOARD)
+        {
+            throw std::runtime_error(
+                "Cannot use NSM_WriteProtect for different device than Baseboard");
+        }
+        auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+        auto settings = NsmChassis<SettingsIntf>(name);
+        device->addStaticSensor(std::make_shared<NsmSoftwareSettings>(
+            settings, deviceType, instanceId));
+    }
 }
 
 std::vector<std::string> chassisInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_Chassis",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.Chassis",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Asset",
     "xyz.openbmc_project.Configuration.NSM_Chassis.ChassisType",
     "xyz.openbmc_project.Configuration.NSM_Chassis.Dimension",
@@ -173,7 +219,8 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.LocationCode",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerLimit",
     "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState"};
+    "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
 

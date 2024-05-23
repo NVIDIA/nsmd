@@ -9,6 +9,7 @@ dep_src_files = [
     '../nsmPCIeFunction.cpp',
     '../nsmPCIeLinkSpeed.cpp',
     '../nsmPCIeLTSSMState.cpp',
+    '../../nsmFwSwInventory/nsmSoftwareSettings.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
@@ -18,6 +19,7 @@ dep_src_files = [
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/pci-links.c',
+    '../../../libnsm/device-configuration.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
 ]
@@ -26,6 +28,7 @@ dep_src_headers = [
     '.',
     '..',
     '../../',
+    '../../nsmFwSwInventory',
     '../../../',
     '../../../common',
     '../../../libnsm',

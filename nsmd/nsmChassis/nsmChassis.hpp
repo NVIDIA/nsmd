@@ -26,6 +26,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
@@ -42,6 +43,7 @@ using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
+using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
 using PowerStateIntf = object_t<State::server::Chassis>;
 using OperationalStatusIntf =

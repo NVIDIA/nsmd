@@ -14,7 +14,7 @@ sources += [
     'nsmChassis/nsmPCIeLTSSMState.cpp',
 ]
 
-nsmd_headers += ['.', '..']
+nsmd_headers += ['.', '..', 'nsmFwSwInventory']
 
 if get_option('tests').enabled()
     subdir('test')
