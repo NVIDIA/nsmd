@@ -29,6 +29,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
+#include <xyz/openbmc_project/MCTP/UUID/server.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
@@ -44,6 +45,7 @@ using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
+using MctpUuidIntf = object_t<MCTP::server::UUID>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
