@@ -21,9 +21,13 @@
 #include "platform-environmental.h"
 
 #include "nsmChassis/nsmInventoryProperty.hpp"
+#include "nsmDbusIfaceOverride/nsmClearPowerCapIface.hpp"
 #include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
+#include "nsmDbusIfaceOverride/nsmPowerCapIface.hpp"
 #include "nsmInterface.hpp"
 #include "nsmSensor.hpp"
+
+#include <stdint.h>
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
@@ -39,6 +43,8 @@
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
+
+#include <cstdint>
 
 namespace nsm
 {
@@ -421,6 +427,53 @@ class NsmMemoryCapacityUtil : public NsmSensor
   private:
     void updateReading(const struct nsm_memory_capacity_utilization& data);
     std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
+};
+
+class NsmPowerCap : public NsmObject
+{
+  public:
+    NsmPowerCap(std::string& name, std::string& type,
+                std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    void updateValue(uint32_t value);
+};
+
+class NsmMaxPowerCap : public NsmObject
+{
+  public:
+    NsmMaxPowerCap(std::string& name, std::string& type,
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    void updateValue(uint32_t value);
+};
+
+class NsmMinPowerCap : public NsmObject
+{
+  public:
+    NsmMinPowerCap(std::string& name, std::string& type,
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    void updateValue(uint32_t value);
+};
+class NsmDefaultPowerCap : public NsmObject
+{
+  public:
+    NsmDefaultPowerCap(std::string& name, std::string& type,
+                       std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf = nullptr;
+    void updateValue(uint32_t value);
 };
 
 } // namespace nsm

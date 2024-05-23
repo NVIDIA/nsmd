@@ -2073,6 +2073,251 @@ int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_set_power_limit_req(uint8_t instance_id, uint32_t id, uint8_t action,
+			       uint8_t persistence, uint32_t power_limit,
+			       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_power_limit_req *request =
+	    (struct nsm_set_power_limit_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_POWER_LIMITS;
+	request->hdr.data_size = 2 * sizeof(uint8_t) + 2 * sizeof(uint32_t);
+	request->action = action;
+	request->persistance = persistence;
+	request->power_limit = htole32(power_limit);
+	request->id = htole32(id);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_power_limit_req(uint8_t instance, uint8_t action,
+				      uint8_t persistence, uint32_t power_limit,
+				      struct nsm_msg *msg)
+{
+	return encode_set_power_limit_req(instance, DEVICE, action, persistence,
+					  power_limit, msg);
+}
+
+int encode_set_module_power_limit_req(uint8_t instance, uint8_t action,
+				      uint8_t persistence, uint32_t power_limit,
+				      struct nsm_msg *msg)
+{
+	return encode_set_power_limit_req(instance, MODULE, action, persistence,
+					  power_limit, msg);
+}
+
+int decode_set_power_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint32_t *id, uint8_t *action,
+			       uint8_t *persistence, uint32_t *power_limit)
+{
+	if (msg == NULL || id == NULL || action == NULL ||
+	    persistence == NULL || power_limit == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_power_limit_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_power_limit_req *request =
+	    (struct nsm_set_power_limit_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    2 * sizeof(uint8_t) + 2 * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*action = request->action;
+	*persistence = request->persistance;
+	*power_limit = le32toh(request->power_limit);
+	*id = le32toh(request->id);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_power_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_SET_POWER_LIMITS,
+					  msg);
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+	resp->command = NSM_SET_POWER_LIMITS;
+	resp->completion_code = cc;
+	resp->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code)
+{
+	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
+
+int encode_get_power_limit_req(uint8_t instance_id, uint32_t id,
+			       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_power_limit_req *request =
+	    (struct nsm_get_power_limit_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_POWER_LIMITS;
+	request->hdr.data_size = sizeof(id);
+	request->id = htole32(id);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_power_limit_req(uint8_t instance, struct nsm_msg *msg)
+{
+	return encode_get_power_limit_req(instance, DEVICE, msg);
+}
+
+int encode_get_module_power_limit_req(uint8_t instance, struct nsm_msg *msg)
+{
+	return encode_get_power_limit_req(instance, MODULE, msg);
+}
+
+int decode_get_power_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint32_t *id)
+{
+	if (msg == NULL || id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_get_power_limit_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_power_limit_req *request =
+	    (struct nsm_get_power_limit_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*id = le32toh(request->id);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_power_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code,
+				uint32_t requested_persistent_limit,
+				uint32_t requested_oneshot_limit,
+				uint32_t enforced_limit, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_POWER_LIMITS,
+					  msg);
+	}
+
+	struct nsm_get_power_limit_resp *resp =
+	    (struct nsm_get_power_limit_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_POWER_LIMITS;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = 3 * sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+	resp->requested_persistent_limit = htole32(requested_persistent_limit);
+	resp->requested_oneshot_limit = htole32(requested_oneshot_limit);
+	resp->enforced_limit = htole32(enforced_limit);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code,
+				uint32_t *requested_persistent_limit,
+				uint32_t *requested_oneshot_limit,
+				uint32_t *enforced_limit)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    requested_persistent_limit == NULL ||
+	    requested_oneshot_limit == NULL || enforced_limit == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_power_limit_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_power_limit_resp *resp =
+	    (struct nsm_get_power_limit_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) != 3 * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*requested_persistent_limit = le32toh(resp->requested_persistent_limit);
+	*requested_oneshot_limit = le32toh(resp->requested_oneshot_limit);
+	*enforced_limit = le32toh(resp->enforced_limit);
+
+	return NSM_SW_SUCCESS;
+}
+
 static void htoleClockLimit(struct nsm_clock_limit *clock_limit)
 {
 	clock_limit->present_limit_max =

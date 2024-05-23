@@ -2077,8 +2077,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: " << "rc=" << rc
-                        << ", cc=" << (int)cc
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -2338,6 +2338,160 @@ class GetProcessorThrottleReason : public CommandInterface
         result["ThrottleReasons"] = throttleReasons;
         nsmtool::helper::DisplayInJson(result);
     }
+};
+
+class SetPowerLimit : public CommandInterface
+{
+  public:
+    ~SetPowerLimit() = default;
+    SetPowerLimit() = delete;
+    SetPowerLimit(const SetPowerLimit&) = delete;
+    SetPowerLimit(SetPowerLimit&&) = default;
+    SetPowerLimit& operator=(const SetPowerLimit&) = delete;
+    SetPowerLimit& operator=(SetPowerLimit&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetPowerLimit(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-i, --powerLimitId", powerLimitId,
+                        "Power Limit Id Device/Module")
+            ->required();
+
+        app->add_option("-a, --action", action,
+                        "action to be performed on power limit")
+            ->required();
+
+        app->add_option("-p, --persistence", persistence,
+                        "Lifetime of new power limit")
+            ->required();
+
+        app->add_option("-l, --power_limit", power_limit,
+                        "Device power Limit in miliwatts")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_power_limit_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        int rc = NSM_SW_ERROR_DATA;
+        if (powerLimitId == DEVICE)
+        {
+            rc = encode_set_device_power_limit_req(
+                instanceId, action, persistence, power_limit, request);
+        }
+        else if (powerLimitId == MODULE)
+        {
+            rc = encode_set_module_power_limit_req(
+                instanceId, action, persistence, power_limit, request);
+        }
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_set_power_limit_resp(responsePtr, payloadLength, &cc,
+                                              &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint32_t powerLimitId;
+    uint8_t action;
+    uint8_t persistence;
+    uint32_t power_limit;
+};
+
+class GetPowerLimit : public CommandInterface
+{
+  public:
+    ~GetPowerLimit() = default;
+    GetPowerLimit() = delete;
+    GetPowerLimit(const GetPowerLimit&) = delete;
+    GetPowerLimit(GetPowerLimit&&) = default;
+    GetPowerLimit& operator=(const GetPowerLimit&) = delete;
+    GetPowerLimit& operator=(GetPowerLimit&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerLimit(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-i, --powerLimitId", powerLimitId,
+                        "Power Limit Id Device/Module")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_power_limit_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        int rc = NSM_SW_ERROR_DATA;
+        if (powerLimitId == DEVICE)
+        {
+            rc = encode_get_device_power_limit_req(instanceId, request);
+        }
+        else if (powerLimitId == MODULE)
+        {
+            rc = encode_get_module_power_limit_req(instanceId, request);
+        }
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        uint32_t requestedPersistentLimit;
+        uint32_t requestedOneShotlimit;
+        uint32_t enforcedLimit;
+        auto rc = decode_get_power_limit_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &requestedPersistentLimit, &requestedOneShotlimit, &enforcedLimit);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_power_limit_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["requestedPersistentLimit"] = requestedPersistentLimit;
+        result["requestedOneShotlimit"] = requestedOneShotlimit;
+        result["enforcedLimit"] = enforcedLimit;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint32_t powerLimitId;
 };
 
 class GetAccumGpuUtilTime : public CommandInterface
@@ -2975,6 +3129,15 @@ void registerCommand(CLI::App& app)
         "GetClockLimit", "retrieve clock Limit for clockId");
     commands.push_back(std::make_unique<GetClockLimit>(
         "telemetry", "GetClockLimit", getClockLimit));
+
+    auto setPowerLimit =
+        telemetry->add_subcommand("SetPowerLimit", "set Power Limit");
+    commands.push_back(std::make_unique<SetPowerLimit>(
+        "telemetry", "SetPowerLimit", setPowerLimit));
+    auto getPowerLimit =
+        telemetry->add_subcommand("GetPowerLimit", "get Power Limit");
+    commands.push_back(std::make_unique<GetPowerLimit>(
+        "telemetry", "getPowerLimit", getPowerLimit));
 
     auto getCurrClockFreq = telemetry->add_subcommand(
         "GetCurrClockFreq", "get current clock frequency of GPU");
