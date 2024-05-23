@@ -1010,7 +1010,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
             nsmDevice
                 ->addStaticSensor(
                     std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                        assetObject, BOARD_PART_NUMBER))
+                        assetObject, DEVICE_PART_NUMBER))
                 .update(manager, eid)
                 .detach();
             nsmDevice
