@@ -979,7 +979,7 @@ requester::Coroutine NsmPowerCap::update(SensorManager& manager, eid_t eid)
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateValue(requested_oneshot_limit);
+        updateValue(enforced_limit);
     }
     else
     {
