@@ -85,7 +85,7 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto eid = manager.getEid(device);
         auto partNumberSensor =
             std::make_shared<NsmInventoryProperty<AssetIntf>>(
-                assetObject, BOARD_PART_NUMBER);
+                assetObject, DEVICE_PART_NUMBER);
         auto serialNumberSensor =
             std::make_shared<NsmInventoryProperty<AssetIntf>>(assetObject,
                                                               SERIAL_NUMBER);
