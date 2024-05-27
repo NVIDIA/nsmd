@@ -3,12 +3,23 @@
         "Exposes": [
             {
                 "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
-                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
+                "DeviceType": "$DEVICE_TYPE",
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "DEVICE_UUID": "$DEVICE_UUID"
+                },
                 "Asset": {
                     "Type": "NSM_Asset",
                     "Manufacturer": "NVIDIA"
                 },
+                "Associations": [
+                    {
+                        "Forward": "pciedevice",
+                        "Backward": "chassis",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM $INSTANCE_NUMBER + 1/PCIeDevices/GPU_SXM $INSTANCE_NUMBER + 1"
+                    }
+                ],
                 "Dimension": {
                     "Type": "NSM_Dimension"
                 },
