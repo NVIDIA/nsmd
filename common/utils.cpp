@@ -227,6 +227,17 @@ std::vector<Association> getAssociations(const std::string& objPath,
     return associations;
 }
 
+Associations getAssociations(const std::vector<Association>& associations)
+{
+    Associations tuples;
+    for (auto& association : associations)
+    {
+        tuples.emplace_back(association.forward, association.backward,
+                            association.absolutePath);
+    }
+    return tuples;
+}
+
 void convertBitMaskToVector(std::vector<uint8_t>& data,
                             const bitfield8_t* value, uint8_t size)
 {

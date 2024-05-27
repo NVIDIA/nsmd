@@ -3,8 +3,12 @@
         "Exposes": [
             {
                 "Name": "HGX_Chassis_$INSTANCE_NUMBER",
-                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
+                "DeviceType": "$DEVICE_TYPE",
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "DEVICE_UUID": "$UUID"
+                },
                 "Asset": {
                     "Type": "NSM_Asset",
                     "Manufacturer": "NVIDIA"
@@ -318,8 +322,12 @@
             },
             {
                 "Name": "HGX_FPGA_$INSTANCE_NUMBER",
-                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
+                "DeviceType": "$DEVICE_TYPE",
+                "Chassis": {
+                    "Type": "NSM_Chassis",
+                    "DEVICE_UUID": "$UUID"
+                },
                 "Asset": {
                     "Type": "NSM_Asset",
                     "Manufacturer": "NVIDIA"
@@ -681,9 +689,9 @@
             },
             {
                 "Name": "HGX_GPU_SXM_1",
-                "Type": "NSM_Chassis",
                 "UUID": "$UUID",
-                "InstanceNumber": 1,
+                "InstanceNumber": 0,
+                "DeviceType": "$DEVICE_TYPE",
                 "OperationalStatus": {
                     "Type": "NSM_OperationalStatus",
                     "InventoryObjPaths": [

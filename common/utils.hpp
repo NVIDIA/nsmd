@@ -77,6 +77,8 @@ struct Association
     std::string backward;
     std::string absolutePath;
 };
+using Associations =
+    std::vector<std::tuple<std::string, std::string, std::string>>;
 
 /** @struct CustomFD
  *
@@ -238,8 +240,9 @@ class DBusHandler : public IDBusHandler
      *
      *  @throw sdbusplus::exception::exception when it fails
      */
-    GetSubTreeResponse getSubtree(const std::string& path, int depth,
-                                  const dbus::Interfaces& ifaceList) const override;
+    GetSubTreeResponse
+        getSubtree(const std::string& path, int depth,
+                   const dbus::Interfaces& ifaceList) const override;
 
     /** @brief Get property(type: variant) from the requested dbus
      *
@@ -364,6 +367,14 @@ std::string makeDBusNameValid(const std::string& name);
  */
 std::vector<Association> getAssociations(const std::string& objPath,
                                          const std::string& interfaceSubStr);
+
+/**
+ * @brief Converts vector of Association struct to dbus tuples collection
+ *
+ * @param associations vector of Association struct
+ * @return Associations Dbus tuples collection
+ */
+Associations getAssociations(const std::vector<Association>& associations);
 
 /** @brief Parse bitfield response for nsm command
  *

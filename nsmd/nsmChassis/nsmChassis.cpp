@@ -58,6 +58,14 @@ void nsmChassisCreateSensors(SensorManager& manager,
         mctpUuid->pdi().uuid(uuid);
         device->addStaticSensor(mctpUuid);
 
+        auto associations =
+            utils::getAssociations(objPath, baseInterface + ".Associations");
+        auto associationsObject =
+            std::make_shared<NsmChassis<AssociationDefinitionsInft>>(name);
+        associationsObject->pdi().associations(
+            utils::getAssociations(associations));
+        device->addStaticSensor(associationsObject);
+
         if (deviceType == NSM_DEV_ID_BASEBOARD)
         {
             auto pCIeRefClock =
