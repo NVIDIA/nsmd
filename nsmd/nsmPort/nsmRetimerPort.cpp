@@ -236,6 +236,10 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         objPath.c_str(), "InventoryObjPath", interface.c_str());
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
+    auto portProtocol = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PortProtocol", interface.c_str());
+    auto portType = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PortType", interface.c_str());
     auto associations =
         utils::getAssociations(objPath, interface + ".Associations");
     auto type = interface.substr(interface.find_last_of('.') + 1);
@@ -274,7 +278,17 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         nsmDevice->deviceSensors.push_back(pciePortIntfSensor);
 
         auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
+        auto portInfoIntf =
+            std::make_shared<PortInfoIntf>(bus, objPath.c_str());
+        auto portWidthIntf =
+            std::make_shared<PortWidthIntf>(bus, objPath.c_str());
 
+        portInfoIntf->protocol(
+            PortInfoIntf::convertPortProtocolFromString(portProtocol));
+        portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
+
+        auto pcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
+            portName, type, portInfoIntf, portWidthIntf, deviceIndex);
         auto pcieECCIntfSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
             portName, type, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
@@ -282,23 +296,25 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
             portName, type, pcieECCIntf, deviceIndex);
 
-        if (!pcieECCIntfSensorGroup2 || !pcieECCIntfSensorGroup3 ||
-            !pcieECCIntfSensorGroup4)
+        if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup2 ||
+            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4)
         {
             lg2::error(
-                "Failed to create NSM PCIe ECC Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                 "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
                 objPath);
             return;
         }
         if (priority)
         {
+            nsmDevice->prioritySensors.emplace_back(pcieSensorGroup1);
             nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup2);
             nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup3);
             nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup4);
         }
         else
         {
+            nsmDevice->roundRobinSensors.emplace_back(pcieSensorGroup1);
             nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup2);
             nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup3);
             nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup4);
