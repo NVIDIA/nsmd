@@ -42,8 +42,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -57,9 +56,9 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                            [&](uint8_t eid, uint8_t nsmType, bool ackr,
                                uint8_t ver, uint8_t eventId, uint8_t eventClass,
                                uint16_t eventState) {
-                               sendNsmEvent(eid, nsmType, ackr, ver, eventId,
-                                            eventClass, eventState, 0, NULL);
-                           });
+        sendNsmEvent(eid, nsmType, ackr, ver, eventId, eventClass, eventState,
+                     0, NULL);
+    });
 
     iface->initialize();
 
@@ -147,8 +146,8 @@ int MockupResponder::initSocket()
         }
 
         std::vector<uint8_t> requestMsg(peekedLength);
-        auto recvDataLength =
-            recv(fd, static_cast<void*>(requestMsg.data()), peekedLength, 0);
+        auto recvDataLength = recv(fd, static_cast<void*>(requestMsg.data()),
+                                   peekedLength, 0);
         if (recvDataLength != peekedLength)
         {
             lg2::error("Failure to read peeked length packet. peekedLength="
@@ -417,8 +416,8 @@ std::optional<std::vector<uint8_t>>
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = 0;
-    [[maybe_unused]] auto rc =
-        encode_ping_resp(requestMsg->hdr.instance_id, reason_code, responseMsg);
+    [[maybe_unused]] auto rc = encode_ping_resp(requestMsg->hdr.instance_id,
+                                                reason_code, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     return response;
 }
@@ -852,7 +851,6 @@ std::optional<std::vector<uint8_t>>
 
     if (sensor_id == 255)
     {
-
         std::vector<uint8_t> response(
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -932,7 +930,6 @@ std::optional<std::vector<uint8_t>>
 
     if (parameter_id == 255)
     {
-
         std::vector<uint8_t> response(
             sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
         auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -1011,7 +1008,7 @@ std::optional<std::vector<uint8_t>>
             requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 3,
             responseMsg);
 
-        auto const now = std::chrono::system_clock::now();
+        const auto now = std::chrono::system_clock::now();
         std::time_t newt = std::chrono::system_clock::to_time_t(now);
         const auto timestamp = static_cast<uint64_t>(newt);
         const uint32_t power[2]{25890, 17023};
@@ -1298,7 +1295,6 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getGpuPresenceAndPowerStatusHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-
     lg2::info("getGpuPresenceAndPowerStatusHandler: request length={LEN}",
               "LEN", requestLen);
 
@@ -2041,8 +2037,8 @@ std::optional<std::vector<uint8_t>>
     lg2::info("getProcessorThrottleReasonHandler: request length={LEN}", "LEN",
               requestLen);
 
-    auto rc =
-        decode_get_current_clock_event_reason_code_req(requestMsg, requestLen);
+    auto rc = decode_get_current_clock_event_reason_code_req(requestMsg,
+                                                             requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {

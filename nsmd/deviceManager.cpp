@@ -60,8 +60,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
         for (auto& mctpInfo : mctpInfos)
         {
             // try ping
-            auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding] =
-                mctpInfo;
+            auto& [eid, mctpUuid, mctpMedium, networkdId,
+                   mctpBinding] = mctpInfo;
             auto rc = co_await ping(eid);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -179,8 +179,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             if (properties.find(DEVICE_GUID) != properties.end())
             {
                 nsmDevice->fruDeviceIntf->register_property(
-                    "DEVICE_UUID",
-                    std::get<uuid_t>(properties[DEVICE_GUID]));
+                    "DEVICE_UUID", std::get<uuid_t>(properties[DEVICE_GUID]));
             }
 
             nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
@@ -236,8 +235,8 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_supported_nvidia_message_types_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto rc =
-        encode_get_supported_nvidia_message_types_req(DEFAULT_INSTANCE_ID, requestMsg);
+    auto rc = encode_get_supported_nvidia_message_types_req(DEFAULT_INSTANCE_ID,
+                                                            requestMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -369,9 +368,8 @@ requester::Coroutine
         std::stringstream ss;
         for (uint8_t commandCode : supportedCommandCodes)
         {
-            nsmDevice
-                ->messageTypesToCommandCodeMatrix[messageType][commandCode] =
-                true;
+            nsmDevice->messageTypesToCommandCodeMatrix[messageType]
+                                                      [commandCode] = true;
             ss << int(commandCode) << " ";
         }
         lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "ROW_NUM",
@@ -503,8 +501,8 @@ requester::Coroutine DeviceManager::getQueryDeviceIdentification(
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_device_identification_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto rc =
-        encode_nsm_query_device_identification_req(DEFAULT_INSTANCE_ID, requestMsg);
+    auto rc = encode_nsm_query_device_identification_req(DEFAULT_INSTANCE_ID,
+                                                         requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(

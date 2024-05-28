@@ -73,8 +73,8 @@ TEST(nsmTemp, GoodHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_temperature_reading_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -101,8 +101,8 @@ TEST(nsmTemp, BadHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_temperature_reading_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_temperature_reading_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -167,8 +167,8 @@ TEST(nsmPower, GoodHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_power_draw_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_current_power_draw_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -199,8 +199,8 @@ TEST(nsmPower, BadHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_power_draw_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_current_power_draw_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -331,8 +331,8 @@ TEST(nsmVoltage, GoodHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_voltage_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_voltage_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -340,8 +340,8 @@ TEST(nsmVoltage, GoodHandleResp)
     const uint16_t reason_code = ERR_NULL;
     const uint32_t reading{4345787};
 
-    auto rc =
-        encode_get_voltage_resp(instance_id, cc, reason_code, reading, msg);
+    auto rc = encode_get_voltage_resp(instance_id, cc, reason_code, reading,
+                                      msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     EXPECT_CALL(*value, updateReading(reading / 1'000'000.0, 0)).Times(1);
@@ -357,8 +357,8 @@ TEST(nsmVoltage, BadHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_voltage_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_voltage_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -404,8 +404,8 @@ TEST(nsmAltitudePressure, GoodHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_altitude_pressure_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -430,8 +430,8 @@ TEST(nsmAltitudePressure, BadHandleResp)
 
     sensor.sensorValue = value;
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_get_altitude_pressure_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -480,8 +480,8 @@ TEST(nsmThreshold, GoodHandleResp)
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_read_thermal_parameter_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
@@ -503,8 +503,8 @@ TEST(nsmThreshold, BadHandleResp)
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
     nsm::NsmThreshold sensor{sensorName, sensorType, 1, value};
 
-    static constexpr size_t msg_size =
-        sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_resp);
+    static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
+                                       sizeof(nsm_read_thermal_parameter_resp);
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};

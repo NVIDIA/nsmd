@@ -53,8 +53,8 @@ std::optional<std::vector<uint8_t>> NsmEnergy::genRequestMsg(eid_t eid,
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_current_energy_count_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_get_current_energy_count_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_get_current_energy_count_req(instanceId, sensorId,
+                                                  requestPtr);
     if (rc)
     {
         lg2::error("encode_get_current_energy_count_req failed. "
@@ -69,7 +69,6 @@ std::optional<std::vector<uint8_t>> NsmEnergy::genRequestMsg(eid_t eid,
 uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
                                      size_t responseLen)
 {
-
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint64_t reading = 0;

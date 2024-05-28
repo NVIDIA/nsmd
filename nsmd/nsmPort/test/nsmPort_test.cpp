@@ -23,7 +23,8 @@ TEST(NsmPortMetrics, GoodTest)
     std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device/Ports";
 
-    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, association, inventoryObjPath);
+    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, association,
+                                inventoryObjPath);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);

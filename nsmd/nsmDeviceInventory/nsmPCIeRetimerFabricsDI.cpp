@@ -13,8 +13,7 @@ NsmPCIeRetimerFabricDI::NsmPCIeRetimerFabricDI(
     const std::string& type, const std::string& fabricsType) :
     NsmObject(name, type)
 {
-    auto inventoryObjPath =
-        std::string(fabricsInventoryBasePath) + "/" + name;
+    auto inventoryObjPath = std::string(fabricsInventoryBasePath) + "/" + name;
     lg2::info("NsmPCIeRetimerFabricDI: {NAME}", "NAME", name.c_str());
 
     associationDefIntf = std::make_unique<AssociationDefinitionsInft>(
@@ -26,9 +25,8 @@ NsmPCIeRetimerFabricDI::NsmPCIeRetimerFabricDI(
         associationsList;
     for (const auto& association : associations)
     {
-        associationsList.emplace_back(association.forward,
-                                       association.backward,
-                                       association.absolutePath);
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
     }
     associationDefIntf->associations(associationsList);
 
@@ -47,8 +45,8 @@ static void createNSMPCIeRetimerFabrics(SensorManager& manager,
         objPath.c_str(), "UUID", interface.c_str());
     auto fabricType = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "FabricType", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);

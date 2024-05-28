@@ -8,8 +8,8 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     sdbusplus::bus::bus& bus, std::string& name, std::string& type,
     std::string& inventoryObjPath,
     const std::vector<utils::Association>& associations,
-    const std::string& fpgaType, const std::string& locationType, std::string& health) :
-    NsmObject(name, type)
+    const std::string& fpgaType, const std::string& locationType,
+    std::string& health) : NsmObject(name, type)
 {
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
@@ -28,12 +28,12 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     }
     associationDefIntf->associations(associations_list);
 
-    locationIntf =
-        std::make_unique<LocationIntf>(bus, inventoryObjPath.c_str());
+    locationIntf = std::make_unique<LocationIntf>(bus,
+                                                  inventoryObjPath.c_str());
     locationIntf->locationType(
         LocationIntf::convertLocationTypesFromString(locationType));
-    fpgaTypeIntf =
-        std::make_unique<FpgaTypeIntf>(bus, inventoryObjPath.c_str());
+    fpgaTypeIntf = std::make_unique<FpgaTypeIntf>(bus,
+                                                  inventoryObjPath.c_str());
     fpgaTypeIntf->fpgaType(FpgaTypeIntf::convertFPGATypeFromString(fpgaType));
     healthIntf = std::make_unique<HealthIntf>(bus, inventoryObjPath.c_str());
     healthIntf->health(HealthIntf::convertHealthTypeFromString(health));

@@ -630,7 +630,7 @@ TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
         testResponse(&value, sizeof(value));
         FAIL() << "Expected std::runtime_error";
     }
-    catch (std::runtime_error const& err)
+    catch (const std::runtime_error& err)
     {
         EXPECT_EQ(err.what(), std::string("Not implemented PDI"));
     }
@@ -681,8 +681,8 @@ TEST_F(NsmPowerSupplyStatusTest, goodTestRequest)
     EXPECT_EQ(request.value().size(),
               sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
-    auto rc =
-        decode_get_power_supply_status_req(requestPtr, request.value().size());
+    auto rc = decode_get_power_supply_status_req(requestPtr,
+                                                 request.value().size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 TEST_F(NsmPowerSupplyStatusTest, goodTestResponse)

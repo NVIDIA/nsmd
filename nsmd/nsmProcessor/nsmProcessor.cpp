@@ -133,7 +133,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                                       size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     bitfield8_t flags;
     uint16_t data_size;
@@ -256,7 +255,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_ECC_error_counts errorCounts;
     uint16_t data_size;
@@ -287,8 +285,8 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
     NsmObject(name, type)
 {
     lg2::info("NsmPciePortIntf: create sensor:{NAME}", "NAME", name.c_str());
-    pciePortIntf =
-        std::make_shared<PciePortIntf>(bus, inventoryObjPath.c_str());
+    pciePortIntf = std::make_shared<PciePortIntf>(bus,
+                                                  inventoryObjPath.c_str());
 }
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
@@ -341,7 +339,6 @@ void NsmPciGroup2::updateReading(
 uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_query_scalar_group_telemetry_group_2 data;
     uint16_t data_size;
@@ -387,7 +384,6 @@ void NsmPciGroup3::updateReading(
 uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_query_scalar_group_telemetry_group_3 data;
     uint16_t data_size;
@@ -439,7 +435,6 @@ void NsmPciGroup4::updateReading(
 uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_query_scalar_group_telemetry_group_4 data;
     uint16_t data_size;
@@ -484,7 +479,6 @@ void NsmPciGroup5::updateReading(
 uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_query_scalar_group_telemetry_group_5 data;
     uint16_t data_size;
@@ -531,8 +525,8 @@ std::optional<std::vector<uint8_t>>
 {
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_get_programmable_EDPp_scaling_factor_req(instanceId, requestPtr);
+    auto rc = encode_get_programmable_EDPp_scaling_factor_req(instanceId,
+                                                              requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_programmable_EDPp_scaling_factor_req failed. "
@@ -547,7 +541,6 @@ uint8_t
     NsmEDPpScalingFactor::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_EDPp_scaling_factors scaling_factors;
     uint16_t data_size;
@@ -629,7 +622,6 @@ uint8_t
     NsmClockLimitGraphics::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_clock_limit clockLimit;
     uint16_t data_size;
@@ -671,7 +663,6 @@ void NsmCurrClockFreq::updateReading(const uint32_t& clockFreq)
 std::optional<std::vector<uint8_t>>
     NsmCurrClockFreq::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_curr_clock_freq_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -691,7 +682,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     uint32_t clockFreq = 1;
     uint16_t data_size;
@@ -764,8 +754,8 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
 
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_get_current_clock_event_reason_code_req(instanceId, requestPtr);
+    auto rc = encode_get_current_clock_event_reason_code_req(instanceId,
+                                                             requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_current_clock_event_reason_code_req failed. "
@@ -779,7 +769,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmProcessorThrottleReason::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     bitfield32_t data;
     uint16_t data_size;
@@ -842,7 +831,6 @@ uint8_t
     NsmAccumGpuUtilTime::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     uint32_t context_util_time;
     uint32_t SM_util_time;
@@ -883,8 +871,8 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus,
 void NsmMemoryCapacityUtil::updateReading(
     const struct nsm_memory_capacity_utilization& data)
 {
-    uint8_t usedMemoryPercent =
-        (data.used_memory * 100) / (data.used_memory + data.reserved_memory);
+    uint8_t usedMemoryPercent = (data.used_memory * 100) /
+                                (data.used_memory + data.reserved_memory);
     dimmMemoryMetricsIntf->capacityUtilizationPercent(usedMemoryPercent);
 }
 
@@ -909,7 +897,6 @@ uint8_t
     NsmMemoryCapacityUtil::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_memory_capacity_utilization data;
     uint16_t data_size;
@@ -936,8 +923,7 @@ uint8_t
 
 NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf)
+    NsmObject(name, type), powerCapIntf(powerCapIntf)
 {}
 
 void NsmPowerCap::updateValue(uint32_t value)
@@ -999,8 +985,7 @@ requester::Coroutine NsmPowerCap::update(SensorManager& manager, eid_t eid)
 
 NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
                                std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf)
+    NsmObject(name, type), powerCapIntf(powerCapIntf)
 {}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
@@ -1016,8 +1001,8 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
     uint8_t propertyIdentifier = MAXIMUM_DEVICE_POWER_LIMIT;
-    auto rc =
-        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -1065,8 +1050,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
 
 NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
                                std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf)
+    NsmObject(name, type), powerCapIntf(powerCapIntf)
 {}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
@@ -1082,8 +1066,8 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
     uint8_t propertyIdentifier = MINIMUM_DEVICE_POWER_LIMIT;
-    auto rc =
-        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -1132,8 +1116,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type),
-    clearPowerCapIntf(clearPowerCapIntf)
+    NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
@@ -1150,8 +1133,8 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
     uint8_t propertyIdentifier = RATED_DEVICE_POWER_LIMIT;
-    auto rc =
-        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -1251,7 +1234,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
             nsmDevice->deviceSensors.push_back(sensor);
 
             auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
+                objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
 
             auto uuidSensor = std::make_shared<NsmUuidIntf>(
                 bus, name, type, inventoryObjPath, deviceUuid);
@@ -1277,7 +1260,6 @@ static void createNsmProcessorSensor(SensorManager& manager,
         }
         else if (type == "NSM_Asset")
         {
-
             auto assetIntf = std::make_shared<AssetIntfProcessor>(
                 bus, inventoryObjPath.c_str());
             auto manufacturer =
@@ -1313,8 +1295,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto sensor =
-                std::make_shared<NsmMigMode>(bus, name, type, inventoryObjPath);
+            auto sensor = std::make_shared<NsmMigMode>(bus, name, type,
+                                                       inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
             if (priority)
             {
@@ -1377,8 +1359,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto eccIntf = std::make_shared<NsmEccModeIntf>(
                 bus, inventoryObjPath.c_str(), uuid);
 
-            auto eccModeSensor =
-                std::make_shared<NsmEccMode>(name, type, eccIntf);
+            auto eccModeSensor = std::make_shared<NsmEccMode>(name, type,
+                                                              eccIntf);
 
             eccModeSensor->update(manager, manager.getEid(nsmDevice)).detach();
 
@@ -1495,8 +1477,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
 
             // create sensors for power cap properties
-            auto powerCap =
-                std::make_shared<NsmPowerCap>(name, type, powerCapIntf);
+            auto powerCap = std::make_shared<NsmPowerCap>(name, type,
+                                                          powerCapIntf);
             nsmDevice->deviceSensors.emplace_back(powerCap);
             nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
 
@@ -1504,12 +1486,12 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 name, type, clearPowerCapIntf);
             nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
 
-            auto maxPowerCap =
-                std::make_shared<NsmMaxPowerCap>(name, type, powerCapIntf);
+            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(name, type,
+                                                                powerCapIntf);
             nsmDevice->deviceSensors.emplace_back(maxPowerCap);
 
-            auto minPowerCap =
-                std::make_shared<NsmMinPowerCap>(name, type, powerCapIntf);
+            auto minPowerCap = std::make_shared<NsmMinPowerCap>(name, type,
+                                                                powerCapIntf);
             nsmDevice->deviceSensors.emplace_back(minPowerCap);
 
             defaultPowerCap->update(manager, manager.getEid(nsmDevice))

@@ -37,12 +37,9 @@ class MctpDiscoveryHandlerIntf
 {
   public:
     virtual void handleMctpEndpoints(const MctpInfos& mctpInfos) = 0;
-    virtual void onlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid)
-    {}
-    virtual void offlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid)
-    {}
-    virtual ~MctpDiscoveryHandlerIntf()
-    {}
+    virtual void onlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid) {}
+    virtual void offlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid) {}
+    virtual ~MctpDiscoveryHandlerIntf() {}
 };
 
 class MctpDiscovery

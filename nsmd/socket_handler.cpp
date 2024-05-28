@@ -189,8 +189,8 @@ SocketInfo Handler::initSocket(int type, int protocol,
     }
 
     /* Register for VDM(0x7e) message type */
-    ssize_t result =
-        write(sockFd, &MCTP_MSG_TYPE_VDM, sizeof(MCTP_MSG_TYPE_VDM));
+    ssize_t result = write(sockFd, &MCTP_MSG_TYPE_VDM,
+                           sizeof(MCTP_MSG_TYPE_VDM));
     if (result == -1)
     {
         rc = -errno;
@@ -201,8 +201,8 @@ SocketInfo Handler::initSocket(int type, int protocol,
     }
 
     auto io = std::make_unique<IO>(event, sockFd, EPOLLIN, std::move(callback));
-    socketInfoMap[pathName] =
-        std::tuple(std::move(fd), sendBufferSize, std::move(io));
+    socketInfoMap[pathName] = std::tuple(std::move(fd), sendBufferSize,
+                                         std::move(io));
 
     return {sockFd, sendBufferSize};
 }

@@ -91,8 +91,8 @@ class EventManager
         std::vector<uint8_t> ackMsg(sizeof(nsm_msg_hdr) +
                                     sizeof(nsm_event_ack));
         auto msg = reinterpret_cast<nsm_msg*>(ackMsg.data());
-        auto rc =
-            encode_nsm_event_acknowledgement(instanceId, nsmType, eventId, msg);
+        auto rc = encode_nsm_event_acknowledgement(instanceId, nsmType, eventId,
+                                                   msg);
         if (rc != NSM_SUCCESS)
         {
             lg2::error(

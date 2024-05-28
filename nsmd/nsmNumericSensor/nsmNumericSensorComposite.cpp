@@ -107,8 +107,8 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 #ifdef NVIDIA_SHMEM
     std::string chassis_association;
     for (const auto& association : associations)
@@ -141,8 +141,8 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
         return;
     }
 
-    auto nsmFPGATotalGPUPowerSensorPath =
-        "/xyz/openbmc_project/sensors/" + sensorType + "/" + name;
+    auto nsmFPGATotalGPUPowerSensorPath = "/xyz/openbmc_project/sensors/" +
+                                          sensorType + "/" + name;
 #ifdef NVIDIA_SHMEM
     auto shmemSensor = std::make_unique<NsmNumericSensorShmem>(
         name, sensorType, chassis_association,

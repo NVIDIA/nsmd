@@ -116,8 +116,8 @@ static void createGPUDriverSensor(SensorManager& manager,
         objPath.c_str(), "UUID", interface.c_str());
     auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Manufacturer", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
     auto nsmDevice = manager.getNsmDevice(uuid);

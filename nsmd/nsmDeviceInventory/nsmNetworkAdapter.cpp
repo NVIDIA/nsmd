@@ -46,8 +46,8 @@ static void createNSMNetworkAdapter(SensorManager& manager,
         objPath.c_str(), "Type", interface.c_str());
     auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
     auto nsmDevice = manager.getNsmDevice(uuid);
 
     if (!nsmDevice)

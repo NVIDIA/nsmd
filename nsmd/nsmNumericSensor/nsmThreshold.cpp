@@ -29,8 +29,8 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_read_thermal_parameter_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_read_thermal_parameter_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_read_thermal_parameter_req(instanceId, sensorId,
+                                                requestPtr);
     if (rc)
     {
         lg2::error("encode_read_thermal_parameter_req failed. "

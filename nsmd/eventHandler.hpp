@@ -72,9 +72,9 @@ class EventHandler
     {
         std::string messageId = "Received an unhandled NSM Event";
 
-        auto createLog = [&messageId](
-                             std::map<std::string, std::string>& addData,
-                             Level& level) {
+        auto createLog =
+            [&messageId](std::map<std::string, std::string>& addData,
+                         Level& level) {
             static constexpr auto logObjPath = "/xyz/openbmc_project/logging";
             static constexpr auto logInterface =
                 "xyz.openbmc_project.Logging.Create";
@@ -82,8 +82,8 @@ class EventHandler
 
             try
             {
-                auto service =
-                    utils::DBusHandler().getService(logObjPath, logInterface);
+                auto service = utils::DBusHandler().getService(logObjPath,
+                                                               logInterface);
                 auto severity = sdbusplus::xyz::openbmc_project::Logging::
                     server::convertForMessage(level);
                 auto method = bus.new_method_call(service.c_str(), logObjPath,

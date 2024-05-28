@@ -40,8 +40,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
     NsmClearPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
                          uuid_t uuid,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-        ClearPowerCapIntf(bus, path),
-        uuid(uuid), powerCapIntf(powerCapIntf)
+        ClearPowerCapIntf(bus, path), uuid(uuid), powerCapIntf(powerCapIntf)
     {}
 
     void getPowerCapFromDevice()

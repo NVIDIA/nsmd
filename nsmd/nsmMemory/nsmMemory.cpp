@@ -16,9 +16,7 @@ namespace nsm
 
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
-    std::string& correctionType) :
-    NsmObject(name, type),
-    dimmIntf(dimmIntf)
+    std::string& correctionType) : NsmObject(name, type), dimmIntf(dimmIntf)
 {
     dimmIntf->ecc(DimmIntf::convertEccFromString(correctionType));
 }
@@ -26,10 +24,8 @@ NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
 NsmMemoryDeviceType::NsmMemoryDeviceType(std::string& name, std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
                                          std::string& memoryType) :
-    NsmObject(name, type),
-    dimmIntf(dimmIntf)
+    NsmObject(name, type), dimmIntf(dimmIntf)
 {
-
     dimmIntf->memoryType(DimmIntf::convertDeviceTypeFromString(memoryType));
 }
 
@@ -50,16 +46,15 @@ NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
                                  std::string& inventoryObjPath) :
     NsmObject(name, type)
 {
-    healthIntf =
-        std::make_unique<MemoryHealthIntf>(bus, inventoryObjPath.c_str());
+    healthIntf = std::make_unique<MemoryHealthIntf>(bus,
+                                                    inventoryObjPath.c_str());
     healthIntf->health(MemoryHealthType::OK);
 }
 
 NsmMemoryAssociation::NsmMemoryAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) :
-    NsmObject(name, type)
+    const std::vector<utils::Association>& associations) : NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -110,7 +105,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmRowRemapState::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     bitfield8_t flags;
     uint16_t data_size;
@@ -173,7 +167,6 @@ uint8_t
     NsmRowRemappingCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     uint32_t correctable_error;
     uint32_t uncorrectable_error;
@@ -201,8 +194,7 @@ uint8_t
 NsmEccErrorCountsDram::NsmEccErrorCountsDram(
     std::string& name, std::string& type,
     std::shared_ptr<EccModeIntfDram> eccIntf) :
-    NsmSensor(name, type),
-    eccIntf(eccIntf)
+    NsmSensor(name, type), eccIntf(eccIntf)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
@@ -235,7 +227,6 @@ uint8_t
     NsmEccErrorCountsDram::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_ECC_error_counts errorCounts;
     uint16_t data_size;
@@ -262,8 +253,7 @@ uint8_t
 NsmClockLimitMemory::NsmClockLimitMemory(const std::string& name,
                                          const std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmSensor(name, type),
-    dimmIntf(dimmIntf)
+    NsmSensor(name, type), dimmIntf(dimmIntf)
 
 {
     lg2::info("NsmClockLimitMemory: create sensor:{NAME}", "NAME",
@@ -301,7 +291,6 @@ uint8_t
     NsmClockLimitMemory::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_clock_limit clockLimit;
     uint16_t data_size;
@@ -328,8 +317,7 @@ uint8_t
 NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
                                          const std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmSensor(name, type),
-    dimmIntf(dimmIntf)
+    NsmSensor(name, type), dimmIntf(dimmIntf)
 
 {
     lg2::info("NsmMemCurrClockFreq: create sensor:{NAME}", "NAME",
@@ -344,7 +332,6 @@ void NsmMemCurrClockFreq::updateReading(const uint32_t& clockFreq)
 std::optional<std::vector<uint8_t>>
     NsmMemCurrClockFreq::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_curr_clock_freq_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -365,7 +352,6 @@ uint8_t
     NsmMemCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     uint32_t clockFreq = 1;
     uint16_t data_size;

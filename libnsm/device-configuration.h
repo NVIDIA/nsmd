@@ -77,13 +77,13 @@ struct nsm_fpga_diagnostics_settings_wp {
 	uint8_t gpu5_8 : 1; // GPU 5-8 SPI Flash
 	/* Byte 2 */
 	uint8_t retimer1 : 1; // Byte 2: Retimers (one per bit)
-	uint8_t retimer2 : 1; 
-	uint8_t retimer3 : 1; 
-	uint8_t retimer4 : 1; 
-	uint8_t retimer5 : 1; 
-	uint8_t retimer6 : 1; 
-	uint8_t retimer7 : 1; 
-	uint8_t retimer8 : 1; 
+	uint8_t retimer2 : 1;
+	uint8_t retimer3 : 1;
+	uint8_t retimer4 : 1;
+	uint8_t retimer5 : 1;
+	uint8_t retimer6 : 1;
+	uint8_t retimer7 : 1;
+	uint8_t retimer8 : 1;
 	/* Byte 3 */
 	uint8_t gpu1 : 1; // 7:4 – GPU 1-4 SPI Flash (one per bit)
 	uint8_t gpu2 : 1;

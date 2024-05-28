@@ -31,7 +31,6 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath)
 {
-
     auto chassisName = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "ChassisName", interface.c_str());
     auto name = utils::DBusHandler().getDbusProperty<std::string>(

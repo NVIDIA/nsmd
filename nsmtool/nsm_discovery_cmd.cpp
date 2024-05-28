@@ -57,12 +57,12 @@ class Ping : public CommandInterface
     {
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
-        auto rc =
-            decode_ping_resp(responsePtr, payloadLength, &cc, &reason_code);
+        auto rc = decode_ping_resp(responsePtr, payloadLength, &cc,
+                                   &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -93,8 +93,8 @@ class GetSupportedMessageTypes : public CommandInterface
             sizeof(nsm_msg_hdr) +
             sizeof(nsm_get_supported_nvidia_message_types_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        auto rc =
-            encode_get_supported_nvidia_message_types_req(instanceId, request);
+        auto rc = encode_get_supported_nvidia_message_types_req(instanceId,
+                                                                request);
         return {rc, requestMsg};
     }
 
@@ -108,8 +108,8 @@ class GetSupportedMessageTypes : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &supportedTypes[0]);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -172,8 +172,8 @@ class GetSupportedCommandCodes : public CommandInterface
             &supportedCommandCodes[0]);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -211,8 +211,8 @@ class QueryDeviceIdentification : public CommandInterface
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_identification_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        auto rc =
-            encode_nsm_query_device_identification_req(instanceId, request);
+        auto rc = encode_nsm_query_device_identification_req(instanceId,
+                                                             request);
         return {rc, requestMsg};
     }
 
@@ -227,8 +227,8 @@ class QueryDeviceIdentification : public CommandInterface
             &device_identification, &device_instanceID);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }

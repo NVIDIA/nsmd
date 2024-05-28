@@ -19,8 +19,8 @@ NsmPortStatus::NsmPortStatus(
 {
     lg2::debug("NsmPortStatus: {NAME}", "NAME", portName.c_str());
 
-    portStateIntf =
-        std::make_unique<PortStateIntf>(bus, inventoryObjPath.c_str());
+    portStateIntf = std::make_unique<PortStateIntf>(bus,
+                                                    inventoryObjPath.c_str());
     portMetricsOem3Intf = portMetricsOem3Interface;
 
     portStateIntf->linkStatus(PortLinkStatus::Starting);
@@ -116,8 +116,8 @@ NsmPortCharacteristics::NsmPortCharacteristics(
 {
     lg2::debug("NsmPortCharacteristics: {NAME}", "NAME", portName.c_str());
 
-    portInfoIntf =
-        std::make_unique<PortInfoIntf>(bus, inventoryObjPath.c_str());
+    portInfoIntf = std::make_unique<PortInfoIntf>(bus,
+                                                  inventoryObjPath.c_str());
     portMetricsOem3Intf = portMetricsOem3Interface;
 
     portInfoIntf->type(PortType::BidirectionalPort);

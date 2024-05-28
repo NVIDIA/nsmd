@@ -4,7 +4,8 @@ namespace nsm
 {
 
 NsmFpgaPort::NsmFpgaPort(sdbusplus::bus::bus& bus, const std::string& name,
-                         const std::string& type, const std::string& health, const std::string& chasisState,
+                         const std::string& type, const std::string& health,
+                         const std::string& chasisState,
                          const std::vector<utils::Association>& associations,
                          const std::string& inventoryObjPath) :
     NsmObject(name, type)
@@ -13,9 +14,11 @@ NsmFpgaPort::NsmFpgaPort(sdbusplus::bus::bus& bus, const std::string& name,
     portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
     associationDefIntf =
         std::make_unique<AssociationDefIntf>(bus, inventoryObjPath.c_str());
-    
-    chasisStateIntf = std::make_unique<ChasisStateIntf>(bus, inventoryObjPath.c_str());
-    chasisStateIntf->currentPowerState(ChasisStateIntf::convertPowerStateFromString(chasisState));
+
+    chasisStateIntf =
+        std::make_unique<ChasisStateIntf>(bus, inventoryObjPath.c_str());
+    chasisStateIntf->currentPowerState(
+        ChasisStateIntf::convertPowerStateFromString(chasisState));
 
     healthIntf = std::make_unique<HealthIntf>(bus, inventoryObjPath.c_str());
     healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
@@ -36,8 +39,7 @@ NsmFpgaPortInfo::NsmFpgaPortInfo(const std::string& name,
                                  const std::string& portType,
                                  const std::string& portProtocol,
                                  std::shared_ptr<PortInfoIntf> portInfoIntf) :
-    NsmObject(name, type),
-    portInfoIntf(portInfoIntf)
+    NsmObject(name, type), portInfoIntf(portInfoIntf)
 {
     lg2::info("NsmFpgaPortInfo: create sensor:{NAME}", "NAME", name.c_str());
     portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
@@ -53,8 +55,8 @@ NsmFpgaPortState::NsmFpgaPortState(sdbusplus::bus::bus& bus,
     NsmObject(name, type)
 {
     lg2::info("NsmFpgaPortState: create sensor:{NAME}", "NAME", name.c_str());
-    portStateIntf =
-        std::make_shared<PortStateIntf>(bus, inventoryObjPath.c_str());
+    portStateIntf = std::make_shared<PortStateIntf>(bus,
+                                                    inventoryObjPath.c_str());
     portStateIntf->linkStatus(
         PortStateIntf::convertLinkStatusTypeFromString(linkStatus));
 }
@@ -94,10 +96,12 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
                 utils::getAssociations(objPath, interface + ".Associations");
             auto health = utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "Health", interface.c_str());
-            auto chasisState = utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "ChasisPowerState", interface.c_str());
+            auto chasisState =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "ChasisPowerState", interface.c_str());
             auto sensor = std::make_shared<NsmFpgaPort>(
-                bus, name, type, health, chasisState, associations, inventoryObjPath);
+                bus, name, type, health, chasisState, associations,
+                inventoryObjPath);
             nsmDevice->deviceSensors.emplace_back(sensor);
         }
         else if (type == "NSM_PortInfo")
@@ -114,8 +118,8 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
                 objPath.c_str(), "DeviceIndex", FPGA_PORT_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
-            auto portWidthIntf = std::make_shared<PortWidthIntf>(
-                bus, inventoryObjPath.c_str());
+            auto portWidthIntf =
+                std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
             auto portInfoSensor = std::make_shared<NsmFpgaPortInfo>(
                 name, type, portType, portProtocol, portInfoIntf);
             nsmDevice->deviceSensors.emplace_back(portInfoSensor);

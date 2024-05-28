@@ -38,8 +38,8 @@ std::optional<std::vector<uint8_t>>
                    sizeof(nsm_read_thermal_parameter_req));
     auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
 
-    auto rc =
-        encode_read_thermal_parameter_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_read_thermal_parameter_req(instanceId, sensorId,
+                                                requestPtr);
 
     if (rc)
     {

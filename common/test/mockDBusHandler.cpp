@@ -30,9 +30,8 @@ PropertyValue DBusTest::get(const PropertyValuesCollection& properties,
     return std::find_if(
                properties.begin(), properties.end(),
                [&name](const std::pair<std::string, PropertyValue>& pair) {
-                   return pair.first == name;
-               })
-        ->second;
+        return pair.first == name;
+    })->second;
 }
 
 } // namespace utils

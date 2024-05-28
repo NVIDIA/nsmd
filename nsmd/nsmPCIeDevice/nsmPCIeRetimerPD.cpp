@@ -91,8 +91,7 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& deviceType,
     const uint8_t deviceIndex, std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    deviceIndex(deviceIndex)
+    NsmSensor(name, type), deviceIndex(deviceIndex)
 {
     auto objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceQueryScalarTelemetry: {NAME}", "NAME",
@@ -217,7 +216,8 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         // update values
-        pcieRefClockIntf->pcIeReferenceClockEnabled(getRetimerClockState(clkBuf));
+        pcieRefClockIntf->pcIeReferenceClockEnabled(
+            getRetimerClockState(clkBuf));
     }
     else
     {
@@ -229,8 +229,7 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
-bool NsmPCIeDeviceGetClockOutput::getRetimerClockState(
-    uint32_t clockBuffer)
+bool NsmPCIeDeviceGetClockOutput::getRetimerClockState(uint32_t clockBuffer)
 {
     auto clkBuf = reinterpret_cast<nsm_pcie_clock_buffer_data*>(&clockBuffer);
 
@@ -260,8 +259,7 @@ bool NsmPCIeDeviceGetClockOutput::getRetimerClockState(
 NsmPCIeDeviceQueryLTSSMState::NsmPCIeDeviceQueryLTSSMState(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uint8_t& deviceIndex, std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    deviceIndex(deviceIndex)
+    NsmSensor(name, type), deviceIndex(deviceIndex)
 {
     auto objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceQueryLTSSMState: {NAME}", "NAME", name.c_str());
@@ -332,13 +330,13 @@ static void CreatePCIeRetimerChassisPCIeDevice(SensorManager& manager,
         objPath.c_str(), "Priority", interface.c_str());
     auto deviceInstance = utils::DBusHandler().getDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceInstance", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     // device_index are between [1 to 8] for retimers, which is
     // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
-    uint8_t deviceIndex =
-        static_cast<uint8_t>(deviceInstance) + PCIE_RETIMER_DEVICE_INDEX_START;
+    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
+                          PCIE_RETIMER_DEVICE_INDEX_START;
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);

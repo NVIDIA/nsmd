@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "device-capability-discovery.h"
 #include "base.h"
@@ -177,7 +175,8 @@ int encode_nsm_configure_event_acknowledgement_req(
 	    (struct nsm_configure_event_acknowledgement_req *)msg->payload;
 
 	request->hdr.command = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT;
-	request->hdr.data_size = NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE;
+	request->hdr.data_size =
+	    NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE;
 	request->nvidia_message_type = nvidia_message_type;
 	memcpy(request->current_event_sources_acknowledgement_mask,
 	       current_event_sources_acknowledgement_mask,
@@ -319,7 +318,8 @@ int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
 	struct nsm_set_current_event_source_req *request =
 	    (struct nsm_set_current_event_source_req *)msg->payload;
 
-	if (request->hdr.data_size != NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE) {
+	if (request->hdr.data_size !=
+	    NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 

@@ -57,8 +57,8 @@ SensorManagerImpl::SensorManagerImpl(
         sdbusplus::bus::match::rules::interfacesAdded(
             "/xyz/openbmc_project/inventory"),
         [this](sdbusplus::message::message& msg) {
-            this->interfaceAddedhandler(msg);
-        });
+        this->interfaceAddedhandler(msg);
+    });
 }
 
 void SensorManagerImpl::scanInventory()

@@ -29,8 +29,8 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     const std::vector<utils::Association>& associations,
     const std::string& type) : NsmObject(name, type)
 {
-    auto pcieRetimerChaasisBasePath =
-        std::string(chassisInventoryBasePath) + "/" + name;
+    auto pcieRetimerChaasisBasePath = std::string(chassisInventoryBasePath) +
+                                      "/" + name;
     lg2::info("NsmPCIeRetimerChassis: create sensor:{NAME}", "NAME",
               name.c_str());
 
@@ -49,8 +49,8 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     }
     associationDef_->associations(associations_list);
 
-    asset_ =
-        std::make_unique<AssetIntf>(bus, pcieRetimerChaasisBasePath.c_str());
+    asset_ = std::make_unique<AssetIntf>(bus,
+                                         pcieRetimerChaasisBasePath.c_str());
     asset_->sku("");
     location_ =
         std::make_unique<LocationIntf>(bus, pcieRetimerChaasisBasePath.c_str());
@@ -73,8 +73,8 @@ static void CreatePCIeRetimerChassis(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);

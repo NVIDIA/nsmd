@@ -65,7 +65,7 @@ class NumericSensorFactory
 {
   public:
     NumericSensorFactory(std::unique_ptr<NumericSensorBuilder> builder) :
-        builder(std::move(builder)){};
+        builder(std::move(builder)) {};
 
     CreationFunction getCreationFunction();
 

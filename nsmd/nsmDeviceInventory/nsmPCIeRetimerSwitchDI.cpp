@@ -79,8 +79,10 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         // update values
         std::stringstream hexaDeviceId;
         std::stringstream hexaVendorId;
-        hexaDeviceId << "0x" << std::setfill('0') << std::setw(4) << std::hex << data.pci_device_id;
-        hexaVendorId << "0x" << std::setfill('0') << std::setw(4) << std::hex << data.pci_vendor_id;
+        hexaDeviceId << "0x" << std::setfill('0') << std::setw(4) << std::hex
+                     << data.pci_device_id;
+        hexaVendorId << "0x" << std::setfill('0') << std::setw(4) << std::hex
+                     << data.pci_vendor_id;
 
         switchIntf->deviceId(hexaDeviceId.str());
         switchIntf->vendorId(hexaVendorId.str());
@@ -201,16 +203,16 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
         objPath.c_str(), "Priority", interface.c_str());
     auto deviceInstance = utils::DBusHandler().getDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceInstance", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
 
     // device_index are between [1 to 8] for retimers, which is
     // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
-    uint8_t deviceIndex =
-        static_cast<uint8_t>(deviceInstance) + PCIE_RETIMER_DEVICE_INDEX_START;
+    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
+                          PCIE_RETIMER_DEVICE_INDEX_START;
 
     if (!nsmDevice)
     {

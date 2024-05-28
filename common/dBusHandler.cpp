@@ -46,7 +46,6 @@ GetSubTreeResponse
     DBusHandler::getSubtree(const std::string& searchPath, int depth,
                             const dbus::Interfaces& ifaceList) const
 {
-
     auto& bus = utils::DBusHandler::getBus();
     auto method = bus.new_method_call(mapperService, mapperPath,
                                       mapperInterface, "GetSubTree");
@@ -62,8 +61,8 @@ void DBusHandler::setDbusProperty(const DBusMapping& dBusMap,
 {
     auto setDbusValue = [&dBusMap, this](const auto& variant) {
         auto& bus = getBus();
-        auto service =
-            getService(dBusMap.objectPath.c_str(), dBusMap.interface.c_str());
+        auto service = getService(dBusMap.objectPath.c_str(),
+                                  dBusMap.interface.c_str());
         auto method = bus.new_method_call(
             service.c_str(), dBusMap.objectPath.c_str(), dbusProperties, "Set");
         method.append(dBusMap.interface.c_str(), dBusMap.propertyName.c_str(),
@@ -138,8 +137,8 @@ PropertyValue DBusHandler::getDbusPropertyVariant(
 {
     auto& bus = DBusHandler::getBus();
     auto service = getService(objPath, dbusInterface);
-    auto method =
-        bus.new_method_call(service.c_str(), objPath, dbusProperties, "Get");
+    auto method = bus.new_method_call(service.c_str(), objPath, dbusProperties,
+                                      "Get");
     method.append(dbusInterface, dbusProp);
     PropertyValue value{};
     auto reply = bus.call(method);
@@ -154,8 +153,8 @@ PropertyValuesCollection
     PropertyValuesCollection properties;
     auto& bus = DBusHandler::getBus();
     auto service = getService(objPath, dbusInterface);
-    auto method =
-        bus.new_method_call(service.c_str(), objPath, dbusProperties, "GetAll");
+    auto method = bus.new_method_call(service.c_str(), objPath, dbusProperties,
+                                      "GetAll");
     method.append(dbusInterface);
     auto reply = bus.call(method);
     reply.read(properties);

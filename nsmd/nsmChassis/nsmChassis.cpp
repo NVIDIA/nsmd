@@ -44,10 +44,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
 
     if (type == "NSM_Chassis")
     {
-        auto deviceType =
-            (NsmDeviceIdentification)utils::DBusHandler()
-                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
-                                           baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
+                              .getDbusProperty<uint64_t>(objPath.c_str(),
+                                                         "DeviceType",
+                                                         baseInterface.c_str());
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
@@ -157,10 +157,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_OperationalStatus")
     {
-        auto deviceType =
-            (NsmDeviceIdentification)utils::DBusHandler()
-                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
-                                           baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
+                              .getDbusProperty<uint64_t>(objPath.c_str(),
+                                                         "DeviceType",
+                                                         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -181,10 +181,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PowerState")
     {
-        auto deviceType =
-            (NsmDeviceIdentification)utils::DBusHandler()
-                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
-                                           baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
+                              .getDbusProperty<uint64_t>(objPath.c_str(),
+                                                         "DeviceType",
+                                                         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -205,10 +205,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_WriteProtect")
     {
-        auto deviceType =
-            (NsmDeviceIdentification)utils::DBusHandler()
-                .getDbusProperty<uint64_t>(objPath.c_str(), "DeviceType",
-                                           baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
+                              .getDbusProperty<uint64_t>(objPath.c_str(),
+                                                         "DeviceType",
+                                                         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(

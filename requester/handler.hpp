@@ -61,7 +61,6 @@ using ResponseHandler = fu2::unique_function<void(
 template <class RequestInterface>
 class Handler
 {
-
   public:
     Handler() = delete;
     Handler(const Handler&) = delete;
@@ -111,8 +110,8 @@ class Handler
         auto instanceIdExpiryCallBack = [eid, type, command, this](void) {
             if (this->handlers.contains(eid) && !this->handlers[eid].empty())
             {
-                auto& [request, responseHandler, timerInstance, valid] =
-                    handlers[eid].front();
+                auto& [request, responseHandler, timerInstance,
+                       valid] = handlers[eid].front();
                 lg2::error("Response not received for the request, instance ID "
                            "expired. EID={EID}, INSTANCE_ID={INSTANCE_ID} ,"
                            "TYPE={TYPE}, COMMAND={COMMAND}",
@@ -171,8 +170,8 @@ class Handler
             return NSM_SUCCESS;
         }
 
-        auto& [request, responseHandler, timerInstance, valid] =
-            handlers[eid].front();
+        auto& [request, responseHandler, timerInstance,
+               valid] = handlers[eid].front();
 
         if (timerInstance->isRunning())
         {
@@ -233,8 +232,8 @@ class Handler
     {
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
-            auto& [request, responseHandler, timerInstance, valid] =
-                handlers[eid].front();
+            auto& [request, responseHandler, timerInstance,
+                   valid] = handlers[eid].front();
             if (request->getInstanceId() == instanceId)
             {
                 request->stop();
@@ -284,12 +283,12 @@ class Handler
     nsm::InstanceIdDb& instanceIdDb; //!< reference to instanceIdDb object
     mctp_socket::Manager& sockManager;
 
-    bool verbose; //!< verbose tracing flag
+    bool verbose;                 //!< verbose tracing flag
     std::chrono::seconds
         instanceIdExpiryInterval; //!< Instance ID expiration interval
     uint8_t numRetries;           //!< number of request retries
     std::chrono::milliseconds
-        responseTimeOut; //!< time to wait between each retry
+        responseTimeOut;          //!< time to wait between each retry
 
     /** @brief Container for storing the details of the NSM request
      *         message, handler for the corresponding NSM response, the
@@ -317,8 +316,8 @@ class Handler
     {
         if (!handlers[eid].empty())
         {
-            auto& [request, responseHandler, timerInstance, valid] =
-                handlers[eid].front();
+            auto& [request, responseHandler, timerInstance,
+                   valid] = handlers[eid].front();
 
             instanceIdDb.free(eid, request->getInstanceId());
             handlers[eid].pop();
@@ -495,8 +494,7 @@ struct Coroutine
 
                 /** @brief Do nothing here for customized awaitable object.
                  */
-                void await_resume() const noexcept
-                {}
+                void await_resume() const noexcept {}
 
                 /** @brief Returning parent coroutine handle here to continue
                  * parent corotuine.

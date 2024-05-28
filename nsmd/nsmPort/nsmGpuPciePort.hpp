@@ -36,9 +36,10 @@ class NsmGpuPciePort : public NsmObject
 {
   public:
     NsmGpuPciePort(sdbusplus::bus::bus& bus, const std::string& name,
-                const std::string& type, const std::string& health, const std::string& chasisState,
-                const std::vector<utils::Association>& associations,
-                const std::string& inventoryObjPath);
+                   const std::string& type, const std::string& health,
+                   const std::string& chasisState,
+                   const std::vector<utils::Association>& associations,
+                   const std::string& inventoryObjPath);
 
   private:
     std::unique_ptr<AssociationDefIntf> associationDefIntf = nullptr;
@@ -50,13 +51,12 @@ class NsmGpuPciePortInfo : public NsmObject
 {
   public:
     NsmGpuPciePortInfo(const std::string& name, const std::string& type,
-                    const std::string& portType,
-                    const std::string& portProtocol,
-                    std::shared_ptr<PortInfoIntf> portInfoIntf);
+                       const std::string& portType,
+                       const std::string& portProtocol,
+                       std::shared_ptr<PortInfoIntf> portInfoIntf);
 
   private:
     std::shared_ptr<PortInfoIntf> portInfoIntf;
 };
 
 } // namespace nsm
-
