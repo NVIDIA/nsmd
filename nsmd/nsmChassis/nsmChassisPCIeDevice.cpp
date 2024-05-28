@@ -53,6 +53,14 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
         auto uuidObject =
             std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(chassisName, name);
+        auto associations =
+            utils::getAssociations(objPath, baseInterface + ".Associations");
+        auto associationsObject =
+            std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsInft>>(
+                chassisName, name);
+        associationsObject->pdi().associations(
+            utils::getAssociations(associations));
+        device->addStaticSensor(associationsObject);
         uuidObject->pdi().uuid(deviceUuid);
         device->addStaticSensor(uuidObject);
     }

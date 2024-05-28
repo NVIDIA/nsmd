@@ -67,16 +67,20 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
         {"Type", "NSM_ChassispCIeDevice"},
     };
     const PropertyValuesCollection basic = {
-        {"ChassisName", chassisName},
-        {"Name", name},
-        {"Type", "NSM_ChassisPCIeDevice"},
-        {"UUID", gpuUuid},
+        {"ChassisName", chassisName},      {"Name", name},
+        {"Type", "NSM_ChassisPCIeDevice"}, {"UUID", gpuUuid},
         {"DEVICE_UUID", gpuDeviceUuid},
     };
     const PropertyValuesCollection asset = {
         {"Type", "NSM_Asset"},
         {"Name", "HGX_GPU_SXM_1"},
         {"Manufacturer", "NVIDIA"},
+    };
+    const PropertyValuesCollection association = {
+        {"Forward", "chassis"},
+        {"Backward", "pciedevice"},
+        {"AbsolutePath",
+         "/xyz/openbmc_project/inventory/system/chassis/" + chassisName},
     };
     const PropertyValuesCollection health = {
         {"Type", "NSM_Health"},
@@ -93,6 +97,16 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
         {"Type", "NSM_LTSSMState"},
         {"DeviceIndex", uint64_t(1)},
         {"Priority", false},
+    };
+    const MapperServiceMap gpuServiceMap = {
+        {
+            {
+                "xyz.openbmc_project.NSM",
+                {
+                    basicIntfName + ".Associations0",
+                },
+            },
+        },
     };
 };
 
@@ -114,12 +128,16 @@ TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 }
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 {
+    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(gpuServiceMap));
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(basic, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(basic, "DEVICE_UUID")));
+        .WillOnce(Return(get(basic, "DEVICE_UUID")))
+        .WillOnce(Return(get(association, "Forward")))
+        .WillOnce(Return(get(association, "Backward")))
+        .WillOnce(Return(get(association, "AbsolutePath")));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
@@ -134,19 +152,31 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(2, gpu.deviceSensors.size());
+    EXPECT_EQ(3, gpu.deviceSensors.size());
+    EXPECT_NE(
+        nullptr,
+        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
+            gpu.deviceSensors[0]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           gpu.deviceSensors[0]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
                            gpu.deviceSensors[1]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+                           gpu.deviceSensors[2]));
 
-    EXPECT_EQ(gpuDeviceUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           gpu.deviceSensors[0])
-                           ->pdi()
-                           .uuid());
+    EXPECT_EQ(
+        1,
+        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
+            gpu.deviceSensors[0])
+            ->pdi()
+            .associations()
+            .size());
+    EXPECT_EQ(gpuDeviceUuid,
+              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+                  gpu.deviceSensors[1])
+                  ->pdi()
+                  .uuid());
     EXPECT_EQ(HealthIntf::HealthType::OK,
               dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                  gpu.deviceSensors[1])
+                  gpu.deviceSensors[2])
                   ->pdi()
                   .health());
 }
