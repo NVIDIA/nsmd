@@ -38,8 +38,7 @@ const std::string emptyUUID = "00000000-0000-0000-0000-000000000000";
 MctpDiscovery::MctpDiscovery(
     sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
     std::initializer_list<MctpDiscoveryHandlerIntf*> list) :
-    bus(bus),
-    handler(handler),
+    bus(bus), handler(handler),
     mctpEndpointAddedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(

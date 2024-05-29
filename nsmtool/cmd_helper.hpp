@@ -99,7 +99,6 @@ void parseBitfieldVar(ordered_json& res, const std::string& key,
 
 class CommandInterface
 {
-
   public:
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :

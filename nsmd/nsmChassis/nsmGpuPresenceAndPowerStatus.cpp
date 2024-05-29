@@ -37,8 +37,8 @@ std::optional<Request>
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_gpu_presence_and_power_status_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_get_gpu_presence_and_power_status_req(instanceId, requestPtr);
+    auto rc = encode_get_gpu_presence_and_power_status_req(instanceId,
+                                                           requestPtr);
     if (rc)
     {
         lg2::error(

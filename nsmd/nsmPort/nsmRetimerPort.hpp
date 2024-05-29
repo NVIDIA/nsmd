@@ -13,9 +13,9 @@
 #include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/PortWidth/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem1/server.hpp>
-#include <xyz/openbmc_project/Inventory/Decorator/PortWidth/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 
 namespace nsm

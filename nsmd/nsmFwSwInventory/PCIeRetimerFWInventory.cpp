@@ -12,11 +12,10 @@ NsmPCIeRetimerFirmwareVersion::NsmPCIeRetimerFirmwareVersion(
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& manufacturer,
     const uint8_t instanceNumber) :
-    NsmObject(name, type),
-    instanceNumber(instanceNumber)
+    NsmObject(name, type), instanceNumber(instanceNumber)
 {
-    auto pcieRetimerFWInvBasePath =
-        std::string(firmwareInventoryBasePath) + "/" + name;
+    auto pcieRetimerFWInvBasePath = std::string(firmwareInventoryBasePath) +
+                                    "/" + name;
     lg2::info("NsmPCIeRetimerFirmwareVersion: create sensor:{NAME}", "NAME",
               name.c_str());
 
@@ -52,8 +51,8 @@ requester::Coroutine
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
     uint8_t propertyIdentifier = PCIeRetimerEEPROMIdentifier + instanceNumber;
-    auto rc =
-        encode_get_inventory_information_req(0, propertyIdentifier, requestMsg);
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -117,8 +116,8 @@ static void CreatePCIeRetimerFWInventory(SensorManager& manager,
     auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
         objPath.c_str(), "INSTANCE_NUMBER", interface.c_str());
 
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);

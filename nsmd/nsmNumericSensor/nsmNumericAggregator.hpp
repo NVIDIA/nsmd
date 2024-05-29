@@ -34,8 +34,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
   public:
     NsmNumericAggregator(const std::string& name, const std::string& type,
                          bool priority) :
-        NsmSensorAggregator(name, type),
-        priority(priority){};
+        NsmSensorAggregator(name, type), priority(priority) {};
     virtual ~NsmNumericAggregator() = default;
 
     int addSensor(uint8_t tag,

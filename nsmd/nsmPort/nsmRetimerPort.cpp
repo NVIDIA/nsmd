@@ -33,13 +33,13 @@ NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
     associationDefIntf->associations(associations_list);
 }
 
-NsmPCIeECCGroup1::NsmPCIeECCGroup1(
-    const std::string& name, const std::string& type,
-    std::shared_ptr<PortInfoIntf> portInfoIntf,
-    std::shared_ptr<PortWidthIntf> portWidthIntf,
-    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, 1),
-    portInfoIntf(portInfoIntf), portWidthIntf(portWidthIntf)
+NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
+                                   const std::string& type,
+                                   std::shared_ptr<PortInfoIntf> portInfoIntf,
+                                   std::shared_ptr<PortWidthIntf> portWidthIntf,
+                                   uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, 1), portInfoIntf(portInfoIntf),
+    portWidthIntf(portWidthIntf)
 
 {
     lg2::info("NsmPCIeECCGroup1: {NAME}", "NAME", name.c_str());
@@ -240,14 +240,14 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         objPath.c_str(), "PortProtocol", interface.c_str());
     auto portType = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "PortType", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
     // device_index are between [1 to 8] for retimers, which is
     // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
-    uint8_t deviceIndex =
-        static_cast<uint8_t>(deviceInstance) + PCIE_RETIMER_DEVICE_INDEX_START;
+    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
+                          PCIE_RETIMER_DEVICE_INDEX_START;
 
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
@@ -278,10 +278,10 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         nsmDevice->deviceSensors.push_back(pciePortIntfSensor);
 
         auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
-        auto portInfoIntf =
-            std::make_shared<PortInfoIntf>(bus, objPath.c_str());
-        auto portWidthIntf =
-            std::make_shared<PortWidthIntf>(bus, objPath.c_str());
+        auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
+                                                           objPath.c_str());
+        auto portWidthIntf = std::make_shared<PortWidthIntf>(bus,
+                                                             objPath.c_str());
 
         portInfoIntf->protocol(
             PortInfoIntf::convertPortProtocolFromString(portProtocol));

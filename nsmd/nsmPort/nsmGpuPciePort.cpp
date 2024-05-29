@@ -3,18 +3,20 @@
 namespace nsm
 {
 
-NsmGpuPciePort::NsmGpuPciePort(sdbusplus::bus::bus& bus, const std::string& name,
-                         const std::string& type, const std::string& health, const std::string& chasisState,
-                         const std::vector<utils::Association>& associations,
-                         const std::string& inventoryObjPath) :
-    NsmObject(name, type)
+NsmGpuPciePort::NsmGpuPciePort(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& health, const std::string& chasisState,
+    const std::vector<utils::Association>& associations,
+    const std::string& inventoryObjPath) : NsmObject(name, type)
 {
     lg2::info("NsmGpuPciePort: create sensor:{NAME}", "NAME", name.c_str());
     associationDefIntf =
         std::make_unique<AssociationDefIntf>(bus, inventoryObjPath.c_str());
-    
-    chasisStateIntf = std::make_unique<ChasisStateIntf>(bus, inventoryObjPath.c_str());
-    chasisStateIntf->currentPowerState(ChasisStateIntf::convertPowerStateFromString(chasisState));
+
+    chasisStateIntf =
+        std::make_unique<ChasisStateIntf>(bus, inventoryObjPath.c_str());
+    chasisStateIntf->currentPowerState(
+        ChasisStateIntf::convertPowerStateFromString(chasisState));
 
     healthIntf = std::make_unique<HealthIntf>(bus, inventoryObjPath.c_str());
     healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
@@ -30,13 +32,11 @@ NsmGpuPciePort::NsmGpuPciePort(sdbusplus::bus::bus& bus, const std::string& name
     associationDefIntf->associations(associations_list);
 }
 
-NsmGpuPciePortInfo::NsmGpuPciePortInfo(const std::string& name,
-                                 const std::string& type,
-                                 const std::string& portType,
-                                 const std::string& portProtocol,
-                                 std::shared_ptr<PortInfoIntf> portInfoIntf) :
-    NsmObject(name, type),
-    portInfoIntf(portInfoIntf)
+NsmGpuPciePortInfo::NsmGpuPciePortInfo(
+    const std::string& name, const std::string& type,
+    const std::string& portType, const std::string& portProtocol,
+    std::shared_ptr<PortInfoIntf> portInfoIntf) :
+    NsmObject(name, type), portInfoIntf(portInfoIntf)
 {
     lg2::info("NsmGpuPciePortInfo: create sensor:{NAME}", "NAME", name.c_str());
     portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
@@ -45,8 +45,8 @@ NsmGpuPciePortInfo::NsmGpuPciePortInfo(const std::string& name,
 }
 
 static void createNsmGpuPcieSensor(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+                                   const std::string& interface,
+                                   const std::string& objPath)
 {
     try
     {
@@ -80,10 +80,12 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
                 utils::getAssociations(objPath, interface + ".Associations");
             auto health = utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "Health", interface.c_str());
-            auto chasisState = utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "ChasisPowerState", interface.c_str());
+            auto chasisState =
+                utils::DBusHandler().getDbusProperty<std::string>(
+                    objPath.c_str(), "ChasisPowerState", interface.c_str());
             auto sensor = std::make_shared<NsmGpuPciePort>(
-                bus, name, type, health, chasisState, associations, inventoryObjPath);
+                bus, name, type, health, chasisState, associations,
+                inventoryObjPath);
             nsmDevice->deviceSensors.emplace_back(sensor);
         }
         else if (type == "NSM_PortInfo")
@@ -100,8 +102,8 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
                 objPath.c_str(), "DeviceIndex", GPU_PCIe_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
-            auto portWidthIntf = std::make_shared<PortWidthIntf>(
-                bus, inventoryObjPath.c_str());
+            auto portWidthIntf =
+                std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
             auto portInfoSensor = std::make_shared<NsmGpuPciePortInfo>(
                 name, type, portType, portProtocol, portInfoIntf);
             nsmDevice->deviceSensors.emplace_back(portInfoSensor);
@@ -130,8 +132,8 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
     }
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmGpuPcieSensor,
-                               "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmGpuPcieSensor, "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0")
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmGpuPcieSensor,
     "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0.PortInfo")

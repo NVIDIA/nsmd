@@ -36,7 +36,8 @@ class NsmFpgaPort : public NsmObject
 {
   public:
     NsmFpgaPort(sdbusplus::bus::bus& bus, const std::string& name,
-                const std::string& type, const std::string& health, const std::string& chasisState,
+                const std::string& type, const std::string& health,
+                const std::string& chasisState,
                 const std::vector<utils::Association>& associations,
                 const std::string& inventoryObjPath);
 

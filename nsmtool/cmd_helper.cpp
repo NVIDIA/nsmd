@@ -42,7 +42,6 @@ namespace helper
 int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                      std::vector<uint8_t>& responseMsg, bool verbose)
 {
-
     const char devPath[] = "\0mctp-pcie-mux";
     int returnCode = 0;
 
@@ -113,8 +112,8 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
         auto reqhdr = reinterpret_cast<const nsm_msg_hdr*>(&requestMsg[2]);
         do
         {
-            auto peekedLength =
-                recv(socketFd(), nullptr, 0, MSG_PEEK | MSG_TRUNC);
+            auto peekedLength = recv(socketFd(), nullptr, 0,
+                                     MSG_PEEK | MSG_TRUNC);
             responseMsg.resize(peekedLength);
             auto recvDataLength =
                 recv(socketFd(), reinterpret_cast<void*>(responseMsg.data()),
@@ -308,7 +307,8 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         auto [type, protocol, sockAddress] = getMctpSockInfo(mctp_eid);
         if (sockAddress.empty())
         {
-            std::cerr << "nsmtool: Remote MCTP endpoint not found" << "\n";
+            std::cerr << "nsmtool: Remote MCTP endpoint not found"
+                      << "\n";
             return -1;
         }
 

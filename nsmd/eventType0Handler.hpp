@@ -39,8 +39,8 @@ class EventType0Handler : public EventHandler
         handlers.emplace(
             NSM_REDISCOVERY_EVENT,
             [this](eid_t eid, const nsm_msg* event, size_t eventLen) {
-                return this->rediscovery(eid, event, eventLen);
-            });
+            return this->rediscovery(eid, event, eventLen);
+        });
     };
 
     virtual uint8_t nsmType() override
@@ -61,8 +61,8 @@ class EventType0Handler : public EventHandler
         SensorManager& sensorManager = SensorManager::getInstance();
         // update sensors for capabilities refresh
         // Get UUID from EID
-        auto uuidOptional =
-            utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+        auto uuidOptional = utils::getUUIDFromEID(deviceManager.getEidTable(),
+                                                  eid);
         if (uuidOptional)
         {
             uuid_t uuid = *uuidOptional;
@@ -91,9 +91,9 @@ class EventType0Handler : public EventHandler
 
         std::string messageId = "Rediscovery";
 
-        auto createLog = [&messageId](
-                             std::map<std::string, std::string>& addData,
-                             Level& level) {
+        auto createLog =
+            [&messageId](std::map<std::string, std::string>& addData,
+                         Level& level) {
             static constexpr auto logObjPath = "/xyz/openbmc_project/logging";
             static constexpr auto logInterface =
                 "xyz.openbmc_project.Logging.Create";
@@ -101,8 +101,8 @@ class EventType0Handler : public EventHandler
 
             try
             {
-                auto service =
-                    utils::DBusHandler().getService(logObjPath, logInterface);
+                auto service = utils::DBusHandler().getService(logObjPath,
+                                                               logInterface);
                 auto severity = sdbusplus::xyz::openbmc_project::Logging::
                     server::convertForMessage(level);
                 auto method = bus.new_method_call(service.c_str(), logObjPath,

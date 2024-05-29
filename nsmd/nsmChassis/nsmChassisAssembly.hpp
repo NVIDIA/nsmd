@@ -45,8 +45,7 @@ class NsmChassisAssembly : public NsmInterfaceProvider<IntfType>
     NsmChassisAssembly(const std::string& chassisName,
                        const std::string& name) :
         NsmInterfaceProvider<IntfType>(name, "NSM_ChassisAssembly",
-                                       chassisInventoryBasePath /
-                                           chassisName)
+                                       chassisInventoryBasePath / chassisName)
     {}
 };
 

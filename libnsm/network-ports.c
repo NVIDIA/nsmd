@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "network-ports.h"
 
@@ -74,7 +72,8 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	uint32_t le32toh_supported_counter_mask;
 	memcpy(&le32toh_supported_counter_mask, &(portData->supported_counter),
 	       sizeof(struct nsm_supported_port_counter));
-	le32toh_supported_counter_mask = le32toh(le32toh_supported_counter_mask);
+	le32toh_supported_counter_mask =
+	    le32toh(le32toh_supported_counter_mask);
 	memcpy(&(portData->supported_counter), &le32toh_supported_counter_mask,
 	       sizeof(struct nsm_supported_port_counter));
 
@@ -294,8 +293,8 @@ int decode_query_port_status_req(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(nsm_query_port_status_req)) {
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_query_port_status_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 

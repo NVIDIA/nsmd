@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-
 
 #include "nsmEnergyAggregator.hpp"
 
@@ -40,8 +38,8 @@ std::optional<std::vector<uint8_t>>
                    sizeof(nsm_get_current_energy_count_req));
     auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
 
-    auto rc =
-        encode_get_current_energy_count_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_get_current_energy_count_req(instanceId, sensorId,
+                                                  requestPtr);
 
     if (rc)
     {

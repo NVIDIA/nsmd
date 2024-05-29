@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -149,8 +149,7 @@ struct nsm_common_port_req {
  *
  *  Structure representing NSM get port telemetry counter request.
  */
-typedef struct nsm_common_port_req
-    nsm_get_port_telemetry_counter_req;
+typedef struct nsm_common_port_req nsm_get_port_telemetry_counter_req;
 
 /** @struct nsm_get_port_telemetry_counter_resp
  *
@@ -165,8 +164,7 @@ struct nsm_get_port_telemetry_counter_resp {
  *
  *  Structure representing NSM query port status request.
  */
-typedef struct nsm_common_port_req
-    nsm_query_port_status_req;
+typedef struct nsm_common_port_req nsm_query_port_status_req;
 
 /** @struct nsm_query_port_status_resp
  *
@@ -182,8 +180,7 @@ struct nsm_query_port_status_resp {
  *
  *  Structure representing NSM query port characteristics request.
  */
-typedef struct nsm_common_port_req
-    nsm_query_port_characteristics_req;
+typedef struct nsm_common_port_req nsm_query_port_characteristics_req;
 
 /** @struct nsm_query_port_characteristics_resp
  *
@@ -365,8 +362,7 @@ int decode_query_port_characteristics_resp(
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_query_ports_available_req(uint8_t instance_id,
-					  struct nsm_msg *msg);
+int encode_query_ports_available_req(uint8_t instance_id, struct nsm_msg *msg);
 
 /** @brief Decode a query ports available request message
  *
@@ -374,8 +370,7 @@ int encode_query_ports_available_req(uint8_t instance_id,
  *  @param[in] msg_len - Length of request message
  *  @return nsm_completion_codes
  */
-int decode_query_ports_available_req(const struct nsm_msg *msg,
-					  size_t msg_len);
+int decode_query_ports_available_req(const struct nsm_msg *msg, size_t msg_len);
 
 /** @brief Encode a query ports available response message
  *
@@ -387,9 +382,9 @@ int decode_query_ports_available_req(const struct nsm_msg *msg,
  *  @return nsm_completion_codes
  */
 int encode_query_ports_available_resp(uint8_t instance_id, uint8_t cc,
-					   uint16_t reason_code,
-					   uint8_t number_of_ports,
-					   struct nsm_msg *msg);
+				      uint16_t reason_code,
+				      uint8_t number_of_ports,
+				      struct nsm_msg *msg);
 
 /** @brief Decode a query ports available response message
  *
@@ -401,11 +396,10 @@ int encode_query_ports_available_resp(uint8_t instance_id, uint8_t cc,
  *  @param[out] number_of_ports - number of ports
  *  @return nsm_completion_codes
  */
-int decode_query_ports_available_resp(const struct nsm_msg *msg,
-					   size_t msg_len, uint8_t *cc,
-					   uint16_t *reason_code,
-					   uint16_t *data_size,
-					   uint8_t *number_of_ports);
+int decode_query_ports_available_resp(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *cc, uint16_t *reason_code,
+				      uint16_t *data_size,
+				      uint8_t *number_of_ports);
 #ifdef __cplusplus
 }
 #endif

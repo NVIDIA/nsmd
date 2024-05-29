@@ -32,8 +32,8 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
             std::make_shared<NsmSwitchDI<AssociationDefinitionsInft>>(
                 name, inventoryObjPath);
 
-        auto associations =
-            utils::getAssociations(objPath, interface + ".Associations");
+        auto associations = utils::getAssociations(objPath,
+                                                   interface + ".Associations");
 
         std::vector<std::tuple<std::string, std::string, std::string>>
             associations_list;

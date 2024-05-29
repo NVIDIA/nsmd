@@ -112,7 +112,6 @@ class Manager
             }
             else
             {
-
                 socketInfo[fd] = sendBufferSize;
             }
         }

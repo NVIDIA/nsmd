@@ -88,8 +88,8 @@ void makeNsmAltitudePressure(SensorManager& manager,
     auto priority = utils::DBusHandler().getDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
 
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -102,8 +102,8 @@ void makeNsmAltitudePressure(SensorManager& manager,
         return;
     }
 
-    auto sensor =
-        std::make_shared<NsmAltitudePressure>(bus, name, type, associations);
+    auto sensor = std::make_shared<NsmAltitudePressure>(bus, name, type,
+                                                        associations);
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", name, "TYPE", type);
 

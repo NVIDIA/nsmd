@@ -100,9 +100,9 @@ uint8_t NsmSWInventoryDriverVersionAndStatus::handleResponseMsg(
     enum8 driverState = 0;
     char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
 
-    auto rc =
-        decode_get_driver_info_resp(responseMsg, responseLen, &cc, &reasonCode,
-                                    &driverState, driverVersion);
+    auto rc = decode_get_driver_info_resp(responseMsg, responseLen, &cc,
+                                          &reasonCode, &driverState,
+                                          driverVersion);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -133,8 +133,8 @@ static void createNsmNVLinkManagerDriverSensor(SensorManager& manager,
         objPath.c_str(), "UUID", interface.c_str());
     auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Manufacturer", interface.c_str());
-    auto associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
     auto nsmDevice = manager.getNsmDevice(uuid);

@@ -60,8 +60,8 @@ void NumericSensorFactory::make(SensorManager& manager,
     info.aggregated = utils::DBusHandler().getDbusProperty<bool>(
         objPath.c_str(), "Aggregated", interface.c_str());
 
-    info.associations =
-        utils::getAssociations(objPath, interface + ".Associations");
+    info.associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
 
     for (const auto& association : info.associations)
     {

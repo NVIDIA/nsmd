@@ -39,7 +39,8 @@ class MockDBusHandler : public IDBusHandler
     MOCK_METHOD(std::string, getService,
                 (const char* path, const char* interface), (const, override));
     MOCK_METHOD(MapperServiceMap, getServiceMap,
-                (const char* path, const dbus::Interfaces& ifaceList), (const, override));
+                (const char* path, const dbus::Interfaces& ifaceList),
+                (const, override));
     MOCK_METHOD(GetSubTreeResponse, getSubtree,
                 (const std::string& path, int depth,
                  const dbus::Interfaces& ifaceList),

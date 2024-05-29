@@ -53,8 +53,8 @@ std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_temperature_reading_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc =
-        encode_get_temperature_reading_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_get_temperature_reading_req(instanceId, sensorId,
+                                                 requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_temperature_reading_req failed. "

@@ -17,8 +17,9 @@
 
 #pragma once
 
-#include "nsmInterface.hpp"
 #include "base.h"
+
+#include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
 

@@ -200,8 +200,8 @@ TEST(nsmEnergySensorAggregator, GoodHandleSampleData)
     std::array<uint8_t, sizeof(reading)> sample;
     size_t data_size;
 
-    auto rc =
-        encode_aggregate_energy_count_data(reading, sample.data(), &data_size);
+    auto rc = encode_aggregate_energy_count_data(reading, sample.data(),
+                                                 &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     EXPECT_CALL(*sensor, updateReading(reading, 0)).Times(1);
@@ -219,8 +219,8 @@ TEST(nsmEnergySensorAggregator, BadHandleSampleData)
     std::array<uint8_t, sizeof(reading)> sample;
     size_t data_size;
 
-    auto rc =
-        encode_aggregate_energy_count_data(reading, sample.data(), &data_size);
+    auto rc = encode_aggregate_energy_count_data(reading, sample.data(),
+                                                 &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     rc = aggregator.handleSamples(

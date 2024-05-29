@@ -65,8 +65,8 @@ TEST(nsmMigMode, GoodHandleResp)
     flags.byte = 1;
     uint16_t reason_code = ERR_NULL;
 
-    uint8_t rc =
-        encode_get_MIG_mode_resp(0, NSM_SUCCESS, reason_code, &flags, response);
+    uint8_t rc = encode_get_MIG_mode_resp(0, NSM_SUCCESS, reason_code, &flags,
+                                          response);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = migSensor.handleResponseMsg(response, msg_len);
@@ -83,8 +83,8 @@ TEST(nsmMigMode, BadHandleResp)
     flags.byte = 1;
     uint16_t reason_code = ERR_NULL;
 
-    uint8_t rc =
-        encode_get_MIG_mode_resp(0, NSM_SUCCESS, reason_code, &flags, response);
+    uint8_t rc = encode_get_MIG_mode_resp(0, NSM_SUCCESS, reason_code, &flags,
+                                          response);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = migSensor.handleResponseMsg(NULL, msg_len);
@@ -200,8 +200,8 @@ TEST(nsmEccErrorCounts, BadHandleResp)
 
 TEST(NsmPCIeGroup2, GoodGenReq)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -226,8 +226,8 @@ TEST(NsmPCIeGroup2, GoodGenReq)
 
 TEST(NsmPCIeGroup2, GoodHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -257,8 +257,8 @@ TEST(NsmPCIeGroup2, GoodHandleResp)
 
 TEST(NsmPCIeGroup2, BadHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -290,8 +290,8 @@ TEST(NsmPCIeGroup2, BadHandleResp)
 
 TEST(NsmPCIeGroup3, GoodGenReq)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -317,8 +317,8 @@ TEST(NsmPCIeGroup3, GoodGenReq)
 
 TEST(NsmPCIeGroup3, GoodHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -344,8 +344,8 @@ TEST(NsmPCIeGroup3, GoodHandleResp)
 
 TEST(NsmPCIeGroup3, BadHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -373,8 +373,8 @@ TEST(NsmPCIeGroup3, BadHandleResp)
 
 TEST(NsmPCIeGroup4, GoodGenReq)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -399,8 +399,8 @@ TEST(NsmPCIeGroup4, GoodGenReq)
 
 TEST(NsmPCIeGroup4, GoodHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -433,8 +433,8 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
 
 TEST(NsmPCIeGroup4, BadHandleResp)
 {
-    auto pCieECCIntf =
-        std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+                                                     inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
@@ -917,7 +917,6 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
 
 TEST(nsmMemCapacityUtil, GoodGenReq)
 {
-
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
                                       inventoryObjPath);
 

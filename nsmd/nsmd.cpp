@@ -61,8 +61,8 @@ int main(int argc, char** argv)
                                            {"eid", required_argument, 0, 'e'},
                                            {0, 0, 0, 0}};
 
-    while ((argflag =
-                getopt_long(argc, argv, "hvre:", long_options, nullptr)) >= 0)
+    while ((argflag = getopt_long(argc, argv, "hvre:", long_options,
+                                  nullptr)) >= 0)
     {
         switch (argflag)
         {
@@ -130,8 +130,8 @@ int main(int argc, char** argv)
 
         // Initialize the SensorManager before getting its instance
         nsm::SensorManagerImpl::initialize(bus, event, reqHandler, instanceIdDb,
-                                       objServer, eidTable, nsmDevices,
-                                       localEid, sockManager, verbose);
+                                           objServer, eidTable, nsmDevices,
+                                           localEid, sockManager, verbose);
 
         auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
         eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,

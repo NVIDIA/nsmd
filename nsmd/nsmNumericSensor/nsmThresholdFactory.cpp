@@ -67,9 +67,9 @@ NsmThresholdFactory::NsmThresholdFactory(
     SensorManager& manager, const std::string& interface,
     const std::string& objPath, std::shared_ptr<NsmNumericSensor> numericSensor,
     const NumericSensorInfo& info, const uuid_t& uuid) :
-    manager(manager),
-    interface(interface), objPath(objPath), numericSensor(numericSensor),
-    info(info), uuid(uuid), nsmDevice(manager.getNsmDevice(uuid))
+    manager(manager), interface(interface), objPath(objPath),
+    numericSensor(numericSensor), info(info), uuid(uuid),
+    nsmDevice(manager.getNsmDevice(uuid))
 {}
 
 void NsmThresholdFactory::make()

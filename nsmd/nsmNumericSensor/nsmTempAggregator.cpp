@@ -37,8 +37,8 @@ std::optional<std::vector<uint8_t>>
                    sizeof(nsm_get_temperature_reading_req));
     auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
 
-    auto rc =
-        encode_get_temperature_reading_req(instanceId, sensorId, requestPtr);
+    auto rc = encode_get_temperature_reading_req(instanceId, sensorId,
+                                                 requestPtr);
 
     if (rc)
     {

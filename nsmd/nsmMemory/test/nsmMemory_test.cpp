@@ -147,8 +147,8 @@ TEST(nsmRowRemappingCounts, BadHandleResp)
 
 TEST(nsmEccErrorCountsDram, GoodGenReq)
 {
-    auto eccIntf =
-        std::make_shared<EccModeIntfDram>(bus, inventoryObjPath.c_str());
+    auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
+                                                     inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram eccErrorCntSensor(sensorName, sensorType,
                                                  eccIntf);
 
@@ -166,8 +166,8 @@ TEST(nsmEccErrorCountsDram, GoodGenReq)
 
 TEST(nsmEccErrorCountsDram_GoodGenReq_Test, GoodHandleResp)
 {
-    auto eccIntf =
-        std::make_shared<EccModeIntfDram>(bus, inventoryObjPath.c_str());
+    auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
+                                                     inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;
@@ -193,8 +193,8 @@ TEST(nsmEccErrorCountsDram_GoodGenReq_Test, GoodHandleResp)
 
 TEST(nsmEccErrorCountsDram, GoodUpdateReading)
 {
-    auto eccIntf =
-        std::make_shared<EccModeIntfDram>(bus, inventoryObjPath.c_str());
+    auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
+                                                     inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -210,8 +210,8 @@ TEST(nsmEccErrorCountsDram, GoodUpdateReading)
 
 TEST(nsmEccErrorCountsDram, BadHandleResp)
 {
-    auto eccIntf =
-        std::make_shared<EccModeIntfDram>(bus, inventoryObjPath.c_str());
+    auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
+                                                     inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
 
     struct nsm_ECC_error_counts errorCounts;

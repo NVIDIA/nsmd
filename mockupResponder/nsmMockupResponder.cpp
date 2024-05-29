@@ -136,8 +136,8 @@ int main(int argc, char** argv)
         sdbusplus::server::manager::manager objManager(bus, "/");
 
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
-        std::string serviceName =
-            "xyz.openbmc_project.NSM.eid_" + std::to_string(eid);
+        std::string serviceName = "xyz.openbmc_project.NSM.eid_" +
+                                  std::to_string(eid);
         bus.request_name(serviceName.c_str());
 
         MockupResponder::MockupResponder mockupResponder(

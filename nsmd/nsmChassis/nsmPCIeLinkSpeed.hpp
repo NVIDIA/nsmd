@@ -70,7 +70,6 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-
     auto pcieType = [](uint32_t value) -> PCIeDeviceIntf::PCIeTypes {
         return value == 0 ? PCIeDeviceIntf::PCIeTypes::Unknown
                           : PCIeDeviceIntf::PCIeTypes(value - 1);
@@ -85,7 +84,6 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeSlotIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-
     auto generation = [](uint32_t value) -> PCIeSlotIntf::Generations {
         return value == 0 ? PCIeSlotIntf::Generations::Unknown
                           : PCIeSlotIntf::Generations(value - 1);
