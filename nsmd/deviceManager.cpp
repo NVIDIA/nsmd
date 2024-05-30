@@ -85,8 +85,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             // get device identification from device
             uint8_t deviceType = 0;
             uint8_t instanceNumber = 0;
-            rc = co_await getQueryDeviceIdentification(eid, deviceType,
-                                                       instanceNumber);
+            rc = co_await getQueryDeviceIdentification(
+                eid, mctpUuid, deviceType, instanceNumber);
             if (rc != NSM_SUCCESS)
             {
                 lg2::error(
@@ -454,8 +454,132 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine DeviceManager::getQueryDeviceIdentification(
-    eid_t eid, uint8_t& deviceIdentification, uint8_t& deviceInstance)
+template <typename TypeOfKey, typename TypeOfVector>
+uint8_t DeviceManager::fetchInstanceIdFromEM(const std::string& path,
+                                            const std::string& intf,
+                                            const TypeOfKey& keyToUse)
+{
+    try
+    {
+        auto fetchedMapping =
+            utils::DBusHandler().getDbusProperty<TypeOfVector>(
+                path.c_str(), "MappingArray", intf.c_str());
+
+        auto it = std::find(fetchedMapping.begin(), fetchedMapping.end(),
+                            keyToUse);
+        if (it != fetchedMapping.end())
+        {
+            auto newInstanceId = std::distance(fetchedMapping.begin(), it);
+            if (newInstanceId < 0 || newInstanceId >= 255)
+            {
+                lg2::info(
+                    "Invalid instanceID: {NEWINS} with Key ({KEY}) found on interface {INTF} on path {PATH}.",
+                    "NEWINS", newInstanceId, "KEY", keyToUse, "INTF", intf,
+                    "PATH", path);
+                return UNKNOWN_INSTANCE_ID;
+            }
+            else
+            {
+                return newInstanceId;
+            }
+        }
+        else
+        {
+            // no instaceId found in the mapping for current key
+            lg2::info(
+                "Key ({KEY}) not found on interface {INTF} on path {PATH}.",
+                "KEY", keyToUse, "INTF", intf, "PATH", path);
+            return UNKNOWN_INSTANCE_ID;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::debug(
+            "Error while fetching mapping, using key {KEY} for interface {INTF} on path {PATH}.",
+            "KEY", keyToUse, "INTF", intf, "PATH", path);
+        return UNKNOWN_INSTANCE_ID;
+    }
+}
+
+void DeviceManager::updateInstanceIdViaRemapping(const uint8_t& deviceType,
+                                                 uint8_t& deviceInstanceID,
+                                                 const eid_t& deviceEID,
+                                                 const uuid_t& deviceUUID)
+{
+    std::string instanceIDMappingIntf =
+        "xyz.openbmc_project.Configuration.NSM_GetInstanceIDByDeviceInstanceID";
+    std::string eidMappingIntf =
+        "xyz.openbmc_project.Configuration.NSM_GetInstanceIDByDeviceEID";
+    std::string uuidMappingIntf =
+        "xyz.openbmc_project.Configuration.NSM_GetInstanceIDByMctpUUID";
+
+    std::string mappingObjectPath =
+        "/xyz/openbmc_project/inventory/system/nsm_configs/Mapping/";
+    switch (deviceType)
+    {
+        case NSM_DEV_ID_GPU:
+            mappingObjectPath = mappingObjectPath + "GPUMapping";
+            break;
+        case NSM_DEV_ID_SWITCH:
+            mappingObjectPath = mappingObjectPath + "SwitchMapping";
+            break;
+        case NSM_DEV_ID_PCIE_BRIDGE:
+            mappingObjectPath = mappingObjectPath + "PCIeBridgeMapping";
+            break;
+        case NSM_DEV_ID_BASEBOARD:
+            mappingObjectPath = mappingObjectPath + "BaseboardMapping";
+            break;
+        default:
+            lg2::debug(
+                "Unknown device type no mapping fetched for instance id.");
+            return;
+    }
+
+    // try to get remapping based on instance ID
+    auto remappedInstanceId =
+        fetchInstanceIdFromEM<uint8_t, std::vector<uint64_t>>(
+            mappingObjectPath, instanceIDMappingIntf, deviceInstanceID);
+    if (remappedInstanceId != UNKNOWN_INSTANCE_ID)
+    {
+        lg2::info(
+            "InstanceID updated with mapping from EM using key ({KEY}) from {OLDI} to {NEWI}",
+            "KEY", deviceInstanceID, "OLDI", deviceInstanceID, "NEWI",
+            remappedInstanceId);
+        deviceInstanceID = remappedInstanceId;
+        return;
+    }
+
+    // try to get remapping based on EID
+    remappedInstanceId = fetchInstanceIdFromEM<eid_t, std::vector<uint64_t>>(
+        mappingObjectPath, eidMappingIntf, deviceEID);
+    if (remappedInstanceId != UNKNOWN_INSTANCE_ID)
+    {
+        lg2::info(
+            "InstanceID updated with mapping from EM using key ({KEY}) from {OLDI} to {NEWI}",
+            "KEY", deviceEID, "OLDI", deviceInstanceID, "NEWI",
+            remappedInstanceId);
+        deviceInstanceID = remappedInstanceId;
+        return;
+    }
+
+    // try to get remapping based on UUID
+    remappedInstanceId = fetchInstanceIdFromEM<uuid_t, std::vector<uuid_t>>(
+        mappingObjectPath, uuidMappingIntf, deviceUUID);
+    if (remappedInstanceId != UNKNOWN_INSTANCE_ID)
+    {
+        lg2::info(
+            "InstanceID updated with mapping from EM using key ({KEY}) from {OLDI} to {NEWI}",
+            "KEY", deviceUUID, "OLDI", deviceInstanceID, "NEWI",
+            remappedInstanceId);
+        deviceInstanceID = remappedInstanceId;
+        return;
+    }
+}
+
+requester::Coroutine
+    DeviceManager::getQueryDeviceIdentification(eid_t eid, uuid_t uuid,
+                                                uint8_t& deviceIdentification,
+                                                uint8_t& deviceInstance)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_device_identification_req));
@@ -490,6 +614,9 @@ requester::Coroutine DeviceManager::getQueryDeviceIdentification(
             "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+
+    // update the instanceId if mapping available for the device
+    updateInstanceIdViaRemapping(deviceIdentification, deviceInstance, eid, uuid);
 
     co_return NSM_SW_SUCCESS;
 }

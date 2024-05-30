@@ -149,8 +149,19 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
                                 InventoryProperties& properties);
 
     requester::Coroutine
-        getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
+        getQueryDeviceIdentification(eid_t eid, uuid_t uuid,
+                                     uint8_t& deviceIdentification,
                                      uint8_t& instanceId);
+
+    template <typename TypeOfKey, typename TypeOfVector>
+    uint8_t fetchInstanceIdFromEM(const std::string& path,
+                                 const std::string& intf,
+                                 const TypeOfKey& keyToUse);
+
+    void updateInstanceIdViaRemapping(const uint8_t& deviceType,
+                                      uint8_t& deviceInstanceID,
+                                      const eid_t& deviceEID,
+                                      const uuid_t& deviceUUID);
 
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
