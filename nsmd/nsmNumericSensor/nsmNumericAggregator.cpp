@@ -43,11 +43,11 @@ int NsmNumericAggregator::updateSensorReading(uint8_t tag, double reading,
 {
     if (!sensors[tag])
     {
-        lg2::warning(
-            "updateSensorReading: No NSM Sensor found for Tag {TAG} in "
-            "NSM Aggregator {NAME} of type {TYPE}.",
-            "TAG", tag, "NAME", getName(), "TYPE", getType());
-        return NSM_SW_ERROR_DATA;
+	    /*lg2::warning(
+		"updateSensorReading: No NSM Sensor found for Tag {TAG} in "
+		"NSM Aggregator {NAME} of type {TYPE}.",
+		"TAG", tag, "NAME", getName(), "TYPE", getType());*/
+	    return NSM_SW_ERROR_DATA;
     }
 
     sensors[tag]->updateReading(reading, timestamp);
@@ -59,11 +59,11 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag)
 {
     if (!sensors[tag])
     {
-        lg2::warning(
-            "updateSensorReading: No NSM Sensor found for Tag {TAG} in "
-            "NSM Aggregator {NAME} of type {TYPE}.",
-            "TAG", tag, "NAME", getName(), "TYPE", getType());
-        return NSM_SW_ERROR_DATA;
+	    /* lg2::warning(
+		 "updateSensorReading: No NSM Sensor found for Tag {TAG} in "
+		 "NSM Aggregator {NAME} of type {TYPE}.",
+		 "TAG", tag, "NAME", getName(), "TYPE", getType());*/
+	    return NSM_SW_ERROR_DATA;
     }
 
     sensors[tag]->updateReading(std::numeric_limits<double>::quiet_NaN());
