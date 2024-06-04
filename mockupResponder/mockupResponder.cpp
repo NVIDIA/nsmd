@@ -42,7 +42,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -526,13 +527,13 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             populateFrom(property, 2600);
             break;
         case MINIMUM_DEVICE_POWER_LIMIT:
-            populateFrom(property, 100);
+            populateFrom(property, 10000);
             break;
         case MAXIMUM_DEVICE_POWER_LIMIT:
-            populateFrom(property, 1800);
+            populateFrom(property, 100000);
             break;
         case RATED_DEVICE_POWER_LIMIT:
-            populateFrom(property, 800);
+            populateFrom(property, 80000);
             break;
         case PCIERETIMER_0_EEPROM_VERSION:
         {
@@ -2084,9 +2085,10 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     assert(rc == NSM_SW_SUCCESS);
-    uint32_t requested_persistent_limit = 100;
-    uint32_t requested_oneshot_limit = 150;
-    uint32_t enforced_limit = 125;
+    // limits are in miliwatts
+    uint32_t requested_persistent_limit = 10000;
+    uint32_t requested_oneshot_limit = 15000;
+    uint32_t enforced_limit = 12500;
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_limit_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());

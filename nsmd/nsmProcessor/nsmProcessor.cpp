@@ -56,7 +56,8 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
 NsmProcessorAssociation::NsmProcessorAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) : NsmObject(name, type)
+    const std::vector<utils::Association>& associations) :
+    NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -72,7 +73,8 @@ NsmProcessorAssociation::NsmProcessorAssociation(
 }
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
-                         uuid_t uuid) : NsmObject(name, type)
+                         uuid_t uuid) :
+    NsmObject(name, type)
 {
     uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
     uuidIntf->uuid(uuid);
@@ -290,7 +292,8 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
 }
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
-    NsmSensor(name, type), deviceId(deviceId), groupId(groupId)
+    NsmSensor(name, type),
+    deviceId(deviceId), groupId(groupId)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -317,8 +320,8 @@ NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_2), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_2),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -366,8 +369,8 @@ NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_3), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_3),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -411,8 +414,8 @@ NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_4), pCiePortIntf(pCiePortIntf),
-    pCieEccIntf(pCieECCIntf)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_4),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf)
 
 {
     lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
@@ -461,7 +464,8 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmPciGroup5::NsmPciGroup5(
     const std::string& name, const std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-    uint8_t deviceId) : NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
+    uint8_t deviceId) :
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_5)
 
 {
     lg2::info("NsmPciGroup5: create sensor:{NAME}", "NAME", name.c_str());
@@ -923,75 +927,76 @@ uint8_t
 
 NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type), powerCapIntf(powerCapIntf)
+    NsmSensor(name, type),
+    powerCapIntf(powerCapIntf)
 {}
 
-void NsmPowerCap::updateValue(uint32_t value)
+void NsmPowerCap::updateReading(uint32_t value)
 {
-    // calling parent powercap to initialize the value on dbus
+    // calling parent powercap to update the value on dbus
     powerCapIntf->PowerCapIntf::powerCap(value);
-    lg2::error("NsmPowerCap::updateValue {VALUE}", "VALUE", value);
+    powerCapIntf->PowerCapIntf::powerCapEnable(true);
 }
 
-requester::Coroutine NsmPowerCap::update(SensorManager& manager, eid_t eid)
+std::optional<std::vector<uint8_t>>
+    NsmPowerCap::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(struct nsm_get_power_limit_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_device_power_limit_req(0, requestMsg);
+    auto rc = encode_get_device_power_limit_req(instanceId, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "encode_get_device_power_limit_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
+        return std::nullopt;
     }
+    return request;
+}
 
-    const nsm_msg* responseMsg = NULL;
-    size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
-    if (rc)
-    {
-        lg2::error("NsmPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-                   "RC", rc, "EID", eid);
-        co_return rc;
-    }
-
+uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                       size_t responseLen)
+{
     uint8_t cc = NSM_ERROR;
     uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
-    uint32_t requested_persistent_limit = 0;
-    uint32_t requested_oneshot_limit = 0;
-    uint32_t enforced_limit = 0;
+    uint32_t requested_persistent_limit_in_miliwatts = 0;
+    uint32_t requested_oneshot_limit_in_miliwatts = 0;
+    uint32_t enforced_limit_in_miliwatts = 0;
 
-    rc = decode_get_power_limit_resp(responseMsg, responseLen, &cc, &dataSize,
-                                     &reason_code, &requested_persistent_limit,
-                                     &requested_oneshot_limit, &enforced_limit);
+    auto rc = decode_get_power_limit_resp(
+        responseMsg, responseLen, &cc, &dataSize, &reason_code,
+        &requested_persistent_limit_in_miliwatts,
+        &requested_oneshot_limit_in_miliwatts, &enforced_limit_in_miliwatts);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateValue(enforced_limit);
+        updateReading(enforced_limit_in_miliwatts / 1000);
     }
     else
     {
         lg2::error(
             "decode_get_power_limit_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    co_return cc;
+    return cc;
 }
 
-NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
-                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type), powerCapIntf(powerCapIntf)
+NsmMaxPowerCap::NsmMaxPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->maxPowerCapValue(value);
-    lg2::error("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
+    powerLimitIntf->maxPowerWatts(value);
+    lg2::info("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
@@ -1036,7 +1041,8 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
-        updateValue(value);
+        // miliwatts to Watts
+        updateValue(value / 1000);
     }
     else
     {
@@ -1048,15 +1054,19 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     co_return cc;
 }
 
-NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
-                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmObject(name, type), powerCapIntf(powerCapIntf)
+NsmMinPowerCap::NsmMinPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->minPowerCapValue(value);
-    lg2::error("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
+    powerLimitIntf->minPowerWatts(value);
+    lg2::info("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
@@ -1101,7 +1111,8 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
-        updateValue(value);
+        // miliwatts to Watts
+        updateValue(value / 1000);
     }
     else
     {
@@ -1116,7 +1127,8 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
+    NsmObject(name, type),
+    clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
@@ -1168,7 +1180,8 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
-        updateValue(value);
+        // miliwatts to Watts
+        updateValue(value / 1000);
     }
     else
     {
@@ -1469,12 +1482,17 @@ static void createNsmProcessorSensor(SensorManager& manager,
         }
         else if (type == "NSM_PowerCap")
         {
-            // create power cap and clear power cap interface
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            // create power cap , clear power cap and power limit interface
             auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
                 bus, inventoryObjPath.c_str(), uuid);
 
             auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
                 bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
+
+            auto powerLimitIntf = std::make_shared<PowerLimitIface>(
+                bus, inventoryObjPath.c_str());
 
             // create sensors for power cap properties
             auto powerCap = std::make_shared<NsmPowerCap>(name, type,
@@ -1486,17 +1504,25 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 name, type, clearPowerCapIntf);
             nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
 
-            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(name, type,
-                                                                powerCapIntf);
+            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
+                name, type, powerCapIntf, powerLimitIntf);
             nsmDevice->deviceSensors.emplace_back(maxPowerCap);
 
-            auto minPowerCap = std::make_shared<NsmMinPowerCap>(name, type,
-                                                                powerCapIntf);
+            auto minPowerCap = std::make_shared<NsmMinPowerCap>(
+                name, type, powerCapIntf, powerLimitIntf);
             nsmDevice->deviceSensors.emplace_back(minPowerCap);
+
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(powerCap);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(powerCap);
+            }
 
             defaultPowerCap->update(manager, manager.getEid(nsmDevice))
                 .detach();
-            powerCap->update(manager, manager.getEid(nsmDevice)).detach();
             maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
             minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
         }

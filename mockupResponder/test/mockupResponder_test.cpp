@@ -76,8 +76,8 @@ TEST_F(MockupResponderTest, goodTestGetPropertyTest)
     testProperty(PRODUCT_LENGTH, 850);
     testProperty(PRODUCT_WIDTH, 730);
     testProperty(PRODUCT_HEIGHT, 2600);
-    testProperty(MINIMUM_DEVICE_POWER_LIMIT, 100);
-    testProperty(MAXIMUM_DEVICE_POWER_LIMIT, 1800);
+    testProperty(MINIMUM_DEVICE_POWER_LIMIT, 10000);
+    testProperty(MAXIMUM_DEVICE_POWER_LIMIT, 100000);
 }
 
 TEST_F(MockupResponderTest, goodTestUuidPropertyTest)
