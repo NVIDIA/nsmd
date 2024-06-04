@@ -71,17 +71,18 @@ class NsmPowerCapIntf : public PowerCapIntf
         uint8_t cc = NSM_ERROR;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
-        uint32_t requested_persistent_limit;
-        uint32_t requested_oneshot_limit;
-        uint32_t enforced_limit;
+        uint32_t requested_persistent_limit_in_miliwatts;
+        uint32_t requested_oneshot_limit_in_miliwatts;
+        uint32_t enforced_limit_in_miliwatts;
 
         rc = decode_get_power_limit_resp(
             responseMsg, responseLen, &cc, &data_size, &reason_code,
-            &requested_persistent_limit, &requested_oneshot_limit,
-            &enforced_limit);
+            &requested_persistent_limit_in_miliwatts,
+            &requested_oneshot_limit_in_miliwatts,
+            &enforced_limit_in_miliwatts);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            PowerCapIntf::powerCap(requested_persistent_limit);
+            PowerCapIntf::powerCap(enforced_limit_in_miliwatts / 1000);
             lg2::info("getPowerCapFromDevice for EID: {EID} completed", "EID",
                       eid);
         }
@@ -102,8 +103,8 @@ class NsmPowerCapIntf : public PowerCapIntf
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant
-        auto rc = encode_set_device_power_limit_req(0, NEW_LIMIT, PERSISTENT,
-                                                    power_limit, requestMsg);
+        auto rc = encode_set_device_power_limit_req(
+            0, NEW_LIMIT, PERSISTENT, power_limit * 1000, requestMsg);
 
         if (rc)
         {

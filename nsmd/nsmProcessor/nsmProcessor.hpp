@@ -36,6 +36,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
@@ -434,27 +435,34 @@ class NsmMemoryCapacityUtil : public NsmSensor
     std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
 };
 
-class NsmPowerCap : public NsmObject
+class NsmPowerCap : public NsmSensor
 {
   public:
     NsmPowerCap(std::string& name, std::string& type,
                 std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    // requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
-    void updateValue(uint32_t value);
+    void updateReading(uint32_t value);
 };
-
+using PowerLimitIface = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::PowerLimit>;
 class NsmMaxPowerCap : public NsmObject
 {
   public:
     NsmMaxPowerCap(std::string& name, std::string& type,
-                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    std::shared_ptr<PowerLimitIface> powerLimitIntf = nullptr;
     void updateValue(uint32_t value);
 };
 
@@ -462,11 +470,13 @@ class NsmMinPowerCap : public NsmObject
 {
   public:
     NsmMinPowerCap(std::string& name, std::string& type,
-                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf);
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    std::shared_ptr<PowerLimitIface> powerLimitIntf = nullptr;
     void updateValue(uint32_t value);
 };
 class NsmDefaultPowerCap : public NsmObject
