@@ -7,6 +7,7 @@ dep_src_files = [
     '../../libnsm/base.c',
     '../../libnsm/platform-environmental.c',
     '../../libnsm/device-configuration.c',
+    '../../libnsm/diagnostics.c',
     '../../libnsm/pci-links.c',
     '../../libnsm/network-ports.c',
     '../../libnsm/requester/mctp.c',

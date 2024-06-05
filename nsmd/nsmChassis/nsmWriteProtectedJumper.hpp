@@ -16,32 +16,29 @@
  */
 
 #pragma once
-#include "globals.hpp"
+
 #include "nsmInterface.hpp"
 
-#include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Software/Settings/server.hpp>
 
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
-using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
+using SettingsIntf = object_t<Software::server::Settings>;
 
-template <typename IntfType>
-class NsmFirmwareInventory : public NsmInterfaceProvider<IntfType>
+class NsmWriteProtectedJumper :
+    public NsmSensor,
+    public NsmInterfaceContainer<SettingsIntf>
 {
   public:
-    NsmFirmwareInventory() = delete;
-    NsmFirmwareInventory(const std::string& name) :
-        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory",
-                                       firmwareInventoryBasePath)
-    {}
-    NsmFirmwareInventory(const std::string& name,
-                         const std::shared_ptr<IntfType>& pdi) :
-        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory", {pdi})
-    {}
+    NsmWriteProtectedJumper(const NsmInterfaceProvider<SettingsIntf>& provider);
+    NsmWriteProtectedJumper() = delete;
+
+    std::optional<Request> genRequestMsg(eid_t eid,
+                                         uint8_t instanceNumber) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
 };
 
 } // namespace nsm

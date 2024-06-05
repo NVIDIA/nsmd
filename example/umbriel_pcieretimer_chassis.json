@@ -18,7 +18,12 @@
             },
             {
                 "Name": "HGX_FW_PCIeRetimer_$INSTANCE_NUMBER",
-                "Type": "NSM_PCIeRetimer_FWInventory",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 3,
+                "IsRetimer": true,
+                "InstanceNumber": "$INSTANCE_NUMBER",
                 "Associations": [
                     {
                         "Forward": "inventory",
@@ -31,9 +36,9 @@
                         "AbsolutePath": "/xyz/openbmc_project/software"
                     }
                 ],
-                "UUID": "$UUID",
-                "Manufacturer": "Nvidia",
-                "INSTANCE_NUMBER": "$INSTANCE_NUMBER"
+                "Version": {
+                    "Type": "NSM_FirmwareVersion"
+                }
             }
         ],
         "Probe": "xyz.openbmc_project.Configuration.NSM_PCIeRetimer({})",

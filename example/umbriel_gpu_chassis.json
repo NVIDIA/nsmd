@@ -274,14 +274,6 @@
                 "UUID": "$UUID",
                 "Count": 9,
                 "Priority": true
-            },
-            {
-                "Name": "HGX_FW_GPU_SXM_$INSTANCE_NUMBER + 1",
-                "Type": "NSM_FirmwareInventory",
-                "UUID": "$UUID",
-                "Manufacturer": "NVIDIA",
-                "DeviceType": "$DEVICE_TYPE",
-                "InstanceNumber": "$INSTANCE_NUMBER"
             }
         ],
         "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 0})",

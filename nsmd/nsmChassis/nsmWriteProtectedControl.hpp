@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include "base.h"
-
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
@@ -27,24 +25,24 @@ namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-
 using SettingsIntf = object_t<Software::server::Settings>;
 
-class NsmSoftwareSettings :
+class NsmWriteProtectedControl :
     public NsmSensor,
     public NsmInterfaceContainer<SettingsIntf>
 {
   private:
     NsmDeviceIdentification deviceType;
-    uint8_t instanceId;
+    uint8_t instanceNumber;
 
   public:
-    NsmSoftwareSettings(const NsmInterfaceProvider<SettingsIntf>& provider,
-                        NsmDeviceIdentification deviceType, uint8_t instanceId);
-    NsmSoftwareSettings() = delete;
+    NsmWriteProtectedControl(const NsmInterfaceProvider<SettingsIntf>& provider,
+                             NsmDeviceIdentification deviceType,
+                             uint8_t instanceNumber);
+    NsmWriteProtectedControl() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
-                                         uint8_t instanceId) override;
+                                         uint8_t instanceNumber) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 };

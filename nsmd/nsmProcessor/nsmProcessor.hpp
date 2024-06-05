@@ -20,13 +20,13 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
-#include "nsmChassis/nsmInventoryProperty.hpp"
 #include "nsmChassis/nsmPowerControl.hpp"
-#include "nsmDbusIfaceOverride/nsmClearPowerCapIface.hpp"
-#include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
-#include "nsmDbusIfaceOverride/nsmPowerCapIface.hpp"
-#include "nsmDbusIfaceOverride/nsmMigModeIface.hpp"
+#include "nsmClearPowerCapIface.hpp"
+#include "nsmEccModeIface.hpp"
 #include "nsmInterface.hpp"
+#include "nsmInventoryProperty.hpp"
+#include "nsmMigModeIface.hpp"
+#include "nsmPowerCapIface.hpp"
 #include "nsmSensor.hpp"
 
 #include <stdint.h>
@@ -435,9 +435,9 @@ class NsmMemoryCapacityUtil : public NsmSensor
 class NsmPowerCap : public NsmSensor
 {
   public:
-    NsmPowerCap(std::string &name, std::string &type,
-		std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-		const std::vector<std::string> &parents);
+    NsmPowerCap(std::string& name, std::string& type,
+                std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                const std::vector<std::string>& parents);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -459,9 +459,9 @@ using PowerLimitIface = sdbusplus::server::object_t<
 class NsmMaxPowerCap : public NsmObject
 {
   public:
-    NsmMaxPowerCap(std::string &name, std::string &type,
-		   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-		   std::shared_ptr<PowerLimitIface> powerLimitIntf);
+    NsmMaxPowerCap(std::string& name, std::string& type,
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     std::shared_ptr<NsmPowerCapIntf> getMaxPowerCapIntf() const
     {
@@ -477,9 +477,9 @@ class NsmMaxPowerCap : public NsmObject
 class NsmMinPowerCap : public NsmObject
 {
   public:
-    NsmMinPowerCap(std::string &name, std::string &type,
-		   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-		   std::shared_ptr<PowerLimitIface> powerLimitIntf);
+    NsmMinPowerCap(std::string& name, std::string& type,
+                   std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     std::shared_ptr<NsmPowerCapIntf> getMinPowerCapIntf() const
     {
@@ -494,8 +494,8 @@ class NsmMinPowerCap : public NsmObject
 class NsmDefaultPowerCap : public NsmObject
 {
   public:
-    NsmDefaultPowerCap(std::string &name, std::string &type,
-		       std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf);
+    NsmDefaultPowerCap(std::string& name, std::string& type,
+                       std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     std::shared_ptr<NsmClearPowerCapIntf> getDefaultPowerCapIntf() const
     {

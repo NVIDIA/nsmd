@@ -1,26 +1,23 @@
 dep_src_files = [
-    '../nsmProcessor.cpp',
+    '../nsmWriteProtectedIntf.cpp',
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../nsmSensor.cpp',
-    '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/pci-links.c',
+    '../../../libnsm/device-configuration.c',
+    '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
-    '../../nsmChassis/nsmPowerControl.cpp',
 ]
 
 dep_src_headers = [
     '.',
     '..',
     '../../',
-    '../../nsmSensors',
-    '../../nsmDbusIfaceOverride',
     '../../../',
     '../../../common',
     '../../../libnsm',
@@ -32,7 +29,7 @@ test_src = declare_dependency(
 )
 
 tests = [
-    'nsmProcessor_test',
+    'nsmWriteProtectedIntf_test',
 ]
 
 tests_deps = [
@@ -42,13 +39,10 @@ tests_deps = [
     sdbusplus,
     sdeventplus,
     phosphor_logging,
+    nvidia_shmem,
     gtest,
     gmock,
 ]
-
-if get_option('shmem').enabled()
-    tests_deps += nvidia_shmem
-endif
 
 foreach t : tests
     test(

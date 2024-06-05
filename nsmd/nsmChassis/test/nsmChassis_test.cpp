@@ -26,7 +26,8 @@ using namespace ::testing;
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPowerSupplyStatus.hpp"
-#include "nsmSoftwareSettings.hpp"
+#include "nsmWriteProtectedControl.hpp"
+#include "nsmWriteProtectedJumper.hpp"
 
 namespace nsm
 {
@@ -294,7 +295,7 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
 TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 {
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(6)
+        .Times(8)
         .WillRepeatedly(
             [](eid_t, Request&, const nsm_msg**,
                size_t*) -> requester::Coroutine { co_return NSM_SUCCESS; });
@@ -319,7 +320,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
                             objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(1, fpga.deviceSensors.size());
+    EXPECT_EQ(2, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(6, gpu.deviceSensors.size());
@@ -343,8 +344,10 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_NE(nullptr,
               dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
                   gpu.deviceSensors[5]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmSoftwareSettings>(fpga.deviceSensors[0]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmWriteProtectedControl>(
+                           fpga.deviceSensors[0]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmWriteProtectedJumper>(
+                           fpga.deviceSensors[1]));
 }
 
 TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)

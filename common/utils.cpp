@@ -278,4 +278,38 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
     }
 }
 
+void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
+                                   uint8_t instanceNumber, bool retimer)
+{
+    switch (deviceType)
+    {
+        case NSM_DEV_ID_GPU:
+            if (instanceNumber > 7)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 7 for GPU");
+            break;
+        case NSM_DEV_ID_SWITCH:
+            if (instanceNumber > 1)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 1 for NvSwitch");
+            break;
+        case NSM_DEV_ID_PCIE_BRIDGE:
+            if (instanceNumber > 0)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 0 for PCIe Bridge");
+            break;
+        case NSM_DEV_ID_BASEBOARD:
+            if (!retimer && instanceNumber > 0)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 0 for Baseboard");
+            else if (instanceNumber > 7)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 7 for Retimer");
+            break;
+        default:
+            throw std::invalid_argument("Unknown device type: " +
+                                        std::to_string((int)deviceType));
+    }
+}
+
 } // namespace utils

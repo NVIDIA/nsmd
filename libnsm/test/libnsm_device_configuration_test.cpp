@@ -105,10 +105,8 @@ TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodEncodeResponse)
 
 TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodDecodeResponse)
 {
-	std::vector<uint8_t> data_byte{
-	    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	};
+	std::vector<uint8_t> data_byte{0b10000000, 0x00, 0b00000100, 0x00,
+				       0x00,	   0x00, 0x00,	     0x00};
 
 	std::vector<uint8_t> responseMsg{
 	    0x10,
@@ -125,7 +123,6 @@ TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodDecodeResponse)
 	};
 	auto data = reinterpret_cast<nsm_fpga_diagnostics_settings_wp *>(
 	    data_byte.data());
-	auto data_test = data;
 	responseMsg.insert(responseMsg.end(), data_byte.begin(),
 			   data_byte.end());
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -138,7 +135,8 @@ TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodDecodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(data_test->gpu1_4, data->gpu1_4);
+	EXPECT_EQ(1, data->gpu1_4);
+	EXPECT_EQ(1, data->retimer3);
 }
 
 TEST(getFpgaDiagnosticsSettingsWPSettings, testBadDecodeResponse)

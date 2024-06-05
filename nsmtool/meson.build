@@ -9,6 +9,7 @@ sources = [
     '../libnsm/base.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
+    '../libnsm/diagnostics.c',
     '../libnsm/requester/mctp.c',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',

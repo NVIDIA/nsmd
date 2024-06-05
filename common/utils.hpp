@@ -163,6 +163,33 @@ class IDBusHandler
                                                    dbusInterface);
         return std::get<Property>(VariantValue);
     }
+    /** @brief The template function to get optional property from the requested
+     * dbus path without throwing sdbusplus::exception::exception on fail
+     *
+     *  @tparam Property - Excepted type of the property on dbus
+     *
+     *  @param[in] objPath - The Dbus object path
+     *  @param[in] dbusProp - The property name to get
+     *  @param[in] dbusInterface - The Dbus interface
+     *
+     *  @return The value of the property
+     *
+     *  @throw std::bad_variant_access when \p Property and property on dbus do
+     *         not match
+     */
+    template <typename Property>
+    auto tryGetDbusProperty(const char* objPath, const char* dbusProp,
+                            const char* dbusInterface)
+    {
+        try
+        {
+            return getDbusProperty<Property>(objPath, dbusProp, dbusInterface);
+        }
+        catch (const sdbusplus::exception::exception&)
+        {
+            return Property();
+        }
+    }
 };
 
 /**
@@ -383,4 +410,17 @@ Associations getAssociations(const std::vector<Association>& associations);
  */
 void convertBitMaskToVector(std::vector<uint8_t>& data,
                             const bitfield8_t* value, uint8_t size);
+
+/**
+ * @brief Verify allowed device type and its instance number
+ *
+ * @param deviceType NSM device type identification
+ * @param instanceNumber NSM device instance number
+ * @param retimer Verify Retimer subdevice under Baseboard device
+ * @throws std::invalid_argument Throws exception when wrong device type or
+ * instance number is given
+ */
+void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
+                                   uint8_t instanceNumber,
+                                   bool retimer = false);
 } // namespace utils
