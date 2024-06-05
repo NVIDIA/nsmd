@@ -24,6 +24,7 @@
 #include "nsmDbusIfaceOverride/nsmClearPowerCapIface.hpp"
 #include "nsmDbusIfaceOverride/nsmEccModeIface.hpp"
 #include "nsmDbusIfaceOverride/nsmPowerCapIface.hpp"
+#include "nsmDbusIfaceOverride/nsmMigModeIface.hpp"
 #include "nsmInterface.hpp"
 #include "nsmSensor.hpp"
 
@@ -147,7 +148,7 @@ class NsmMigMode : public NsmSensor
 {
   public:
     NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
-               std::string& inventoryObjPath);
+               std::string& inventoryObjPath, const uuid_t& uuid);
     NsmMigMode() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -158,7 +159,7 @@ class NsmMigMode : public NsmSensor
   private:
     void updateReading(bitfield8_t flags);
 
-    std::unique_ptr<MigModeIntf> migModeIntf = nullptr;
+    std::unique_ptr<NsmMigModeIntf> migModeIntf = nullptr;
 };
 
 using EccModeIntf = sdbusplus::server::object_t<

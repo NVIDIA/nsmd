@@ -102,17 +102,17 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 }
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath) :
+                       std::string& type, std::string& inventoryObjPath, const uuid_t& uuid) :
     NsmSensor(name, type)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
-    migModeIntf = std::make_unique<MigModeIntf>(bus, inventoryObjPath.c_str());
+    migModeIntf = std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(),uuid);
 }
 
 void NsmMigMode::updateReading(bitfield8_t flags)
 {
-    migModeIntf->migModeEnabled(flags.bits.bit0);
+    migModeIntf->migModeEnabled(flags.bits.bit0, true);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -1308,8 +1308,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto sensor = std::make_shared<NsmMigMode>(bus, name, type,
-                                                       inventoryObjPath);
+            auto sensor = std::make_shared<NsmMigMode>(bus, name, type, inventoryObjPath,
+                                         uuid);
             nsmDevice->deviceSensors.push_back(sensor);
             if (priority)
             {
