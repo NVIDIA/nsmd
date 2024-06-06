@@ -20,6 +20,7 @@
 #include "globals.hpp"
 #include "nsmInterface.hpp"
 
+#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
@@ -46,6 +47,12 @@ class NsmNVSwitchAndNicChassis : public NsmInterfaceProvider<IntfType>
     NsmNVSwitchAndNicChassis(const std::string& name, const std::string& type) :
         NsmInterfaceProvider<IntfType>(name, type, chassisInventoryBasePath)
     {}
+
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::unique_ptr<sdbusplus::asio::dbus_interface> nsmDeviceAssociationIntf;
+    std::string name;
 };
 
 } // namespace nsm

@@ -61,6 +61,7 @@ class NsmChassis : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_Chassis",
                                        chassisInventoryBasePath)
     {}
+    virtual requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 };
 
 } // namespace nsm

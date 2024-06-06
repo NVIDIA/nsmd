@@ -40,4 +40,5 @@ struct MockSensorManager : public SensorManager
                 (override));
     MOCK_METHOD(void, startPolling, (uuid_t uuid), (override));
     MOCK_METHOD(void, stopPolling, (uuid_t uuid), (override));
+    MOCK_METHOD(sdbusplus::asio::object_server&, getObjServer, (), (override));
 };

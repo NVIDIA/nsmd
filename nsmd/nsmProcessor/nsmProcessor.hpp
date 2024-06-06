@@ -90,6 +90,8 @@ class NsmUuidIntf : public NsmObject
     NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
                 std::string& inventoryObjPath, uuid_t uuid);
 
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
   private:
     std::unique_ptr<UuidIntf> uuidIntf = nullptr;
 };
@@ -144,7 +146,7 @@ class NsmMigMode : public NsmSensor
 {
   public:
     NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
-               std::string& inventoryObjPath, const uuid_t& uuid);
+               std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device);
     NsmMigMode() = default;
 
     std::optional<std::vector<uint8_t>>

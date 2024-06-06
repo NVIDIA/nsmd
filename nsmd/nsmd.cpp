@@ -100,7 +100,8 @@ int main(int argc, char** argv)
         auto bus = sdbusplus::bus::new_default();
         auto event = sdeventplus::Event::get_default();
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
-        sdbusplus::server::manager::manager objManager(bus, "/");
+        sdbusplus::server::manager::manager rootObjManager(bus, "/");
+        sdbusplus::server::manager::manager inventoryObjManager(bus, "/xyz/openbmc_project/inventory");
 
         bus.request_name("xyz.openbmc_project.NSM");
         nsm::InstanceIdDb instanceIdDb;

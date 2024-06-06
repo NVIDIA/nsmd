@@ -19,14 +19,14 @@ using MigModeIntf =
 class NsmMigModeIntf : public MigModeIntf
 {
   public:
-    NsmMigModeIntf(sdbusplus::bus::bus& bus, const char* path, uuid_t uuid) :
-        MigModeIntf(bus, path), uuid(uuid)
+    NsmMigModeIntf(sdbusplus::bus::bus& bus, const char* path,
+                   std::shared_ptr<NsmDevice> device) :
+        MigModeIntf(bus, path), device(device)
     {}
 
     void getMigModeFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("getMigModeFromDevice for EID: {EID}", "EID", eid);
         std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
@@ -75,7 +75,6 @@ class NsmMigModeIntf : public MigModeIntf
     void setMigModeOnDevice(bool migMode)
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("setMigModeOnDevice for EID: {EID}", "EID", eid);
         uint8_t requestedMigMode = static_cast<uint8_t>(migMode);
@@ -150,6 +149,6 @@ class NsmMigModeIntf : public MigModeIntf
     }
 
   private:
-    uuid_t uuid;
+    std::shared_ptr<NsmDevice> device;
 };
 } // namespace nsm

@@ -82,55 +82,11 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
-            nsmDevice = std::make_shared<NsmDevice>(mctpUuid);
-            nsmDevice->isDeviceActive = true;
-            nsmDevices.emplace_back(nsmDevice);
-
-            // get supported commands for device for each message type
-            for (uint8_t messageType : supportedMessageTypes)
-            {
-                std::vector<uint8_t> supportedCommands;
-                rc = co_await getSupportedCommandCodes(eid, messageType,
-                                                       supportedCommands);
-                if (rc != NSM_SW_SUCCESS)
-                {
-                    lg2::error(
-                        "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
-                        "MT", messageType, "RC", rc, "EID", eid);
-                    continue;
-                }
-                std::vector<uint8_t> supportedCommandCodes;
-                utils::convertBitMaskToVector(
-                    supportedCommandCodes,
-                    reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
-                    SUPPORTED_COMMAND_CODE_DATA_SIZE);
-                std::stringstream ss;
-                for (uint8_t commandCode : supportedCommandCodes)
-                {
-                    nsmDevice->messageTypesToCommandCodeMatrix[messageType]
-                                                              [commandCode] =
-                        true;
-                    ss << int(commandCode) << " ";
-                }
-                lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}",
-                          "ROW_NUM", messageType, "ROW_VALUES", ss.str());
-            }
-
-            // get inventory information from device
-            InventoryProperties properties{};
-            rc = co_await getFRU(eid, properties);
-            if (rc != NSM_SW_SUCCESS)
-            {
-                lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC",
-                           rc, "EID", eid);
-                continue;
-            }
-
             // get device identification from device
-            uint8_t deviceIdentification = 0;
-            uint8_t deviceInstance = 0;
-            rc = co_await getQueryDeviceIdentification(
-                eid, deviceIdentification, deviceInstance);
+            uint8_t deviceType = 0;
+            uint8_t instanceNumber = 0;
+            rc = co_await getQueryDeviceIdentification(eid, deviceType,
+                                                       instanceNumber);
             if (rc != NSM_SUCCESS)
             {
                 lg2::error(
@@ -139,56 +95,40 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 continue;
             }
 
+            // find if a nsmDevice has been created for th device
+            nsmDevice = findNsmDeviceByIdentification(nsmDevices, deviceType,
+                                                      instanceNumber);
+            if (!nsmDevice)
+            {
+                nsmDevice =
+                    std::make_shared<NsmDevice>(deviceType, instanceNumber);
+                nsmDevices.emplace_back(nsmDevice);
+            }
+            nsmDevice->isDeviceActive = true;
+            nsmDevice->uuid = mctpUuid;
+
+            rc = co_await updateNsmDevice(nsmDevice, eid);
+            if (rc)
+            {
+                lg2::error("updateNsmDevice failed, rc={RC} eid={EID}", "RC",
+                           rc, "EID", eid);
+                continue;
+            }
+
             // update eid table [from UUID from MCTP dbus property]
             eidTable.insert(std::make_pair(
                 mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
 
-            // expose inventory information to FruDevice PDI
-            nsmDevice->fruDeviceIntf = objServer.add_interface(
-                "/xyz/openbmc_project/FruDevice/" + std::to_string(eid),
-                "xyz.openbmc_project.FruDevice");
 
-            if (properties.find(BOARD_PART_NUMBER) != properties.end())
+            rc = co_await updateFruDeviceIntf(nsmDevice, eid);
+            if (rc)
             {
-                nsmDevice->fruDeviceIntf->register_property(
-                    "BOARD_PART_NUMBER",
-                    std::get<std::string>(properties[BOARD_PART_NUMBER]));
+                lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}",
+                           "RC", rc, "EID", eid);
+                continue;
             }
 
-            if (properties.find(SERIAL_NUMBER) != properties.end())
-            {
-                nsmDevice->fruDeviceIntf->register_property(
-                    "SERIAL_NUMBER",
-                    std::get<std::string>(properties[SERIAL_NUMBER]));
-            }
-
-            if (properties.find(MARKETING_NAME) != properties.end())
-            {
-                nsmDevice->fruDeviceIntf->register_property(
-                    "MARKETING_NAME",
-                    std::get<std::string>(properties[MARKETING_NAME]));
-            }
-
-            if (properties.find(BUILD_DATE) != properties.end())
-            {
-                nsmDevice->fruDeviceIntf->register_property(
-                    "BUILD_DATE",
-                    std::get<std::string>(properties[BUILD_DATE]));
-            }
-
-            if (properties.find(DEVICE_GUID) != properties.end())
-            {
-                nsmDevice->fruDeviceIntf->register_property(
-                    "DEVICE_UUID", std::get<uuid_t>(properties[DEVICE_GUID]));
-            }
-
-            nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
-                                                        deviceIdentification);
-            nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
-                                                        deviceInstance);
-            nsmDevice->fruDeviceIntf->register_property("UUID", mctpUuid);
-
-            nsmDevice->fruDeviceIntf->initialize();
+            co_await updateDeviceSensors(nsmDevice, eid);
         }
         queuedMctpInfos.pop();
     }
@@ -390,6 +330,25 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
+requester::Coroutine
+    DeviceManager::updateDeviceSensors(std::shared_ptr<NsmDevice> nsmDevice,
+                                       uint8_t eid)
+{
+    // update all sensors attached to the NsmDevice
+    SensorManager& sensorManager = SensorManager::getInstance();
+    size_t sensorIndex{0};
+    auto& sensors = nsmDevice->deviceSensors;
+    while (sensorIndex < sensors.size())
+    {
+        auto sensor = sensors[sensorIndex];
+        lg2::info("updateDeviceSensors: call {SENSORNAME} update()",
+                  "SENSORNAME", sensor->getName());
+        co_await sensor->update(sensorManager, eid);
+        ++sensorIndex;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine DeviceManager::getInventoryInformation(
     eid_t eid, uint8_t& propertyIdentifier, InventoryProperties& properties)
 {
@@ -565,6 +524,71 @@ void DeviceManager::offlineMctpEndpoint(const uuid_t& uuid)
     {
         nsmDevice->setOffline();
     }
+}
+
+requester::Coroutine
+    DeviceManager::updateFruDeviceIntf(std::shared_ptr<NsmDevice> nsmDevice,
+                                       uint8_t eid)
+{
+    // get inventory information from device
+    InventoryProperties properties{};
+    auto rc = co_await getFRU(eid, properties);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc, "EID",
+                   eid);
+        co_return rc;
+    }
+
+    // expose inventory information to FruDevice PDI
+    nsmDevice->fruDeviceIntf = objServer.add_unique_interface(
+        "/xyz/openbmc_project/FruDevice/" + std::to_string(eid),
+        "xyz.openbmc_project.FruDevice");
+
+    if (properties.find(BOARD_PART_NUMBER) != properties.end())
+    {
+        nsmDevice->fruDeviceIntf->register_property(
+            "BOARD_PART_NUMBER",
+            std::get<std::string>(properties[BOARD_PART_NUMBER]));
+    }
+
+    if (properties.find(SERIAL_NUMBER) != properties.end())
+    {
+        nsmDevice->fruDeviceIntf->register_property(
+            "SERIAL_NUMBER", std::get<std::string>(properties[SERIAL_NUMBER]));
+    }
+
+    if (properties.find(MARKETING_NAME) != properties.end())
+    {
+        nsmDevice->fruDeviceIntf->register_property(
+            "MARKETING_NAME",
+            std::get<std::string>(properties[MARKETING_NAME]));
+    }
+
+    if (properties.find(BUILD_DATE) != properties.end())
+    {
+        nsmDevice->fruDeviceIntf->register_property(
+            "BUILD_DATE", std::get<std::string>(properties[BUILD_DATE]));
+    }
+
+    //set deviceUuid to mctp uuid as default value
+    nsmDevice->deviceUuid = nsmDevice->uuid;
+    if (properties.find(DEVICE_GUID) != properties.end())
+    {
+        nsmDevice->fruDeviceIntf->register_property(
+            "DEVICE_UUID", std::get<uuid_t>(properties[DEVICE_GUID]));
+        nsmDevice->deviceUuid = std::get<uuid_t>(properties[DEVICE_GUID]);
+    }
+
+    nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
+                                                nsmDevice->getDeviceType());
+    nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
+                                                nsmDevice->getInstanceNumber());
+    nsmDevice->fruDeviceIntf->register_property("UUID", nsmDevice->uuid);
+
+    nsmDevice->fruDeviceIntf->initialize();
+
+    co_return NSM_SW_SUCCESS;
 }
 
 } // namespace nsm

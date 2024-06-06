@@ -239,7 +239,7 @@ void NsmThresholdFactory::createNsmThreshold(
         nsmDevice->deviceSensors.emplace_back(sensor);
         nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
 
-        updateSensorWithRetries(manager, sensor, manager.getEid(nsmDevice), -1)
+        updateSensorWithRetries(manager, sensor, manager.getEid(nsmDevice), 3)
             .detach();
 
         return;

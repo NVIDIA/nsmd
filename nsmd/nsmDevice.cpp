@@ -42,6 +42,45 @@ std::shared_ptr<NsmNumericAggregator>
     return aggregator;
 }
 
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber)
+{
+    int n1 = -1;
+    int n2 = -1;
+
+    std::sscanf(uuid.c_str(), "STATIC:%d:%d", &n1, &n2);
+
+    if (n1 < 0 || n1 > 0xff)
+    {
+        return -1;
+    }
+    if (n2 < 0 || n2 > 0xff)
+    {
+        return -2;
+    }
+
+    deviceType = n1;
+    instanceNumber = n2;
+    return 0;
+}
+
+std::shared_ptr<NsmDevice>
+    findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
+                                  uint8_t deviceType, uint8_t instanceNumber)
+{
+    std::shared_ptr<NsmDevice> ret{};
+
+    for (auto nsmDevice : nsmDevices)
+    {
+        if (nsmDevice->getDeviceType() == deviceType &&
+            nsmDevice->getInstanceNumber() == instanceNumber)
+        {
+            ret = nsmDevice;
+            break;
+        }
+    }
+    return ret;
+}
+
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
                                                const uuid_t& uuid)
 {

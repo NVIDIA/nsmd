@@ -81,6 +81,7 @@ class SensorManager
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual void startPolling(uuid_t uuid) = 0;
     virtual void stopPolling(uuid_t uuid) = 0;
+    virtual sdbusplus::asio::object_server& getObjServer() = 0;
     eid_t getLocalEid()
     {
         return localEid;
@@ -145,6 +146,11 @@ class SensorManagerImpl : public SensorManager
                                       objServer, eidTable, nsmDevices, localEid,
                                       sockManager, verbose);
         instance.reset(&inst);
+    }
+
+    sdbusplus::asio::object_server& getObjServer()
+    {
+        return objServer;
     }
 
   private:

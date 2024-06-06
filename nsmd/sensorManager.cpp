@@ -224,6 +224,14 @@ requester::Coroutine
     {
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
+        if (!nsmDevice->isDeviceActive)
+        {
+            lg2::error(
+                "SensorManager::doPollingTask : skip polling due to inactive device, uuid:{UUID}",
+                "UUID", nsmDevice->uuid);
+            co_return NSM_ERR_NOT_READY;
+        }
+
 #if false
 //place holder: to be implemented once related specification is available
         if (nsmDevice->getEventMode() == GLOBAL_EVENT_GENERATION_ENABLE_POLLING)
@@ -333,14 +341,31 @@ requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 {
-    auto device = findNsmDeviceByUUID(nsmDevices, uuid);
-    if (!device)
+    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    if (!nsmDevice)
     {
-        throw std::runtime_error(
-            "SensorManager::getNsmDevice - Couldn't find device with uuid " +
-            uuid);
+        // check if the uuid is in static inventory format.
+        uint8_t deviceType = 0xff;
+        uint8_t instanceNumber = 0xff;
+        if (parseStaticUuid(uuid, deviceType, instanceNumber) < 0)
+        {
+            throw std::runtime_error(
+                "SensorManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d), UUID=" +
+                uuid);
+            return nullptr;
+        }
+
+        nsmDevice = findNsmDeviceByIdentification(nsmDevices, deviceType,
+                                                  instanceNumber);
+        if (!nsmDevice)
+        {
+            // create nsmDevice
+            nsmDevice = std::make_shared<NsmDevice>(deviceType, instanceNumber);
+            nsmDevices.emplace_back(nsmDevice);
+            nsmDevice->isDeviceActive = false;
+        }
     }
-    return device;
+    return nsmDevice;
 }
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)

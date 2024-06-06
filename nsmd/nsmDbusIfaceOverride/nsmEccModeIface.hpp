@@ -36,14 +36,14 @@ using EccModeIntf = sdbusplus::server::object_t<
 class NsmEccModeIntf : public EccModeIntf
 {
   public:
-    NsmEccModeIntf(sdbusplus::bus::bus& bus, const char* path, uuid_t uuid) :
-        EccModeIntf(bus, path), uuid(uuid)
+    NsmEccModeIntf(sdbusplus::bus::bus& bus, const char* path,
+                   std::shared_ptr<NsmDevice> device) :
+        EccModeIntf(bus, path), device(device)
     {}
 
     void getECCModeFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("getECCModeFromDevice for EID: {EID}", "EID", eid);
         std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
@@ -96,7 +96,6 @@ class NsmEccModeIntf : public EccModeIntf
     void setECCModeOnDevice(bool eccMode)
     {
         SensorManager& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(uuid);
         auto eid = manager.getEid(device);
         lg2::info("setECCModeOnDevice for EID: {EID}", "EID", eid);
         // NSM spec expects  requestedECCMode mode to be uint8_t
@@ -170,6 +169,6 @@ class NsmEccModeIntf : public EccModeIntf
     }
 
   private:
-    uuid_t uuid;
+    std::shared_ptr<NsmDevice> device;
 };
 } // namespace nsm
