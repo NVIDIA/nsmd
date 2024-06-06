@@ -726,12 +726,264 @@
                 }
             },
             {
-                "Name": "HGX_FW_FPGA_$INSTANCE_NUMBER",
+                "Name": "HGX_FW_GPU_SXM_1",
                 "Type": "NSM_FirmwareInventory",
                 "UUID": "$UUID",
                 "Manufacturer": "NVIDIA",
-                "DeviceType": "$DEVICE_TYPE",
-                "InstanceNumber": "$INSTANCE_NUMBER"
+                "DeviceType": 0,
+                "InstanceNumber": 0,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_1"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_2",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 1,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_2"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_3",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 2,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_3"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_4",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 3,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_4"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_5",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 4,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_5"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_6",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 5,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_6"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_7",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 6,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_7"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_GPU_SXM_8",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 0,
+                "InstanceNumber": 7,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_8"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_NVSwitch_0",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 1,
+                "InstanceNumber": 0,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_0"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_NVSwitch_1",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 1,
+                "InstanceNumber": 1,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVSwitch_1"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_NVLinkManagementNIC_0",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 2,
+                "InstanceNumber": 0,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_0"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_FPGA_0",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 3,
+                "InstanceNumber": 0,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_FPGA_0"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
+            },
+            {
+                "Name": "HGX_FW_BMC_0",
+                "Type": "NSM_FirmwareInventory",
+                "UUID": "$UUID",
+                "Manufacturer": "NVIDIA",
+                "DeviceType": 3,
+                "InstanceNumber": 0,
+                "Associations": [
+                    {
+                        "Forward": "inventory",
+                        "Backward": "activation",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_BMC_0"
+                    },
+                    {
+                        "Forward": "software_version",
+                        "Backward": "updateable",
+                        "AbsolutePath": "/xyz/openbmc_project/software"
+                    }
+                ]
             }
         ],
         "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 3})",

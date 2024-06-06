@@ -19,11 +19,13 @@
 
 #include "libnsm/platform-environmental.h"
 
+#include "globals.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Dimension/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Software/Version/server.hpp>
 
 #include <type_traits>
 
@@ -34,6 +36,7 @@ using namespace sdbusplus::server;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
+using VersionIntf = object_t<Software::server::Version>;
 
 class NsmInventoryPropertyBase : public NsmSensor
 {
@@ -134,6 +137,34 @@ inline void
             pdi().maxPowerWatts(decode_inventory_information_as_uint32(
                 data.data(), data.size()));
             break;
+        default:
+            throw std::runtime_error("Not implemented PDI");
+            break;
+    }
+}
+
+template <>
+inline void
+    NsmInventoryProperty<VersionIntf>::handleResponse(const Response& data)
+{
+    switch (property)
+    {
+        case PCIERETIMER_0_EEPROM_VERSION:
+        case PCIERETIMER_1_EEPROM_VERSION:
+        case PCIERETIMER_2_EEPROM_VERSION:
+        case PCIERETIMER_3_EEPROM_VERSION:
+        case PCIERETIMER_4_EEPROM_VERSION:
+        case PCIERETIMER_5_EEPROM_VERSION:
+        case PCIERETIMER_6_EEPROM_VERSION:
+        case PCIERETIMER_7_EEPROM_VERSION:
+        {
+            std::stringstream iss;
+            iss << int(data[0]) << '.' << int(data[2]);
+            iss << '.';
+            iss << int(((data[4] << 8) | data[6]));
+            pdi().version(iss.str());
+        }
+        break;
         default:
             throw std::runtime_error("Not implemented PDI");
             break;

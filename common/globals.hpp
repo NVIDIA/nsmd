@@ -30,6 +30,4 @@ const path fabricsInventoryBasePath =
 const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";
 const path sotwareInventoryBasePath = "/xyz/openbmc_project/inventory_software";
 
-const uint8_t PCIeRetimerEEPROMIdentifier = 144;
-
 const std::vector<uint8_t> supportedMessageTypes = {0, 1, 2, 3, 4, 5};

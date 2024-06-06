@@ -4,6 +4,7 @@ sources = [
     '../libnsm/base.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
+    '../libnsm/diagnostics.c',
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
     '../libnsm/instance-id.c',
@@ -17,7 +18,7 @@ sources = [
     'nsmd.cpp',
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
-    'nsmNumericSensor/nsmNumericSensorComposite.cpp'
+    'nsmNumericSensor/nsmNumericSensorComposite.cpp',
 ]
 
 nsmd_headers = [
@@ -38,6 +39,7 @@ subdir('nsmDbusIfaceOverride')
 subdir('nsmMemory')
 subdir('nsmPCIeDevice')
 subdir('nsmDeviceInventory')
+subdir('nsmSensors')
 
 executable(
     'nsmd',

@@ -22,7 +22,8 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
-#include "nsmSoftwareSettings.hpp"
+#include "nsmWriteProtectedControl.hpp"
+#include "nsmWriteProtectedJumper.hpp"
 #include "utils.hpp"
 
 namespace nsm
@@ -41,6 +42,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
+    auto eid = manager.getEid(device);
 
     if (type == "NSM_Chassis")
     {
@@ -78,7 +80,6 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.pdi().manufacturer(manufacturer);
-        auto eid = manager.getEid(device);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             chassisAsset, BOARD_PART_NUMBER);
@@ -102,7 +103,6 @@ void nsmChassisCreateSensors(SensorManager& manager,
     else if (type == "NSM_Dimension")
     {
         auto chassisDimension = NsmChassis<DimensionIntf>(name);
-        auto eid = manager.getEid(device);
         auto depth = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
             chassisDimension, PRODUCT_LENGTH);
         auto width = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
@@ -216,8 +216,16 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto settings = NsmChassis<SettingsIntf>(name);
-        device->addStaticSensor(std::make_shared<NsmSoftwareSettings>(
-            settings, deviceType, instanceId));
+        auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
+            settings, deviceType, instanceId);
+        auto writeProtectJumper =
+            std::make_shared<NsmWriteProtectedJumper>(settings);
+        device->addStaticSensor(writeProtectControl)
+            .update(manager, eid)
+            .detach();
+        device->addStaticSensor(writeProtectJumper)
+            .update(manager, eid)
+            .detach();
     }
 }
 

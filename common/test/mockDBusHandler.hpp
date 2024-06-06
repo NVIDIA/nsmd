@@ -59,6 +59,23 @@ class MockDBusHandler : public IDBusHandler
                 (const, override));
 };
 
+struct SdBusTestError : public sdbusplus::exception::exception
+{
+    int error = 0;
+    SdBusTestError(int error) : error(error) {}
+    const char* name() const noexcept override
+    {
+        return "";
+    };
+    const char* description() const noexcept override
+    {
+        return "";
+    };
+    int get_errno() const noexcept override
+    {
+        return error;
+    };
+};
 class DBusTest
 {
   protected:

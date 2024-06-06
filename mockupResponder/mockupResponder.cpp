@@ -20,6 +20,7 @@
 #include "base.h"
 #include "device-capability-discovery.h"
 #include "device-configuration.h"
+#include "diagnostics.h"
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
@@ -42,9 +43,9 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
-    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE)
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
+    writeProtected()
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
     iface = server.add_interface(path, "xyz.openbmc_project.NSM.Device");
@@ -366,6 +367,18 @@ std::optional<std::vector<uint8_t>>
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
+        case NSM_TYPE_DIAGNOSTIC:
+            switch (command)
+            {
+                case NSM_ENABLE_DISABLE_WP:
+                    return enableDisableWriteProtectedHandler(request,
+                                                              requestLen);
+                default:
+                    lg2::error("unsupported Command:{CMD} request length={LEN}",
+                               "CMD", command, "LEN", requestLen);
+                    return unsupportedCommandHandler(request, requestLen);
+            }
+            break;
         case NSM_TYPE_DEVICE_CONFIGURATION:
             switch (command)
             {
@@ -461,12 +474,41 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
     // this is to mock that
-    // 0,1,2,3,4,6,7,9,15,17,18,20,C[12],42[66],43[67],61[97],6A[106]
+    // 0,1,2,3,4,6,7,9,15,17,18,20,C[12],42[66],43[67],61[97],64[100],65[101],6A[106]
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
-        0xDF, 0x93, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C, 0xE0, 0x00,
-        0x00, 0x02, 0x04, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0b11011111, /*   7 -   0 */
+        0b10010011, /*  15 -   8 */
+        0b00010110, /*  23 -  16 */
+        0b00000000, /*  31 -  24 */
+        0b00000000, /*  39 -  32 */
+        0b00000000, /*  47 -  40 */
+        0b00000000, /*  55 -  48 */
+        0b00000000, /*  63 -  56 */
+        0b00001100, /*  71 -  64 */
+        0b00001110, /*  79 -  72 */
+        0b00000000, /*  87 -  80 */
+        0b00000000, /*  95 -  88 */
+        0b00110010, /* 103 -  96 */
+        0b00000100, /* 111 - 104 */
+        0b00000000, /* 119 - 112 */
+        0b00010000, /* 127 - 120 */
+        0b00000000, /* 135 - 128 */
+        0b00000000, /* 143 - 136 */
+        0b00000000, /* 151 - 144 */
+        0b00000000, /* 159 - 152 */
+        0b00000000, /* 167 - 160 */
+        0b00000000, /* 175 - 168 */
+        0b00000000, /* 183 - 176 */
+        0b00000000, /* 191 - 184 */
+        0b00000000, /* 199 - 192 */
+        0b00000000, /* 207 - 200 */
+        0b00000000, /* 215 - 208 */
+        0b00000000, /* 223 - 216 */
+        0b00000000, /* 231 - 224 */
+        0b00000000, /* 239 - 232 */
+        0b00000000, /* 247 - 240 */
+        0b00000000, /* 255 - 248 */
     };
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
@@ -536,69 +578,16 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             populateFrom(property, 80000);
             break;
         case PCIERETIMER_0_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_1_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_2_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_3_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_4_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_5_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_6_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
-            break;
-        }
         case PCIERETIMER_7_EEPROM_VERSION:
-        {
-            std::vector<uint8_t> data{0x01, 0x00, 0x1a, 0x00,
-                                      0x00, 0x00, 0x0a, 0x00};
-            property.resize(data.size());
-            memcpy(property.data(), data.data(), data.size());
+            property = std::vector<uint8_t>{0x01, 0x00, 0x1a, 0x00,
+                                            0x00, 0x00, 0x0a, 0x00};
             break;
-        }
         default:
             break;
     }
@@ -2322,8 +2311,9 @@ std::optional<std::vector<uint8_t>>
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_query_scalar_group_telemetry_v1_req failed: rc={RC}",
-                   "RC", rc);
+        lg2::error(
+            "getFpgaDiagnosticsSettingsHandler: decode_query_scalar_group_telemetry_v1_req failed: rc={RC}",
+            "RC", rc);
         return std::nullopt;
     }
 
@@ -2336,20 +2326,16 @@ std::optional<std::vector<uint8_t>>
                     sizeof(nsm_fpga_diagnostics_settings_wp_resp),
                 0);
             auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-            struct nsm_fpga_diagnostics_settings_wp data = {};
-
-            data.gpu5_8 = 1;
-            data.nvSwitch1 = 1;
 
             uint16_t reason_code = ERR_NULL;
             rc = encode_get_fpga_diagnostics_settings_wp_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                &writeProtected, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
-                    "encode_get_fpga_diagnostics_settings_wp_resp failed: rc={RC}",
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_fpga_diagnostics_settings_wp_resp failed: rc={RC}",
                     "RC", rc);
                 return std::nullopt;
             }
@@ -2362,7 +2348,7 @@ std::optional<std::vector<uint8_t>>
                     sizeof(nsm_fpga_diagnostics_settings_wp_jumper_resp),
                 0);
             auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-            struct nsm_fpga_diagnostics_settings_wp_jumper data = {0, 1};
+            struct nsm_fpga_diagnostics_settings_wp_jumper data = {0, 0};
 
             uint16_t reason_code = ERR_NULL;
             rc = encode_get_fpga_diagnostics_settings_wp_jumper_resp(
@@ -2372,7 +2358,7 @@ std::optional<std::vector<uint8_t>>
             if (rc != NSM_SW_SUCCESS)
             {
                 lg2::error(
-                    "encode_get_fpga_diagnostics_settings_wp_jumper_resp failed: rc={RC}",
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_fpga_diagnostics_settings_wp_jumper_resp failed: rc={RC}",
                     "RC", rc);
                 return std::nullopt;
             }
@@ -2382,6 +2368,122 @@ std::optional<std::vector<uint8_t>>
             break;
     }
     return std::nullopt;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::enableDisableWriteProtectedHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    lg2::info("enableDisableWriteProtectedHandler: request length={LEN}", "LEN",
+              requestLen);
+    diagnostics_enable_disable_wp_data_index data_index;
+    uint8_t value = 0;
+    [[maybe_unused]] auto rc = decode_enable_disable_wp_req(
+        requestMsg, requestLen, &data_index, &value);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableWriteProtectedHandler: decode_enable_disable_wp_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    switch (data_index)
+    {
+        case BASEBOARD_FRU_EEPROM:
+        case CX7_FRU_EEPROM:
+        case HMC_FRU_EEPROM:
+        case HMC_SPI_FLASH:
+            writeProtected.baseboard = value;
+            break;
+        case PEX_SW_EEPROM:
+            writeProtected.pex = value;
+            break;
+        case RETIMER_EEPROM:
+            writeProtected.retimer = value;
+            break;
+        case NVSW_EEPROM_BOTH:
+            writeProtected.nvSwitch = value;
+            break;
+        case NVSW_EEPROM_1:
+            writeProtected.nvSwitch1 = value;
+            break;
+        case NVSW_EEPROM_2:
+            writeProtected.nvSwitch2 = value;
+            break;
+        case GPU_1_4_SPI_FLASH:
+            writeProtected.gpu1_4 = value;
+            break;
+        case GPU_5_8_SPI_FLASH:
+            writeProtected.gpu5_8 = value;
+            break;
+        case GPU_SPI_FLASH_1:
+            writeProtected.gpu1 = value;
+            break;
+        case GPU_SPI_FLASH_2:
+            writeProtected.gpu2 = value;
+            break;
+        case GPU_SPI_FLASH_3:
+            writeProtected.gpu3 = value;
+            break;
+        case GPU_SPI_FLASH_4:
+            writeProtected.gpu4 = value;
+            break;
+        case GPU_SPI_FLASH_5:
+            writeProtected.gpu5 = value;
+            break;
+        case GPU_SPI_FLASH_6:
+            writeProtected.gpu6 = value;
+            break;
+        case GPU_SPI_FLASH_7:
+            writeProtected.gpu7 = value;
+            break;
+        case GPU_SPI_FLASH_8:
+            writeProtected.gpu8 = value;
+            break;
+        case RETIMER_EEPROM_1:
+            writeProtected.retimer1 = value;
+            break;
+        case RETIMER_EEPROM_2:
+            writeProtected.retimer2 = value;
+            break;
+        case RETIMER_EEPROM_3:
+            writeProtected.retimer3 = value;
+            break;
+        case RETIMER_EEPROM_4:
+            writeProtected.retimer4 = value;
+            break;
+        case RETIMER_EEPROM_5:
+            writeProtected.retimer5 = value;
+            break;
+        case RETIMER_EEPROM_6:
+            writeProtected.retimer6 = value;
+            break;
+        case RETIMER_EEPROM_7:
+            writeProtected.retimer7 = value;
+            break;
+        case RETIMER_EEPROM_8:
+            writeProtected.retimer8 = value;
+            break;
+        default:
+            lg2::error(
+                "enableDisableWriteProtectedHandler: Invalid Data Index");
+            break;
+    }
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_enable_disable_wp_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                       reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableWriteProtectedHandler: encode_enable_disable_wp_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
 }
 
 } // namespace MockupResponder

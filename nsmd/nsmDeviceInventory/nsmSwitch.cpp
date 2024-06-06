@@ -1,6 +1,6 @@
 #include "nsmSwitch.hpp"
 
-#include "nsmChassis/nsmInventoryProperty.hpp"
+#include "nsmInventoryProperty.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"

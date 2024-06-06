@@ -6,16 +6,17 @@ sources += [
     'nsmChassis/nsmChassisAssembly.cpp',
     'nsmChassis/nsmChassisPCIeDevice.cpp',
     'nsmChassis/nsmChassisPCIeSlot.cpp',
-    'nsmChassis/nsmInventoryProperty.cpp',
     'nsmChassis/nsmPowerSupplyStatus.cpp',
     'nsmChassis/nsmGpuPresenceAndPowerStatus.cpp',
     'nsmChassis/nsmPCIeFunction.cpp',
     'nsmChassis/nsmPCIeLinkSpeed.cpp',
     'nsmChassis/nsmPCIeLTSSMState.cpp',
     'nsmChassis/nsmPowerControl.cpp',
+    'nsmChassis/nsmWriteProtectedJumper.cpp',
+    'nsmChassis/nsmWriteProtectedControl.cpp',
 ]
 
-nsmd_headers += ['.', '..', 'nsmFwSwInventory']
+nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']
 
 if get_option('tests').enabled()
     subdir('test')

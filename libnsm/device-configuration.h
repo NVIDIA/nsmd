@@ -66,15 +66,15 @@ struct nsm_get_fpga_diagnostics_settings_resp {
  */
 struct nsm_fpga_diagnostics_settings_wp {
 	/* Byte 0 */
-	uint8_t gpu1_4 : 1;    // Bit 7 – GPU 1-4 SPI Flash
-	uint8_t res1 : 3;      // 6:4 – Reserved
-	uint8_t nvSwitch : 1;  // 3 – Any NVSW EROT
-	uint8_t pex : 1;       // 2 – PEXSW EROT
-	uint8_t baseboard : 1; // 1 – FRU EEPROM (Baseboard or CX7 or HMC)
 	uint8_t retimer : 1;   // 0 – Any Retimer
+	uint8_t baseboard : 1; // 1 – FRU EEPROM (Baseboard or CX7 or HMC)
+	uint8_t pex : 1;       // 2 – PEXSW EROT
+	uint8_t nvSwitch : 1;  // 3 – Any NVSW EROT
+	uint8_t res1 : 3;      // 4:6 – Reserved
+	uint8_t gpu1_4 : 1;    // Bit 7 – GPU 1-4 SPI Flash
 	/* Byte 1 */
-	uint8_t res2 : 7;   // 7:1 – Reserved
 	uint8_t gpu5_8 : 1; // GPU 5-8 SPI Flash
+	uint8_t res2 : 7;   // 1:7 – Reserved
 	/* Byte 2 */
 	uint8_t retimer1 : 1; // Byte 2: Retimers (one per bit)
 	uint8_t retimer2 : 1;
@@ -85,19 +85,19 @@ struct nsm_fpga_diagnostics_settings_wp {
 	uint8_t retimer7 : 1;
 	uint8_t retimer8 : 1;
 	/* Byte 3 */
-	uint8_t gpu1 : 1; // 7:4 – GPU 1-4 SPI Flash (one per bit)
+	uint8_t nvSwitch1 : 1; // 0 - NVSW
+	uint8_t nvSwitch2 : 1; // 1 - NVSW
+	uint8_t res3 : 2;      // 2:3 Reserved
+	uint8_t gpu1 : 1;      // 4:7 – GPU 1-4 SPI Flash (one per bit)
 	uint8_t gpu2 : 1;
 	uint8_t gpu3 : 1;
 	uint8_t gpu4 : 1;
-	uint8_t res3 : 2;      // 3:2 Reserved
-	uint8_t nvSwitch1 : 1; // 1:0 – NVSW
-	uint8_t nvSwitch2 : 1;
 	/* Byte 4 */
-	uint8_t res4 : 4; // 7:4 – Reserved
-	uint8_t gpu5 : 1; // 3:0 – GPU 5-8 SPI Flash (one per bit)
+	uint8_t gpu5 : 1; // 0:3 – GPU 5-8 SPI Flash (one per bit)
 	uint8_t gpu6 : 1;
 	uint8_t gpu7 : 1;
 	uint8_t gpu8 : 1;
+	uint8_t res4 : 4; // 4:7 – Reserved
 	/* Bytes 5-7 reserved */
 	uint8_t res5;
 	uint8_t res6;
@@ -119,8 +119,8 @@ struct nsm_fpga_diagnostics_settings_wp_resp {
  *  Structure representing Get FPGA Diagnostics Settings for Get WP Jumper.
  */
 struct nsm_fpga_diagnostics_settings_wp_jumper {
-	uint8_t reserved : 7;
-	uint8_t presence : 1;
+	uint8_t presence : 1; // 0 – WP jumper presence
+	uint8_t reserved : 7; // 1:7 – reserved
 } __attribute__((packed));
 
 /** @struct nsm_fpga_diagnostics_settings_wp_jumper_resp

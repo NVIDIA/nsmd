@@ -131,14 +131,6 @@
                 "UUID": "$UUID",
                 "Priority": false,
                 "Count": 74
-            },
-            {
-                "Name": "HGX_FW_NVSwitch_$INSTANCE_NUMBER",
-                "Type": "NSM_FirmwareInventory",
-                "UUID": "$UUID",
-                "Manufacturer": "NVIDIA",
-                "DeviceType": "$DEVICE_TYPE",
-                "InstanceNumber": "$INSTANCE_NUMBER"
             }
         ],
         "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",

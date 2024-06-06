@@ -15,44 +15,47 @@
  * limitations under the License.
  */
 
-#include "nsmSoftwareSettings.hpp"
+#include "nsmWriteProtectedControl.hpp"
 
 #include "device-configuration.h"
+
+#include "nsmWriteProtectedIntf.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
 {
 
-NsmSoftwareSettings::NsmSoftwareSettings(
+NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
-    NsmDeviceIdentification deviceType, uint8_t instanceId) :
+    NsmDeviceIdentification deviceType, uint8_t instanceNumber) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceType(deviceType), instanceId(instanceId)
-{}
+    deviceType(deviceType), instanceNumber(instanceNumber)
+{
+    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber);
+}
 
-std::optional<Request> NsmSoftwareSettings::genRequestMsg(eid_t eid,
-                                                          uint8_t instanceId)
+std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,
+                                                               uint8_t)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_fpga_diagnostics_settings_req));
 
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_fpga_diagnostics_settings_req(
-        instanceId, GET_WP_SETTINGS, requestPtr);
+    auto rc = encode_get_fpga_diagnostics_settings_req(0, GET_WP_SETTINGS,
+                                                       requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "encode_get_fpga_diagnostics_settings_req failed. eid={EID} rc={RC}",
+            "encode_get_fpga_diagnostics_settings_req(GET_WP_SETTINGS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
     }
     return request;
 }
 
-uint8_t
-    NsmSoftwareSettings::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                           size_t responseLen)
+uint8_t NsmWriteProtectedControl::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
@@ -63,27 +66,8 @@ uint8_t
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        switch (deviceType)
-        {
-            case NSM_DEV_ID_GPU:
-                pdi().writeProtected(instanceId < 4 ? data.gpu1_4
-                                                    : data.gpu5_8);
-                break;
-            case NSM_DEV_ID_SWITCH:
-                pdi().writeProtected(data.nvSwitch);
-                break;
-            case NSM_DEV_ID_PCIE_BRIDGE:
-                pdi().writeProtected(data.pex);
-                break;
-            case NSM_DEV_ID_BASEBOARD:
-                pdi().writeProtected(data.baseboard);
-                break;
-            default:
-                lg2::error(
-                    "handleResponseMsg: decode_get_fpga_diagnostics_settings_wp_resp sensor={NAME}, deviceType={DEVICETYPE}",
-                    "NAME", getName(), "DEVICETYPE", (uint8_t)deviceType);
-                break;
-        }
+        pdi().writeProtectedControl(NsmWriteProtectedIntf::getValue(
+            data, deviceType, instanceNumber));
     }
     else
     {

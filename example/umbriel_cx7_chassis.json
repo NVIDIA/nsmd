@@ -131,14 +131,6 @@
                 "UUID": "$UUID",
                 "Count": 9,
                 "Priority": true
-            },
-            {
-                "Name": "HGX_FW_NVLinkManagementNIC_$INSTANCE_NUMBER",
-                "Type": "NSM_FirmwareInventory",
-                "UUID": "$UUID",
-                "Manufacturer": "NVIDIA",
-                "DeviceType": "$DEVICE_TYPE",
-                "InstanceNumber": "$INSTANCE_NUMBER"
             }
         ],
         "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",

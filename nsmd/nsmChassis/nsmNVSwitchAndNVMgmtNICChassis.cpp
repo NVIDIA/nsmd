@@ -17,8 +17,8 @@
 
 #include "nsmNVSwitchAndNVMgmtNICChassis.hpp"
 
-#include "nsmChassis/nsmInventoryProperty.hpp"
 #include "nsmDevice.hpp"
+#include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 

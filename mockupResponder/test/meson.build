@@ -6,6 +6,7 @@ dep_src_files = [
     '../../libnsm/network-ports.c',
     '../../libnsm/device-capability-discovery.c',
     '../../libnsm/device-configuration.c',
+    '../../libnsm/diagnostics.c',
     '../../libnsm/platform-environmental.c',
     '../../libnsm/pci-links.c',
     '../../libnsm/requester/mctp.c',
