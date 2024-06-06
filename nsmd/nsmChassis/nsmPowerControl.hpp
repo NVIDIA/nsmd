@@ -26,6 +26,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Cap/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Mode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 
 #include <cstdint>
 #include <iostream>
@@ -42,6 +43,7 @@ using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using PowerCapIntf = object_t<Control::Power::server::Cap>;
 using PowerModeIntf = object_t<Control::Power::server::Mode>;
 using Mode = sdbusplus::xyz::openbmc_project::Control::Power::server::Mode;
+using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using ClearPowerCapIntf =
     object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCap>;
 
@@ -53,7 +55,7 @@ class NsmPowerControl :
   public:
     NsmPowerControl(sdbusplus::bus::bus &bus, const std::string &name,
 		    const std::vector<utils::Association> &associations,
-		    std::string &type, const std::string &path);
+		    std::string &type, const std::string &path, const std::string& physicalContext);
     virtual uint32_t minPowerCapValue() const override;
     virtual uint32_t maxPowerCapValue() const override;
     virtual uint32_t defaultPowerCap() const override;
@@ -65,6 +67,7 @@ class NsmPowerControl :
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
         nullptr;
     std::unique_ptr<PowerModeIntf> powerModeIntf = nullptr;
+    std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
     std::map<std::string, double> powerCapChildValues;
 };
 } // namespace nsm

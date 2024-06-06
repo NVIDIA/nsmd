@@ -29,6 +29,8 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
+#include <xyz/openbmc_project/Sensor/Type/server.hpp>
 
 #include <iostream>
 #include <limits>
@@ -44,14 +46,17 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using ValueIntf = object_t<Sensor::server::Value>;
 using TimestampIntf = object_t<Time::server::EpochTime>;
-
+using TypeIntf = object_t<Sensor::server::Type>;
+using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 class NsmNumericSensorComposite : public NsmObject
 {
   public:
     NsmNumericSensorComposite(
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
-        const std::string& type, const std::string& path
+        const std::string& type, const std::string& path,
+        const std::string& physicalContext,
+        const std::string& implementation
 #ifdef NVIDIA_SHMEM
         ,
         std::unique_ptr<NsmNumericSensorShmem> shmemSensor
@@ -63,6 +68,8 @@ class NsmNumericSensorComposite : public NsmObject
     std::unique_ptr<ValueIntf> valueIntf = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
         nullptr;
+    std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
+    std::unique_ptr<TypeIntf> typeIntf = nullptr;
     std::map<std::string, double> childValues;
 #ifdef NVIDIA_SHMEM
     std::unique_ptr<NsmNumericSensorShmem> shmemSensor;

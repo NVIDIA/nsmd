@@ -31,10 +31,16 @@ namespace nsm
 NsmPowerControl::NsmPowerControl(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations, std::string& type,
-    const std::string& path) :
+    const std::string& path, const std::string& physicalContext) :
     NsmObject(name, type),
     PowerCapIntf(bus, path.c_str()), ClearPowerCapIntf(bus, path.c_str())
 {
+    decoratorAreaIntf = std::make_unique<DecoratorAreaIntf>(bus, path.c_str());
+    decoratorAreaIntf->physicalContext(
+        sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
+            convertPhysicalContextTypeFromString(
+                "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
+                physicalContext));
     // add all interfaces
     associationDefinitionsInft =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
@@ -146,6 +152,8 @@ static void CreateControlGpuPower(SensorManager& manager,
 
     auto associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
+    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PhysicalContext", interface.c_str());
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -162,7 +170,7 @@ static void CreateControlGpuPower(SensorManager& manager,
         "/xyz/openbmc_project/inventory/system/chassis/power/control/" + name;
 
     auto fpgaControlTotalGpuPower = std::make_shared<NsmPowerControl>(
-        bus, name, associations, type, nsmFPGAControlTotalGPUPowerPath);
+        bus, name, associations, type, nsmFPGAControlTotalGPUPowerPath, physicalContext);
     nsmDevice->deviceSensors.emplace_back(fpgaControlTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGAControlTotalGPUPowerPath] =
         fpgaControlTotalGpuPower;
