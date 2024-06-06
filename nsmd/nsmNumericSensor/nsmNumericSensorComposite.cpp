@@ -31,7 +31,9 @@ namespace nsm
 NsmNumericSensorComposite::NsmNumericSensorComposite(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
-    const std::string& type, const std::string& path
+    const std::string& type, const std::string& path,
+    const std::string& physicalContext,
+    const std::string& implementation
 #ifdef NVIDIA_SHMEM
     ,
     std::unique_ptr<NsmNumericSensorShmem> shmemSensor
@@ -44,6 +46,19 @@ NsmNumericSensorComposite::NsmNumericSensorComposite(
 #endif
 {
     // add all interfaces
+    decoratorAreaIntf = std::make_unique<DecoratorAreaIntf>(bus, path.c_str());
+    decoratorAreaIntf->physicalContext(
+        sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
+            convertPhysicalContextTypeFromString(
+                "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
+                physicalContext));
+
+    typeIntf = std::make_unique<TypeIntf>(bus, path.c_str());
+    typeIntf->implementation(
+        sdbusplus::common::xyz::openbmc_project::sensor::Type::
+            convertImplementationTypeFromString(
+                "xyz.openbmc_project.Sensor.Type.ImplementationType." +
+                implementation));
     associationDefinitionsInft =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
     valueIntf = std::make_unique<ValueIntf>(bus, path.c_str());
@@ -109,6 +124,11 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
 
     auto associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
+
+    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PhysicalContext", interface.c_str());
+    auto implementation = utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "Implementation", interface.c_str());
 #ifdef NVIDIA_SHMEM
     std::string chassis_association;
     for (const auto& association : associations)
@@ -149,7 +169,7 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
         std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>());
 #endif
     auto fpgaTotalGpuPower = std::make_shared<NsmNumericSensorComposite>(
-        bus, name, associations, type, nsmFPGATotalGPUPowerSensorPath
+        bus, name, associations, type, nsmFPGATotalGPUPowerSensorPath, physicalContext, implementation
 #ifdef NVIDIA_SHMEM
         ,
         std::move(shmemSensor)
