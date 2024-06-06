@@ -39,6 +39,7 @@ static const std::string sensorType("dummy_type");
 static const std::vector<utils::Association>
     associations({{"chassis", "all_sensors",
                    "/xyz/openbmc_project/inventory/dummy_device"}});
+static const std::string physicalContexnt("GPU");
 
 static const double val{32432.8970};
 static const uint64_t timestamp{13432548};
@@ -46,7 +47,8 @@ static const uint64_t timestamp{13432548};
 TEST(NsmNumericSensorDbusValue, GoodTest)
 {
     nsm::NsmNumericSensorDbusValue value{
-        bus, sensorName, sensorType, nsm::SensorUnit::DegreesC, associations};
+        bus,          sensorName,      sensorType, nsm::SensorUnit::DegreesC,
+        associations, physicalContexnt};
     value.updateReading(val);
 
     EXPECT_EQ(value.valueIntf.value(), val);
@@ -56,7 +58,8 @@ TEST(NsmNumericSensorDbusValue, GoodTest)
 TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
 {
     nsm::NsmNumericSensorDbusValueTimestamp value{
-        bus, sensorName, sensorType, nsm::SensorUnit::DegreesC, associations};
+        bus,          sensorName,      sensorType, nsm::SensorUnit::DegreesC,
+        associations, physicalContexnt};
     value.updateReading(val, timestamp);
 
     EXPECT_EQ(value.timestampIntf.elapsed(), timestamp);

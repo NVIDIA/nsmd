@@ -39,15 +39,37 @@ using namespace std::string_literals;
 NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
-    const std::vector<utils::Association>& associations) :
+    const std::vector<utils::Association>& associations,
+    const std::string& physicalContext, const std::string* implementation) :
     valueIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
     associationDefinitionsIntf(
         bus,
+        ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
+    decoratorAreaIntf(
+        bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())
 {
     valueIntf.unit(unit);
+    decoratorAreaIntf.physicalContext(
+        sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
+            convertPhysicalContextTypeFromString(
+                "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType." +
+                physicalContext));
+
+    if (implementation)
+    {
+        typeIntf = std::make_unique<TypeIntf>(
+            bus, ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name)
+                     .c_str());
+
+        typeIntf->implementation(
+            sdbusplus::common::xyz::openbmc_project::sensor::Type::
+                convertImplementationTypeFromString(
+                    "xyz.openbmc_project.Sensor.Type.ImplementationType." +
+                    *implementation));
+    }
 
     std::vector<std::tuple<std::string, std::string, std::string>>
         associations_list;
@@ -71,8 +93,10 @@ void NsmNumericSensorDbusValue::updateReading(double value,
 NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
-    const std::vector<utils::Association>& association) :
-    NsmNumericSensorDbusValue(bus, name, sensor_type, unit, association),
+    const std::vector<utils::Association>& association,
+    const std::string& physicalContext, const std::string* implementation) :
+    NsmNumericSensorDbusValue(bus, name, sensor_type, unit, association,
+                              physicalContext, implementation),
     timestampIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())
@@ -184,7 +208,8 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
 NsmNumericSensorCompositeChildValue::NsmNumericSensorCompositeChildValue(
     const std::string& name, const std::string& sensorType,
     const std::vector<std::string>& parents) :
-    name(name), sensorType(sensorType), parents(parents)
+    name(name),
+    sensorType(sensorType), parents(parents)
 {}
 
 void NsmNumericSensorCompositeChildValue::updateReading(double value,

@@ -27,7 +27,9 @@ class NsmVoltage : public NsmNumericSensor
   public:
     NsmVoltage(sdbusplus::bus::bus& bus, const std::string& name,
                const std::string& type, uint8_t sensorId,
-               const std::vector<utils::Association>& association);
+               const std::vector<utils::Association>& association,
+               const std::string& physicalContext,
+               const std::string* implementation = nullptr);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;

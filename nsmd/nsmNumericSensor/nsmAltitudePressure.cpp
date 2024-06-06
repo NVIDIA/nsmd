@@ -12,13 +12,14 @@ namespace nsm
 {
 NsmAltitudePressure::NsmAltitudePressure(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
-    const std::vector<utils::Association>& association) :
+    const std::vector<utils::Association>& association,
+    const std::string& physicalContext, const std::string* implementation) :
 
-    NsmNumericSensor(
-        name, type, 0,
-        std::make_shared<NsmNumericSensorValueAggregate>(
-            std::make_unique<NsmNumericSensorDbusValue>(
-                bus, name, getSensorType(), SensorUnit::Pascals, association)))
+    NsmNumericSensor(name, type, 0,
+                     std::make_shared<NsmNumericSensorValueAggregate>(
+                         std::make_unique<NsmNumericSensorDbusValue>(
+                             bus, name, getSensorType(), SensorUnit::Pascals,
+                             association, physicalContext, implementation)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -88,6 +89,19 @@ void makeNsmAltitudePressure(SensorManager& manager,
     auto priority = utils::DBusHandler().getDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
 
+    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PhysicalContext", interface.c_str());
+
+    std::unique_ptr<std::string> implementation{};
+    try
+    {
+        implementation = std::make_unique<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "Implementation", interface.c_str()));
+    }
+    catch (const std::exception& e)
+    {}
+
     auto associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
 
@@ -102,8 +116,8 @@ void makeNsmAltitudePressure(SensorManager& manager,
         return;
     }
 
-    auto sensor = std::make_shared<NsmAltitudePressure>(bus, name, type,
-                                                        associations);
+    auto sensor = std::make_shared<NsmAltitudePressure>(
+        bus, name, type, associations, physicalContext, implementation.get());
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", name, "TYPE", type);
 
