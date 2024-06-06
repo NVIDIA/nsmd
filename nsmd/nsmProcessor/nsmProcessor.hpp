@@ -42,7 +42,6 @@
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/SPDMResponder/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
@@ -56,19 +55,15 @@ using AcceleratorIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Accelerator>;
 using accelaratorType = sdbusplus::xyz::openbmc_project::Inventory::Item::
     server::Accelerator::AcceleratorType;
-using SpdmResponderIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::SPDMResponder>;
 
 class NsmAcceleratorIntf : public NsmObject
 {
   public:
     NsmAcceleratorIntf(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath,
-                       std::string& chassisObjPath);
+                       std::string& type, std::string& inventoryObjPath);
 
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf = nullptr;
-    std::unique_ptr<SpdmResponderIntf> spdmResponderIntf = nullptr;
 };
 
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
