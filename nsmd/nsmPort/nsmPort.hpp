@@ -13,6 +13,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Metrics/IBPort/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem2/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem3/server.hpp>
@@ -23,6 +24,8 @@ using PortInfoIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::PortInfo>;
 using PortStateIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::inventory::decorator::PortState>;
+using PortIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::item::Port>;
 using IBPortIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::IBPort>;
 using PortMetricsOem2Intf = sdbusplus::server::object_t<
@@ -89,6 +92,7 @@ class NsmPortMetrics : public NsmSensor
   public:
     NsmPortMetrics(sdbusplus::bus::bus& bus, std::string& portName,
                    uint8_t portNum, const std::string& type,
+                   const std::vector<utils::Association>& associations,
                    std::string& parentObjPath, std::string& inventoryObjPath);
     NsmPortMetrics() = default;
 
@@ -104,6 +108,7 @@ class NsmPortMetrics : public NsmSensor
     std::unique_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::unique_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
+    std::unique_ptr<PortIntf> portIntf = nullptr;
 
     uint8_t portNumber;
 };

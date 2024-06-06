@@ -9,6 +9,109 @@
 
 namespace nsm
 {
+static std::string getTopologyObjPath(const std::string& deviceName,
+                                      const uint8_t deviceType)
+{
+    std::string topologyObjPath =
+        "/xyz/openbmc_project/inventory/system/linktopology/";
+    switch (deviceType)
+    {
+        case NSM_DEV_ID_GPU:
+            topologyObjPath += "GPU/";
+            break;
+        case NSM_DEV_ID_SWITCH:
+            topologyObjPath += "SWITCH/";
+            break;
+        case NSM_DEV_ID_PCIE_BRIDGE:
+            topologyObjPath += "PCIE_BRIDGE/";
+            break;
+        default:
+            lg2::error("Topology not defined for device type = {DTYPE}",
+                       "DTYPE", deviceType);
+            return "";
+    }
+    topologyObjPath += deviceName;
+
+    return topologyObjPath;
+}
+
+static std::map<std::string,
+                std::pair<uint8_t, std::vector<utils::Association>>>
+    getTopologyData(const std::string& topoObjPath,
+                    const std::string& topoIntfSubStr)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    std::map<std::string, std::vector<std::string>> mapperResponse;
+
+    auto mapper = bus.new_method_call(utils::mapperService, utils::mapperPath,
+                                      utils::mapperInterface, "GetObject");
+    mapper.append(topoObjPath, std::vector<std::string>{});
+
+    std::map<std::string, std::pair<uint8_t, std::vector<utils::Association>>>
+        topoInformation;
+    try
+    {
+        auto mapperResponseMsg = bus.call(mapper);
+        mapperResponseMsg.read(mapperResponse);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "GetTopology:: Error: '{ERROR}' for interface: {INTF} and path: {PATH}",
+            "ERROR", e, "INTF", topoIntfSubStr, "PATH", topoObjPath);
+        return topoInformation;
+    }
+
+    std::vector<utils::Association> associationTmp;
+    for (const auto& [service, interfaces] : mapperResponse)
+    {
+        for (const auto& interface : interfaces)
+        {
+            if (interface.find(topoIntfSubStr) != std::string::npos)
+            {
+                auto inventoryObjPath =
+                    utils::DBusHandler().getDbusProperty<std::string>(
+                        topoObjPath.c_str(), "InventoryObjPath",
+                        interface.c_str());
+                auto logicalPortNumber =
+                    utils::DBusHandler().getDbusProperty<uint64_t>(
+                        topoObjPath.c_str(), "LogicalPortNumber",
+                        interface.c_str());
+                auto associations =
+                    utils::DBusHandler()
+                        .getDbusProperty<std::vector<std::string>>(
+                            topoObjPath.c_str(), "Associations",
+                            interface.c_str());
+
+                if (associations.size() % 3 != 0)
+                {
+                    lg2::error(
+                        "Association in topology must follow (fwd, bck, absolutePath) for {OBJ}",
+                        "OBJ", topoObjPath);
+                }
+
+                associationTmp.clear();
+                for (uint8_t it = 0; it < associations.size(); it += 3)
+                {
+                    associationTmp.push_back({});
+                    auto& tmp = associationTmp.back();
+
+                    tmp.forward = associations[it];
+                    tmp.backward = associations[it + 1];
+                    tmp.absolutePath = associations[it + 2];
+                    tmp.absolutePath =
+                        utils::makeDBusNameValid(tmp.absolutePath);
+                }
+
+                inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
+                topoInformation[inventoryObjPath] = {logicalPortNumber,
+                                                     associationTmp};
+            }
+        }
+    }
+
+    return topoInformation;
+}
 
 NsmPortStatus::NsmPortStatus(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
@@ -17,7 +120,8 @@ NsmPortStatus::NsmPortStatus(
     std::string& inventoryObjPath) :
     NsmSensor(portName, type), portName(portName), portNumber(portNum)
 {
-    lg2::debug("NsmPortStatus: {NAME}", "NAME", portName.c_str());
+    lg2::debug("NsmPortStatus: {NAME} with port number {NUM}", "NAME",
+               portName.c_str(), "NUM", portNum);
 
     portStateIntf = std::make_unique<PortStateIntf>(bus,
                                                     inventoryObjPath.c_str());
@@ -100,8 +204,9 @@ uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
     else
     {
         lg2::error(
-            "responseHandler: decode_query_port_status_resp unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+            "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
+            "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -114,7 +219,8 @@ NsmPortCharacteristics::NsmPortCharacteristics(
     std::string& inventoryObjPath) :
     NsmSensor(portName, type), portName(portName), portNumber(portNum)
 {
-    lg2::debug("NsmPortCharacteristics: {NAME}", "NAME", portName.c_str());
+    lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
+               portName.c_str(), "NUM", portNum);
 
     portInfoIntf = std::make_unique<PortInfoIntf>(bus,
                                                   inventoryObjPath.c_str());
@@ -170,30 +276,42 @@ uint8_t
     else
     {
         lg2::error(
-            "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+            "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
+            "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
 }
 
-NsmPortMetrics::NsmPortMetrics(sdbusplus::bus::bus& bus, std::string& portName,
-                               uint8_t portNum, const std::string& type,
-                               std::string& parentObjPath,
-                               std::string& inventoryObjPath) :
+NsmPortMetrics::NsmPortMetrics(
+    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    const std::string& type,
+    const std::vector<utils::Association>& associations,
+    std::string& parentObjPath, std::string& inventoryObjPath) :
     NsmSensor(portName, type), portName(portName), portNumber(portNum)
 {
-    lg2::debug("NsmPortMetrics: {NAME}", "NAME", portName.c_str());
+    lg2::debug("NsmPortMetrics: {NAME} with port number {NUM}", "NAME",
+               portName.c_str(), "NUM", portNum);
 
     iBPortIntf = std::make_unique<IBPortIntf>(bus, inventoryObjPath.c_str());
+    portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
 
     portMetricsOem2Intf =
         std::make_unique<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
 
     associationDefinitionsIntf =
         std::make_unique<AssociationDefInft>(bus, inventoryObjPath.c_str());
-    associationDefinitionsIntf->associations(
-        {{"parent_device", "all_states", parentObjPath.c_str()}});
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    associationsList.emplace_back("parent_device", "all_states",
+                                  parentObjPath.c_str());
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    associationDefinitionsIntf->associations(associationsList);
 }
 
 void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
@@ -388,8 +506,9 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     else
     {
         lg2::error(
-            "responseHandler: get_port_telemetry_counter unsuccessfull. portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+            "responseHandler: get_port_telemetry_counter unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
+            "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -410,8 +529,6 @@ static void createNsmPortSensor(SensorManager& manager,
         objPath.c_str(), "Count", interface.c_str());
     auto deviceType = utils::DBusHandler().getDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceType", interface.c_str());
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
-        objPath.c_str(), "InventoryObjPath", interface.c_str());
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
     auto type = interface.substr(interface.find_last_of('.') + 1);
@@ -426,11 +543,36 @@ static void createNsmPortSensor(SensorManager& manager,
         return;
     }
 
+    // get topology information from EM
+    std::string deviceName =
+        parentObjPath.substr(parentObjPath.find_last_of('/') + 1);
+    std::string topologyIntfSubStr =
+        "xyz.openbmc_project.Configuration.NVLinkTopology.Topology";
+    std::string topologyObjPath = getTopologyObjPath(deviceName, deviceType);
+    auto deviceTopologies =
+        getTopologyData(topologyObjPath, topologyIntfSubStr);
+
     // create nvlink [as per count and also they are 1-based]
-    for (uint64_t i = 1; i <= count; i++)
+    for (uint64_t i = 0; i < count; i++)
     {
+        uint8_t logicalPortNum = i + 1;
         std::string portName = name + '_' + std::to_string(i);
-        std::string objPath = inventoryObjPath + "/Ports/" + portName;
+        std::string objPath = parentObjPath + "/Ports/" + portName;
+        std::vector<utils::Association> associations;
+
+        auto deviceTopologyIt = deviceTopologies.find(objPath);
+        if (deviceTopologies.size() != 0 &&
+            deviceTopologyIt != deviceTopologies.end())
+        {
+            logicalPortNum = deviceTopologyIt->second.first;
+            associations = deviceTopologyIt->second.second;
+        }
+        else
+        {
+            lg2::debug(
+                "Topology information not found for object port number: {PNUM} and path: {OBJP}",
+                "PNUM", logicalPortNum, "OBJP", objPath);
+        }
 
         if (deviceType == NSM_DEV_ID_GPU)
         {
@@ -438,7 +580,8 @@ static void createNsmPortSensor(SensorManager& manager,
                 std::make_shared<PortMetricsOem3Intf>(bus, objPath.c_str());
 
             auto portStatusSensor = std::make_shared<NsmPortStatus>(
-                bus, portName, i, type, portMetricsOem3Intf, objPath);
+                bus, portName, logicalPortNum, type, portMetricsOem3Intf,
+                objPath);
             if (!portStatusSensor)
             {
                 lg2::error(
@@ -461,7 +604,8 @@ static void createNsmPortSensor(SensorManager& manager,
 
             auto portCharacteristicsSensor =
                 std::make_shared<NsmPortCharacteristics>(
-                    bus, portName, i, type, portMetricsOem3Intf, objPath);
+                    bus, portName, logicalPortNum, type, portMetricsOem3Intf,
+                    objPath);
             if (!portCharacteristicsSensor)
             {
                 lg2::error(
@@ -487,7 +631,8 @@ static void createNsmPortSensor(SensorManager& manager,
         }
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
-            bus, portName, i, type, parentObjPath, objPath);
+            bus, portName, logicalPortNum, type, associations, parentObjPath,
+            objPath);
         if (!portMetricsSensor)
         {
             lg2::error(
