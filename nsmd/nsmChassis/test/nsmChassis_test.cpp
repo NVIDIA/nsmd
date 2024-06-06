@@ -203,56 +203,61 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(6, gpu.deviceSensors.size());
+
+    auto sensors = 0;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           gpu.deviceSensors[0]));
+                           gpu.deviceSensors[sensors]));
+    EXPECT_EQ(gpuDeviceUuid,
+              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+                  gpu.deviceSensors[sensors++])
+                  ->pdi()
+                  .uuid());
     EXPECT_NE(
         nullptr,
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu.deviceSensors[1]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                           gpu.deviceSensors[2]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu.deviceSensors[3]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                           gpu.deviceSensors[4]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu.deviceSensors[5]));
-
-    EXPECT_EQ(gpuDeviceUuid,
-              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                  gpu.deviceSensors[0])
-                  ->pdi()
-                  .uuid());
-
+            gpu.deviceSensors[sensors]));
     EXPECT_EQ(
         1,
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu.deviceSensors[1])
+            gpu.deviceSensors[sensors++])
             ->pdi()
             .associations()
             .size());
+
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
+                           gpu.deviceSensors[sensors]));
     EXPECT_EQ(ChassisIntf::ChassisType::Module,
               dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                  gpu.deviceSensors[2])
+                  gpu.deviceSensors[sensors++])
                   ->pdi()
                   .type());
+
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+                           gpu.deviceSensors[sensors]));
     EXPECT_EQ(HealthIntf::HealthType::OK,
               dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                  gpu.deviceSensors[3])
+                  gpu.deviceSensors[sensors++])
                   ->pdi()
                   .health());
+
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
+                           gpu.deviceSensors[sensors]));
     EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                  gpu.deviceSensors[4])
+                  gpu.deviceSensors[sensors++])
                   ->pdi()
                   .locationType());
+
+    EXPECT_NE(nullptr,
+              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
+                  gpu.deviceSensors[sensors]));
     EXPECT_EQ(get<std::string>(locationCode, "LocationCode"),
               dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu.deviceSensors[5])
+                  gpu.deviceSensors[sensors++])
                   ->pdi()
                   .locationCode());
+
+    EXPECT_EQ(sensors, gpu.deviceSensors.size());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
@@ -278,23 +283,11 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
                             fpga.deviceSensors[sensors++])
                             ->pdi()
                             .uuid());
-    EXPECT_NE(
-        nullptr,
-        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            fpga.deviceSensors[sensors]));
-    EXPECT_EQ(
-        0,
-        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            fpga.deviceSensors[sensors++])
-            ->pdi()
-            .associations()
-            .size());
 
     EXPECT_NE(nullptr,
               dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
                   fpga.deviceSensors[sensors++]));
 
-            
     EXPECT_EQ(sensors, fpga.deviceSensors.size());
 }
 
