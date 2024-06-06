@@ -77,7 +77,6 @@ uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
     rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        free((void*)responseMsg);
         return rc;
     }
 

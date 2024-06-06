@@ -101,12 +101,14 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 
 		if (length != bytes) {
 			free(*nsm_resp_msg);
+			*nsm_resp_msg = NULL;
 			return NSM_REQUESTER_INVALID_RECV_LEN;
 		}
 
 		if ((mctp_prefix[1] != eid) ||
 		    (mctp_prefix[2] != MCTP_MSG_TYPE_PCI_VDM)) {
 			free(*nsm_resp_msg);
+			*nsm_resp_msg = NULL;
 			return NSM_REQUESTER_NOT_NSM_MSG;
 		}
 		*resp_msg_len = nsm_len;
@@ -126,6 +128,7 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 	struct nsm_msg_hdr *hdr = (struct nsm_msg_hdr *)(*nsm_resp_msg);
 	if (hdr->request != 0 || hdr->datagram != 0) {
 		free(*nsm_resp_msg);
+		*nsm_resp_msg = NULL;
 		return NSM_REQUESTER_NOT_RESP_MSG;
 	}
 
@@ -133,6 +136,7 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 	if (*resp_msg_len <
 	    (sizeof(struct nsm_msg_hdr) + NSM_RESPONSE_MIN_LEN)) {
 		free(*nsm_resp_msg);
+		*nsm_resp_msg = NULL;
 		return NSM_REQUESTER_RESP_MSG_TOO_SMALL;
 	}
 
@@ -151,6 +155,7 @@ nsm_requester_rc_t nsm_recv(mctp_eid_t eid, int mctp_fd, uint8_t instance_id,
 	struct nsm_msg_hdr *hdr = (struct nsm_msg_hdr *)(*nsm_resp_msg);
 	if (hdr->instance_id != instance_id) {
 		free(*nsm_resp_msg);
+		*nsm_resp_msg = NULL;
 		return NSM_REQUESTER_INSTANCE_ID_MISMATCH;
 	}
 

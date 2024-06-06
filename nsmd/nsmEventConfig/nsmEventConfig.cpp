@@ -100,7 +100,6 @@ uint8_t NsmEventConfig::setCurrentEventSources(
     rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        free((void*)responseMsg);
         return rc;
     }
 
@@ -145,7 +144,6 @@ uint8_t NsmEventConfig::configureEventAcknowledgement(
     rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
-        free((void*)responseMsg);
         return rc;
     }
 

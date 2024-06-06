@@ -68,7 +68,6 @@ class NsmEccModeIntf : public EccModeIntf
                            "eid={EID} rc={RC}",
                            "EID", eid, "RC", rc_);
             }
-            free((void*)responseMsg);
             return;
         }
         uint8_t cc = NSM_ERROR;
@@ -130,7 +129,6 @@ class NsmEccModeIntf : public EccModeIntf
                     "eid={EID} rc={RC}",
                     "EID", eid, "RC", rc_);
             }
-            free((void*)responseMsg);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
             return;

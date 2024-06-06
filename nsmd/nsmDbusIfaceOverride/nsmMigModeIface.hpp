@@ -48,7 +48,6 @@ class NsmMigModeIntf : public MigModeIntf
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
-            free((void*)responseMsg);
             return;
         }
         uint8_t cc = NSM_ERROR;
@@ -105,7 +104,6 @@ class NsmMigModeIntf : public MigModeIntf
                 "setMigModeOnDevice SendRecvNsmMsgSync failed for while setting MigMode "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc_);
-            free((void*)responseMsg);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
             return;
