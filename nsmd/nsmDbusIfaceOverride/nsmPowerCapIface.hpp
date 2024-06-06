@@ -17,16 +17,15 @@
 
 #pragma once
 #include "platform-environmental.h"
-
+#include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
-
+#include <cstdint>
+#include <memory>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Control/Power/Cap/server.hpp>
-
-#include <cstdint>
 
 namespace nsm
 {
@@ -36,8 +35,9 @@ using PowerCapIntf = sdbusplus::server::object_t<
 class NsmPowerCapIntf : public PowerCapIntf
 {
   public:
-    NsmPowerCapIntf(sdbusplus::bus::bus& bus, const char* path, uuid_t uuid) :
-        PowerCapIntf(bus, path), uuid(uuid)
+    NsmPowerCapIntf(sdbusplus::bus::bus &bus, const char *path,
+		    std::string &name, const std::vector<std::string> &parents, uuid_t uuid)
+	: PowerCapIntf(bus, path), name(name), parents(parents), uuid(uuid)
     {}
 
     void getPowerCapFromDevice()
@@ -142,15 +142,34 @@ class NsmPowerCapIntf : public PowerCapIntf
             getPowerCapFromDevice();
             lg2::info("setPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
-        }
-        else
-        {
-            lg2::error(
-                "setPowerCapOnDevice decode_set_power_limit_resp failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC = {A} ",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-        }
+
+	    for (auto it = parents.begin(); it != parents.end();) {
+		    auto sensorIt = manager.objectPathToSensorMap.find(*it);
+		    if (sensorIt != manager.objectPathToSensorMap.end()) {
+			    auto sensor = sensorIt->second;
+			    if (sensor) {
+				    sensorCache.emplace_back(
+					std::dynamic_pointer_cast<
+					    NsmPowerControl>(sensor));
+				    it = parents.erase(it);
+				    continue;
+			    }
+		    }
+		    ++it;
+	    }
+
+	    // update each cached sensor
+	    for (const auto &sensor : sensorCache) {
+		    sensor->updatePowerCapValue(name, PowerCapIntf::powerCap());
+	    }
+	} else {
+		lg2::error("setPowerCapOnDevice decode_set_power_limit_resp "
+			   "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
+			   "RC = {A} ",
+			   "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+		throw sdbusplus::xyz::openbmc_project::Common::Device::
+			Error::WriteFailure();
+	}
     }
 
     uint32_t powerCap(uint32_t power_limit) override
@@ -165,6 +184,9 @@ class NsmPowerCapIntf : public PowerCapIntf
         return PowerCapIntf::powerCap();
     }
 
+    std::string name;
+    std::vector<std::string> parents;
+    std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
   private:
     uuid_t uuid;
 };

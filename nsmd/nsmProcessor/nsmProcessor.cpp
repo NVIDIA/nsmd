@@ -919,10 +919,10 @@ uint8_t
     return cc;
 }
 
-NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
-                         std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-    NsmSensor(name, type),
-    powerCapIntf(powerCapIntf)
+NsmPowerCap::NsmPowerCap(std::string &name, std::string &type,
+			 std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+			 const std::vector<std::string> &parents)
+    : NsmSensor(name, type), powerCapIntf(powerCapIntf), parents(parents)
 {}
 
 void NsmPowerCap::updateReading(uint32_t value)
@@ -930,6 +930,25 @@ void NsmPowerCap::updateReading(uint32_t value)
     // calling parent powercap to update the value on dbus
     powerCapIntf->PowerCapIntf::powerCap(value);
     powerCapIntf->PowerCapIntf::powerCapEnable(true);
+    SensorManager &manager = SensorManager::getInstance();
+    for (auto it = parents.begin(); it != parents.end();) {
+	    auto sensorIt = manager.objectPathToSensorMap.find(*it);
+	    if (sensorIt != manager.objectPathToSensorMap.end()) {
+		    auto sensor = sensorIt->second;
+		    if (sensor) {
+			    sensorCache.emplace_back(
+				std::dynamic_pointer_cast<NsmPowerControl>(
+				    sensor));
+			    it = parents.erase(it);
+			    continue;
+		    }
+	    }
+	    ++it;
+    }
+    // update each cached sensor
+    for (const auto &sensor : sensorCache) {
+	    sensor->updatePowerCapValue(getName(), value);
+    }
 }
 
 std::optional<std::vector<uint8_t>>
@@ -978,12 +997,11 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-NsmMaxPowerCap::NsmMaxPowerCap(
-    std::string& name, std::string& type,
-    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
+NsmMaxPowerCap::NsmMaxPowerCap(std::string &name, std::string &type,
+			       std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+			       std::shared_ptr<PowerLimitIface> powerLimitIntf)
+    : NsmObject(name, type), powerCapIntf(powerCapIntf),
+      powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
@@ -1048,12 +1066,11 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     co_return cc;
 }
 
-NsmMinPowerCap::NsmMinPowerCap(
-    std::string& name, std::string& type,
-    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
+NsmMinPowerCap::NsmMinPowerCap(std::string &name, std::string &type,
+			       std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+			       std::shared_ptr<PowerLimitIface> powerLimitIntf)
+    : NsmObject(name, type), powerCapIntf(powerCapIntf),
+      powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
@@ -1119,10 +1136,9 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 }
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
-    std::string& name, std::string& type,
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type),
-    clearPowerCapIntf(clearPowerCapIntf)
+    std::string &name, std::string &type,
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf)
+    : NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
@@ -1466,50 +1482,63 @@ static void createNsmProcessorSensor(SensorManager& manager,
         }
         else if (type == "NSM_PowerCap")
         {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            // create power cap , clear power cap and power limit interface
-            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
-                bus, inventoryObjPath.c_str(), uuid);
+		std::vector<std::string> candidateForList;
+		try {
+			candidateForList =
+			    utils::DBusHandler()
+				.getDbusProperty<std::vector<std::string>>(
+				    objPath.c_str(), "CompositeNumericSensors",
+				    interface.c_str());
+		} catch (const sdbusplus::exception::SdBusError &e) {
+		}
+		auto priority = utils::DBusHandler().getDbusProperty<bool>(
+		    objPath.c_str(), "Priority", interface.c_str());
+		// create power cap , clear power cap and power limit interface
+		auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+		    bus, inventoryObjPath.c_str(), name,
+		    candidateForList, uuid);
 
-            auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
-                bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
+		auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
+		    bus, inventoryObjPath.c_str(), uuid, powerCapIntf);
 
-            auto powerLimitIntf = std::make_shared<PowerLimitIface>(
-                bus, inventoryObjPath.c_str());
+		auto powerLimitIntf = std::make_shared<PowerLimitIface>(
+		    bus, inventoryObjPath.c_str());
 
-            // create sensors for power cap properties
-            auto powerCap = std::make_shared<NsmPowerCap>(name, type,
-                                                          powerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(powerCap);
-            nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+		// create sensors for power cap properties
+		auto powerCap = std::make_shared<NsmPowerCap>(
+		    name, type, powerCapIntf, candidateForList);
+		nsmDevice->deviceSensors.emplace_back(powerCap);
+		nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+		manager.powerCapList.emplace_back(powerCap);
 
-            auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
-                name, type, clearPowerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
+		auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
+		    name, type, clearPowerCapIntf);
+		nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
+		manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
-            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
-                name, type, powerCapIntf, powerLimitIntf);
-            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
+		auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
+		    name, type, powerCapIntf, powerLimitIntf);
+		nsmDevice->deviceSensors.emplace_back(maxPowerCap);
+		manager.maxPowerCapList.emplace_back(maxPowerCap);
 
-            auto minPowerCap = std::make_shared<NsmMinPowerCap>(
-                name, type, powerCapIntf, powerLimitIntf);
-            nsmDevice->deviceSensors.emplace_back(minPowerCap);
+		auto minPowerCap = std::make_shared<NsmMinPowerCap>(
+		    name, type, powerCapIntf, powerLimitIntf);
+		nsmDevice->deviceSensors.emplace_back(minPowerCap);
+		manager.minPowerCapList.emplace_back(minPowerCap);
 
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(powerCap);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(powerCap);
-            }
+		if (priority) {
+			nsmDevice->prioritySensors.push_back(powerCap);
+		} else {
+			nsmDevice->roundRobinSensors.push_back(powerCap);
+		}
 
-            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
-                .detach();
-            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
-            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
-        }
+		defaultPowerCap->update(manager, manager.getEid(nsmDevice))
+		    .detach();
+		maxPowerCap->update(manager, manager.getEid(nsmDevice))
+		    .detach();
+		minPowerCap->update(manager, manager.getEid(nsmDevice))
+		    .detach();
+	}
     }
 
     catch (const std::exception& e)

@@ -22,7 +22,7 @@
 #include "nsmDevice.hpp"
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
-
+#include "nsmObject.hpp"
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 #include <sdbusplus/timer.hpp>
@@ -33,6 +33,10 @@ namespace nsm
 {
 using RequesterHandler = requester::Handler<requester::Request>;
 class NsmNumericSensorComposite;
+class NsmPowerCap;
+class NsmDefaultPowerCap;
+class NsmMaxPowerCap;
+class NsmMinPowerCap;
 /**
  * @brief Sensor manager abstraction class
  *
@@ -92,8 +96,12 @@ class SensorManager
         }
         return *instance;
     }
-    std::unordered_map<std::string, std::shared_ptr<NsmNumericSensorComposite>>
+    std::unordered_map<std::string, std::shared_ptr<NsmObject>>
         objectPathToSensorMap;
+    std::vector<std::shared_ptr<NsmPowerCap>> powerCapList;
+    std::vector<std::shared_ptr<NsmDefaultPowerCap>> defaultPowerCapList;
+    std::vector<std::shared_ptr<NsmMaxPowerCap>> maxPowerCapList;
+    std::vector<std::shared_ptr<NsmMinPowerCap>> minPowerCapList;
 
   protected:
     static std::unique_ptr<SensorManager> instance;

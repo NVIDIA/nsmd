@@ -21,7 +21,7 @@
 #include "nsmDevice.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "sensorManager.hpp"
-
+#include <phosphor-logging/lg2.hpp>
 #include <com/nvidia/Common/ClearPowerCap/server.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -143,6 +143,25 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
             getPowerCapFromDevice();
             lg2::info("clearPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
+            for (auto it = powerCapIntf->parents.begin(); it != powerCapIntf->parents.end();) {
+		    auto sensorIt = manager.objectPathToSensorMap.find(*it);
+		    if (sensorIt != manager.objectPathToSensorMap.end()) {
+			    auto sensor = sensorIt->second;
+			    if (sensor) {
+				    powerCapIntf->sensorCache.emplace_back(
+					std::dynamic_pointer_cast<
+					    NsmPowerControl>(sensor));
+				    it = powerCapIntf->parents.erase(it);
+				    continue;
+			    }
+		    }
+		    ++it;
+	    }
+
+	    // update each cached sensor
+	    for (const auto &sensor : powerCapIntf->sensorCache) {
+		    sensor->updatePowerCapValue(powerCapIntf->name, powerCapIntf->PowerCapIntf::powerCap());
+	    }
         }
         else
         {

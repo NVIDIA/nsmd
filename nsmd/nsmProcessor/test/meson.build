@@ -12,6 +12,7 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
     '../../nsmChassis/nsmInventoryProperty.cpp',
+    '../../nsmChassis/nsmPowerControl.cpp',
 ]
 
 dep_src_headers = [

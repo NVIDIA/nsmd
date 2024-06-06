@@ -12,6 +12,7 @@ sources += [
     'nsmChassis/nsmPCIeFunction.cpp',
     'nsmChassis/nsmPCIeLinkSpeed.cpp',
     'nsmChassis/nsmPCIeLTSSMState.cpp',
+    'nsmChassis/nsmPowerControl.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmFwSwInventory']

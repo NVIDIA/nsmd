@@ -202,7 +202,9 @@ void NsmNumericSensorCompositeChildValue::updateReading(double value,
             auto sensor = sensorIt->second;
             if (sensor)
             {
-                sensorCache.emplace_back(sensor);
+                sensorCache.emplace_back(
+                    std::dynamic_pointer_cast<NsmNumericSensorComposite>(
+                        sensor));
                 it = parents.erase(it);
                 continue;
             }
