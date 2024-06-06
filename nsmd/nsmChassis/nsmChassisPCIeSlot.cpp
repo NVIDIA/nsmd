@@ -45,12 +45,21 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
         objPath.c_str(), "Priority", interface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
-    auto pcieSlotProvider = NsmChassisPCIeSlot(chassisName, name);
+    auto pcieSlotProvider = NsmChassisPCIeSlot<PCIeSlotIntf>(chassisName, name);
     pcieSlotProvider.pdi().slotType(
         PCIeSlotIntf::convertSlotTypesFromString(slotType));
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
                           pcieSlotProvider, deviceIndex),
                       priority);
+
+    auto associations = utils::getAssociations(objPath,
+                                               interface + ".Associations");
+    auto associationsObject =
+        std::make_shared<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
+            chassisName, name);
+    associationsObject->pdi().associations(
+        utils::getAssociations(associations));
+    device->addStaticSensor(associationsObject);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

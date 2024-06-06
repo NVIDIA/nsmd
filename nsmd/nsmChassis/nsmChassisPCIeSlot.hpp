@@ -20,6 +20,7 @@
 #include "globals.hpp"
 #include "nsmInterface.hpp"
 
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
 
 namespace nsm
@@ -28,15 +29,17 @@ namespace nsm
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
+using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 
-class NsmChassisPCIeSlot : public NsmInterfaceProvider<PCIeSlotIntf>
+template <typename IntfType>
+class NsmChassisPCIeSlot : public NsmInterfaceProvider<IntfType>
 {
   public:
     NsmChassisPCIeSlot() = delete;
     NsmChassisPCIeSlot(const std::string& chassisName,
                        const std::string& name) :
-        NsmInterfaceProvider<PCIeSlotIntf>(
-            name, "NSM_ChassisPCIeSlot", chassisInventoryBasePath / chassisName)
+        NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeSlot",
+                                       chassisInventoryBasePath / chassisName)
     {}
 };
 

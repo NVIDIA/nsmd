@@ -68,10 +68,12 @@ struct NsmChassisPCIeSlotTest : public testing::Test, public utils::DBusTest
          "xyz.openbmc_project.Inventory.Item.PCIeSlot.SlotTypes.OEM"},
         {"Priority", false},
     };
+    const MapperServiceMap serviceMap;
 };
 
 TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 {
+    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(serviceMap));
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -82,13 +84,18 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, baseboard.prioritySensors.size());
     EXPECT_EQ(1, baseboard.roundRobinSensors.size());
-    EXPECT_EQ(0, baseboard.deviceSensors.size());
+    EXPECT_EQ(1, baseboard.deviceSensors.size());
     auto sensor = dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
         baseboard.roundRobinSensors[0]);
     EXPECT_NE(nullptr, sensor);
     EXPECT_EQ(PCIeSlotIntf::convertSlotTypesFromString(
                   get<std::string>(basic, "SlotType")),
               sensor->pdi().slotType());
+    auto associations =
+        dynamic_pointer_cast<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
+            baseboard.deviceSensors[0]);
+    EXPECT_NE(nullptr, associations);
+    EXPECT_EQ(0, associations->pdi().associations().size());
 }
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {
@@ -111,7 +118,7 @@ struct NsmPCIeSlotTest : public NsmChassisPCIeSlotTest
 {
   protected:
     uint8_t deviceIndex = 1;
-    NsmChassisPCIeSlot pcieDevice{chassisName, name};
+    NsmChassisPCIeSlot<PCIeSlotIntf> pcieDevice{chassisName, name};
 
   private:
     std::shared_ptr<NsmPCIeLinkSpeed<PCIeSlotIntf>> sensor =
