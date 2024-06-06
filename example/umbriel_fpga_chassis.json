@@ -63,7 +63,24 @@
                 "Priority": false,
                 "UUID": "$UUID",
                 "DeviceIndex": 0,
-                "SlotType": "xyz.openbmc_project.Inventory.Item.PCIeSlot.SlotTypes.OEM"
+                "SlotType": "xyz.openbmc_project.Inventory.Item.PCIeSlot.SlotTypes.OEM",
+                "Associations": [
+                    {
+                        "Forward": "switch_link",
+                        "Backward": "pcieslot",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology $INSTANCE_NUMBER/Switches/PCIeRetimer $INSTANCE_NUMBER"
+                    },
+                    {
+                        "Forward": "fabric_link",
+                        "Backward": "pcieslot",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology $INSTANCE_NUMBER"
+                    },
+                    {
+                        "Forward": "port_link",
+                        "Backward": "pcieslot",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology $INSTANCE_NUMBER/Switches/PCIeRetimer $INSTANCE_NUMBER/Ports/Up_0"
+                    }
+                ]
             },
             {
                 "Name": "HGX_Chassis_0_Inlet_0_Temp_0",
