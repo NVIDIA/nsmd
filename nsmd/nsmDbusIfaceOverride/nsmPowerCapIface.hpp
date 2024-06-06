@@ -65,7 +65,6 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
-            free((void*)responseMsg);
             return;
         }
         uint8_t cc = NSM_ERROR;
@@ -80,6 +79,7 @@ class NsmPowerCapIntf : public PowerCapIntf
             &requested_persistent_limit_in_miliwatts,
             &requested_oneshot_limit_in_miliwatts,
             &enforced_limit_in_miliwatts);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             PowerCapIntf::powerCap(enforced_limit_in_miliwatts / 1000);
@@ -125,7 +125,6 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "setPowerCapOnDevice SendRecvNsmMsgSync failed for whilesetting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
-            free((void*)responseMsg);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
             return;
@@ -136,6 +135,7 @@ class NsmPowerCapIntf : public PowerCapIntf
         uint16_t data_size = 0;
         rc = decode_set_power_limit_resp(responseMsg, responseLen, &cc,
                                          &data_size, &reason_code);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
