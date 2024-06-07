@@ -60,6 +60,18 @@ void NumericSensorFactory::make(SensorManager& manager,
     info.aggregated = utils::DBusHandler().getDbusProperty<bool>(
         objPath.c_str(), "Aggregated", interface.c_str());
 
+    info.physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "PhysicalContext", interface.c_str());
+
+    try
+    {
+        info.implementation = std::make_unique<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "Implementation", interface.c_str()));
+    }
+    catch (const std::exception& e)
+    {}
+
     info.associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
 

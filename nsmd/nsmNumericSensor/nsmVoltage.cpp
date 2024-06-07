@@ -29,12 +29,14 @@ namespace nsm
 {
 NsmVoltage::NsmVoltage(sdbusplus::bus::bus& bus, const std::string& name,
                        const std::string& type, uint8_t sensorId,
-                       const std::vector<utils::Association>& association) :
-    NsmNumericSensor(
-        name, type, sensorId,
-        std::make_shared<NsmNumericSensorValueAggregate>(
-            std::make_unique<NsmNumericSensorDbusValue>(
-                bus, name, getSensorType(), SensorUnit::Volts, association)))
+                       const std::vector<utils::Association>& association,
+                       const std::string& physicalContext,
+                       const std::string* implementation) :
+    NsmNumericSensor(name, type, sensorId,
+                     std::make_shared<NsmNumericSensorValueAggregate>(
+                         std::make_unique<NsmNumericSensorDbusValue>(
+                             bus, name, getSensorType(), SensorUnit::Volts,
+                             association, physicalContext, implementation)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -94,8 +96,9 @@ class VoltageSensorFactory : public NumericSensorBuilder
                    sdbusplus::bus::bus& bus,
                    const NumericSensorInfo& info) override
     {
-        return std::make_shared<NsmVoltage>(bus, info.name, info.type,
-                                            info.sensorId, info.associations);
+        return std::make_shared<NsmVoltage>(
+            bus, info.name, info.type, info.sensorId, info.associations,
+            info.physicalContext, info.implementation.get());
     };
 
     std::shared_ptr<NsmNumericAggregator>

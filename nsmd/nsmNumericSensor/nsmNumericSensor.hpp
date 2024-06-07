@@ -21,6 +21,8 @@
 #include "nsmSensor.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
+#include <xyz/openbmc_project/Sensor/Type/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Availability/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
@@ -39,8 +41,12 @@ class NsmNumericSensorComposite;
 using SensorUnit = sdbusplus::xyz::openbmc_project::Sensor::server::Value::Unit;
 using ValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Value>;
+using TypeIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Sensor::server::Type>;
 using AvailabilityIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::State::Decorator::server::Availability>;
+using DecoratorAreaIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Area>;
 using OperationalStatusIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::State::
                                     Decorator::server::OperationalStatus>;
@@ -69,12 +75,16 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     NsmNumericSensorDbusValue(
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
-        const std::vector<utils::Association>& association);
+        const std::vector<utils::Association>& association,
+        const std::string& physicalContext,
+        const std::string* implementation = nullptr);
     void updateReading(double value, uint64_t timestamp = 0) override;
 
   private:
     ValueIntf valueIntf;
     AssociationDefinitionsInft associationDefinitionsIntf;
+    DecoratorAreaIntf decoratorAreaIntf;
+    std::unique_ptr<TypeIntf> typeIntf{};
 };
 
 class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
@@ -83,7 +93,9 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
     NsmNumericSensorDbusValueTimestamp(
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
-        const std::vector<utils::Association>& association);
+        const std::vector<utils::Association>& association,
+        const std::string& physicalContext,
+        const std::string* implementation = nullptr);
     void updateReading(double value, uint64_t timestamp = 0) final;
 
   private:
@@ -113,7 +125,8 @@ class NsmNumericSensor : public NsmSensor
     NsmNumericSensor(
         const std::string& name, const std::string& type, uint8_t sensorId,
         std::shared_ptr<NsmNumericSensorValueAggregate> sensorValue) :
-        NsmSensor(name, type), sensorId(sensorId), sensorValue(sensorValue) {};
+        NsmSensor(name, type),
+        sensorId(sensorId), sensorValue(sensorValue){};
 
     std::shared_ptr<NsmNumericSensorValueAggregate> getSensorValueObject()
     {

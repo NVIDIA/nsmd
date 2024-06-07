@@ -35,6 +35,8 @@ struct NumericSensorInfo
     uint8_t sensorId;
     std::vector<utils::Association> associations;
     std::string chassis_association;
+    std::string physicalContext;
+    std::unique_ptr<std::string> implementation{};
     bool priority;
     bool aggregated;
 };
