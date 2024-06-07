@@ -1803,7 +1803,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_8"
@@ -1815,7 +1815,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_5"
@@ -1827,7 +1827,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_2"
@@ -1839,7 +1839,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_7"
@@ -1851,7 +1851,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_12"
@@ -1863,7 +1863,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_13"
@@ -1875,7 +1875,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_10"
@@ -1887,7 +1887,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_15"
@@ -1899,7 +1899,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_14"
@@ -1911,7 +1911,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_17"
@@ -1923,7 +1923,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_16"
@@ -1935,7 +1935,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_0"
@@ -1947,7 +1947,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_0"
@@ -1959,7 +1959,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_6"
@@ -1971,7 +1971,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_6"
@@ -1983,7 +1983,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_4"
@@ -1995,7 +1995,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_4"
@@ -2007,7 +2007,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_3"
@@ -2019,7 +2019,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_14"
@@ -2031,7 +2031,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_1"
@@ -2043,7 +2043,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_16"
@@ -2055,7 +2055,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_11"
@@ -2067,7 +2067,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_9"
@@ -2079,7 +2079,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_2"
@@ -2091,7 +2091,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_1"
@@ -2103,7 +2103,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_8"
@@ -2115,7 +2115,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_3"
@@ -2127,7 +2127,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_10"
@@ -2139,7 +2139,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_9"
@@ -2151,7 +2151,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_12"
@@ -2163,7 +2163,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_11"
@@ -2175,7 +2175,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_5"
@@ -2187,7 +2187,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_8"
@@ -2199,7 +2199,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_7"
@@ -2211,7 +2211,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_2"
@@ -2223,7 +2223,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_13"
@@ -2235,7 +2235,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_12"
@@ -2247,7 +2247,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_15"
@@ -2259,7 +2259,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_10"
@@ -2271,7 +2271,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_17"
@@ -2283,7 +2283,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_17"
@@ -2295,7 +2295,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_5"
@@ -2307,7 +2307,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_0"
@@ -2319,7 +2319,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_7"
@@ -2331,7 +2331,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_6"
@@ -2343,7 +2343,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_13"
@@ -2355,7 +2355,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_4"
@@ -2367,7 +2367,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_15"
@@ -2379,7 +2379,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_14"
@@ -2391,7 +2391,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_3"
@@ -2403,7 +2403,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_16"
@@ -2415,7 +2415,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_1"
@@ -2427,7 +2427,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_0"
@@ -2439,7 +2439,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_11"
@@ -2451,7 +2451,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_6"
@@ -2463,7 +2463,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_9"
@@ -2475,7 +2475,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_4"
@@ -2487,7 +2487,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_1"
@@ -2499,7 +2499,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_14"
@@ -2511,7 +2511,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_3"
@@ -2523,7 +2523,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_16"
@@ -2535,7 +2535,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_9"
@@ -2547,7 +2547,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_12"
@@ -2559,7 +2559,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_11"
@@ -2571,7 +2571,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_7"
@@ -2583,7 +2583,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_2"
@@ -2595,7 +2595,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_13"
@@ -2607,7 +2607,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_8"
@@ -2619,7 +2619,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_15"
@@ -2631,7 +2631,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_10"
@@ -2643,7 +2643,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_17"
@@ -2655,7 +2655,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_5"
@@ -2698,7 +2698,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_16"
@@ -2710,7 +2710,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_0"
@@ -2722,7 +2722,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_3"
@@ -2734,7 +2734,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_6"
@@ -2746,7 +2746,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_9"
@@ -2758,7 +2758,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_4"
@@ -2770,7 +2770,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_11"
@@ -2782,7 +2782,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_14"
@@ -2794,7 +2794,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_2"
@@ -2806,7 +2806,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_1",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_1/Ports/NVLink_1"
@@ -2818,7 +2818,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_8"
@@ -2830,7 +2830,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_5"
@@ -2842,7 +2842,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_10"
@@ -2854,7 +2854,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_7"
@@ -2866,7 +2866,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_12"
@@ -2878,7 +2878,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_13"
@@ -2890,7 +2890,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_8"
@@ -2902,7 +2902,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_15"
@@ -2914,7 +2914,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_2"
@@ -2926,7 +2926,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_2",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_2/Ports/NVLink_17"
@@ -2938,7 +2938,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_12"
@@ -2950,7 +2950,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_5"
@@ -2962,7 +2962,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_10"
@@ -2974,7 +2974,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_7"
@@ -2986,7 +2986,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_6"
@@ -2998,7 +2998,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_13"
@@ -3010,7 +3010,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_4"
@@ -3022,7 +3022,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_15"
@@ -3034,7 +3034,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_14"
@@ -3046,7 +3046,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_3",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_3/Ports/NVLink_17"
@@ -3058,7 +3058,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_16"
@@ -3070,7 +3070,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_0"
@@ -3082,7 +3082,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_0"
@@ -3094,7 +3094,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_3"
@@ -3106,7 +3106,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_6"
@@ -3118,7 +3118,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_1"
@@ -3130,7 +3130,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_4"
@@ -3142,7 +3142,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_11"
@@ -3154,7 +3154,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_14"
@@ -3166,7 +3166,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_4",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_4/Ports/NVLink_9"
@@ -3178,7 +3178,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_2"
@@ -3190,7 +3190,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_1"
@@ -3202,7 +3202,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_8"
@@ -3214,7 +3214,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_3"
@@ -3226,7 +3226,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_10"
@@ -3238,7 +3238,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_9"
@@ -3250,7 +3250,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_12"
@@ -3262,7 +3262,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_11"
@@ -3274,7 +3274,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_8"
@@ -3286,7 +3286,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_5",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_5/Ports/NVLink_16"
@@ -3298,7 +3298,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_2"
@@ -3310,7 +3310,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_5"
@@ -3322,7 +3322,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_12"
@@ -3334,7 +3334,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_7"
@@ -3346,7 +3346,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_10"
@@ -3358,7 +3358,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_13"
@@ -3370,7 +3370,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_13"
@@ -3382,7 +3382,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_15"
@@ -3394,7 +3394,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_15"
@@ -3406,7 +3406,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_6",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_6/Ports/NVLink_17"
@@ -3418,7 +3418,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_17"
@@ -3430,7 +3430,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_5"
@@ -3442,7 +3442,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_0"
@@ -3454,7 +3454,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_7",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_7/Ports/NVLink_7"
@@ -3466,7 +3466,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_6"
@@ -3478,7 +3478,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_3"
@@ -3490,7 +3490,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_4"
@@ -3502,7 +3502,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_1"
@@ -3514,7 +3514,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_14"
@@ -3526,7 +3526,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_11"
@@ -3538,7 +3538,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_16"
@@ -3550,7 +3550,7 @@
                         "Associations": [
                             "associated_endpoint",
                             "connected_port",
-                            "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8",
+                            "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/GPU_SXM_8",
                             "processor_port",
                             "switch_port",
                             "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_8/Ports/NVLink_9"
