@@ -78,6 +78,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
         chassisUuid->pdi().uuid(deviceUuid);
         device->addStaticSensor(chassisUuid);
 
+        auto mctpUuid = std::make_shared<NsmChassis<MctpUuidIntf>>(name);
+        mctpUuid->pdi().uuid(uuid);
+        device->addStaticSensor(mctpUuid);
+
         auto associations =
             utils::getAssociations(objPath, baseInterface + ".Associations");
         if (!associations.empty())
