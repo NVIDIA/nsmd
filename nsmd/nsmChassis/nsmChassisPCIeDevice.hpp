@@ -53,6 +53,7 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
                                        chassisInventoryBasePath / chassisName /
                                            "PCIeDevices")
     {}
+    virtual requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 };
 
 } // namespace nsm
