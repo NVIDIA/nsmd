@@ -118,12 +118,14 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 }
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
+                       std::string& type, std::string& inventoryObjPath,
+                       std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
-    migModeIntf = std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(), device);
+    migModeIntf =
+        std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(), device);
 }
 
 void NsmMigMode::updateReading(bitfield8_t flags)
@@ -875,11 +877,12 @@ uint8_t
     return cc;
 }
 
-NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus,
-                                             const std::string& name,
-                                             const std::string& type,
-                                             std::string& inventoryObjPath) :
-    NsmSensor(name, type)
+NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    std::string& inventoryObjPath,
+    std::shared_ptr<NsmTotalMemory> totalMemory) :
+    NsmSensor(name, type),
+    totalMemory(totalMemory)
 
 {
     lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
@@ -891,8 +894,23 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus,
 void NsmMemoryCapacityUtil::updateReading(
     const struct nsm_memory_capacity_utilization& data)
 {
-    uint8_t usedMemoryPercent = (data.used_memory * 100) /
-                                (data.used_memory + data.reserved_memory);
+    const uint32_t* totalMemoryCapacity = totalMemory->getReading();
+    if (totalMemoryCapacity == NULL)
+    {
+        lg2::error(
+            "NsmMemoryCapacityUtil::updateReading unable to fetch total Memory Capacity data");
+        return;
+    }
+    else if ((*totalMemoryCapacity) == 0)
+    {
+        lg2::error(
+            "NsmMemoryCapacityUtil::updateReading total Memory Capacity value is {A}",
+            "A", (*totalMemoryCapacity));
+        return;
+    }
+
+    uint8_t usedMemoryPercent = (data.used_memory + data.reserved_memory) *
+                                100 / (*totalMemoryCapacity);
     dimmMemoryMetricsIntf->capacityUtilizationPercent(usedMemoryPercent);
 }
 
@@ -941,35 +959,153 @@ uint8_t
     return cc;
 }
 
-NsmPowerCap::NsmPowerCap(std::string &name, std::string &type,
-			 std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-			 const std::vector<std::string> &parents)
-    : NsmSensor(name, type), powerCapIntf(powerCapIntf), parents(parents)
+NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
+                         std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                         const std::vector<std::string>& parents) :
+    NsmSensor(name, type),
+    powerCapIntf(powerCapIntf), parents(parents)
 {}
+NsmTotalMemory::NsmTotalMemory(const std::string& name,
+                               const std::string& type) :
+    NsmMemoryCapacity(name, type)
+{
+    lg2::info("NsmTotalMemory : create sensor:{NAME}", "NAME", name.c_str());
+}
+
+void NsmTotalMemory::updateReading(uint32_t* maximumMemoryCapacity)
+{
+    if (maximumMemoryCapacity)
+    {
+        totalMemoryCapacity = new uint32_t(*maximumMemoryCapacity);
+    }
+    else
+    {
+        totalMemoryCapacity = nullptr;
+    }
+}
+
+const uint32_t* NsmTotalMemory::getReading()
+{
+    return totalMemoryCapacity;
+}
+
+NsmTotalCacheMemory::NsmTotalCacheMemory(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface) :
+    NsmMemoryCapacity(name, type),
+    persistentMemoryInterface(persistentMemoryInterface)
+{
+    lg2::info("NsmTotalCacheMemory : create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+void NsmTotalCacheMemory::updateReading(uint32_t* maximumMemoryCapacity)
+{
+    if (maximumMemoryCapacity == NULL)
+    {
+        lg2::error(
+            "NsmTotalCacheMemory::updateReading unable to fetch Maximum Memory Capacity");
+        return;
+    }
+    uint64_t cacheSize = *maximumMemoryCapacity;
+    persistentMemoryInterface->cacheSizeInKiB(cacheSize * 1024);
+}
+
+NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus::bus& bus,
+                                           const std::string& name,
+                                           const std::string& type,
+                                           std::string& inventoryObjPath) :
+    NsmSensor(name, type)
+
+{
+    lg2::info("NsmProcessorRevision: create sensor:{NAME}", "NAME",
+              name.c_str());
+    revisionIntf = std::make_unique<RevisionIntf>(bus,
+                                                  inventoryObjPath.c_str());
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmProcessorRevision::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_inventory_information_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_inventory_information_req(
+        instanceId, DEVICE_PART_NUMBER, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_inventory_information_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmProcessorRevision::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    std::vector<uint8_t> data(65535, 0);
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        std::string revision(data.begin(), data.end());
+        revisionIntf->version(revision);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_inventory_information_resp "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
+NsmGpuHealth::NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
+                           std::string& type, std::string& inventoryObjPath) :
+    NsmObject(name, type)
+{
+    healthIntf = std::make_unique<GpuHealthIntf>(bus, inventoryObjPath.c_str());
+    healthIntf->health(GpuHealthType::OK);
+}
 
 void NsmPowerCap::updateReading(uint32_t value)
 {
     // calling parent powercap to update the value on dbus
     powerCapIntf->PowerCapIntf::powerCap(value);
     powerCapIntf->PowerCapIntf::powerCapEnable(true);
-    SensorManager &manager = SensorManager::getInstance();
-    for (auto it = parents.begin(); it != parents.end();) {
-	    auto sensorIt = manager.objectPathToSensorMap.find(*it);
-	    if (sensorIt != manager.objectPathToSensorMap.end()) {
-		    auto sensor = sensorIt->second;
-		    if (sensor) {
-			    sensorCache.emplace_back(
-				std::dynamic_pointer_cast<NsmPowerControl>(
-				    sensor));
-			    it = parents.erase(it);
-			    continue;
-		    }
-	    }
-	    ++it;
+    SensorManager& manager = SensorManager::getInstance();
+    for (auto it = parents.begin(); it != parents.end();)
+    {
+        auto sensorIt = manager.objectPathToSensorMap.find(*it);
+        if (sensorIt != manager.objectPathToSensorMap.end())
+        {
+            auto sensor = sensorIt->second;
+            if (sensor)
+            {
+                sensorCache.emplace_back(
+                    std::dynamic_pointer_cast<NsmPowerControl>(sensor));
+                it = parents.erase(it);
+                continue;
+            }
+        }
+        ++it;
     }
     // update each cached sensor
-    for (const auto &sensor : sensorCache) {
-	    sensor->updatePowerCapValue(getName(), value);
+    for (const auto& sensor : sensorCache)
+    {
+        sensor->updatePowerCapValue(getName(), value);
     }
 }
 
@@ -1019,11 +1155,12 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-NsmMaxPowerCap::NsmMaxPowerCap(std::string &name, std::string &type,
-			       std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-			       std::shared_ptr<PowerLimitIface> powerLimitIntf)
-    : NsmObject(name, type), powerCapIntf(powerCapIntf),
-      powerLimitIntf(powerLimitIntf)
+NsmMaxPowerCap::NsmMaxPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
@@ -1088,11 +1225,12 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     co_return cc;
 }
 
-NsmMinPowerCap::NsmMinPowerCap(std::string &name, std::string &type,
-			       std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-			       std::shared_ptr<PowerLimitIface> powerLimitIntf)
-    : NsmObject(name, type), powerCapIntf(powerCapIntf),
-      powerLimitIntf(powerLimitIntf)
+NsmMinPowerCap::NsmMinPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+    NsmObject(name, type),
+    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
@@ -1158,9 +1296,10 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 }
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
-    std::string &name, std::string &type,
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf)
-    : NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
+    NsmObject(name, type),
+    clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
@@ -1284,6 +1423,24 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto uuidSensor = std::make_shared<NsmUuidIntf>(
                 bus, name, type, inventoryObjPath, deviceUuid);
             nsmDevice->deviceSensors.push_back(uuidSensor);
+            auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
+                bus, name, type, inventoryObjPath);
+            nsmDevice->deviceSensors.push_back(gpuRevisionSensor);
+            gpuRevisionSensor->update(manager, manager.getEid(nsmDevice))
+                .detach();
+
+            auto persistentMemoryIntf =
+                std::make_shared<PersistentMemoryInterface>(
+                    bus, inventoryObjPath.c_str());
+            auto cacheMemorySensor = std::make_shared<NsmTotalCacheMemory>(
+                name, type, persistentMemoryIntf);
+            nsmDevice->deviceSensors.push_back(cacheMemorySensor);
+            cacheMemorySensor->update(manager, manager.getEid(nsmDevice))
+                .detach();
+
+            auto healthSensor = std::make_shared<NsmGpuHealth>(
+                bus, name, type, inventoryObjPath);
+            nsmDevice->deviceSensors.push_back(healthSensor);
         }
         else if (type == "NSM_Location")
         {
@@ -1340,8 +1497,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto sensor = std::make_shared<NsmMigMode>(bus, name, type, inventoryObjPath,
-                                         nsmDevice);
+            auto sensor = std::make_shared<NsmMigMode>(
+                bus, name, type, inventoryObjPath, nsmDevice);
             nsmDevice->deviceSensors.push_back(sensor);
             if (priority)
             {
@@ -1500,8 +1657,13 @@ static void createNsmProcessorSensor(SensorManager& manager,
         {
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
+            auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
+                                                                      type);
+            nsmDevice->deviceSensors.push_back(totalMemorySensor);
+            totalMemorySensor->update(manager, manager.getEid(nsmDevice))
+                .detach();
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-                bus, name, type, inventoryObjPath);
+                bus, name, type, inventoryObjPath, totalMemorySensor);
             nsmDevice->deviceSensors.push_back(sensor);
             if (priority)
             {
@@ -1514,63 +1676,66 @@ static void createNsmProcessorSensor(SensorManager& manager,
         }
         else if (type == "NSM_PowerCap")
         {
-		std::vector<std::string> candidateForList;
-		try {
-			candidateForList =
-			    utils::DBusHandler()
-				.getDbusProperty<std::vector<std::string>>(
-				    objPath.c_str(), "CompositeNumericSensors",
-				    interface.c_str());
-		} catch (const sdbusplus::exception::SdBusError &e) {
-		}
-		auto priority = utils::DBusHandler().getDbusProperty<bool>(
-		    objPath.c_str(), "Priority", interface.c_str());
-		// create power cap , clear power cap and power limit interface
-		auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
-		    bus, inventoryObjPath.c_str(), name,
-		    candidateForList, nsmDevice);
+            std::vector<std::string> candidateForList;
+            try
+            {
+                candidateForList =
+                    utils::DBusHandler()
+                        .getDbusProperty<std::vector<std::string>>(
+                            objPath.c_str(), "CompositeNumericSensors",
+                            interface.c_str());
+            }
+            catch (const sdbusplus::exception::SdBusError& e)
+            {}
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            // create power cap , clear power cap and power limit interface
+            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+                bus, inventoryObjPath.c_str(), name, candidateForList,
+                nsmDevice);
 
-		auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
-		    bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
+            auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
+                bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
 
-		auto powerLimitIntf = std::make_shared<PowerLimitIface>(
-		    bus, inventoryObjPath.c_str());
+            auto powerLimitIntf = std::make_shared<PowerLimitIface>(
+                bus, inventoryObjPath.c_str());
 
-		// create sensors for power cap properties
-		auto powerCap = std::make_shared<NsmPowerCap>(
-		    name, type, powerCapIntf, candidateForList);
-		nsmDevice->deviceSensors.emplace_back(powerCap);
-		nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
-		manager.powerCapList.emplace_back(powerCap);
+            // create sensors for power cap properties
+            auto powerCap = std::make_shared<NsmPowerCap>(
+                name, type, powerCapIntf, candidateForList);
+            nsmDevice->deviceSensors.emplace_back(powerCap);
+            nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+            manager.powerCapList.emplace_back(powerCap);
 
-		auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
-		    name, type, clearPowerCapIntf);
-		nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
-		manager.defaultPowerCapList.emplace_back(defaultPowerCap);
+            auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
+                name, type, clearPowerCapIntf);
+            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
+            manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
-		auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
-		    name, type, powerCapIntf, powerLimitIntf);
-		nsmDevice->deviceSensors.emplace_back(maxPowerCap);
-		manager.maxPowerCapList.emplace_back(maxPowerCap);
+            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
+                name, type, powerCapIntf, powerLimitIntf);
+            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
+            manager.maxPowerCapList.emplace_back(maxPowerCap);
 
-		auto minPowerCap = std::make_shared<NsmMinPowerCap>(
-		    name, type, powerCapIntf, powerLimitIntf);
-		nsmDevice->deviceSensors.emplace_back(minPowerCap);
-		manager.minPowerCapList.emplace_back(minPowerCap);
+            auto minPowerCap = std::make_shared<NsmMinPowerCap>(
+                name, type, powerCapIntf, powerLimitIntf);
+            nsmDevice->deviceSensors.emplace_back(minPowerCap);
+            manager.minPowerCapList.emplace_back(minPowerCap);
 
-		if (priority) {
-			nsmDevice->prioritySensors.push_back(powerCap);
-		} else {
-			nsmDevice->roundRobinSensors.push_back(powerCap);
-		}
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(powerCap);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(powerCap);
+            }
 
-		defaultPowerCap->update(manager, manager.getEid(nsmDevice))
-		    .detach();
-		maxPowerCap->update(manager, manager.getEid(nsmDevice))
-		    .detach();
-		minPowerCap->update(manager, manager.getEid(nsmDevice))
-		    .detach();
-	}
+            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
+                .detach();
+            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+        }
     }
 
     catch (const std::exception& e)
@@ -1602,11 +1767,9 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig")
-/*  Disbale Memory Capacity Utilization Sensor to avoid nsmd crash, will be
-  enabled once many to one mapping is available */
-// REGISTER_NSM_CREATION_FUNCTION(
-//     createNsmProcessorSensor,
-//     "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmProcessorSensor,
+    "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmProcessorSensor,
     "xyz.openbmc_project.Configuration.NSM_Processor.Location")

@@ -3,7 +3,7 @@
 #include "platform-environmental.h"
 
 #include "nsmSensor.hpp"
-
+#include "nsmCommon/nsmCommon.hpp"
 #include <com/nvidia/MemoryRowRemapping/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
@@ -182,6 +182,18 @@ class NsmMemCurrClockFreq : public NsmSensor
   private:
     void updateReading(const uint32_t& clockFreq);
 
+    std::shared_ptr<DimmIntf> dimmIntf;
+};
+
+class NsmMemCapacity : public NsmMemoryCapacity
+{
+  public:
+    NsmMemCapacity(const std::string& name, const std::string& type,
+                   std::shared_ptr<DimmIntf> dimmIntf);
+    NsmMemCapacity() = default;
+
+  private:
+    void updateReading(uint32_t* maximumMemoryCapacity);
     std::shared_ptr<DimmIntf> dimmIntf;
 };
 } // namespace nsm

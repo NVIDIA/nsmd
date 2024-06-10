@@ -375,6 +375,28 @@ uint8_t
     return cc;
 }
 
+NsmMemCapacity::NsmMemCapacity(const std::string& name,
+                                         const std::string& type,
+                                         std::shared_ptr<DimmIntf> dimmIntf) :
+    NsmMemoryCapacity(name, type),
+    dimmIntf(dimmIntf)
+
+{
+    lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
+{
+    if(maximumMemoryCapacity == NULL)
+    {
+        lg2::error(
+            "NsmMemCapacity::updateReading unable to fetch Maximum Memory Capacity");
+        return;
+    }
+    dimmIntf->memorySizeInKB(*maximumMemoryCapacity * 1024);
+}
+
 static void createNsmMemorySensor(SensorManager& manager,
                                   const std::string& interface,
                                   const std::string& objPath)
@@ -450,6 +472,9 @@ static void createNsmMemorySensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
                 nsmDevice->roundRobinSensors.push_back(currClockFreqSensor);
             }
+            auto memCapacitySensor = std::make_shared<NsmMemCapacity>(name,type, dimmIntf);
+            nsmDevice->deviceSensors.emplace_back(memCapacitySensor);
+            memCapacitySensor->update(manager, manager.getEid(nsmDevice)).detach();
         }
         else if (type == "NSM_RowRemapping")
         {

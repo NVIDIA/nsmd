@@ -916,8 +916,10 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
 
 TEST(nsmMemCapacityUtil, GoodGenReq)
 {
+    auto totalMemorySensor =
+        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath);
+                                      inventoryObjPath, totalMemorySensor);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -933,9 +935,10 @@ TEST(nsmMemCapacityUtil, GoodGenReq)
 
 TEST(nsmMemCapacityUtil, GoodHandleResp)
 {
+    auto totalMemorySensor =
+        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath);
-
+                                      inventoryObjPath, totalMemorySensor);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
         0);
@@ -956,8 +959,10 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
 
 TEST(nsmMemCapacityUtil, BadHandleResp)
 {
+    auto totalMemorySensor =
+        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath);
+                                      inventoryObjPath, totalMemorySensor);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
@@ -970,6 +975,71 @@ TEST(nsmMemCapacityUtil, BadHandleResp)
 
     uint8_t rc = encode_get_memory_capacity_util_resp(
         0, NSM_SUCCESS, reason_code, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(response, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmProcessorRevision, GoodGenReq)
+{
+
+    nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_get_inventory_information_req*>(msg->payload);
+
+   EXPECT_EQ(command->hdr.command, NSM_GET_INVENTORY_INFORMATION);
+   EXPECT_EQ(command->property_identifier, DEVICE_PART_NUMBER);
+}
+
+TEST(nsmProcessorRevision, GoodHandleResp)
+{
+    nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
+                                     inventoryObjPath);
+
+     std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, reason_code, data.size(), (uint8_t*)data.data(),
+        response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmProcessorRevision, BadHandleResp)
+{
+    nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
+                                     inventoryObjPath);
+    
+     std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_inventory_information_resp(
+        0, NSM_SUCCESS, reason_code, data.size(), (uint8_t*)data.data(),
+        response);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);

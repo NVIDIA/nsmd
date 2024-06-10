@@ -28,12 +28,14 @@
 #include "nsmMigModeIface.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "nsmSensor.hpp"
+#include "nsmCommon/nsmCommon.hpp"
 
 #include <stdint.h>
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/PersistentMemory/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
@@ -47,6 +49,8 @@
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
+#include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 
 #include <cstdint>
 
@@ -417,6 +421,34 @@ class NsmPciGroup5 : public NsmPcieGroup
         nullptr;
 };
 
+class NsmTotalMemory : public NsmMemoryCapacity
+{
+  public:
+    NsmTotalMemory(const std::string& name, const std::string& type);
+    NsmTotalMemory() = default;
+    const uint32_t* getReading();
+
+  private:
+    void updateReading(uint32_t* maximumMemoryCapacity) override;
+    uint32_t* totalMemoryCapacity = nullptr;
+};
+
+using PersistentMemoryInterface = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::item::PersistentMemory>;
+
+class NsmTotalCacheMemory : public NsmMemoryCapacity
+{
+  public:
+    NsmTotalCacheMemory(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface);
+    NsmTotalCacheMemory() = default;
+
+  private:
+    void updateReading(uint32_t* maximumMemoryCapacity) override;
+    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface;
+};
+
 using DimmMemoryMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Dimm::server::MemoryMetrics>;
@@ -426,7 +458,7 @@ class NsmMemoryCapacityUtil : public NsmSensor
   public:
     NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
                           const std::string& type,
-                          std::string& inventoryObjPath);
+                          std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory>totalMemory);
     NsmMemoryCapacityUtil() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -435,6 +467,7 @@ class NsmMemoryCapacityUtil : public NsmSensor
                               size_t responseLen) override;
 
   private:
+    std::shared_ptr<NsmTotalMemory> totalMemory;
     void updateReading(const struct nsm_memory_capacity_utilization& data);
     std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
 };
@@ -512,6 +545,38 @@ class NsmDefaultPowerCap : public NsmObject
   private:
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf = nullptr;
     void updateValue(uint32_t value);
+};
+using RevisionIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::inventory::decorator::Revision>;
+class NsmProcessorRevision : public NsmSensor
+{
+  public:
+    NsmProcessorRevision(sdbusplus::bus::bus& bus, const std::string& name,
+                         const std::string& type,
+                         std::string& inventoryObjPath);
+    NsmProcessorRevision() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::unique_ptr<RevisionIntf> revisionIntf = nullptr;
+};
+
+using GpuHealthIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::State::Decorator::server::Health>;
+using GpuHealthType = sdbusplus::xyz::openbmc_project::State::Decorator::
+    server::Health::HealthType;
+class NsmGpuHealth : public NsmObject
+{
+  public:
+    NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
+                    std::string& type, std::string& inventoryObjPath);
+
+  private:
+    std::shared_ptr<GpuHealthIntf> healthIntf;
 };
 
 } // namespace nsm

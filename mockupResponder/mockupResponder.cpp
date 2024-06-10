@@ -43,7 +43,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     writeProtected()
 {
@@ -477,38 +478,38 @@ std::optional<std::vector<uint8_t>>
     // 0,1,2,3,4,6,7,9,15,17,18,20,C[12],42[66],43[67],61[97],64[100],65[101],6A[106]
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
-        0b11011111, /*   7 -   0 */
-        0b10010011, /*  15 -   8 */
-        0b00010110, /*  23 -  16 */
-        0b00000000, /*  31 -  24 */
-        0b00000000, /*  39 -  32 */
-        0b00000000, /*  47 -  40 */
-        0b00000000, /*  55 -  48 */
-        0b00000000, /*  63 -  56 */
-        0b00001100, /*  71 -  64 */
-        0b00001110, /*  79 -  72 */
-        0b00000000, /*  87 -  80 */
-        0b00000000, /*  95 -  88 */
-        0b00110010, /* 103 -  96 */
-        0b00000100, /* 111 - 104 */
-        0b00000000, /* 119 - 112 */
-        0b00010000, /* 127 - 120 */
-        0b00000000, /* 135 - 128 */
-        0b00000000, /* 143 - 136 */
-        0b00000000, /* 151 - 144 */
-        0b00000000, /* 159 - 152 */
-        0b00000000, /* 167 - 160 */
-        0b00000000, /* 175 - 168 */
-        0b00000000, /* 183 - 176 */
-        0b00000000, /* 191 - 184 */
-        0b00000000, /* 199 - 192 */
-        0b00000000, /* 207 - 200 */
-        0b00000000, /* 215 - 208 */
-        0b00000000, /* 223 - 216 */
-        0b00000000, /* 231 - 224 */
-        0b00000000, /* 239 - 232 */
-        0b00000000, /* 247 - 240 */
-        0b00000000, /* 255 - 248 */
+        0b11011111, /*   7 -   0  - Byte 1*/
+        0b10010011, /*  15 -   8  - Byte 2 */
+        0b00010110, /*  23 -  16  - Byte 3 */
+        0b00000000, /*  31 -  24  - Byte 4 */
+        0b00000000, /*  39 -  32  - Byte 5 */
+        0b00000000, /*  47 -  40  - Byte 6 */
+        0b00000000, /*  55 -  48  - Byte 7 */
+        0b00000000, /*  63 -  56  - Byte 8 */
+        0b00011100, /*  71 -  64  - Byte 9 */
+        0b00001110, /*  79 -  72  - Byte 10 */
+        0b00000000, /*  87 -  80  - Byte 11 */
+        0b00000000, /*  95 -  88  - Byte 12 */
+        0b00110010, /* 103 -  96  - Byte 13 */
+        0b00000100, /* 111 - 104  - Byte 14 */
+        0b00000000, /* 119 - 112  - Byte 15 */
+        0b00010000, /* 127 - 120  - Byte 16 */
+        0b00000000, /* 135 - 128  - Byte 17 */
+        0b00000000, /* 143 - 136  - Byte 18 */
+        0b00000000, /* 151 - 144  - Byte 19 */
+        0b00000000, /* 159 - 152  - Byte 20 */
+        0b00000000, /* 167 - 160  - Byte 21 */
+        0b00100000, /* 175 - 168  - Byte 22 */
+        0b00000000, /* 183 - 176  - Byte 23 */
+        0b00000000, /* 191 - 184  - Byte 24 */
+        0b00000000, /* 199 - 192  - Byte 25 */
+        0b00000000, /* 207 - 200  - Byte 26 */
+        0b00000000, /* 215 - 208  - Byte 27 */
+        0b00000000, /* 223 - 216  - Byte 28 */
+        0b00000000, /* 231 - 224  - Byte 29 */
+        0b00000000, /* 239 - 232  - Byte 30 */
+        0b00000000, /* 247 - 240  - Byte 31 */
+        0b00000000, /* 255 - 248  - Byte 32 */
     };
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
@@ -587,6 +588,12 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case PCIERETIMER_7_EEPROM_VERSION:
             property = std::vector<uint8_t>{0x01, 0x00, 0x1a, 0x00,
                                             0x00, 0x00, 0x0a, 0x00};
+            break;
+        case DEVICE_PART_NUMBER:
+            populateFrom(property, "A1");
+            break;
+        case MAXIMUM_MEMORY_CAPACITY:
+            populateFrom(property, 20000000);
             break;
         default:
             break;
