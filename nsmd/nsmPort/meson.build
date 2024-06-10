@@ -5,7 +5,9 @@ sources += [
     'nsmPort/nsmPort.cpp',
     'nsmPort/nsmRetimerPort.cpp',
     'nsmPort/nsmFpgaPort.cpp',
-    'nsmPort/nsmGpuPciePort.cpp'
+    'nsmPort/nsmGpuPciePort.cpp',
+    'nsmPort/nsmZone.cpp',
+    'nsmPort/nsmEndpoint.cpp'
 ]
 
 nsmd_headers += ['.', '..']

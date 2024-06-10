@@ -196,10 +196,13 @@ def getAssociations(self_device_type, connected_device_type, connected_device_pa
             ))
     elif self_device_type == "SWITCH":
         if connected_device_type == "GPU":
+
+            gpu_device_name = connected_device_path.split('/')[-1]
+            connected_gpu_endpoint = f"/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Endpoints/{gpu_device_name}"
             association.extend((
                 "associated_endpoint",
                 "connected_port",
-                connected_device_path
+                connected_gpu_endpoint
             ))
             association.extend((
                 "processor_port",
