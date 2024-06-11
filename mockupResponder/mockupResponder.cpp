@@ -328,6 +328,8 @@ std::optional<std::vector<uint8_t>>
                     return getEDPpScalingFactorHandler(request, requestLen);
                 case NSM_GET_CLOCK_LIMIT:
                     return getClockLimitHandler(request, requestLen);
+                case NSM_SET_CLOCK_LIMIT:
+                    return setClockLimitHandler(request, requestLen);
                 case NSM_GET_CURRENT_CLOCK_FREQUENCY:
                     return getCurrClockFreqHandler(request, requestLen);
                 case NSM_GET_CLOCK_EVENT_REASON_CODES:
@@ -475,19 +477,19 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
     // this is to mock that
-    // 0,1,2,3,4,6,7,9,15,17,18,20,C[12],42[66],43[67],61[97],64[100],65[101],6A[106]
+    // 0,1,2,3,4,6,7,9,15,16,17,18,20,C[12],42[66],43[67],61[97],64[100],65[101],6A[106]
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
         0b11011111, /*   7 -   0  - Byte 1*/
         0b10010011, /*  15 -   8  - Byte 2 */
-        0b00010110, /*  23 -  16  - Byte 3 */
+        0b00010111, /*  23 -  16  - Byte 3 */
         0b00000000, /*  31 -  24  - Byte 4 */
         0b00000000, /*  39 -  32  - Byte 5 */
         0b00000000, /*  47 -  40  - Byte 6 */
         0b00000000, /*  55 -  48  - Byte 7 */
         0b00000000, /*  63 -  56  - Byte 8 */
         0b00011100, /*  71 -  64  - Byte 9 */
-        0b00001110, /*  79 -  72  - Byte 10 */
+        0b10001110, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
         0b00110010, /* 103 -  96  - Byte 13 */
@@ -577,6 +579,12 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             break;
         case RATED_DEVICE_POWER_LIMIT:
             populateFrom(property, 80000);
+            break;
+        case MINIMUM_GRAPHICS_CLOCK_LIMIT:
+            populateFrom(property, 100);
+            break;
+        case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
+            populateFrom(property, 5000);
             break;
         case PCIERETIMER_0_EEPROM_VERSION:
         case PCIERETIMER_1_EEPROM_VERSION:
@@ -1308,6 +1316,8 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::setEventSubscription(const nsm_msg* requestMsg,
                                           size_t requestLen)
@@ -1985,6 +1995,38 @@ std::optional<std::vector<uint8_t>>
     if (rc)
     {
         lg2::error("encode_get_clock_limit_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setClockLimitHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    uint8_t clock_id;
+    uint8_t flags;
+    uint32_t limit_min;
+    uint32_t limit_max;
+    auto rc = decode_set_clock_limit_req(requestMsg, requestLen, &clock_id,
+                                         &flags, &limit_min, &limit_max);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_clock_limit_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_clock_limit_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_set_clock_limit_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
     return response;

@@ -43,6 +43,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_INVENTORY_INFORMATION = 0x0C,
 	NSM_GET_DRIVER_INFO = 0x0E,
 	NSM_GET_MIG_MODE = 0x4d,
+	NSM_SET_CLOCK_LIMIT = 0x10,
 	NSM_GET_CLOCK_LIMIT = 0x11,
 	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
 	NSM_GET_CLOCK_EVENT_REASON_CODES = 0x44,
@@ -84,6 +85,8 @@ enum nsm_inventory_property_identifiers {
 	MINIMUM_MODULE_POWER_LIMIT = 18,
 	MAXMUM_MODULE_POWER_LIMIT = 19,
 	RATED_MODULE_POWER_LIMIT = 20,
+	MINIMUM_GRAPHICS_CLOCK_LIMIT = 26,
+	MAXIMUM_GRAPHICS_CLOCK_LIMIT = 27,
 	DEFAULT_BOOST_CLOCKS = 21,
 	DEFAULT_BASE_CLOCKS = 22,
 	PCIERETIMER_0_EEPROM_VERSION = 144,
@@ -617,6 +620,19 @@ struct nsm_EDPp_scaling_factors {
 struct nsm_get_programmable_EDPp_scaling_factor_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_EDPp_scaling_factors scaling_factors;
+} __attribute__((packed));
+
+
+/** @struct nsm_set_clock_limit_req
+ *
+ *  Structure representing NSM set clock limit request.
+ */
+struct nsm_set_clock_limit_req {
+	struct nsm_common_req hdr;
+	uint8_t clock_id;
+	uint8_t flags;
+	uint32_t limit_min;
+	uint32_t limit_max;
 } __attribute__((packed));
 
 /** @struct nsm_get_row_remap_state_resp
@@ -1381,6 +1397,55 @@ int encode_aggregate_voltage_data(uint32_t voltage, uint8_t *data,
  */
 int decode_aggregate_voltage_data(const uint8_t *data, size_t data_len,
 				  uint32_t *voltage);
+
+/** @brief Encode a Set Clock Limit request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] clock_id - clock Id (Graphics/Memory)
+ *  @param[in] flags - Peristence/Clear
+ *  @param[in] limit_min - minimum clock frequency desired by the client
+ *  @param[in] limit_max - maximum clock frequency desired by the client
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_clock_limit_req(uint8_t instance, uint8_t clock_id,
+			       uint8_t flags, uint32_t limit_min,
+			       uint32_t limit_max, struct nsm_msg *msg);
+
+/** @brief Decode a Set Clock Limit request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] clock_id - clock Id (Graphics/Memory)
+ *  @param[out] flags - Peristence/Clear
+ *  @param[out] limit_min - minimum clock frequency desired by the client
+ *  @param[out] limit_max - maximum clock frequency desired by the client
+ *  @return nsm_completion_codes
+ */
+int decode_set_clock_limit_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t* clock_id, uint8_t* flags,
+			       uint32_t* limit_min, uint32_t* limit_max);
+
+/** @brief Encode a Set Clock Limit response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_clock_limit_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Set Clock Limit response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_clock_limit_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *data_size,
+				uint16_t *reason_code);
 
 /** @brief Encode a Get Programmable EDPp Scaling Factor request message
  *

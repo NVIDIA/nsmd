@@ -134,6 +134,8 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getClockLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setClockLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getCurrClockFreqHandler(const nsm_msg* requestMsg, size_t requestLen);

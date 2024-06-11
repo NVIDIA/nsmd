@@ -29,6 +29,7 @@
 #include "nsmPowerCapIface.hpp"
 #include "nsmSensor.hpp"
 #include "nsmCommon/nsmCommon.hpp"
+#include "nsmCpuOperatingConfigInterface.hpp"
 
 #include <stdint.h>
 
@@ -42,7 +43,6 @@
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/SPDMResponder/server.hpp>
@@ -337,7 +337,6 @@ class NsmClockLimitGraphics : public NsmSensor
 
   private:
     void updateReading(const struct nsm_clock_limit&);
-    bool updateStaticProp;
 
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
@@ -357,6 +356,26 @@ class NsmCurrClockFreq : public NsmSensor
   private:
     void updateReading(const uint32_t& clockFreq);
 
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+};
+
+class NsmMinGraphicsClockLimit : public NsmObject
+{
+  public:
+    NsmMinGraphicsClockLimit(std::string& name, std::string& type,
+                       std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+  private:
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+};
+
+class NsmMaxGraphicsClockLimit : public NsmObject
+{
+  public:
+    NsmMaxGraphicsClockLimit(std::string& name, std::string& type,
+                       std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+  private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
 

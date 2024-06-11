@@ -595,30 +595,24 @@ NsmClockLimitGraphics::NsmClockLimitGraphics(
     lg2::info("NsmClockLimitGraphics: create sensor:{NAME}", "NAME",
               name.c_str());
     cpuOperatingConfigIntf = cpuConfigIntf;
-    updateStaticProp = true;
 }
 
 void NsmClockLimitGraphics::updateReading(
     const struct nsm_clock_limit& clockLimit)
 {
-    if (updateStaticProp)
-    {
-        cpuOperatingConfigIntf->maxSpeed(clockLimit.present_limit_max);
-        cpuOperatingConfigIntf->minSpeed(clockLimit.present_limit_min);
-        updateStaticProp = false;
-    }
-    cpuOperatingConfigIntf->speedLimit(clockLimit.requested_limit_max);
-    if (clockLimit.requested_limit_max == clockLimit.requested_limit_min)
+    cpuOperatingConfigIntf->speedLimit(clockLimit.present_limit_max);
+    if (clockLimit.present_limit_max == clockLimit.present_limit_min)
     {
         cpuOperatingConfigIntf->speedLocked(true);
         cpuOperatingConfigIntf->speedConfig(
-            std::make_tuple(true, (uint32_t)clockLimit.requested_limit_max));
+            std::make_tuple(true, (uint32_t)clockLimit.present_limit_max));
     }
     else
     {
         cpuOperatingConfigIntf->speedLocked(false);
         cpuOperatingConfigIntf->speedConfig(
-            std::make_tuple(false, (uint32_t)clockLimit.requested_limit_max));
+            std::make_tuple(false, (uint32_t)clockLimit.present_limit_max),
+            true);
     }
 }
 
@@ -725,6 +719,134 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
+}
+
+NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
+                                                eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MINIMUM_GRAPHICS_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf->minSpeed(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
+                                                eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAXIMUM_GRAPHICS_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    const nsm_msg* responseMsg = NULL;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(
+        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf->maxSpeed(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
 }
 
 NsmProcessorThrottleReason::NsmProcessorThrottleReason(
@@ -1603,13 +1725,21 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
             auto cpuOperatingConfigIntf =
-                std::make_shared<CpuOperatingConfigIntf>(
-                    bus, inventoryObjPath.c_str());
+                std::make_shared<NsmCpuOperatingConfigIntf>(
+                    bus, inventoryObjPath.c_str(), nsmDevice, GRAPHICS_CLOCK);
 
             auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
                 name, type, cpuOperatingConfigIntf);
             auto clockLimitSensor = std::make_shared<NsmClockLimitGraphics>(
                 name, type, cpuOperatingConfigIntf);
+            auto minGraphicsClockFreq =
+                std::make_shared<NsmMinGraphicsClockLimit>(
+                    name, type, cpuOperatingConfigIntf);
+            auto maxGraphicsClockFreq =
+                std::make_shared<NsmMaxGraphicsClockLimit>(
+                    name, type, cpuOperatingConfigIntf);
+            nsmDevice->deviceSensors.emplace_back(minGraphicsClockFreq);
+            nsmDevice->deviceSensors.emplace_back(maxGraphicsClockFreq);
             if (priority)
             {
                 nsmDevice->prioritySensors.push_back(clockFreqSensor);
@@ -1620,6 +1750,10 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(clockFreqSensor);
                 nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
             }
+            minGraphicsClockFreq->update(manager, manager.getEid(nsmDevice))
+                .detach();
+            maxGraphicsClockFreq->update(manager, manager.getEid(nsmDevice))
+                .detach();
         }
         else if (type == "NSM_ProcessorPerformance")
         {

@@ -2955,6 +2955,164 @@ TEST(getClockLimit, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
+TEST(setClockLimit, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_set_clock_limit_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t clock_id = 0;
+	uint8_t flags = 11;
+	uint32_t limit_max = 40;
+	uint32_t limit_min = 29;
+	auto rc = encode_set_clock_limit_req(0, clock_id, flags, limit_min, limit_max, request);
+	struct nsm_set_clock_limit_req *req =
+	    reinterpret_cast<struct nsm_set_clock_limit_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_CLOCK_LIMIT, req->hdr.command);
+	EXPECT_EQ(10, req->hdr.data_size);
+	EXPECT_EQ(limit_max, le32toh(req->limit_max));
+    EXPECT_EQ(limit_min, le32toh(req->limit_min));
+}
+
+TEST(setClockLimit, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_CLOCK_LIMIT,	     // command
+	    10,				     // data size
+	    01,
+	    02,
+	    14,
+	    00,
+	    00,
+	    00,
+	    28,
+	    00,
+	    00,
+	    00,
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t clock_id;
+	uint8_t flags;
+	uint32_t limit_min;
+	uint32_t limit_max;
+	auto rc = decode_set_clock_limit_req(request, msg_len, &clock_id,
+					     &flags, &limit_min, &limit_max);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(28, limit_max);
+	EXPECT_EQ(14, limit_min);
+}
+
+TEST(setClockLimit, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    encode_set_clock_limit_resp(0, NSM_SUCCESS, reason_code, response);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_CLOCK_LIMIT, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setClockLimit, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_CLOCK_LIMIT,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_clock_limit_resp(response, msg_len, &cc,
+					      &data_size, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}
+
+TEST(setClockLimit, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_CLOCK_LIMIT,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,				     // data size
+	    0				     // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_clock_limit_resp(NULL, msg_len, &cc, &data_size,
+					      &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_clock_limit_resp(response, msg_len, NULL, &data_size,
+					 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_clock_limit_resp(response, msg_len, &cc, NULL,
+					 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_clock_limit_resp(response, msg_len - 1, &cc, &data_size,
+					 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 TEST(getCurrClockFreq, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
