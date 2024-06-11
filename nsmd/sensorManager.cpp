@@ -352,7 +352,6 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
             throw std::runtime_error(
                 "SensorManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d), UUID=" +
                 uuid);
-            return nullptr;
         }
 
         nsmDevice = findNsmDeviceByIdentification(nsmDevices, deviceType,
