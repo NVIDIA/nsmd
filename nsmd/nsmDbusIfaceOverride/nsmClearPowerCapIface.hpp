@@ -21,7 +21,7 @@
 #include "nsmDevice.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "sensorManager.hpp"
-#include <phosphor-logging/lg2.hpp>
+
 #include <com/nvidia/Common/ClearPowerCap/server.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -40,8 +40,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
     NsmClearPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
                          std::shared_ptr<NsmDevice> device,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-        ClearPowerCapIntf(bus, path), device(device),
-        powerCapIntf(powerCapIntf)
+        ClearPowerCapIntf(bus, path), device(device), powerCapIntf(powerCapIntf)
     {}
 
     void getPowerCapFromDevice()
@@ -59,10 +58,10 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
                 "getPowerCapFromDevice encode_get_device_power_limit_req failed.eid = {EID} rc ={RC}",
                 "EID", eid, "RC", rc);
         }
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                              &responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
+                                              responseLen);
         if (rc_)
         {
             lg2::error("SendRecvNsmMsgSync failed.eid={EID} rc={RC}", "EID",
@@ -77,10 +76,10 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
         uint32_t enforced_limit = 0;
 
         rc = decode_get_power_limit_resp(
-            responseMsg, responseLen, &cc, &data_size, &reason_code,
+            responseMsg.get(), responseLen, &cc, &data_size, &reason_code,
             &requested_persistent_limit, &requested_oneshot_limit,
             &enforced_limit);
-        free((void*)responseMsg);
+
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             powerCapIntf->PowerCapIntf::powerCap(enforced_limit);
@@ -116,10 +115,10 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
             return;
         }
 
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                              &responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
+                                              responseLen);
         if (rc_)
         {
             lg2::error(
@@ -133,34 +132,39 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
-        rc = decode_set_power_limit_resp(responseMsg, responseLen, &cc,
+        rc = decode_set_power_limit_resp(responseMsg.get(), responseLen, &cc,
                                          &data_size, &reason_code);
-        free((void*)responseMsg);
+
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
             getPowerCapFromDevice();
             lg2::info("clearPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
-            for (auto it = powerCapIntf->parents.begin(); it != powerCapIntf->parents.end();) {
-		    auto sensorIt = manager.objectPathToSensorMap.find(*it);
-		    if (sensorIt != manager.objectPathToSensorMap.end()) {
-			    auto sensor = sensorIt->second;
-			    if (sensor) {
-				    powerCapIntf->sensorCache.emplace_back(
-					std::dynamic_pointer_cast<
-					    NsmPowerControl>(sensor));
-				    it = powerCapIntf->parents.erase(it);
-				    continue;
-			    }
-		    }
-		    ++it;
-	    }
+            for (auto it = powerCapIntf->parents.begin();
+                 it != powerCapIntf->parents.end();)
+            {
+                auto sensorIt = manager.objectPathToSensorMap.find(*it);
+                if (sensorIt != manager.objectPathToSensorMap.end())
+                {
+                    auto sensor = sensorIt->second;
+                    if (sensor)
+                    {
+                        powerCapIntf->sensorCache.emplace_back(
+                            std::dynamic_pointer_cast<NsmPowerControl>(sensor));
+                        it = powerCapIntf->parents.erase(it);
+                        continue;
+                    }
+                }
+                ++it;
+            }
 
-	    // update each cached sensor
-	    for (const auto &sensor : powerCapIntf->sensorCache) {
-		    sensor->updatePowerCapValue(powerCapIntf->name, powerCapIntf->PowerCapIntf::powerCap());
-	    }
+            // update each cached sensor
+            for (const auto& sensor : powerCapIntf->sensorCache)
+            {
+                sensor->updatePowerCapValue(
+                    powerCapIntf->name, powerCapIntf->PowerCapIntf::powerCap());
+            }
         }
         else
         {

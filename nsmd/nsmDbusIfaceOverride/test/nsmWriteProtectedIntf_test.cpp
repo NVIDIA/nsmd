@@ -63,7 +63,6 @@ struct NsmWriteProtectedIntfTest : public testing::Test
     void init(NsmDeviceIdentification deviceType, uint8_t instanceNumber,
               bool retimer = false)
     {
-        responses.clear();
         writeProtectedIntf = std::make_unique<MockWriteProtectedIntf>(
             mockManager, devices[0], instanceNumber, deviceType,
             (firmwareInventoryBasePath / "HGX_FW_TEST_DEV").string().c_str(),
@@ -97,30 +96,32 @@ struct NsmWriteProtectedIntfTest : public testing::Test
         0 // data size
     };
 
-    std::vector<std::shared_ptr<Response>> responses;
-    auto data() const
+    Response lastResponse;
+    nsm_fpga_diagnostics_settings_wp& data()
     {
         const auto headerSize = fpgaDiagnosticMsgHeader.size();
-        EXPECT_FALSE(responses.empty());
         EXPECT_EQ(headerSize + sizeof(nsm_fpga_diagnostics_settings_wp),
-                  responses.back()->size());
+                  lastResponse.size());
         return *reinterpret_cast<nsm_fpga_diagnostics_settings_wp*>(
-            responses.back()->data() + headerSize);
+            lastResponse.data() + headerSize);
     }
     auto mockSendRecvNsmMsgSync(const Response& responseMsg,
                                 const Response& data = Response(),
                                 nsm_completion_codes code = NSM_SUCCESS)
     {
-        auto response = std::make_shared<Response>();
-        response->insert(response->end(), responseMsg.begin(),
-                         responseMsg.end());
-        response->insert(response->end(), data.begin(), data.end());
-        responses.emplace_back(response);
-        return [response, code](eid_t, Request&,
-                                [[maybe_unused]] const nsm_msg** responseMsg,
-                                [[maybe_unused]] size_t* responseLen) {
-            *responseMsg = reinterpret_cast<nsm_msg*>(response->data());
-            *responseLen = response->size();
+        Response response;
+        response.insert(response.end(), responseMsg.begin(), responseMsg.end());
+        response.insert(response.end(), data.begin(), data.end());
+        lastResponse = response;
+        return [response, code](
+                   eid_t, Request&,
+                   [[maybe_unused]] std::shared_ptr<const nsm_msg>& responseMsg,
+                   [[maybe_unused]] size_t& responseLen) {
+            responseLen = response.size();
+            auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
+            memcpy((uint8_t*)msg, response.data(), responseLen);
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                msg, [](const nsm_msg* ptr) { free((void*)ptr); });
             return code;
         };
     }

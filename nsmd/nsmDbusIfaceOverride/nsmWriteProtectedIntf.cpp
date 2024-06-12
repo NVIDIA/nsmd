@@ -233,9 +233,9 @@ bool NsmWriteProtectedIntf::writeProtected(bool value)
             WriteFailure();
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -252,7 +252,7 @@ bool NsmWriteProtectedIntf::writeProtected(bool value)
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
 
-    rc = decode_enable_disable_wp_resp(responseMsg, responseLen, &cc,
+    rc = decode_enable_disable_wp_resp(responseMsg.get(), responseLen, &cc,
                                        &reasonCode);
 
     if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
@@ -283,9 +283,9 @@ bool NsmWriteProtectedIntf::writeProtected() const
         return getWriteProtected();
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -302,8 +302,8 @@ bool NsmWriteProtectedIntf::writeProtected() const
     uint16_t reasonCode = ERR_NULL;
     nsm_fpga_diagnostics_settings_wp data;
 
-    rc = decode_get_fpga_diagnostics_settings_wp_resp(responseMsg, responseLen,
-                                                      &cc, &reasonCode, &data);
+    rc = decode_get_fpga_diagnostics_settings_wp_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode, &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {

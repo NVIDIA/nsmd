@@ -29,12 +29,14 @@ struct MockSensorManager : public SensorManager
     MockSensorManager(NsmDeviceTable& nsmDevices) : SensorManager(nsmDevices, 0)
     {}
     MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
-                (eid_t eid, Request& request, const nsm_msg** responseMsg,
-                 size_t* responseLen),
+                (eid_t eid, Request& request,
+                 std::shared_ptr<const nsm_msg>& responseMsg,
+                 size_t& responseLen),
                 (override));
     MOCK_METHOD(uint8_t, SendRecvNsmMsgSync,
-                (eid_t eid, Request& request, const nsm_msg** responseMsg,
-                 size_t* responseLen),
+                (eid_t eid, Request& request,
+                 std::shared_ptr<const nsm_msg>& responseMsg,
+                 size_t& responseLen),
                 (override));
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));
