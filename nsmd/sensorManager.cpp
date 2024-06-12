@@ -59,6 +59,14 @@ SensorManagerImpl::SensorManagerImpl(
         [this](sdbusplus::message::message& msg) {
         this->interfaceAddedhandler(msg);
     });
+    gpioStatusPropertyChangedSignal = std::make_unique<sdbusplus::bus::match_t>(
+        sdbusplus::bus::match_t(bus,
+                                sdbusplus::bus::match::rules::propertiesChanged(
+                                    "/xyz/openbmc_project/GpioStatusHandler",
+                                    "xyz.openbmc_project.GpioStatus"),
+                                [this](sdbusplus::message::message& msg) {
+        this->gpioStatusPropertyChangedHandler(msg);
+    }));
 }
 
 void SensorManagerImpl::scanInventory()
@@ -125,6 +133,67 @@ void SensorManagerImpl::interfaceAddedhandler(sdbusplus::message::message& msg)
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
                          std::placeholders::_1));
+}
+
+void SensorManagerImpl::gpioStatusPropertyChangedHandler(
+    sdbusplus::message::message& msg)
+{
+    lg2::debug("SensorManager::gpioStatusPropertyChangedHandler: xyz.openbmc_project.GpioStatus PropertiesChanged signal received.");
+    std::string interface;
+    std::map<std::string, std::variant<std::string, bool>> properties;
+    try
+    {
+        const std::string propertyName = "GPU_BASE_PWR_GD";
+        std::string errStr;
+        msg.read(interface, properties);
+        auto prop = properties.find(propertyName);
+        if (prop == properties.end())
+        {
+            lg2::error(
+                "SensorManager::gpioStatusPropertyChangedHandler: Unable to find property: {PROP}",
+                "PROP", propertyName);
+            return;
+        }
+
+        bool pgood;
+        pgood = *std::get_if<bool>(&(prop->second));
+        if (pgood == true)
+        {
+            lg2::info("SensorManager::gpioStatusPropertyChangedHandler: Power transition from standby to DC power detected");
+            for (auto nsmDevice : nsmDevices)
+            {
+                for (auto sensor : nsmDevice->roundRobinSensors)
+                {
+                    // Mark all the sensors as unrefreshed.
+                    sensor->setRefreshed(false);
+                }
+                for (auto sensor : nsmDevice->standByToDcRefreshSensors)
+                {
+                    sensor->update(*this, nsmDevice->eid).detach();
+                }
+                nsmDevice->isDeviceReady = false;
+            }
+        }
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        lg2::error(
+            "SensorManager::gpioStatusPropertyChangedHandler: Unable to read properties from xyz.openbmc_project.GpioStatus. ERR={ERR}",
+            "ERR", e.what());
+    }
+}
+
+void SensorManagerImpl::checkAllDevices()
+{
+    for (auto nsmDevice : nsmDevices)
+    {
+        if (nsmDevice->eid != 255 && !nsmDevice->isDeviceReady)
+        {
+            return;
+        }
+    }
+    lg2::error("SensorManager::checkAllDevices Every Device Checked and Ready. Setting ServiceReady.State to enabled.");
+    NsmServiceReadyIntf::getInstance().setStateEnabled();
 }
 
 void SensorManagerImpl::_startPolling(
@@ -266,6 +335,15 @@ requester::Coroutine
         {
             if (toBeUpdated == 0)
             {
+                if (!nsmDevice->isDeviceReady) // toBeUpdated can be zero because of two reasons
+                                               // 1. There are no round robin sensors
+                                               // 2. All the round robin sensors were updated.
+                                               // If the case is 2 then device would be already ready.
+                {
+                    // Handle the case where there are no round robin sensors.
+                    nsmDevice->isDeviceReady = true;
+                    checkAllDevices();
+                }
                 break;
             }
             auto sensor = nsmDevice->roundRobinSensors.front();
@@ -274,6 +352,21 @@ requester::Coroutine
             toBeUpdated--;
 
             co_await sensor->update(*this, eid);
+
+            if (!sensor->isRefreshed())
+            {
+                auto nextSensor = nsmDevice->roundRobinSensors.front();
+                if (nsmDevice->roundRobinSensors.size() == 1 ||
+                        nextSensor->isRefreshed())
+                {
+                    // Implies the current was the last stale sensor and we have
+                    // refreshed all the round robin sensors.
+                    nsmDevice->isDeviceReady = true;
+                    checkAllDevices();
+                }
+                sensor->setRefreshed(true);
+            }
+
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {

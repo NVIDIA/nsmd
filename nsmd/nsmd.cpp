@@ -27,6 +27,7 @@
 #include "sensorManager.hpp"
 #include "socket_handler.hpp"
 #include "socket_manager.hpp"
+#include "nsmServiceReadyInterface.hpp"
 
 #include <err.h>
 #include <getopt.h>
@@ -119,6 +120,9 @@ int main(int argc, char** argv)
                                          sockManager, verbose);
 
         nsm::NsmDeviceTable nsmDevices;
+
+        // Initialize the singleton instance
+        nsm::NsmServiceReadyIntf::initialize(bus, "/xyz/openbmc_project/NSM", nsmDevices);
 
         // Initialize the DeviceManager before getting its instance
         nsm::DeviceManager::initialize(event, reqHandler, instanceIdDb,

@@ -19,10 +19,12 @@
 
 #include "common/types.hpp"
 #include "instance_id.hpp"
+#include "nsmServiceReadyInterface.hpp"
 #include "nsmDevice.hpp"
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
 #include "nsmObject.hpp"
+
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 #include <sdbusplus/timer.hpp>
@@ -161,6 +163,7 @@ class SensorManagerImpl : public SensorManager
     void stopPolling(uuid_t uuid) override;
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedhandler(sdbusplus::message::message& msg);
+    void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
     void _startPolling(sdeventplus::source::EventBase& /* source */);
     requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
@@ -182,6 +185,7 @@ class SensorManagerImpl : public SensorManager
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
         mctp_socket::Manager& sockManager, bool verbose);
+    void checkAllDevices();
 
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;
@@ -191,6 +195,7 @@ class SensorManagerImpl : public SensorManager
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable;
 
     std::unique_ptr<sdbusplus::bus::match_t> inventoryAddedSignal;
+    std::unique_ptr<sdbusplus::bus::match_t> gpioStatusPropertyChangedSignal;
     std::unique_ptr<sdeventplus::source::Defer> deferScanInventory;
     std::unique_ptr<sdeventplus::source::Defer> newSensorEvent;
     mctp_socket::Manager& sockManager;
