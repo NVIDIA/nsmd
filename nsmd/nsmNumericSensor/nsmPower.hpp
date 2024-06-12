@@ -31,7 +31,7 @@ class NsmPower : public NsmNumericSensor
              const std::vector<utils::Association>& association,
              const std::string& chassis_association,
              const std::string& physicalContext,
-             const std::string* implementation = nullptr);
+             const std::string* implementation, const double maxAllowableValue);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;

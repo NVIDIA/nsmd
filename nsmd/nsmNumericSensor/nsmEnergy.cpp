@@ -34,13 +34,14 @@ NsmEnergy::NsmEnergy(sdbusplus::bus::bus& bus, const std::string& name,
                      const std::vector<utils::Association>& association,
                      [[maybe_unused]] const std::string& chassis_association,
                      const std::string& physicalContext,
-                     const std::string* implementation) :
+                     const std::string* implementation,
+                     const double maxAllowableValue) :
     NsmNumericSensor(
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
             std::make_unique<NsmNumericSensorDbusValue>(
                 bus, name, getSensorType(), SensorUnit::Joules, association,
-                physicalContext, implementation)
+                physicalContext, implementation, maxAllowableValue)
 #ifdef NVIDIA_SHMEM
                 ,
             std::make_unique<NsmNumericSensorShmem>(
@@ -108,7 +109,7 @@ class EnergySensorFactory : public NumericSensorBuilder
         return std::make_shared<NsmEnergy>(
             bus, info.name, info.type, info.sensorId, info.associations,
             info.chassis_association, info.physicalContext,
-            info.implementation.get());
+            info.implementation.get(), info.maxAllowableValue);
     };
 
     std::shared_ptr<NsmNumericAggregator>

@@ -40,7 +40,8 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& associations,
-    const std::string& physicalContext, const std::string* implementation) :
+    const std::string& physicalContext, const std::string* implementation,
+    const double maxAllowableValue) :
     valueIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
@@ -52,6 +53,7 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())
 {
     valueIntf.unit(unit);
+    valueIntf.maxAllowableValue(maxAllowableValue);
     decoratorAreaIntf.physicalContext(
         sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
             convertPhysicalContextTypeFromString(
@@ -94,9 +96,11 @@ NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& association,
-    const std::string& physicalContext, const std::string* implementation) :
+    const std::string& physicalContext, const std::string* implementation,
+    const double maxAllowableValue) :
     NsmNumericSensorDbusValue(bus, name, sensor_type, unit, association,
-                              physicalContext, implementation),
+                              physicalContext, implementation,
+                              maxAllowableValue),
     timestampIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())

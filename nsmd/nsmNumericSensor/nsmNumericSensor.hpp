@@ -76,8 +76,8 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
-        const std::string& physicalContext,
-        const std::string* implementation = nullptr);
+        const std::string& physicalContext, const std::string* implementation,
+        const double maxAllowableValue);
     void updateReading(double value, uint64_t timestamp = 0) override;
 
   private:
@@ -94,8 +94,8 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
-        const std::string& physicalContext,
-        const std::string* implementation = nullptr);
+        const std::string& physicalContext, const std::string* implementation,
+        const double maxAllowableValue);
     void updateReading(double value, uint64_t timestamp = 0) final;
 
   private:

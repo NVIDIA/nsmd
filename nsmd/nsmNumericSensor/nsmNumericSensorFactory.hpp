@@ -39,6 +39,7 @@ struct NumericSensorInfo
     std::unique_ptr<std::string> implementation{};
     bool priority;
     bool aggregated;
+    double maxAllowableValue{std::numeric_limits<double>::infinity()};
 };
 
 class NumericSensorAggregatorBuilder
