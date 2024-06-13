@@ -72,6 +72,14 @@ void NumericSensorFactory::make(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
+    try
+    {
+        info.maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
     info.associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
 

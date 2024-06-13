@@ -13,13 +13,14 @@ namespace nsm
 NsmAltitudePressure::NsmAltitudePressure(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::vector<utils::Association>& association,
-    const std::string& physicalContext, const std::string* implementation) :
-
-    NsmNumericSensor(name, type, 0,
-                     std::make_shared<NsmNumericSensorValueAggregate>(
-                         std::make_unique<NsmNumericSensorDbusValue>(
-                             bus, name, getSensorType(), SensorUnit::Pascals,
-                             association, physicalContext, implementation)))
+    const std::string& physicalContext, const std::string* implementation,
+    const double maxAllowableValue) :
+    NsmNumericSensor(
+        name, type, 0,
+        std::make_shared<NsmNumericSensorValueAggregate>(
+            std::make_unique<NsmNumericSensorDbusValue>(
+                bus, name, getSensorType(), SensorUnit::Pascals, association,
+                physicalContext, implementation, maxAllowableValue)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -102,6 +103,15 @@ void makeNsmAltitudePressure(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
+    double maxAllowableValue{std::numeric_limits<double>::infinity()};
+    try
+    {
+        maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
+            objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
+    }
+    catch (const std::exception& e)
+    {}
+
     auto associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
 
@@ -117,7 +127,8 @@ void makeNsmAltitudePressure(SensorManager& manager,
     }
 
     auto sensor = std::make_shared<NsmAltitudePressure>(
-        bus, name, type, associations, physicalContext, implementation.get());
+        bus, name, type, associations, physicalContext, implementation.get(),
+        maxAllowableValue);
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", name, "TYPE", type);
 

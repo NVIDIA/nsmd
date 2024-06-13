@@ -31,12 +31,14 @@ NsmVoltage::NsmVoltage(sdbusplus::bus::bus& bus, const std::string& name,
                        const std::string& type, uint8_t sensorId,
                        const std::vector<utils::Association>& association,
                        const std::string& physicalContext,
-                       const std::string* implementation) :
-    NsmNumericSensor(name, type, sensorId,
-                     std::make_shared<NsmNumericSensorValueAggregate>(
-                         std::make_unique<NsmNumericSensorDbusValue>(
-                             bus, name, getSensorType(), SensorUnit::Volts,
-                             association, physicalContext, implementation)))
+                       const std::string* implementation,
+                       const double maxAllowableValue) :
+    NsmNumericSensor(
+        name, type, sensorId,
+        std::make_shared<NsmNumericSensorValueAggregate>(
+            std::make_unique<NsmNumericSensorDbusValue>(
+                bus, name, getSensorType(), SensorUnit::Volts, association,
+                physicalContext, implementation, maxAllowableValue)))
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -98,7 +100,8 @@ class VoltageSensorFactory : public NumericSensorBuilder
     {
         return std::make_shared<NsmVoltage>(
             bus, info.name, info.type, info.sensorId, info.associations,
-            info.physicalContext, info.implementation.get());
+            info.physicalContext, info.implementation.get(),
+            info.maxAllowableValue);
     };
 
     std::shared_ptr<NsmNumericAggregator>

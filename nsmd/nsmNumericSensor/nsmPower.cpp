@@ -39,13 +39,14 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
                    const std::vector<utils::Association>& association,
                    [[maybe_unused]] const std::string& chassis_association,
                    const std::string& physicalContext,
-                   const std::string* implementation) :
+                   const std::string* implementation,
+                   const double maxAllowableValue) :
     NsmNumericSensor(
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
             std::make_unique<NsmNumericSensorDbusValueTimestamp>(
                 bus, name, getSensorType(), SensorUnit::Watts, association,
-                physicalContext, implementation)
+                physicalContext, implementation, maxAllowableValue)
 #ifdef NVIDIA_SHMEM
                 ,
             std::make_unique<NsmNumericSensorShmem>(
@@ -132,7 +133,7 @@ class PowerSensorFactory : public NumericSensorBuilder
         auto sensor = std::make_shared<NsmPower>(
             bus, info.name, info.type, info.sensorId, averagingInterval,
             info.associations, info.chassis_association, info.physicalContext,
-            info.implementation.get());
+            info.implementation.get(), info.maxAllowableValue);
 
         if (!candidateForList.empty())
         {

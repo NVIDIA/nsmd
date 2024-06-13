@@ -43,6 +43,7 @@ static const std::vector<utils::Association>
     associations({{"chassis", "all_sensors",
                    "/xyz/openbmc_project/inventory/dummy_device"}});
 static const std::string physicalContexnt("GPU");
+static const double maxAllowableValue{std::numeric_limits<double>::infinity()};
 
 TEST(nsmTemp, GoodGenReq)
 {
@@ -52,7 +53,9 @@ TEST(nsmTemp, GoodGenReq)
                         1,
                         associations,
                         associations[0].absolutePath,
-                        physicalContexnt};
+                        physicalContexnt,
+                        nullptr,
+                        maxAllowableValue};
 
     EXPECT_EQ(sensor.sensorId, 1);
 
@@ -78,7 +81,9 @@ TEST(nsmTemp, GoodHandleResp)
                         1,
                         associations,
                         associations[0].absolutePath,
-                        physicalContexnt};
+                        physicalContexnt,
+                        nullptr,
+                        maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -111,7 +116,9 @@ TEST(nsmTemp, BadHandleResp)
                         1,
                         associations,
                         associations[0].absolutePath,
-                        physicalContexnt};
+                        physicalContexnt,
+                        nullptr,
+                        maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -149,7 +156,9 @@ TEST(nsmPower, GoodGenReq)
                          1,
                          associations,
                          associations[0].absolutePath,
-                         physicalContexnt};
+                         physicalContexnt,
+                         nullptr,
+                         maxAllowableValue};
 
     EXPECT_EQ(sensor.sensorId, 1);
     EXPECT_EQ(sensor.averagingInterval, 1);
@@ -179,7 +188,9 @@ TEST(nsmPower, GoodHandleResp)
                          1,
                          associations,
                          associations[0].absolutePath,
-                         physicalContexnt};
+                         physicalContexnt,
+                         nullptr,
+                         maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -212,7 +223,9 @@ TEST(nsmPower, BadHandleResp)
                          1,
                          associations,
                          associations[0].absolutePath,
-                         physicalContexnt};
+                         physicalContexnt,
+                         nullptr,
+                         maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -249,7 +262,9 @@ TEST(nsmEnergy, GoodGenReq)
                           1,
                           associations,
                           associations[0].absolutePath,
-                          physicalContexnt};
+                          physicalContexnt,
+                          nullptr,
+                          maxAllowableValue};
 
     EXPECT_EQ(sensor.sensorId, 1);
 
@@ -276,7 +291,9 @@ TEST(nsmEnergy, GoodHandleResp)
                           1,
                           associations,
                           associations[0].absolutePath,
-                          physicalContexnt};
+                          physicalContexnt,
+                          nullptr,
+                          maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -308,7 +325,9 @@ TEST(nsmEnergy, BadHandleResp)
                           1,
                           associations,
                           associations[0].absolutePath,
-                          physicalContexnt};
+                          physicalContexnt,
+                          nullptr,
+                          maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -339,8 +358,9 @@ TEST(nsmEnergy, BadHandleResp)
 
 TEST(nsmVoltage, GoodGenReq)
 {
-    nsm::NsmVoltage sensor{bus, sensorName,   sensorType,
-                           1,   associations, physicalContexnt};
+    nsm::NsmVoltage sensor{bus,     sensorName,       sensorType,
+                           1,       associations,     physicalContexnt,
+                           nullptr, maxAllowableValue};
 
     EXPECT_EQ(sensor.sensorId, 1);
 
@@ -360,8 +380,9 @@ TEST(nsmVoltage, GoodGenReq)
 
 TEST(nsmVoltage, GoodHandleResp)
 {
-    nsm::NsmVoltage sensor{bus, sensorName,   sensorType,
-                           1,   associations, physicalContexnt};
+    nsm::NsmVoltage sensor{bus,     sensorName,       sensorType,
+                           1,       associations,     physicalContexnt,
+                           nullptr, maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -387,8 +408,9 @@ TEST(nsmVoltage, GoodHandleResp)
 
 TEST(nsmVoltage, BadHandleResp)
 {
-    nsm::NsmVoltage sensor{bus, sensorName,   sensorType,
-                           1,   associations, physicalContexnt};
+    nsm::NsmVoltage sensor{bus,     sensorName,       sensorType,
+                           1,       associations,     physicalContexnt,
+                           nullptr, maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -418,8 +440,9 @@ TEST(nsmVoltage, BadHandleResp)
 
 TEST(nsmAltitudePressure, GoodGenReq)
 {
-    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations,
-                                    physicalContexnt};
+    nsm::NsmAltitudePressure sensor{
+        bus,     sensorName,       sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue};
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -436,8 +459,9 @@ TEST(nsmAltitudePressure, GoodGenReq)
 
 TEST(nsmAltitudePressure, GoodHandleResp)
 {
-    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations,
-                                    physicalContexnt};
+    nsm::NsmAltitudePressure sensor{
+        bus,     sensorName,       sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
@@ -463,8 +487,9 @@ TEST(nsmAltitudePressure, GoodHandleResp)
 
 TEST(nsmAltitudePressure, BadHandleResp)
 {
-    nsm::NsmAltitudePressure sensor{bus, sensorName, sensorType, associations,
-                                    physicalContexnt};
+    nsm::NsmAltitudePressure sensor{
+        bus,     sensorName,       sensorType, associations, physicalContexnt,
+        nullptr, maxAllowableValue};
 
     auto value = std::make_shared<MockNsmNumericSensorValueAggregate>();
 
