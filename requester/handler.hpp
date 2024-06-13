@@ -125,15 +125,25 @@ class Handler
                         "Failed to stop the instance ID expiry timer. RC={RC}",
                         "RC", rc);
                 }
-                // Call response handler with an empty response to indicate
-                // no response
-                responseHandler(eid, nullptr, 0);
 
-                // remove expired request and run queued request
+                // Defer to remove expired timer and run queued request
+                // the timerInstance callback cannot free timerInstance itself
+                timerToFree[eid] = std::move(timerInstance);
                 this->removeRequestContainer[eid] =
                     std::make_unique<sdeventplus::source::Defer>(
                         event,
                         std::bind(&Handler::removeRequestEntry, this, eid));
+
+                // Call responseHandler after erase it from the handlers to
+                // avoid starting the same request again in runRegisteredRequest()
+                auto unique_handler = std::move(responseHandler);
+
+                instanceIdDb.free(eid, request->getInstanceId());
+                handlers[eid].pop();
+
+                // Call response handler with an empty response to indicate
+                // no response
+                unique_handler(eid, nullptr, 0);
             }
             else
             {
@@ -308,20 +318,15 @@ class Handler
     std::unordered_map<eid_t, std::unique_ptr<sdeventplus::source::Defer>>
         removeRequestContainer;
 
+    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>> timerToFree;
+
     /** @brief Remove request entry for which the instance ID expired
      *
      *  @param[in] eid - eid for the Request
      */
     void removeRequestEntry(eid_t eid)
     {
-        if (!handlers[eid].empty())
-        {
-            auto& [request, responseHandler, timerInstance,
-                   valid] = handlers[eid].front();
-
-            instanceIdDb.free(eid, request->getInstanceId());
-            handlers[eid].pop();
-        }
+        timerToFree[eid] = nullptr;
         runRegisteredRequest(eid);
     }
 };
