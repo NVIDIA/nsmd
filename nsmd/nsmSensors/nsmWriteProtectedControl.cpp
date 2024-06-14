@@ -28,11 +28,11 @@ namespace nsm
 
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
-    NsmDeviceIdentification deviceType, uint8_t instanceNumber) :
+    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceType(deviceType), instanceNumber(instanceNumber)
+    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer)
 {
-    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber);
+    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
 }
 
 std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,
@@ -67,7 +67,7 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         pdi().writeProtectedControl(NsmWriteProtectedIntf::getValue(
-            data, deviceType, instanceNumber));
+            data, deviceType, instanceNumber, retimer));
     }
     else
     {

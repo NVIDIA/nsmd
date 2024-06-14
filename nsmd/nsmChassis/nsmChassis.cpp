@@ -191,7 +191,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
             throw std::runtime_error(
                 "Cannot use NSM_OperationalStatus for different device than Baseboard");
         }
-        auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
             utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
@@ -201,7 +201,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
         auto gpuOperationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
             name, type, inventoryObjPaths);
         device->addSensor(std::make_shared<NsmGpuPresenceAndPowerStatus>(
-                              gpuOperationalStatus, instanceId),
+                              gpuOperationalStatus, instanceNumber),
                           priority);
     }
     else if (type == "NSM_PowerState")
@@ -215,7 +215,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
             throw std::runtime_error(
                 "Cannot use NSM_PowerState for different device than Baseboard");
         }
-        auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
             utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
@@ -224,9 +224,9 @@ void nsmChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "Priority", interface.c_str());
         auto gpuPowerState =
             NsmInterfaceProvider<PowerStateIntf>(name, type, inventoryObjPaths);
-        device->addSensor(
-            std::make_shared<NsmPowerSupplyStatus>(gpuPowerState, instanceId),
-            priority);
+        device->addSensor(std::make_shared<NsmPowerSupplyStatus>(
+                              gpuPowerState, instanceNumber),
+                          priority);
     }
     else if (type == "NSM_WriteProtect")
     {
@@ -239,11 +239,11 @@ void nsmChassisCreateSensors(SensorManager& manager,
             throw std::runtime_error(
                 "Cannot use NSM_WriteProtect for different device than Baseboard");
         }
-        auto instanceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto settings = NsmChassis<SettingsIntf>(name);
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            settings, deviceType, instanceId);
+            settings, deviceType, instanceNumber, false);
         auto writeProtectJumper =
             std::make_shared<NsmWriteProtectedJumper>(settings);
         device->addStaticSensor(writeProtectControl)

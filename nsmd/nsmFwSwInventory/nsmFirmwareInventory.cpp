@@ -19,6 +19,7 @@
 
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmWriteProtectedControl.hpp"
 #include "nsmWriteProtectedIntf.hpp"
 #include "utils.hpp"
 
@@ -69,7 +70,10 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
             (firmwareInventoryBasePath / name).string().c_str(), retimer);
         auto settings = std::make_shared<NsmFirmwareInventory<SettingsIntf>>(
             name, dynamic_pointer_cast<SettingsIntf>(writeProtectControlIntf));
+        auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
+            *settings, deviceType, instanceNumber, retimer);
         device->addStaticSensor(settings);
+        device->addSensor(writeProtectControl, false);
     }
     else if (type == "NSM_FirmwareVersion")
     {
