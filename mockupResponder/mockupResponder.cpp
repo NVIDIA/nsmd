@@ -376,6 +376,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1:
                     return queryScalarGroupTelemetryHandler(request,
                                                             requestLen);
+                case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
+                     return pcieFundamentalResetHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -504,7 +506,7 @@ std::optional<std::vector<uint8_t>>
         0b10001110, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
-        0b00110010, /* 103 -  96  - Byte 13 */
+        0b00110011, /* 103 -  96  - Byte 13 */
         0b00000100, /* 111 - 104  - Byte 14 */
         0b00000000, /* 119 - 112  - Byte 15 */
         0b00010000, /* 127 - 120  - Byte 16 */
@@ -1984,6 +1986,38 @@ std::optional<std::vector<uint8_t>>
             break;
     }
     return std::nullopt;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::pcieFundamentalResetHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    uint8_t device_index;
+    uint8_t action;
+    auto rc = decode_assert_pcie_fundamental_reset_req(requestMsg, requestLen,
+                                                       &device_index, &action);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_assert_pcie_fundamental_reset_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_assert_pcie_fundamental_reset_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_assert_pcie_fundamental_reset_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
 }
 
 std::optional<std::vector<uint8_t>>

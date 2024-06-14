@@ -177,6 +177,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        pcieFundamentalResetHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
 
     int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg,
                      bool verbose);

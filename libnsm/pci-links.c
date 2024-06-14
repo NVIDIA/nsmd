@@ -316,3 +316,91 @@ int decode_query_scalar_group_telemetry_v1_group6_resp(
 		ret = NSM_SW_ERROR_LENGTH;
 	return ret;
 }
+
+int encode_assert_pcie_fundamental_reset_req(uint8_t instance_id, uint8_t device_index, uint8_t action,
+			    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PCI_LINK;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_assert_pcie_fundamental_reset_req *request =
+	    (struct nsm_assert_pcie_fundamental_reset_req *)msg->payload;
+
+	request->hdr.command = NSM_ASSERT_PCIE_FUNDAMENTAL_RESET;
+	request->hdr.data_size = 2*sizeof(uint8_t);
+	request->device_index = device_index;
+	request->action = action;
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_assert_pcie_fundamental_reset_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t* device_index, uint8_t* action)
+{
+	if (msg == NULL || device_index == NULL || action == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_assert_pcie_fundamental_reset_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_assert_pcie_fundamental_reset_req *request =
+	    (struct nsm_assert_pcie_fundamental_reset_req *)msg->payload;
+
+	if (request->hdr.data_size != 2*sizeof(uint8_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_index = request->device_index;
+	*action = request->action;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_assert_pcie_fundamental_reset_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_PCI_LINK;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_ASSERT_PCIE_FUNDAMENTAL_RESET,
+					  msg);
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+	resp->command = NSM_ASSERT_PCIE_FUNDAMENTAL_RESET;
+	resp->completion_code = cc;
+	resp->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_assert_pcie_fundamental_reset_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code)
+{
+	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
