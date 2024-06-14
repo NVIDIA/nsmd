@@ -3,12 +3,14 @@
 #include "libnsm/network-ports.h"
 
 #include "common/types.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
+#include <tal.hpp>
 #include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
@@ -57,12 +59,14 @@ class NsmPortStatus : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
     std::string portName;
 
   private:
     std::unique_ptr<PortStateIntf> portStateIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     uint8_t portNumber;
+    std::string objPath;
 };
 
 class NsmPortCharacteristics : public NsmSensor
@@ -79,12 +83,14 @@ class NsmPortCharacteristics : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
     std::string portName;
 
   private:
     std::unique_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     uint8_t portNumber;
+    std::string objPath;
 };
 
 class NsmPortMetrics : public NsmSensor
@@ -100,6 +106,7 @@ class NsmPortMetrics : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
     std::string portName;
 
   private:
@@ -111,6 +118,7 @@ class NsmPortMetrics : public NsmSensor
     std::unique_ptr<PortIntf> portIntf = nullptr;
 
     uint8_t portNumber;
+    std::string objPath;
 };
 
 } // namespace nsm
