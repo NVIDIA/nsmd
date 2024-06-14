@@ -168,6 +168,12 @@ class MockupResponder
                       uint8_t eventId, uint8_t eventClass, uint16_t eventState,
                       uint8_t dataSize, uint8_t* data);
 
+    void sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag, uint32_t reason,
+                      uint32_t sequence_number, uint64_t timestamp,
+                      std::string message_text);
+
+    void sendResetRequiredEvent(uint8_t eid, bool ackr);
+
     std::optional<std::vector<uint8_t>>
         queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);

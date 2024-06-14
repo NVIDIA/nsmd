@@ -67,7 +67,8 @@ class EventManager
             return std::nullopt;
         }
 
-        evenTypeHandlers.at(nsmType)->handle(eid, eventId, eventMsg, eventLen);
+        evenTypeHandlers.at(nsmType)->handle(eid, nsmType, eventId, eventMsg,
+                                             eventLen);
 
         struct nsm_event* event = (struct nsm_event*)eventMsg->payload;
         if (event->ackr)

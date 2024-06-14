@@ -4846,3 +4846,162 @@ TEST(getClockOutputEnableState, testBadDecodeResponseWithPayload)
 	    response, msg_len, &cc, &reason_code, &data_size, &clk_buf);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+TEST(XIDEvent, testGoodEncodeResponse)
+{
+	const std::string message_text{"XID Event"};
+
+	std::vector<uint8_t> event_msg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+				       sizeof(nsm_xid_event_payload) +
+				       message_text.size());
+	auto msg = reinterpret_cast<nsm_msg *>(event_msg.data());
+
+	const nsm_xid_event_payload payload_data{.flag = 0x3A,
+						 .reserved = {},
+						 .reason = 0x29FB,
+						 .sequence_number = 11490,
+						 .timestamp = 2483710479};
+
+	auto rc =
+	    encode_nsm_xid_event(0, true, payload_data, message_text.data(),
+				 message_text.size(), msg);
+
+	auto response = reinterpret_cast<nsm_msg *>(event_msg.data());
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, response->hdr.request);
+	EXPECT_EQ(1, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	struct nsm_event *event = (struct nsm_event *)response->payload;
+
+	EXPECT_EQ(NSM_XID_EVENT, event->event_id);
+	EXPECT_EQ(true, event->ackr);
+	EXPECT_EQ(NSM_EVENT_VERSION, event->version);
+	EXPECT_EQ(NSM_GENERAL_EVENT_CLASS, event->event_class);
+	EXPECT_EQ(0, event->event_state);
+	EXPECT_EQ(sizeof(nsm_xid_event_payload) + message_text.size(),
+		  event->data_size);
+
+	nsm_xid_event_payload *payload =
+	    (struct nsm_xid_event_payload *)event->data;
+
+	EXPECT_EQ(payload_data.flag, payload->flag);
+	EXPECT_EQ(payload_data.reason, payload->reason);
+	EXPECT_EQ(payload_data.sequence_number, payload->sequence_number);
+	EXPECT_EQ(payload_data.timestamp, payload->timestamp);
+
+	std::string text(
+	    (const char *)&event->data[sizeof(nsm_xid_event_payload)],
+	    event->data_size - sizeof(nsm_xid_event_payload));
+	EXPECT_EQ(text, message_text.data());
+}
+
+class XIDEventDecode : public testing::Test
+{
+      protected:
+	XIDEventDecode()
+	    : message_text{"XID Event"},
+	      event_msg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+			sizeof(nsm_xid_event_payload) + message_text.size()),
+	      payload_data{.flag = 0x3A,
+			   .reserved = {},
+			   .reason = 0x29FB,
+			   .sequence_number = 11490,
+			   .timestamp = 2483710479}
+	{
+		auto rc = encode_nsm_xid_event(
+		    0, true, payload_data, message_text.data(),
+		    message_text.size(),
+		    reinterpret_cast<nsm_msg *>(event_msg.data()));
+
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		response = reinterpret_cast<nsm_msg *>(event_msg.data());
+	};
+
+	const std::string message_text;
+	std::vector<uint8_t> event_msg;
+	const nsm_msg *response;
+	const nsm_xid_event_payload payload_data;
+};
+
+TEST_F(XIDEventDecode, testGoodDecodeResponse)
+{
+	uint8_t event_class{};
+	uint16_t event_state{};
+	nsm_xid_event_payload payload{};
+	char text[NSM_EVENT_DATA_MAX_LEN]{};
+	size_t message_text_size{};
+
+	auto rc = decode_nsm_xid_event(response, event_msg.size(), &event_class,
+				       &event_state, &payload, text,
+				       &message_text_size);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	std::string message_text_decoded(text, message_text_size);
+
+	EXPECT_EQ(NSM_GENERAL_EVENT_CLASS, event_class);
+	EXPECT_EQ(0, event_state);
+
+	EXPECT_EQ(payload_data.flag, payload.flag);
+	EXPECT_EQ(payload_data.reason, payload.reason);
+	EXPECT_EQ(payload_data.sequence_number, payload.sequence_number);
+	EXPECT_EQ(payload_data.timestamp, payload.timestamp);
+
+	EXPECT_EQ(message_text, message_text_decoded);
+}
+
+TEST_F(XIDEventDecode, testBadDecodeResponseLength)
+{
+	uint8_t event_class{};
+	uint16_t event_state{};
+	nsm_xid_event_payload payload{};
+	char text[NSM_EVENT_DATA_MAX_LEN]{};
+	size_t message_text_size{};
+
+	auto rc = decode_nsm_xid_event(response, 10, &event_class, &event_state,
+				       &payload, text, &message_text_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST_F(XIDEventDecode, testBadDecodeResponseNull)
+{
+	uint8_t event_class{};
+	uint16_t event_state{};
+	char text[NSM_EVENT_DATA_MAX_LEN]{};
+	size_t message_text_size{};
+
+	auto rc = decode_nsm_xid_event(response, event_msg.size(), &event_class,
+				       &event_state, nullptr, text,
+				       &message_text_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST_F(XIDEventDecode, testBadDecodeResponseDataLength)
+{
+	uint8_t event_class{};
+	uint16_t event_state{};
+	nsm_xid_event_payload payload{};
+	char text[NSM_EVENT_DATA_MAX_LEN]{};
+	size_t message_text_size{};
+
+	auto rc = decode_nsm_xid_event(response, event_msg.size() - 1,
+				       &event_class, &event_state, &payload,
+				       text, &message_text_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+
+	struct nsm_event *event = (struct nsm_event *)response->payload;
+	event->data_size -= message_text.size() - 1;
+
+	rc = decode_nsm_xid_event(
+	    response, event_msg.size() - message_text.size() - 1, &event_class,
+	    &event_state, &payload, text, &message_text_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

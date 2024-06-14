@@ -55,6 +55,9 @@ extern "C" {
 #define NSM_EVENT_ACK_LEN 1
 // eventId(1byte)
 
+#define NSM_EVENT_DATA_MAX_LEN 256
+#define NSM_EVENT_MAX_EVENT_ID 256
+
 #define NUM_NSM_TYPES 6
 #define NUM_COMMAND_CODES 256
 enum nsm_type {

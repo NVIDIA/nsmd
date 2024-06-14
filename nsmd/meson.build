@@ -19,6 +19,8 @@ sources = [
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
     'nsmNumericSensor/nsmNumericSensorComposite.cpp',
+    'eventType3Handler.cpp',
+    'nsmEvent.cpp'
 ]
 
 nsmd_headers = [
@@ -41,6 +43,7 @@ subdir('nsmCommon')
 subdir('nsmPCIeDevice')
 subdir('nsmDeviceInventory')
 subdir('nsmSensors')
+subdir('nsmEvent')
 
 executable(
     'nsmd',

@@ -253,6 +253,14 @@ void nsmChassisCreateSensors(SensorManager& manager,
             .update(manager, eid)
             .detach();
     }
+    else if (type == "NSM_PrettyName")
+    {
+        auto prettyName = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "Name", interface.c_str());
+        auto chassisPrettyName = std::make_shared<NsmChassis<ItemIntf>>(name);
+        chassisPrettyName->pdi().prettyName(prettyName);
+        device->addStaticSensor(chassisPrettyName);
+    }
 }
 
 std::vector<std::string> chassisInterfaces{
@@ -266,6 +274,7 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerLimit",
     "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.PrettyName",
     "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)

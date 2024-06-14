@@ -37,7 +37,8 @@ namespace nsm
 {
 
 using EventHandlerFunc =
-    std::function<void(eid_t eid, const nsm_msg* event, size_t eventLen)>;
+    std::function<void(eid_t eid, NsmType type, NsmEventId eventId,
+                       const nsm_msg* event, size_t eventLen)>;
 using Level = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 
 class EventHandler
@@ -51,8 +52,8 @@ class EventHandler
      *  @param[in] event - nsm event
      *  @param[in] eventLen - nsm event size
      */
-    void handle(eid_t eid, NsmEventId eventId, const nsm_msg* event,
-                size_t eventLen)
+    void handle(eid_t eid, NsmType type, NsmEventId eventId,
+                const nsm_msg* event, size_t eventLen)
     {
         if (handlers.find(eventId) == handlers.end())
         {
@@ -64,7 +65,7 @@ class EventHandler
             return;
         }
 
-        handlers.at(eventId)(eid, event, eventLen);
+        handlers.at(eventId)(eid, type, eventId, event, eventLen);
     }
 
     virtual void unsupportedEvent(uint8_t eid, const nsm_msg* event,

@@ -63,6 +63,13 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_POWER_LIMITS = 0x07
 };
 
+/** @brief NSM Type3 platform environmental events
+ */
+enum nsm_platform_environmental_events {
+	NSM_RESET_REQUIRED_EVENT = 0x00,
+	NSM_XID_EVENT = 0x01,
+};
+
 enum nsm_inventory_property_identifiers {
 	BOARD_PART_NUMBER = 0,
 	SERIAL_NUMBER = 1,
@@ -498,6 +505,18 @@ struct nsm_get_gpu_presence_and_power_status_resp {
 	uint8_t power_status;
 	uint8_t reserved1;
 	uint8_t reserved2;
+} __attribute__((packed));
+
+/** @struct nsm_xid_event_payload
+ *
+ *  Structure representing payload of NSM xid event
+ */
+struct nsm_xid_event_payload {
+	uint8_t flag;
+	uint8_t reserved[3];
+	uint32_t reason;
+	uint32_t sequence_number;
+	uint64_t timestamp;
 } __attribute__((packed));
 
 /** @brief Encode a Get Driver Information request message
@@ -2069,6 +2088,59 @@ int encode_get_memory_capacity_util_resp(
 int decode_get_memory_capacity_util_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code, struct nsm_memory_capacity_utilization *data);
+
+/** @brief Create a xid (Driver Event Message) event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] payload - xid event payload
+ *  @param[in] message_text - xid event message text
+ *  @param[in] message_text_size - xid event message text length
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_xid_event(uint8_t instance_id, bool ackr,
+			 struct nsm_xid_event_payload payload,
+			 const char *message_text, size_t message_text_size,
+			 struct nsm_msg *msg);
+
+/** @brief Decode a xid (Driver Event Message) event message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] payload - xid event payload
+ *  @param[out] message_text - xid event message text
+ *  @param[out] message_text_size - xid event message text length
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_xid_event(const struct nsm_msg *msg, size_t msg_len,
+			 uint8_t *event_class, uint16_t *event_state,
+			 struct nsm_xid_event_payload *payload,
+			 char *message_text, size_t *message_text_size);
+
+/** @brief Create a Reset Required event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_reset_required_event(uint8_t instance_id, bool ackr,
+				    struct nsm_msg *msg);
+
+/** @brief Decode a Reset Required event message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *event_class,
+				    uint16_t *event_state);
 
 #ifdef __cplusplus
 }
