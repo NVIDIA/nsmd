@@ -6,6 +6,7 @@ dep_src_files = [
     '../../sensorManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
+    '../../nsmSensors/nsmWriteProtectedControl.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',

@@ -202,19 +202,12 @@ int NsmWriteProtectedIntf::getDataIndex(NsmDeviceIdentification deviceType,
     }
     return dataIndex;
 }
-bool NsmWriteProtectedIntf::setWriteProtected(bool value)
-{
-    return SettingsIntf::writeProtected(value);
-}
-bool NsmWriteProtectedIntf::getWriteProtected() const
-{
-    return SettingsIntf::writeProtected();
-}
 bool NsmWriteProtectedIntf::writeProtected(bool value)
 {
-    if (getWriteProtected() == value)
-        return value;
-
+    return SettingsIntf::writeProtected(setWriteProtected(value));
+}
+bool NsmWriteProtectedIntf::setWriteProtected(bool value)
+{
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_req));
 
     auto eid = manager.getEid(device);
@@ -223,6 +216,10 @@ bool NsmWriteProtectedIntf::writeProtected(bool value)
     auto rc = encode_enable_disable_wp_req(
         0, (diagnostics_enable_disable_wp_data_index)dataIndex, value,
         requestPtr);
+
+    lg2::debug(
+        "NsmWriteProtectedIntf::setWriteProtected encode_enable_disable_wp_req call - value={VALUE}, dataIndex={DI}",
+        "VALUE", value, "DI", dataIndex);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -241,7 +238,7 @@ bool NsmWriteProtectedIntf::writeProtected(bool value)
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmWriteProtectedIntf::writeProtected(bool): SendRecvNsmMsgSync failed."
+                "NsmWriteProtectedIntf::setWriteProtected: SendRecvNsmMsgSync failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
@@ -254,18 +251,17 @@ bool NsmWriteProtectedIntf::writeProtected(bool value)
 
     rc = decode_enable_disable_wp_resp(responseMsg.get(), responseLen, &cc,
                                        &reasonCode);
-
     if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "NsmWriteProtectedIntf::writeProtected(bool): decode_enable_disable_wp_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NsmWriteProtectedIntf::setWriteProtected: decode_enable_disable_wp_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
             WriteFailure();
     }
-    return setWriteProtected(writeProtected());
+    return getWriteProtected();
 }
-bool NsmWriteProtectedIntf::writeProtected() const
+bool NsmWriteProtectedIntf::getWriteProtected() const
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_fpga_diagnostics_settings_req));
@@ -275,12 +271,15 @@ bool NsmWriteProtectedIntf::writeProtected() const
     auto rc = encode_get_fpga_diagnostics_settings_req(0, GET_WP_SETTINGS,
                                                        requestPtr);
 
+    lg2::debug(
+        "NsmWriteProtectedIntf::getWriteProtected: encode_get_fpga_diagnostics_settings_req call");
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "NsmWriteProtectedIntf::writeProtected: encode_get_fpga_diagnostics_settings_req(GET_WP_SETTINGS) failed. eid={EID} rc={RC}",
+            "NsmWriteProtectedIntf::getWriteProtected: encode_get_fpga_diagnostics_settings_req(GET_WP_SETTINGS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        return getWriteProtected();
+        throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+            WriteFailure();
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
@@ -291,11 +290,12 @@ bool NsmWriteProtectedIntf::writeProtected() const
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmWriteProtectedIntf::writeProtected: SendRecvNsmMsgSync failed."
+                "NsmWriteProtectedIntf::getWriteProtected: SendRecvNsmMsgSync failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
-        return getWriteProtected();
+        throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+            WriteFailure();
     }
 
     uint8_t cc = NSM_ERROR;
@@ -307,15 +307,18 @@ bool NsmWriteProtectedIntf::writeProtected() const
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        lg2::debug(
+            "NsmWriteProtectedIntf::getWriteProtected: decode_get_fpga_diagnostics_settings_wp_resp success");
         return getValue(data, deviceType, instanceNumber, retimer);
     }
     else
     {
         lg2::error(
-            "NsmWriteProtectedIntf::writeProtected:  decode_get_fpga_diagnostics_settings_wp_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NsmWriteProtectedIntf::getWriteProtected:  decode_get_fpga_diagnostics_settings_wp_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+            WriteFailure();
     }
-    return getWriteProtected();
 }
 
 } // namespace nsm

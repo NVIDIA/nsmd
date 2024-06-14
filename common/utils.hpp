@@ -421,6 +421,5 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
  * instance number is given
  */
 void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
-                                   uint8_t instanceNumber,
-                                   bool retimer = false);
+                                   uint8_t instanceNumber, bool retimer);
 } // namespace utils

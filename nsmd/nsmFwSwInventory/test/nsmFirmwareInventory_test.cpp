@@ -26,6 +26,7 @@ using namespace ::testing;
 
 #include "nsmFirmwareInventory.hpp"
 #include "nsmInventoryProperty.hpp"
+#include "nsmWriteProtectedControl.hpp"
 #include "nsmWriteProtectedIntf.hpp"
 
 namespace nsm
@@ -158,55 +159,64 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
             int(sdbusplus::UnpackErrorReason::missingProperty))));
     EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(serviceMap));
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
 
-    auto sensorId = 0;
+    auto staticSensors = 0;
+    auto dynamicSensors = 0;
+    auto prioritySensors = 0;
     auto retimerAsset = dynamic_pointer_cast<NsmFirmwareInventory<AssetIntf>>(
-        fpga.deviceSensors[sensorId++]);
+        fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, retimerAsset);
     EXPECT_EQ(get<std::string>(retimer, "Manufacturer"),
               retimerAsset->pdi().manufacturer());
 
     auto retimerAssociation =
         dynamic_pointer_cast<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
-            fpga.deviceSensors[sensorId++]);
+            fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, retimerAssociation);
     EXPECT_EQ(2, retimerAssociation->pdi().associations().size());
 
     auto retimerSettings =
         dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
-            fpga.deviceSensors[sensorId++]);
+            fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, retimerSettings);
     EXPECT_NE(nullptr,
               dynamic_cast<NsmWriteProtectedIntf*>(&retimerSettings->pdi()));
 
+    auto retimerWriteProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
+        fpga.roundRobinSensors[dynamicSensors++]);
+    EXPECT_NE(nullptr, retimerWriteProtectedSensor);
+
     auto version = dynamic_pointer_cast<NsmInventoryProperty<VersionIntf>>(
-        fpga.deviceSensors[sensorId++]);
+        fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, version);
     EXPECT_EQ(PCIERETIMER_0_EEPROM_VERSION +
                   get<uint64_t>(retimer, "InstanceNumber"),
               version->property);
 
     auto gpuAsset = dynamic_pointer_cast<NsmFirmwareInventory<AssetIntf>>(
-        fpga.deviceSensors[sensorId++]);
+        fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, gpuAsset);
     EXPECT_EQ(get<std::string>(gpu, "Manufacturer"),
               gpuAsset->pdi().manufacturer());
 
     auto gpuAssociation =
         dynamic_pointer_cast<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
-            fpga.deviceSensors[sensorId++]);
+            fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, gpuAssociation);
     EXPECT_EQ(2, gpuAssociation->pdi().associations().size());
 
     auto gpuSettings = dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
-        fpga.deviceSensors[sensorId++]);
+        fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, gpuSettings);
-    EXPECT_NE(nullptr,
-              dynamic_cast<NsmWriteProtectedIntf*>(&gpuSettings->pdi()));
+    EXPECT_NE(nullptr, dynamic_cast<NsmWriteProtectedIntf*>(&gpuSettings->pdi()));
 
-    EXPECT_EQ(sensorId, fpga.deviceSensors.size());
+    auto gpuWriteProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
+        fpga.roundRobinSensors[dynamicSensors++]);
+    EXPECT_NE(nullptr, gpuWriteProtectedSensor);
+
+    EXPECT_EQ(staticSensors, fpga.deviceSensors.size());
+    EXPECT_EQ(dynamicSensors, fpga.roundRobinSensors.size());
+    EXPECT_EQ(prioritySensors, fpga.prioritySensors.size());
 }
 
 TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)

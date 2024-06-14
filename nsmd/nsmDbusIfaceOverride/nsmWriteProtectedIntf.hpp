@@ -42,11 +42,8 @@ class NsmWriteProtectedIntf : public SettingsIntf
     bool retimer;
 
     bool writeProtected(bool value) override;
-    bool writeProtected() const override;
-
-  protected:
-    virtual bool setWriteProtected(bool value);
-    virtual bool getWriteProtected() const;
+    bool setWriteProtected(bool value);
+    bool getWriteProtected() const;
 
   public:
     NsmWriteProtectedIntf() = delete;
@@ -69,7 +66,7 @@ class NsmWriteProtectedIntf : public SettingsIntf
      */
     static bool getValue(const nsm_fpga_diagnostics_settings_wp& data,
                          NsmDeviceIdentification deviceType,
-                         uint8_t instanceNumber, bool retimer = false);
+                         uint8_t instanceNumber, bool retimer);
 
     /**
      * @brief Get the Write Protected data index depending on device type and
