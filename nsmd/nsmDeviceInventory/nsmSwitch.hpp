@@ -4,6 +4,7 @@
 
 #include "nsmInterface.hpp"
 
+#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -28,6 +29,8 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
     NsmSwitchDI(const std::string& name, const std::string& inventoryObjPath) :
         NsmInterfaceProvider<IntfType>(name, "NSM_NVSwitch", inventoryObjPath)
     {}
+
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 };
 
 } // namespace nsm

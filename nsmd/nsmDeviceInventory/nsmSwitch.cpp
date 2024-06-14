@@ -1,5 +1,6 @@
 #include "nsmSwitch.hpp"
 
+#include "deviceManager.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
@@ -7,6 +8,26 @@
 
 namespace nsm
 {
+template <typename IntfType>
+requester::Coroutine
+    NsmSwitchDI<IntfType>::update(SensorManager& manager,
+                                               eid_t eid)
+{
+    DeviceManager& deviceManager = DeviceManager::getInstance();
+    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
+    if (uuid)
+    {
+        if constexpr (std::is_same_v<IntfType, UuidIntf>)
+        {
+            auto nsmDevice = manager.getNsmDevice(*uuid);
+            if (nsmDevice)
+            {
+                this->pdi().uuid(nsmDevice->deviceUuid);
+            }
+        }
+    }
+    co_return NSM_SUCCESS;
+}
 
 void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
                        const std::string& objPath)
