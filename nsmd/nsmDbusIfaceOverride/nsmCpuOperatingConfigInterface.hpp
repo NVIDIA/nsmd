@@ -17,7 +17,8 @@ using CpuOperatingConfigIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Cpu::server::OperatingConfig>;
 
-enum class clockLimitFlag{
+enum class clockLimitFlag
+{
     PERSISTENCE = 0,
     CLEAR = 1
 };
@@ -26,9 +27,9 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
 {
   public:
     NsmCpuOperatingConfigIntf(sdbusplus::bus::bus& bus, const char* path,
-                              std::shared_ptr<NsmDevice> device, uint8_t clockId) :
-        CpuOperatingConfigIntf(bus, path),
-        device(device), clockId(clockId)
+                              std::shared_ptr<NsmDevice> device,
+                              uint8_t clockId) :
+        CpuOperatingConfigIntf(bus, path), device(device), clockId(clockId)
     {}
 
     int getMinGraphicsClockLimit(uint32_t& minClockLimit)
@@ -49,16 +50,15 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
                 "EID", eid, "RC", rc);
             return rc;
         }
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                        &responseLen);
+        rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
         if (rc)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
-            free((void*)responseMsg);
+
             return rc;
         }
         uint8_t cc = NSM_ERROR;
@@ -66,10 +66,9 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
         uint16_t dataSize = 0;
         uint32_t value;
         std::vector<uint8_t> data(4, 0);
-        rc = decode_get_inventory_information_resp(responseMsg, responseLen,
-                                                   &cc, &reason_code, &dataSize,
-                                                   data.data());
-        free((void*)responseMsg);
+        rc = decode_get_inventory_information_resp(
+            responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
+            data.data());
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS &&
             dataSize == sizeof(value))
@@ -86,7 +85,7 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
         }
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    
+
     int getMaxGraphicsClockLimit(uint32_t& maxClockLimit)
     {
         SensorManager& manager = SensorManager::getInstance();
@@ -105,16 +104,15 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
                 "EID", eid, "RC", rc);
             return rc;
         }
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                        &responseLen);
+        rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
         if (rc)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
-            free((void*)responseMsg);
+
             return rc;
         }
         uint8_t cc = NSM_ERROR;
@@ -122,10 +120,9 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
         uint16_t dataSize = 0;
         uint32_t value;
         std::vector<uint8_t> data(4, 0);
-        rc = decode_get_inventory_information_resp(responseMsg, responseLen,
-                                                   &cc, &reason_code, &dataSize,
-                                                   data.data());
-        free((void*)responseMsg);
+        rc = decode_get_inventory_information_resp(
+            responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
+            data.data());
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS &&
             dataSize == sizeof(value))
@@ -157,32 +154,29 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
                 "getClockLimitFromDevice: encode_get_clock_limit_req failed. "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
-            return ;
+            return;
         }
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                              &responseLen);
+        rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
         if (rc)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
-            free((void*)responseMsg);
-            return ;
+
+            return;
         }
         uint8_t cc = NSM_ERROR;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
 
-        rc = decode_get_clock_limit_resp(responseMsg, responseLen, &cc,
+        rc = decode_get_clock_limit_resp(responseMsg.get(), responseLen, &cc,
                                          &data_size, &reason_code, &clockLimit);
-        free((void*)responseMsg);
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            if (clockLimit.present_limit_max ==
-                clockLimit.present_limit_min)
+            if (clockLimit.present_limit_max == clockLimit.present_limit_min)
             {
                 CpuOperatingConfigIntf::speedConfig(std::make_tuple(
                     true, (uint32_t)clockLimit.present_limit_max));
@@ -220,7 +214,7 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
                 WriteFailure();
             return;
         }
-        
+
         uint32_t maxClockLimit;
         rc = getMaxGraphicsClockLimit(maxClockLimit);
         if (rc)
@@ -267,17 +261,16 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
             return;
         }
 
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                        &responseLen);
+        rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
         if (rc)
         {
             lg2::error(
                 "setClockLimitOnDevice SendRecvNsmMsgSync failed for while setting clock limits "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
-            free((void*)responseMsg);
+
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
             return;
@@ -286,9 +279,9 @@ class NsmCpuOperatingConfigIntf : public CpuOperatingConfigIntf
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
-        rc = decode_set_clock_limit_resp(responseMsg, responseLen, &cc,
+        rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
                                          &reason_code, &data_size);
-        free((void*)responseMsg);
+
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device

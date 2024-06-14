@@ -94,10 +94,6 @@ std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
             break;
         }
     }
-    if (!ret)
-    {
-        lg2::error("Device not found for UUID: {UUID}", "UUID", uuid);
-    }
     return ret;
 }
 
