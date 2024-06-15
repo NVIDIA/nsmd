@@ -43,10 +43,10 @@ class NsmResetIntf : public ResetIntf
                 "EID", eid, "RC", rc);
             return rc;
         }
-        std::shared_ptr<const nsm_msg> responseMsg;
+        const nsm_msg* responseMsg = NULL;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
+                                              &responseLen);
         if (rc_)
         {
 
@@ -62,8 +62,8 @@ class NsmResetIntf : public ResetIntf
         uint16_t data_size = 0;
 
         rc = decode_assert_pcie_fundamental_reset_resp(
-            responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
-        
+            responseMsg, responseLen, &cc, &data_size, &reason_code);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             lg2::info(
