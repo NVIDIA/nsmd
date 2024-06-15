@@ -39,10 +39,10 @@ class NsmMigModeIntf : public MigModeIntf
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
         }
-        std::shared_ptr<const nsm_msg> responseMsg;
+        const nsm_msg* responseMsg = NULL;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
+                                              &responseLen);
         if (rc_)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
@@ -55,9 +55,9 @@ class NsmMigModeIntf : public MigModeIntf
         bitfield8_t flags;
         uint16_t data_size = 0;
 
-        rc = decode_get_MIG_mode_resp(responseMsg.get(), responseLen, &cc,
-                                      &data_size, &reason_code, &flags);
-
+        rc = decode_get_MIG_mode_resp(responseMsg, responseLen, &cc, &data_size,
+                                      &reason_code, &flags);
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             MigModeIntf::migModeEnabled(flags.bits.bit0);
@@ -93,10 +93,10 @@ class NsmMigModeIntf : public MigModeIntf
             return;
         }
 
-        std::shared_ptr<const nsm_msg> responseMsg;
+        const nsm_msg* responseMsg = NULL;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
+                                              &responseLen);
         if (rc_)
         {
             lg2::error(
@@ -111,9 +111,9 @@ class NsmMigModeIntf : public MigModeIntf
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
-        rc = decode_set_MIG_mode_resp(responseMsg.get(), responseLen, &cc,
+        rc = decode_set_MIG_mode_resp(responseMsg, responseLen, &cc,
                                       &reason_code, &data_size);
-
+        free((void*)responseMsg);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device

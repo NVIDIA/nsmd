@@ -321,8 +321,8 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .Times(8)
         .WillRepeatedly(
-            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
-               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
+            [](eid_t, Request&, const nsm_msg**,
+               size_t*) -> requester::Coroutine { co_return NSM_SUCCESS; });
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(asset, "Type")))

@@ -138,8 +138,8 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         .WillOnce(Return(get(retimer, "InstanceNumber")));
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .WillOnce(
-            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
-               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
+            [](eid_t, Request&, const nsm_msg**,
+               size_t*) -> requester::Coroutine { co_return NSM_SUCCESS; });
     nsmFirmwareInventoryCreateSensors(
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)

@@ -15,16 +15,16 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
         co_return NSM_SW_ERROR;
     }
 
-    std::shared_ptr<const nsm_msg> responseMsg;
+    const struct nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen);
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, &responseMsg,
+                                              &responseLen);
     if (rc)
     {
         co_return rc;
     }
 
-    rc = handleResponseMsg(responseMsg.get(), responseLen);
+    rc = handleResponseMsg(responseMsg, responseLen);
     if (rc)
     {
         lg2::error(

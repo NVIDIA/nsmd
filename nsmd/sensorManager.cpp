@@ -289,9 +289,10 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
-    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen)
+requester::Coroutine
+    SensorManagerImpl::SendRecvNsmMsg(eid_t eid, Request& request,
+                                      const nsm_msg** responseMsg,
+                                      size_t* responseLen)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -322,11 +323,8 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
-    const nsm_msg* response = nullptr;
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, &response, &responseLen);
-    responseMsg = std::shared_ptr<const nsm_msg>(
-        response, [](const nsm_msg* ptr) { free((void*)ptr); });
+        handler, eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
@@ -374,14 +372,13 @@ eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
     return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
 }
 
-uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
-    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen)
+uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
+                                              const nsm_msg** responseMsg,
+                                              size_t* responseLen)
 {
     auto mctpFd = sockManager.getSocket(eid);
     uint8_t rc = NSM_REQUESTER_SUCCESS;
 
-    const nsm_msg* response = nullptr;
     // check if there is request in progress.
     if (handler.hasInProgressRequest(eid))
     {
@@ -391,7 +388,7 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
         // waiting for response
         while (1)
         {
-            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)&response, &responseLen);
+            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)responseMsg, responseLen);
 
             handler.invalidInProgressRequest(eid);
             if (rc == NSM_REQUESTER_SUCCESS)
@@ -400,8 +397,8 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
                     "SendRecvNsmMsgSync: received response and discard it. EID={EID}",
                     "EID", eid);
                 // discard the response
-                free((void*)response);
-                response = nullptr;
+                free((void*)*responseMsg);
+                *responseMsg = NULL;
                 break;
             }
             else
@@ -451,21 +448,19 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
     }
 
     rc = nsm_send_recv(eid, mctpFd, request.data(), request.size(),
-                       (uint8_t**)&response, &responseLen);
-    responseMsg = std::shared_ptr<const nsm_msg>(
-        response, [](const nsm_msg* ptr) { free((void*)ptr); });
-
+                       (uint8_t**)responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
             "SendRecvNsmMsgSync: nsm_send_recv failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        responseLen = 0;
+        *responseMsg = NULL;
+        *responseLen = 0;
     }
 
     if (verbose && rc == NSM_REQUESTER_SUCCESS)
     {
-        utils::printBuffer(utils::Rx, response, responseLen);
+        utils::printBuffer(utils::Rx, *responseMsg, *responseLen);
     }
 
     instanceIdDb.free(eid, requestMsg->hdr.instance_id);

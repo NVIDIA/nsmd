@@ -95,24 +95,24 @@ uint8_t NsmEventConfig::setCurrentEventSources(
         return rc;
     }
 
-    std::shared_ptr<const nsm_msg> responseMsg;
+    const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
         return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
-    rc = decode_nsm_set_current_event_sources_resp(responseMsg.get(),
-                                                   responseLen, &cc);
+    rc = decode_nsm_set_current_event_sources_resp(responseMsg, responseLen,
+                                                   &cc);
     if (rc)
     {
         lg2::error(
             "decode_nsm_set_current_event_sources_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    free((void*)responseMsg);
     return cc;
 }
 
@@ -139,9 +139,9 @@ uint8_t NsmEventConfig::configureEventAcknowledgement(
         return rc;
     }
 
-    std::shared_ptr<const nsm_msg> responseMsg;
+    const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
         return rc;
@@ -151,14 +151,14 @@ uint8_t NsmEventConfig::configureEventAcknowledgement(
 
     uint8_t cc = NSM_SUCCESS;
     rc = decode_nsm_configure_event_acknowledgement_resp(
-        responseMsg.get(), responseLen, &cc, &newEventIdMasks);
+        responseMsg, responseLen, &cc, &newEventIdMasks);
     if (rc)
     {
         lg2::error(
             "decode_nsm_configure_event_acknowledgement_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    free((void*)responseMsg);
     return cc;
 }
 
