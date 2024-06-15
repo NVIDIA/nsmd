@@ -76,32 +76,30 @@ struct NsmWriteProtectedIntfTest : public testing::Test
         0 // data size
     };
 
-    Response lastResponse;
-    nsm_fpga_diagnostics_settings_wp& data()
+    std::vector<std::shared_ptr<Response>> responses;
+    auto data() const
     {
         const auto headerSize = fpgaDiagnosticMsgHeader.size();
+        EXPECT_FALSE(responses.empty());
         EXPECT_EQ(headerSize + sizeof(nsm_fpga_diagnostics_settings_wp),
-                  lastResponse.size());
+                  responses.back()->size());
         return *reinterpret_cast<nsm_fpga_diagnostics_settings_wp*>(
-            lastResponse.data() + headerSize);
+            responses.back()->data() + headerSize);
     }
     auto mockSendRecvNsmMsgSync(const Response& responseMsg,
                                 const Response& data = Response(),
                                 nsm_completion_codes code = NSM_SUCCESS)
     {
-        Response response;
-        response.insert(response.end(), responseMsg.begin(), responseMsg.end());
-        response.insert(response.end(), data.begin(), data.end());
-        lastResponse = response;
-        return [response, code](
-                   eid_t, Request&,
-                   [[maybe_unused]] std::shared_ptr<const nsm_msg>& responseMsg,
-                   [[maybe_unused]] size_t& responseLen) {
-            responseLen = response.size();
-            auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
-            memcpy((uint8_t*)msg, response.data(), responseLen);
-            responseMsg = std::shared_ptr<const nsm_msg>(
-                msg, [](const nsm_msg* ptr) { free((void*)ptr); });
+        auto response = std::make_shared<Response>();
+        response->insert(response->end(), responseMsg.begin(),
+                         responseMsg.end());
+        response->insert(response->end(), data.begin(), data.end());
+        responses.emplace_back(response);
+        return [response, code](eid_t, Request&,
+                                [[maybe_unused]] const nsm_msg** responseMsg,
+                                [[maybe_unused]] size_t* responseLen) {
+            *responseMsg = reinterpret_cast<nsm_msg*>(response->data());
+            *responseLen = response->size();
             return code;
         };
     }

@@ -72,24 +72,23 @@ uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
         return rc;
     }
 
-    std::shared_ptr<const nsm_msg> responseMsg;
+    const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = manager.SendRecvNsmMsgSync(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
         return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
-    rc = decode_nsm_set_event_subscription_resp(responseMsg.get(), responseLen,
-                                                &cc);
+    rc = decode_nsm_set_event_subscription_resp(responseMsg, responseLen, &cc);
     if (rc)
     {
         lg2::error(
             "decode_nsm_set_event_subscription_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    free((void*)responseMsg);
     return cc;
 }
 

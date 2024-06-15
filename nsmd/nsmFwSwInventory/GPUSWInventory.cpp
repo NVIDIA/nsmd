@@ -72,10 +72,10 @@ requester::Coroutine
         co_return rc;
     }
 
-    std::shared_ptr<const nsm_msg> responseMsg;
+    const nsm_msg* responseMsg = NULL;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
+                                         &responseLen);
     if (rc)
     {
         co_return rc;
@@ -86,8 +86,8 @@ requester::Coroutine
     enum8 driverState = 0;
     char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
 
-    rc = decode_get_driver_info_resp(responseMsg.get(), responseLen, &cc,
-                                     &reasonCode, &driverState, driverVersion);
+    rc = decode_get_driver_info_resp(responseMsg, responseLen, &cc, &reasonCode,
+                                     &driverState, driverVersion);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
