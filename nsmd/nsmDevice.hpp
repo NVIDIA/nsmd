@@ -63,9 +63,11 @@ class NsmDevice
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
+    eid_t eid = 255;
     uuid_t uuid;
     uuid_t deviceUuid;
     bool isDeviceActive;
+    bool isDeviceReady = false;
     std::unique_ptr<sdbusplus::Timer> pollingTimer;
     std::coroutine_handle<> doPollingTaskHandle;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;

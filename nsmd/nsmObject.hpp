@@ -41,6 +41,14 @@ class NsmObject
     {
         return type;
     }
+    const bool& isRefreshed() const
+    {
+        return refreshed;
+    }
+    void setRefreshed(bool r)
+    {
+        refreshed = r;
+    }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
                                         [[maybe_unused]] eid_t eid)
@@ -56,5 +64,6 @@ class NsmObject
   private:
     const std::string name;
     const std::string type;
+    bool refreshed = false;
 };
 } // namespace nsm

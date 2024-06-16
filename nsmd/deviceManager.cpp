@@ -106,6 +106,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             }
             nsmDevice->isDeviceActive = true;
             nsmDevice->uuid = mctpUuid;
+            nsmDevice->eid = eid;
 
             rc = co_await updateNsmDevice(nsmDevice, eid);
             if (rc)
