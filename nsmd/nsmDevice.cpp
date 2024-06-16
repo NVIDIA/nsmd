@@ -145,6 +145,14 @@ void NsmDevice::addSensor(const std::shared_ptr<NsmSensor>& sensor,
 void NsmDevice::setOnline()
 {
     isDeviceActive = true;
+    isDeviceReady = false;
+    NsmServiceReadyIntf::getInstance().setStateStarting();
+
+    for (auto sensor : roundRobinSensors)
+    {
+        // Mark all the sensors as unrefreshed.
+        sensor->setRefreshed(false);
+    }
     SensorManager& sensorManager = SensorManager::getInstance();
     sensorManager.startPolling(uuid);
 }

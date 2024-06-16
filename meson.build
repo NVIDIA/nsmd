@@ -29,6 +29,7 @@ endif
 
 conf_data = configuration_data()
 conf_data.set('SENSOR_POLLING_TIME', get_option('sensor-polling-time'))
+conf_data.set('GPU_PWR_GD_GPIO', '"' + get_option('gpio-name') + '"')
 conf_data.set(
     'INSTANCE_ID_EXPIRATION_INTERVAL',
     get_option('instance-id-expiration-interval'),
@@ -40,6 +41,9 @@ conf_data.set(
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
+endif
+if get_option('stanbyToDC').enabled()
+    conf_data.set('NVIDIA_STANDBYTODC', 0)
 endif
 conf_data.set('LOCAL_EID', get_option('local-eid'))
 configure_file(output: 'config.h', configuration: conf_data)

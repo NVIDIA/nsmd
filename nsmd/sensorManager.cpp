@@ -59,6 +59,9 @@ SensorManagerImpl::SensorManagerImpl(
         [this](sdbusplus::message::message& msg) {
         this->interfaceAddedhandler(msg);
     });
+
+#ifdef NVIDIA_STANDBYTODC
+    //helping with telemetry in standby power and transitions between standby and DC power
     gpioStatusPropertyChangedSignal = std::make_unique<sdbusplus::bus::match_t>(
         sdbusplus::bus::match_t(bus,
                                 sdbusplus::bus::match::rules::propertiesChanged(
@@ -67,6 +70,7 @@ SensorManagerImpl::SensorManagerImpl(
                                 [this](sdbusplus::message::message& msg) {
         this->gpioStatusPropertyChangedHandler(msg);
     }));
+#endif
 }
 
 void SensorManagerImpl::scanInventory()
@@ -143,7 +147,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
     std::map<std::string, std::variant<std::string, bool>> properties;
     try
     {
-        const std::string propertyName = "GPU_BASE_PWR_GD";
+        const std::string propertyName = GPU_PWR_GD_GPIO;
         std::string errStr;
         msg.read(interface, properties);
         auto prop = properties.find(propertyName);
@@ -160,6 +164,9 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
         if (pgood == true)
         {
             lg2::info("SensorManager::gpioStatusPropertyChangedHandler: Power transition from standby to DC power detected");
+
+            // Set state to starting for NSM Readiness
+            NsmServiceReadyIntf::getInstance().setStateStarting();
             for (auto nsmDevice : nsmDevices)
             {
                 for (auto sensor : nsmDevice->roundRobinSensors)
@@ -173,6 +180,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
                 }
                 nsmDevice->isDeviceReady = false;
             }
+
         }
     }
     catch (const sdbusplus::exception::SdBusError& e)
@@ -187,7 +195,10 @@ void SensorManagerImpl::checkAllDevices()
 {
     for (auto nsmDevice : nsmDevices)
     {
-        if (nsmDevice->eid != 255 && !nsmDevice->isDeviceReady)
+        /*consider only active devices, helps in 2 scenarios
+         First only static inventory present.
+         Second when a particular device is not responding from starting or not present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not presnt*/
+        if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady)
         {
             return;
         }

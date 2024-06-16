@@ -1,5 +1,11 @@
 option('tests', type: 'feature', description: 'Build tests', value: 'enabled')
 option(
+    'stanbyToDC',
+    type: 'feature',
+    description: 'Use for MAnager ready feature',
+    value: 'enabled',
+)
+option(
     'shmem',
     type: 'feature',
     description: 'Use NVIDIA Shared-Memory IPC',
@@ -12,6 +18,12 @@ option(
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds',
     value: 249,
+)
+option(
+    'gpio-name',
+    type: 'string',
+    value: 'GPU_BASE_PWR_GD',
+    description: 'GPIO name for NSM'
 )
 option(
     'mockup-responder',

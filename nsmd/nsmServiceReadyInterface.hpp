@@ -67,6 +67,11 @@ class NsmServiceReadyIntf
         serviceIntf->state(ServiceReadyIntf::States::Enabled);
     }
 
+    void setStateStarting()
+    {
+        serviceIntf->state(ServiceReadyIntf::States::Starting);
+    }
+
   private:
     // Private constructor to prevent direct instantiation
     NsmServiceReadyIntf(sdbusplus::bus::bus& bus, const char* path,
