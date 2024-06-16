@@ -72,10 +72,7 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
          "xyz.openbmc_project.Inventory.Decorator.Area.PhysicalContextType.GPU"},
     };
     const PropertyValuesCollection asset = {
-        {"Type", "NSM_Asset"},
-        {"Name", "HGX_GPU_SXM_1"},
-        {"Vendor", "NVIDIA"},
-    };
+        {"Type", "NSM_Asset"}, {"Name", "HGX_GPU_SXM_1"}, {"Vendor", "NVIDIA"}};
     const PropertyValuesCollection health = {
         {"Type", "NSM_Health"},
         {"Health", "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"},
@@ -93,7 +90,8 @@ TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(error, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(basic, "DeviceAssembly")));
     EXPECT_NO_THROW(
         nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath));
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -109,7 +107,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(basic, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(basic, "DeviceAssembly")));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
@@ -180,7 +179,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
         .WillOnce(Return(get(asset, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(asset, "Vendor")))
-        .WillOnce(Return(get(asset, "Name")));
+        .WillOnce(Return(get(asset, "Name")))
+        .WillOnce(Return(get(basic, "DeviceAssembly")));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());

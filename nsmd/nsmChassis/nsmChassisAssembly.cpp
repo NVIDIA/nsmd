@@ -22,6 +22,8 @@
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
+#include <cstdint>
+
 namespace nsm
 {
 
@@ -41,6 +43,17 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
+
+    bool deviceAssembly = false;
+    try
+    {
+        deviceAssembly = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
+    }
+    catch (const std::exception& e)
+    {
+        deviceAssembly = false;
+    }
 
     if (type == "NSM_ChassisAssembly")
     {
@@ -66,14 +79,20 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
             objPath.c_str(), "Vendor", interface.c_str());
         auto assetsName = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
+        // default part number for asset is Board part number
+        auto partNumberId = BOARD_PART_NUMBER;
+        if (deviceAssembly)
+        {
+            partNumberId = DEVICE_PART_NUMBER;
+        }
+
         auto assetObject = NsmChassisAssembly<AssetIntf>(chassisName, name);
         assetObject.pdi().manufacturer(vendor);
         assetObject.pdi().name(assetsName);
-
-        // create sensor
+        //  create sensor
         auto eid = manager.getEid(device);
         auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            assetObject, BOARD_PART_NUMBER);
+            assetObject, partNumberId);
         auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             assetObject, SERIAL_NUMBER);
         auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
