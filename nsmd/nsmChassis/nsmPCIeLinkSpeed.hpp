@@ -74,7 +74,12 @@ inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
         return value == 0 ? PCIeDeviceIntf::PCIeTypes::Unknown
                           : PCIeDeviceIntf::PCIeTypes(value - 1);
     };
+    auto generationInUse = [](uint32_t value) -> PCIeSlotIntf::Generations {
+        return value == 0 ? PCIeSlotIntf::Generations::Unknown
+                          : PCIeSlotIntf::Generations(value - 1);
+    };
     pdi().pcIeType(pcieType(data.negotiated_link_speed));
+    pdi().generationInUse(generationInUse(data.negotiated_link_speed));
     pdi().maxPCIeType(pcieType(data.max_link_speed));
     pdi().lanesInUse(data.negotiated_link_width);
     pdi().maxLanes(data.max_link_width);
