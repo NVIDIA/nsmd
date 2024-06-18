@@ -40,18 +40,12 @@ namespace nsm
 
 NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
                                        std::string& name, std::string& type,
-                                       std::string& inventoryObjPath,
-                                       std::string& chassisObjPath) :
+                                       std::string& inventoryObjPath) :
     NsmObject(name, type)
 {
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::GPU);
-    if (!chassisObjPath.empty())
-    {
-        spdmResponderIntf =
-            std::make_unique<SpdmResponderIntf>(bus, chassisObjPath.c_str());
-    }
 }
 
 NsmProcessorAssociation::NsmProcessorAssociation(
@@ -726,7 +720,8 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+    NsmObject(name, type),
+    cpuOperatingConfigIntf(cpuConfigIntf)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -791,7 +786,8 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
 NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+    NsmObject(name, type),
+    cpuOperatingConfigIntf(cpuConfigIntf)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -1531,19 +1527,8 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, associations);
             nsmDevice->deviceSensors.push_back(associationSensor);
 
-            std::string chassisObjPath;
-            for (const auto& assoc : associations)
-            {
-                if (assoc.forward == "parent_chassis")
-                {
-                    chassisObjPath = assoc.absolutePath;
-                    std::replace(chassisObjPath.begin(), chassisObjPath.end(),
-                                 ' ', '_');
-                    break;
-                }
-            }
             auto sensor = std::make_shared<NsmAcceleratorIntf>(
-                bus, name, type, inventoryObjPath, chassisObjPath);
+                bus, name, type, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensor);
 
             auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
