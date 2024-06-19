@@ -55,10 +55,10 @@ class NsmPowerCapIntf : public PowerCapIntf
                 "getPowerCapFromDevice encode_get_device_power_limit_req failed.eid = {EID} rc ={RC}",
                 "EID", eid, "RC", rc);
         }
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                              &responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
+                                              responseLen);
         if (rc_)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
@@ -74,11 +74,11 @@ class NsmPowerCapIntf : public PowerCapIntf
         uint32_t enforced_limit_in_miliwatts;
 
         rc = decode_get_power_limit_resp(
-            responseMsg, responseLen, &cc, &data_size, &reason_code,
+            responseMsg.get(), responseLen, &cc, &data_size, &reason_code,
             &requested_persistent_limit_in_miliwatts,
             &requested_oneshot_limit_in_miliwatts,
             &enforced_limit_in_miliwatts);
-        free((void*)responseMsg);
+
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             PowerCapIntf::powerCap(enforced_limit_in_miliwatts / 1000);
@@ -114,10 +114,10 @@ class NsmPowerCapIntf : public PowerCapIntf
             return;
         }
 
-        const nsm_msg* responseMsg = NULL;
+        std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, &responseMsg,
-                                              &responseLen);
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
+                                              responseLen);
         if (rc_)
         {
             lg2::error(
@@ -131,9 +131,9 @@ class NsmPowerCapIntf : public PowerCapIntf
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t data_size = 0;
-        rc = decode_set_power_limit_resp(responseMsg, responseLen, &cc,
+        rc = decode_set_power_limit_resp(responseMsg.get(), responseLen, &cc,
                                          &data_size, &reason_code);
-        free((void*)responseMsg);
+
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
@@ -142,32 +142,32 @@ class NsmPowerCapIntf : public PowerCapIntf
                       eid);
 
 	    for (auto it = parents.begin(); it != parents.end();) {
-		    auto sensorIt = manager.objectPathToSensorMap.find(*it);
+                auto sensorIt = manager.objectPathToSensorMap.find(*it);
 		    if (sensorIt != manager.objectPathToSensorMap.end()) {
-			    auto sensor = sensorIt->second;
+                    auto sensor = sensorIt->second;
 			    if (sensor) {
-				    sensorCache.emplace_back(
+                        sensorCache.emplace_back(
 					std::dynamic_pointer_cast<
 					    NsmPowerControl>(sensor));
-				    it = parents.erase(it);
-				    continue;
-			    }
-		    }
-		    ++it;
-	    }
+                        it = parents.erase(it);
+                        continue;
+                    }
+                }
+                ++it;
+            }
 
-	    // update each cached sensor
+            // update each cached sensor
 	    for (const auto &sensor : sensorCache) {
-		    sensor->updatePowerCapValue(name, PowerCapIntf::powerCap());
-	    }
+                sensor->updatePowerCapValue(name, PowerCapIntf::powerCap());
+            }
 	} else {
-		lg2::error("setPowerCapOnDevice decode_set_power_limit_resp "
-			   "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
-			   "RC = {A} ",
-			   "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            lg2::error("setPowerCapOnDevice decode_set_power_limit_resp "
+                       "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
+                       "RC = {A} ",
+                       "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
 		throw sdbusplus::xyz::openbmc_project::Common::Device::
 			Error::WriteFailure();
-	}
+        }
     }
 
     uint32_t powerCap(uint32_t power_limit) override

@@ -138,8 +138,8 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         .WillOnce(Return(get(retimer, "InstanceNumber")));
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .WillOnce(
-            [](eid_t, Request&, const nsm_msg**,
-               size_t*) -> requester::Coroutine { co_return NSM_SUCCESS; });
+            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
+               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
     nsmFirmwareInventoryCreateSensors(
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
@@ -182,8 +182,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_NE(nullptr,
               dynamic_cast<NsmWriteProtectedIntf*>(&retimerSettings->pdi()));
 
-    auto retimerWriteProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
-        fpga.roundRobinSensors[dynamicSensors++]);
+    auto retimerWriteProtectedSensor =
+        dynamic_pointer_cast<NsmWriteProtectedControl>(
+            fpga.roundRobinSensors[dynamicSensors++]);
     EXPECT_NE(nullptr, retimerWriteProtectedSensor);
 
     auto version = dynamic_pointer_cast<NsmInventoryProperty<VersionIntf>>(
@@ -208,10 +209,12 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     auto gpuSettings = dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
         fpga.deviceSensors[staticSensors++]);
     EXPECT_NE(nullptr, gpuSettings);
-    EXPECT_NE(nullptr, dynamic_cast<NsmWriteProtectedIntf*>(&gpuSettings->pdi()));
+    EXPECT_NE(nullptr,
+              dynamic_cast<NsmWriteProtectedIntf*>(&gpuSettings->pdi()));
 
-    auto gpuWriteProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
-        fpga.roundRobinSensors[dynamicSensors++]);
+    auto gpuWriteProtectedSensor =
+        dynamic_pointer_cast<NsmWriteProtectedControl>(
+            fpga.roundRobinSensors[dynamicSensors++]);
     EXPECT_NE(nullptr, gpuWriteProtectedSensor);
 
     EXPECT_EQ(staticSensors, fpga.deviceSensors.size());

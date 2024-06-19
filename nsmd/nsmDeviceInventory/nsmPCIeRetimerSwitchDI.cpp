@@ -57,10 +57,10 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         co_return rc;
@@ -72,7 +72,7 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
     struct nsm_query_scalar_group_telemetry_group_0 data;
 
     rc = decode_query_scalar_group_telemetry_v1_group0_resp(
-        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
+        responseMsg.get(), responseLen, &cc, &dataSize, &reasonCode, &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
