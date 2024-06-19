@@ -62,24 +62,12 @@ void createNsmChassisAssembly(SensorManager& manager,
 
         auto assemblyName = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
-        auto model = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "Model", interface.c_str());
         auto vendor = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Vendor", interface.c_str());
-        auto sku = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "SKU", interface.c_str());
-        auto serialNumber = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "SerialNumber", interface.c_str());
-        auto productionDate = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "ProductionDate", interface.c_str());
 
         // initial value update
         assetObject.pdi().name(assemblyName);
-        assetObject.pdi().model(model);
         assetObject.pdi().manufacturer(vendor);
-        assetObject.pdi().sku(sku);
-        assetObject.pdi().serialNumber(serialNumber);
-        assetObject.pdi().buildDate(productionDate);
 
         // create sensor
         auto eid = manager.getEid(device);

@@ -107,18 +107,9 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
 
         auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        auto model = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "Model", interface.c_str());
-        auto sku = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "SKU", interface.c_str());
-        auto serialNumber = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "SerialNumber", interface.c_str());
 
         // initial value update
-        chassisAsset.pdi().sku(sku);
-        chassisAsset.pdi().model(model);
         chassisAsset.pdi().manufacturer(manufacturer);
-        chassisAsset.pdi().serialNumber(serialNumber);
 
         auto eid = manager.getEid(device);
         // create sensor
