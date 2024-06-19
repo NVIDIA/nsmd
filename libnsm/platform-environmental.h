@@ -60,7 +60,9 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_ROW_REMAP_STATE_FLAGS = 0x7F,
 	NSM_GET_ROW_REMAPPING_COUNTS = 0x7E,
 	NSM_SET_POWER_LIMITS = 0x08,
-	NSM_GET_POWER_LIMITS = 0x07
+	NSM_GET_POWER_LIMITS = 0x07,
+	NSM_QUERY_AGGREGATE_GPM_METRICS = 0x49,
+	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A
 };
 
 /** @brief NSM Type3 platform environmental events
@@ -517,6 +519,31 @@ struct nsm_xid_event_payload {
 	uint32_t reason;
 	uint32_t sequence_number;
 	uint64_t timestamp;
+} __attribute__((packed));
+
+/** @struct nsm_query_aggregate_gpm_metrics_req
+ *
+ *  Structure representing Query Aggregate GPM Metrics request.
+ */
+struct nsm_query_aggregate_gpm_metrics_req {
+	struct nsm_common_req hdr;
+	uint8_t retrieval_source;
+	uint8_t gpu_instance;
+	uint8_t compute_instance;
+	uint8_t metrics_bitfield[1];
+} __attribute__((packed));
+
+/** @struct nsm_query_per_instance_gpm_metrics_req
+ *
+ *  Structure representing Query Per-instance GPM Metrics request.
+ */
+struct nsm_query_per_instance_gpm_metrics_req {
+	struct nsm_common_req hdr;
+	uint8_t retrieval_source;
+	uint8_t gpu_instance;
+	uint8_t compute_instance;
+	uint8_t metric_id;
+	uint32_t instance_bitmask;
 } __attribute__((packed));
 
 /** @brief Encode a Get Driver Information request message
@@ -2142,6 +2169,112 @@ int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
 				    uint8_t *event_class,
 				    uint16_t *event_state);
 
+/** @brief Encode an Query Aggregate GPM Metrics request message
+ *
+ *  @param[in] instance - NSM instance ID
+ *  @param[in] retrieval_source - retrieval source
+ *  @param[in] gpu_instance - GPU instance
+ *  @param[in] compute_instance - compute instance
+ *  @param[in] metrics_bitfield - pointer to Metrics bitfield inside msg buffer
+ *  @param[in] metrics_bitfield_length - length of Metrics bitfield
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_aggregate_gpm_metrics_req(
+    uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
+    uint8_t compute_instance, const uint8_t *metrics_bitfield,
+    size_t metrics_bitfield_length, struct nsm_msg *msg);
+
+/** @brief Decode an Query Aggregate GPM Metrics response message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[in-out] retrieval_source - retrieval source
+ *  @param[in-out] gpu_instance - GPU instance
+ *  @param[in-out] compute_instance - compute instance
+ *  @param[in-out] metrics_bitfield - pointer to Metrics bitfield
+ *  @param[in-out] metrics_bitfield_length - length of Metrics bitfield
+ *  @return nsm_completion_codes
+ */
+int decode_query_aggregate_gpm_metrics_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *retrieval_source,
+    uint8_t *gpu_instance, uint8_t *compute_instance,
+    const uint8_t **metrics_bitfield, size_t *metrics_bitfield_length);
+
+/** @brief Encode an Query Per-instance GPM Metrics request message
+ *
+ *  @param[in] instance - NSM instance ID
+ *  @param[in] retrieval_source - retrieval source
+ *  @param[in] gpu_instance - GPU instance
+ *  @param[in] compute_instance - compute instance
+ *  @param[in] metric_id - metric Id
+ *  @param[in] instance_bitmask - instance bitmask
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_per_instance_gpm_metrics_req(
+    uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
+    uint8_t compute_instance, uint8_t metric_id, uint32_t instance_bitmask,
+    struct nsm_msg *msg);
+
+/** @brief Decode an Query Per-instance GPM Metrics response message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[in-out] retrieval_source - retrieval source
+ *  @param[in-out] gpu_instance - GPU instance
+ *  @param[in-out] compute_instance - compute instance
+ *  @param[in-out] metric_id - metric Id
+ *  @param[in-out] instance_bitmask - instance bitmask
+ *  @return nsm_completion_codes
+ */
+int decode_query_per_instance_gpm_metrics_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *retrieval_source,
+    uint8_t *gpu_instance, uint8_t *compute_instance, uint8_t *metric_id,
+    uint32_t *instance_bitmask);
+
+/** @brief Encode data of an GPM Metric in percentage unit
+ *
+ *  @param[in] percentage - percentage
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_gpm_metric_percentage_data(double percentage,
+						uint8_t *data,
+						size_t *data_len);
+
+/** @brief Decode data of an GPM Metric in percentage unit
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data
+ *  @param[out] percentage - percentage
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_gpm_metric_percentage_data(const uint8_t *data,
+						size_t data_len,
+						double *percentage);
+
+/** @brief Encode data of an GPM Metric in bandwidth (bytes per second) unit
+ *
+ *  @param[in] bandwidth - bandwidth
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_gpm_metric_bandwidth_data(uint64_t bandwidth,
+					       uint8_t *data, size_t *data_len);
+
+/** @brief Decode data of an GPM Metric in percentage unit
+ *
+ *  @param[in] data - pointer to telemetry sample data
+ *  @param[in] data_len - number of bytes in telemetry sample data
+ *  @param[out] bandwidth - bandwidth
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
+					       size_t data_len,
+					       uint64_t *bandwidth);
 #ifdef __cplusplus
 }
 #endif

@@ -44,6 +44,7 @@ subdir('nsmPCIeDevice')
 subdir('nsmDeviceInventory')
 subdir('nsmSensors')
 subdir('nsmEvent')
+subdir('nsmGPM')
 
 executable(
     'nsmd',

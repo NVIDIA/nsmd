@@ -3367,6 +3367,41 @@ int decode_nsm_xid_event(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_query_aggregate_gpm_metrics_req(
+    uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
+    uint8_t compute_instance, const uint8_t *metrics_bitfield,
+    size_t metrics_bitfield_length, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_aggregate_gpm_metrics_req *request =
+	    (struct nsm_query_aggregate_gpm_metrics_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_AGGREGATE_GPM_METRICS;
+	request->hdr.data_size =
+	    sizeof(struct nsm_query_aggregate_gpm_metrics_req) -
+	    sizeof(struct nsm_common_req) - 1 + metrics_bitfield_length;
+	request->retrieval_source = retrieval_source;
+	request->gpu_instance = gpu_instance;
+	request->compute_instance = compute_instance;
+	memcpy(request->metrics_bitfield, metrics_bitfield,
+	       metrics_bitfield_length);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_nsm_reset_required_event(uint8_t instance_id, bool ackr,
 				    struct nsm_msg *msg)
 {
@@ -3394,6 +3429,196 @@ int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
 
 	*event_class = event->event_class;
 	*event_state = le16toh(event->event_state);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_aggregate_gpm_metrics_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *retrieval_source,
+    uint8_t *gpu_instance, uint8_t *compute_instance,
+    const uint8_t **metrics_bitfield, size_t *metrics_bitfield_length)
+{
+	if (msg == NULL || retrieval_source == NULL || gpu_instance == NULL ||
+	    compute_instance == NULL || metrics_bitfield == NULL ||
+	    metrics_bitfield_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_query_aggregate_gpm_metrics_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_aggregate_gpm_metrics_req *request =
+	    (struct nsm_query_aggregate_gpm_metrics_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    (sizeof(struct nsm_query_aggregate_gpm_metrics_req) -
+	     sizeof(struct nsm_common_req))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*retrieval_source = request->retrieval_source;
+	*gpu_instance = request->gpu_instance;
+	*compute_instance = request->compute_instance;
+	*metrics_bitfield = request->metrics_bitfield;
+	*metrics_bitfield_length =
+	    request->hdr.data_size -
+	    (sizeof(struct nsm_query_aggregate_gpm_metrics_req) -
+	     sizeof(struct nsm_common_req) - 1);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_per_instance_gpm_metrics_req(
+    uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
+    uint8_t compute_instance, uint8_t metric_id, uint32_t instance_bitmask,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_per_instance_gpm_metrics_req *request =
+	    (struct nsm_query_per_instance_gpm_metrics_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_PER_INSTANCE_GPM_METRICS;
+	request->hdr.data_size =
+	    sizeof(struct nsm_query_per_instance_gpm_metrics_req) -
+	    sizeof(struct nsm_common_req);
+	request->retrieval_source = retrieval_source;
+	request->gpu_instance = gpu_instance;
+	request->compute_instance = compute_instance;
+	request->metric_id = metric_id;
+	request->instance_bitmask = htole32(instance_bitmask);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_per_instance_gpm_metrics_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *retrieval_source,
+    uint8_t *gpu_instance, uint8_t *compute_instance, uint8_t *metric_id,
+    uint32_t *instance_bitmask)
+{
+	if (msg == NULL || retrieval_source == NULL || gpu_instance == NULL ||
+	    compute_instance == NULL || metric_id == NULL ||
+	    instance_bitmask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_query_per_instance_gpm_metrics_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_per_instance_gpm_metrics_req *request =
+	    (struct nsm_query_per_instance_gpm_metrics_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    (sizeof(struct nsm_query_per_instance_gpm_metrics_req) -
+	     sizeof(struct nsm_common_req))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*retrieval_source = request->retrieval_source;
+	*gpu_instance = request->gpu_instance;
+	*compute_instance = request->compute_instance;
+	*metric_id = request->metric_id;
+	*instance_bitmask = le32toh(request->instance_bitmask);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_gpm_metric_percentage_data(double percentage,
+						uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (percentage < 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	// Data type of the percentage in NSM Response is NvS24.8 which is 32
+	// bit fixed point signed number with 8 fraction bits. And hence the
+	// floating point value value is multiplied by 256 (1 << 8 fraction
+	// bits) and converted into integer value.
+	uint32_t reading = percentage * (1 << 8);
+	reading = htole32(reading);
+
+	memcpy(data, &reading, sizeof(uint32_t));
+	*data_len = sizeof(uint32_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_gpm_metric_percentage_data(const uint8_t *data,
+						size_t data_len,
+						double *percentage)
+{
+	if (data == NULL || percentage == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t reading = 0;
+	memcpy(&reading, data, sizeof(uint32_t));
+
+	// Data type of the percentage in NSM Response is NvS24.8 which is 32
+	// bit fixed point signed number with 8 fraction bits. And hence the
+	// value is divided by 256 (1 << 8 fraction bits) in its integer form to
+	// obtain a floating point value.
+	*percentage = (uint32_t)le32toh(reading) / (double)(1 << 8);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_gpm_metric_bandwidth_data(uint64_t bandwidth,
+					       uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint64_t le_reading = htole64(bandwidth);
+
+	memcpy(data, &le_reading, sizeof(uint64_t));
+	*data_len = sizeof(uint64_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
+					       size_t data_len,
+					       uint64_t *bandwidth)
+{
+	if (data == NULL || bandwidth == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint64_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint64_t le_reading;
+	memcpy(&le_reading, data, sizeof(uint64_t));
+
+	*bandwidth = le64toh(le_reading);
 
 	return NSM_SW_SUCCESS;
 }
