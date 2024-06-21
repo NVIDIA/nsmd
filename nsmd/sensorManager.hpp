@@ -62,9 +62,10 @@ class SensorManager
      *  @param[out] responseLen length of response NSM message
      *  @return return_value - nsm_requester_error_codes
      */
-    virtual requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
-                                                const nsm_msg** responseMsg,
-                                                size_t* responseLen) = 0;
+    virtual requester::Coroutine
+        SendRecvNsmMsg(eid_t eid, Request& request,
+                       std::shared_ptr<const nsm_msg>& responseMsg,
+                       size_t& responseLen) = 0;
 
     /** @brief Send request NSM message to eid by blocking socket API directly.
      *         The function will return when received the response message from
@@ -77,9 +78,10 @@ class SensorManager
      *  @param[out] responseLen length of response NSM message
      *  @return return_value - nsm_requester_error_codes
      */
-    virtual uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
-                                       const nsm_msg** responseMsg,
-                                       size_t* responseLen) = 0;
+    virtual uint8_t
+        SendRecvNsmMsgSync(eid_t eid, Request& request,
+                           std::shared_ptr<const nsm_msg>& responseMsg,
+                           size_t& responseLen) = 0;
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual void startPolling(uuid_t uuid) = 0;
     virtual void stopPolling(uuid_t uuid) = 0;
@@ -168,12 +170,13 @@ class SensorManagerImpl : public SensorManager
 #endif
     void _startPolling(sdeventplus::source::EventBase& /* source */);
     requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
-    requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
-                                        const nsm_msg** responseMsg,
-                                        size_t* responseLen) override;
+    requester::Coroutine
+        SendRecvNsmMsg(eid_t eid, Request& request,
+                       std::shared_ptr<const nsm_msg>& responseMsg,
+                       size_t& responseLen) override;
     uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
-                               const nsm_msg** responseMsg,
-                               size_t* responseLen) override;
+                               std::shared_ptr<const nsm_msg>& responseMsg,
+                               size_t& responseLen) override;
     void scanInventory();
     requester::Coroutine pollEvents(eid_t eid);
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;

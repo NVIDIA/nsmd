@@ -197,10 +197,10 @@ requester::Coroutine NsmEccMode::update(SensorManager& manager, eid_t eid)
                    "EID", eid, "RC", rc);
         co_return rc;
     }
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error("NsmEccMode SendRecvNsmMsg failed with RC={RC}, eid={EID}",
@@ -213,8 +213,8 @@ requester::Coroutine NsmEccMode::update(SensorManager& manager, eid_t eid)
     uint16_t data_size;
     uint16_t reason_code = ERR_NULL;
 
-    rc = decode_get_ECC_mode_resp(responseMsg, responseLen, &cc, &data_size,
-                                  &reason_code, &flags);
+    rc = decode_get_ECC_mode_resp(responseMsg.get(), responseLen, &cc,
+                                  &data_size, &reason_code, &flags);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -731,7 +731,7 @@ NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
 }
 
 requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
-                                                eid_t eid)
+                                                      eid_t eid)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -748,10 +748,10 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error(
@@ -766,8 +766,9 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
-    rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -795,7 +796,7 @@ NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
 }
 
 requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
-                                                eid_t eid)
+                                                      eid_t eid)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -812,10 +813,10 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error(
@@ -830,8 +831,9 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
-    rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1309,10 +1311,10 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error(
@@ -1327,8 +1329,9 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
-    rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1379,10 +1382,10 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error(
@@ -1397,8 +1400,9 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
-    rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
@@ -1448,10 +1452,10 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         co_return rc;
     }
 
-    const nsm_msg* responseMsg = NULL;
+    std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, &responseMsg,
-                                         &responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         lg2::error(
@@ -1466,8 +1470,9 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
-    rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {

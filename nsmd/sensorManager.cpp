@@ -61,7 +61,8 @@ SensorManagerImpl::SensorManagerImpl(
     });
 
 #ifdef NVIDIA_STANDBYTODC
-    //helping with telemetry in standby power and transitions between standby and DC power
+    // helping with telemetry in standby power and transitions between standby
+    // and DC power
     gpioStatusPropertyChangedSignal = std::make_unique<sdbusplus::bus::match_t>(
         sdbusplus::bus::match_t(bus,
                                 sdbusplus::bus::match::rules::propertiesChanged(
@@ -142,7 +143,8 @@ void SensorManagerImpl::interfaceAddedhandler(sdbusplus::message::message& msg)
 void SensorManagerImpl::gpioStatusPropertyChangedHandler(
     sdbusplus::message::message& msg)
 {
-    lg2::debug("SensorManager::gpioStatusPropertyChangedHandler: xyz.openbmc_project.GpioStatus PropertiesChanged signal received.");
+    lg2::debug(
+        "SensorManager::gpioStatusPropertyChangedHandler: xyz.openbmc_project.GpioStatus PropertiesChanged signal received.");
     std::string interface;
     std::map<std::string, std::variant<std::string, bool>> properties;
     try
@@ -163,7 +165,8 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
         pgood = *std::get_if<bool>(&(prop->second));
         if (pgood == true)
         {
-            lg2::info("SensorManager::gpioStatusPropertyChangedHandler: Power transition from standby to DC power detected");
+            lg2::info(
+                "SensorManager::gpioStatusPropertyChangedHandler: Power transition from standby to DC power detected");
 
             // Set state to starting for NSM Readiness
             NsmServiceReadyIntf::getInstance().setStateStarting();
@@ -180,7 +183,6 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
                 }
                 nsmDevice->isDeviceReady = false;
             }
-
         }
     }
     catch (const sdbusplus::exception::SdBusError& e)
@@ -197,13 +199,16 @@ void SensorManagerImpl::checkAllDevices()
     {
         /*consider only active devices, helps in 2 scenarios
          First only static inventory present.
-         Second when a particular device is not responding from starting or not present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not presnt*/
+         Second when a particular device is not responding from starting or not
+         present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not
+         presnt*/
         if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady)
         {
             return;
         }
     }
-    lg2::error("SensorManager::checkAllDevices Every Device Checked and Ready. Setting ServiceReady.State to enabled.");
+    lg2::error(
+        "SensorManager::checkAllDevices Every Device Checked and Ready. Setting ServiceReady.State to enabled.");
     NsmServiceReadyIntf::getInstance().setStateEnabled();
 }
 
@@ -346,10 +351,13 @@ requester::Coroutine
         {
             if (toBeUpdated == 0)
             {
-                if (!nsmDevice->isDeviceReady) // toBeUpdated can be zero because of two reasons
-                                               // 1. There are no round robin sensors
-                                               // 2. All the round robin sensors were updated.
-                                               // If the case is 2 then device would be already ready.
+                if (!nsmDevice
+                         ->isDeviceReady) // toBeUpdated can be zero because of
+                                          // two reasons
+                                          // 1. There are no round robin sensors
+                                          // 2. All the round robin sensors were
+                                          // updated. If the case is 2 then
+                                          // device would be already ready.
                 {
                     // Handle the case where there are no round robin sensors.
                     nsmDevice->isDeviceReady = true;
@@ -368,7 +376,7 @@ requester::Coroutine
             {
                 auto nextSensor = nsmDevice->roundRobinSensors.front();
                 if (nsmDevice->roundRobinSensors.size() == 1 ||
-                        nextSensor->isRefreshed())
+                    nextSensor->isRefreshed())
                 {
                     // Implies the current was the last stale sensor and we have
                     // refreshed all the round robin sensors.
@@ -393,10 +401,9 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    SensorManagerImpl::SendRecvNsmMsg(eid_t eid, Request& request,
-                                      const nsm_msg** responseMsg,
-                                      size_t* responseLen)
+requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
+    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
+    size_t& responseLen)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -427,8 +434,11 @@ requester::Coroutine
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
+    const nsm_msg* response = nullptr;
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, responseMsg, responseLen);
+        handler, eid, request, &response, &responseLen);
+    responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
+    }); // the memory is allocated and free at sock_handler.cpp
     if (rc)
     {
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
@@ -476,13 +486,14 @@ eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
     return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
 }
 
-uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
-                                              const nsm_msg** responseMsg,
-                                              size_t* responseLen)
+uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
+    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
+    size_t& responseLen)
 {
     auto mctpFd = sockManager.getSocket(eid);
     uint8_t rc = NSM_REQUESTER_SUCCESS;
 
+    const nsm_msg* response = nullptr;
     // check if there is request in progress.
     if (handler.hasInProgressRequest(eid))
     {
@@ -492,7 +503,7 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
         // waiting for response
         while (1)
         {
-            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)responseMsg, responseLen);
+            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)&response, &responseLen);
 
             handler.invalidInProgressRequest(eid);
             if (rc == NSM_REQUESTER_SUCCESS)
@@ -501,8 +512,8 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
                     "SendRecvNsmMsgSync: received response and discard it. EID={EID}",
                     "EID", eid);
                 // discard the response
-                free((void*)*responseMsg);
-                *responseMsg = NULL;
+                free((void*)response);
+                response = nullptr;
                 break;
             }
             else
@@ -552,19 +563,24 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(eid_t eid, Request& request,
     }
 
     rc = nsm_send_recv(eid, mctpFd, request.data(), request.size(),
-                       (uint8_t**)responseMsg, responseLen);
+                       (uint8_t**)&response, &responseLen);
+    responseMsg = std::shared_ptr<const nsm_msg>(response,
+                                                 [](const nsm_msg* ptr) {
+        free((void*)ptr);
+    }); // the memory is allocated at mctp_recv API of /libnsm/requester/mctp.c
+        // and should be free after that
+
     if (rc)
     {
         lg2::error(
             "SendRecvNsmMsgSync: nsm_send_recv failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        *responseMsg = NULL;
-        *responseLen = 0;
+        responseLen = 0;
     }
 
     if (verbose && rc == NSM_REQUESTER_SUCCESS)
     {
-        utils::printBuffer(utils::Rx, *responseMsg, *responseLen);
+        utils::printBuffer(utils::Rx, response, responseLen);
     }
 
     instanceIdDb.free(eid, requestMsg->hdr.instance_id);
