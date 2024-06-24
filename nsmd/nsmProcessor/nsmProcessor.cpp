@@ -254,6 +254,8 @@ void NsmEccErrorCounts::updateReading(struct nsm_ECC_error_counts errorCounts)
     int64_t ueCount = errorCounts.sram_uncorrected_secded +
                       errorCounts.sram_uncorrected_parity;
     eccErrorCountIntf->ueCount(ueCount);
+
+    eccErrorCountIntf->isThresholdExceeded(errorCounts.flags.bits.bit0);
 }
 
 std::optional<std::vector<uint8_t>>
