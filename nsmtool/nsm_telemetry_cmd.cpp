@@ -32,6 +32,7 @@
 #include "platform-environmental.h"
 
 #include "cmd_helper.hpp"
+#include "gpm_metrics_list.hpp"
 #include "utils.hpp"
 
 #include <CLI/CLI.hpp>
@@ -910,7 +911,8 @@ class AggregateResponseParser
                 {
                     std::cerr
                         << "Response message error while parsing timestamp sample : "
-                        << "tag=" << tag << ", rc=" << rc << "\n";
+                        << "tag=" << static_cast<int>(tag) << ", rc=" << rc
+                        << "\n";
 
                     continue;
                 }
@@ -921,7 +923,8 @@ class AggregateResponseParser
                 {
                     std::cerr
                         << "Response message error while parsing timestamp sample data : "
-                        << "tag=" << tag << ", rc=" << rc << "\n";
+                        << "tag=" << static_cast<int>(tag) << ", rc=" << rc
+                        << "\n";
 
                     continue;
                 }
@@ -941,7 +944,8 @@ class AggregateResponseParser
                 {
                     std::cerr
                         << "Response message error while parsing sample data: "
-                        << "tag=" << tag << ", rc=" << rc << "\n";
+                        << "tag=" << static_cast<int>(tag) << ", rc=" << rc
+                        << "\n";
 
                     continue;
                 }
@@ -3278,6 +3282,240 @@ class EnableDisableWriteProtected : public CommandInterface
     uint8_t dataId;
     uint8_t value;
 };
+
+class QueryAggregatedGPMMetrics : public CommandInterface
+{
+  public:
+    QueryAggregatedGPMMetrics() = delete;
+    QueryAggregatedGPMMetrics(const QueryAggregatedGPMMetrics&) = delete;
+    QueryAggregatedGPMMetrics(QueryAggregatedGPMMetrics&&) = default;
+    QueryAggregatedGPMMetrics&
+        operator=(const QueryAggregatedGPMMetrics&) = delete;
+    QueryAggregatedGPMMetrics& operator=(QueryAggregatedGPMMetrics&&) = delete;
+
+    explicit QueryAggregatedGPMMetrics(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-r, --retrievalSource", retrievalSource,
+                        "Retrieval Source")
+            ->required();
+        app->add_option("-g, --gpuInstance", gpuInstance, "GPU Instance")
+            ->required();
+        app->add_option("-c, --computeInstance", computeInstance,
+                        "Compute Instance")
+            ->required();
+        app->add_option("-b, --metricsBitfield", metricsBitfield,
+                        "Metrics Bitfield")
+            ->required();
+    }
+
+  private:
+    class QueryAggregatedGPMMetricsAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            const auto info = metricsTable.find(tag);
+            if (info == metricsTable.end())
+            {
+                return NSM_SW_ERROR_DATA;
+            }
+
+            uint8_t rc = NSM_SW_SUCCESS;
+            double value{};
+
+            switch (info->second.unit)
+            {
+                case GPMMetricsUnit::PERCENTAGE:
+                {
+                    rc = decode_aggregate_gpm_metric_percentage_data(
+                        data, data_len, &value);
+
+                    break;
+                }
+
+                case GPMMetricsUnit::BANDWIDTH:
+                {
+                    uint64_t val;
+                    rc = decode_aggregate_gpm_metric_bandwidth_data(
+                        data, data_len, &val);
+
+                    // unit of bandwidth is Bytes per seconds in NSM Command
+                    // Response and unit for GPMMetrics PDI is Gbps. Hence it is
+                    // converted to Gbps.
+                    static constexpr uint64_t conversionFactor = 1024 * 1024 *
+                                                                 128;
+                    value = val / static_cast<double>(conversionFactor);
+
+                    break;
+                }
+            }
+
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Metric Id"] = tag;
+                sample_json["Metric Name"] = info->second.name;
+                sample_json["Metric Value"] = value;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        // struct nsm_query_aggregate_gpm_metrics_req has char[1] as its last
+        // member to handle variable size Metrics bitfield of the NSM Request.
+        // 1 is subtracted from it's size to account for it.
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_query_aggregate_gpm_metrics_req) -
+            1 + metricsBitfield.size());
+        auto requestPtr = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        auto rc = encode_query_aggregate_gpm_metrics_req(
+            instanceId, retrievalSource, gpuInstance, computeInstance,
+            metricsBitfield.data(), metricsBitfield.size(), requestPtr);
+
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        QueryAggregatedGPMMetricsAggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    uint8_t retrievalSource;
+    uint8_t gpuInstance;
+    uint8_t computeInstance;
+    std::vector<uint8_t> metricsBitfield;
+};
+
+class QueryPerInstanceGPMMetrics : public CommandInterface
+{
+  public:
+    QueryPerInstanceGPMMetrics() = delete;
+    QueryPerInstanceGPMMetrics(const QueryPerInstanceGPMMetrics&) = delete;
+    QueryPerInstanceGPMMetrics(QueryPerInstanceGPMMetrics&&) = default;
+    QueryPerInstanceGPMMetrics&
+        operator=(const QueryPerInstanceGPMMetrics&) = delete;
+    QueryPerInstanceGPMMetrics& operator=(QueryAggregatedGPMMetrics&&) = delete;
+
+    explicit QueryPerInstanceGPMMetrics(const char* type, const char* name,
+                                        CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-r, --retrievalSource", retrievalSource,
+                        "Retrieval Source")
+            ->required();
+        app->add_option("-g, --gpuInstance", gpuInstance, "GPU Instance")
+            ->required();
+        app->add_option("-c, --computeInstance", computeInstance,
+                        "Compute Instance")
+            ->required();
+        app->add_option("-i, --metricId", metricId, "Metric Id")->required();
+        app->add_option("-b, --instanceBitfield", instanceBitfield,
+                        "Instance Bitfield")
+            ->required();
+    }
+
+  private:
+    class QueryPerInstanceGPMMetricsAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      public:
+        QueryPerInstanceGPMMetricsAggregateResponseParser(
+            const MetricsInfo* info) :
+            info(info)
+        {}
+
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint8_t rc = NSM_SW_SUCCESS;
+            double value{};
+
+            switch (info->unit)
+            {
+                case GPMMetricsUnit::PERCENTAGE:
+                {
+                    rc = decode_aggregate_gpm_metric_percentage_data(
+                        data, data_len, &value);
+
+                    break;
+                }
+
+                case GPMMetricsUnit::BANDWIDTH:
+                {
+                    uint64_t val;
+                    rc = decode_aggregate_gpm_metric_bandwidth_data(
+                        data, data_len, &val);
+
+                    // unit of bandwidth is Bytes per seconds in NSM Command
+                    // Response and unit for GPMMetrics PDI is Gbps. Hence it is
+                    // converted to Gbps.
+                    static constexpr uint64_t conversionFactor = 1024 * 1024 *
+                                                                 128;
+                    value = val / static_cast<double>(conversionFactor);
+
+                    break;
+                }
+            }
+
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Instance Id"] = tag;
+                sample_json["Metric Value"] = value;
+            }
+
+            return rc;
+        }
+
+      private:
+        const MetricsInfo* info;
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_per_instance_gpm_metrics_req));
+
+        auto requestPtr = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        auto rc = encode_query_per_instance_gpm_metrics_req(
+            instanceId, retrievalSource, gpuInstance, computeInstance, metricId,
+            instanceBitfield, requestPtr);
+
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        const auto find_result = metricsTable.find(metricId);
+        if (find_result == metricsTable.end())
+        {
+            return;
+        }
+        QueryPerInstanceGPMMetricsAggregateResponseParser{&find_result->second}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    uint8_t retrievalSource;
+    uint8_t gpuInstance;
+    uint8_t computeInstance;
+    uint8_t metricId;
+    uint32_t instanceBitfield;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -3454,6 +3692,16 @@ void registerCommand(CLI::App& app)
         "EnableDisableWriteProtected", "Enable/Disable WriteProtected");
     commands.push_back(std::make_unique<EnableDisableWriteProtected>(
         "diag", "EnableDisableWriteProtected", enableDisableWriteProtected));
+
+    auto queryAggregatedGPMMetrics = telemetry->add_subcommand(
+        "QueryAggregatedGPMMetrics", "Query Aggregated GPM Metrics");
+    commands.push_back(std::make_unique<QueryAggregatedGPMMetrics>(
+        "telemetry", "QueryAggregatedGPMMetrics", queryAggregatedGPMMetrics));
+
+    auto queryPerInstanceGPMMetrics = telemetry->add_subcommand(
+        "QueryPerInstanceGPMMetrics", "Query Per-instance GPM Metrics");
+    commands.push_back(std::make_unique<QueryPerInstanceGPMMetrics>(
+        "telemetry", "QueryPerInstanceGPMMetrics", queryPerInstanceGPMMetrics));
 }
 
 } // namespace telemetry
