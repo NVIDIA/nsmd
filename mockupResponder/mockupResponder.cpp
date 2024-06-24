@@ -25,6 +25,7 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "gpmMetricsList.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
@@ -363,6 +364,10 @@ std::optional<std::vector<uint8_t>>
                     return getRowRemappingCountsHandler(request, requestLen);
                 case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
                     return getMemoryCapacityUtilHandler(request, requestLen);
+                case NSM_QUERY_AGGREGATE_GPM_METRICS:
+                    return queryAggregatedGPMMetrics(request, requestLen);
+                case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
+                    return queryPerInstanceGPMMetrics(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -2629,6 +2634,193 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryAggregatedGPMMetrics(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    auto request = reinterpret_cast<const nsm_query_aggregate_gpm_metrics_req*>(
+        requestMsg->payload);
+    lg2::info("queryAggregatedGPMMetrics: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t retrieval_source;
+    uint8_t gpu_instance;
+    uint8_t compute_instance;
+    const uint8_t* metrics_bitfield;
+    size_t metrics_bitfield_length;
+
+    auto rc = decode_query_aggregate_gpm_metrics_req(
+        requestMsg, requestLen, &retrieval_source, &gpu_instance,
+        &compute_instance, &metrics_bitfield, &metrics_bitfield_length);
+
+    assert(rc == NSM_SW_SUCCESS);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    for (size_t i{}; i < metrics_bitfield_length; ++i)
+    {
+        for (uint8_t j{}; j < 8; ++j)
+        {
+            if (metrics_bitfield[i] & 1 << j)
+            {
+                const uint8_t metric_id = 8 * i + j;
+                const auto info = metricsTable.find(metric_id);
+                if (info == metricsTable.end())
+                {
+                    continue;
+                }
+
+                ++samplesCount;
+
+                uint8_t reading[64]{};
+                size_t sample_len{};
+                std::array<uint8_t, 256> sample;
+                auto nsm_sample =
+                    reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+                switch (info->second.unit)
+                {
+                    case GPMMetricsUnit::PERCENTAGE:
+                        rc = encode_aggregate_gpm_metric_percentage_data(
+                            info->second.mockValue, reading, &sample_len);
+                        assert(rc == NSM_SW_SUCCESS);
+
+                        break;
+
+                    case GPMMetricsUnit::BANDWIDTH:
+                        rc = encode_aggregate_gpm_metric_bandwidth_data(
+                            info->second.mockValue, reading, &sample_len);
+                        assert(rc == NSM_SW_SUCCESS);
+
+                        break;
+                }
+
+                rc = encode_aggregate_resp_sample(metric_id, true, reading,
+                                                  sample_len, nsm_sample,
+                                                  &sample_len);
+                assert(rc == NSM_SW_SUCCESS);
+
+                response.insert(response.end(), sample.begin(),
+                                std::next(sample.begin(), sample_len));
+            }
+        }
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               request->hdr.command, NSM_SUCCESS, samplesCount,
+                               responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    auto request =
+        reinterpret_cast<const nsm_query_per_instance_gpm_metrics_req*>(
+            requestMsg->payload);
+    lg2::info("queryPerInstanceGPMMetrics: request length={LEN}", "LEN",
+              requestLen);
+
+    uint8_t retrieval_source;
+    uint8_t gpu_instance;
+    uint8_t compute_instance;
+    uint8_t metric_id;
+    uint32_t instance_bitfield;
+
+    auto rc = decode_query_per_instance_gpm_metrics_req(
+        requestMsg, requestLen, &retrieval_source, &gpu_instance,
+        &compute_instance, &metric_id, &instance_bitfield);
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    const auto info = metricsTable.find(metric_id);
+    if (info == metricsTable.end())
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        rc = encode_cc_only_resp(requestMsg->hdr.instance_id,
+                                 requestMsg->hdr.nvidia_msg_type,
+                                 request->hdr.command, NSM_ERR_INVALID_DATA,
+                                 ERR_NOT_SUPPORTED, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+
+        return response;
+    }
+
+    for (size_t i{}; i < 32; ++i)
+    {
+        if (instance_bitfield & 1 << i)
+        {
+            ++samplesCount;
+
+            uint8_t reading[64]{};
+            size_t consumed_len{};
+            std::array<uint8_t, 256> sample;
+            auto nsm_sample =
+                reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+            switch (info->second.unit)
+            {
+                case GPMMetricsUnit::PERCENTAGE:
+                {
+                    auto val = info->second.mockValue * (i + 1);
+                    val -= 100 * (static_cast<int>(val) / 100);
+                    rc = encode_aggregate_gpm_metric_percentage_data(
+                        val, reading, &consumed_len);
+                    assert(rc == NSM_SW_SUCCESS);
+
+                    break;
+                }
+
+                case GPMMetricsUnit::BANDWIDTH:
+                {
+                    // To obtain a unique value for each instance Metric, base
+                    // Metric value is multiplied by instance number and then
+                    // the module of base 10 is taken on that number.
+                    constexpr uint64_t mod = 10 * 1024 * 1024 * 128;
+                    auto val = info->second.mockValue * (i + 1);
+                    val -= mod * (static_cast<uint64_t>(val) / mod);
+                    rc = encode_aggregate_gpm_metric_bandwidth_data(
+                        val, reading, &consumed_len);
+                    assert(rc == NSM_SW_SUCCESS);
+
+                    break;
+                }
+            }
+
+            rc = encode_aggregate_resp_sample(i, true, reading, consumed_len,
+                                              nsm_sample, &consumed_len);
+            assert(rc == NSM_SW_SUCCESS);
+
+            response.insert(response.end(), sample.begin(),
+                            std::next(sample.begin(), consumed_len));
+        }
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               request->hdr.command, NSM_SUCCESS, samplesCount,
+                               responseMsg);
+
+    assert(rc == NSM_SW_SUCCESS);
+
     return response;
 }
 
