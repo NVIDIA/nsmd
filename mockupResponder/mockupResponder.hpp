@@ -215,6 +215,13 @@ class MockupResponder
         readThermalParameterHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        queryAggregatedGPMMetrics(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;
