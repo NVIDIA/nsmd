@@ -56,6 +56,12 @@ struct MetricInfo
     std::unique_ptr<MetricUpdator> updater;
 };
 
+struct NVLinkMetricsUpdatorInfo
+{
+    std::string objPath;
+    std::shared_ptr<NVLinkMetricsIntf> interface;
+};
+
 std::pair<uint8_t, double> decodePercentage(const uint8_t* sample, size_t size);
 std::pair<uint8_t, double> decodeBandwidth(const uint8_t* sample, size_t size);
 
@@ -66,6 +72,18 @@ std::shared_ptr<MetricPerInstanceUpdator>
 std::shared_ptr<MetricPerInstanceUpdator>
     makeNVJpgPerInstanceUpdator(const std::string& objPath,
                                 const std::shared_ptr<GPMMetricsIntf> gpmIntf);
+
+std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkRawRxPerInstanceUpdator(
+    const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
+
+std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkRawTxPerInstanceUpdator(
+    const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
+
+std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkDataRxPerInstanceUpdator(
+    const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
+
+std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkDataTxPerInstanceUpdator(
+    const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
 
 class NsmGPMAggregated : public NsmSensorAggregator
 {
