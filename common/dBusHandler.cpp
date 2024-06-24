@@ -166,4 +166,19 @@ IDBusHandler& DBusHandler()
     return DBusHandler::instance();
 }
 
+GetAssociatedObjectsResponse
+    DBusHandler::getAssociatedObjects(const std::string& path,
+                                      const std::string& association) const
+{
+    auto& bus = utils::DBusHandler::getBus();
+    const auto associationPath = path + "/" + association;
+    auto method = bus.new_method_call(mapperService, associationPath.c_str(),
+                                      dbusProperties, "Get");
+    method.append("xyz.openbmc_project.Association", "endpoints");
+    auto reply = bus.call(method);
+    GetAssociatedObjectsResponse response;
+    reply.read(response);
+    return response;
+}
+
 } // namespace utils

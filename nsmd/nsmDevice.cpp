@@ -131,7 +131,7 @@ NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
     return *sensor;
 }
 
-void NsmDevice::addSensor(const std::shared_ptr<NsmSensor>& sensor,
+void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
                           bool priority)
 {
     deviceSensors.emplace_back(sensor);
