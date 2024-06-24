@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include "config.h"
+
 #include "nsmProcessor.hpp"
 
 #include "pci-links.h"
@@ -28,6 +30,7 @@
 #include <stdint.h>
 
 #include <phosphor-logging/lg2.hpp>
+#include <telemetry_mrd_producer.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -849,6 +852,82 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
     co_return cc;
 }
 
+const std::string NsmCurrentUtilization::dBusIntf{
+    "xyz.openbmc_project.Inventory.Item.Cpu.OperatingConfig"};
+
+const std::string NsmCurrentUtilization::dBusProperty{"Utilization"};
+
+NsmCurrentUtilization::NsmCurrentUtilization(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+    const std::string& objPath) :
+    NsmSensor(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    objPath(objPath)
+{}
+
+std::optional<std::vector<uint8_t>>
+    NsmCurrentUtilization::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    auto rc = encode_get_current_utilization_req(instanceId, requestPtr);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_current_utilization_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t
+    NsmCurrentUtilization::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint32_t gpu_utilization;
+    uint32_t memory_utilization;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_current_utilization_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        &gpu_utilization, &memory_utilization);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        cpuOperatingConfigIntf->utilization(gpu_utilization);
+
+#ifdef NVIDIA_SHMEM
+        auto timestamp = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count());
+
+        DbusVariantType valueVariant{gpu_utilization};
+
+        nv::shmem::AggregationService::updateTelemetry(
+            objPath, dBusIntf, dBusProperty, valueVariant, timestamp, 0);
+#endif
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_current_utilization_resp  "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
 NsmProcessorThrottleReason::NsmProcessorThrottleReason(
     std::string& name, std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf) :
@@ -1626,17 +1705,25 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto maxGraphicsClockFreq =
                 std::make_shared<NsmMaxGraphicsClockLimit>(
                     name, type, cpuOperatingConfigIntf);
+            auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
+                name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
+                inventoryObjPath);
+
             nsmDevice->deviceSensors.emplace_back(minGraphicsClockFreq);
             nsmDevice->deviceSensors.emplace_back(maxGraphicsClockFreq);
+            nsmDevice->deviceSensors.emplace_back(currentUtilization);
+
             if (priority)
             {
                 nsmDevice->prioritySensors.push_back(clockFreqSensor);
                 nsmDevice->prioritySensors.push_back(clockLimitSensor);
+                nsmDevice->prioritySensors.push_back(currentUtilization);
             }
             else
             {
                 nsmDevice->roundRobinSensors.push_back(clockFreqSensor);
                 nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
+                nsmDevice->roundRobinSensors.push_back(currentUtilization);
             }
             minGraphicsClockFreq->update(manager, manager.getEid(nsmDevice))
                 .detach();

@@ -146,6 +146,10 @@ class MockupResponder
                                    size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getCurrentUtilizationHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
     std::optional<std::vector<uint8_t>>

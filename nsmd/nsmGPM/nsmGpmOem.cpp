@@ -103,6 +103,34 @@ class NVLinkMetricUpdator : public MetricUpdator
 const std::string NVLinkMetricUpdator::DBusIntf{
     "com.nvidia.NVLink.NVLinkMetrics"};
 
+DRAMUsageMetricUpdator::DRAMUsageMetricUpdator(std::shared_ptr<DimmIntf> intf,
+                                               const std::string& objPath) :
+    intf(intf), objPath(objPath)
+{}
+
+void DRAMUsageMetricUpdator::updateMetric(
+    [[maybe_unused]] const std::string& name, const double val)
+{
+    intf->utilization(val);
+
+#ifdef NVIDIA_SHMEM
+    auto timestamp = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+
+    DbusVariantType valueVariant{val};
+
+    nv::shmem::AggregationService::updateTelemetry(
+        objPath, dBusIntf, dBusProperty, valueVariant, timestamp, 0);
+#endif
+}
+
+const std::string DRAMUsageMetricUpdator::dBusIntf{
+    "xyz.openbmc_project.Inventory.Item.Dimm"};
+
+const std::string DRAMUsageMetricUpdator::dBusProperty{"Utilization"};
+
 std::pair<uint8_t, double> decodePercentage(const uint8_t* sample, size_t size)
 {
     double percentage{};
@@ -294,7 +322,7 @@ NsmGPMAggregated::NsmGPMAggregated(
             gpmIntf.get(), &GPMMetricsIntf::tensorCoreActivityPercent,
             objPath}}};
 
-    // Metric DRAM_Usage is not published
+    metricsTable[4] = {"DRAMUsagePercent", decodePercentage, {}};
 
     metricsTable[5] = {
         "FP64ActivityPercent", decodePercentage,

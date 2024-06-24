@@ -2715,6 +2715,60 @@ class GetMemoryCapacityUtil : public CommandInterface
     }
 };
 
+class GetCurrentUtilization : public CommandInterface
+{
+  public:
+    ~GetCurrentUtilization() = default;
+    GetCurrentUtilization() = delete;
+    GetCurrentUtilization(const GetCurrentUtilization&) = delete;
+    GetCurrentUtilization(GetCurrentUtilization&&) = default;
+    GetCurrentUtilization& operator=(const GetCurrentUtilization&) = delete;
+    GetCurrentUtilization& operator=(GetCurrentUtilization&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_current_utilization_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint32_t gpu_utilization;
+        uint32_t memory_utilization;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_get_current_utilization_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &gpu_utilization, &memory_utilization);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_current_utilization_resp))
+                      << '\n';
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["GPU Utilizatin"] = gpu_utilization;
+        result["Memory Utilizatin"] = memory_utilization;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class GetClockOutputEnableState : public CommandInterface
 {
   public:
@@ -3273,6 +3327,11 @@ void registerCommand(CLI::App& app)
         "GetMemoryCapacityUtil", "Get memory Capacity Capacity Utilization");
     commands.push_back(std::make_unique<GetMemoryCapacityUtil>(
         "telemetry", "GetMemoryCapacityUtil", getMemoryCapacityUtil));
+
+    auto getCurrentUtilization = telemetry->add_subcommand(
+        "GetCurrentUtilization", "Get Current Capacity Utilization");
+    commands.push_back(std::make_unique<GetCurrentUtilization>(
+        "telemetry", "GetCurrentUtilization", getCurrentUtilization));
 
     auto getClockOutputEnableState = telemetry->add_subcommand(
         "GetClockOutputEnableState", "get clock output enable state");

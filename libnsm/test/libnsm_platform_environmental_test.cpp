@@ -4340,6 +4340,167 @@ TEST(getMemCapacityUtil, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
+TEST(getCurrentUtilization, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_CURRENT_UTILIZATION,     // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_memory_capacity_util_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getCurrentUtilization, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_current_utilization_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t gpu_utilization = 36;
+	uint32_t memory_utilization = 75;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_current_utilization_resp(
+	    0, NSM_SUCCESS, reason_code, gpu_utilization, memory_utilization,
+	    response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_current_utilization_resp *resp =
+	    reinterpret_cast<struct nsm_get_current_utilization_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CURRENT_UTILIZATION, resp->hdr.command);
+	EXPECT_EQ(sizeof(gpu_utilization) + sizeof(memory_utilization),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(le32toh(resp->gpu_utilization), gpu_utilization);
+	EXPECT_EQ(le32toh(resp->memory_utilization), memory_utilization);
+}
+
+TEST(getCurrentUtilization, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, // command
+	    0,					 // completion code
+	    0,					 // reserved
+	    0,					 // reserved
+	    8,
+	    0, // data size
+	    0x10,
+	    0x01,
+	    0x00,
+	    0x00,
+	    0x11,
+	    0x00,
+	    0x00,
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	uint32_t gpu_utilization;
+	uint32_t memory_utilization;
+
+	auto rc = decode_get_current_utilization_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
+	    &memory_utilization);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(8, data_size);
+	EXPECT_EQ(272, gpu_utilization);
+	EXPECT_EQ(17, memory_utilization);
+}
+
+TEST(getCurrentUtilization, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, // command
+	    0,					 // completion code
+	    0,					 // reserved
+	    0,					 // reserved
+	    8,
+	    0, // data size
+	    0x10,
+	    0x01,
+	    0x00,
+	    0x00,
+	    0x11,
+	    0x00,
+	    0x00,
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	uint32_t gpu_utilization;
+	uint32_t memory_utilization;
+
+	auto rc = decode_get_current_utilization_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
+	    &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_current_utilization_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &gpu_utilization,
+	    &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_current_utilization_resp(response, msg_len, &cc, NULL,
+						 &reason_code, &gpu_utilization,
+						 &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_current_utilization_resp(response, msg_len, &cc, NULL,
+						 &reason_code, NULL,
+						 &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_current_utilization_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code,
+	    &gpu_utilization, &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	responseMsg[9] = 6;
+	rc = decode_get_current_utilization_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
+	    &memory_utilization);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
 TEST(getClockOutputEnableState, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> request_msg(
