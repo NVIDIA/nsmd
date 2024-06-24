@@ -20,10 +20,13 @@
                 "Name": "HGX_FW_PCIeRetimer_$INSTANCE_NUMBER",
                 "Type": "NSM_FirmwareInventory",
                 "UUID": "$UUID",
-                "Manufacturer": "NVIDIA",
                 "DeviceType": 3,
                 "IsRetimer": true,
                 "InstanceNumber": "$INSTANCE_NUMBER",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Manufacturer": "NVIDIA"
+                },
                 "Associations": [
                     {
                         "Forward": "inventory",

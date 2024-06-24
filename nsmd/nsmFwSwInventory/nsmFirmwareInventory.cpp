@@ -48,20 +48,16 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
 
     if (type == "NSM_FirmwareInventory")
     {
-        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
-        auto asset = std::make_shared<NsmFirmwareInventory<AssetIntf>>(name);
-        asset->pdi().manufacturer(manufacturer);
-        device->addStaticSensor(asset);
-
         auto associations = utils::getAssociations(objPath,
                                                    interface + ".Associations");
-        auto associationsObject =
-            std::make_shared<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
-                name);
-        associationsObject->pdi().associations(
-            utils::getAssociations(associations));
-        device->addStaticSensor(associationsObject);
+        if (!associations.empty())
+        {
+            auto associationsObject = std::make_shared<
+                NsmFirmwareInventory<AssociationDefinitionsIntf>>(name);
+            associationsObject->pdi().associations(
+                utils::getAssociations(associations));
+            device->addStaticSensor(associationsObject);
+        }
 
         auto retimer = utils::DBusHandler().tryGetDbusProperty<bool>(
             objPath.c_str(), "IsRetimer", interface.c_str());
@@ -74,6 +70,14 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
             *settings, deviceType, instanceNumber, retimer);
         device->addStaticSensor(settings);
         device->addSensor(writeProtectControl, false);
+    }
+    else if (type == "NSM_Asset")
+    {
+        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "Manufacturer", interface.c_str());
+        auto asset = std::make_shared<NsmFirmwareInventory<AssetIntf>>(name);
+        asset->pdi().manufacturer(manufacturer);
+        device->addStaticSensor(asset);
     }
     else if (type == "NSM_FirmwareVersion")
     {
@@ -89,6 +93,7 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
 
 dbus::Interfaces firmwareInventoryInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_FirmwareInventory",
+    "xyz.openbmc_project.Configuration.NSM_FirmwareInventory.Asset",
     "xyz.openbmc_project.Configuration.NSM_FirmwareInventory.Version",
 };
 
