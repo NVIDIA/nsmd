@@ -18,6 +18,8 @@
 #include "cmd_helper.hpp"
 #include "nsm_discovery_cmd.hpp"
 #include "nsm_telemetry_cmd.hpp"
+#include "nsm_diag_cmd.hpp"
+#include "nsm_config_cmd.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -85,6 +87,8 @@ int main(int argc, char** argv)
         nsmtool::raw::registerCommand(app);
         nsmtool::discovery::registerCommand(app);
         nsmtool::telemetry::registerCommand(app);
+        nsmtool::diag::registerCommand(app);
+        nsmtool::config::registerCommand(app);
 
         CLI11_PARSE(app, argc, argv);
         return 0;

@@ -312,3 +312,315 @@ TEST(getFpgaDiagnosticsSettingsWPJumper, testBadDecodeResponse)
 	    response, msg_len, &cc, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(getPowerSupplyStatus, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t status = 0x02;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = encode_get_power_supply_status_resp(
+	    0, NSM_SUCCESS, reasonCode, status, response);
+
+	struct nsm_get_power_supply_status_resp *resp =
+	    reinterpret_cast<struct nsm_get_power_supply_status_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(status, resp->power_supply_status);
+}
+
+TEST(getPowerSupplyStatus, testGoodDecodeResponse)
+{
+#define EXPECTED_POWER_SUPPLY_STATUS_LSB 0x02
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    1,
+	    0,				      // data size
+	    EXPECTED_POWER_SUPPLY_STATUS_LSB, // status
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint8_t status = 0;
+
+	auto rc = decode_get_power_supply_status_resp(response, msg_len, &cc,
+						      &reasonCode, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(status, EXPECTED_POWER_SUPPLY_STATUS_LSB);
+}
+
+TEST(getPowerSupplyStatus, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    0,
+	    0, // incorrect data size
+	    0};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t status = 0;
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_get_power_supply_status_resp(NULL, msg_len, &cc,
+						      &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_supply_status_resp(response, msg_len, NULL,
+						 &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_supply_status_resp(response, msg_len, &cc,
+						 &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_supply_status_resp(response, msg_len - 1, &cc,
+						 &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_power_supply_status_resp(response, msg_len, &cc,
+						 &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getGpusPresence, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_gpu_presence_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t presence = 0b00111001;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = encode_get_gpu_presence_resp(0, NSM_SUCCESS, reasonCode,
+					       presence, response);
+
+	struct nsm_get_gpu_presence_resp *resp =
+	    reinterpret_cast<struct nsm_get_gpu_presence_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(presence, resp->presence);
+}
+
+TEST(getGpusPresence, testGoodDecodeResponse)
+{
+#define EXPECTED_PRESENCE_LSB 0b00111001
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    1,
+	    0,			   // data size
+	    EXPECTED_PRESENCE_LSB, // status
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint8_t presence = 0;
+
+	auto rc = decode_get_gpu_presence_resp(response, msg_len, &cc,
+					       &reasonCode, &presence);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(presence, EXPECTED_PRESENCE_LSB);
+}
+
+TEST(getGpusPresence, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    0,
+	    0, // incorrect data size
+	    0};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t presence = 0;
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_get_gpu_presence_resp(NULL, msg_len, &cc, &reason_code,
+					       &presence);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_presence_resp(response, msg_len, NULL, &reason_code,
+					  &presence);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_presence_resp(response, msg_len, &cc, &reason_code,
+					  NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_presence_resp(response, msg_len - 1, &cc,
+					  &reason_code, &presence);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_gpu_presence_resp(response, msg_len, &cc, &reason_code,
+					  &presence);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getGpusPowerStatus, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_gpu_power_status_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t status = 0x02;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = encode_get_gpu_power_status_resp(0, NSM_SUCCESS, reasonCode,
+						   status, response);
+
+	struct nsm_get_gpu_power_status_resp *resp =
+	    reinterpret_cast<struct nsm_get_gpu_power_status_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(status, resp->power_status);
+}
+
+TEST(getGpusPowerStatus, testGoodDecodeResponse)
+{
+#define EXPECTED_STATUS_LSB 0b11001011
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    1,
+	    0,			 // data size
+	    EXPECTED_STATUS_LSB, // status
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint8_t status = 0;
+
+	auto rc = decode_get_gpu_power_status_resp(response, msg_len, &cc,
+						   &reasonCode, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(status, EXPECTED_STATUS_LSB);
+}
+
+TEST(getGpusPowerStatus, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    0,
+	    0, // incorrect data size
+	    0};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t status = 0;
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_get_gpu_power_status_resp(NULL, msg_len, &cc,
+						   &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_power_status_resp(response, msg_len, NULL,
+					      &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_power_status_resp(response, msg_len, &cc,
+					      &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_power_status_resp(response, msg_len - 1, &cc,
+					      &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_gpu_power_status_resp(response, msg_len, &cc,
+					      &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}

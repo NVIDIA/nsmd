@@ -17,7 +17,9 @@
 
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 
-#include "libnsm/platform-environmental.h"
+#include "device-configuration.h"
+
+#include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -31,19 +33,80 @@ NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
     gpuInstanceId(gpuInstanceId)
 {}
 
+requester::Coroutine
+    NsmGpuPresenceAndPowerStatus::update(SensorManager& manager, eid_t eid)
+{
+    uint8_t rc = NSM_SW_SUCCESS;
+    for (int state = (int)State::GetPresence;
+         state <= (int)State::GetPowerStatus && rc == NSM_SW_SUCCESS; state++)
+    {
+        NsmGpuPresenceAndPowerStatus::state = (State)state;
+        rc = co_await NsmSensor::update(manager, eid);
+    }
+
+    if (rc == NSM_SW_SUCCESS)
+    {
+        // "State": "Enabled" if presence=active, power=active
+        // "State": "UnavailableOffline" if presence=active,
+        // power=inactive "State": "Absent" if presence=inactive
+
+        bool power = ((gpusPower >> (gpuInstanceId)) & 0x1) != 0;
+        bool presence = ((gpusPresence >> (gpuInstanceId)) & 0x1) != 0;
+
+        for (auto pdi : interfaces)
+        {
+            if (power && presence)
+                pdi->state(OperationalStatusIntf::StateType::Enabled);
+            else if (presence)
+                pdi->state(
+                    OperationalStatusIntf::StateType::UnavailableOffline);
+            else
+                pdi->state(OperationalStatusIntf::StateType::Absent);
+        }
+    }
+    else
+    {
+        for (auto pdi : interfaces)
+        {
+            pdi->state(OperationalStatusIntf::StateType::Fault);
+        }
+        lg2::error(
+            "responseHandler: decode_get_gpu_power_status_resp is not success CC. rc={RC}",
+            "RC", rc);
+    }
+
+    co_return rc;
+}
+
 std::optional<Request>
     NsmGpuPresenceAndPowerStatus::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_get_gpu_presence_and_power_status_req));
+                    sizeof(nsm_get_fpga_diagnostics_settings_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_gpu_presence_and_power_status_req(instanceId,
-                                                           requestPtr);
+    int rc = NSM_SW_ERROR;
+    switch (state)
+    {
+        case State::GetPresence:
+            rc = encode_get_fpga_diagnostics_settings_req(
+                instanceId, GET_GPU_PRESENCE, requestPtr);
+            break;
+        case State::GetPowerStatus:
+            rc = encode_get_fpga_diagnostics_settings_req(
+                instanceId, GET_GPU_POWER_STATUS, requestPtr);
+            break;
+        default:
+            lg2::error(
+                "NsmGpuPresenceAndPowerStatus::genRequestMsg unsupported state. eid={EID} rc={RC}, state={STATE}",
+                "EID", eid, "RC", rc, "STATE", int(state));
+            break;
+    }
+
     if (rc)
     {
         lg2::error(
-            "encode_get_gpu_presence_and_power_status_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "NsmGpuPresenceAndPowerStatus::genRequestMsg failed. eid={EID} rc={RC}, state={STATE}",
+            "EID", eid, "RC", rc, "STATE", int(state));
         return std::nullopt;
     }
 
@@ -53,47 +116,34 @@ std::optional<Request>
 uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
+    uint8_t rc = NSM_SW_ERROR;
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    uint8_t gpus_presence = 0;
-    uint8_t gpus_power = 0;
 
-    auto rc = decode_get_gpu_presence_and_power_status_resp(
-        responseMsg, responseLen, &cc, &reasonCode, &gpus_presence,
-        &gpus_power);
-    if (rc)
+    switch (state)
+    {
+        case State::GetPresence:
+            rc = decode_get_gpu_presence_resp(responseMsg, responseLen, &cc,
+                                              &reasonCode, &gpusPresence);
+            break;
+        case State::GetPowerStatus:
+            rc = decode_get_gpu_power_status_resp(responseMsg, responseLen, &cc,
+                                                  &reasonCode, &gpusPower);
+            break;
+        default:
+            lg2::error(
+                "NsmGpuPresenceAndPowerStatus::handleResponseMsg unsupported state. rc={RC}, state={STATE}",
+                "RC", rc, "STATE", int(state));
+            break;
+    }
+
+    if (cc != NSM_SUCCESS)
     {
         lg2::error(
-            "responseHandler: decode_get_gpu_presence_and_power_status_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return rc;
+            "NsmGpuPresenceAndPowerStatus::handleResponseMsg  is not success CC. rc={RC}, cc={CC}, reasonCode={REASON_CODE}",
+            "RC", rc, "CC", cc, "REASON_CODE", reasonCode);
     }
-
-    if (cc == NSM_SUCCESS)
-    {
-        // "State": "Enabled" if presence=active, power=active
-        // "State": "UnavailableOffline" if presence=active,
-        // power=inactive "State": "Absent" if presence=inactive
-
-        bool power = ((gpus_power >> (gpuInstanceId)) & 0x1) != 0;
-        bool presence = ((gpus_presence >> (gpuInstanceId)) & 0x1) != 0;
-        if (power && presence)
-            pdi().state(OperationalStatusIntf::StateType::Enabled);
-        else if (presence)
-            pdi().state(OperationalStatusIntf::StateType::UnavailableOffline);
-        else
-            pdi().state(OperationalStatusIntf::StateType::Absent);
-    }
-    else
-    {
-        pdi().state(OperationalStatusIntf::StateType::Fault);
-        lg2::error(
-            "responseHandler: decode_get_gpu_presence_and_power_status_resp is not success CC. rc={RC}",
-            "RC", rc);
-        return rc;
-    }
-
-    return cc;
+    return rc;
 }
 
 } // namespace nsm

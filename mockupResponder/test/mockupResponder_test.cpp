@@ -16,6 +16,7 @@
  */
 
 #include "base.h"
+#include "device-configuration.h"
 #include "platform-environmental.h"
 
 #include "mockupResponder.hpp"
@@ -95,50 +96,78 @@ TEST_F(MockupResponderTest, goodTestUuidPropertyTest)
 
 TEST_F(MockupResponderTest, goodTestPowerSupplyStatusTest)
 {
-    uint8_t expectedStatus = 0x01;
-    std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
-                                     sizeof(nsm_get_power_supply_status_resp));
-    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uint8_t expectedStatus = 0b00110011;
+    std::vector<uint8_t> requestMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_fpga_diagnostics_settings_req));
 
-    encode_get_power_supply_status_resp(0, NSM_SUCCESS, ERR_NULL,
-                                        expectedStatus, response);
-    auto res = mockupResponder->getPowerSupplyStatusHandler(response,
-                                                            responseMsg.size());
+    auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+    fpga_diagnostics_settings_data_index data_index = GET_POWER_SUPPLY_STATUS;
+
+    auto rc = encode_get_fpga_diagnostics_settings_req(0, data_index, request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto res = mockupResponder->getFpgaDiagnosticsSettingsHandler(
+        request, requestMsg.size());
 
     EXPECT_TRUE(res.has_value());
     EXPECT_EQ(res.value().size(),
               sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp));
 
-    response = reinterpret_cast<nsm_msg*>(res.value().data());
+    auto response = reinterpret_cast<nsm_msg*>(res.value().data());
     auto resp = (nsm_get_power_supply_status_resp*)response->payload;
 
-    EXPECT_EQ(NSM_GET_POWER_SUPPLY_STATUS, resp->hdr.command);
+    EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
     EXPECT_EQ(expectedStatus, resp->power_supply_status);
+}
+
+TEST_F(MockupResponderTest, goodTestGpuPresenceTest)
+{
+    uint32_t expectedPresence = 0b11111111;
+    std::vector<uint8_t> requestMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_fpga_diagnostics_settings_req));
+
+    auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+    fpga_diagnostics_settings_data_index data_index = GET_GPU_PRESENCE;
+
+    auto rc = encode_get_fpga_diagnostics_settings_req(0, data_index, request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto res = mockupResponder->getFpgaDiagnosticsSettingsHandler(
+        request, requestMsg.size());
+
+    EXPECT_TRUE(res.has_value());
+    EXPECT_EQ(res.value().size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_presence_resp));
+
+    auto response = reinterpret_cast<nsm_msg*>(res.value().data());
+    auto resp = (nsm_get_gpu_presence_resp*)response->payload;
+
+    EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
+    EXPECT_EQ(expectedPresence, resp->presence);
 }
 
 TEST_F(MockupResponderTest, goodTestGpuPresenceAndPowerStatusTest)
 {
-    uint32_t expectedPresence = 0x01;
-    uint32_t expectedPower = 0x01;
-    std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_get_gpu_presence_and_power_status_resp));
-    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint32_t expectedPower = 0b11110111;
+    std::vector<uint8_t> requestMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_fpga_diagnostics_settings_req));
 
-    encode_get_gpu_presence_and_power_status_resp(
-        0, NSM_SUCCESS, ERR_NULL, expectedPresence, expectedPower, response);
-    auto res = mockupResponder->getGpuPresenceAndPowerStatusHandler(
-        response, responseMsg.size());
+    auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+    fpga_diagnostics_settings_data_index data_index = GET_GPU_POWER_STATUS;
+
+    auto rc = encode_get_fpga_diagnostics_settings_req(0, data_index, request);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto res = mockupResponder->getFpgaDiagnosticsSettingsHandler(
+        request, requestMsg.size());
 
     EXPECT_TRUE(res.has_value());
     EXPECT_EQ(res.value().size(),
-              sizeof(nsm_msg_hdr) +
-                  sizeof(nsm_get_gpu_presence_and_power_status_resp));
+              sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_power_status_resp));
 
-    response = reinterpret_cast<nsm_msg*>(res.value().data());
-    auto resp = (nsm_get_gpu_presence_and_power_status_resp*)response->payload;
+    auto response = reinterpret_cast<nsm_msg*>(res.value().data());
+    auto resp = (nsm_get_gpu_power_status_resp*)response->payload;
 
-    EXPECT_EQ(NSM_GET_GPU_PRESENCE_POWER_STATUS, resp->hdr.command);
-    EXPECT_EQ(expectedPresence, resp->presence);
+    EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
     EXPECT_EQ(expectedPower, resp->power_status);
 }
