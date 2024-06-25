@@ -22,6 +22,8 @@
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
+#include <cstdint>
+
 namespace nsm
 {
 
@@ -66,14 +68,19 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
             objPath.c_str(), "Vendor", interface.c_str());
         auto assetsName = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
+        // default part number for asset is Board part number
+        auto deviceAssembly = utils::DBusHandler().tryGetDbusProperty<bool>(
+            objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
+        auto partNumberId = deviceAssembly ? DEVICE_PART_NUMBER
+                                           : BOARD_PART_NUMBER;
+
         auto assetObject = NsmChassisAssembly<AssetIntf>(chassisName, name);
         assetObject.pdi().manufacturer(vendor);
         assetObject.pdi().name(assetsName);
-
-        // create sensor
+        //  create sensor
         auto eid = manager.getEid(device);
         auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            assetObject, BOARD_PART_NUMBER);
+            assetObject, partNumberId);
         auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             assetObject, SERIAL_NUMBER);
         auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(

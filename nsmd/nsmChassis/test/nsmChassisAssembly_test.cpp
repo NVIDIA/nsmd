@@ -65,6 +65,7 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
         {"Name", name},
         {"Type", "NSM_ChassisAssembly"},
         {"UUID", gpuUuid},
+        {"DeviceAssembly", true},
     };
     const PropertyValuesCollection area = {
         {"Type", "NSM_Area"},
@@ -180,7 +181,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
         .WillOnce(Return(get(asset, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(asset, "Vendor")))
-        .WillOnce(Return(get(asset, "Name")));
+        .WillOnce(Return(get(asset, "Name")))
+        .WillOnce(Return(get(basic, "DeviceAssembly")));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -196,10 +198,13 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
             dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(sensor);
         EXPECT_NE(nullptr, inventorySensor);
     }
-    auto sensor = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[0]);
+    EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
+    auto model = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
         gpu.deviceSensors[2]);
-    EXPECT_EQ(get<std::string>(asset, "Vendor"), sensor->pdi().manufacturer());
-    EXPECT_EQ(get<std::string>(asset, "Name"), sensor->pdi().name());
+    EXPECT_EQ(get<std::string>(asset, "Vendor"), model->pdi().manufacturer());
+    EXPECT_EQ(get<std::string>(asset, "Name"), model->pdi().name());
 }
 
 TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
@@ -208,9 +213,7 @@ TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
         .WillOnce(Return(get(asset, "Type")))
-        .WillOnce(Return(get(error, "UUID")))
-        .WillOnce(Return(get(asset, "Vendor")))
-        .WillOnce(Return(get(asset, "Name")));
+        .WillOnce(Return(get(error, "UUID")));
     EXPECT_THROW(nsmChassisAssemblyCreateSensors(
                      mockManager, basicIntfName + ".Asset", objPath),
                  std::runtime_error);
