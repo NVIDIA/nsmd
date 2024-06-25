@@ -64,8 +64,9 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
         {"IsRetimer", true},
         {"InstanceNumber", uint64_t(5)},
     };
-    const PropertyValuesCollection retimerVersion = {
-        {"Type", "NSM_FirmwareVersion"},
+    const PropertyValuesCollection retimerAsset = {
+        {"Type", "NSM_Asset"},
+        {"Manufacturer", "NVIDIA"},
     };
     const PropertyValuesCollection retimerAssociations[2] = {
         {
@@ -80,26 +81,15 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
             {"AbsolutePath", "/xyz/openbmc_project/software"},
         },
     };
+    const PropertyValuesCollection retimerVersion = {
+        {"Type", "NSM_FirmwareVersion"},
+    };
     const PropertyValuesCollection gpu = {
         {"Name", "HGX_FW_GPU_SXM_2"},
         {"Type", "NSM_FirmwareInventory"},
         {"UUID", fpgaUuid},
-        {"Manufacturer", "NVIDIA"},
         {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"InstanceNumber", uint64_t(1)},
-    };
-    const PropertyValuesCollection gpuAssociations[2] = {
-        {
-            {"Forward", "inventory"},
-            {"Backward", "activation"},
-            {"AbsolutePath",
-             "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_2"},
-        },
-        {
-            {"Forward", "software_version"},
-            {"Backward", "updateable"},
-            {"AbsolutePath", "/xyz/openbmc_project/software"},
-        },
     };
     const MapperServiceMap serviceMap = {
         {
@@ -110,17 +100,26 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
             },
         },
     };
+    const MapperServiceMap emtpyServiceMap;
 };
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 {
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(retimer, "Name")))
+        .WillOnce(Return(get(retimerAsset, "Type")))
+        .WillOnce(Return(get(retimer, "UUID")))
+        .WillOnce(Return(get(retimer, "DeviceType")))
+        .WillOnce(Return(get(retimer, "InstanceNumber")))
+        .WillOnce(Return(get(retimerAsset, "Manufacturer")));
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
+                                      objPath);
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(retimer, "Name")))
         .WillOnce(Return(get(retimer, "Type")))
         .WillOnce(Return(get(retimer, "UUID")))
         .WillOnce(Return(get(retimer, "DeviceType")))
         .WillOnce(Return(get(retimer, "InstanceNumber")))
-        .WillOnce(Return(get(retimer, "Manufacturer")))
         .WillOnce(Return(get(retimerAssociations[0], "Forward")))
         .WillOnce(Return(get(retimerAssociations[0], "Backward")))
         .WillOnce(Return(get(retimerAssociations[0], "AbsolutePath")))
@@ -148,16 +147,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         .WillOnce(Return(get(gpu, "UUID")))
         .WillOnce(Return(get(gpu, "DeviceType")))
         .WillOnce(Return(get(gpu, "InstanceNumber")))
-        .WillOnce(Return(get(gpu, "Manufacturer")))
-        .WillOnce(Return(get(gpuAssociations[0], "Forward")))
-        .WillOnce(Return(get(gpuAssociations[0], "Backward")))
-        .WillOnce(Return(get(gpuAssociations[0], "AbsolutePath")))
-        .WillOnce(Return(get(gpuAssociations[1], "Forward")))
-        .WillOnce(Return(get(gpuAssociations[1], "Backward")))
-        .WillOnce(Return(get(gpuAssociations[1], "AbsolutePath")))
         .WillOnce(Throw(utils::SdBusTestError(
             int(sdbusplus::UnpackErrorReason::missingProperty))));
-    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(serviceMap));
+    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(emtpyServiceMap));
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     auto staticSensors = 0;
@@ -193,18 +185,6 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_EQ(PCIERETIMER_0_EEPROM_VERSION +
                   get<uint64_t>(retimer, "InstanceNumber"),
               version->property);
-
-    auto gpuAsset = dynamic_pointer_cast<NsmFirmwareInventory<AssetIntf>>(
-        fpga.deviceSensors[staticSensors++]);
-    EXPECT_NE(nullptr, gpuAsset);
-    EXPECT_EQ(get<std::string>(gpu, "Manufacturer"),
-              gpuAsset->pdi().manufacturer());
-
-    auto gpuAssociation =
-        dynamic_pointer_cast<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
-            fpga.deviceSensors[staticSensors++]);
-    EXPECT_NE(nullptr, gpuAssociation);
-    EXPECT_EQ(2, gpuAssociation->pdi().associations().size());
 
     auto gpuSettings = dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
         fpga.deviceSensors[staticSensors++]);
