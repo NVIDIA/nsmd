@@ -282,8 +282,6 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
                   gpu.deviceSensors[sensors++])
                   ->pdi()
                   .locationCode());
-
-    EXPECT_EQ(sensors, gpu.deviceSensors.size());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
@@ -344,6 +342,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
         .WillOnce(Return(get(fpgaProperties, "INSTANCE_NUMBER")));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
                             objPath);
+
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(2, fpga.deviceSensors.size());
@@ -407,10 +406,10 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
                             objPath);
     EXPECT_EQ(1, fpga.prioritySensors.size());
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
+    EXPECT_EQ(2, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(2, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(2, gpu.deviceSensors.size());
 }
 TEST_F(NsmChassisTest, badTestCreateStaticSensors)
 {

@@ -82,18 +82,21 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
         .WillOnce(Return(get(basic, "SlotType")))
         .WillOnce(Return(get(basic, "Priority")));
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
+
     EXPECT_EQ(0, baseboard.prioritySensors.size());
     EXPECT_EQ(1, baseboard.roundRobinSensors.size());
-    EXPECT_EQ(1, baseboard.deviceSensors.size());
+    EXPECT_EQ(2, baseboard.deviceSensors.size());
+    
+    auto sensors = 0;
     auto sensor = dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
-        baseboard.roundRobinSensors[0]);
+        baseboard.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, sensor);
     EXPECT_EQ(PCIeSlotIntf::convertSlotTypesFromString(
                   get<std::string>(basic, "SlotType")),
               sensor->pdi().slotType());
     auto associations =
         dynamic_pointer_cast<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
-            baseboard.deviceSensors[0]);
+            baseboard.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, associations);
     EXPECT_EQ(0, associations->pdi().associations().size());
 }
