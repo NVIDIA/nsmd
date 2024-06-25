@@ -22,35 +22,34 @@
 
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
+#include "nsmCommon/nsmCommon.hpp"
+#include "nsmCpuOperatingConfigInterface.hpp"
 #include "nsmEccModeIface.hpp"
 #include "nsmInterface.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmMigModeIface.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "nsmSensor.hpp"
-#include "nsmCommon/nsmCommon.hpp"
-#include "nsmCpuOperatingConfigInterface.hpp"
 
 #include <stdint.h>
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/PersistentMemory/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/PersistentMemory/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/SPDMResponder/server.hpp>
 #include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
-#include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
-#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
+#include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
 
 #include <cstdint>
 
@@ -61,19 +60,15 @@ using AcceleratorIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Accelerator>;
 using accelaratorType = sdbusplus::xyz::openbmc_project::Inventory::Item::
     server::Accelerator::AcceleratorType;
-using SpdmResponderIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Item::server::SPDMResponder>;
 
 class NsmAcceleratorIntf : public NsmObject
 {
   public:
     NsmAcceleratorIntf(sdbusplus::bus::bus& bus, std::string& name,
-                       std::string& type, std::string& inventoryObjPath,
-                       std::string& chassisObjPath);
+                       std::string& type, std::string& inventoryObjPath);
 
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf = nullptr;
-    std::unique_ptr<SpdmResponderIntf> spdmResponderIntf = nullptr;
 };
 
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
@@ -155,7 +150,8 @@ class NsmMigMode : public NsmSensor
 {
   public:
     NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
-               std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device);
+               std::string& inventoryObjPath,
+               std::shared_ptr<NsmDevice> device);
     NsmMigMode() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -362,9 +358,11 @@ class NsmCurrClockFreq : public NsmSensor
 class NsmMinGraphicsClockLimit : public NsmObject
 {
   public:
-    NsmMinGraphicsClockLimit(std::string& name, std::string& type,
-                       std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    NsmMinGraphicsClockLimit(
+        std::string& name, std::string& type,
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
@@ -372,9 +370,11 @@ class NsmMinGraphicsClockLimit : public NsmObject
 class NsmMaxGraphicsClockLimit : public NsmObject
 {
   public:
-    NsmMaxGraphicsClockLimit(std::string& name, std::string& type,
-                       std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    NsmMaxGraphicsClockLimit(
+        std::string& name, std::string& type,
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
@@ -477,7 +477,8 @@ class NsmMemoryCapacityUtil : public NsmSensor
   public:
     NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
                           const std::string& type,
-                          std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory>totalMemory);
+                          std::string& inventoryObjPath,
+                          std::shared_ptr<NsmTotalMemory> totalMemory);
     NsmMemoryCapacityUtil() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -591,8 +592,8 @@ using GpuHealthType = sdbusplus::xyz::openbmc_project::State::Decorator::
 class NsmGpuHealth : public NsmObject
 {
   public:
-    NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
-                    std::string& type, std::string& inventoryObjPath);
+    NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+                 std::string& inventoryObjPath);
 
   private:
     std::shared_ptr<GpuHealthIntf> healthIntf;
