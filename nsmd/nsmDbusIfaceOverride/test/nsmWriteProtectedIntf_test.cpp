@@ -95,8 +95,8 @@ struct NsmWriteProtectedIntfTest : public testing::Test
         lastResponse = response;
         return [response, code](
                    eid_t, Request&,
-                   [[maybe_unused]] std::shared_ptr<const nsm_msg>& responseMsg,
-                   [[maybe_unused]] size_t& responseLen) {
+                   std::shared_ptr<const nsm_msg>& responseMsg,
+                   size_t& responseLen) {
             responseLen = response.size();
             auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
             memcpy((uint8_t*)msg, response.data(), responseLen);

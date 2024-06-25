@@ -54,8 +54,6 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09,
 	NSM_SET_ECC_MODE = 0x7c,
 	NSM_GET_CLOCK_OUTPUT_ENABLE_STATE = 0x61,
-	NSM_GET_POWER_SUPPLY_STATUS = 0x63,
-	NSM_GET_GPU_PRESENCE_POWER_STATUS = 0x64,
 	NSM_GET_MEMORY_CAPACITY_UTILIZATION = 0xAD,
 	NSM_GET_ROW_REMAP_STATE_FLAGS = 0x7F,
 	NSM_GET_ROW_REMAPPING_COUNTS = 0x7E,
@@ -467,48 +465,6 @@ struct nsm_get_accum_GPU_util_time_resp {
 	uint32_t SM_util_time;
 } __attribute__((packed));
 
-/** @struct nsm_get_power_supply_status_req
- *
- *  Structure representing NSM get power supply status information request.
- */
-struct nsm_get_power_supply_status_req {
-	struct nsm_common_req hdr;
-} __attribute__((packed));
-
-/** @struct nsm_get_power_supply_status_resp
- *
- *  Structure representing NSM get power supply status information response.
- */
-struct nsm_get_power_supply_status_resp {
-	struct nsm_common_resp hdr;
-	uint8_t power_supply_status;
-	uint8_t reserved1;
-	uint8_t reserved2;
-	uint8_t reserved3;
-} __attribute__((packed));
-
-/** @struct nsm_get_gpu_presence_and_power_status_req
- *
- *  Structure representing NSM get GPU presence and power status information
- * request.
- */
-struct nsm_get_gpu_presence_and_power_status_req {
-	struct nsm_common_req hdr;
-} __attribute__((packed));
-
-/** @struct nsm_get_gpu_presence_and_power_status_resp
- *
- *  Structure representing NSM get GPU presence and power status information
- * response.
- */
-struct nsm_get_gpu_presence_and_power_status_resp {
-	struct nsm_common_resp hdr;
-	uint8_t presence;
-	uint8_t power_status;
-	uint8_t reserved1;
-	uint8_t reserved2;
-} __attribute__((packed));
-
 /** @struct nsm_xid_event_payload
  *
  *  Structure representing payload of NSM xid event
@@ -667,7 +623,6 @@ struct nsm_get_programmable_EDPp_scaling_factor_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_EDPp_scaling_factors scaling_factors;
 } __attribute__((packed));
-
 
 /** @struct nsm_set_clock_limit_req
  *
@@ -1469,8 +1424,8 @@ int encode_set_clock_limit_req(uint8_t instance, uint8_t clock_id,
  *  @return nsm_completion_codes
  */
 int decode_set_clock_limit_req(const struct nsm_msg *msg, size_t msg_len,
-			       uint8_t* clock_id, uint8_t* flags,
-			       uint32_t* limit_min, uint32_t* limit_max);
+			       uint8_t *clock_id, uint8_t *flags,
+			       uint32_t *limit_min, uint32_t *limit_max);
 
 /** @brief Encode a Set Clock Limit response message
  *
@@ -1703,52 +1658,6 @@ int decode_get_accum_GPU_util_time_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code, uint32_t *context_util_time, uint32_t *SM_util_time);
 
-/** @brief Encode a Get power supply status request message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_power_supply_status_req(uint8_t instance_id,
-				       struct nsm_msg *msg);
-
-/** @brief Decode a Get power supply status request message
- *
- *  @param[in] msg    - request message
- *  @param[in] msg_len - Length of request message
- *  @return nsm_completion_codes
- */
-int decode_get_power_supply_status_req(const struct nsm_msg *msg,
-				       size_t msg_len);
-
-/** @brief Encode a Get power supply status response message
- *  *
- *  @param[in] instance_id - NSM instance ID
- *  @param[in] cc - pointer to response message completion code
- *  @param[in] reason_code - NSM reason code
- *  @param[in] power_supply_status - GPUs power supply status
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_power_supply_status_resp(uint8_t instance_id, uint8_t cc,
-					uint16_t reason_code,
-					uint8_t power_supply_status,
-					struct nsm_msg *msg);
-
-/** @brief Decode a Get power supply status response message
- *
- *  @param[in] msg    - response message
- *  @param[in] msg_len - Length of response message
- *  @param[out] cc - pointer to response message completion code
- *  @param[out] reason_code     - pointer to reason code
- *  @param[out] power_supply_status - pointer to GPUs power supply status
- *  @return nsm_completion_codes
- */
-int decode_get_power_supply_status_resp(const struct nsm_msg *msg,
-					size_t msg_len, uint8_t *cc,
-					uint16_t *reason_code,
-					uint8_t *power_supply_status);
-
 /** @brief Encode a Set Power Limits request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -1890,53 +1799,6 @@ int decode_get_power_limit_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint32_t *requested_oneshot_limit,
 				uint32_t *enforced_limit);
 
-/** @brief Encode a Get gpu presence and power status request message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_gpu_presence_and_power_status_req(uint8_t instance_id,
-						 struct nsm_msg *msg);
-
-/** @brief Decode a Get gpu presence and power status request message
- *
- *  @param[in] msg    - request message
- *  @param[in] msg_len - Length of request message
- *  @return nsm_completion_codes
- */
-int decode_get_gpu_presence_and_power_status_req(const struct nsm_msg *msg,
-						 size_t msg_len);
-
-/** @brief Encode a Get gpu presence and power status response message
- *
- *  @param[in] instance_id - NSM instance ID
- *  @param[in] cc - pointer to response message completion code
- *  @param[in] reason_code - NSM reason code
- *  @param[in] presence - GPUs presence
- *  @param[in] power_status - GPUs power status
- *  @param[out] msg - Message will be written to this
- *  @return nsm_completion_codes
- */
-int encode_get_gpu_presence_and_power_status_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t presence,
-    uint8_t power_status, struct nsm_msg *msg);
-
-/** @brief Decode a Get gpu presence and power status response message
- *
- *  @param[in] msg    - response message
- *  @param[in] msg_len - Length of response message
- *  @param[out] cc - pointer to response message completion code
- *  @param[out] reason_code     - pointer to reason code
- *  @param[out] presence - pointer to GPUs presence
- *  @param[out] power_status - pointer to GPUs power status
- *  @return nsm_completion_codes
- */
-int decode_get_gpu_presence_and_power_status_resp(const struct nsm_msg *msg,
-						  size_t msg_len, uint8_t *cc,
-						  uint16_t *reason_code,
-						  uint8_t *presence,
-						  uint8_t *power_status);
 /** @brief Encode a Get Clock Output Enabled State request message
  *
  *  @param[in] instance_id - NSM instance ID

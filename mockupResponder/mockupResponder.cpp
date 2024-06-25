@@ -44,8 +44,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     writeProtected()
 {
@@ -312,11 +311,6 @@ std::optional<std::vector<uint8_t>>
                     return getTemperatureReadingHandler(request, requestLen);
                 case NSM_READ_THERMAL_PARAMETER:
                     return readThermalParameterHandler(request, requestLen);
-                case NSM_GET_POWER_SUPPLY_STATUS:
-                    return getPowerSupplyStatusHandler(request, requestLen);
-                case NSM_GET_GPU_PRESENCE_POWER_STATUS:
-                    return getGpuPresenceAndPowerStatusHandler(request,
-                                                               requestLen);
                 case NSM_GET_POWER:
                     return getCurrentPowerDrawHandler(request, requestLen);
                 case NSM_GET_ENERGY_COUNT:
@@ -382,7 +376,7 @@ std::optional<std::vector<uint8_t>>
                     return queryScalarGroupTelemetryHandler(request,
                                                             requestLen);
                 case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
-                     return pcieFundamentalResetHandler(request, requestLen);
+                    return pcieFundamentalResetHandler(request, requestLen);
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -1299,43 +1293,6 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
-std::optional<std::vector<uint8_t>>
-    MockupResponder::getPowerSupplyStatusHandler(const nsm_msg* requestMsg,
-                                                 size_t requestLen)
-{
-    lg2::info("getPowerSupplyStatusHandler: request length={LEN}", "LEN",
-              requestLen);
-
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp), 0);
-
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_power_supply_status_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, 0x01, responseMsg);
-    assert(rc == NSM_SUCCESS);
-    return response;
-}
-std::optional<std::vector<uint8_t>>
-    MockupResponder::getGpuPresenceAndPowerStatusHandler(
-        const nsm_msg* requestMsg, size_t requestLen)
-{
-    lg2::info("getGpuPresenceAndPowerStatusHandler: request length={LEN}",
-              "LEN", requestLen);
-
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-            sizeof(nsm_get_gpu_presence_and_power_status_resp),
-        0);
-
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_gpu_presence_and_power_status_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, 0x01, 0x01,
-        responseMsg);
-    assert(rc == NSM_SUCCESS);
-    return response;
-}
-
-
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::setEventSubscription(const nsm_msg* requestMsg,
@@ -2510,6 +2467,67 @@ std::optional<std::vector<uint8_t>>
             {
                 lg2::error(
                     "getFpgaDiagnosticsSettingsHandler: encode_get_fpga_diagnostics_settings_wp_jumper_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GET_POWER_SUPPLY_STATUS:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_power_supply_status_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                0b00110011, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_power_supply_status_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GET_GPU_PRESENCE:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_presence_resp), 0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_gpu_presence_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              0b11111111, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_gpu_presence_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GET_GPU_POWER_STATUS:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_power_status_resp), 0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_gpu_power_status_resp(requestMsg->hdr.instance_id,
+                                                  NSM_SUCCESS, reason_code,
+                                                  0b11110111, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_gpu_power_status_resp failed: rc={RC}",
                     "RC", rc);
                 return std::nullopt;
             }

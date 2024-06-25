@@ -22,6 +22,8 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "device-configuration.h"
+
 #include "nsmChassis.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -697,11 +699,14 @@ TEST_F(NsmPowerSupplyStatusTest, goodTestRequest)
     auto request = sensor->genRequestMsg(eid, instanceId);
     EXPECT_TRUE(request.has_value());
     EXPECT_EQ(request.value().size(),
-              sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_supply_status_req));
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_get_fpga_diagnostics_settings_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
-    auto rc = decode_get_power_supply_status_req(requestPtr,
-                                                 request.value().size());
+    fpga_diagnostics_settings_data_index data_index;
+    auto rc = decode_get_fpga_diagnostics_settings_req(
+        requestPtr, request.value().size(), &data_index);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(data_index, GET_POWER_SUPPLY_STATUS);
 }
 TEST_F(NsmPowerSupplyStatusTest, goodTestResponse)
 {
@@ -776,33 +781,79 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
         EXPECT_EQ(sensor->getType(), "NSM_OperationalStatus");
         EXPECT_EQ(sensor->gpuInstanceId, gpuInstanceId);
     }
+
+    Response lastResponse;
+    auto mockSendRecvNsmMsg(const Response& data,
+                            nsm_completion_codes code = NSM_SUCCESS)
+    {
+        const Response fpgaDiagnosticMsgHeader{
+            0x10,
+            0xDE,                          // PCI VID: NVIDIA 0x10DE
+            0x00,                          // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+            0x89,                          // OCP_TYPE=8, OCP_VER=9
+            NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+            NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+            0,                                 // completion code
+            0,
+            0,
+            1,
+            0 // data size
+        };
+        Response response;
+        response.insert(response.end(), fpgaDiagnosticMsgHeader.begin(), fpgaDiagnosticMsgHeader.end());
+        response.insert(response.end(), data.begin(), data.end());
+        lastResponse = response;
+        return [response, code](
+                   eid_t, Request&,
+                   std::shared_ptr<const nsm_msg>& responseMsg,
+                   size_t& responseLen) -> requester::Coroutine {
+            responseLen = response.size();
+            auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
+            memcpy((uint8_t*)msg, response.data(), responseLen);
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                msg, [](const nsm_msg* ptr) { free((void*)ptr); });
+            co_return code;
+        };
+    }
     void testResponse(uint8_t presence, uint8_t power_status)
     {
-        std::vector<uint8_t> response(
-            sizeof(nsm_msg_hdr) +
-            sizeof(nsm_get_gpu_presence_and_power_status_resp));
-        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-        auto rc = encode_get_gpu_presence_and_power_status_resp(
-            instanceId, NSM_SUCCESS, ERR_NULL, presence, power_status,
-            responseMsg);
-        EXPECT_EQ(rc, NSM_SW_SUCCESS);
-        rc = sensor->handleResponseMsg(responseMsg, response.size());
-        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        const Response presenceMsg{presence};
+        const Response powerStatusMsg{power_status};
+        EXPECT_CALL(mockManager, SendRecvNsmMsg)
+            .Times(2)
+            .WillOnce(mockSendRecvNsmMsg(presenceMsg))
+            .WillOnce(mockSendRecvNsmMsg(powerStatusMsg));
+        sensor->update(mockManager, eid);
     }
 };
-
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestRequest)
 {
     init(0);
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPresence;
+
     auto request = sensor->genRequestMsg(eid, instanceId);
     EXPECT_TRUE(request.has_value());
     EXPECT_EQ(request.value().size(),
               sizeof(nsm_msg_hdr) +
-                  sizeof(nsm_get_gpu_presence_and_power_status_req));
+                  sizeof(nsm_get_fpga_diagnostics_settings_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
-    auto rc = decode_get_gpu_presence_and_power_status_req(
-        requestPtr, request.value().size());
+    fpga_diagnostics_settings_data_index data_index;
+    auto rc = decode_get_fpga_diagnostics_settings_req(
+        requestPtr, request.value().size(), &data_index);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(data_index, GET_GPU_PRESENCE);
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPowerStatus;
+
+    request = sensor->genRequestMsg(eid, instanceId);
+    EXPECT_TRUE(request.has_value());
+    EXPECT_EQ(request.value().size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_get_fpga_diagnostics_settings_req));
+    requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
+    rc = decode_get_fpga_diagnostics_settings_req(
+        requestPtr, request.value().size(), &data_index);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(data_index, GET_GPU_POWER_STATUS);
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
 {
@@ -830,6 +881,20 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
                   StateType::UnavailableOffline);
     }
 }
+TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
+{
+    init(0);
+    using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
+        server::OperationalStatus::StateType;
+    const Response presenceMsg{0};
+    const Response powerStatusMsg{0};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(2)
+        .WillOnce(mockSendRecvNsmMsg(presenceMsg))
+        .WillOnce(mockSendRecvNsmMsg(powerStatusMsg, NSM_ERROR));
+    sensor->update(mockManager, eid);
+    EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Fault);
+}
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
 {
     // power=inactive "State": "Absent" if presence=inactive
@@ -845,20 +910,23 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestRequest)
 {
     init(0);
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPresence;
     auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPowerStatus;
+    request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestResponseSize)
 {
     init(0);
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPresence;
     uint8_t presence = 0;
-    uint8_t power_status = 0;
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_get_gpu_presence_and_power_status_resp));
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_gpu_presence_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_gpu_presence_and_power_status_resp(
-        instanceId, NSM_SUCCESS, ERR_NULL, presence, power_status, responseMsg);
+    auto rc = encode_get_gpu_presence_resp(instanceId, NSM_SUCCESS, ERR_NULL,
+                                           presence, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = sensor->handleResponseMsg(responseMsg, response.size() - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
@@ -866,19 +934,17 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestResponseSize)
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestCompletionErrorResponse)
 {
     init(0);
-    uint8_t presence = 0;
+    sensor->state = NsmGpuPresenceAndPowerStatus::State::GetPowerStatus;
     uint8_t power_status = 0;
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_get_gpu_presence_and_power_status_resp));
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_gpu_power_status_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_get_gpu_presence_and_power_status_resp(
-        instanceId, NSM_SUCCESS, ERR_NULL, presence, power_status, responseMsg);
+    auto rc = encode_get_gpu_power_status_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, power_status, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    struct nsm_get_gpu_presence_and_power_status_resp* resp =
-        (struct nsm_get_gpu_presence_and_power_status_resp*)
-            responseMsg->payload;
+    auto resp = reinterpret_cast<struct nsm_get_gpu_power_status_resp*>(
+        responseMsg->payload);
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());

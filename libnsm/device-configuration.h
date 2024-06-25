@@ -39,6 +39,8 @@ enum fpga_diagnostics_settings_data_index {
 	GET_NVSW_FLASH_PRESENT_SETTINGS = 0x09,
 	GET_NVSW_FUSE_SRC_SETTINGS = 0x0A,
 	GET_RETIMER_LTSSM_DUMP_MODE_SETTINGS = 0x0B,
+	GET_GPU_PRESENCE = 0x0C,
+	GET_GPU_POWER_STATUS = 0x0D,
 	GET_AGGREGATE_TELEMETRY = 0xFF,
 };
 
@@ -131,6 +133,35 @@ struct nsm_fpga_diagnostics_settings_wp_jumper {
 struct nsm_fpga_diagnostics_settings_wp_jumper_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_fpga_diagnostics_settings_wp_jumper data;
+} __attribute__((packed));
+
+/** @struct nsm_get_power_supply_status_resp
+ *
+ *  Structure representing NSM get power supply status information response.
+ */
+struct nsm_get_power_supply_status_resp {
+	struct nsm_common_resp hdr;
+	uint8_t power_supply_status;
+} __attribute__((packed));
+
+/** @struct nsm_get_gpu_presence_resp
+ *
+ *  Structure representing NSM get GPU presence information
+ * response.
+ */
+struct nsm_get_gpu_presence_resp {
+	struct nsm_common_resp hdr;
+	uint8_t presence;
+} __attribute__((packed));
+
+/** @struct nsm_get_gpu_power_status_resp
+ *
+ *  Structure representing NSM get GPU power status information
+ * response.
+ */
+struct nsm_get_gpu_power_status_resp {
+	struct nsm_common_resp hdr;
+	uint8_t power_status;
 } __attribute__((packed));
 
 /** @brief Encode a Get FPGA Diagnostics Settings request message
@@ -238,11 +269,90 @@ int encode_get_fpga_diagnostics_settings_wp_jumper_resp(
  *  @param[out] data  - struct pointer Get WP Jumper data source
  * @return nsm_completion_codes
  */
-
 int decode_get_fpga_diagnostics_settings_wp_jumper_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code,
     struct nsm_fpga_diagnostics_settings_wp_jumper *data);
+
+/** @brief Encode a Get power supply status response message
+ *  *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] power_supply_status - GPUs power supply status
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_supply_status_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint8_t power_supply_status,
+					struct nsm_msg *msg);
+
+/** @brief Decode a Get power supply status response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] power_supply_status - pointer to GPUs power supply status
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_supply_status_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					uint8_t *power_supply_status);
+
+/** @brief Encode a Get GPUs presence response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] presence - GPUs presence
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_gpu_presence_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint8_t presence,
+				 struct nsm_msg *msg);
+
+/** @brief Decode a Get GPUs presence response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] presence - pointer to GPUs presence
+ *  @return nsm_completion_codes
+ */
+int decode_get_gpu_presence_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint8_t *presence);
+
+/** @brief Encode a Get GPUs power status response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] power_status - GPUs power status
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_gpu_power_status_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, uint8_t power_status,
+				     struct nsm_msg *msg);
+
+/** @brief Decode a Get GPUs power status response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] power_status - pointer to GPUs power status
+ *  @return nsm_completion_codes
+ */
+int decode_get_gpu_power_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint8_t *power_status);
 
 #ifdef __cplusplus
 }

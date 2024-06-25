@@ -17,7 +17,7 @@
 
 #include "nsmPowerSupplyStatus.hpp"
 
-#include "libnsm/platform-environmental.h"
+#include "device-configuration.h"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -34,13 +34,14 @@ std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,
                                                            uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_get_power_supply_status_req));
+                    sizeof(nsm_get_fpga_diagnostics_settings_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_get_power_supply_status_req(instanceId, requestPtr);
+    auto rc = encode_get_fpga_diagnostics_settings_req(
+        instanceId, GET_POWER_SUPPLY_STATUS, requestPtr);
     if (rc)
     {
         lg2::error(
-            "encode_get_power_supply_status_req failed. eid={EID} rc={RC}",
+            "encode_get_fpga_diagnostics_settings_req(GET_POWER_SUPPLY_STATUS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
     }

@@ -43,8 +43,17 @@ class NsmGpuPresenceAndPowerStatus :
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
   private:
     uint8_t gpuInstanceId;
+    uint8_t gpusPresence;
+    uint8_t gpusPower;
+    enum class State
+    {
+        GetPresence,
+        GetPowerStatus
+    } state;
 };
 
 } // namespace nsm

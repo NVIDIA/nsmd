@@ -2,6 +2,8 @@ sources = [
     'cmd_helper.cpp',
     'nsm_discovery_cmd.cpp',
     'nsm_telemetry_cmd.cpp',
+    'nsm_diag_cmd.cpp',
+    'nsm_config_cmd.cpp',
     'nsmtool.cpp',
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
