@@ -44,17 +44,6 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
-    bool deviceAssembly = false;
-    try
-    {
-        deviceAssembly = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
-    }
-    catch (const std::exception& e)
-    {
-        deviceAssembly = false;
-    }
-
     if (type == "NSM_ChassisAssembly")
     {
         auto assemblyObject =
@@ -80,11 +69,10 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
         auto assetsName = utils::DBusHandler().getDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
         // default part number for asset is Board part number
-        auto partNumberId = BOARD_PART_NUMBER;
-        if (deviceAssembly)
-        {
-            partNumberId = DEVICE_PART_NUMBER;
-        }
+        auto deviceAssembly = utils::DBusHandler().tryGetDbusProperty<bool>(
+            objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
+        auto partNumberId = deviceAssembly ? DEVICE_PART_NUMBER
+                                           : BOARD_PART_NUMBER;
 
         auto assetObject = NsmChassisAssembly<AssetIntf>(chassisName, name);
         assetObject.pdi().manufacturer(vendor);
