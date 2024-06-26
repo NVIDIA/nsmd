@@ -38,6 +38,7 @@ def generateConfig(input_file):
                 "Name": f"{exposeName}_$INSTANCE_NUMBER_Port_{count}_Info",
                 "Type": "SensorPortInfo",
                 "SensorId": sensorID,
+                "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
                 "PortType": f"xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.{portType}",
                 "MaxSpeedMBps": 50000,
                 "Association": [

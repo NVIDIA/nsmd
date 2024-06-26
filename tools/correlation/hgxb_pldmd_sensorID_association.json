@@ -11,6 +11,7 @@
         "Name": "NVLinkManagementNIC_$INSTANCE_NUMBER_Port_0_Info",
         "Type": "SensorPortInfo",
         "SensorId": 200,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.ManagementPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -31,6 +32,7 @@
         "Name": "NVLinkManagementNIC_$INSTANCE_NUMBER_Port_1_Info",
         "Type": "SensorPortInfo",
         "SensorId": 201,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.ManagementPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -51,6 +53,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_2_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5500,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -71,6 +74,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_3_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5501,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -91,6 +95,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_4_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5502,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -111,6 +116,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_5_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5503,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -131,6 +137,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_6_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5504,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -151,6 +158,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_7_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5505,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -171,6 +179,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_8_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5506,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -191,6 +200,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_9_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5507,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -211,6 +221,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_10_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5508,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -231,6 +242,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_11_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5509,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -251,6 +263,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_12_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5510,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -271,6 +284,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_13_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5511,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -291,6 +305,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_14_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5512,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -311,6 +326,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_15_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5513,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -331,6 +347,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_16_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5514,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -351,6 +368,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_17_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5515,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -371,6 +389,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_18_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5516,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -391,6 +410,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_19_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5517,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -411,6 +431,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_20_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5518,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -431,6 +452,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_21_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5519,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -451,6 +473,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_22_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5520,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -471,6 +494,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_23_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5521,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -491,6 +515,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_24_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5522,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -511,6 +536,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_25_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5523,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -531,6 +557,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_26_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5524,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -551,6 +578,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_27_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5525,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -571,6 +599,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_28_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5526,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -591,6 +620,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_29_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5527,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -611,6 +641,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_30_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5528,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -631,6 +662,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_31_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5529,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -651,6 +683,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_32_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5530,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -671,6 +704,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_33_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5531,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -691,6 +725,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_34_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5532,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -711,6 +746,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_35_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5533,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -731,6 +767,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_36_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5534,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -751,6 +788,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_37_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5535,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -771,6 +809,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_38_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5536,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -791,6 +830,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_39_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5537,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -811,6 +851,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_40_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5538,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -831,6 +872,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_41_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5539,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -851,6 +893,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_42_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5540,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -871,6 +914,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_43_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5541,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -891,6 +935,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_44_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5542,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -911,6 +956,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_45_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5543,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -931,6 +977,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_46_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5544,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -951,6 +998,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_47_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5545,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -971,6 +1019,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_48_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5546,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -991,6 +1040,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_49_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5547,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1011,6 +1061,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_50_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5548,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1031,6 +1082,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_51_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5549,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1051,6 +1103,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_52_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5550,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1071,6 +1124,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_53_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5551,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1091,6 +1145,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_54_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5552,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1111,6 +1166,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_55_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5553,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1131,6 +1187,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_56_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5554,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1151,6 +1208,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_57_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5555,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1171,6 +1229,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_58_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5556,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1191,6 +1250,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_59_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5557,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1211,6 +1271,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_60_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5558,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1231,6 +1292,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_61_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5559,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1251,6 +1313,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_62_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5560,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1271,6 +1334,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_63_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5561,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1291,6 +1355,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_64_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5562,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1311,6 +1376,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_65_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5563,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1331,6 +1397,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_66_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5564,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1351,6 +1418,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_67_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5565,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1371,6 +1439,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_68_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5566,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1391,6 +1460,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_69_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5567,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1411,6 +1481,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_70_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5568,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1431,6 +1502,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_71_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5569,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1451,6 +1523,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_72_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5570,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1471,6 +1544,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_73_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5571,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.BidirectionalPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1491,6 +1565,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_74_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5572,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.ManagementPort",
         "MaxSpeedMBps": 50000,
         "Association": [
@@ -1511,6 +1586,7 @@
         "Name": "NVSwitch_$INSTANCE_NUMBER_Port_75_Info",
         "Type": "SensorPortInfo",
         "SensorId": 5573,
+        "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.NVLink",
         "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.InterswitchPort",
         "MaxSpeedMBps": 50000,
         "Association": [
