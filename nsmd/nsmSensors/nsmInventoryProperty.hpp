@@ -131,11 +131,13 @@ inline void
     {
         case MINIMUM_DEVICE_POWER_LIMIT:
             pdi().minPowerWatts(decode_inventory_information_as_uint32(
-                data.data(), data.size()));
+                                    data.data(), data.size()) /
+                                1000);
             break;
         case MAXIMUM_DEVICE_POWER_LIMIT:
             pdi().maxPowerWatts(decode_inventory_information_as_uint32(
-                data.data(), data.size()));
+                                    data.data(), data.size()) /
+                                1000);
             break;
         default:
             throw std::runtime_error("Not implemented PDI");

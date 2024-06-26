@@ -579,11 +579,12 @@ TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsRequest)
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsResponse)
 {
-    uint32_t minPowerWatts = 100;
+    uint32_t minPowerMilliWatts = 20000;
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT);
-    testResponse((uint8_t*)&minPowerWatts, sizeof(minPowerWatts));
-    EXPECT_EQ(chassisPowerLimit.pdi().minPowerWatts(), (size_t)minPowerWatts);
+    testResponse((uint8_t*)&minPowerMilliWatts, sizeof(minPowerMilliWatts));
+    EXPECT_EQ(chassisPowerLimit.pdi().minPowerWatts(),
+              (size_t)minPowerMilliWatts / 1000);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
 {
@@ -593,11 +594,12 @@ TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsResponse)
 {
-    uint32_t maxPowerWatts = 100;
+    uint32_t maxPowerMilliWatts = 100000;
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT);
-    testResponse((uint8_t*)&maxPowerWatts, sizeof(maxPowerWatts));
-    EXPECT_EQ(chassisPowerLimit.pdi().maxPowerWatts(), (size_t)maxPowerWatts);
+    testResponse((uint8_t*)&maxPowerMilliWatts, sizeof(maxPowerMilliWatts));
+    EXPECT_EQ(chassisPowerLimit.pdi().maxPowerWatts(),
+              (size_t)maxPowerMilliWatts / 1000);
 }
 TEST_F(NsmInventoryPropertyTest, badTestRequest)
 {
@@ -799,13 +801,13 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
             0 // data size
         };
         Response response;
-        response.insert(response.end(), fpgaDiagnosticMsgHeader.begin(), fpgaDiagnosticMsgHeader.end());
+        response.insert(response.end(), fpgaDiagnosticMsgHeader.begin(),
+                        fpgaDiagnosticMsgHeader.end());
         response.insert(response.end(), data.begin(), data.end());
         lastResponse = response;
-        return [response, code](
-                   eid_t, Request&,
-                   std::shared_ptr<const nsm_msg>& responseMsg,
-                   size_t& responseLen) -> requester::Coroutine {
+        return [response, code](eid_t, Request&,
+                                std::shared_ptr<const nsm_msg>& responseMsg,
+                                size_t& responseLen) -> requester::Coroutine {
             responseLen = response.size();
             auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
             memcpy((uint8_t*)msg, response.data(), responseLen);
