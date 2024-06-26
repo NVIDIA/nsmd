@@ -73,10 +73,19 @@ double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
         }
         default:
         {
+            lg2::error("NsmPCIeECCGroup1: {NAME}, unknown speed {SPEED}",
+                       "NAME", getName(), "SPEED", speed);
             return 0;
         }
     }
 }
+
+size_t
+    NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(const uint32_t& width)
+{
+    return (width > 0 && width <=6) ? (uint32_t)pow(2, width - 1) : 0;
+}
+
 uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
@@ -93,8 +102,8 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
         portInfoIntf->maxSpeed(convertEncodedSpeedToGbps(data.max_link_speed));
         portInfoIntf->currentSpeed(
             convertEncodedSpeedToGbps(data.negotiated_link_speed));
-        portWidthIntf->width(data.max_link_width);
-        portWidthIntf->activeWidth(data.negotiated_link_width);
+        portWidthIntf->width(convertEncodedWidthToActualWidth(data.max_link_width));
+        portWidthIntf->activeWidth(convertEncodedWidthToActualWidth(data.negotiated_link_width));
     }
     else
     {
