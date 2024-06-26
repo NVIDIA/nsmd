@@ -496,7 +496,7 @@ std::optional<std::vector<uint8_t>>
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
         0b11011111, /*   7 -   0  - Byte 1*/
-        0b10010011, /*  15 -   8  - Byte 2 */
+        0b10011011, /*  15 -   8  - Byte 2 */
         0b00010111, /*  23 -  16  - Byte 3 */
         0b00000000, /*  31 -  24  - Byte 4 */
         0b00000000, /*  39 -  32  - Byte 5 */
@@ -504,7 +504,7 @@ std::optional<std::vector<uint8_t>>
         0b00000000, /*  55 -  48  - Byte 7 */
         0b00000000, /*  63 -  56  - Byte 8 */
         0b10011100, /*  71 -  64  - Byte 9 */
-        0b10001110, /*  79 -  72  - Byte 10 */
+        0b11101110, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
         0b00110011, /* 103 -  96  - Byte 13 */
