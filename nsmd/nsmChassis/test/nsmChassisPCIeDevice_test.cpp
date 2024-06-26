@@ -28,7 +28,6 @@ using namespace ::testing;
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPCIeFunction.hpp"
-#include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 
 namespace nsm
@@ -76,11 +75,19 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
         {"Name", "HGX_GPU_SXM_1"},
         {"Manufacturer", "NVIDIA"},
     };
-    const PropertyValuesCollection association = {
-        {"Forward", "chassis"},
-        {"Backward", "pciedevice"},
-        {"AbsolutePath",
-         "/xyz/openbmc_project/inventory/system/chassis/" + chassisName},
+    const PropertyValuesCollection associations[2] = {
+        {
+            {"Forward", "chassis"},
+            {"Backward", "pciedevice"},
+            {"AbsolutePath",
+             "/xyz/openbmc_project/inventory/system/chassis/" + chassisName},
+        },
+        {
+            {"Forward", "connected_port"},
+            {"Backward", "connected_pciedevice"},
+            {"AbsolutePath",
+             "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
+        },
     };
     const PropertyValuesCollection health = {
         {"Type", "NSM_Health"},
@@ -104,6 +111,7 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
                 "xyz.openbmc_project.NSM",
                 {
                     basicIntfName + ".Associations0",
+                    basicIntfName + ".Associations1",
                 },
             },
         },
@@ -135,9 +143,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
         .WillOnce(Return(get(basic, "Type")))
         .WillOnce(Return(get(basic, "UUID")))
         .WillOnce(Return(get(basic, "DEVICE_UUID")))
-        .WillOnce(Return(get(association, "Forward")))
-        .WillOnce(Return(get(association, "Backward")))
-        .WillOnce(Return(get(association, "AbsolutePath")));
+        .WillOnce(Return(get(associations[0], "Forward")))
+        .WillOnce(Return(get(associations[0], "Backward")))
+        .WillOnce(Return(get(associations[0], "AbsolutePath")))
+        .WillOnce(Return(get(associations[1], "Forward")))
+        .WillOnce(Return(get(associations[1], "Backward")))
+        .WillOnce(Return(get(associations[1], "AbsolutePath")));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
@@ -152,33 +163,34 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(3, gpu.deviceSensors.size());
-    EXPECT_NE(
-        nullptr,
-        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu.deviceSensors[0]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           gpu.deviceSensors[1]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu.deviceSensors[2]));
+    EXPECT_EQ(5, gpu.deviceSensors.size());
 
-    EXPECT_EQ(
-        1,
-        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
-            gpu.deviceSensors[0])
-            ->pdi()
-            .associations()
-            .size());
-    EXPECT_EQ(gpuDeviceUuid,
-              dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                  gpu.deviceSensors[1])
-                  ->pdi()
-                  .uuid());
-    EXPECT_EQ(HealthIntf::HealthType::OK,
-              dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                  gpu.deviceSensors[2])
-                  ->pdi()
-                  .health());
+    auto sensor = 0;
+    auto uuidObject = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+        gpu.deviceSensors[sensor++]);
+    auto associationsObject =
+        dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsIntf>>(
+            gpu.deviceSensors[sensor++]);
+    auto pcieRefClock =
+        dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
+            gpu.deviceSensors[sensor++]);
+    auto nvLinkRefClock =
+        dynamic_pointer_cast<NsmInterfaceProvider<NVLinkRefClockIntf>>(
+            gpu.deviceSensors[sensor++]);
+    auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+        gpu.deviceSensors[sensor++]);
+
+    EXPECT_NE(nullptr, uuidObject);
+    EXPECT_NE(nullptr, associationsObject);
+    EXPECT_NE(nullptr, pcieRefClock);
+    EXPECT_NE(nullptr, nvLinkRefClock);
+    EXPECT_NE(nullptr, healthObject);
+
+    EXPECT_EQ(gpuDeviceUuid, uuidObject->pdi().uuid());
+    EXPECT_EQ(2, associationsObject->pdi().associations().size());
+    EXPECT_EQ(true, pcieRefClock->pdi().pcIeReferenceClockEnabled());
+    EXPECT_EQ(true, nvLinkRefClock->pdi().nvLinkReferenceClockEnabled());
+    EXPECT_EQ(HealthIntf::HealthType::OK, healthObject->pdi().health());
 }
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
@@ -207,23 +219,13 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(pcieDevice, "Priority")));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(ltssmState, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(ltssmState, "DeviceIndex")))
-        .WillOnce(Return(get(ltssmState, "Priority")));
-    nsmChassisPCIeDeviceCreateSensors(mockManager,
-                                      basicIntfName + ".LTSSMState", objPath);
-                                      
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(2, gpu.roundRobinSensors.size());
-    EXPECT_EQ(7, gpu.deviceSensors.size());
+    EXPECT_EQ(1, gpu.roundRobinSensors.size());
+    EXPECT_EQ(6, gpu.deviceSensors.size());
 
     auto sensors = 0;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
@@ -237,7 +239,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
                   gpu.deviceSensors[sensors++])
                   ->pdi()
                   .manufacturer());
-                  
+
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
                            gpu.deviceSensors[sensors]));
     EXPECT_EQ(get<uint64_t>(pcieDevice, "DeviceIndex"),
@@ -256,11 +258,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         auto functionSensor = dynamic_pointer_cast<NsmPCIeFunction>(sensor);
         EXPECT_NE(nullptr, functionSensor);
     }
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLTSSMState>(
-                           gpu.deviceSensors[sensors]));
-    EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
-              dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.deviceSensors[sensors++])
-                  ->deviceIndex);
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
@@ -422,77 +419,6 @@ TEST_F(NsmPCIeFunctionTest, badTestCompletionErrorResponse)
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     nsm_query_scalar_group_telemetry_group_0 data{3, 3, 3, 3};
     auto rc = encode_query_scalar_group_telemetry_v1_group0_resp(
-        instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    struct nsm_query_scalar_group_telemetry_v1_resp* resp =
-        (struct nsm_query_scalar_group_telemetry_v1_resp*)responseMsg->payload;
-    resp->hdr.completion_code = NSM_ERROR;
-    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
-    rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-
-struct NsmPCIeLTSSMStateTest : public NsmPCIeDeviceTest
-{
-    NsmChassisPCIeDevice<LTSSMStateIntf> ltssmDevice{chassisName, name};
-    std::shared_ptr<NsmPCIeLTSSMState> sensor =
-        std::make_shared<NsmPCIeLTSSMState>(ltssmDevice, deviceIndex);
-};
-
-TEST_F(NsmPCIeLTSSMStateTest, goodTestRequest)
-{
-    auto request = sensor->genRequestMsg(eid, instanceId);
-    EXPECT_TRUE(request.has_value());
-    EXPECT_EQ(request.value().size(),
-              sizeof(nsm_msg_hdr) +
-                  sizeof(nsm_query_scalar_group_telemetry_v1_req));
-    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
-    uint8_t groupIndex = 0;
-    uint8_t deviceIndex = 0;
-    auto rc = decode_query_scalar_group_telemetry_v1_req(
-        requestPtr, request.value().size(), &deviceIndex, &groupIndex);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(6, groupIndex);
-    EXPECT_EQ(deviceIndex, deviceIndex);
-}
-TEST_F(NsmPCIeLTSSMStateTest, badTestRequest)
-{
-    auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
-    EXPECT_FALSE(request.has_value());
-}
-TEST_F(NsmPCIeLTSSMStateTest, goodTestResponse)
-{
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_6 data{3, 3};
-    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
-        instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
-}
-TEST_F(NsmPCIeLTSSMStateTest, badTestResponseSize)
-{
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp) - 1);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
-        instanceId, NSM_SUCCESS, ERR_NULL, nullptr, responseMsg);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-    rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
-}
-TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
-{
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_6 data{3, 3};
-    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     struct nsm_query_scalar_group_telemetry_v1_resp* resp =

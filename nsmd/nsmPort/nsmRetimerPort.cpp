@@ -1,6 +1,8 @@
 #include "nsmRetimerPort.hpp"
 
 #include "common/types.hpp"
+#include "nsmInterface.hpp"
+#include "nsmPCIeLTSSMState.hpp"
 #include "nsmProcessor/nsmProcessor.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -275,13 +277,15 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
                 objPath);
             return;
         }
-        nsmDevice->deviceSensors.push_back(pciePortIntfSensor);
+        nsmDevice->addStaticSensor(pciePortIntfSensor);
 
         auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
         auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
                                                            objPath.c_str());
         auto portWidthIntf = std::make_shared<PortWidthIntf>(bus,
                                                              objPath.c_str());
+        auto ltssmStateInft = NsmInterfaceProvider<LTSSMStateIntf>(
+            portName, type, dbus::Interfaces{objPath});
 
         portInfoIntf->protocol(
             PortInfoIntf::convertPortProtocolFromString(portProtocol));
@@ -295,9 +299,11 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
             portName, type, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
             portName, type, pcieECCIntf, deviceIndex);
+        auto ltssmState = std::make_shared<NsmPCIeLTSSMState>(ltssmStateInft,
+                                                              deviceIndex);
 
         if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup2 ||
-            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4)
+            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4 || !ltssmState)
         {
             lg2::error(
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
@@ -305,20 +311,12 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
                 objPath);
             return;
         }
-        if (priority)
-        {
-            nsmDevice->prioritySensors.emplace_back(pcieSensorGroup1);
-            nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup2);
-            nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup3);
-            nsmDevice->prioritySensors.emplace_back(pcieECCIntfSensorGroup4);
-        }
-        else
-        {
-            nsmDevice->roundRobinSensors.emplace_back(pcieSensorGroup1);
-            nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup2);
-            nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup3);
-            nsmDevice->roundRobinSensors.emplace_back(pcieECCIntfSensorGroup4);
-        }
+
+        nsmDevice->addSensor(pcieSensorGroup1, priority);
+        nsmDevice->addSensor(pcieECCIntfSensorGroup2, priority);
+        nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
+        nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
+        nsmDevice->addSensor(ltssmState, priority);
     }
 }
 

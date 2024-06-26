@@ -23,7 +23,6 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPCIeFunction.hpp"
-#include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "utils.hpp"
 
@@ -31,9 +30,8 @@ namespace nsm
 {
 
 template <typename IntfType>
-requester::Coroutine
-    NsmChassisPCIeDevice<IntfType>::update([[maybe_unused]] SensorManager& manager,
-                                 [[maybe_unused]] eid_t eid)
+requester::Coroutine NsmChassisPCIeDevice<IntfType>::update(
+    [[maybe_unused]] SensorManager& manager, [[maybe_unused]] eid_t eid)
 {
     DeviceManager& deviceManager = DeviceManager::getInstance();
     auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
@@ -78,13 +76,25 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         auto associations =
             utils::getAssociations(objPath, baseInterface + ".Associations");
         auto associationsObject =
-            std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsInft>>(
+            std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
                 chassisName, name);
+        auto pcieRefClock =
+            std::make_shared<NsmChassisPCIeDevice<PCIeRefClockIntf>>(
+                chassisName, name);
+        auto nvLinkRefClock =
+            std::make_shared<NsmChassisPCIeDevice<NVLinkRefClockIntf>>(
+                chassisName, name);
+
+        uuidObject->pdi().uuid(deviceUuid);
         associationsObject->pdi().associations(
             utils::getAssociations(associations));
-        device->addStaticSensor(associationsObject);
-        uuidObject->pdi().uuid(deviceUuid);
+        pcieRefClock->pdi().pcIeReferenceClockEnabled(true);
+        nvLinkRefClock->pdi().nvLinkReferenceClockEnabled(true);
+
         device->addStaticSensor(uuidObject);
+        device->addStaticSensor(associationsObject);
+        device->addStaticSensor(pcieRefClock);
+        device->addStaticSensor(nvLinkRefClock);
     }
     else if (type == "NSM_Asset")
     {
@@ -138,26 +148,13 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             device->addStaticSensor(function).update(manager, eid).detach();
         }
     }
-    else if (type == "NSM_LTSSMState")
-    {
-        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceIndex", interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
-        auto ltssmStateObject =
-            NsmChassisPCIeDevice<LTSSMStateIntf>(chassisName, name);
-        device->addSensor(
-            std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
-            priority);
-    }
 }
 
 std::vector<std::string> chassisPCIeDeviceInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Asset",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Health",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisPCIeDeviceCreateSensors,
                                chassisPCIeDeviceInterfaces)

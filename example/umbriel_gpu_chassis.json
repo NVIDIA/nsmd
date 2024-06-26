@@ -173,6 +173,18 @@
                     "Name": "HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
                     "Manufacturer": "NVIDIA"
                 },
+                "Associations": [
+                    {
+                        "Forward": "chassis",
+                        "Backward": "pciedevice",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_GPU_SXM_$INSTANCE_NUMBER + 1"
+                    },
+                    {
+                        "Forward": "connected_port",
+                        "Backward": "connected_pciedevice",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_$INSTANCE_NUMBER/Switches/PCIeRetimer_$INSTANCE_NUMBER/Ports/Down_0"
+                    }
+                ],
                 "Health": {
                     "Type": "NSM_Health",
                     "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
@@ -185,11 +197,6 @@
                     "Functions": [
                         0
                     ]
-                },
-                "LTSSMState": {
-                    "Type": "NSM_LTSSMState",
-                    "DeviceIndex": 0,
-                    "Priority": false
                 }
             },
             {

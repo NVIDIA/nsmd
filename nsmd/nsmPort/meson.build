@@ -1,4 +1,3 @@
-
 sources += [
     '../libnsm/network-ports.c',
     '../libnsm/pci-links.c',
@@ -7,7 +6,8 @@ sources += [
     'nsmPort/nsmFpgaPort.cpp',
     'nsmPort/nsmGpuPciePort.cpp',
     'nsmPort/nsmZone.cpp',
-    'nsmPort/nsmEndpoint.cpp'
+    'nsmPort/nsmEndpoint.cpp',
+    'nsmPort/nsmPCIeLTSSMState.cpp',
 ]
 
 nsmd_headers += ['.', '..']
