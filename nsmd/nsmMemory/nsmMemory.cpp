@@ -516,6 +516,29 @@ static void createNsmMemorySensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
         }
+        else if (type == "NSM_MemCapacityUtil")
+        {
+            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+                objPath.c_str(), "Priority", interface.c_str());
+            auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
+                                                                      type);
+            nsmDevice->deviceSensors.push_back(totalMemorySensor);
+            totalMemorySensor->update(manager, manager.getEid(nsmDevice))
+                .detach();
+            auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
+                bus, name, type, inventoryObjPath, totalMemorySensor);
+            nsmDevice->deviceSensors.push_back(sensor);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.push_back(sensor);
+                nsmDevice->prioritySensors.push_back(totalMemorySensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.push_back(sensor);
+                nsmDevice->roundRobinSensors.push_back(totalMemorySensor);
+            }
+        }
     }
 
     catch (const std::exception& e)
@@ -535,5 +558,8 @@ REGISTER_NSM_CREATION_FUNCTION(
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmMemorySensor,
     "xyz.openbmc_project.Configuration.NSM_Memory.RowRemapping")
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmMemorySensor,
+    "xyz.openbmc_project.Configuration.NSM_Memory.MemCapacityUtil")
 
 } // namespace nsm
