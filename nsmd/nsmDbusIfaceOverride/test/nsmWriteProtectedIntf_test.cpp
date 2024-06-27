@@ -28,7 +28,9 @@ using namespace ::testing;
 
 #include "nsmWriteProtectedIntf.hpp"
 
-struct NsmWriteProtectedIntfTest : public testing::Test
+struct NsmWriteProtectedIntfTest :
+    public testing::Test,
+    public SensorManagerTest
 {
     const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
 
@@ -76,34 +78,10 @@ struct NsmWriteProtectedIntfTest : public testing::Test
         0 // data size
     };
 
-    Response lastResponse;
-    nsm_fpga_diagnostics_settings_wp& data()
+    auto& data()
     {
-        const auto headerSize = fpgaDiagnosticMsgHeader.size();
-        EXPECT_EQ(headerSize + sizeof(nsm_fpga_diagnostics_settings_wp),
-                  lastResponse.size());
-        return *reinterpret_cast<nsm_fpga_diagnostics_settings_wp*>(
-            lastResponse.data() + headerSize);
-    }
-    auto mockSendRecvNsmMsgSync(const Response& responseMsg,
-                                const Response& data = Response(),
-                                nsm_completion_codes code = NSM_SUCCESS)
-    {
-        Response response;
-        response.insert(response.end(), responseMsg.begin(), responseMsg.end());
-        response.insert(response.end(), data.begin(), data.end());
-        lastResponse = response;
-        return [response, code](
-                   eid_t, Request&,
-                   std::shared_ptr<const nsm_msg>& responseMsg,
-                   size_t& responseLen) {
-            responseLen = response.size();
-            auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
-            memcpy((uint8_t*)msg, response.data(), responseLen);
-            responseMsg = std::shared_ptr<const nsm_msg>(
-                msg, [](const nsm_msg* ptr) { free((void*)ptr); });
-            return code;
-        };
+        return SensorManagerTest::data<nsm_fpga_diagnostics_settings_wp>(
+            fpgaDiagnosticMsgHeader.size());
     }
 };
 

@@ -44,3 +44,79 @@ struct MockSensorManager : public SensorManager
     MOCK_METHOD(void, stopPolling, (uuid_t uuid), (override));
     MOCK_METHOD(sdbusplus::asio::object_server&, getObjServer, (), (override));
 };
+
+class SensorManagerTest
+{
+    static void allocMessage(const Response& response,
+                             std::shared_ptr<const nsm_msg>& responseMsg,
+                             size_t& responseLen)
+    {
+        responseLen = response.size();
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), response.data(), responseLen);
+        }
+    }
+    Response joinResponse(const Response& header, const Response& data)
+    {
+        Response response;
+        response.insert(response.end(), header.begin(), header.end());
+        response.insert(response.end(), data.begin(), data.end());
+        return response;
+    }
+
+  protected:
+    Response lastResponse;
+    template <typename DataType>
+    DataType& data(size_t lastResponseOffset)
+    {
+        EXPECT_GE(lastResponse.size(), lastResponseOffset + sizeof(DataType));
+        return *reinterpret_cast<DataType*>(lastResponse.data() +
+                                            lastResponseOffset);
+    }
+    auto mockSendRecvNsmMsgSync(const Response& response,
+                                nsm_completion_codes code = NSM_SUCCESS)
+    {
+        lastResponse = response;
+        return [response, code](eid_t, Request&,
+                                std::shared_ptr<const nsm_msg>& responseMsg,
+                                size_t& responseLen) {
+            allocMessage(response, responseMsg, responseLen);
+            return code;
+        };
+    }
+    auto mockSendRecvNsmMsgSync(const Response& header,
+                                const Response& data,
+                                nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockSendRecvNsmMsgSync(joinResponse(header, data), code);
+    }
+    auto mockSendRecvNsmMsgSync(nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockSendRecvNsmMsgSync(Response(), code);
+    }
+    auto mockSendRecvNsmMsg(const Response& response,
+                            nsm_completion_codes code = NSM_SUCCESS)
+    {
+        lastResponse = response;
+        return [response, code](eid_t, Request&,
+                                std::shared_ptr<const nsm_msg>& responseMsg,
+                                size_t& responseLen) -> requester::Coroutine {
+            allocMessage(response, responseMsg, responseLen);
+            co_return code;
+        };
+    }
+    auto mockSendRecvNsmMsg(const Response& header,
+                            const Response& data,
+                            nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockSendRecvNsmMsg(joinResponse(header, data), code);
+    }
+    auto mockSendRecvNsmMsg(nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockSendRecvNsmMsg(Response(), code);
+    }
+};

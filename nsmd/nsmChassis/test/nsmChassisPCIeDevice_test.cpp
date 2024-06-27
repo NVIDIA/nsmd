@@ -39,7 +39,10 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
 
 using namespace nsm;
 
-struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
+struct NsmChassisPCIeDeviceTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
@@ -98,7 +101,7 @@ struct NsmChassisPCIeDeviceTest : public testing::Test, public utils::DBusTest
         {"DeviceType", "GPU"},
         {"DeviceIndex", uint64_t(1)},
         {"Priority", false},
-        {"Functions", std::vector<uint64_t>{0, 1}},
+        {"Functions", std::vector<uint64_t>{0}},
     };
     const PropertyValuesCollection ltssmState = {
         {"Type", "NSM_LTSSMState"},
@@ -195,11 +198,23 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
+    nsm_query_scalar_group_telemetry_group_0 function0Data{
+        0xDEAD,
+        0x1234,
+        0xFFAB,
+        0x0022,
+    };
+    Response function0Response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp));
+    auto function0Code = (nsm_completion_codes)
+        encode_query_scalar_group_telemetry_v1_group0_resp(
+            instanceId, NSM_SUCCESS, ERR_NULL, &function0Data,
+            reinterpret_cast<nsm_msg*>(function0Response.data()));
+
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(5)
-        .WillRepeatedly(
-            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
-               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
+        .Times(3)
+        .WillRepeatedly(mockSendRecvNsmMsg());
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -208,6 +223,9 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(asset, "Manufacturer")));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(function0Response, function0Code));
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -225,7 +243,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(1, gpu.roundRobinSensors.size());
-    EXPECT_EQ(6, gpu.deviceSensors.size());
+    EXPECT_EQ(5, gpu.deviceSensors.size());
 
     auto sensors = 0;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
@@ -237,9 +255,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     auto pcieDeviceObject =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
             gpu.deviceSensors[sensors++]);
-    auto function0Sensor =
-        dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
-    auto function1Sensor =
+    auto functionSensor =
         dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
     EXPECT_EQ(sensors, gpu.deviceSensors.size());
 
@@ -247,8 +263,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, serialNumber);
     EXPECT_NE(nullptr, model);
     EXPECT_NE(nullptr, pcieDeviceObject);
-    EXPECT_NE(nullptr, function0Sensor);
-    EXPECT_NE(nullptr, function1Sensor);
+    EXPECT_NE(nullptr, functionSensor);
 
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
@@ -259,6 +274,10 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
               pcieDeviceObject->deviceIndex);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
               pcieDeviceObject->pdi().deviceType());
+    EXPECT_EQ("0xDEAD", functionSensor->pdi().function0VendorId());
+    EXPECT_EQ("0x1234", functionSensor->pdi().function0DeviceId());
+    EXPECT_EQ("0xFFAB", functionSensor->pdi().function0SubsystemVendorId());
+    EXPECT_EQ("0x0022", functionSensor->pdi().function0SubsystemId());
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
@@ -387,7 +406,7 @@ TEST_F(NsmPCIeFunctionTest, goodTestResponse)
         sizeof(nsm_msg_hdr) +
         sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_0 data{3, 3, 3, 3};
+    nsm_query_scalar_group_telemetry_group_0 data{10, 3, 0x10, 0xFB0C};
     auto rc = encode_query_scalar_group_telemetry_v1_group0_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -396,6 +415,38 @@ TEST_F(NsmPCIeFunctionTest, goodTestResponse)
         init(i);
         rc = sensor->handleResponseMsg(responseMsg, response.size());
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
+#define EXPECT_EQ_PcieFunction(X)                                              \
+    EXPECT_EQ("0x000A", sensor->pdi().function##X##VendorId());              \
+    EXPECT_EQ("0x0003", sensor->pdi().function##X##DeviceId());              \
+    EXPECT_EQ("0x0010", sensor->pdi().function##X##SubsystemVendorId());     \
+    EXPECT_EQ("0xFB0C", sensor->pdi().function##X##SubsystemId());
+        switch (i)
+        {
+            case 0:
+                EXPECT_EQ_PcieFunction(0);
+                break;
+            case 1:
+                EXPECT_EQ_PcieFunction(1);
+                break;
+            case 2:
+                EXPECT_EQ_PcieFunction(2);
+                break;
+            case 3:
+                EXPECT_EQ_PcieFunction(3);
+                break;
+            case 4:
+                EXPECT_EQ_PcieFunction(4);
+                break;
+            case 5:
+                EXPECT_EQ_PcieFunction(5);
+                break;
+            case 6:
+                EXPECT_EQ_PcieFunction(6);
+                break;
+            case 7:
+                EXPECT_EQ_PcieFunction(7);
+                break;
+        }
     }
 }
 TEST_F(NsmPCIeFunctionTest, badTestResponseSize)
@@ -427,5 +478,9 @@ TEST_F(NsmPCIeFunctionTest, badTestCompletionErrorResponse)
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ("", sensor->pdi().function0VendorId());
+    EXPECT_EQ("", sensor->pdi().function0DeviceId());
+    EXPECT_EQ("", sensor->pdi().function0SubsystemVendorId());
+    EXPECT_EQ("", sensor->pdi().function0SubsystemId());
 }

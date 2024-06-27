@@ -60,29 +60,28 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
-    if (rc)
+
+    auto error = rc != NSM_SUCCESS || cc != NSM_SUCCESS;
+    if (error)
     {
         lg2::error(
             "responseHandler: decode_query_scalar_group_telemetry_v1_group0_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return rc;
     }
-
-    if (cc != NSM_SUCCESS)
-    {
-        memset(&data, 0, sizeof(data));
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group0_resp is not success CC. rc={RC}",
-            "RC", rc);
-    }
+    auto hexFormat = [error](const uint32_t value) -> std::string {
+        if (error)
+            return "";
+        std::string hexStr(6, '\0');
+        sprintf(hexStr.data(), "0x%04X", (uint16_t)value);
+        return hexStr;
+    };
 
 #define pcieFunction(X)                                                        \
-    pdi().function##X##VendorId(std::to_string(data.pci_vendor_id));           \
-    pdi().function##X##DeviceId(std::to_string(data.pci_device_id));           \
+    pdi().function##X##VendorId(hexFormat(data.pci_vendor_id));                \
+    pdi().function##X##DeviceId(hexFormat(data.pci_device_id));                \
     pdi().function##X##SubsystemVendorId(                                      \
-        std::to_string(data.pci_subsystem_vendor_id));                         \
-    pdi().function##X##SubsystemId(                                            \
-        std::to_string(data.pci_subsystem_device_id));
+        hexFormat(data.pci_subsystem_vendor_id));                              \
+    pdi().function##X##SubsystemId(hexFormat(data.pci_subsystem_device_id));
 
     switch (functionId)
     {
@@ -112,7 +111,7 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
             break;
     }
 
-    return cc == NSM_SUCCESS ? NSM_SUCCESS : rc;
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

@@ -762,7 +762,9 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
+struct NsmGpuPresenceAndPowerStatusTest :
+    public NsmChassisTest,
+    public SensorManagerTest
 {
     NsmInterfaceProvider<OperationalStatusIntf> chassisOperationalStatus{
         name, "NSM_OperationalStatus", "/xyz/openbmc_project/dummy"};
@@ -783,47 +785,27 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
         EXPECT_EQ(sensor->gpuInstanceId, gpuInstanceId);
     }
 
-    Response lastResponse;
-    auto mockSendRecvNsmMsg(const Response& data,
-                            nsm_completion_codes code = NSM_SUCCESS)
-    {
-        const Response fpgaDiagnosticMsgHeader{
-            0x10,
-            0xDE,                          // PCI VID: NVIDIA 0x10DE
-            0x00,                          // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-            0x89,                          // OCP_TYPE=8, OCP_VER=9
-            NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
-            NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
-            0,                                 // completion code
-            0,
-            0,
-            1,
-            0 // data size
-        };
-        Response response;
-        response.insert(response.end(), fpgaDiagnosticMsgHeader.begin(),
-                        fpgaDiagnosticMsgHeader.end());
-        response.insert(response.end(), data.begin(), data.end());
-        lastResponse = response;
-        return [response, code](eid_t, Request&,
-                                std::shared_ptr<const nsm_msg>& responseMsg,
-                                size_t& responseLen) -> requester::Coroutine {
-            responseLen = response.size();
-            auto msg = reinterpret_cast<const nsm_msg*>(malloc(responseLen));
-            memcpy((uint8_t*)msg, response.data(), responseLen);
-            responseMsg = std::shared_ptr<const nsm_msg>(
-                msg, [](const nsm_msg* ptr) { free((void*)ptr); });
-            co_return code;
-        };
-    }
+    const Response diagHeader{
+        0x10,
+        0xDE,                              // PCI VID: NVIDIA 0x10DE
+        0x00,                              // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+        0x89,                              // OCP_TYPE=8, OCP_VER=9
+        NSM_TYPE_DEVICE_CONFIGURATION,     // NVIDIA_MSG_TYPE
+        NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+        0,                                 // completion code
+        0,
+        0,
+        1,
+        0 // data size
+    };
     void testResponse(uint8_t presence, uint8_t power_status)
     {
         const Response presenceMsg{presence};
         const Response powerStatusMsg{power_status};
         EXPECT_CALL(mockManager, SendRecvNsmMsg)
             .Times(2)
-            .WillOnce(mockSendRecvNsmMsg(presenceMsg))
-            .WillOnce(mockSendRecvNsmMsg(powerStatusMsg));
+            .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
+            .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg));
         sensor->update(mockManager, eid);
     }
 };
@@ -891,8 +873,8 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
     const Response powerStatusMsg{0};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .Times(2)
-        .WillOnce(mockSendRecvNsmMsg(presenceMsg))
-        .WillOnce(mockSendRecvNsmMsg(powerStatusMsg, NSM_ERROR));
+        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
+        .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg, NSM_ERROR));
     sensor->update(mockManager, eid);
     EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Fault);
 }
