@@ -29,8 +29,10 @@ enum class GPMMetricsUnit : uint8_t
     BANDWIDTH
 };
 
-using GPMMetricsIntf = sdbusplus::com::nvidia::server::GPMMetrics;
-using NVLinkMetricsIntf = sdbusplus::com::nvidia::NVLink::server::NVLinkMetrics;
+using GPMMetricsIntf =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::server::GPMMetrics>;
+using NVLinkMetricsIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::NVLink::server::NVLinkMetrics>;
 
 using DecodeMetricFunc = std::pair<uint8_t, double> (*)(const uint8_t*, size_t);
 
