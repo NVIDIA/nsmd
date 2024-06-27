@@ -20,11 +20,12 @@
 #include "globals.hpp"
 #include "nsmInterface.hpp"
 
+#include <com/nvidia/NVLink/NVLinkRefClock/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
-#include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
@@ -32,15 +33,17 @@ namespace nsm
 {
 
 using namespace sdbusplus::xyz::openbmc_project;
+using namespace sdbusplus::com::nvidia;
 using namespace sdbusplus::server;
 using UuidIntf = object_t<Common::server::UUID>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
-using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
+using NVLinkRefClockIntf = object_t<NVLink::server::NVLinkRefClock>;
+using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
+using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
-using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
 
 template <typename IntfType>
 class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
@@ -53,7 +56,8 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
                                        chassisInventoryBasePath / chassisName /
                                            "PCIeDevices")
     {}
-    virtual requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    virtual requester::Coroutine update(SensorManager& manager,
+                                        eid_t eid) override;
 };
 
 } // namespace nsm

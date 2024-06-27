@@ -59,28 +59,45 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     auto rc = decode_query_scalar_group_telemetry_v1_group6_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
-    if (rc)
-    {
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group6_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return rc;
-    }
 
-    if (cc == NSM_SUCCESS)
+    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
-        pdi().ltssmState(LTSSMStateIntf::State(data.ltssm_state));
+        // Current LTSSM state. The value is encoded as follows:
+        // 0x0 – Detect
+        // 0x1 – Polling
+        // 0x2 – Configuration
+        // 0x3 – Recovery
+        // 0x4 – Recovery.EQ
+        // 0x5 – L0
+        // 0x6 – L0s
+        // 0x7 – L1
+        // 0x8 – L1_PLL_PD
+        // 0x9 – L2
+        // 0xA – L1 CPM
+        // 0xB – L1.1
+        // 0xC – L1.2
+        // 0xD – Hot Reset
+        // 0xE – Loopback
+        // 0xF – Disabled
+        // 0x10 – Link down
+        // 0x11 – Link ready
+        // 0x12 – Lanes in sleep
+        // 0xFF – Illegal state
+
+        LTSSMStateIntf::State state =
+            data.ltssm_state == 0xFF ? LTSSMStateIntf::State::IllegalState
+                                     : LTSSMStateIntf::State(data.ltssm_state);
+        pdi().ltssmState(state);
     }
     else
     {
         pdi().ltssmState(LTSSMStateIntf::State::NA);
         lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group6_resp is not success CC. rc={RC}",
-            "RC", rc);
-        return rc;
+            "responseHandler: decode_query_scalar_group_telemetry_v1_group6_resp failed. rc={RC}, cc={CC}",
+            "RC", rc, "CC", cc);
     }
 
-    return cc;
+    return rc;
 }
 
 } // namespace nsm
