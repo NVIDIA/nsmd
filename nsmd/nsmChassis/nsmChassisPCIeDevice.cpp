@@ -66,7 +66,6 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
-    auto eid = manager.getEid(device);
 
     if (type == "NSM_ChassisPCIeDevice")
     {
@@ -110,9 +109,9 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             assetObject, SERIAL_NUMBER);
         auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             assetObject, MARKETING_NAME);
-        device->addStaticSensor(partNumber).update(manager, eid).detach();
-        device->addStaticSensor(serialNumber).update(manager, eid).detach();
-        device->addStaticSensor(model).update(manager, eid).detach();
+        device->addStaticSensor(partNumber);
+        device->addStaticSensor(serialNumber);
+        device->addStaticSensor(model);
     }
     else if (type == "NSM_Health")
     {
@@ -146,7 +145,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         {
             auto function = std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
                                                               deviceIndex, id);
-            device->addStaticSensor(function).update(manager, eid).detach();
+            device->addStaticSensor(function);
         }
     }
     else if (type == "NSM_LTSSMState")

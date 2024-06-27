@@ -81,13 +81,12 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_FirmwareVersion")
     {
-        auto eid = manager.getEid(device);
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
         auto version = std::make_shared<NsmInventoryProperty<VersionIntf>>(
             firmwareInventoryVersion,
             nsm_inventory_property_identifiers(PCIERETIMER_0_EEPROM_VERSION +
                                                instanceNumber));
-        device->addStaticSensor(version).update(manager, eid).detach();
+        device->addStaticSensor(version);
     }
 }
 

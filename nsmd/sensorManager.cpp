@@ -170,17 +170,22 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
 
             // Set state to starting for NSM Readiness
             NsmServiceReadyIntf::getInstance().setStateStarting();
+
             for (auto nsmDevice : nsmDevices)
             {
+                // Mark all the round-robin sensors as unrefreshed.
                 for (auto sensor : nsmDevice->roundRobinSensors)
                 {
-                    // Mark all the sensors as unrefreshed.
                     sensor->setRefreshed(false);
                 }
+
+                // Re-queue the static sensors for updation.
                 for (auto sensor : nsmDevice->standByToDcRefreshSensors)
                 {
-                    sensor->update(*this, nsmDevice->eid).detach();
+                    sensor->setRefreshed(false);
+                    nsmDevice->roundRobinSensors.push_back(sensor);
                 }
+
                 nsmDevice->isDeviceReady = false;
             }
         }
@@ -365,12 +370,21 @@ requester::Coroutine
                 }
                 break;
             }
+
             auto sensor = nsmDevice->roundRobinSensors.front();
             nsmDevice->roundRobinSensors.pop_front();
-            nsmDevice->roundRobinSensors.push_back(sensor);
             toBeUpdated--;
 
-            co_await sensor->update(*this, eid);
+            auto cc = co_await sensor->update(*this, eid);
+
+            if (!(sensor->isStatic() &&
+                  cc == NSM_SUCCESS)) // Filter out the static sensor as it was
+                                      // succesfully updated.
+            {
+                // Only re-queue non-static sensors or static sensors that
+                // failed to update succesfully.
+                nsmDevice->roundRobinSensors.push_back(sensor);
+            }
 
             if (!sensor->isRefreshed())
             {

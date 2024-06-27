@@ -64,7 +64,6 @@ void nsmChassisCreateSensors(SensorManager& manager,
     auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
-    auto eid = manager.getEid(device);
 
     if (type == "NSM_Chassis")
     {
@@ -113,9 +112,9 @@ void nsmChassisCreateSensors(SensorManager& manager,
             chassisAsset, SERIAL_NUMBER);
         auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             chassisAsset, MARKETING_NAME);
-        device->addStaticSensor(partNumber).update(manager, eid).detach();
-        device->addStaticSensor(serialNumber).update(manager, eid).detach();
-        device->addStaticSensor(model).update(manager, eid).detach();
+        device->addStaticSensor(partNumber);
+        device->addStaticSensor(serialNumber);
+        device->addStaticSensor(model);
     }
     else if (type == "NSM_ChassisType")
     {
@@ -135,9 +134,9 @@ void nsmChassisCreateSensors(SensorManager& manager,
             chassisDimension, PRODUCT_WIDTH);
         auto height = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
             chassisDimension, PRODUCT_HEIGHT);
-        device->addStaticSensor(depth).update(manager, eid).detach();
-        device->addStaticSensor(width).update(manager, eid).detach();
-        device->addStaticSensor(height).update(manager, eid).detach();
+        device->addStaticSensor(depth);
+        device->addStaticSensor(width);
+        device->addStaticSensor(height);
     }
     else if (type == "NSM_Health")
     {
@@ -246,12 +245,8 @@ void nsmChassisCreateSensors(SensorManager& manager,
             settings, deviceType, instanceNumber, false);
         auto writeProtectJumper =
             std::make_shared<NsmWriteProtectedJumper>(settings);
-        device->addStaticSensor(writeProtectControl)
-            .update(manager, eid)
-            .detach();
-        device->addStaticSensor(writeProtectJumper)
-            .update(manager, eid)
-            .detach();
+        device->addStaticSensor(writeProtectControl);
+        device->addStaticSensor(writeProtectJumper);
     }
     else if (type == "NSM_PrettyName")
     {

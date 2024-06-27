@@ -135,9 +135,7 @@ static void createGPUDriverSensor(SensorManager& manager,
     nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
 
     // update sensor
-    nsmDevice->addStaticSensor(sensor)
-        .update(manager, manager.getEid(nsmDevice))
-        .detach();
+    nsmDevice->addStaticSensor(sensor);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

@@ -480,9 +480,7 @@ static void createNsmMemorySensor(SensorManager& manager,
             }
             auto memCapacitySensor =
                 std::make_shared<NsmMemCapacity>(name, type, dimmIntf);
-            nsmDevice->addStaticSensor(memCapacitySensor)
-                .update(manager, manager.getEid(nsmDevice))
-                .detach();
+            nsmDevice->addStaticSensor(memCapacitySensor);
         }
         else if (type == "NSM_RowRemapping")
         {
@@ -530,9 +528,7 @@ static void createNsmMemorySensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);
-            nsmDevice->addStaticSensor(totalMemorySensor)
-                .update(manager, manager.getEid(nsmDevice))
-                .detach();
+            nsmDevice->addStaticSensor(totalMemorySensor);
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
                 bus, name, type, inventoryObjPath, totalMemorySensor);
             nsmDevice->deviceSensors.push_back(sensor);

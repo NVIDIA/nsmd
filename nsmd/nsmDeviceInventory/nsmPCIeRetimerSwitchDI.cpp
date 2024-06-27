@@ -236,9 +236,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
     nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
 
     // update sensor
-    nsmDevice->addStaticSensor(retimerSwitchDi)
-        .update(manager, manager.getEid(nsmDevice))
-        .detach();
+    nsmDevice->addStaticSensor(retimerSwitchDi);
 
     auto retimerSwitchRefClock =
         std::make_shared<NsmPCIeRetimerSwitchGetClockState>(
