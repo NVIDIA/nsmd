@@ -228,36 +228,37 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(6, gpu.deviceSensors.size());
 
     auto sensors = 0;
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[sensors]));
+    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto serialNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto model = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto pcieDeviceObject =
+        dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+            gpu.deviceSensors[sensors++]);
+    auto function0Sensor =
+        dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
+    auto function1Sensor =
+        dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
+    EXPECT_EQ(sensors, gpu.deviceSensors.size());
+
+    EXPECT_NE(nullptr, partNumber);
+    EXPECT_NE(nullptr, serialNumber);
+    EXPECT_NE(nullptr, model);
+    EXPECT_NE(nullptr, pcieDeviceObject);
+    EXPECT_NE(nullptr, function0Sensor);
+    EXPECT_NE(nullptr, function1Sensor);
+
+    EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
+    EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
+    EXPECT_EQ(MARKETING_NAME, model->property);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                  gpu.deviceSensors[sensors++])
-                  ->pdi()
-                  .manufacturer());
-
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                           gpu.deviceSensors[sensors]));
+              model->pdi().manufacturer());
     EXPECT_EQ(get<uint64_t>(pcieDevice, "DeviceIndex"),
-              dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                  gpu.deviceSensors[sensors])
-                  ->deviceIndex);
+              pcieDeviceObject->deviceIndex);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
-              dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                  gpu.deviceSensors[sensors++])
-                  ->pdi()
-                  .deviceType());
-
-    for (int i = 0; i < 2; i++)
-    {
-        auto& sensor = gpu.deviceSensors[sensors++];
-        auto functionSensor = dynamic_pointer_cast<NsmPCIeFunction>(sensor);
-        EXPECT_NE(nullptr, functionSensor);
-    }
+              pcieDeviceObject->pdi().deviceType());
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
