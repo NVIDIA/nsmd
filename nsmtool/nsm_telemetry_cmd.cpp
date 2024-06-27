@@ -2309,10 +2309,10 @@ class GetProcessorThrottleReason : public CommandInterface
         ordered_json result;
         result["Completion Code"] = cc;
         std::vector<std::string> throttleReasons;
-        if (flags.bits.bit1)
+        if (flags.bits.bit0)
         {
             throttleReasons.push_back(
-                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.ClockOptimizedForPower");
+                "xyz.openbmc_project.State.ProcessorPerformance.ThrottleReasons.SWPowerCap");
         }
         if (flags.bits.bit1)
         {

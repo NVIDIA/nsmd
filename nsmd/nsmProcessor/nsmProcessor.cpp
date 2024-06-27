@@ -1255,7 +1255,7 @@ void NsmProcessorThrottleReason::updateReading(bitfield32_t flags)
 
     if (flags.bits.bit0)
     {
-        throttleReasons.push_back(ThrottleReasons::ClockOptimizedForPower);
+        throttleReasons.push_back(ThrottleReasons::SWPowerCap);
     }
     if (flags.bits.bit1)
     {
