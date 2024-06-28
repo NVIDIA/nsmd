@@ -86,7 +86,7 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     EXPECT_EQ(0, baseboard.prioritySensors.size());
     EXPECT_EQ(1, baseboard.roundRobinSensors.size());
     EXPECT_EQ(2, baseboard.deviceSensors.size());
-    
+
     auto sensors = 0;
     auto sensor = dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
         baseboard.deviceSensors[sensors++]);
@@ -200,5 +200,5 @@ TEST_F(NsmPCIeSlotTest, badTestCompletionErrorResponse)
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_ERROR);
 }

@@ -57,15 +57,8 @@ uint8_t
 
     auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
-    if (rc)
-    {
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return rc;
-    }
 
-    if (cc == NSM_SUCCESS)
+    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         handleResponse(data);
     }
@@ -75,12 +68,26 @@ uint8_t
         handleResponse(data);
 
         lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp is not success CC. rc={RC}",
-            "RC", rc);
-        return rc;
+            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     }
 
-    return cc;
+    return cc ? cc : rc;
+}
+
+PCIeSlotIntf::Generations NsmPCIeLinkSpeedBase::generation(uint32_t value)
+{
+    return (value == 0) || (value > 5) ? PCIeSlotIntf::Generations::Unknown
+                                       : PCIeSlotIntf::Generations(value - 1);
+}
+PCIeDeviceIntf::PCIeTypes NsmPCIeLinkSpeedBase::pcieType(uint32_t value)
+{
+    return (value == 0) || (value > 5) ? PCIeDeviceIntf::PCIeTypes::Unknown
+                                       : PCIeDeviceIntf::PCIeTypes(value - 1);
+};
+uint32_t NsmPCIeLinkSpeedBase::linkWidth(uint32_t value)
+{
+    return (value > 0) ? (uint32_t)pow(2, value - 1) : 0;
 }
 
 } // namespace nsm

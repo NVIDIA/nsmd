@@ -104,7 +104,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         assetObject.pdi().manufacturer(manufacturer);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            assetObject, BOARD_PART_NUMBER);
+            assetObject, DEVICE_PART_NUMBER);
         auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             assetObject, SERIAL_NUMBER);
         auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(

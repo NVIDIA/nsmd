@@ -46,6 +46,10 @@ class NsmPCIeLinkSpeedBase : public NsmSensor
     virtual void handleResponse(
         const nsm_query_scalar_group_telemetry_group_1& data) = 0;
     const uint8_t deviceIndex;
+
+    static PCIeSlotIntf::Generations generation(uint32_t value);
+    static PCIeDeviceIntf::PCIeTypes pcieType(uint32_t value);
+    static uint32_t linkWidth(uint32_t value);
 };
 
 template <typename IntfType>
@@ -70,31 +74,19 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    auto pcieType = [](uint32_t value) -> PCIeDeviceIntf::PCIeTypes {
-        return value == 0 ? PCIeDeviceIntf::PCIeTypes::Unknown
-                          : PCIeDeviceIntf::PCIeTypes(value - 1);
-    };
-    auto generationInUse = [](uint32_t value) -> PCIeSlotIntf::Generations {
-        return value == 0 ? PCIeSlotIntf::Generations::Unknown
-                          : PCIeSlotIntf::Generations(value - 1);
-    };
     pdi().pcIeType(pcieType(data.negotiated_link_speed));
-    pdi().generationInUse(generationInUse(data.negotiated_link_speed));
+    pdi().generationInUse(generation(data.negotiated_link_speed));
     pdi().maxPCIeType(pcieType(data.max_link_speed));
-    pdi().lanesInUse(data.negotiated_link_width);
-    pdi().maxLanes(data.max_link_width);
+    pdi().lanesInUse(linkWidth(data.negotiated_link_width));
+    pdi().maxLanes(linkWidth(data.max_link_width));
 }
 
 template <>
 inline void NsmPCIeLinkSpeed<PCIeSlotIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    auto generation = [](uint32_t value) -> PCIeSlotIntf::Generations {
-        return value == 0 ? PCIeSlotIntf::Generations::Unknown
-                          : PCIeSlotIntf::Generations(value - 1);
-    };
     pdi().generation(generation(data.negotiated_link_speed));
-    pdi().lanes(data.negotiated_link_width);
+    pdi().lanes(linkWidth(data.negotiated_link_width));
 }
 
 } // namespace nsm
