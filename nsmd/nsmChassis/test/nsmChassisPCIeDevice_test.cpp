@@ -329,12 +329,17 @@ TEST_F(NsmPCIeDeviceTest, goodTestResponse)
         sizeof(nsm_msg_hdr) +
         sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_1 data{3, 3, 3, 3, 3};
+    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2};
     auto rc = encode_query_scalar_group_telemetry_v1_group1_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen4, sensor->pdi().pcIeType());
+    EXPECT_EQ(PCIeSlotIntf::Generations::Gen4, sensor->pdi().generationInUse());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen5, sensor->pdi().maxPCIeType());
+    EXPECT_EQ(1, sensor->pdi().lanesInUse());
+    EXPECT_EQ(2, sensor->pdi().maxLanes());
 }
 TEST_F(NsmPCIeDeviceTest, badTestResponseSize)
 {
@@ -354,7 +359,7 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
         sizeof(nsm_msg_hdr) +
         sizeof(nsm_query_scalar_group_telemetry_v1_group_1_resp));
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    nsm_query_scalar_group_telemetry_group_1 data{3, 3, 3, 3, 3};
+    nsm_query_scalar_group_telemetry_group_1 data{4, 1, 3, 5, 2};
     auto rc = encode_query_scalar_group_telemetry_v1_group1_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -363,7 +368,13 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Unknown, sensor->pdi().pcIeType());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Unknown, sensor->pdi().maxPCIeType());
+    EXPECT_EQ(PCIeSlotIntf::Generations::Unknown,
+              sensor->pdi().generationInUse());
+    EXPECT_EQ(0, sensor->pdi().lanesInUse());
+    EXPECT_EQ(0, sensor->pdi().maxLanes());
 }
 
 struct NsmPCIeFunctionTest : public NsmPCIeDeviceTest
@@ -416,9 +427,9 @@ TEST_F(NsmPCIeFunctionTest, goodTestResponse)
         rc = sensor->handleResponseMsg(responseMsg, response.size());
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
 #define EXPECT_EQ_PcieFunction(X)                                              \
-    EXPECT_EQ("0x000A", sensor->pdi().function##X##VendorId());              \
-    EXPECT_EQ("0x0003", sensor->pdi().function##X##DeviceId());              \
-    EXPECT_EQ("0x0010", sensor->pdi().function##X##SubsystemVendorId());     \
+    EXPECT_EQ("0x000A", sensor->pdi().function##X##VendorId());                \
+    EXPECT_EQ("0x0003", sensor->pdi().function##X##DeviceId());                \
+    EXPECT_EQ("0x0010", sensor->pdi().function##X##SubsystemVendorId());       \
     EXPECT_EQ("0xFB0C", sensor->pdi().function##X##SubsystemId());
         switch (i)
         {
@@ -483,4 +494,26 @@ TEST_F(NsmPCIeFunctionTest, badTestCompletionErrorResponse)
     EXPECT_EQ("", sensor->pdi().function0DeviceId());
     EXPECT_EQ("", sensor->pdi().function0SubsystemVendorId());
     EXPECT_EQ("", sensor->pdi().function0SubsystemId());
+}
+TEST(NsmPCIeLinkSpeedTest, testGenerationTypeConvertion)
+{
+    using GenType = PCIeSlotIntf::Generations;
+    EXPECT_EQ(GenType::Unknown, NsmPCIeLinkSpeedBase::generation(0));
+    EXPECT_EQ(GenType::Gen1, NsmPCIeLinkSpeedBase::generation(1));
+    EXPECT_EQ(GenType::Gen2, NsmPCIeLinkSpeedBase::generation(2));
+    EXPECT_EQ(GenType::Gen3, NsmPCIeLinkSpeedBase::generation(3));
+    EXPECT_EQ(GenType::Gen4, NsmPCIeLinkSpeedBase::generation(4));
+    EXPECT_EQ(GenType::Gen5, NsmPCIeLinkSpeedBase::generation(5));
+    EXPECT_EQ(GenType::Unknown, NsmPCIeLinkSpeedBase::generation(6));
+}
+TEST(NsmPCIeLinkSpeedTest, testPcieTypeConvertion)
+{
+    using PCIeType = PCIeDeviceIntf::PCIeTypes;
+    EXPECT_EQ(PCIeType::Unknown, NsmPCIeLinkSpeedBase::pcieType(0));
+    EXPECT_EQ(PCIeType::Gen1, NsmPCIeLinkSpeedBase::pcieType(1));
+    EXPECT_EQ(PCIeType::Gen2, NsmPCIeLinkSpeedBase::pcieType(2));
+    EXPECT_EQ(PCIeType::Gen3, NsmPCIeLinkSpeedBase::pcieType(3));
+    EXPECT_EQ(PCIeType::Gen4, NsmPCIeLinkSpeedBase::pcieType(4));
+    EXPECT_EQ(PCIeType::Gen5, NsmPCIeLinkSpeedBase::pcieType(5));
+    EXPECT_EQ(PCIeType::Unknown, NsmPCIeLinkSpeedBase::pcieType(6));
 }
