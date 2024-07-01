@@ -24,8 +24,6 @@
 
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
 
-#include <functional>
-
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;

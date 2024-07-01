@@ -640,6 +640,19 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 
 int decode_common_req(const struct nsm_msg *msg, size_t msg_len);
 
+/** @brief Encode a Common response message
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] nvidia_msg_type - NVIDIA message type
+ *  @param[in] command - command identifier
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+		       uint8_t nvidia_msg_type, uint8_t command,
+		       struct nsm_msg *msg);
+
 /** @brief Decode a Common response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message

@@ -20,17 +20,18 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-TEST(getFpgaDiagnosticsSettings, testGoodEncodeRequest)
+void testGetFpgaDiagnosticSettingsEncodeRequest(
+    fpga_diagnostics_settings_data_index dataIndex)
 {
+
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) +
 	    sizeof(nsm_get_fpga_diagnostics_settings_req));
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
-	fpga_diagnostics_settings_data_index data_index = GET_WP_SETTINGS;
 
 	auto rc =
-	    encode_get_fpga_diagnostics_settings_req(0, data_index, request);
+	    encode_get_fpga_diagnostics_settings_req(0, dataIndex, request);
 
 	struct nsm_get_fpga_diagnostics_settings_req *req =
 	    (struct nsm_get_fpga_diagnostics_settings_req *)request->payload;
@@ -43,10 +44,10 @@ TEST(getFpgaDiagnosticsSettings, testGoodEncodeRequest)
 
 	EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, req->hdr.command);
 	EXPECT_EQ(sizeof(uint8_t), req->hdr.data_size);
-	EXPECT_EQ(data_index, req->data_index);
+	EXPECT_EQ(dataIndex, req->data_index);
 }
-
-TEST(getFpgaDiagnosticsSettings, testGoodDecodeRequest)
+void testGetFpgaDiagnosticSettingsEncodeResponse(
+    fpga_diagnostics_settings_data_index expectedDataIndex)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
@@ -56,19 +57,31 @@ TEST(getFpgaDiagnosticsSettings, testGoodDecodeRequest)
 	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
 	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
 	    1,				       // data size
-	    0				       // data_index
+	    (uint8_t)expectedDataIndex	       // data_index
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
 	size_t msg_len = requestMsg.size();
 
-	fpga_diagnostics_settings_data_index data_index;
+	fpga_diagnostics_settings_data_index dataIndex;
 	auto rc = decode_get_fpga_diagnostics_settings_req(request, msg_len,
-							   &data_index);
+							   &dataIndex);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(0, data_index);
+	EXPECT_EQ(expectedDataIndex, dataIndex);
+}
+
+TEST(getFpgaDiagnosticsSettings, testRequests)
+{
+	for (auto di = (uint8_t)GET_WP_SETTINGS;
+	     di < (uint8_t)GET_GPU_POWER_STATUS; di++) {
+		auto dataIndex = fpga_diagnostics_settings_data_index(di);
+		testGetFpgaDiagnosticSettingsEncodeRequest(dataIndex);
+		testGetFpgaDiagnosticSettingsEncodeResponse(dataIndex);
+	}
+	testGetFpgaDiagnosticSettingsEncodeRequest(GET_AGGREGATE_TELEMETRY);
+	testGetFpgaDiagnosticSettingsEncodeResponse(GET_AGGREGATE_TELEMETRY);
 }
 
 TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodEncodeResponse)
@@ -622,5 +635,255 @@ TEST(getGpusPowerStatus, testBadDecodeResponse)
 
 	rc = decode_get_gpu_power_status_resp(response, msg_len, &cc,
 					      &reason_code, &status);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(getFpgaDiagnosticsSettingsGpuIstMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_ist_mode_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	uint8_t data = 0b01111001;
+	uint8_t data_test = data;
+
+	auto rc = encode_get_gpu_ist_mode_resp(0, NSM_SUCCESS, reason_code,
+					       data, response);
+
+	auto resp = reinterpret_cast<nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->command);
+	EXPECT_EQ(sizeof(uint8_t), le16toh(resp->data_size));
+	EXPECT_EQ(data_test, data);
+}
+
+TEST(getFpgaDiagnosticsSettingsGpuIstMode, testGoodDecodeResponse)
+{
+	uint8_t data = 0x01;
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    1,
+	    0, // data size
+	    data,
+	};
+	auto data_test = data;
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc = decode_get_gpu_ist_mode_resp(response, msg_len, &cc,
+					       &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_test, data);
+}
+
+TEST(getFpgaDiagnosticsSettingsGpuIstMode, testBadDecodeResponse)
+{
+	uint8_t data = 0;
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, // command
+	    0,				       // completion code
+	    0,
+	    0,
+	    0, // incorrect data size
+	    0, // data size
+	    data,
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_get_gpu_ist_mode_resp(NULL, msg_len, &cc, &reason_code,
+					       &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_ist_mode_resp(response, msg_len, NULL, &reason_code,
+					  &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_ist_mode_resp(response, msg_len, &cc, &reason_code,
+					  NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_gpu_ist_mode_resp(response, msg_len - 1, &cc,
+					  &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_gpu_ist_mode_resp(response, msg_len, &cc, &reason_code,
+					  &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(enableDisableGpuIstMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_gpu_ist_mode_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t device_index = ALL_GPUS_DEVICE_INDEX;
+	uint8_t value = 0;
+
+	auto rc = encode_enable_disable_gpu_ist_mode_req(0, device_index, value,
+							 request);
+
+	auto req = reinterpret_cast<nsm_enable_disable_gpu_ist_mode_req *>(
+	    request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_ENABLE_DISABLE_GPU_IST_MODE, req->hdr.command);
+	EXPECT_EQ(2, req->hdr.data_size);
+	EXPECT_EQ(device_index, req->device_index);
+	EXPECT_EQ(value, req->value);
+}
+
+TEST(enableDisableGpuIstMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION,   // NVIDIA_MSG_TYPE
+	    NSM_ENABLE_DISABLE_GPU_IST_MODE, // command
+	    2,				     // data size
+	    0,				     // device_index
+	    1,				     // set
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	size_t msg_len = requestMsg.size();
+
+	uint8_t device_index;
+	uint8_t value;
+	auto rc = decode_enable_disable_gpu_ist_mode_req(request, msg_len,
+							 &device_index, &value);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, device_index);
+	EXPECT_EQ(1, value);
+}
+
+TEST(enableDisableGpuIstMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_enable_disable_gpu_ist_mode_resp(
+	    0, NSM_SUCCESS, reason_code, response);
+
+	auto resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_ENABLE_DISABLE_GPU_IST_MODE, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(enableDisableGpuIstMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION,   // NVIDIA_MSG_TYPE
+	    NSM_ENABLE_DISABLE_GPU_IST_MODE, // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    0,
+	    0 // data size
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len,
+							  &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+}
+
+TEST(enableDisableGpuIstMode, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION,   // NVIDIA_MSG_TYPE
+	    NSM_ENABLE_DISABLE_GPU_IST_MODE, // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    1, // incorrect data size
+	    0, // data size
+	    0, // invalid data byte
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_enable_disable_gpu_ist_mode_resp(NULL, msg_len, &cc,
+							  &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len, NULL,
+						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len, &cc,
+						     NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len, &cc,
+						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len - 1, &cc,
+						     &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

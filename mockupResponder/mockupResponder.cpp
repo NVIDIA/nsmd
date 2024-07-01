@@ -45,8 +45,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
     event(event), verbose(verbose), server(server), eventReceiverEid(0),
-    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
-    writeProtected()
+    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE), state()
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
     iface = server.add_interface(path, "xyz.openbmc_project.NSM.Device");
@@ -400,10 +399,11 @@ std::optional<std::vector<uint8_t>>
         case NSM_TYPE_DEVICE_CONFIGURATION:
             switch (command)
             {
+                case NSM_ENABLE_DISABLE_GPU_IST_MODE:
+                    return enableDisableGpuIstModeHandler(request, requestLen);
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
                     return getFpgaDiagnosticsSettingsHandler(request,
                                                              requestLen);
-                    break;
                 default:
                     lg2::error("unsupported Command:{CMD} request length={LEN}",
                                "CMD", command, "LEN", requestLen);
@@ -492,7 +492,7 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
     // this is to mock that
-    // 0,1,2,3,4,6,7,9,15,16,17,18,20,C[12],42[66],43[67],61[97],64[100],65[101],6A[106]
+    // 0,1,2,3,4,6,7,9,15,16,17,18,20,C[12],42[66],43[67],61[97],62[98],64[100],65[101],6A[106]
     // commandCodes are supported
     bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
         0b11011111, /*   7 -   0  - Byte 1*/
@@ -507,7 +507,7 @@ std::optional<std::vector<uint8_t>>
         0b11101110, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
-        0b00110011, /* 103 -  96  - Byte 13 */
+        0b00110111, /* 103 -  96  - Byte 13 */
         0b00000100, /* 111 - 104  - Byte 14 */
         0b00000000, /* 119 - 112  - Byte 15 */
         0b00010000, /* 127 - 120  - Byte 16 */
@@ -2477,7 +2477,7 @@ std::optional<std::vector<uint8_t>>
             uint16_t reason_code = ERR_NULL;
             rc = encode_get_fpga_diagnostics_settings_wp_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-                &writeProtected, responseMsg);
+                &state.writeProtected, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -2572,6 +2572,26 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
+        case GET_GPU_IST_MODE_SETTINGS:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) + sizeof(nsm_get_gpu_ist_mode_resp), 0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_get_gpu_ist_mode_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              state.istMode, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "getFpgaDiagnosticsSettingsHandler: encode_get_gpu_ist_mode_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
         default:
             break;
     }
@@ -2595,6 +2615,7 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
+    auto& writeProtected = state.writeProtected;
     switch (data_index)
     {
         case BASEBOARD_FRU_EEPROM:
@@ -2677,8 +2698,8 @@ std::optional<std::vector<uint8_t>>
                 "enableDisableWriteProtectedHandler: Invalid Data Index");
             break;
     }
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_resp), 0);
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
     rc = encode_enable_disable_wp_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
@@ -2878,6 +2899,55 @@ std::optional<std::vector<uint8_t>>
 
     assert(rc == NSM_SW_SUCCESS);
 
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    lg2::info("enableDisableGpuIstModeHandler: request length={LEN}", "LEN",
+              requestLen);
+    uint8_t device_index;
+    uint8_t value = 0;
+    [[maybe_unused]] auto rc = decode_enable_disable_gpu_ist_mode_req(
+        requestMsg, requestLen, &device_index, &value);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableGpuIstModeHandler: decode_enable_disable_gpu_ist_mode_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    auto& istMode = state.istMode;
+    if (device_index < 8)
+    {
+        istMode = value ? (istMode | (1 << device_index))
+                        : (istMode & (0 << device_index));
+    }
+    else if (device_index == ALL_GPUS_DEVICE_INDEX)
+    {
+        istMode = value ? 0b11111111 : 0b00000000;
+    }
+    else
+    {
+        lg2::error("enableDisableGpuIstModeHandler: Invalid Device Index");
+    }
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_enable_disable_gpu_ist_mode_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableGpuIstModeHandler: encode_enable_disable_gpu_ist_mode_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
     return response;
 }
 

@@ -48,6 +48,82 @@ std::vector<std::unique_ptr<CommandInterface>> commands;
 
 } // namespace
 
+class EnableDisableGpuIstMode : public CommandInterface
+{
+  public:
+    ~EnableDisableGpuIstMode() = default;
+    EnableDisableGpuIstMode() = delete;
+    EnableDisableGpuIstMode(const EnableDisableGpuIstMode&) = delete;
+    EnableDisableGpuIstMode(EnableDisableGpuIstMode&&) = default;
+    EnableDisableGpuIstMode& operator=(const EnableDisableGpuIstMode&) = delete;
+    EnableDisableGpuIstMode& operator=(EnableDisableGpuIstMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit EnableDisableGpuIstMode(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto istModeGroup = app->add_option_group(
+            "Required",
+            "Device Index and Value for which GPU IST Mode will be set.");
+
+        deviceIndex = 0;
+        istModeGroup->add_option(
+            "-d, --deviceIndex", deviceIndex,
+            "Device GPU IST Mode: 0-7: select GPU, 10 all GPUs");
+        value = 0;
+        istModeGroup->add_option("-V, --value", value,
+                                 "Disable - 0 / Enable - 1");
+        istModeGroup->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_gpu_ist_mode_req));
+        int rc = NSM_SW_ERROR;
+        if (deviceIndex < 8 || deviceIndex == ALL_GPUS_DEVICE_INDEX)
+        {
+            auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+            rc = encode_enable_disable_gpu_ist_mode_req(instanceId, deviceIndex,
+                                                        value, request);
+        }
+        else
+        {
+            std::cerr << "Invalid Device Index \n";
+        }
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_enable_disable_gpu_ist_mode_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t deviceIndex;
+    uint8_t value;
+};
 class GetFpgaDiagnosticsSettings : public CommandInterface
 {
   public:
@@ -259,6 +335,31 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
+            case GET_GPU_IST_MODE_SETTINGS:
+            {
+                uint8_t data;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_get_gpu_ist_mode_resp(
+                    responsePtr, payloadLength, &cc, &reason_code, &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << ", cc=" << (int)cc
+                              << ", reasonCode=" << (int)reason_code << "\n"
+                              << payloadLength << "...."
+                              << (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_gpu_ist_mode_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["GPUs IST Mode Settings"] = (int)data;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
             default:
             {
                 std::cerr << "Invalid Data Id \n";
@@ -282,6 +383,12 @@ void registerCommand(CLI::App& app)
         "retrieve FPGA Diagnostics Settings for data index ");
     commands.push_back(std::make_unique<GetFpgaDiagnosticsSettings>(
         "config", "GetFpgaDiagnosticsSettings", getFpgaDiagnosticsSettings));
+
+    auto enableDisableGpuIstMode = config->add_subcommand(
+        "EnableDisableGpuIstMode",
+        "Enable/Disable GPUs IST Mode Settings for device index ");
+    commands.push_back(std::make_unique<EnableDisableGpuIstMode>(
+        "config", "EnableDisableGpuIstMode", enableDisableGpuIstMode));
 }
 
 } // namespace config

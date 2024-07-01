@@ -66,14 +66,6 @@ struct nsm_enable_disable_wp_req {
 	uint8_t value; // 0 - disable, 1 - enable
 } __attribute__((packed));
 
-/** @struct nsm_enable_disable_wp_resp
- *
- *  Structure representing Diagnostics Enable/Disable WP response.
- */
-struct nsm_enable_disable_wp_resp {
-	struct nsm_common_resp hdr;
-} __attribute__((packed));
-
 /** @brief Encode a Diagnostics Enable/Disable WP request message
  *
  *  @param[in] instance_id - NSM instance ID
