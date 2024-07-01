@@ -3,6 +3,7 @@
 #include "platform-environmental.h"
 
 #include "interfaceWrapper.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 
@@ -34,8 +35,8 @@ void NsmMemoryErrorCorrection::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType eccValue{
         static_cast<uint16_t>(dimmIntf->ecc())};
     std::string propName = "ECC";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, eccValue);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData, eccValue);
 #endif
 }
 
@@ -59,8 +60,8 @@ void NsmMemoryDeviceType::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType memoryTypeValue{
         dimmIntf->convertDeviceTypeToString(dimmIntf->memoryType())};
     std::string propName = "MemoryType";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, memoryTypeValue);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, memoryTypeValue);
 #endif
 }
 
@@ -75,16 +76,6 @@ NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
         std::make_unique<LocationIntfMemory>(bus, inventoryObjPath.c_str());
 
     locationIntf->locationType(LocationTypesMemory::Embedded);
-    // #ifdef NVIDIA_SHMEM
-    //     auto ifaceName = std::string(locationIntf->interface);
-    //     std::vector<uint8_t> smbusData = {};
-
-    //     nv::sensor_aggregation::DbusVariantType memoryTypeValue{
-    //         locationIntf->locationType()};
-    //     std::string propName = "LocationType";
-    //     updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-    //                                 smbusData, memoryTypeValue);
-    // #endif
 }
 
 NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
@@ -138,14 +129,16 @@ void NsmRowRemapState::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType rowRemappingFailureStateVal{
         memoryRowRemappingStateIntf->rowRemappingFailureState()};
     std::string propName = "RowRemappingFailureState";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, rowRemappingFailureStateVal);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 rowRemappingFailureStateVal);
 
     nv::sensor_aggregation::DbusVariantType rowRemappingPendingStateVal{
         memoryRowRemappingStateIntf->rowRemappingPendingState()};
     propName = "RowRemappingPendingState";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, rowRemappingPendingStateVal);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 rowRemappingPendingStateVal);
 #endif
 }
 
@@ -222,14 +215,14 @@ void NsmRowRemappingCounts::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ceRowRemappingCount{
         memoryRowRemappingCountsIntf->ceRowRemappingCount()};
     std::string propName = "ceRowRemappingCount";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, ceRowRemappingCount);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, ceRowRemappingCount);
 
     propName = "ueRowRemappingCount";
     nv::sensor_aggregation::DbusVariantType ueRowRemappingCount{
         memoryRowRemappingCountsIntf->ueRowRemappingCount()};
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, ueRowRemappingCount);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, ueRowRemappingCount);
 #endif
 }
 
@@ -306,13 +299,13 @@ void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
     std::string propName = "ceCount";
     nv::sensor_aggregation::DbusVariantType ceCount{
         static_cast<int64_t>(eccIntf->ceCount())};
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, ceCount);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData, ceCount);
     propName = "ueCount";
     nv::sensor_aggregation::DbusVariantType ueCount{
         static_cast<int64_t>(eccIntf->ueCount())};
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, ueCount);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData, ueCount);
 #endif
 }
 
@@ -387,8 +380,8 @@ void NsmClockLimitMemory::updateMetricOnSharedMemory()
         dimmIntf->allowedSpeedsMT()};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "AllowedSpeedsMT";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, valueVariant);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
 }
 void NsmClockLimitMemory::updateReading(
@@ -467,8 +460,8 @@ void NsmMemCurrClockFreq::updateMetricOnSharedMemory()
         dimmIntf->memoryConfiguredSpeedInMhz()};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "MemoryConfiguredSpeedInMhz";
-    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
-                                smbusData, valueVariant);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
 }
 

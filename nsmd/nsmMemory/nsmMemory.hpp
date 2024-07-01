@@ -3,6 +3,7 @@
 #include "platform-environmental.h"
 
 #include "nsmCommon/nsmCommon.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmSensor.hpp"
 
 #include <com/nvidia/MemoryRowRemapping/server.hpp>
@@ -27,7 +28,7 @@ class NsmMemoryErrorCorrection : public NsmObject
                              std::shared_ptr<DimmIntf> dimmIntf,
                              std::string& correctionType,
                              std::string& inventoryObjPath);
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;
@@ -42,7 +43,7 @@ class NsmMemoryDeviceType : public NsmObject
     NsmMemoryDeviceType(std::string& name, std::string& type,
                         std::shared_ptr<DimmIntf> dimmIntf,
                         std::string& memoryType, std::string& inventoryObjPath);
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;
@@ -109,7 +110,7 @@ class NsmRowRemapState : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(bitfield8_t flags);
@@ -127,7 +128,7 @@ class NsmRowRemappingCounts : public NsmSensor
         std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
         std::string& inventoryObjPath);
     NsmRowRemappingCounts() = default;
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -159,7 +160,7 @@ class NsmEccErrorCountsDram : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(struct nsm_ECC_error_counts);
@@ -180,7 +181,7 @@ class NsmClockLimitMemory : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(const struct nsm_clock_limit&);
@@ -199,7 +200,7 @@ class NsmMemCurrClockFreq : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    void updateMetricOnSharedMemory();
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(const uint32_t& clockFreq);
