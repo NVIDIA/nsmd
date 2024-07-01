@@ -74,13 +74,12 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
             name, baseType);
         auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", interface.c_str());
-        auto eid = manager.getEid(device);
 
         // initial value update
         chassisUuid->pdi().uuid(uuid);
 
         // add sensor
-        device->addStaticSensor(chassisUuid).update(manager, eid).detach();
+        device->addStaticSensor(chassisUuid);
     }
     else if (type == "NSM_Chassis")
     {
@@ -111,7 +110,6 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
         // initial value update
         chassisAsset.pdi().manufacturer(manufacturer);
 
-        auto eid = manager.getEid(device);
         // create sensor
         auto partNumberSensor =
             std::make_shared<NsmInventoryProperty<AssetIntf>>(
@@ -121,11 +119,9 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
                                                               SERIAL_NUMBER);
         auto modelSensor = std::make_shared<NsmInventoryProperty<AssetIntf>>(
             chassisAsset, MARKETING_NAME);
-        device->addStaticSensor(partNumberSensor).update(manager, eid).detach();
-        device->addStaticSensor(serialNumberSensor)
-            .update(manager, eid)
-            .detach();
-        device->addStaticSensor(modelSensor).update(manager, eid).detach();
+        device->addStaticSensor(partNumberSensor);
+        device->addStaticSensor(serialNumberSensor);
+        device->addStaticSensor(modelSensor);
     }
     else if (type == "NSM_Health")
     {

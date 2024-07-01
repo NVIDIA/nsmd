@@ -63,7 +63,7 @@ class NsmDevice
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
-    eid_t eid = 255;
+    eid_t eid;
     uuid_t uuid;
     uuid_t deviceUuid;
     bool isDeviceActive;
@@ -72,7 +72,7 @@ class NsmDevice
     std::coroutine_handle<> doPollingTaskHandle;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
-    std::deque<std::shared_ptr<NsmSensor>> roundRobinSensors;
+    std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;

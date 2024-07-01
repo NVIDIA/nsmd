@@ -140,7 +140,7 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(4, gpu.roundRobinSensors.size());
     EXPECT_EQ(4, gpu.deviceSensors.size());
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<AssemblyIntf>>(
                            gpu.deviceSensors[0]));
@@ -170,11 +170,6 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
 {
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(4)
-        .WillRepeatedly(
-            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
-               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -189,7 +184,7 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(4, gpu.roundRobinSensors.size());
     EXPECT_EQ(4, gpu.deviceSensors.size());
     for (int i = 0; i < 4; i++)
     {

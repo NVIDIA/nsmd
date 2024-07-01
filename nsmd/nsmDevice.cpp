@@ -125,7 +125,9 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 
 NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
 {
+    sensor->setStatic(true);
     deviceSensors.emplace_back(sensor);
+    roundRobinSensors.emplace_back(sensor);
     return *sensor;
 }
 

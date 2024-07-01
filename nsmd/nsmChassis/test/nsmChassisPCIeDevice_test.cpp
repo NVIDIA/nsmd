@@ -168,7 +168,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(5, gpu.roundRobinSensors.size());
     EXPECT_EQ(5, gpu.deviceSensors.size());
 
     auto sensor = 0;
@@ -201,23 +201,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
-    nsm_query_scalar_group_telemetry_group_0 function0Data{
-        0xDEAD,
-        0x1234,
-        0xFFAB,
-        0x0022,
-    };
-    Response function0Response(
-        sizeof(nsm_msg_hdr) +
-        sizeof(nsm_query_scalar_group_telemetry_v1_group_0_resp));
-    auto function0Code = (nsm_completion_codes)
-        encode_query_scalar_group_telemetry_v1_group0_resp(
-            instanceId, NSM_SUCCESS, ERR_NULL, &function0Data,
-            reinterpret_cast<nsm_msg*>(function0Response.data()));
-
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(3)
-        .WillRepeatedly(mockSendRecvNsmMsg());
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -227,8 +210,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
 
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(function0Response, function0Code));
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -255,7 +236,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(2, gpu.roundRobinSensors.size());
+    EXPECT_EQ(6, gpu.roundRobinSensors.size());
     EXPECT_EQ(6, gpu.deviceSensors.size());
 
     auto sensors = 0;
@@ -290,10 +271,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
               pcieDeviceObject->deviceIndex);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
               pcieDeviceObject->pdi().deviceType());
-    EXPECT_EQ("0xDEAD", functionSensor->pdi().function0VendorId());
-    EXPECT_EQ("0x1234", functionSensor->pdi().function0DeviceId());
-    EXPECT_EQ("0xFFAB", functionSensor->pdi().function0SubsystemVendorId());
-    EXPECT_EQ("0x0022", functionSensor->pdi().function0SubsystemId());
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               ltssmStateSensor->deviceIndex);
 }

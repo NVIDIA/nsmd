@@ -1515,18 +1515,14 @@ static void createNsmProcessorSensor(SensorManager& manager,
             nsmDevice->deviceSensors.push_back(uuidSensor);
             auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
                 bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(gpuRevisionSensor);
-            gpuRevisionSensor->update(manager, manager.getEid(nsmDevice))
-                .detach();
+            nsmDevice->addStaticSensor(gpuRevisionSensor);
 
             auto persistentMemoryIntf =
                 std::make_shared<PersistentMemoryInterface>(
                     bus, inventoryObjPath.c_str());
             auto cacheMemorySensor = std::make_shared<NsmTotalCacheMemory>(
                 name, type, persistentMemoryIntf);
-            nsmDevice->deviceSensors.push_back(cacheMemorySensor);
-            cacheMemorySensor->update(manager, manager.getEid(nsmDevice))
-                .detach();
+            nsmDevice->addStaticSensor(cacheMemorySensor);
 
             auto healthSensor = std::make_shared<NsmGpuHealth>(
                 bus, name, type, inventoryObjPath);
@@ -1561,26 +1557,19 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto assetObject = NsmAssetIntfProcessor<AssetIntfProcessor>(
                 name, type, assetIntf);
             assetObject.pdi().manufacturer(manufacturer);
-            auto eid = manager.getEid(nsmDevice);
             // create sensor
             nsmDevice
                 ->addStaticSensor(
                     std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                        assetObject, DEVICE_PART_NUMBER))
-                .update(manager, eid)
-                .detach();
+                        assetObject, DEVICE_PART_NUMBER));
             nsmDevice
                 ->addStaticSensor(
                     std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                        assetObject, SERIAL_NUMBER))
-                .update(manager, eid)
-                .detach();
+                        assetObject, SERIAL_NUMBER));
             nsmDevice
                 ->addStaticSensor(
                     std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                        assetObject, MARKETING_NAME))
-                .update(manager, eid)
-                .detach();
+                        assetObject, MARKETING_NAME));
         }
         else if (type == "NSM_MIG")
         {
@@ -1654,9 +1643,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
             auto eccModeSensor = std::make_shared<NsmEccMode>(name, type,
                                                               eccIntf);
 
-            eccModeSensor->update(manager, manager.getEid(nsmDevice)).detach();
-
-            nsmDevice->deviceSensors.push_back(eccModeSensor);
+            nsmDevice->addStaticSensor(eccModeSensor);
 
             auto eccErrorCntSensor =
                 std::make_shared<NsmEccErrorCounts>(name, type, eccIntf);
@@ -1710,8 +1697,6 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
                 inventoryObjPath);
 
-            nsmDevice->deviceSensors.emplace_back(minGraphicsClockFreq);
-            nsmDevice->deviceSensors.emplace_back(maxGraphicsClockFreq);
             nsmDevice->deviceSensors.emplace_back(currentUtilization);
 
             if (priority)
@@ -1726,10 +1711,9 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
                 nsmDevice->roundRobinSensors.push_back(currentUtilization);
             }
-            minGraphicsClockFreq->update(manager, manager.getEid(nsmDevice))
-                .detach();
-            maxGraphicsClockFreq->update(manager, manager.getEid(nsmDevice))
-                .detach();
+
+            nsmDevice->addStaticSensor(minGraphicsClockFreq);
+            nsmDevice->addStaticSensor(maxGraphicsClockFreq);
         }
         else if (type == "NSM_ProcessorPerformance")
         {
@@ -1769,9 +1753,7 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);
-            nsmDevice->deviceSensors.push_back(totalMemorySensor);
-            totalMemorySensor->update(manager, manager.getEid(nsmDevice))
-                .detach();
+            nsmDevice->addStaticSensor(totalMemorySensor);
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
                 bus, name, type, inventoryObjPath, totalMemorySensor);
             nsmDevice->deviceSensors.push_back(sensor);
@@ -1821,17 +1803,14 @@ static void createNsmProcessorSensor(SensorManager& manager,
 
             auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
                 name, type, clearPowerCapIntf);
-            nsmDevice->deviceSensors.emplace_back(defaultPowerCap);
             manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
             auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
                 name, type, powerCapIntf, powerLimitIntf);
-            nsmDevice->deviceSensors.emplace_back(maxPowerCap);
             manager.maxPowerCapList.emplace_back(maxPowerCap);
 
             auto minPowerCap = std::make_shared<NsmMinPowerCap>(
                 name, type, powerCapIntf, powerLimitIntf);
-            nsmDevice->deviceSensors.emplace_back(minPowerCap);
             manager.minPowerCapList.emplace_back(minPowerCap);
 
             if (priority)
@@ -1843,10 +1822,9 @@ static void createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.push_back(powerCap);
             }
 
-            defaultPowerCap->update(manager, manager.getEid(nsmDevice))
-                .detach();
-            maxPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
-            minPowerCap->update(manager, manager.getEid(nsmDevice)).detach();
+            nsmDevice->addStaticSensor(defaultPowerCap);
+            nsmDevice->addStaticSensor(maxPowerCap);
+            nsmDevice->addStaticSensor(minPowerCap);
         }
     }
 

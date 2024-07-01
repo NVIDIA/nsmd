@@ -40,29 +40,6 @@ class NsmThresholdAggregatorBuilder : public NumericSensorAggregatorBuilder
     }
 };
 
-requester::Coroutine static updateSensorWithRetries(
-    SensorManager& manager, std::shared_ptr<NsmSensor> sensor, const eid_t eid,
-    const int retries)
-{
-    for (int retryCount{0}; retries == -1 || retryCount <= retries;
-         ++retryCount)
-    {
-        auto rc = co_await sensor->update(manager, eid);
-        if (rc == NSM_SW_SUCCESS || rc == NSM_SW_ERROR_COMMAND_FAIL)
-        {
-            co_return rc;
-        }
-
-        lg2::error(
-            "updateSensorWithRetries: sensor update failed. rc={RC}, name={NAME}, "
-            "eid={EID}, retryCount={RETRY}.",
-            "RC", rc, "NAME", sensor->getName(), "EID", eid, "RETRY",
-            retryCount);
-    }
-
-    co_return NSM_SW_ERROR;
-}
-
 NsmThresholdFactory::NsmThresholdFactory(
     SensorManager& manager, const std::string& interface,
     const std::string& objPath, std::shared_ptr<NsmNumericSensor> numericSensor,
@@ -236,12 +213,8 @@ void NsmThresholdFactory::createNsmThreshold(
 
     if (!periodicUpdate)
     {
-        nsmDevice->deviceSensors.emplace_back(sensor);
+        nsmDevice->addStaticSensor(sensor);
         nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
-
-        updateSensorWithRetries(manager, sensor, manager.getEid(nsmDevice), 3)
-            .detach();
-
         return;
     }
 

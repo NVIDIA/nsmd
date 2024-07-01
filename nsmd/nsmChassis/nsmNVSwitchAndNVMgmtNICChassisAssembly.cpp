@@ -70,7 +70,6 @@ void createNsmChassisAssembly(SensorManager& manager,
         assetObject.pdi().manufacturer(vendor);
 
         // create sensor
-        auto eid = manager.getEid(device);
         auto partNumberSensor =
             std::make_shared<NsmInventoryProperty<AssetIntf>>(
                 assetObject, DEVICE_PART_NUMBER);
@@ -82,12 +81,10 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto buildDateSensor =
             std::make_shared<NsmInventoryProperty<AssetIntf>>(assetObject,
                                                               BUILD_DATE);
-        device->addStaticSensor(partNumberSensor).update(manager, eid).detach();
-        device->addStaticSensor(serialNumberSensor)
-            .update(manager, eid)
-            .detach();
-        device->addStaticSensor(modelSensor).update(manager, eid).detach();
-        device->addStaticSensor(buildDateSensor).update(manager, eid).detach();
+        device->addStaticSensor(partNumberSensor);
+        device->addStaticSensor(serialNumberSensor);
+        device->addStaticSensor(modelSensor);
+        device->addStaticSensor(buildDateSensor);
     }
     else if (type == "NSM_Health")
     {
