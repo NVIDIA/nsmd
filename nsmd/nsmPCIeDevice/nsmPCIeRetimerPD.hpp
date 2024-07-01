@@ -12,6 +12,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
 #include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
 
 namespace nsm
@@ -23,6 +24,7 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
+using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
 using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
 
 /** @brief Convert to PCIe gen type
@@ -38,6 +40,12 @@ std::string convertToPCIeTypeStr(uint32_t link_speed);
  *  @return size_t lane count
  */
 size_t convertToLaneCount(uint32_t link_width);
+
+/** @brief Convert to generation
+ *
+ *  @param[in] value - generation value
+ */
+PCIeSlotIntf::Generations convertToGeneration(uint32_t value);
 
 /** @brief Convert to lTSSM State
  *

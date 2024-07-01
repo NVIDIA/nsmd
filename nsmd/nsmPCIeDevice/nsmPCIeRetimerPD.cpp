@@ -37,6 +37,12 @@ size_t convertToLaneCount(uint32_t link_width)
     return pow(2, (link_width - 1));
 }
 
+PCIeSlotIntf::Generations convertToGeneration(uint32_t value)
+{
+    return (value == 0) || (value > 5) ? PCIeSlotIntf::Generations::Unknown
+                                       : PCIeSlotIntf::Generations(value - 1);
+}
+
 std::string convertToLTSSMStateStr(uint32_t ltssm_state)
 {
     switch (ltssm_state)
@@ -151,6 +157,8 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
         pcieDeviceIntf->PCIeDeviceIntf::pcIeType(
             PCIeDeviceIntf::convertPCIeTypesFromString(
                 convertToPCIeTypeStr(data.negotiated_link_speed)));
+        pcieDeviceIntf->PCIeDeviceIntf::generationInUse(
+            convertToGeneration(data.negotiated_link_speed));
         pcieDeviceIntf->PCIeDeviceIntf::maxPCIeType(
             PCIeDeviceIntf::convertPCIeTypesFromString(
                 convertToPCIeTypeStr(data.max_link_speed)));
