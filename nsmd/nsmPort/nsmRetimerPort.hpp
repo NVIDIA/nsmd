@@ -65,6 +65,7 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
 
   private:
     double convertEncodedSpeedToGbps(const uint32_t& speed);
+    size_t convertEncodedWidthToActualWidth(const uint32_t& width);
     std::shared_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortWidthIntf> portWidthIntf = nullptr;
 };
