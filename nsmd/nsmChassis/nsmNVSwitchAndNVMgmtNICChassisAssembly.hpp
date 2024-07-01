@@ -22,6 +22,7 @@
 
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Assembly/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 
@@ -35,6 +36,7 @@ using AssemblyIntf = object_t<Inventory::Item::server::Assembly>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
+using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
 
 template <typename IntfType>
 class NsmNVSwitchAndNicChassisAssembly : public NsmInterfaceProvider<IntfType>

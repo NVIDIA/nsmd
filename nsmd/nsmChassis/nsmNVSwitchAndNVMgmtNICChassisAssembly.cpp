@@ -51,6 +51,14 @@ void createNsmChassisAssembly(SensorManager& manager,
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<AssemblyIntf>>(
                 chassisName, name, baseType);
         device->addStaticSensor(assemblyObject);
+
+        // add revision
+        auto revisionObject = NsmNVSwitchAndNicChassisAssembly<RevisionIntf>(
+            chassisName, name, baseType);
+        auto versionSensor =
+            std::make_shared<NsmInventoryProperty<RevisionIntf>>(revisionObject,
+                                                              INFO_ROM_VERSION);
+        device->addStaticSensor(versionSensor);
     }
     else if (type == "NSM_Asset")
     {
