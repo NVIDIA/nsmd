@@ -1,8 +1,6 @@
 #include "nsmRetimerPort.hpp"
 
 #include "common/types.hpp"
-#include "nsmInterface.hpp"
-#include "nsmPCIeLTSSMState.hpp"
 #include "nsmProcessor/nsmProcessor.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -284,8 +282,6 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
                                                            objPath.c_str());
         auto portWidthIntf = std::make_shared<PortWidthIntf>(bus,
                                                              objPath.c_str());
-        auto ltssmStateInft = NsmInterfaceProvider<LTSSMStateIntf>(
-            portName, type, dbus::Interfaces{objPath});
 
         portInfoIntf->protocol(
             PortInfoIntf::convertPortProtocolFromString(portProtocol));
@@ -299,11 +295,9 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
             portName, type, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
             portName, type, pcieECCIntf, deviceIndex);
-        auto ltssmState = std::make_shared<NsmPCIeLTSSMState>(ltssmStateInft,
-                                                              deviceIndex);
 
         if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup2 ||
-            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4 || !ltssmState)
+            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4)
         {
             lg2::error(
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
@@ -316,7 +310,6 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         nsmDevice->addSensor(pcieECCIntfSensorGroup2, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
-        nsmDevice->addSensor(ltssmState, priority);
     }
 }
 

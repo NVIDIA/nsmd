@@ -97,7 +97,7 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
             "RC", rc, "CC", cc);
     }
 
-    return rc;
+    return cc ? cc : rc;
 }
 
 } // namespace nsm
