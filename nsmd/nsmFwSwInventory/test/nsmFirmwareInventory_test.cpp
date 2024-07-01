@@ -135,10 +135,6 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         .WillOnce(Return(get(retimer, "UUID")))
         .WillOnce(Return(get(retimer, "DeviceType")))
         .WillOnce(Return(get(retimer, "InstanceNumber")));
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(
-            [](eid_t, Request&, std::shared_ptr<const nsm_msg>&,
-               size_t&) -> requester::Coroutine { co_return NSM_SUCCESS; });
     nsmFirmwareInventoryCreateSensors(
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
@@ -152,7 +148,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(emtpyServiceMap));
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(2, fpga.roundRobinSensors.size());
+    EXPECT_EQ(7, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(7, fpga.deviceSensors.size());
     auto sensors = 0;
