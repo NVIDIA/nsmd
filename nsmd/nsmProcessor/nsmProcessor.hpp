@@ -323,7 +323,7 @@ class NsmClockLimitGraphics : public NsmSensor
   public:
     NsmClockLimitGraphics(
         const std::string& name, const std::string& type,
-        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+        std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf);
     NsmClockLimitGraphics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -334,7 +334,7 @@ class NsmClockLimitGraphics : public NsmSensor
   private:
     void updateReading(const struct nsm_clock_limit&);
 
-    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::shared_ptr<NsmCpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
 
 class NsmCurrClockFreq : public NsmSensor

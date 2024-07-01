@@ -2170,11 +2170,11 @@ class GetClockLimit : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["SpeedLimit"] = (int)clockLimit.present_limit_max;
-        result["PresentLimitMin"] = (int)clockLimit.present_limit_min;
-        result["PresentLimitMax"] = (int)clockLimit.present_limit_max;
-        result["RequestedLimitMax"] = (int)clockLimit.requested_limit_max;
-        result["RequestedLimitMin"] = (int)clockLimit.requested_limit_min;
+        result["SpeedLimit"] = (uint32_t)clockLimit.present_limit_max;
+        result["PresentLimitMin"] = (uint32_t)clockLimit.present_limit_min;
+        result["PresentLimitMax"] = (uint32_t)clockLimit.present_limit_max;
+        result["RequestedLimitMax"] = (uint32_t)clockLimit.requested_limit_max;
+        result["RequestedLimitMin"] = (uint32_t)clockLimit.requested_limit_min;
         if (clockLimit.present_limit_min == clockLimit.present_limit_max)
         {
             result["SpeedLocked"] = true;

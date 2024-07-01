@@ -127,7 +127,7 @@ NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
 
 void NsmMigMode::updateReading(bitfield8_t flags)
 {
-    migModeIntf->migModeEnabled(flags.bits.bit0, true);
+    migModeIntf->MigModeIntf::migModeEnabled(flags.bits.bit0);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -587,7 +587,7 @@ uint8_t
 
 NsmClockLimitGraphics::NsmClockLimitGraphics(
     const std::string& name, const std::string& type,
-    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf) :
     NsmSensor(name, type)
 
 {
@@ -599,17 +599,18 @@ NsmClockLimitGraphics::NsmClockLimitGraphics(
 void NsmClockLimitGraphics::updateReading(
     const struct nsm_clock_limit& clockLimit)
 {
-    cpuOperatingConfigIntf->speedLimit(clockLimit.present_limit_max);
+    cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLimit(
+        clockLimit.present_limit_max);
     if (clockLimit.present_limit_max == clockLimit.present_limit_min)
     {
-        cpuOperatingConfigIntf->speedLocked(true);
-        cpuOperatingConfigIntf->speedConfig(
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLocked(true);
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig(
             std::make_tuple(true, (uint32_t)clockLimit.present_limit_max));
     }
     else
     {
-        cpuOperatingConfigIntf->speedLocked(false);
-        cpuOperatingConfigIntf->speedConfig(
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLocked(false);
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig(
             std::make_tuple(false, (uint32_t)clockLimit.present_limit_max),
             true);
     }
@@ -672,7 +673,7 @@ NsmCurrClockFreq::NsmCurrClockFreq(
 
 void NsmCurrClockFreq::updateReading(const uint32_t& clockFreq)
 {
-    cpuOperatingConfigIntf->operatingSpeed(clockFreq);
+    cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed(clockFreq);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -774,7 +775,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
-        cpuOperatingConfigIntf->minSpeed(value);
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::minSpeed(value);
     }
     else
     {
@@ -792,7 +793,7 @@ NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     NsmObject(name, type),
     cpuOperatingConfigIntf(cpuConfigIntf)
 {
-    lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
+    lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
 }
 
@@ -840,7 +841,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
-        cpuOperatingConfigIntf->maxSpeed(value);
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::maxSpeed(value);
     }
     else
     {
