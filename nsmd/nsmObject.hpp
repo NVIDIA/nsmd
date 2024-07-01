@@ -16,9 +16,10 @@
  */
 
 #pragma once
-
 #include "requester/handler.hpp"
 #include "types.hpp"
+
+#include <tal.hpp>
 
 namespace nsm
 {
@@ -67,6 +68,23 @@ class NsmObject
     virtual void handleOfflineState()
     {
         return;
+    }
+
+    void updateSharedMemoryOnSuccess(
+        std::string& inventoryObjPath, std::string& ifaceName,
+        std::string& propName, std::vector<uint8_t>& smbusData,
+        nv::sensor_aggregation::DbusVariantType propValue)
+    {
+#ifdef NVIDIA_SHMEM
+        auto timestamp = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count());
+
+        tal::TelemetryAggregator::updateTelemetry(inventoryObjPath, ifaceName,
+                                                  propName, smbusData,
+                                                  timestamp, 0, propValue);
+#endif
     }
 
   private:
