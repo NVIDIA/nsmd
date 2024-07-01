@@ -27,6 +27,10 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 using SettingsIntf = object_t<Software::server::Settings>;
 
+/**
+ * @brief Sensor for updating Oem.Nvidia.HardwareWriteProtectedControl in
+ * Chassis and WriteProtected in FirmwareInventory
+ */
 class NsmWriteProtectedControl :
     public NsmSensor,
     public NsmInterfaceContainer<SettingsIntf>
@@ -34,12 +38,14 @@ class NsmWriteProtectedControl :
   private:
     NsmDeviceIdentification deviceType;
     uint8_t instanceNumber;
-    bool retimer;
+    const bool retimer;
+    const bool writeProtectedControl;
 
   public:
     NsmWriteProtectedControl(const NsmInterfaceProvider<SettingsIntf>& provider,
                              NsmDeviceIdentification deviceType,
-                             uint8_t instanceNumber, bool retimer);
+                             uint8_t instanceNumber, bool retimer,
+                             bool writeProtectedControl);
     NsmWriteProtectedControl() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,

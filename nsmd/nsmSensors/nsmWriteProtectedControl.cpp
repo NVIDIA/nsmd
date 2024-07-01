@@ -28,9 +28,11 @@ namespace nsm
 
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
-    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
+    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer,
+    bool writeProtectedControl) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer)
+    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer),
+    writeProtectedControl(writeProtectedControl)
 {
     utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
 }
@@ -66,8 +68,18 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        pdi().writeProtectedControl(NsmWriteProtectedIntf::getValue(
-            data, deviceType, instanceNumber, retimer));
+        auto value = NsmWriteProtectedIntf::getValue(data, deviceType,
+                                                     instanceNumber, retimer);
+        if (writeProtectedControl)
+        {
+            // Updates Oem.Nvidia.HardwareWriteProtectedControl in Chassis
+            pdi().SettingsIntf::writeProtectedControl(value);
+        }
+        else
+        {
+            // Updates WriteProtected in FirmwareInventory
+            pdi().SettingsIntf::writeProtected(value);
+        }
     }
     else
     {
