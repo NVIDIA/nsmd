@@ -40,7 +40,8 @@ std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
 
 TEST(nsmMigMode, GoodGenReq)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
+                              nullptr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -56,7 +57,8 @@ TEST(nsmMigMode, GoodGenReq)
 
 TEST(nsmMigMode, GoodHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
+                              nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -74,7 +76,8 @@ TEST(nsmMigMode, GoodHandleResp)
 
 TEST(nsmMigMode, BadHandleResp)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
+                              nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -95,7 +98,8 @@ TEST(nsmMigMode, BadHandleResp)
 
 TEST(nsmMigMode, GoodUpdateReading)
 {
-    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath, nullptr);
+    nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
+                              nullptr);
     bitfield8_t flags;
     flags.byte = 1;
     migSensor.updateReading(flags);
@@ -104,9 +108,10 @@ TEST(nsmMigMode, GoodUpdateReading)
 
 TEST(nsmEccErrorCounts, GoodGenReq)
 {
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
-    nsm::NsmEccErrorCounts eccErrorCntSensor(sensorName, sensorType, eccIntf);
+    auto eccIntf = std::make_shared<NsmEccModeIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEccErrorCounts eccErrorCntSensor(sensorName, sensorType, eccIntf,
+                                             inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -122,9 +127,10 @@ TEST(nsmEccErrorCounts, GoodGenReq)
 
 TEST(nsmEccErrorCounts, GoodHandleResp)
 {
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
-    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
+    auto eccIntf = std::make_shared<NsmEccModeIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
+                                  inventoryObjPath);
 
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -149,9 +155,10 @@ TEST(nsmEccErrorCounts, GoodHandleResp)
 
 TEST(nsmEccErrorCounts, GoodUpdateReading)
 {
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
-    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
+    auto eccIntf = std::make_shared<NsmEccModeIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
+                                  inventoryObjPath);
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
@@ -168,9 +175,10 @@ TEST(nsmEccErrorCounts, GoodUpdateReading)
 
 TEST(nsmEccErrorCounts, BadHandleResp)
 {
-    auto eccIntf =
-        std::make_shared<NsmEccModeIntf>(bus, inventoryObjPath.c_str(), nullptr);
-    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf);
+    auto eccIntf = std::make_shared<NsmEccModeIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
+                                  inventoryObjPath);
 
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -205,7 +213,7 @@ TEST(NsmPCIeGroup2, GoodGenReq)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -231,7 +239,7 @@ TEST(NsmPCIeGroup2, GoodHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
     data.non_fatal_errors = 1111;
@@ -262,7 +270,7 @@ TEST(NsmPCIeGroup2, BadHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
     data.non_fatal_errors = 1111;
@@ -296,7 +304,7 @@ TEST(NsmPCIeGroup3, GoodGenReq)
     uint8_t deviceId = 0;
 
     nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -322,7 +330,7 @@ TEST(NsmPCIeGroup3, GoodHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
     data.L0ToRecoveryCount = 8769;
@@ -349,7 +357,7 @@ TEST(NsmPCIeGroup3, BadHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
     data.L0ToRecoveryCount = 8769;
@@ -378,7 +386,7 @@ TEST(NsmPCIeGroup4, GoodGenReq)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -404,7 +412,7 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
     data.recv_err_cnt = 100;
@@ -438,7 +446,7 @@ TEST(NsmPCIeGroup4, BadHandleResp)
     auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
     data.recv_err_cnt = 100;
@@ -472,7 +480,7 @@ TEST(NsmPCIeGroup5, GoodGenReq)
         bus, inventoryObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -496,7 +504,7 @@ TEST(NsmPCIeGroup5, GoodHandleResp)
         bus, inventoryObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_5 data;
     data.PCIeRXBytes = 100;
@@ -523,7 +531,7 @@ TEST(NsmPCIeGroup5, BadHandleResp)
         bus, inventoryObjPath.c_str());
     uint8_t deviceId = 0;
     nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
-                             deviceId);
+                             deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_5 data;
     data.PCIeRXBytes = 100;
@@ -639,7 +647,7 @@ TEST(NsmClockLimitGraphics, GoodGenReq)
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
-                                      cpuOperatingConfigIntf);
+                                      cpuOperatingConfigIntf, inventoryObjPath);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -657,7 +665,7 @@ TEST(NsmClockLimitGraphics, GoodHandleResp)
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
-                                      cpuOperatingConfigIntf);
+                                      cpuOperatingConfigIntf, inventoryObjPath);
 
     struct nsm_clock_limit clockLimit;
     clockLimit.requested_limit_min = 800;
@@ -684,7 +692,7 @@ TEST(NsmClockLimitGraphics, BadHandleResp)
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
-                                      cpuOperatingConfigIntf);
+                                      cpuOperatingConfigIntf, inventoryObjPath);
 
     struct nsm_clock_limit clockLimit;
     clockLimit.requested_limit_min = 800;
@@ -711,8 +719,8 @@ TEST(NsmCurrClockFreq, GoodGenReq)
 {
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
-    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
-                                 cpuOperatingConfigIntf);
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
+                                 inventoryObjPath);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -730,8 +738,8 @@ TEST(NsmCurrClockFreq, GoodHandleResp)
 {
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
-    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
-                                 cpuOperatingConfigIntf);
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
+                                 inventoryObjPath);
 
     uint32_t clockFreq = 3000;
 
@@ -753,8 +761,8 @@ TEST(NsmCurrClockFreq, BadHandleResp)
 {
     auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
         bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
-    nsm::NsmCurrClockFreq sensor(sensorName, sensorType,
-                                 cpuOperatingConfigIntf);
+    nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
+                                 inventoryObjPath);
 
     uint32_t clockFreq = 3000;
 
@@ -778,8 +786,8 @@ TEST(nsmProcessorThrottleReason, GoodGenReq)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
-                                           processorPerformanceIntf);
+    nsm::NsmProcessorThrottleReason sensor(
+        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -797,8 +805,8 @@ TEST(nsmProcessorThrottleReason, GoodHandleResp)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
-                                           processorPerformanceIntf);
+    nsm::NsmProcessorThrottleReason sensor(
+        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) +
@@ -821,8 +829,8 @@ TEST(nsmProcessorThrottleReason, BadHandleResp)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleReason sensor(sensorName, sensorType,
-                                           processorPerformanceIntf);
+    nsm::NsmProcessorThrottleReason sensor(
+        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) +
@@ -849,7 +857,7 @@ TEST(NsmAccumGpuUtilTime, GoodGenReq)
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
-                                    processorPerformanceIntf);
+                                    processorPerformanceIntf, inventoryObjPath);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -867,7 +875,7 @@ TEST(NsmAccumGpuUtilTime, GoodHandleResp)
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
-                                    processorPerformanceIntf);
+                                    processorPerformanceIntf, inventoryObjPath);
 
     uint32_t context_util_time = 100;
     uint32_t SM_util_time = 200;
@@ -892,7 +900,7 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmAccumGpuUtilTime sensor(sensorName, sensorType,
-                                    processorPerformanceIntf);
+                                    processorPerformanceIntf, inventoryObjPath);
 
     uint32_t context_util_time = 100;
     uint32_t SM_util_time = 200;
@@ -916,9 +924,8 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
 
 TEST(nsmProcessorRevision, GoodGenReq)
 {
-
     nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath);
+                                     inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -927,10 +934,11 @@ TEST(nsmProcessorRevision, GoodGenReq)
     EXPECT_EQ(request.has_value(), true);
 
     auto msg = reinterpret_cast<const nsm_msg*>(request->data());
-    auto command = reinterpret_cast<const nsm_get_inventory_information_req*>(msg->payload);
+    auto command = reinterpret_cast<const nsm_get_inventory_information_req*>(
+        msg->payload);
 
-   EXPECT_EQ(command->hdr.command, NSM_GET_INVENTORY_INFORMATION);
-   EXPECT_EQ(command->property_identifier, DEVICE_PART_NUMBER);
+    EXPECT_EQ(command->hdr.command, NSM_GET_INVENTORY_INFORMATION);
+    EXPECT_EQ(command->property_identifier, DEVICE_PART_NUMBER);
 }
 
 TEST(nsmProcessorRevision, GoodHandleResp)
@@ -938,10 +946,9 @@ TEST(nsmProcessorRevision, GoodHandleResp)
     nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
                                      inventoryObjPath);
 
-     std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
+    std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
     std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(),
-        0);
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint16_t reason_code = ERR_NULL;
@@ -959,11 +966,10 @@ TEST(nsmProcessorRevision, BadHandleResp)
 {
     nsm::NsmProcessorRevision sensor(bus, sensorName, sensorType,
                                      inventoryObjPath);
-    
-     std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
+
+    std::vector<uint8_t> data{'N', 'V', 'I', 'D', 'I', 'A', '\0'};
     std::vector<uint8_t> responseMsg(
-        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(),
-        0);
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + data.size(), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint16_t reason_code = ERR_NULL;
