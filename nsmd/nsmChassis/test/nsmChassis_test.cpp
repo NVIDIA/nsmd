@@ -338,36 +338,56 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
                             objPath);
 
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(2, fpga.roundRobinSensors.size());
-    EXPECT_EQ(2, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(6, gpu.roundRobinSensors.size());
     EXPECT_EQ(6, gpu.deviceSensors.size());
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[0]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[1]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                           gpu.deviceSensors[2]));
+
+    auto sensors = 0;
+    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto serialNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto model = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto depth = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto width = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
+        gpu.deviceSensors[sensors++]);
+    auto height = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
+        gpu.deviceSensors[sensors++]);
+    EXPECT_EQ(sensors, gpu.deviceSensors.size());
+
+    EXPECT_NE(nullptr, partNumber);
+    EXPECT_NE(nullptr, serialNumber);
+    EXPECT_NE(nullptr, model);
+    EXPECT_NE(nullptr, depth);
+    EXPECT_NE(nullptr, width);
+    EXPECT_NE(nullptr, height);
+
+    EXPECT_EQ(BOARD_PART_NUMBER, partNumber->property);
+    EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
+    EXPECT_EQ(MARKETING_NAME, model->property);
+    EXPECT_EQ(PRODUCT_LENGTH, depth->property);
+    EXPECT_EQ(PRODUCT_WIDTH, width->property);
+    EXPECT_EQ(PRODUCT_HEIGHT, height->property);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-                  gpu.deviceSensors[2])
-                  ->pdi()
-                  .manufacturer());
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-                  gpu.deviceSensors[3]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-                  gpu.deviceSensors[4]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-                  gpu.deviceSensors[5]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmWriteProtectedControl>(
-                           fpga.deviceSensors[0]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmWriteProtectedJumper>(
-                           fpga.deviceSensors[1]));
+              model->pdi().manufacturer());
+
+    EXPECT_EQ(0, fpga.prioritySensors.size());
+    EXPECT_EQ(2, fpga.roundRobinSensors.size());
+    EXPECT_EQ(2, fpga.deviceSensors.size());
+
+    sensors = 0;
+    auto writeProtectedControl = dynamic_pointer_cast<NsmWriteProtectedControl>(
+        fpga.deviceSensors[sensors++]);
+    auto writeProtectedJumper = dynamic_pointer_cast<NsmWriteProtectedJumper>(
+        fpga.deviceSensors[sensors++]);
+    EXPECT_EQ(sensors, fpga.deviceSensors.size());
+
+    EXPECT_NE(nullptr, writeProtectedControl);
+    EXPECT_NE(nullptr, writeProtectedJumper);
+
+    EXPECT_TRUE(writeProtectedControl->writeProtectedControl);
 }
 
 TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)

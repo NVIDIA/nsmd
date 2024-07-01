@@ -61,14 +61,15 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
 
         auto retimer = utils::DBusHandler().tryGetDbusProperty<bool>(
             objPath.c_str(), "IsRetimer", interface.c_str());
-        auto writeProtectControlIntf = std::make_shared<NsmWriteProtectedIntf>(
+        auto writeProtectedIntf = std::make_shared<NsmWriteProtectedIntf>(
             manager, device, instanceNumber, deviceType,
             (firmwareInventoryBasePath / name).string().c_str(), retimer);
-        auto settings = std::make_shared<NsmFirmwareInventory<SettingsIntf>>(
-            name, dynamic_pointer_cast<SettingsIntf>(writeProtectControlIntf));
+        auto settingsIntf =
+            std::make_shared<NsmFirmwareInventory<SettingsIntf>>(
+                name, dynamic_pointer_cast<SettingsIntf>(writeProtectedIntf));
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            *settings, deviceType, instanceNumber, retimer);
-        device->addStaticSensor(settings);
+            *settingsIntf, deviceType, instanceNumber, retimer, false);
+        device->addStaticSensor(settingsIntf);
         device->addSensor(writeProtectControl, false);
     }
     else if (type == "NSM_Asset")

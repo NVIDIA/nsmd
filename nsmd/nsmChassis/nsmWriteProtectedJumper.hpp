@@ -27,6 +27,9 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 using SettingsIntf = object_t<Software::server::Settings>;
 
+/**
+ * @brief Sensor for updating Oem.Nvidia.HardwareWriteProtected in Chassis
+ */
 class NsmWriteProtectedJumper :
     public NsmSensor,
     public NsmInterfaceContainer<SettingsIntf>

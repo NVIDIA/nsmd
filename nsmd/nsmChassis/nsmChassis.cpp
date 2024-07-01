@@ -242,7 +242,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto settings = NsmChassis<SettingsIntf>(name);
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            settings, deviceType, instanceNumber, false);
+            settings, deviceType, instanceNumber, false, true);
         auto writeProtectJumper =
             std::make_shared<NsmWriteProtectedJumper>(settings);
         device->addStaticSensor(writeProtectControl);
