@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "interfaceWrapper.hpp"
 #include "nsmGpmOem.hpp"
 #include "nsmObjectFactory.hpp"
 
@@ -24,6 +25,7 @@ namespace nsm
 {
 enum class GPMMetricId : uint8_t
 {
+    DRAMUsage = 4,
     NVLinkRawTxBandwidth = 10,
     NVLinkDataTxBandwidth = 11,
     NVLinkRawRxBandwidth = 12,
@@ -203,6 +205,17 @@ static void createNsmGPMMetrics(SensorManager& manager,
             .value();
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
+    bool populateMemoryBandwidth{false};
+
+    try
+    {
+        populateMemoryBandwidth =
+            getPropertyFromCollection<bool>(properties, "MemoryBandwidth")
+                .value();
+    }
+    catch (const std::exception& e)
+    {}
+
     auto nsmDevice = manager.getNsmDevice(uuid);
 
     if (!nsmDevice)
@@ -222,6 +235,28 @@ static void createNsmGPMMetrics(SensorManager& manager,
     auto gpmAggregateMetrics = std::make_shared<NsmGPMAggregated>(
         name, type, inventoryObjPath, retrievalSource, gpuInstance,
         computeInstance, metricsBitfield, gpmIntf, nvlinkMetricsIntf);
+
+    if (populateMemoryBandwidth)
+    {
+        std::string memoryInventoryObjPath =
+            getPropertyFromCollection<std::string>(properties,
+                                                   "MemoryInventoryObjPath")
+                .value();
+        memoryInventoryObjPath =
+            utils::makeDBusNameValid(memoryInventoryObjPath);
+
+        auto sensorObjectPath = memoryInventoryObjPath +
+                                "/xyz.openbmc_project.Inventory.Item.Dimm";
+
+        std::shared_ptr<DimmIntf> dimmIntf =
+            retrieveInterfaceFromSensorMap<DimmIntf>(
+                sensorObjectPath, manager, bus, memoryInventoryObjPath.c_str());
+
+        auto dramUsage = gpmAggregateMetrics->getMetricInfo(
+            static_cast<uint8_t>(GPMMetricId::DRAMUsage));
+        dramUsage->updater = std::make_unique<DRAMUsageMetricUpdator>(
+            dimmIntf, memoryInventoryObjPath);
+    }
 
     lg2::info(
         "Created NSM GPM Aggregted Metrics : UUID={UUID}, Name={NAME}, Type={TYPE}",

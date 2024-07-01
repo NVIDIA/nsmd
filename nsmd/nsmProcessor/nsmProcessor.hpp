@@ -379,6 +379,27 @@ class NsmMaxGraphicsClockLimit : public NsmObject
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
 
+class NsmCurrentUtilization : public NsmSensor
+{
+  public:
+    NsmCurrentUtilization(const std::string& name, const std::string& type,
+                          std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+                          const std::string& objPath);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf{nullptr};
+
+    const std::string objPath;
+    static const std::string dBusIntf;
+    static const std::string dBusProperty;
+};
+
 using ProcessorPerformanceIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::State::server::ProcessorPerformance>;
 

@@ -2547,6 +2547,103 @@ int decode_get_accum_GPU_util_time_resp(
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_current_utilization_req(uint8_t instance, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = NSM_GET_CURRENT_UTILIZATION;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_current_utilization_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint32_t gpu_utilization,
+					uint32_t memory_utilization,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_CURRENT_UTILIZATION, msg);
+	}
+
+	struct nsm_get_current_utilization_resp *resp =
+	    (struct nsm_get_current_utilization_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_CURRENT_UTILIZATION;
+	resp->hdr.completion_code = cc;
+	uint16_t data_size = 2 * sizeof(uint32_t);
+	resp->hdr.data_size = htole16(data_size);
+
+	resp->gpu_utilization = htole32(gpu_utilization);
+	resp->memory_utilization = htole32(memory_utilization);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_utilization_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *data_size,
+					uint16_t *reason_code,
+					uint32_t *gpu_utilization,
+					uint32_t *memory_utilization)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    gpu_utilization == NULL || memory_utilization == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr)) +
+			  sizeof(struct nsm_get_current_utilization_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_current_utilization_resp *resp =
+	    (struct nsm_get_current_utilization_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) < 2 * sizeof(uint32_t)) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*gpu_utilization = le32toh(resp->gpu_utilization);
+	*memory_utilization = le32toh(resp->memory_utilization);
+
+	return NSM_SW_SUCCESS;
+}
+
 // Get Row Remap State command, NSM T3 spec
 int encode_get_row_remap_state_req(uint8_t instance_id, struct nsm_msg *msg)
 {

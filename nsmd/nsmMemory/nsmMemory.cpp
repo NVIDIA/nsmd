@@ -2,6 +2,7 @@
 
 #include "platform-environmental.h"
 
+#include "interfaceWrapper.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 
@@ -429,8 +430,13 @@ static void createNsmMemorySensor(SensorManager& manager,
 
         if (type == "NSM_Memory")
         {
-            auto dimmIntf =
-                std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
+            auto sensorObjectPath = inventoryObjPath +
+                                    "/xyz.openbmc_project.Inventory.Item.Dimm";
+
+            std::shared_ptr<DimmIntf> dimmIntf =
+                retrieveInterfaceFromSensorMap<DimmIntf>(
+                    sensorObjectPath, manager, bus, inventoryObjPath.c_str());
+
             auto correctionType =
                 utils::DBusHandler().getDbusProperty<std::string>(
                     objPath.c_str(), "ErrorCorrection", interface.c_str());

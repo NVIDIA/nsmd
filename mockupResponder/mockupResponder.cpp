@@ -344,6 +344,8 @@ std::optional<std::vector<uint8_t>>
                                                              requestLen);
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
+                case NSM_GET_CURRENT_UTILIZATION:
+                    return getCurrentUtilizationHandler(request, requestLen);
                 case NSM_SET_POWER_LIMITS:
                     return setPowerLimitHandler(request, requestLen);
                 case NSM_GET_POWER_LIMITS:
@@ -501,7 +503,7 @@ std::optional<std::vector<uint8_t>>
         0b00000000, /*  47 -  40  - Byte 6 */
         0b00000000, /*  55 -  48  - Byte 7 */
         0b00000000, /*  63 -  56  - Byte 8 */
-        0b00011100, /*  71 -  64  - Byte 9 */
+        0b10011100, /*  71 -  64  - Byte 9 */
         0b10001110, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
@@ -2265,6 +2267,43 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentUtilizationHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    auto rc = decode_common_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "decode req for getCurrentUtilizationHandler failed: rc={RC}", "RC",
+            rc);
+        return std::nullopt;
+    }
+
+    uint32_t gpu_utilization = 36;
+    uint32_t memory_utilization = 75;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_utilization_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_current_utilization_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, gpu_utilization,
+        memory_utilization, responseMsg);
+
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_current_utilization_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 

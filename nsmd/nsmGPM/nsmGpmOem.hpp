@@ -20,6 +20,7 @@
 #include <com/nvidia/GPMMetrics/server.hpp>
 #include <com/nvidia/NVLink/NVLinkMetrics/server.hpp>
 #include <nsmSensorAggregator.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
 
 namespace nsm
 {
@@ -33,6 +34,8 @@ using GPMMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::server::GPMMetrics>;
 using NVLinkMetricsIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::NVLink::server::NVLinkMetrics>;
+using DimmIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>;
 
 using DecodeMetricFunc = std::pair<uint8_t, double> (*)(const uint8_t*, size_t);
 
@@ -87,6 +90,21 @@ std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkDataRxPerInstanceUpdator(
 std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkDataTxPerInstanceUpdator(
     const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
 
+class DRAMUsageMetricUpdator : public MetricUpdator
+{
+  public:
+    DRAMUsageMetricUpdator(std::shared_ptr<DimmIntf> intf,
+                           const std::string& objPath);
+
+    void updateMetric(const std::string& name, const double val) override;
+
+  private:
+    std::shared_ptr<DimmIntf> intf;
+    const std::string objPath;
+    static const std::string dBusIntf;
+    static const std::string dBusProperty;
+};
+
 class NsmGPMAggregated : public NsmSensorAggregator
 {
   public:
@@ -99,6 +117,13 @@ class NsmGPMAggregated : public NsmSensorAggregator
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
+
+    MetricInfo* getMetricInfo(uint8_t metricId)
+    {
+        return metricId < NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE
+                   ? &metricsTable[metricId]
+                   : nullptr;
+    }
 
   private:
     int handleSamples(const std::vector<TelemetrySample>& samples) override;

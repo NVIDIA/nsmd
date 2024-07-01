@@ -48,6 +48,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_CURRENT_CLOCK_FREQUENCY = 0x0B,
 	NSM_GET_CLOCK_EVENT_REASON_CODES = 0x44,
 	NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME = 0x46,
+	NSM_GET_CURRENT_UTILIZATION = 0x47,
 	NSM_SET_MIG_MODE = 0x4e,
 	NSM_GET_ECC_MODE = 0x4f,
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
@@ -463,6 +464,16 @@ struct nsm_get_accum_GPU_util_time_resp {
 	struct nsm_common_resp hdr;
 	uint32_t context_util_time;
 	uint32_t SM_util_time;
+} __attribute__((packed));
+
+/** @struct nsm_get_current_utilization
+ *
+ *  Structure representing Get Current Utilization response.
+ */
+struct nsm_get_current_utilization_resp {
+	struct nsm_common_resp hdr;
+	uint32_t gpu_utilization;
+	uint32_t memory_utilization;
 } __attribute__((packed));
 
 /** @struct nsm_xid_event_payload
@@ -1657,6 +1668,49 @@ int encode_get_accum_GPU_util_time_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_accum_GPU_util_time_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code, uint32_t *context_util_time, uint32_t *SM_util_time);
+
+/** @brief Encode a Get Current Utilization request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_utilization_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Encode a Get Current Utilization response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] gpu_utilization - Current SM Utilization for the GPU (in
+ * percentage)
+ *  @param[in] memory_utilization - Current memory bandwidth utilization for the
+ * GPU (in percentage)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_utilization_resp(uint8_t instance_id, uint8_t cc,
+					uint16_t reason_code,
+					uint32_t gpu_utilization,
+					uint32_t memory_utilization,
+					struct nsm_msg *msg);
+
+/** @brief Dncode a Get Current Utilization response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] gpu_utilization - Current SM Utilization for the GPU (in
+ * percentage)
+ *  @param[out] memory_utilization - Current memory bandwidth utilization for
+ * the GPU (in percentage)
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_utilization_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *data_size,
+					uint16_t *reason_code,
+					uint32_t *gpu_utilization,
+					uint32_t *memory_utilization);
 
 /** @brief Encode a Set Power Limits request message
  *
