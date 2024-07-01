@@ -68,7 +68,7 @@ class EnableDisableWriteProtected : public CommandInterface
     {
         auto writeProtectedGroup = app->add_option_group(
             "Required",
-            "Data Index and Value for wich write protected will be set.");
+            "Data Index and Value for which write protected will be set.");
 
         dataId = 0;
         writeProtectedGroup->add_option(
@@ -155,8 +155,7 @@ class EnableDisableWriteProtected : public CommandInterface
                       << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
-                      << (sizeof(nsm_msg_hdr) +
-                          sizeof(nsm_enable_disable_wp_resp));
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
 
             return;
         }

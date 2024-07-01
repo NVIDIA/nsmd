@@ -88,8 +88,7 @@ class SensorManagerTest
             return code;
         };
     }
-    auto mockSendRecvNsmMsgSync(const Response& header,
-                                const Response& data,
+    auto mockSendRecvNsmMsgSync(const Response& header, const Response& data,
                                 nsm_completion_codes code = NSM_SUCCESS)
     {
         return mockSendRecvNsmMsgSync(joinResponse(header, data), code);
@@ -109,8 +108,7 @@ class SensorManagerTest
             co_return code;
         };
     }
-    auto mockSendRecvNsmMsg(const Response& header,
-                            const Response& data,
+    auto mockSendRecvNsmMsg(const Response& header, const Response& data,
                             nsm_completion_codes code = NSM_SUCCESS)
     {
         return mockSendRecvNsmMsg(joinResponse(header, data), code);

@@ -208,6 +208,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         enableDisableWriteProtectedHandler(const nsm_msg* requestMsg,
                                            size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
+                                           size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         readThermalParameterHandler(const nsm_msg* requestMsg,
@@ -232,7 +235,10 @@ class MockupResponder
     std::unique_ptr<sdeventplus::source::IO> io;
     eid_t eventReceiverEid;
     uint8_t globalEventGenerationSetting;
-    nsm_fpga_diagnostics_settings_wp writeProtected;
+    struct State {
+        nsm_fpga_diagnostics_settings_wp writeProtected;
+        uint8_t istMode;
+    } state;
 };
 
 } // namespace MockupResponder

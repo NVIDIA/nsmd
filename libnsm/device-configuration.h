@@ -24,7 +24,10 @@ extern "C" {
 
 #include "base.h"
 
-enum device_configuration_command { NSM_GET_FPGA_DIAGNOSTICS_SETTINGS = 0x64 };
+enum device_configuration_command {
+	NSM_ENABLE_DISABLE_GPU_IST_MODE = 0x62,
+	NSM_GET_FPGA_DIAGNOSTICS_SETTINGS = 0x64,
+};
 
 enum fpga_diagnostics_settings_data_index {
 	GET_WP_SETTINGS = 0x00,
@@ -43,6 +46,8 @@ enum fpga_diagnostics_settings_data_index {
 	GET_GPU_POWER_STATUS = 0x0D,
 	GET_AGGREGATE_TELEMETRY = 0xFF,
 };
+
+#define ALL_GPUS_DEVICE_INDEX 0xA
 
 /** @struct nsm_get_fpga_diagnostics_settings_req
  *
@@ -162,6 +167,26 @@ struct nsm_get_gpu_presence_resp {
 struct nsm_get_gpu_power_status_resp {
 	struct nsm_common_resp hdr;
 	uint8_t power_status;
+} __attribute__((packed));
+
+/** @struct nsm_get_gpu_ist_mode_resp
+ *
+ *  Structure representing Get FPGA Diagnostics Settings response for GPU IST
+ * Mode response
+ */
+struct nsm_get_gpu_ist_mode_resp {
+	struct nsm_common_resp hdr;
+	uint8_t mode; // 7:0 – setting per GPU
+} __attribute__((packed));
+
+/** @struct nsm_enable_disable_gpu_ist_mode_req
+ *
+ *  Structure representing Enable/Disable GPU IST Mode request.
+ */
+struct nsm_enable_disable_gpu_ist_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t device_index; // 0-7: select GPU, 0xA all GPUs
+	uint8_t value;	      // 0 - disable, 1 - enable
 } __attribute__((packed));
 
 /** @brief Encode a Get FPGA Diagnostics Settings request message
@@ -353,6 +378,81 @@ int encode_get_gpu_power_status_resp(uint8_t instance_id, uint8_t cc,
 int decode_get_gpu_power_status_resp(const struct nsm_msg *msg, size_t msg_len,
 				     uint8_t *cc, uint16_t *reason_code,
 				     uint8_t *power_status);
+
+/** @brief Encode a Get GPU IST Mode Settings response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] mode - GPU IST Mode Settings 7:0 – setting per GPU
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_get_gpu_ist_mode_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint8_t mode,
+				 struct nsm_msg *msg);
+
+/** @brief Decode a Get GPU IST Mode Settings response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] mode  - GPU IST Mode Settings 7:0 – setting per GPU
+ * @return nsm_completion_codes
+ */
+int decode_get_gpu_ist_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint8_t *mode);
+
+/** @brief Encode a Enable/Disable GPU IST Mode Settings request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_index - Device index 0-7: select GPU, 0xA all GPUs
+ *  @param[in] value - 0 = disable, 1 = enable
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_enable_disable_gpu_ist_mode_req(uint8_t instance_id,
+					   uint8_t device_index, uint8_t value,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Enable/Disable GPU IST Mode Settings request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_index - Device index 0-7: select GPU, 0xA all GPUs
+ *  @param[out] value - 0 = disable, 1 = enable
+ *  @return nsm_completion_codes
+ */
+int decode_enable_disable_gpu_ist_mode_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint8_t *device_index,
+					   uint8_t *value);
+
+/** @brief Encode a Enable/Disable GPU IST Mode Settings response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_enable_disable_gpu_ist_mode_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a Enable/Disable GPU IST Mode Settings response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ * @return nsm_completion_codes
+ */
+int decode_enable_disable_gpu_ist_mode_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

@@ -257,3 +257,103 @@ int decode_get_gpu_power_status_resp(const struct nsm_msg *msg, size_t msg_len,
 		ret = NSM_SW_ERROR_LENGTH;
 	return ret;
 }
+
+int encode_get_gpu_ist_mode_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint8_t mode,
+				 struct nsm_msg *msg)
+{
+	return encode_get_fpga_diagnostics_settings_resp(
+	    instance_id, cc, reason_code, sizeof(uint8_t), &mode, msg);
+}
+
+int decode_get_gpu_ist_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint8_t *mode)
+{
+	uint16_t data_size = 0;
+	int ret = decode_get_fpga_diagnostics_settings_resp(
+	    msg, msg_len, cc, &data_size, reason_code, mode);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (data_size < sizeof(uint8_t))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
+int encode_enable_disable_gpu_ist_mode_req(uint8_t instance_id,
+					   uint8_t device_index, uint8_t value,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_enable_disable_gpu_ist_mode_req *request =
+	    (struct nsm_enable_disable_gpu_ist_mode_req *)msg->payload;
+
+	request->hdr.command = NSM_ENABLE_DISABLE_GPU_IST_MODE;
+	request->hdr.data_size = 2;
+	request->device_index = device_index;
+	request->value = value;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_enable_disable_gpu_ist_mode_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint8_t *device_index,
+					   uint8_t *value)
+{
+	if (msg == NULL || device_index == NULL || value == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_enable_disable_gpu_ist_mode_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_enable_disable_gpu_ist_mode_req *request =
+	    (struct nsm_enable_disable_gpu_ist_mode_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(struct nsm_enable_disable_gpu_ist_mode_req) -
+		NSM_REQUEST_CONVENTION_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_index = request->device_index;
+	*value = request->value;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_enable_disable_gpu_ist_mode_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_ENABLE_DISABLE_GPU_IST_MODE, msg);
+}
+
+int decode_enable_disable_gpu_ist_mode_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}

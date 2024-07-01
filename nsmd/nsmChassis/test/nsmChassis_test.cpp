@@ -27,6 +27,7 @@ using namespace ::testing;
 #include "nsmChassis.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
+#include "nsmIstModeEnabled.hpp"
 #include "nsmPowerSupplyStatus.hpp"
 #include "nsmWriteProtectedControl.hpp"
 #include "nsmWriteProtectedJumper.hpp"
@@ -295,25 +296,32 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
         .WillOnce(Return(get(fpgaProperties, "DEVICE_UUID")));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(3, fpga.roundRobinSensors.size());
+    EXPECT_EQ(5, fpga.roundRobinSensors.size());
+    EXPECT_EQ(5, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(0, gpu.deviceSensors.size());
 
     auto sensors = 0;
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                           fpga.deviceSensors[sensors]));
-    EXPECT_EQ(fpgaUuid, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-                            fpga.deviceSensors[sensors++])
-                            ->pdi()
-                            .uuid());
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
-                           fpga.deviceSensors[sensors++]));
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
-                  fpga.deviceSensors[sensors++]));
 
-    EXPECT_EQ(sensors, fpga.deviceSensors.size());
+    auto chassisUuid = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
+        fpga.deviceSensors[sensors++]);
+    auto mctpUuid = dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
+        fpga.deviceSensors[sensors++]);
+    auto pcieRefClock =
+        dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
+            fpga.deviceSensors[sensors++]);
+    auto mode = dynamic_pointer_cast<NsmInterfaceProvider<ModeIntf>>(
+        fpga.deviceSensors[sensors++]);
+    auto istModeEnabled =
+        dynamic_pointer_cast<NsmIstModeEnabled>(fpga.deviceSensors[sensors++]);
+    EXPECT_NE(nullptr, chassisUuid);
+    EXPECT_NE(nullptr, mctpUuid);
+    EXPECT_NE(nullptr, pcieRefClock);
+    EXPECT_NE(nullptr, mode);
+    EXPECT_NE(nullptr, istModeEnabled);
+
+    EXPECT_EQ(fpgaUuid, chassisUuid->pdi().uuid());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateStaticSensors)

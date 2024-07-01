@@ -77,7 +77,7 @@ TEST(getDiagnostics, testGoodDecodeRequest)
 TEST(getDiagnostics, testGoodEncodeResponse)
 {
 	std::vector<uint8_t> responseMsg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_resp), 0);
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
 	uint16_t reason_code = ERR_NULL;
@@ -85,9 +85,8 @@ TEST(getDiagnostics, testGoodEncodeResponse)
 	auto rc = encode_enable_disable_wp_resp(0, NSM_SUCCESS, reason_code,
 						response);
 
-	struct nsm_enable_disable_wp_resp *resp =
-	    reinterpret_cast<struct nsm_enable_disable_wp_resp *>(
-		response->payload);
+	auto resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
@@ -95,8 +94,8 @@ TEST(getDiagnostics, testGoodEncodeResponse)
 	EXPECT_EQ(0, response->hdr.datagram);
 	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
 
-	EXPECT_EQ(NSM_ENABLE_DISABLE_WP, resp->hdr.command);
-	EXPECT_EQ(0, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(NSM_ENABLE_DISABLE_WP, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
 }
 
 TEST(getDiagnostics, testGoodDecodeResponse)

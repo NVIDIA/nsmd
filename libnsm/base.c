@@ -592,6 +592,36 @@ int decode_common_req(const struct nsm_msg *msg, size_t msg_len)
 	return NSM_SW_SUCCESS;
 }
 
+int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+		       uint8_t nvidia_msg_type, uint8_t command,
+		       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = nvidia_msg_type;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, command, msg);
+	}
+
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
+
+	resp->command = command;
+	resp->completion_code = cc;
+	resp->data_size = htole16(0);
+	return NSM_SW_SUCCESS;
+}
+
 int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 		       uint16_t *data_size, uint16_t *reason_code)
 {
