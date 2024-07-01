@@ -197,6 +197,12 @@
                     "Functions": [
                         0
                     ]
+                },
+                "LTSSMState": {
+                    "Type": "NSM_LTSSMState",
+                    "DeviceIndex": 0,
+                    "Priority": false,
+                    "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_$INSTANCE_NUMBER/Switches/PCIeRetimer_$INSTANCE_NUMBER/Ports/Down_0"
                 }
             },
             {

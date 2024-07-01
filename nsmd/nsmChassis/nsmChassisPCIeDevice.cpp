@@ -23,6 +23,7 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPCIeFunction.hpp"
+#include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "utils.hpp"
 
@@ -148,13 +149,32 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
             device->addStaticSensor(function).update(manager, eid).detach();
         }
     }
+    else if (type == "NSM_LTSSMState")
+    {
+        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceIndex", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto inventoryObjPath =
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "InventoryObjPath", interface.c_str());
+
+        auto ltssmStateObject = NsmChassisPCIeDevice<LTSSMStateIntf>(
+            name, dbus::Interfaces{inventoryObjPath});
+        device->addSensor(
+            std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
+            priority);
+        lg2::debug("Created LTSSMStateIntf sensor {NAME} path: {PATH}", "NAME",
+                   name, "PATH", inventoryObjPath);
+    }
 }
 
-std::vector<std::string> chassisPCIeDeviceInterfaces{
+dbus::Interfaces chassisPCIeDeviceInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Asset",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Health",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisPCIeDeviceCreateSensors,
                                chassisPCIeDeviceInterfaces)

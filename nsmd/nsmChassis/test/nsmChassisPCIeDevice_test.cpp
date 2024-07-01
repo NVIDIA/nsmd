@@ -28,6 +28,7 @@ using namespace ::testing;
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPCIeFunction.hpp"
+#include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 
 namespace nsm
@@ -107,6 +108,8 @@ struct NsmChassisPCIeDeviceTest :
         {"Type", "NSM_LTSSMState"},
         {"DeviceIndex", uint64_t(1)},
         {"Priority", false},
+        {"InventoryObjPath",
+         "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
     };
     const MapperServiceMap gpuServiceMap = {
         {
@@ -237,13 +240,23 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(pcieDevice, "Priority")));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "ChassisName")))
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(ltssmState, "Type")))
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(ltssmState, "DeviceIndex")))
+        .WillOnce(Return(get(ltssmState, "Priority")))
+        .WillOnce(Return(get(ltssmState, "InventoryObjPath")));
+    nsmChassisPCIeDeviceCreateSensors(mockManager,
+                                      basicIntfName + ".LTSSMState", objPath);
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(1, gpu.roundRobinSensors.size());
-    EXPECT_EQ(5, gpu.deviceSensors.size());
+    EXPECT_EQ(2, gpu.roundRobinSensors.size());
+    EXPECT_EQ(6, gpu.deviceSensors.size());
 
     auto sensors = 0;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
@@ -257,6 +270,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
             gpu.deviceSensors[sensors++]);
     auto functionSensor =
         dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
+    auto ltssmStateSensor =
+        dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.deviceSensors[sensors++]);
     EXPECT_EQ(sensors, gpu.deviceSensors.size());
 
     EXPECT_NE(nullptr, partNumber);
@@ -264,6 +279,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, model);
     EXPECT_NE(nullptr, pcieDeviceObject);
     EXPECT_NE(nullptr, functionSensor);
+    EXPECT_NE(nullptr, ltssmStateSensor);
 
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
@@ -278,6 +294,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ("0x1234", functionSensor->pdi().function0DeviceId());
     EXPECT_EQ("0xFFAB", functionSensor->pdi().function0SubsystemVendorId());
     EXPECT_EQ("0x0022", functionSensor->pdi().function0SubsystemId());
+    EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
+              ltssmStateSensor->deviceIndex);
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
@@ -516,4 +534,87 @@ TEST(NsmPCIeLinkSpeedTest, testPcieTypeConvertion)
     EXPECT_EQ(PCIeType::Gen4, NsmPCIeLinkSpeedBase::pcieType(4));
     EXPECT_EQ(PCIeType::Gen5, NsmPCIeLinkSpeedBase::pcieType(5));
     EXPECT_EQ(PCIeType::Unknown, NsmPCIeLinkSpeedBase::pcieType(6));
+}
+
+struct NsmPCIeLTSSMStateTest : public NsmPCIeDeviceTest
+{
+    NsmChassisPCIeDevice<LTSSMStateIntf> ltssmDevice{chassisName, name};
+    std::shared_ptr<NsmPCIeLTSSMState> sensor =
+        std::make_shared<NsmPCIeLTSSMState>(ltssmDevice, deviceIndex);
+    void testResponse(uint32_t ltssmState)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        nsm_query_scalar_group_telemetry_group_6 data{ltssmState, 0};
+        auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+            instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        rc = sensor->handleResponseMsg(responseMsg, response.size());
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    }
+};
+
+TEST_F(NsmPCIeLTSSMStateTest, goodTestRequest)
+{
+    auto request = sensor->genRequestMsg(eid, instanceId);
+    EXPECT_TRUE(request.has_value());
+    EXPECT_EQ(request.value().size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_query_scalar_group_telemetry_v1_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.value().data());
+    uint8_t groupIndex = 0;
+    uint8_t deviceIndex = 0;
+    auto rc = decode_query_scalar_group_telemetry_v1_req(
+        requestPtr, request.value().size(), &deviceIndex, &groupIndex);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(6, groupIndex);
+    EXPECT_EQ(deviceIndex, deviceIndex);
+}
+TEST_F(NsmPCIeLTSSMStateTest, badTestRequest)
+{
+    auto request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
+    EXPECT_FALSE(request.has_value());
+}
+TEST_F(NsmPCIeLTSSMStateTest, goodTestResponse)
+{
+    for (uint32_t state = 0x0; state < 0x12; state++)
+    {
+        testResponse(state);
+        EXPECT_EQ(LTSSMStateIntf::State(state), sensor->pdi().ltssmState());
+    }
+    testResponse(0xFF);
+    EXPECT_EQ(LTSSMStateIntf::State::IllegalState, sensor->pdi().ltssmState());
+}
+TEST_F(NsmPCIeLTSSMStateTest, badTestResponseSize)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp) - 1);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, nullptr, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+    rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->pdi().ltssmState());
+}
+TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
+{
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_query_scalar_group_telemetry_v1_group_6_resp));
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_query_scalar_group_telemetry_group_6 data{3, 3};
+    auto rc = encode_query_scalar_group_telemetry_v1_group6_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &data, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    struct nsm_query_scalar_group_telemetry_v1_resp* resp =
+        (struct nsm_query_scalar_group_telemetry_v1_resp*)responseMsg->payload;
+    resp->hdr.completion_code = NSM_ERROR;
+    response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+    rc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->pdi().ltssmState());
 }

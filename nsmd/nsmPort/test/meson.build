@@ -1,6 +1,5 @@
 dep_src_files = [
     '../nsmPort.cpp',
-    '../nsmPCIeLTSSMState.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
@@ -9,7 +8,6 @@ dep_src_files = [
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/network-ports.c',
-    '../../../libnsm/pci-links.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
 ]
@@ -30,7 +28,6 @@ test_src = declare_dependency(
 
 tests = [
     'nsmPort_test',
-    'nsmPCIeLTSSMState_test',
 ]
 
 tests_deps = [

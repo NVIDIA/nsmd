@@ -26,6 +26,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
+#include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
@@ -44,6 +45,7 @@ using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
+using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
 
 template <typename IntfType>
 class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
@@ -55,6 +57,10 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
                                        chassisInventoryBasePath / chassisName /
                                            "PCIeDevices")
+    {}
+    NsmChassisPCIeDevice(const std::string& name, dbus::Interfaces inventoryPaths) :
+        NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
+                                       inventoryPaths)
     {}
     virtual requester::Coroutine update(SensorManager& manager,
                                         eid_t eid) override;
