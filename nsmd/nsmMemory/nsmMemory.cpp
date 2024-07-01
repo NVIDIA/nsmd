@@ -17,29 +17,74 @@ namespace nsm
 
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
-    std::string& correctionType) : NsmObject(name, type), dimmIntf(dimmIntf)
+    std::string& correctionType, std::string& inventoryObjPath) :
+    NsmObject(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->ecc(DimmIntf::convertEccFromString(correctionType));
+    updateMetricOnSharedMemory();
+}
+
+void NsmMemoryErrorCorrection::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(dimmIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType eccValue{
+        static_cast<uint16_t>(dimmIntf->ecc())};
+    std::string propName = "ECC";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, eccValue);
+#endif
 }
 
 NsmMemoryDeviceType::NsmMemoryDeviceType(std::string& name, std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
-                                         std::string& memoryType) :
-    NsmObject(name, type), dimmIntf(dimmIntf)
+                                         std::string& memoryType,
+                                         std::string& inventoryObjPath) :
+    NsmObject(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->memoryType(DimmIntf::convertDeviceTypeFromString(memoryType));
+    updateMetricOnSharedMemory();
+}
+
+void NsmMemoryDeviceType::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(dimmIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType memoryTypeValue{
+        dimmIntf->convertDeviceTypeToString(dimmIntf->memoryType())};
+    std::string propName = "MemoryType";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, memoryTypeValue);
+#endif
 }
 
 NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
                                              std::string& name,
                                              std::string& type,
                                              std::string& inventoryObjPath) :
-    NsmObject(name, type)
+    NsmObject(name, type),
+    inventoryObjPath(inventoryObjPath)
 {
     locationIntf =
         std::make_unique<LocationIntfMemory>(bus, inventoryObjPath.c_str());
 
     locationIntf->locationType(LocationTypesMemory::Embedded);
+    // #ifdef NVIDIA_SHMEM
+    //     auto ifaceName = std::string(locationIntf->interface);
+    //     std::vector<uint8_t> smbusData = {};
+
+    //     nv::sensor_aggregation::DbusVariantType memoryTypeValue{
+    //         locationIntf->locationType()};
+    //     std::string propName = "LocationType";
+    //     updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+    //                                 smbusData, memoryTypeValue);
+    // #endif
 }
 
 NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
@@ -55,7 +100,8 @@ NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
 NsmMemoryAssociation::NsmMemoryAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) : NsmObject(name, type)
+    const std::vector<utils::Association>& associations) :
+    NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -72,18 +118,42 @@ NsmMemoryAssociation::NsmMemoryAssociation(
 
 NsmRowRemapState::NsmRowRemapState(
     std::string& name, std::string& type,
-    std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf) :
-    NsmSensor(name, type)
+    std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
+    std::string& inventoryObjPath) :
+    NsmSensor(name, type),
+    inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemapIntf: create sensor:{NAME}", "NAME", name.c_str());
     memoryRowRemappingStateIntf = memoryRowRemappingIntf;
+    updateMetricOnSharedMemory();
+}
+
+void NsmRowRemapState::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(memoryRowRemappingStateIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType rowRemappingFailureStateVal{
+        memoryRowRemappingStateIntf->rowRemappingFailureState()};
+    std::string propName = "RowRemappingFailureState";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, rowRemappingFailureStateVal);
+
+    nv::sensor_aggregation::DbusVariantType rowRemappingPendingStateVal{
+        memoryRowRemappingStateIntf->rowRemappingPendingState()};
+    propName = "RowRemappingPendingState";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, rowRemappingPendingStateVal);
+#endif
 }
 
 void NsmRowRemapState::updateReading(bitfield8_t flags)
 {
     memoryRowRemappingStateIntf->rowRemappingFailureState(flags.bits.bit0);
     memoryRowRemappingStateIntf->rowRemappingPendingState(flags.bits.bit1);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -131,13 +201,36 @@ uint8_t NsmRowRemapState::handleResponseMsg(const struct nsm_msg* responseMsg,
 
 NsmRowRemappingCounts::NsmRowRemappingCounts(
     std::string& name, std::string& type,
-    std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf) :
-    NsmSensor(name, type)
+    std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
+    std::string& inventoryObjPath) :
+    NsmSensor(name, type),
+    inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemappingCount: create sensor:{NAME}", "NAME",
               name.c_str());
     memoryRowRemappingCountsIntf = memoryRowRemappingIntf;
+    updateMetricOnSharedMemory();
+}
+
+void NsmRowRemappingCounts::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(memoryRowRemappingCountsIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType ceRowRemappingCount{
+        memoryRowRemappingCountsIntf->ceRowRemappingCount()};
+    std::string propName = "ceRowRemappingCount";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, ceRowRemappingCount);
+
+    propName = "ueRowRemappingCount";
+    nv::sensor_aggregation::DbusVariantType ueRowRemappingCount{
+        memoryRowRemappingCountsIntf->ueRowRemappingCount()};
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, ueRowRemappingCount);
+#endif
 }
 
 void NsmRowRemappingCounts::updateReading(uint32_t correctable_error,
@@ -145,6 +238,7 @@ void NsmRowRemappingCounts::updateReading(uint32_t correctable_error,
 {
     memoryRowRemappingCountsIntf->ceRowRemappingCount(correctable_error);
     memoryRowRemappingCountsIntf->ueRowRemappingCount(uncorrectable_error);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -194,11 +288,32 @@ uint8_t
 
 NsmEccErrorCountsDram::NsmEccErrorCountsDram(
     std::string& name, std::string& type,
-    std::shared_ptr<EccModeIntfDram> eccIntf) :
-    NsmSensor(name, type), eccIntf(eccIntf)
+    std::shared_ptr<EccModeIntfDram> eccIntf, std::string& inventoryObjPath) :
+    NsmSensor(name, type),
+    eccIntf(eccIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
+    updateMetricOnSharedMemory();
+}
+
+void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(eccIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "ceCount";
+    nv::sensor_aggregation::DbusVariantType ceCount{
+        static_cast<int64_t>(eccIntf->ceCount())};
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, ceCount);
+    propName = "ueCount";
+    nv::sensor_aggregation::DbusVariantType ueCount{
+        static_cast<int64_t>(eccIntf->ueCount())};
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, ueCount);
+#endif
 }
 
 void NsmEccErrorCountsDram::updateReading(
@@ -206,6 +321,7 @@ void NsmEccErrorCountsDram::updateReading(
 {
     eccIntf->ceCount(errorCounts.dram_corrected);
     eccIntf->ueCount(errorCounts.dram_uncorrected);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -253,14 +369,28 @@ uint8_t
 
 NsmClockLimitMemory::NsmClockLimitMemory(const std::string& name,
                                          const std::string& type,
-                                         std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmSensor(name, type), dimmIntf(dimmIntf)
+                                         std::shared_ptr<DimmIntf> dimmIntf,
+                                         std::string& inventoryObjPath) :
+    NsmSensor(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmClockLimitMemory: create sensor:{NAME}", "NAME",
               name.c_str());
+    updateMetricOnSharedMemory();
 }
-
+void NsmClockLimitMemory::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(dimmIntf->interface);
+    nv::sensor_aggregation::DbusVariantType valueVariant{
+        dimmIntf->allowedSpeedsMT()};
+    std::vector<uint8_t> smbusData = {};
+    std::string propName = "AllowedSpeedsMT";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, valueVariant);
+#endif
+}
 void NsmClockLimitMemory::updateReading(
     const struct nsm_clock_limit& clockLimit)
 {
@@ -268,6 +398,7 @@ void NsmClockLimitMemory::updateReading(
         static_cast<uint16_t>(clockLimit.present_limit_min),
         static_cast<uint16_t>(clockLimit.present_limit_max)};
     dimmIntf->allowedSpeedsMT(speedLimit);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -317,17 +448,34 @@ uint8_t
 
 NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
                                          const std::string& type,
-                                         std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmSensor(name, type), dimmIntf(dimmIntf)
+                                         std::shared_ptr<DimmIntf> dimmIntf,
+                                         std::string inventoryObjPath) :
+    NsmSensor(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMemCurrClockFreq: create sensor:{NAME}", "NAME",
               name.c_str());
+    updateMetricOnSharedMemory();
+}
+
+void NsmMemCurrClockFreq::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(dimmIntf->interface);
+    nv::sensor_aggregation::DbusVariantType valueVariant{
+        dimmIntf->memoryConfiguredSpeedInMhz()};
+    std::vector<uint8_t> smbusData = {};
+    std::string propName = "MemoryConfiguredSpeedInMhz";
+    updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName, propName,
+                                smbusData, valueVariant);
+#endif
 }
 
 void NsmMemCurrClockFreq::updateReading(const uint32_t& clockFreq)
 {
     dimmIntf->memoryConfiguredSpeedInMhz(clockFreq);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -376,20 +524,18 @@ uint8_t
     return cc;
 }
 
-NsmMemCapacity::NsmMemCapacity(const std::string& name,
-                                         const std::string& type,
-                                         std::shared_ptr<DimmIntf> dimmIntf) :
+NsmMemCapacity::NsmMemCapacity(const std::string& name, const std::string& type,
+                               std::shared_ptr<DimmIntf> dimmIntf) :
     NsmMemoryCapacity(name, type),
     dimmIntf(dimmIntf)
 
 {
-    lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME",
-              name.c_str());
+    lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME", name.c_str());
 }
 
 void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
 {
-    if(maximumMemoryCapacity == NULL)
+    if (maximumMemoryCapacity == NULL)
     {
         lg2::error(
             "NsmMemCapacity::updateReading unable to fetch Maximum Memory Capacity");
@@ -441,13 +587,13 @@ static void createNsmMemorySensor(SensorManager& manager,
                 utils::DBusHandler().getDbusProperty<std::string>(
                     objPath.c_str(), "ErrorCorrection", interface.c_str());
             auto sensorErrorCorrection =
-                std::make_shared<NsmMemoryErrorCorrection>(name, type, dimmIntf,
-                                                           correctionType);
+                std::make_shared<NsmMemoryErrorCorrection>(
+                    name, type, dimmIntf, correctionType, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorErrorCorrection);
             auto deviceType = utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "DeviceType", interface.c_str());
             auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
-                name, type, dimmIntf, deviceType);
+                name, type, dimmIntf, deviceType, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorDeviceType);
             auto sensorHealth = std::make_shared<NsmMemoryHealth>(
                 bus, name, type, inventoryObjPath);
@@ -463,10 +609,10 @@ static void createNsmMemorySensor(SensorManager& manager,
 
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
-            auto clockLimitSensor =
-                std::make_shared<NsmClockLimitMemory>(name, type, dimmIntf);
-            auto currClockFreqSensor =
-                std::make_shared<NsmMemCurrClockFreq>(name, type, dimmIntf);
+            auto clockLimitSensor = std::make_shared<NsmClockLimitMemory>(
+                name, type, dimmIntf, inventoryObjPath);
+            auto currClockFreqSensor = std::make_shared<NsmMemCurrClockFreq>(
+                name, type, dimmIntf, inventoryObjPath);
 
             if (priority)
             {
@@ -488,11 +634,11 @@ static void createNsmMemorySensor(SensorManager& manager,
                 bus, inventoryObjPath.c_str());
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
-            auto sensorRowRemapState =
-                std::make_shared<NsmRowRemapState>(name, type, rowRemapIntf);
+            auto sensorRowRemapState = std::make_shared<NsmRowRemapState>(
+                name, type, rowRemapIntf, inventoryObjPath);
             auto sensorRowRemappingCounts =
-                std::make_shared<NsmRowRemappingCounts>(name, type,
-                                                        rowRemapIntf);
+                std::make_shared<NsmRowRemappingCounts>(
+                    name, type, rowRemapIntf, inventoryObjPath);
             if (priority)
             {
                 nsmDevice->prioritySensors.push_back(sensorRowRemapState);
@@ -511,8 +657,8 @@ static void createNsmMemorySensor(SensorManager& manager,
                 objPath.c_str(), "Priority", interface.c_str());
             auto eccModeIntf = std::make_shared<EccModeIntfDram>(
                 bus, inventoryObjPath.c_str());
-            auto sensor = std::make_shared<NsmEccErrorCountsDram>(name, type,
-                                                                  eccModeIntf);
+            auto sensor = std::make_shared<NsmEccErrorCountsDram>(
+                name, type, eccModeIntf, inventoryObjPath);
             if (priority)
             {
                 nsmDevice->prioritySensors.push_back(sensor);

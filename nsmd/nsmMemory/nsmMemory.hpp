@@ -2,9 +2,11 @@
 #include "base.h"
 #include "platform-environmental.h"
 
-#include "nsmSensor.hpp"
 #include "nsmCommon/nsmCommon.hpp"
+#include "nsmSensor.hpp"
+
 #include <com/nvidia/MemoryRowRemapping/server.hpp>
+#include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
@@ -16,7 +18,6 @@ namespace nsm
 {
 using DimmIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>;
-
 using EccType =
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm::Ecc;
 class NsmMemoryErrorCorrection : public NsmObject
@@ -24,10 +25,13 @@ class NsmMemoryErrorCorrection : public NsmObject
   public:
     NsmMemoryErrorCorrection(std::string& name, std::string& type,
                              std::shared_ptr<DimmIntf> dimmIntf,
-                             std::string& correctionType);
+                             std::string& correctionType,
+                             std::string& inventoryObjPath);
+    void updateMetricOnSharedMemory();
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;
+    std::string inventoryObjPath;
 };
 
 using MemoryDeviceType =
@@ -37,10 +41,12 @@ class NsmMemoryDeviceType : public NsmObject
   public:
     NsmMemoryDeviceType(std::string& name, std::string& type,
                         std::shared_ptr<DimmIntf> dimmIntf,
-                        std::string& memoryType);
+                        std::string& memoryType, std::string& inventoryObjPath);
+    void updateMetricOnSharedMemory();
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;
+    std::string inventoryObjPath;
 };
 
 using MemoryHealthIntf = sdbusplus::server::object_t<
@@ -69,6 +75,7 @@ class NsmLocationIntfMemory : public NsmObject
 
   private:
     std::unique_ptr<LocationIntfMemory> locationIntf;
+    std::string inventoryObjPath;
 };
 
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
@@ -94,19 +101,22 @@ class NsmRowRemapState : public NsmSensor
   public:
     NsmRowRemapState(
         std::string& name, std::string& type,
-        std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf);
+        std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
+        std::string& inventoryObjPath);
     NsmRowRemapState() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory();
 
   private:
     void updateReading(bitfield8_t flags);
 
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingStateIntf =
         nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmRowRemappingCounts : public NsmSensor
@@ -114,8 +124,10 @@ class NsmRowRemappingCounts : public NsmSensor
   public:
     NsmRowRemappingCounts(
         std::string& name, std::string& type,
-        std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf);
+        std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
+        std::string& inventoryObjPath);
     NsmRowRemappingCounts() = default;
+    void updateMetricOnSharedMemory();
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -128,6 +140,7 @@ class NsmRowRemappingCounts : public NsmSensor
 
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingCountsIntf =
         nullptr;
+    std::string inventoryObjPath;
 };
 
 using EccModeIntfDram = sdbusplus::server::object_t<
@@ -137,7 +150,8 @@ class NsmEccErrorCountsDram : public NsmSensor
 {
   public:
     NsmEccErrorCountsDram(std::string& name, std::string& type,
-                          std::shared_ptr<EccModeIntfDram> eccIntf);
+                          std::shared_ptr<EccModeIntfDram> eccIntf,
+                          std::string& inventoryObjPath);
     NsmEccErrorCountsDram() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -145,17 +159,20 @@ class NsmEccErrorCountsDram : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    void updateMetricOnSharedMemory();
+
   private:
     void updateReading(struct nsm_ECC_error_counts);
-
     std::shared_ptr<EccModeIntfDram> eccIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmClockLimitMemory : public NsmSensor
 {
   public:
     NsmClockLimitMemory(const std::string& name, const std::string& type,
-                        std::shared_ptr<DimmIntf> dimmIntf);
+                        std::shared_ptr<DimmIntf> dimmIntf,
+                        std::string& inventoryObjPath);
     NsmClockLimitMemory() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -163,26 +180,32 @@ class NsmClockLimitMemory : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    void updateMetricOnSharedMemory();
+
   private:
     void updateReading(const struct nsm_clock_limit&);
     std::shared_ptr<DimmIntf> dimmIntf;
+    std::string inventoryObjPath;
 };
 class NsmMemCurrClockFreq : public NsmSensor
 {
   public:
     NsmMemCurrClockFreq(const std::string& name, const std::string& type,
-                        std::shared_ptr<DimmIntf> dimmIntf);
+                        std::shared_ptr<DimmIntf> dimmIntf,
+                        std::string inventoryObjPath);
     NsmMemCurrClockFreq() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory();
 
   private:
     void updateReading(const uint32_t& clockFreq);
 
     std::shared_ptr<DimmIntf> dimmIntf;
+    std::string inventoryObjPath;
 };
 
 class NsmMemCapacity : public NsmMemoryCapacity
