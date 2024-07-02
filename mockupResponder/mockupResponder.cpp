@@ -85,7 +85,10 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
 
 int MockupResponder::initSocket()
 {
-    lg2::info("connect to Mockup EID({EID})", "EID", mockEid);
+    if (verbose)
+    {
+        lg2::info("connect to Mockup EID({EID})", "EID", mockEid);
+    }
 
     auto fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if (fd == -1)
@@ -238,14 +241,20 @@ std::optional<std::vector<uint8_t>>
 
     if (NSM_EVENT_ACKNOWLEDGMENT == hdrFields.nsm_msg_type)
     {
-        lg2::info("received NSM event acknowledgement length={LEN}", "LEN",
+        if (verbose)
+        {
+            lg2::info("received NSM event acknowledgement length={LEN}", "LEN",
                   rxMsg.size());
+        }
         return std::nullopt;
     }
 
     if (NSM_REQUEST == hdrFields.nsm_msg_type)
     {
-        lg2::info("received NSM request length={LEN}", "LEN", rxMsg.size());
+        if (verbose)
+        {
+            lg2::info("received NSM request length={LEN}", "LEN", rxMsg.size());
+        }
     }
     auto request = reinterpret_cast<const nsm_msg*>(hdr);
     size_t requestLen = rxMsg.size() - MCTP_DEMUX_PREFIX;
@@ -253,8 +262,12 @@ std::optional<std::vector<uint8_t>>
     auto nvidiaMsgType = request->hdr.nvidia_msg_type;
     auto command = request->payload[0];
 
-    lg2::info("nsm msg type={TYPE} command code={COMMAND}", "TYPE",
+    if (verbose)
+    {
+        lg2::info("nsm msg type={TYPE} command code={COMMAND}", "TYPE",
               nvidiaMsgType, "COMMAND", command);
+    }
+
     switch (nvidiaMsgType)
     {
         case NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY:
@@ -277,8 +290,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT:
                     return configureEventAcknowledgement(request, requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
 
                     return unsupportedCommandHandler(request, requestLen);
             }
@@ -295,8 +308,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_QUERY_PORTS_AVAILABLE:
                     return queryPortsAvailableHandler(request, requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
 
                     return unsupportedCommandHandler(request, requestLen);
             }
@@ -364,8 +377,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
                     return queryPerInstanceGPMMetrics(request, requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
 
                     return unsupportedCommandHandler(request, requestLen);
             }
@@ -379,8 +392,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
                     return pcieFundamentalResetHandler(request, requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
@@ -391,8 +404,8 @@ std::optional<std::vector<uint8_t>>
                     return enableDisableWriteProtectedHandler(request,
                                                               requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
@@ -405,8 +418,8 @@ std::optional<std::vector<uint8_t>>
                     return getFpgaDiagnosticsSettingsHandler(request,
                                                              requestLen);
                 default:
-                    lg2::error("unsupported Command:{CMD} request length={LEN}",
-                               "CMD", command, "LEN", requestLen);
+                    lg2::error("unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                               "CMD", command, "LEN", requestLen, "TYPE", nvidiaMsgType);
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
@@ -425,7 +438,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::unsupportedCommandHandler(const nsm_msg* requestMsg,
                                                size_t requestLen)
 {
-    lg2::info("unsupportedCommand: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("unsupportedCommand: request length={LEN}", "LEN", requestLen);
+    }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
@@ -442,7 +458,10 @@ std::optional<std::vector<uint8_t>>
 std::optional<std::vector<uint8_t>>
     MockupResponder::pingHandler(const nsm_msg* requestMsg, size_t requestLen)
 {
-    lg2::info("pingHandler: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("pingHandler: request length={LEN}", "LEN", requestLen);
+    }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
@@ -458,8 +477,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getSupportNvidiaMessageTypesHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-    lg2::info("getSupportNvidiaMessageTypesHandler: request length={LEN}",
+    if (verbose)
+    {
+        lg2::info("getSupportNvidiaMessageTypesHandler: request length={LEN}",
               "LEN", requestLen);
+    }
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
@@ -485,32 +507,107 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getSupportCommandCodeHandler(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
-    lg2::error("getSupportCommandCodeHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getSupportCommandCodeHandler: request length={LEN}", "LEN",
                requestLen);
+    }
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_command_codes_resp), 0);
 
-    // this is to mock that
-    // 0,1,2,3,4,6,7,9,15,16,17,18,20,C[12],42[66],43[67],61[97],62[98],64[100],65[101],6A[106]
-    // commandCodes are supported
-    bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
-        0b11011111, /*   7 -   0  - Byte 1*/
-        0b10011011, /*  15 -   8  - Byte 2 */
-        0b00010111, /*  23 -  16  - Byte 3 */
+    bitfield8_t commandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = { 0 };
+
+    // Supported discovery commands codes
+    bitfield8_t discoveryCommandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
+        0b01100111, /*   7 -   0  - Byte 1*/
+        0b00000110, /*  15 -   8  - Byte 2 */
+        0b00000000, /*  23 -  16  - Byte 3 */
         0b00000000, /*  31 -  24  - Byte 4 */
         0b00000000, /*  39 -  32  - Byte 5 */
         0b00000000, /*  47 -  40  - Byte 6 */
         0b00000000, /*  55 -  48  - Byte 7 */
         0b00000000, /*  63 -  56  - Byte 8 */
-        0b10011100, /*  71 -  64  - Byte 9 */
-        0b11101110, /*  79 -  72  - Byte 10 */
+        0b00000000, /*  71 -  64  - Byte 9 */
+        0b00000000, /*  79 -  72  - Byte 10 */
         0b00000000, /*  87 -  80  - Byte 11 */
         0b00000000, /*  95 -  88  - Byte 12 */
-        0b00110111, /* 103 -  96  - Byte 13 */
+        0b00000000, /* 103 -  96  - Byte 13 */
+        0b00000000, /* 111 - 104  - Byte 14 */
+        0b00000000, /* 119 - 112  - Byte 15 */
+        0b00000000, /* 127 - 120  - Byte 16 */
+        0b00000000, /* 135 - 128  - Byte 17 */
+        0b00000000, /* 143 - 136  - Byte 18 */
+        0b00000000, /* 151 - 144  - Byte 19 */
+        0b00000000, /* 159 - 152  - Byte 20 */
+        0b00000000, /* 167 - 160  - Byte 21 */
+        0b00000000, /* 175 - 168  - Byte 22 */
+        0b00000000, /* 183 - 176  - Byte 23 */
+        0b00000000, /* 191 - 184  - Byte 24 */
+        0b00000000, /* 199 - 192  - Byte 25 */
+        0b00000000, /* 207 - 200  - Byte 26 */
+        0b00000000, /* 215 - 208  - Byte 27 */
+        0b00000000, /* 223 - 216  - Byte 28 */
+        0b00000000, /* 231 - 224  - Byte 29 */
+        0b00000000, /* 239 - 232  - Byte 30 */
+        0b00000000, /* 247 - 240  - Byte 31 */
+        0b00000000, /* 255 - 248  - Byte 32 */
+    };
+
+    // Supported network commands codes
+    bitfield8_t networkCommandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
+        0b00000010, /*   7 -   0  - Byte 1*/
+        0b00000000, /*  15 -   8  - Byte 2 */
+        0b00000000, /*  23 -  16  - Byte 3 */
+        0b00000000, /*  31 -  24  - Byte 4 */
+        0b00000000, /*  39 -  32  - Byte 5 */
+        0b00000000, /*  47 -  40  - Byte 6 */
+        0b00000000, /*  55 -  48  - Byte 7 */
+        0b00000000, /*  63 -  56  - Byte 8 */
+        0b00001110, /*  71 -  64  - Byte 9 */
+        0b00000000, /*  79 -  72  - Byte 10 */
+        0b00000000, /*  87 -  80  - Byte 11 */
+        0b00000000, /*  95 -  88  - Byte 12 */
+        0b00000000, /* 103 -  96  - Byte 13 */
+        0b00000000, /* 111 - 104  - Byte 14 */
+        0b00000000, /* 119 - 112  - Byte 15 */
+        0b00000000, /* 127 - 120  - Byte 16 */
+        0b00000000, /* 135 - 128  - Byte 17 */
+        0b00000000, /* 143 - 136  - Byte 18 */
+        0b00000000, /* 151 - 144  - Byte 19 */
+        0b00000000, /* 159 - 152  - Byte 20 */
+        0b00000000, /* 167 - 160  - Byte 21 */
+        0b00000000, /* 175 - 168  - Byte 22 */
+        0b00000000, /* 183 - 176  - Byte 23 */
+        0b00000000, /* 191 - 184  - Byte 24 */
+        0b00000000, /* 199 - 192  - Byte 25 */
+        0b00000000, /* 207 - 200  - Byte 26 */
+        0b00000000, /* 215 - 208  - Byte 27 */
+        0b00000000, /* 223 - 216  - Byte 28 */
+        0b00000000, /* 231 - 224  - Byte 29 */
+        0b00000000, /* 239 - 232  - Byte 30 */
+        0b00000000, /* 247 - 240  - Byte 31 */
+        0b00000000, /* 255 - 248  - Byte 32 */
+    };
+
+    // Supported platform environment commands codes
+    bitfield8_t platformCommandCode[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {
+        0b11001101, /*   7 -   0  - Byte 1*/
+        0b11011111, /*  15 -   8  - Byte 2 */
+        0b00000011, /*  23 -  16  - Byte 3 */
+        0b00000000, /*  31 -  24  - Byte 4 */
+        0b00000000, /*  39 -  32  - Byte 5 */
+        0b00000000, /*  47 -  40  - Byte 6 */
+        0b00000000, /*  55 -  48  - Byte 7 */
+        0b00000000, /*  63 -  56  - Byte 8 */
+        0b01010000, /*  71 -  64  - Byte 9 */
+        0b11100110, /*  79 -  72  - Byte 10 */
+        0b00000000, /*  87 -  80  - Byte 11 */
+        0b00000000, /*  95 -  88  - Byte 12 */
+        0b00000010, /* 103 -  96  - Byte 13 */
         0b00000100, /* 111 - 104  - Byte 14 */
         0b00000000, /* 119 - 112  - Byte 15 */
-        0b00010000, /* 127 - 120  - Byte 16 */
+        0b11110000, /* 127 - 120  - Byte 16 */
         0b00000000, /* 135 - 128  - Byte 17 */
         0b00000000, /* 143 - 136  - Byte 18 */
         0b00000000, /* 151 - 144  - Byte 19 */
@@ -528,13 +625,63 @@ std::optional<std::vector<uint8_t>>
         0b00000000, /* 247 - 240  - Byte 31 */
         0b00000000, /* 255 - 248  - Byte 32 */
     };
+
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
-        requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
+
+    if (NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY == requestMsg->payload[2])
+    {
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, discoveryCommandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else if (NSM_TYPE_NETWORK_PORT == requestMsg->payload[2])
+    {
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, networkCommandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else if (NSM_TYPE_PLATFORM_ENVIRONMENTAL == requestMsg->payload[2])
+    {
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, platformCommandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else if (NSM_TYPE_PCI_LINK == requestMsg->payload[2])
+    {
+        commandCode[NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 / 8].byte |=
+            1 << (NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 % 8);
+        commandCode[NSM_ASSERT_PCIE_FUNDAMENTAL_RESET / 8].byte |=
+            1 << (NSM_ASSERT_PCIE_FUNDAMENTAL_RESET % 8);
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else if (NSM_TYPE_DIAGNOSTIC == requestMsg->payload[2])
+    {
+        commandCode[NSM_ENABLE_DISABLE_WP / 8].byte |=
+            1 << (NSM_ENABLE_DISABLE_WP % 8);
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else if (NSM_TYPE_DEVICE_CONFIGURATION == requestMsg->payload[2])
+    {
+        commandCode[NSM_GET_FPGA_DIAGNOSTICS_SETTINGS / 8].byte |=
+            1 << (NSM_GET_FPGA_DIAGNOSTICS_SETTINGS % 8);
+        [[maybe_unused]] auto rc = encode_get_supported_command_codes_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, commandCode, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        lg2::error("getSupportCommandCodeHandler: request msg type={MSG} is not supported",
+                "MSG", requestMsg->payload[2]);
+        return std::nullopt;
+    }
+
     return response;
 }
 
@@ -628,16 +775,22 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
-    lg2::info("getPortTelemetryCounterHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getPortTelemetryCounterHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t portNumber = 0;
     auto rc = decode_get_port_telemetry_counter_req(requestMsg, requestLen,
                                                     &portNumber);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_get_port_telemetry_counter_req failed: rc={RC}",
+        if (verbose)
+        {
+            lg2::error("decode_get_port_telemetry_counter_req failed: rc={RC}",
                    "RC", rc);
+        }
         return std::nullopt;
     }
 
@@ -688,8 +841,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::queryPortCharacteristicsHandler(const nsm_msg* requestMsg,
                                                      size_t requestLen)
 {
-    lg2::info("queryPortCharacteristicsHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryPortCharacteristicsHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t portNumber = 0;
     auto rc = decode_query_port_characteristics_req(requestMsg, requestLen,
@@ -731,8 +887,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::queryPortStatusHandler(const nsm_msg* requestMsg,
                                             size_t requestLen)
 {
-    lg2::info("queryPortStatusHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryPortStatusHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t portNumber = 0;
     auto rc = decode_query_port_status_req(requestMsg, requestLen, &portNumber);
@@ -767,8 +926,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::queryPortsAvailableHandler(const nsm_msg* requestMsg,
                                                 size_t requestLen)
 {
-    lg2::info("queryPortsAvailableHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryPortsAvailableHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     auto rc = decode_query_ports_available_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
@@ -804,8 +966,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getInventoryInformationHandler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
-    lg2::info("getInventoryInformationHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getInventoryInformationHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t propertyIdentifier = 0;
     auto rc = decode_get_inventory_information_req(requestMsg, requestLen,
@@ -839,8 +1004,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::queryDeviceIdentificationHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
 {
-    lg2::info("queryDeviceIdentificationHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryDeviceIdentificationHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_identification_resp), 0);
@@ -865,9 +1033,12 @@ std::optional<std::vector<uint8_t>>
     auto request = reinterpret_cast<const nsm_get_temperature_reading_req*>(
         requestMsg->payload);
     uint8_t sensor_id{request->sensor_id};
-    lg2::info(
-        "getTemperatureReadingHandler: Sensor_Id={ID}, request length={LEN}",
-        "LEN", requestLen, "ID", sensor_id);
+    if (verbose)
+    {
+        lg2::info(
+            "getTemperatureReadingHandler: Sensor_Id={ID}, request length={LEN}",
+            "LEN", requestLen, "ID", sensor_id);
+    }
 
     if (sensor_id == 255)
     {
@@ -936,17 +1107,23 @@ std::optional<std::vector<uint8_t>>
     if (requestLen <
         sizeof(nsm_msg_hdr) + sizeof(nsm_read_thermal_parameter_req))
     {
-        lg2::info(
+        if (verbose)
+        {
+            lg2::info(
             "readThermalParameterHandler: invalid command request length of {LEN}.",
             "LEN", requestLen);
+        }
 
         return std::nullopt;
     }
 
     uint8_t parameter_id{request->parameter_id};
-    lg2::info(
-        "readThermalParameterHandler: Parameter_Id={ID}, request length={LEN}",
-        "LEN", requestLen, "ID", parameter_id);
+    if (verbose)
+    {
+        lg2::info(
+            "readThermalParameterHandler: Parameter_Id={ID}, request length={LEN}",
+            "LEN", requestLen, "ID", parameter_id);
+    }
 
     if (parameter_id == 255)
     {
@@ -1014,9 +1191,12 @@ std::optional<std::vector<uint8_t>>
     auto request = reinterpret_cast<const nsm_get_current_power_draw_req*>(
         requestMsg->payload);
     uint8_t sensor_id{request->sensor_id};
-    lg2::info(
+    if (verbose)
+    {
+        lg2::info(
         "getCurrentPowerDrawHandler: Sensor_Id={ID}, request length={LEN}",
         "LEN", requestLen, "ID", sensor_id);
+    }
 
     if (sensor_id == 255)
     {
@@ -1095,7 +1275,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getDriverInfoHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("getDriverInfoHandler: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getDriverInfoHandler: request length={LEN}", "LEN", requestLen);
+    }
 
     // Assuming decode_get_driver_info_req
     auto rc = decode_get_driver_info_req(requestMsg, requestLen);
@@ -1120,8 +1303,11 @@ std::optional<std::vector<uint8_t>>
     // starting at index 0
     driver_info_data[data.length() + 1] = static_cast<uint8_t>('\0');
 
-    lg2::info("Mock driver info - State: {STATE}, Version: {VERSION}", "STATE",
+    if (verbose)
+    {
+        lg2::info("Mock driver info - State: {STATE}, Version: {VERSION}", "STATE",
               2, "VERSION", data);
+    }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                       NSM_RESPONSE_CONVENTION_LEN +
@@ -1300,7 +1486,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::setEventSubscription(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("setEventSubscription: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("setEventSubscription: request length={LEN}", "LEN", requestLen);
+    }
 
     uint8_t globalSetting = 0;
     uint8_t receiverEid = 0;
@@ -1314,8 +1503,11 @@ std::optional<std::vector<uint8_t>>
 
     globalEventGenerationSetting = globalSetting;
     eventReceiverEid = receiverEid;
-    lg2::info("setEventSubscription: setting={SETTING} ReceiverEID={EID}",
+    if (verbose)
+    {
+        lg2::info("setEventSubscription: setting={SETTING} ReceiverEID={EID}",
               "SETTING", globalEventGenerationSetting, "EID", eventReceiverEid);
+    }
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN, 0);
@@ -1336,8 +1528,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::setCurrentEventSources(const nsm_msg* requestMsg,
                                             size_t requestLen)
 {
-    lg2::info("setCurrentEventSources: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("setCurrentEventSources: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t nvidiaMessageType = 0;
     bitfield8_t* event_sources;
@@ -1369,8 +1564,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::configureEventAcknowledgement(const nsm_msg* requestMsg,
                                                    size_t requestLen)
 {
-    lg2::info("configureEventAcknowledgement: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("configureEventAcknowledgement: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t nvidiaMessageType = 0;
     bitfield8_t* currentEventSourcesAcknowledgementMask;
@@ -1385,11 +1583,14 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
     }
 
-    lg2::info(
-        "receive configureEventAcknowledgement request, nvidiaMessageType={MSGTYPE} mask[0]={M0} mask[1]={M1}",
-        "MSGTYPE", nvidiaMessageType, "M0",
-        currentEventSourcesAcknowledgementMask[0].byte, "M1",
-        currentEventSourcesAcknowledgementMask[1].byte);
+    if (verbose)
+    {
+        lg2::info(
+            "receive configureEventAcknowledgement request, nvidiaMessageType={MSGTYPE} mask[0]={M0} mask[1]={M1}",
+            "MSGTYPE", nvidiaMessageType, "M0",
+            currentEventSourcesAcknowledgementMask[0].byte, "M1",
+            currentEventSourcesAcknowledgementMask[1].byte);
+    }
 
     std::vector<bitfield8_t> newEventSourcesAcknowledgementMask(8);
     std::vector<uint8_t> response(
@@ -1457,7 +1658,11 @@ int MockupResponder::mctpSockSend(uint8_t dest_eid,
 
 void MockupResponder::sendRediscoveryEvent(uint8_t dest, bool ackr)
 {
-    lg2::info("sendRediscoveryEvent dest eid={EID}", "EID", dest);
+    if (verbose)
+    {
+        lg2::info("sendRediscoveryEvent dest eid={EID}", "EID", dest);
+    }
+
     uint8_t instanceId = 23;
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
     auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
@@ -1478,7 +1683,11 @@ void MockupResponder::sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag,
                                    uint32_t reason, uint32_t sequence_number,
                                    uint64_t timestamp, std::string message_text)
 {
-    lg2::info("sendXIDEvent dest eid={EID}", "EID", dest);
+    if (verbose)
+    {
+        lg2::info("sendXIDEvent dest eid={EID}", "EID", dest);
+    }
+
     uint8_t instanceId = 23;
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
                                   sizeof(nsm_xid_event_payload) +
@@ -1508,7 +1717,11 @@ void MockupResponder::sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag,
 
 void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
 {
-    lg2::info("sendResetRequiredEvent dest eid={EID}", "EID", dest);
+    if (verbose)
+    {
+        lg2::info("sendResetRequiredEvent dest eid={EID}", "EID", dest);
+    }
+
     uint8_t instanceId = 23;
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN);
     auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
@@ -1530,7 +1743,11 @@ void MockupResponder::sendNsmEvent(uint8_t dest, uint8_t nsmType, bool ackr,
                                    uint8_t eventClass, uint16_t eventState,
                                    uint8_t dataSize, uint8_t* data)
 {
-    lg2::info("sendNsmEvent dest eid={EID}", "EID", dest);
+    if (verbose)
+    {
+        lg2::info("sendNsmEvent dest eid={EID}", "EID", dest);
+    }
+
     uint8_t instanceId = 23;
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
                                   dataSize);
@@ -1556,9 +1773,12 @@ std::optional<std::vector<uint8_t>>
     auto request = reinterpret_cast<const nsm_get_current_energy_count_req*>(
         requestMsg->payload);
     uint8_t sensor_id{request->sensor_id};
-    lg2::info(
-        "getCurrentEnergyCountHandler: Sensor_Id={ID}, request length={LEN}",
-        "LEN", requestLen, "ID", sensor_id);
+    if (verbose)
+    {
+        lg2::info(
+            "getCurrentEnergyCountHandler: Sensor_Id={ID}, request length={LEN}",
+            "LEN", requestLen, "ID", sensor_id);
+    }
 
     if (sensor_id == 255)
     {
@@ -1626,8 +1846,11 @@ std::optional<std::vector<uint8_t>>
     auto request =
         reinterpret_cast<const nsm_get_voltage_req*>(requestMsg->payload);
     uint8_t sensor_id{request->sensor_id};
-    lg2::info("getVoltageHandler: Sensor_Id={ID}, request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getVoltageHandler: Sensor_Id={ID}, request length={LEN}", "LEN",
               requestLen, "ID", sensor_id);
+    }
 
     if (sensor_id == 255)
     {
@@ -1690,8 +1913,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getAltitudePressureHandler(const nsm_msg* requestMsg,
                                                 size_t requestLen)
 {
-    lg2::info("getAltitudePressureHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getAltitudePressureHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_altitude_pressure_resp), 0);
@@ -1767,8 +1993,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
 {
-    lg2::info("queryScalarGroupTelemetryHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryScalarGroupTelemetryHandler: request length={LEN}", "LEN",
               requestLen);
+    }
+
     uint8_t device_id;
     uint8_t group_index;
     [[maybe_unused]] auto rc = decode_query_scalar_group_telemetry_v1_req(
@@ -2134,8 +2364,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getProcessorThrottleReasonHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-    lg2::info("getProcessorThrottleReasonHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getProcessorThrottleReasonHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     auto rc = decode_get_current_clock_event_reason_code_req(requestMsg,
                                                              requestLen);
@@ -2150,7 +2383,11 @@ std::optional<std::vector<uint8_t>>
 
     bitfield32_t flags;
     flags.byte = 63;
-    lg2::error("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    if (verbose)
+    {
+        lg2::info("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    }
+
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
             sizeof(nsm_get_current_clock_event_reason_code_resp),
@@ -2175,7 +2412,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getPowerLimitHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("getPowerLimitHandler: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getPowerLimitHandler: request length={LEN}", "LEN", requestLen);
+    }
+
     uint32_t id;
     auto rc = decode_get_power_limit_req(requestMsg, requestLen, &id);
     if (rc != NSM_SW_SUCCESS)
@@ -2209,7 +2450,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::setPowerLimitHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("setPowerLimitHandler: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("setPowerLimitHandler: request length={LEN}", "LEN", requestLen);
+    }
+
     uint32_t id;
     uint8_t action;
     uint8_t persistent;
@@ -2321,7 +2566,11 @@ std::optional<std::vector<uint8_t>>
 
     bitfield8_t flags;
     flags.byte = 13;
-    lg2::error("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    if (verbose)
+    {
+        lg2::info("value of flag is {FLAGS}", "FLAGS", flags.byte);
+    }
+
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_row_remap_state_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -2335,6 +2584,7 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_get_row_remap_state_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+
     return response;
 }
 
@@ -2374,8 +2624,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getMemoryCapacityUtilHandler(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
-    lg2::info("getMemoryCapacityUtilHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getMemoryCapacityUtilHandler: request length={LEN}", "LEN",
               requestLen);
+    }
 
     auto rc = decode_get_memory_capacity_util_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
@@ -2409,8 +2662,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
 {
-    lg2::info("getClockOutputEnableStateHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getClockOutputEnableStateHandler: request length={LEN}", "LEN",
               requestLen);
+    }
+
     uint8_t index = 0;
     auto rc = decode_get_clock_output_enable_state_req(requestMsg, requestLen,
                                                        &index);
@@ -2450,8 +2707,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getFpgaDiagnosticsSettingsHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-    lg2::info("getFpgaDiagnosticsSettingsHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("getFpgaDiagnosticsSettingsHandler: request length={LEN}", "LEN",
               requestLen);
+    }
+
     fpga_diagnostics_settings_data_index data_index;
     [[maybe_unused]] auto rc = decode_get_fpga_diagnostics_settings_req(
         requestMsg, requestLen, &data_index);
@@ -2601,8 +2862,12 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::enableDisableWriteProtectedHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-    lg2::info("enableDisableWriteProtectedHandler: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("enableDisableWriteProtectedHandler: request length={LEN}", "LEN",
               requestLen);
+    }
+
     diagnostics_enable_disable_wp_data_index data_index;
     uint8_t value = 0;
     [[maybe_unused]] auto rc = decode_enable_disable_wp_req(
@@ -2721,8 +2986,11 @@ std::optional<std::vector<uint8_t>>
 {
     auto request = reinterpret_cast<const nsm_query_aggregate_gpm_metrics_req*>(
         requestMsg->payload);
-    lg2::info("queryAggregatedGPMMetrics: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryAggregatedGPMMetrics: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t retrieval_source;
     uint8_t gpu_instance;
@@ -2808,8 +3076,11 @@ std::optional<std::vector<uint8_t>>
     auto request =
         reinterpret_cast<const nsm_query_per_instance_gpm_metrics_req*>(
             requestMsg->payload);
-    lg2::info("queryPerInstanceGPMMetrics: request length={LEN}", "LEN",
+    if (verbose)
+    {
+        lg2::info("queryPerInstanceGPMMetrics: request length={LEN}", "LEN",
               requestLen);
+    }
 
     uint8_t retrieval_source;
     uint8_t gpu_instance;
