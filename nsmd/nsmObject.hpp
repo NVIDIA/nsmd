@@ -16,9 +16,10 @@
  */
 
 #pragma once
-
 #include "requester/handler.hpp"
 #include "types.hpp"
+
+#include <tal.hpp>
 
 namespace nsm
 {
@@ -68,6 +69,8 @@ class NsmObject
     {
         return;
     }
+
+    virtual void updateMetricOnSharedMemory() {}
 
   private:
     const std::string name;

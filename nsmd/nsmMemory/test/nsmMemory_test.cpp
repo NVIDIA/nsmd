@@ -23,7 +23,8 @@ TEST(nsmRowRemapState, GoodGenReq)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                                 inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -41,7 +42,8 @@ TEST(nsmRowRemapState, GoodHandleResp)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                                 inventoryObjPath);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remap_state_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -61,7 +63,8 @@ TEST(nsmRowRemapState, BadHandleResp)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemapState sensor(sensorName, sensorType, rowRemapIntf,
+                                 inventoryObjPath);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remap_state_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -83,7 +86,8 @@ TEST(nsmRowRemappingCounts, GoodGenReq)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf,
+                                      inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -101,7 +105,8 @@ TEST(nsmRowRemappingCounts, GoodHandleResp)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf,
+                                      inventoryObjPath);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remapping_counts_resp),
         0);
@@ -124,7 +129,8 @@ TEST(nsmRowRemappingCounts, BadHandleResp)
 {
     auto rowRemapIntf =
         std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf);
+    nsm::NsmRowRemappingCounts sensor(sensorName, sensorType, rowRemapIntf,
+                                      inventoryObjPath);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_row_remapping_counts_resp),
         0);
@@ -150,7 +156,7 @@ TEST(nsmEccErrorCountsDram, GoodGenReq)
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
                                                      inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram eccErrorCntSensor(sensorName, sensorType,
-                                                 eccIntf);
+                                                 eccIntf, inventoryObjPath);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -168,7 +174,8 @@ TEST(nsmEccErrorCountsDram_GoodGenReq_Test, GoodHandleResp)
 {
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
                                                      inventoryObjPath.c_str());
-    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
+    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
+                                      inventoryObjPath);
 
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -195,7 +202,8 @@ TEST(nsmEccErrorCountsDram, GoodUpdateReading)
 {
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
                                                      inventoryObjPath.c_str());
-    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
+    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
+                                      inventoryObjPath);
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
@@ -212,7 +220,8 @@ TEST(nsmEccErrorCountsDram, BadHandleResp)
 {
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
                                                      inventoryObjPath.c_str());
-    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf);
+    nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
+                                      inventoryObjPath);
 
     struct nsm_ECC_error_counts errorCounts;
     errorCounts.flags.byte = 132;
@@ -242,7 +251,8 @@ TEST(nsmEccErrorCountsDram, BadHandleResp)
 TEST(nsmMemCurrClockFreq, GoodGenReq)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -259,7 +269,8 @@ TEST(nsmMemCurrClockFreq, GoodGenReq)
 TEST(nsmMemCurrClockFreq, GoodHandleResp)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
 
     uint32_t clockFreq = 3000;
 
@@ -280,7 +291,8 @@ TEST(nsmMemCurrClockFreq, GoodHandleResp)
 TEST(nsmMemCurrClockFreq, BadHandleResp)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmMemCurrClockFreq sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
 
     uint32_t clockFreq = 3000;
 
@@ -303,7 +315,8 @@ TEST(nsmMemCurrClockFreq, BadHandleResp)
 TEST(nsmClockLimitMemory, GoodGenReq)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -319,7 +332,8 @@ TEST(nsmClockLimitMemory, GoodGenReq)
 TEST(nsmClockLimitMemory, GoodHandleResp)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
 
     struct nsm_clock_limit clockLimit;
     clockLimit.requested_limit_min = 800;
@@ -344,7 +358,8 @@ TEST(nsmClockLimitMemory, GoodHandleResp)
 TEST(nsmClockLimitMemory, BadHandleResp)
 {
     auto dimmIntf = std::make_shared<DimmIntf>(bus, inventoryObjPath.c_str());
-    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf);
+    nsm::NsmClockLimitMemory sensor(sensorName, sensorType, dimmIntf,
+                                    inventoryObjPath);
 
     struct nsm_clock_limit clockLimit;
     clockLimit.requested_limit_min = 800;

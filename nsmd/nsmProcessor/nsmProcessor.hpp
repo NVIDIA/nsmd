@@ -23,6 +23,7 @@
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
 #include "nsmCommon/nsmCommon.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmCpuOperatingConfigInterface.hpp"
 #include "nsmEccModeIface.hpp"
 #include "nsmInterface.hpp"
@@ -35,6 +36,7 @@
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
+#include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -95,9 +97,11 @@ class NsmUuidIntf : public NsmObject
                 std::string& inventoryObjPath, uuid_t uuid);
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::unique_ptr<UuidIntf> uuidIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 using AssetIntfProcessor = sdbusplus::server::object_t<
@@ -158,43 +162,52 @@ class NsmMigMode : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(bitfield8_t flags);
-
+    std::string inventoryObjPath;
     std::unique_ptr<NsmMigModeIntf> migModeIntf = nullptr;
 };
 
 using EccModeIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Memory::server::MemoryECC>;
-
-class NsmEccMode : public NsmObject
+class NsmEccMode : public NsmSensor
 {
   public:
     NsmEccMode(std::string& name, std::string& type,
-               std::shared_ptr<NsmEccModeIntf> eccIntf);
+               std::shared_ptr<NsmEccModeIntf> eccIntf,
+               std::string& inventoryObjPath);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(bitfield8_t flags);
     std::shared_ptr<NsmEccModeIntf> eccModeIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmEccErrorCounts : public NsmSensor
 {
   public:
     NsmEccErrorCounts(std::string& name, std::string& type,
-                      std::shared_ptr<NsmEccModeIntf> eccIntf);
+                      std::shared_ptr<NsmEccModeIntf> eccIntf,
+                      std::string& inventoryObjPath);
     NsmEccErrorCounts() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(struct nsm_ECC_error_counts);
+    std::string inventoryObjPath;
 
     std::shared_ptr<NsmEccModeIntf> eccErrorCountIntf = nullptr;
 };
@@ -233,17 +246,20 @@ class NsmPciGroup2 : public NsmPcieGroup
   public:
     NsmPciGroup2(const std::string& name, const std::string& type,
                  std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::string& inventoryObjPath);
     NsmPciGroup2() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_2& data);
     std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmPciGroup3 : public NsmPcieGroup
@@ -251,16 +267,19 @@ class NsmPciGroup3 : public NsmPcieGroup
   public:
     NsmPciGroup3(const std::string& name, const std::string& type,
                  std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::string& inventoryObjPath);
     NsmPciGroup3() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_3& data);
     std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmPciGroup4 : public NsmPcieGroup
@@ -268,16 +287,20 @@ class NsmPciGroup4 : public NsmPcieGroup
   public:
     NsmPciGroup4(const std::string& name, const std::string& type,
                  std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId);
+                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::string& inventoryObjPath);
+
     NsmPciGroup4() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_4& data);
     std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 using EDPpIntf =
@@ -307,11 +330,13 @@ class NsmEDPpScalingFactor : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(struct nsm_EDPp_scaling_factors scaling_factor);
 
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 using CpuOperatingConfigIntf =
@@ -323,25 +348,29 @@ class NsmClockLimitGraphics : public NsmSensor
   public:
     NsmClockLimitGraphics(
         const std::string& name, const std::string& type,
-        std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf);
+        std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf,
+        std::string& inventoryObjPath);
     NsmClockLimitGraphics() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(const struct nsm_clock_limit&);
 
     std::shared_ptr<NsmCpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmCurrClockFreq : public NsmSensor
 {
   public:
     NsmCurrClockFreq(const std::string& name, const std::string& type,
-                     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+                     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+                     std::string& inventoryObjPath);
     NsmCurrClockFreq() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -349,10 +378,13 @@ class NsmCurrClockFreq : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 
+    void updateMetricOnSharedMemory() override;
+
   private:
     void updateReading(const uint32_t& clockFreq);
 
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmMinGraphicsClockLimit : public NsmObject
@@ -384,18 +416,19 @@ class NsmCurrentUtilization : public NsmSensor
   public:
     NsmCurrentUtilization(const std::string& name, const std::string& type,
                           std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
-                          const std::string& objPath);
+                          std::string& inventoryObjPath);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf{nullptr};
 
-    const std::string objPath;
+    std::string inventoryObjPath;
     static const std::string dBusIntf;
     static const std::string dBusProperty;
 };
@@ -410,18 +443,21 @@ class NsmProcessorThrottleReason : public NsmSensor
   public:
     NsmProcessorThrottleReason(
         std::string& name, std::string& type,
-        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf);
+        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+        std::string& inventoryObjPath);
     NsmProcessorThrottleReason() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(bitfield32_t flags);
     std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
         nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmAccumGpuUtilTime : public NsmSensor
@@ -429,19 +465,22 @@ class NsmAccumGpuUtilTime : public NsmSensor
   public:
     NsmAccumGpuUtilTime(
         const std::string& name, const std::string& type,
-        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf);
+        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+        std::string& inventoryObjPath);
     NsmAccumGpuUtilTime() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(const uint32_t& context_util_time,
                        const uint32_t& SM_util_time);
     std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
         nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmPciGroup5 : public NsmPcieGroup
@@ -449,16 +488,18 @@ class NsmPciGroup5 : public NsmPcieGroup
   public:
     NsmPciGroup5(const std::string& name, const std::string& type,
                  std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-                 uint8_t deviceId);
+                 uint8_t deviceId, std::string& inventoryObjPath);
     NsmPciGroup5() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_5& data);
     std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
         nullptr;
+    std::string inventoryObjPath;
 };
 
 using PersistentMemoryInterface = sdbusplus::server::object_t<
@@ -469,12 +510,15 @@ class NsmTotalCacheMemory : public NsmMemoryCapacity
   public:
     NsmTotalCacheMemory(
         const std::string& name, const std::string& type,
-        std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface);
+        std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface,
+        std::string& inventoryObjPath);
     NsmTotalCacheMemory() = default;
+    void updateMetricOnSharedMemory() override;
 
   private:
     void updateReading(uint32_t* maximumMemoryCapacity) override;
     std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface;
+    std::string inventoryObjPath;
 };
 
 using DimmMemoryMetricsIntf =
@@ -486,11 +530,13 @@ class NsmPowerCap : public NsmSensor
   public:
     NsmPowerCap(std::string& name, std::string& type,
                 std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-                const std::vector<std::string>& parents);
+                const std::vector<std::string>& parents,
+                std::string& inventoryObjPath);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
     std::shared_ptr<NsmPowerCapIntf> getPowerCapIntf() const
     {
@@ -502,6 +548,7 @@ class NsmPowerCap : public NsmSensor
     void updateReading(uint32_t value);
     std::vector<std::string> parents;
     std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
+    std::string inventoryObjPath;
 };
 using PowerLimitIface = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::PowerLimit>;
@@ -569,9 +616,11 @@ class NsmProcessorRevision : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::unique_ptr<RevisionIntf> revisionIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 using GpuHealthIntf = sdbusplus::server::object_t<
