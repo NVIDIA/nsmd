@@ -125,7 +125,7 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 
 NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
 {
-    sensor->setStatic(true);
+    sensor->isStatic = true;
     deviceSensors.emplace_back(sensor);
     roundRobinSensors.emplace_back(sensor);
     return *sensor;
@@ -154,7 +154,7 @@ void NsmDevice::setOnline()
     for (auto sensor : roundRobinSensors)
     {
         // Mark all the sensors as unrefreshed.
-        sensor->setRefreshed(false);
+        sensor->isRefreshed = false;
     }
     SensorManager& sensorManager = SensorManager::getInstance();
     sensorManager.startPolling(uuid);

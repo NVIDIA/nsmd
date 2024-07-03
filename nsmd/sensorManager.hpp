@@ -190,7 +190,7 @@ class SensorManagerImpl : public SensorManager
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
         mctp_socket::Manager& sockManager, bool verbose);
-    void checkAllDevices();
+    void checkAllDevicesReady();
 
     sdbusplus::bus::bus& bus;
     sdeventplus::Event& event;

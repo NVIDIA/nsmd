@@ -42,22 +42,6 @@ class NsmObject
     {
         return type;
     }
-    const bool& isRefreshed() const
-    {
-        return refreshed;
-    }
-    void setRefreshed(bool r)
-    {
-        refreshed = r;
-    }
-    inline bool isStatic() const
-    {
-        return staticSensor;
-    }
-    inline void setStatic(bool s)
-    {
-        staticSensor = s;
-    }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
                                         [[maybe_unused]] eid_t eid)
@@ -72,10 +56,11 @@ class NsmObject
 
     virtual void updateMetricOnSharedMemory() {}
 
+    bool isRefreshed = false;
+    bool isStatic = false;
+
   private:
     const std::string name;
     const std::string type;
-    bool refreshed = false;
-    bool staticSensor = false;
 };
 } // namespace nsm
