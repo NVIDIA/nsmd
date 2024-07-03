@@ -25,6 +25,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Dimension/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>
 
 #include <type_traits>
@@ -36,6 +37,7 @@ using namespace sdbusplus::server;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
+using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
 using VersionIntf = object_t<Software::server::Version>;
 
 class NsmInventoryPropertyBase : public NsmSensor
@@ -165,6 +167,23 @@ inline void
             iss << '.';
             iss << int(((data[4] << 8) | data[6]));
             pdi().version(iss.str());
+        }
+        break;
+        default:
+            throw std::runtime_error("Not implemented PDI");
+            break;
+    }
+}
+
+template <>
+inline void
+    NsmInventoryProperty<RevisionIntf>::handleResponse(const Response& data)
+{
+    switch (property)
+    {
+        case INFO_ROM_VERSION:
+        {
+            pdi().version(std::string((char*)data.data(), data.size()));
         }
         break;
         default:
