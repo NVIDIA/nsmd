@@ -44,6 +44,7 @@ typedef enum nsm_requester_error_codes {
 	NSM_REQUESTER_RECV_FAIL = -8,
 	NSM_REQUESTER_INVALID_RECV_LEN = -9,
 	NSM_REQUESTER_RECV_TIMEOUT = -10,
+	NSM_REQUESTER_EID_MISMATCH = -11,
 } nsm_requester_rc_t;
 
 /**
