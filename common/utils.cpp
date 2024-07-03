@@ -289,9 +289,9 @@ void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
                     "Instance number cannot be bigger than 7 for GPU");
             break;
         case NSM_DEV_ID_SWITCH:
-            if (instanceNumber > 1)
+            if (instanceNumber > 3)
                 throw std::invalid_argument(
-                    "Instance number cannot be bigger than 1 for NvSwitch");
+                    "Instance number cannot be bigger than 3 for NvSwitch");
             break;
         case NSM_DEV_ID_PCIE_BRIDGE:
             if (instanceNumber > 0)

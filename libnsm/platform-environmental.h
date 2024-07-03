@@ -25,9 +25,11 @@ extern "C" {
 #include "base.h"
 #include <stdbool.h>
 
-#define PCIE_CLKBUF_INDEX 0x80
-#define NVHS_CLKBUF_INDEX 0x81
-#define IBLINK_CLKBUF_INDEX 0x82
+enum clock_output_enable_state_index {
+	PCIE_CLKBUF_INDEX = 0x80,
+	NVHS_CLKBUF_INDEX = 0x81,
+	IBLINK_CLKBUF_INDEX = 0x82,
+};
 
 const uint8_t MAX_VERSION_STRING_SIZE = 100;
 
