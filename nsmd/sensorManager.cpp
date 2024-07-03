@@ -386,6 +386,18 @@ requester::Coroutine
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
 
+            if (nsmDevice->roundRobinSensors.size() == 0)
+            {
+                // Meaning there were only static sensors in the round robin
+                // queue and this is the last sensor that we have access to.
+                sensor->setRefreshed(true);
+                if (!nsmDevice->isDeviceReady)
+                {
+                    nsmDevice->isDeviceReady = true;
+                    checkAllDevices();
+                }
+            }
+
             if (!sensor->isRefreshed())
             {
                 auto nextSensor = nsmDevice->roundRobinSensors.front();
