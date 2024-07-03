@@ -118,7 +118,8 @@ NsmPortStatus::NsmPortStatus(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum)
+    NsmSensor(portName, type), portName(portName), portNumber(portNum),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortStatus: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -130,6 +131,7 @@ NsmPortStatus::NsmPortStatus(
     portStateIntf->linkStatus(PortLinkStatus::Starting);
     portStateIntf->linkState(PortLinkStates::Unknown);
     portMetricsOem3Intf->trainingError(false);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -200,6 +202,7 @@ uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
                 portStateIntf->linkState(PortLinkStates::Unknown);
                 break;
         }
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -212,12 +215,27 @@ uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
+void NsmPortStatus::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(portMetricsOem3Intf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+    std::string propName = "TrainingError";
+
+    nv::sensor_aggregation::DbusVariantType variantTE{
+        portMetricsOem3Intf->trainingError()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 rawSmbpbiData, variantTE);
+#endif
+}
+
 NsmPortCharacteristics::NsmPortCharacteristics(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum)
+    NsmSensor(portName, type), portName(portName), portNumber(portNum),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -228,6 +246,7 @@ NsmPortCharacteristics::NsmPortCharacteristics(
 
     portInfoIntf->type(PortType::BidirectionalPort);
     portInfoIntf->protocol(PortProtocol::NVLink);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -272,6 +291,8 @@ uint8_t
         portMetricsOem3Intf->rxNoProtocolBytes(data.nv_port_data_rate_kbps);
         portMetricsOem3Intf->txWidth(data.status_lane_info);
         portMetricsOem3Intf->rxWidth(data.status_lane_info);
+
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -284,12 +305,40 @@ uint8_t
     return NSM_SW_SUCCESS;
 }
 
+void NsmPortCharacteristics::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePortInfoName = std::string(portInfoIntf->interface);
+    auto ifacePortOem3Name = std::string(portMetricsOem3Intf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantCS{
+        portInfoIntf->currentSpeed()};
+    std::string propName = "CurrentSpeed";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
+
+    nv::sensor_aggregation::DbusVariantType variantTX{
+        portMetricsOem3Intf->txNoProtocolBytes()};
+    propName = "TXNoProtocolBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTX);
+
+    nv::sensor_aggregation::DbusVariantType variantRX{
+        portMetricsOem3Intf->rxNoProtocolBytes()};
+    propName = "RXNoProtocolBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRX);
+#endif
+}
+
 NsmPortMetrics::NsmPortMetrics(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
     const std::string& type,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum)
+    NsmSensor(portName, type), portName(portName), portNumber(portNum),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortMetrics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -312,6 +361,162 @@ NsmPortMetrics::NsmPortMetrics(
                                       association.absolutePath);
     }
     associationDefinitionsIntf->associations(associationsList);
+    updateMetricOnSharedMemory();
+}
+
+void NsmPortMetrics::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> rawSmbpbiData = {};
+    auto ifaceIBPortName = std::string(iBPortIntf->interface);
+    auto ifacePortOem2Name = std::string(portMetricsOem2Intf->interface);
+
+    nv::sensor_aggregation::DbusVariantType variantRXP{iBPortIntf->rxPkts()};
+    std::string propName = "RXPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXP);
+
+    nv::sensor_aggregation::DbusVariantType variantRXMP{
+        iBPortIntf->rxMulticastPkts()};
+    propName = "RXMulticastPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXMP);
+
+    nv::sensor_aggregation::DbusVariantType variantRXUP{
+        iBPortIntf->rxUnicastPkts()};
+    propName = "RXUnicastPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXUP);
+
+    nv::sensor_aggregation::DbusVariantType variantMP{
+        iBPortIntf->malformedPkts()};
+    propName = "MalformedPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantMP);
+
+    nv::sensor_aggregation::DbusVariantType variantVLDP{
+        iBPortIntf->vL15DroppedPkts()};
+    propName = "VL15DroppedPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantVLDP);
+
+    nv::sensor_aggregation::DbusVariantType variantRXE{iBPortIntf->rxErrors()};
+    propName = "RXErrors";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXE);
+
+    nv::sensor_aggregation::DbusVariantType variantTXP{iBPortIntf->txPkts()};
+    propName = "TXPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXP);
+
+    nv::sensor_aggregation::DbusVariantType variantVLTXP{
+        iBPortIntf->vL15TXPkts()};
+    propName = "VL15TXPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantVLTXP);
+
+    nv::sensor_aggregation::DbusVariantType variantVLTXD{
+        iBPortIntf->vL15TXData()};
+    propName = "VL15TXData";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantVLTXD);
+
+    nv::sensor_aggregation::DbusVariantType variantTXUP{
+        iBPortIntf->txUnicastPkts()};
+    propName = "TXUnicastPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXUP);
+
+    nv::sensor_aggregation::DbusVariantType variantTXMP{
+        iBPortIntf->txMulticastPkts()};
+    propName = "TXMulticastPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXMP);
+
+    nv::sensor_aggregation::DbusVariantType variantTXBP{
+        iBPortIntf->txBroadcastPkts()};
+    propName = "TXBroadcastPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXBP);
+
+    nv::sensor_aggregation::DbusVariantType variantTXDP{
+        iBPortIntf->txDiscardPkts()};
+    propName = "TXDiscardPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXDP);
+
+    nv::sensor_aggregation::DbusVariantType variantMTUD{
+        iBPortIntf->mtuDiscard()};
+    propName = "MTUDiscard";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantMTUD);
+
+    nv::sensor_aggregation::DbusVariantType variantIBGRXP{
+        iBPortIntf->ibG2RXPkts()};
+    propName = "IBG2RXPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantIBGRXP);
+
+    nv::sensor_aggregation::DbusVariantType variantIBGTXP{
+        iBPortIntf->ibG2TXPkts()};
+    propName = "IBG2TXPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantIBGTXP);
+
+    nv::sensor_aggregation::DbusVariantType variantSE{
+        iBPortIntf->symbolError()};
+    propName = "SymbolError";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
+
+    nv::sensor_aggregation::DbusVariantType variantLERC{
+        iBPortIntf->linkErrorRecoveryCounter()};
+    propName = "LinkErrorRecoveryCounter";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantLERC);
+
+    nv::sensor_aggregation::DbusVariantType variantLDC{
+        iBPortIntf->linkDownCount()};
+    propName = "LinkDownCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantLDC);
+
+    nv::sensor_aggregation::DbusVariantType variantRXRPEP{
+        iBPortIntf->rxRemotePhysicalErrorPkts()};
+    propName = "RXRemotePhysicalErrorPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXRPEP);
+
+    nv::sensor_aggregation::DbusVariantType variantRXSREP{
+        iBPortIntf->rxSwitchRelayErrorPkts()};
+    propName = "RXSwitchRelayErrorPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXSREP);
+
+    nv::sensor_aggregation::DbusVariantType variantQPDP{
+        iBPortIntf->qP1DroppedPkts()};
+    propName = "QP1DroppedPkts";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantQPDP);
+
+    nv::sensor_aggregation::DbusVariantType variantTXW{iBPortIntf->txWait()};
+    propName = "TXWait";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXW);
+
+    nv::sensor_aggregation::DbusVariantType variantRXB{
+        portMetricsOem2Intf->rxBytes()};
+    propName = "RXBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem2Name, propName, rawSmbpbiData, variantRXB);
+
+    nv::sensor_aggregation::DbusVariantType variantTXB{
+        portMetricsOem2Intf->txBytes()};
+    propName = "TXBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem2Name, propName, rawSmbpbiData, variantTXB);
+#endif
 }
 
 void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
@@ -502,6 +707,7 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateCounterValues(&data);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -549,8 +755,8 @@ static void createNsmPortSensor(SensorManager& manager,
     std::string topologyIntfSubStr =
         "xyz.openbmc_project.Configuration.NVLinkTopology.Topology";
     std::string topologyObjPath = getTopologyObjPath(deviceName, deviceType);
-    auto deviceTopologies =
-        getTopologyData(topologyObjPath, topologyIntfSubStr);
+    auto deviceTopologies = getTopologyData(topologyObjPath,
+                                            topologyIntfSubStr);
 
     // create nvlink [as per count and also they are 1-based]
     for (uint64_t i = 0; i < count; i++)

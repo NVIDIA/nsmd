@@ -4,6 +4,7 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
