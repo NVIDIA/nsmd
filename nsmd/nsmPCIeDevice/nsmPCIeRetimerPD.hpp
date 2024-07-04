@@ -13,7 +13,6 @@
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
-#include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
 
 namespace nsm
 {
@@ -25,7 +24,6 @@ using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
 using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
-using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
 
 /** @brief Convert to PCIe gen type
  *
@@ -46,13 +44,6 @@ size_t convertToLaneCount(uint32_t link_width);
  *  @param[in] value - generation value
  */
 PCIeSlotIntf::Generations convertToGeneration(uint32_t value);
-
-/** @brief Convert to lTSSM State
- *
- *  @param[in] ltssm_state - ltssm state
- *  @return string lTSSM State
- */
-std::string convertToLTSSMStateStr(uint32_t ltssm_state);
 
 class NsmPCIeDeviceQueryScalarTelemetry : public NsmSensor
 {
@@ -96,25 +87,5 @@ class NsmPCIeDeviceGetClockOutput : public NsmSensor
     std::unique_ptr<PCIeRefClockIntf> pcieRefClockIntf = nullptr;
     uint8_t clkBufIndex;
     uint8_t deviceInstanceNumber;
-};
-
-class NsmPCIeDeviceQueryLTSSMState : public NsmSensor
-{
-  public:
-    NsmPCIeDeviceQueryLTSSMState(sdbusplus::bus::bus& bus,
-                                 const std::string& name,
-                                 const std::string& type,
-                                 const uint8_t& deviceIndex,
-                                 std::string& inventoryObjPath);
-    NsmPCIeDeviceQueryLTSSMState() = default;
-
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
-
-  private:
-    std::unique_ptr<LTSSMStateIntf> ltssmStateIntf = nullptr;
-    uint8_t deviceIndex;
 };
 } // namespace nsm
