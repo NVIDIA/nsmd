@@ -71,7 +71,7 @@ class NsmDevice
     std::unique_ptr<sdbusplus::Timer> pollingTimer;
     std::coroutine_handle<> doPollingTaskHandle;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
-    std::vector<std::shared_ptr<NsmSensor>> prioritySensors;
+    std::vector<std::shared_ptr<NsmObject>> prioritySensors;
     std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
@@ -108,7 +108,7 @@ class NsmDevice
      * @param sensor[in] Pointer to dynamic sensor
      * @param priority[in] Flag to add sensor as priority sensor
      */
-    void addSensor(const std::shared_ptr<NsmSensor>& sensor, bool priority);
+    void addSensor(const std::shared_ptr<NsmObject>& sensor, bool priority);
 
     /** @brief getter of deviceType */
     uint8_t getDeviceType()

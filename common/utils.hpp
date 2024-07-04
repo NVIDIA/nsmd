@@ -56,6 +56,7 @@ using ObjectPath = std::string;
 using ServiceName = std::string;
 using MapperServiceMap = std::vector<std::pair<ServiceName, dbus::Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
+using GetAssociatedObjectsResponse = std::variant<std::vector<ObjectPath>>;
 using PropertyValuesCollection =
     std::vector<std::pair<std::string, PropertyValue>>;
 
@@ -139,6 +140,10 @@ class IDBusHandler
     virtual PropertyValuesCollection
         getDbusProperties(const char* objPath,
                           const char* dbusInterface) const = 0;
+
+    virtual GetAssociatedObjectsResponse
+        getAssociatedObjects(const std::string& path,
+                             const std::string& association) const = 0;
 
     /** @brief The template function to get property from the requested dbus
      *         path
@@ -307,6 +312,21 @@ class DBusHandler : public IDBusHandler
     PropertyValuesCollection
         getDbusProperties(const char* objPath,
                           const char* dbusInterface) const override;
+
+    /**
+     *  @brief Get the associated object response from the mapper
+     *
+     *  @param[in] path - DBUS object path
+     *  @param[in] association - forward / reverse association
+     *
+     *  @return GetAssociatedObjectsResponse - the mapper get associated object
+     * response
+     *
+     *  @throw sdbusplus::exception::exception when it fails
+     */
+    GetAssociatedObjectsResponse
+        getAssociatedObjects(const std::string& path,
+                             const std::string& association) const override;
 };
 
 IDBusHandler& DBusHandler();

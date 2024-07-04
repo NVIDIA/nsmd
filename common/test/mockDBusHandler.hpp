@@ -57,6 +57,9 @@ class MockDBusHandler : public IDBusHandler
     MOCK_METHOD(PropertyValuesCollection, getDbusProperties,
                 (const char* objPath, const char* dbusInterface),
                 (const, override));
+    MOCK_METHOD(GetAssociatedObjectsResponse, getAssociatedObjects,
+                (const std::string& path, const std::string& association),
+                (const, override));
 };
 
 struct SdBusTestError : public sdbusplus::exception::exception
