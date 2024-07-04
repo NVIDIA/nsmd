@@ -75,7 +75,7 @@ void testGetFpgaDiagnosticSettingsEncodeResponse(
 TEST(getFpgaDiagnosticsSettings, testRequests)
 {
 	for (auto di = (uint8_t)GET_WP_SETTINGS;
-	     di < (uint8_t)GET_GPU_POWER_STATUS; di++) {
+	     di <= (uint8_t)GET_GPU_POWER_STATUS; di++) {
 		auto dataIndex = fpga_diagnostics_settings_data_index(di);
 		testGetFpgaDiagnosticSettingsEncodeRequest(dataIndex);
 		testGetFpgaDiagnosticSettingsEncodeResponse(dataIndex);
@@ -885,5 +885,179 @@ TEST(enableDisableGpuIstMode, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 	rc = decode_enable_disable_gpu_ist_mode_resp(response, msg_len - 1, &cc,
 						     &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+void testGetReconfigurationPermissionsV1EncodeRequest(
+    reconfiguration_permissions_v1_index settingIndex)
+{
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_reconfiguration_permissions_v1_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_reconfiguration_permissions_v1_req(0, settingIndex,
+								request);
+
+	auto req =
+	    reinterpret_cast<nsm_get_reconfiguration_permissions_v1_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_RECONFIGURATION_PERMISSIONS_V1, req->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), req->hdr.data_size);
+	EXPECT_EQ(settingIndex, req->setting_index);
+}
+void testGetReconfigurationPermissionsV1EncodeResponse(
+    reconfiguration_permissions_v1_index expectedSettingIndex)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    1,					    // data size
+	    (uint8_t)expectedSettingIndex	    // data_index
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	size_t msg_len = requestMsg.size();
+
+	reconfiguration_permissions_v1_index dataIndex;
+	auto rc = decode_get_reconfiguration_permissions_v1_req(
+	    request, msg_len, &dataIndex);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(expectedSettingIndex, dataIndex);
+}
+
+TEST(getReconfigurationPermissionsV1, testRequests)
+{
+	for (auto di = (uint8_t)RP_IN_SYSTEM_TEST;
+	     di < (uint8_t)RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2; di++) {
+		auto dataIndex = reconfiguration_permissions_v1_index(di);
+		testGetReconfigurationPermissionsV1EncodeRequest(dataIndex);
+		testGetReconfigurationPermissionsV1EncodeResponse(dataIndex);
+	}
+}
+
+TEST(getReconfigurationPermissionsV1, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_get_reconfiguration_permissions_v1_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	nsm_reconfiguration_permissions_v1 data;
+	data.persistent = 1;
+
+	auto rc = encode_get_reconfiguration_permissions_v1_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+
+	auto resp =
+	    reinterpret_cast<nsm_get_reconfiguration_permissions_v1_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_RECONFIGURATION_PERMISSIONS_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_reconfiguration_permissions_v1),
+		  le16toh(resp->hdr.data_size));
+	EXPECT_EQ(1, data.persistent);
+}
+
+TEST(getReconfigurationPermissionsV1, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    0,					    // completion code
+	    0,
+	    0,
+	    1,
+	    0,		// data size
+	    0b00000110, // data
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	nsm_reconfiguration_permissions_v1 data;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc = decode_get_reconfiguration_permissions_v1_resp(
+	    response, msg_len, &cc, &reason_code, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data.oneshot);
+	EXPECT_EQ(1, data.persistent);
+	EXPECT_EQ(1, data.flr_persistent);
+}
+
+TEST(getReconfigurationPermissionsV1, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    0,					    // completion code
+	    0,
+	    0,
+	    0, // incorrect data size
+	    0  // data size
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	nsm_reconfiguration_permissions_v1 data;
+	auto rc = decode_get_reconfiguration_permissions_v1_resp(
+	    NULL, msg_len, &cc, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_reconfiguration_permissions_v1_resp(
+	    response, msg_len, NULL, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_reconfiguration_permissions_v1_resp(response, msg_len,
+							    &cc, NULL, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_reconfiguration_permissions_v1_resp(
+	    response, msg_len, &cc, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_reconfiguration_permissions_v1_resp(
+	    response, msg_len - 1, &cc, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_reconfiguration_permissions_v1_resp(
+	    response, msg_len, &cc, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

@@ -371,6 +371,116 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
   private:
     uint8_t dataId;
 };
+class GetReconfigurationPermissionsV1 : public CommandInterface
+{
+  public:
+    ~GetReconfigurationPermissionsV1() = default;
+    GetReconfigurationPermissionsV1() = delete;
+    GetReconfigurationPermissionsV1(const GetReconfigurationPermissionsV1&) =
+        delete;
+    GetReconfigurationPermissionsV1(GetReconfigurationPermissionsV1&&) =
+        default;
+    GetReconfigurationPermissionsV1&
+        operator=(const GetReconfigurationPermissionsV1&) = delete;
+    GetReconfigurationPermissionsV1&
+        operator=(GetReconfigurationPermissionsV1&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetReconfigurationPermissionsV1(const char* type, const char* name,
+                                             CLI::App* app) :
+        CommandInterface(type, name, app), settingIndex(0),
+        settingsDictionary({
+            {0, "In system test"},
+            {1, "Fusing Mode"},
+            {2, "Confidential compute"},
+            {3, "BAR0 Firewall"},
+            {4, "Confidential compute dev-mode"},
+            {5, "Total GPU Power (TGP) current limit"},
+            {6, "Total GPU Power (TGP) rated limit"},
+            {7, "Total GPU Power (TGP) max limit"},
+            {8, "Total GPU Power (TGP) min limit"},
+            {9, "Clock limit"},
+            {10, "NVLink disable"},
+            {11, "ECC enable"},
+            {12, "PCIe VF configuration"},
+            {13, "Row remapping allowed"},
+            {14, "Row remapping feature"},
+            {15, "HBM frequency change"},
+            {16, "HULK license update"},
+            {17, "Force test coupling"},
+            {18, "BAR0 type config"},
+            {19, "EDPp scaling factor"},
+            {20, "Power Smoothing Feature Toggle"},
+            {21, "Power Smoothing Privilege Level 0"},
+            {22, "Power Smoothing Privilege Level 1"},
+            {23, "Power Smoothing Privilege Level 2"},
+        })
+    {
+        auto getReconfigurationPermissionsV1Group = app->add_option_group(
+            "Required",
+            "Setting Index for which data source is to be retrieved.");
+        std::string list;
+        for (auto [id, setting] : settingsDictionary)
+        {
+            list += std::to_string(id) + " - " + setting + "\n";
+        }
+        getReconfigurationPermissionsV1Group->add_option(
+            "-s, --settingId", settingIndex,
+            "retrieve data source for settingIndex\n" + list);
+        getReconfigurationPermissionsV1Group->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_reconfiguration_permissions_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_reconfiguration_permissions_v1_req(
+            instanceId, (reconfiguration_permissions_v1_index)settingIndex,
+            request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (settingsDictionary.find(settingIndex) == settingsDictionary.end())
+        {
+            std::cerr << "Invalid Settings Id \n";
+            return;
+        }
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        nsm_reconfiguration_permissions_v1 data;
+
+        auto rc = decode_get_reconfiguration_permissions_v1_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &data);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_reconfiguration_permissions_v1_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["PRC Knob"] = settingsDictionary[settingIndex];
+        result["One-shot"] = bool(data.oneshot);
+        result["Persistent"] = bool(data.persistent);
+        result["FLR Persistent"] = bool(data.flr_persistent);
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t settingIndex;
+    std::map<uint8_t, std::string> settingsDictionary;
+};
 
 void registerCommand(CLI::App& app)
 {
@@ -389,6 +499,13 @@ void registerCommand(CLI::App& app)
         "Enable/Disable GPUs IST Mode Settings for device index ");
     commands.push_back(std::make_unique<EnableDisableGpuIstMode>(
         "config", "EnableDisableGpuIstMode", enableDisableGpuIstMode));
+
+    auto getReconfigurationPermissionsV1 = config->add_subcommand(
+        "GetReconfigurationPermissionsV1",
+        "retrieve Get Reconfiguration Permissions v1 for setting index ");
+    commands.push_back(std::make_unique<GetReconfigurationPermissionsV1>(
+        "config", "GetReconfigurationPermissionsV1",
+        getReconfigurationPermissionsV1));
 }
 
 } // namespace config
