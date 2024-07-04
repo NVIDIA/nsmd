@@ -3,6 +3,7 @@ dep_src_files = [
     '../nsmChassisAssembly.cpp',
     '../nsmChassisPCIeDevice.cpp',
     '../nsmChassisPCIeSlot.cpp',
+    '../nsmClockOutputEnableState.cpp',
     '../nsmIstModeEnabled.cpp',
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',

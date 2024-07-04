@@ -18,6 +18,7 @@
 #include "nsmChassisPCIeDevice.hpp"
 
 #include "deviceManager.hpp"
+#include "nsmClockOutputEnableState.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -78,23 +79,13 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         auto associationsObject =
             std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
                 chassisName, name);
-        auto pcieRefClock =
-            std::make_shared<NsmChassisPCIeDevice<PCIeRefClockIntf>>(
-                chassisName, name);
-        auto nvLinkRefClock =
-            std::make_shared<NsmChassisPCIeDevice<NVLinkRefClockIntf>>(
-                chassisName, name);
 
         uuidObject->pdi().uuid(deviceUuid);
         associationsObject->pdi().associations(
             utils::getAssociations(associations));
-        pcieRefClock->pdi().pcIeReferenceClockEnabled(true);
-        nvLinkRefClock->pdi().nvLinkReferenceClockEnabled(true);
 
         device->addStaticSensor(uuidObject);
         device->addStaticSensor(associationsObject);
-        device->addStaticSensor(pcieRefClock);
-        device->addStaticSensor(nvLinkRefClock);
     }
     else if (type == "NSM_Asset")
     {
@@ -166,6 +157,32 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         lg2::debug("Created LTSSMStateIntf sensor {NAME} path: {PATH}", "NAME",
                    name, "PATH", inventoryObjPath);
     }
+    else if (type == "NSM_ClockOutputEnableState")
+    {
+        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "InstanceNumber", interface.c_str());
+        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
+                              .getDbusProperty<uint64_t>(objPath.c_str(),
+                                                         "DeviceType",
+                                                         interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto pcieRefClockObject =
+            NsmChassisPCIeDevice<PCIeRefClockIntf>(chassisName, name);
+        auto nvLinkRefClockObject =
+            NsmChassisPCIeDevice<NVLinkRefClockIntf>(chassisName, name);
+
+        auto pcieRefClock =
+            std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+                pcieRefClockObject, PCIE_CLKBUF_INDEX, deviceType,
+                instanceNumber);
+        auto nvLinkRefClock =
+            std::make_shared<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
+                nvLinkRefClockObject, NVHS_CLKBUF_INDEX, deviceType,
+                instanceNumber);
+        device->addSensor(pcieRefClock, priority);
+        device->addSensor(nvLinkRefClock, priority);
+    }
 }
 
 dbus::Interfaces chassisPCIeDeviceInterfaces{
@@ -173,7 +190,8 @@ dbus::Interfaces chassisPCIeDeviceInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Asset",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Health",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState",
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ClockOutputEnableState"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisPCIeDeviceCreateSensors,
                                chassisPCIeDeviceInterfaces)

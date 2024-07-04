@@ -203,6 +203,13 @@
                     "DeviceIndex": 0,
                     "Priority": false,
                     "InventoryObjPath": "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_$INSTANCE_NUMBER/Switches/PCIeRetimer_$INSTANCE_NUMBER/Ports/Down_0"
+                },
+                "ClockOutputEnableState": {
+                    "Type": "NSM_ClockOutputEnableState",
+                    "InstanceNumber": "$INSTANCE_NUMBER",
+                    "DeviceType": "$DEVICE_TYPE",
+                    "IsRetimer": false,
+                    "Priority": false
                 }
             },
             {

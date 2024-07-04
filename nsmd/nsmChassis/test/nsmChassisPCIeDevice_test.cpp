@@ -25,6 +25,7 @@ using namespace ::testing;
 #include "pci-links.h"
 
 #include "nsmChassisPCIeDevice.hpp"
+#include "nsmClockOutputEnableState.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPCIeFunction.hpp"
@@ -111,6 +112,12 @@ struct NsmChassisPCIeDeviceTest :
         {"InventoryObjPath",
          "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
     };
+    const PropertyValuesCollection clockOutputEnableState = {
+        {"Type", "NSM_ClockOutputEnableState"},
+        {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
+        {"InstanceNumber", uint64_t(instanceId)},
+        {"Priority", false},
+    };
     const MapperServiceMap gpuServiceMap = {
         {
             {
@@ -168,8 +175,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(5, gpu.roundRobinSensors.size());
-    EXPECT_EQ(5, gpu.deviceSensors.size());
+    EXPECT_EQ(3, gpu.roundRobinSensors.size());
+    EXPECT_EQ(3, gpu.deviceSensors.size());
 
     auto sensor = 0;
     auto uuidObject = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
@@ -177,25 +184,15 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     auto associationsObject =
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsIntf>>(
             gpu.deviceSensors[sensor++]);
-    auto pcieRefClock =
-        dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
-            gpu.deviceSensors[sensor++]);
-    auto nvLinkRefClock =
-        dynamic_pointer_cast<NsmInterfaceProvider<NVLinkRefClockIntf>>(
-            gpu.deviceSensors[sensor++]);
     auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
         gpu.deviceSensors[sensor++]);
 
     EXPECT_NE(nullptr, uuidObject);
     EXPECT_NE(nullptr, associationsObject);
-    EXPECT_NE(nullptr, pcieRefClock);
-    EXPECT_NE(nullptr, nvLinkRefClock);
     EXPECT_NE(nullptr, healthObject);
 
     EXPECT_EQ(gpuDeviceUuid, uuidObject->pdi().uuid());
     EXPECT_EQ(2, associationsObject->pdi().associations().size());
-    EXPECT_EQ(true, pcieRefClock->pdi().pcIeReferenceClockEnabled());
-    EXPECT_EQ(true, nvLinkRefClock->pdi().nvLinkReferenceClockEnabled());
     EXPECT_EQ(HealthIntf::HealthType::OK, healthObject->pdi().health());
 }
 
@@ -209,7 +206,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(asset, "Manufacturer")));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-
     EXPECT_CALL(mockDBus, getDbusPropertyVariant)
         .WillOnce(Return(get(basic, "ChassisName")))
         .WillOnce(Return(get(basic, "Name")))
@@ -231,13 +227,23 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillOnce(Return(get(ltssmState, "InventoryObjPath")));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "ChassisName")))
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(clockOutputEnableState, "Type")))
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(clockOutputEnableState, "DeviceType")))
+        .WillOnce(Return(get(clockOutputEnableState, "InstanceNumber")))
+        .WillOnce(Return(get(clockOutputEnableState, "Priority")));
+    nsmChassisPCIeDeviceCreateSensors(
+        mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(6, gpu.roundRobinSensors.size());
-    EXPECT_EQ(6, gpu.deviceSensors.size());
+    EXPECT_EQ(8, gpu.roundRobinSensors.size());
+    EXPECT_EQ(8, gpu.deviceSensors.size());
 
     auto sensors = 0;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
@@ -253,6 +259,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
     auto ltssmStateSensor =
         dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.deviceSensors[sensors++]);
+    auto pcieRefClock =
+        dynamic_pointer_cast<NsmClockOutputEnableState<PCIeRefClockIntf>>(
+            gpu.deviceSensors[sensors++]);
+    auto nvLinkRefClock =
+        dynamic_pointer_cast<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
+            gpu.deviceSensors[sensors++]);
     EXPECT_EQ(sensors, gpu.deviceSensors.size());
 
     EXPECT_NE(nullptr, partNumber);
@@ -261,6 +273,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, pcieDeviceObject);
     EXPECT_NE(nullptr, functionSensor);
     EXPECT_NE(nullptr, ltssmStateSensor);
+    EXPECT_NE(nullptr, pcieRefClock);
+    EXPECT_NE(nullptr, nvLinkRefClock);
 
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
@@ -273,6 +287,16 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
               pcieDeviceObject->pdi().deviceType());
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               ltssmStateSensor->deviceIndex);
+    EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
+    EXPECT_EQ(NVHS_CLKBUF_INDEX, nvLinkRefClock->bufferIndex);
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(sensors)
+        .WillRepeatedly(mockSendRecvNsmMsg());
+    for (auto i = 0; i < sensors; i++)
+    {
+        gpu.deviceSensors[i]->update(mockManager, eid).detach();
+    }
 }
 
 struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
