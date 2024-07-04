@@ -414,7 +414,8 @@ std::optional<std::vector<uint8_t>>
                     return queryAggregatedGPMMetrics(request, requestLen);
                 case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
                     return queryPerInstanceGPMMetrics(request, requestLen);
-
+                case NSM_GET_VIOLATION_DURATION:
+                    return getViolationDurationHandler(request, requestLen);
                 /*
                  ** Power Smoothing related Mockups
                  */
@@ -651,7 +652,7 @@ std::optional<std::vector<uint8_t>>
                  {2, {4}},
                  {3,
                   {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,  16,
-                   17,  70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
+                   17,  69, 70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
                    116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 173}},
                  {4, {}},
                  {5, {}},
@@ -3747,4 +3748,41 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getViolationDurationHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    auto rc = decode_get_violation_duration_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("decode_get_violation_duration_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+   
+    struct nsm_violation_duration data;
+    data.supported_counter.byte = 255;
+    data.hw_violation_duration = 2000000;
+    data.global_sw_violation_duration = 3000000;
+    data.power_violation_duration = 4000000;
+    data.thermal_violation_duration = 5000000;
+    data.counter4 = 6000000;
+    data.counter5 = 7000000;
+    data.counter6 = 8000000;
+    data.counter7 = 9000000;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_violation_duration_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_violation_duration_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                     reason_code, &data, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_violation_duration_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
 } // namespace MockupResponder

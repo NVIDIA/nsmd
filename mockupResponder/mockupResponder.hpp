@@ -158,6 +158,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getViolationDurationHandler(const nsm_msg* requestMsg, size_t requestLen);
+
     // send rediscovery event
     void sendRediscoveryEvent(uint8_t eid, bool ackr);
 
