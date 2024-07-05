@@ -17,8 +17,8 @@
 
 #include "nsmNVSwitchAndNVMgmtNICChassisAssembly.hpp"
 
-#include "nsmInventoryProperty.hpp"
 #include "nsmDevice.hpp"
+#include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 
 #include <utils.hpp>
@@ -56,9 +56,21 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto revisionObject = NsmNVSwitchAndNicChassisAssembly<RevisionIntf>(
             chassisName, name, baseType);
         auto versionSensor =
-            std::make_shared<NsmInventoryProperty<RevisionIntf>>(revisionObject,
-                                                              INFO_ROM_VERSION);
+            std::make_shared<NsmInventoryProperty<RevisionIntf>>(
+                revisionObject, INFO_ROM_VERSION);
         device->addStaticSensor(versionSensor);
+    }
+    else if (type == "NSM_Area")
+    {
+        auto physicalContext =
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "PhysicalContext", interface.c_str());
+        auto assemblyArea =
+            std::make_shared<NsmNVSwitchAndNicChassisAssembly<AreaIntf>>(
+                chassisName, name, baseType);
+        assemblyArea->pdi().physicalContext(
+            AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
+        device->addStaticSensor(assemblyArea);
     }
     else if (type == "NSM_Asset")
     {
@@ -145,12 +157,14 @@ void createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
 
 std::vector<std::string> nvSwitchChassisAssemblyInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly",
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly.Area",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly.Asset",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly.Health",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_ChassisAssembly.Location"};
 
 std::vector<std::string> nvLinkMgmtNicChassisAssemblyInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly",
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly.Area",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly.Asset",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly.Health",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_ChassisAssembly.Location"};
