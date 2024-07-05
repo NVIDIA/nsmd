@@ -19,6 +19,7 @@
 
 #include "nsmProcessor.hpp"
 
+#include "device-configuration.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
 
@@ -27,6 +28,7 @@
 #include "nsmDevice.hpp"
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmReconfigPermissions.hpp"
 
 #include <stdint.h>
 
@@ -38,6 +40,8 @@
 #include <vector>
 
 #define PROCESSOR_INTERFACE "xyz.openbmc_project.Configuration.NSM_Processor"
+
+using std::filesystem::path;
 
 namespace nsm
 {
@@ -55,8 +59,7 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
 NsmProcessorAssociation::NsmProcessorAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) :
-    NsmObject(name, type)
+    const std::vector<utils::Association>& associations) : NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -73,8 +76,7 @@ NsmProcessorAssociation::NsmProcessorAssociation(
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
                          uuid_t uuid) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath)
 {
     uuidIntf = std::make_unique<UuidIntf>(bus, inventoryObjPath.c_str());
     uuidIntf->uuid(uuid);
@@ -132,8 +134,7 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath,
                        std::shared_ptr<NsmDevice> device) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
@@ -208,8 +209,7 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
                        std::shared_ptr<NsmEccModeIntf> eccIntf,
                        std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     eccModeIntf = eccIntf;
@@ -289,8 +289,7 @@ void NsmEccMode::updateReading(bitfield8_t flags)
 NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
                                      std::shared_ptr<NsmEccModeIntf> eccIntf,
                                      std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
@@ -382,8 +381,7 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
 }
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
-    NsmSensor(name, type),
-    deviceId(deviceId), groupId(groupId)
+    NsmSensor(name, type), deviceId(deviceId), groupId(groupId)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -410,9 +408,8 @@ NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_2),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_2), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -503,9 +500,8 @@ NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_3),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_3), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmPciGroup2: create sensor:{NAME}", "NAME", name.c_str());
@@ -571,9 +567,8 @@ NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
                            std::shared_ptr<PCieEccIntf> pCieECCIntf,
                            std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
-    NsmPcieGroup(name, type, deviceId, GROUP_ID_4),
-    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmPcieGroup(name, type, deviceId, GROUP_ID_4), pCiePortIntf(pCiePortIntf),
+    pCieEccIntf(pCieECCIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmPciGroup4: create sensor:{NAME}", "NAME", name.c_str());
@@ -743,8 +738,7 @@ uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmEDPpScalingFactor::NsmEDPpScalingFactor(sdbusplus::bus::bus& bus,
                                            std::string& name, std::string& type,
                                            std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEDPpScalingFactor: create sensor:{NAME}", "NAME",
@@ -828,8 +822,7 @@ NsmClockLimitGraphics::NsmClockLimitGraphics(
     const std::string& name, const std::string& type,
     std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmClockLimitGraphics: create sensor:{NAME}", "NAME",
@@ -928,8 +921,7 @@ NsmCurrClockFreq::NsmCurrClockFreq(
     const std::string& name, const std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmCurrClockFreq: create sensor:{NAME}", "NAME", name.c_str());
@@ -1006,8 +998,7 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
 NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf)
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -1072,8 +1063,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
 NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf)
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
 {
     lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -1139,8 +1129,8 @@ NsmCurrentUtilization::NsmCurrentUtilization(
     const std::string& name, const std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     updateMetricOnSharedMemory();
 }
@@ -1215,8 +1205,7 @@ NsmProcessorThrottleReason::NsmProcessorThrottleReason(
     std::string& name, std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmProcessorThrottleReason: create sensor:{NAME}", "NAME",
@@ -1333,8 +1322,7 @@ NsmAccumGpuUtilTime::NsmAccumGpuUtilTime(
     const std::string& name, const std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmAccumGpuUtilTime: create sensor:{NAME}", "NAME",
@@ -1467,8 +1455,7 @@ NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus::bus& bus,
                                            const std::string& name,
                                            const std::string& type,
                                            std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmProcessorRevision: create sensor:{NAME}", "NAME",
@@ -1553,8 +1540,7 @@ NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
                          std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
                          const std::vector<std::string>& parents,
                          std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    powerCapIntf(powerCapIntf), parents(parents),
+    NsmSensor(name, type), powerCapIntf(powerCapIntf), parents(parents),
     inventoryObjPath(inventoryObjPath)
 {}
 
@@ -1661,8 +1647,8 @@ NsmMaxPowerCap::NsmMaxPowerCap(
     std::string& name, std::string& type,
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
     std::shared_ptr<PowerLimitIface> powerLimitIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
+    NsmObject(name, type), powerCapIntf(powerCapIntf),
+    powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
@@ -1732,8 +1718,8 @@ NsmMinPowerCap::NsmMinPowerCap(
     std::string& name, std::string& type,
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
     std::shared_ptr<PowerLimitIface> powerLimitIntf) :
-    NsmObject(name, type),
-    powerCapIntf(powerCapIntf), powerLimitIntf(powerLimitIntf)
+    NsmObject(name, type), powerCapIntf(powerCapIntf),
+    powerLimitIntf(powerLimitIntf)
 {}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
@@ -1802,8 +1788,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type),
-    clearPowerCapIntf(clearPowerCapIntf)
+    NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
@@ -1873,410 +1858,276 @@ static void createNsmProcessorSensor(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath)
 {
-    try
+    auto& bus = utils::DBusHandler::getBus();
+    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "Name", PROCESSOR_INTERFACE);
+
+    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        objPath.c_str(), "UUID", PROCESSOR_INTERFACE);
+
+    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "Type", interface.c_str());
+
+    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+        objPath.c_str(), "InventoryObjPath", PROCESSOR_INTERFACE);
+
+    auto nsmDevice = manager.getNsmDevice(uuid);
+
+    if (type == "NSM_Processor")
     {
-        auto& bus = utils::DBusHandler::getBus();
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "Name", PROCESSOR_INTERFACE);
+        auto associations = utils::getAssociations(objPath,
+                                                   interface + ".Associations");
+        auto associationSensor = std::make_shared<NsmProcessorAssociation>(
+            bus, name, type, inventoryObjPath, associations);
+        nsmDevice->deviceSensors.push_back(associationSensor);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", PROCESSOR_INTERFACE);
+        auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
+                                                           inventoryObjPath);
+        nsmDevice->deviceSensors.push_back(sensor);
 
-        auto type = utils::DBusHandler().getDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
+        auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+            objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
 
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", PROCESSOR_INTERFACE);
+        auto uuidSensor = std::make_shared<NsmUuidIntf>(
+            bus, name, type, inventoryObjPath, deviceUuid);
+        nsmDevice->deviceSensors.push_back(uuidSensor);
+        auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
+            bus, name, type, inventoryObjPath);
+        nsmDevice->addStaticSensor(gpuRevisionSensor);
 
-        auto nsmDevice = manager.getNsmDevice(uuid);
-        if (!nsmDevice)
+        auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
+            bus, inventoryObjPath.c_str());
+        auto cacheMemorySensor = std::make_shared<NsmTotalCacheMemory>(
+            name, type, persistentMemoryIntf, inventoryObjPath);
+        nsmDevice->addStaticSensor(cacheMemorySensor);
+
+        auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
+                                                           inventoryObjPath);
+        nsmDevice->deviceSensors.push_back(healthSensor);
+    }
+    else if (type == "NSM_Location")
+    {
+        auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "LocationType", interface.c_str());
+        auto sensor = std::make_shared<NsmLocationIntfProcessor>(
+            bus, name, type, inventoryObjPath, locationType);
+        nsmDevice->deviceSensors.push_back(sensor);
+    }
+    else if (type == "NSM_LocationCode")
+    {
+        auto locationCode = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "LocationCode", interface.c_str());
+        auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
+            bus, name, type, inventoryObjPath, locationCode);
+        nsmDevice->deviceSensors.push_back(sensor);
+    }
+    else if (type == "NSM_Asset")
+    {
+        auto assetIntf =
+            std::make_shared<AssetIntfProcessor>(bus, inventoryObjPath.c_str());
+        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "Manufacturer", interface.c_str());
+
+        auto assetObject = NsmAssetIntfProcessor<AssetIntfProcessor>(name, type,
+                                                                     assetIntf);
+        assetObject.pdi().manufacturer(manufacturer);
+        // create sensor
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                assetObject, DEVICE_PART_NUMBER));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                assetObject, SERIAL_NUMBER));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
+                assetObject, MARKETING_NAME));
+    }
+    else if (type == "NSM_MIG")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+
+        auto sensor = std::make_shared<NsmMigMode>(bus, name, type,
+                                                   inventoryObjPath, nsmDevice);
+        nsmDevice->addSensor(sensor, priority);
+    }
+    if (type == "NSM_PCIe")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceId", interface.c_str());
+        int count = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "Count", interface.c_str());
+        for (auto idx = 0; idx < count; idx++)
         {
-            // cannot found a nsmDevice for the sensor
-            lg2::error(
-                "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-                "UUID", uuid, "NAME", name, "TYPE", type);
-            return;
-        }
-
-        if (type == "NSM_Processor")
-        {
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
-            auto associationSensor = std::make_shared<NsmProcessorAssociation>(
-                bus, name, type, inventoryObjPath, associations);
-            nsmDevice->deviceSensors.push_back(associationSensor);
-
-            auto sensor = std::make_shared<NsmAcceleratorIntf>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensor);
-
-            auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
-                objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
-
-            auto uuidSensor = std::make_shared<NsmUuidIntf>(
-                bus, name, type, inventoryObjPath, deviceUuid);
-            nsmDevice->deviceSensors.push_back(uuidSensor);
-            auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->addStaticSensor(gpuRevisionSensor);
-
-            auto persistentMemoryIntf =
-                std::make_shared<PersistentMemoryInterface>(
-                    bus, inventoryObjPath.c_str());
-            auto cacheMemorySensor = std::make_shared<NsmTotalCacheMemory>(
-                name, type, persistentMemoryIntf, inventoryObjPath);
-            nsmDevice->addStaticSensor(cacheMemorySensor);
-
-            auto healthSensor = std::make_shared<NsmGpuHealth>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(healthSensor);
-        }
-        else if (type == "NSM_Location")
-        {
-            auto locationType =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "LocationType", interface.c_str());
-            auto sensor = std::make_shared<NsmLocationIntfProcessor>(
-                bus, name, type, inventoryObjPath, locationType);
-            nsmDevice->deviceSensors.push_back(sensor);
-        }
-        else if (type == "NSM_LocationCode")
-        {
-            auto locationCode =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "LocationCode", interface.c_str());
-            auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
-                bus, name, type, inventoryObjPath, locationCode);
-            nsmDevice->deviceSensors.push_back(sensor);
-        }
-        else if (type == "NSM_Asset")
-        {
-            auto assetIntf = std::make_shared<AssetIntfProcessor>(
-                bus, inventoryObjPath.c_str());
-            auto manufacturer =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "Manufacturer", interface.c_str());
-
-            auto assetObject = NsmAssetIntfProcessor<AssetIntfProcessor>(
-                name, type, assetIntf);
-            assetObject.pdi().manufacturer(manufacturer);
-            // create sensor
-            nsmDevice->addStaticSensor(
-                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                    assetObject, DEVICE_PART_NUMBER));
-            nsmDevice->addStaticSensor(
-                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                    assetObject, SERIAL_NUMBER));
-            nsmDevice->addStaticSensor(
-                std::make_shared<NsmInventoryProperty<AssetIntfProcessor>>(
-                    assetObject, MARKETING_NAME));
-        }
-        else if (type == "NSM_MIG")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-
-            auto sensor = std::make_shared<NsmMigMode>(
-                bus, name, type, inventoryObjPath, nsmDevice);
-            nsmDevice->deviceSensors.push_back(sensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensor);
-            }
-        }
-        if (type == "NSM_PCIe")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceId", interface.c_str());
-            int count = utils::DBusHandler().getDbusProperty<uint64_t>(
-                objPath.c_str(), "Count", interface.c_str());
-            for (auto idx = 0; idx < count; idx++)
-            {
-                auto pcieObjPath =
-                    inventoryObjPath + "/Ports/PCIe_" +
-                    std::to_string(idx); // port metrics dbus path
-                auto pCieECCIntf = std::make_shared<PCieEccIntf>(
-                    bus, inventoryObjPath.c_str());
-                auto pCiePortIntf =
-                    std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
-                auto pciPortSensor = std::make_shared<NsmPciePortIntf>(
-                    bus, name, type, pcieObjPath);
-                auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
-                    name, type, pCieECCIntf, pCiePortIntf, deviceId,
-                    inventoryObjPath);
-                auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
-                    name, type, pCieECCIntf, pCiePortIntf, deviceId,
-                    inventoryObjPath);
-                auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
-                    name, type, pCieECCIntf, pCiePortIntf, deviceId,
-                    inventoryObjPath);
-                nsmDevice->deviceSensors.push_back(pciPortSensor);
-                nsmDevice->deviceSensors.push_back(sensorGroup2);
-                nsmDevice->deviceSensors.push_back(sensorGroup3);
-                nsmDevice->deviceSensors.push_back(sensorGroup4);
-
-                if (priority)
-                {
-                    nsmDevice->prioritySensors.push_back(sensorGroup2);
-                    nsmDevice->prioritySensors.push_back(sensorGroup3);
-                    nsmDevice->prioritySensors.push_back(sensorGroup4);
-                }
-                else
-                {
-                    nsmDevice->roundRobinSensors.push_back(sensorGroup2);
-                    nsmDevice->roundRobinSensors.push_back(sensorGroup3);
-                    nsmDevice->roundRobinSensors.push_back(sensorGroup4);
-                }
-            }
-        }
-        else if (type == "NSM_ECC")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-
-            auto eccIntf = std::make_shared<NsmEccModeIntf>(
-                bus, inventoryObjPath.c_str(), nsmDevice);
-
-            auto eccModeSensor = std::make_shared<NsmEccMode>(
-                name, type, eccIntf, inventoryObjPath);
-
-            nsmDevice->addStaticSensor(eccModeSensor);
-
-            auto eccErrorCntSensor = std::make_shared<NsmEccErrorCounts>(
-                name, type, eccIntf, inventoryObjPath);
-
-            nsmDevice->deviceSensors.push_back(eccErrorCntSensor);
-
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(eccErrorCntSensor);
-                nsmDevice->prioritySensors.push_back(eccModeSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(eccErrorCntSensor);
-                nsmDevice->roundRobinSensors.push_back(eccModeSensor);
-            }
-        }
-        else if (type == "NSM_EDPp")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto sensor = std::make_shared<NsmEDPpScalingFactor>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensor);
-            }
-        }
-        else if (type == "NSM_CpuOperatingConfig")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto cpuOperatingConfigIntf =
-                std::make_shared<NsmCpuOperatingConfigIntf>(
-                    bus, inventoryObjPath.c_str(), nsmDevice, GRAPHICS_CLOCK);
-
-            auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
-                name, type, cpuOperatingConfigIntf, inventoryObjPath);
-            auto clockLimitSensor = std::make_shared<NsmClockLimitGraphics>(
-                name, type, cpuOperatingConfigIntf, inventoryObjPath);
-            auto minGraphicsClockFreq =
-                std::make_shared<NsmMinGraphicsClockLimit>(
-                    name, type, cpuOperatingConfigIntf);
-            auto maxGraphicsClockFreq =
-                std::make_shared<NsmMaxGraphicsClockLimit>(
-                    name, type, cpuOperatingConfigIntf);
-            auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
-                name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
+            auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_" +
+                               std::to_string(idx); // port metrics dbus path
+            auto pCieECCIntf =
+                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+            auto pCiePortIntf =
+                std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+            auto pciPortSensor =
+                std::make_shared<NsmPciePortIntf>(bus, name, type, pcieObjPath);
+            auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
                 inventoryObjPath);
-
-            nsmDevice->deviceSensors.emplace_back(currentUtilization);
-
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(clockFreqSensor);
-                nsmDevice->prioritySensors.push_back(clockLimitSensor);
-                nsmDevice->prioritySensors.push_back(currentUtilization);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(clockFreqSensor);
-                nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
-                nsmDevice->roundRobinSensors.push_back(currentUtilization);
-            }
-
-            nsmDevice->addStaticSensor(minGraphicsClockFreq);
-            nsmDevice->addStaticSensor(maxGraphicsClockFreq);
-        }
-        else if (type == "NSM_ProcessorPerformance")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceId", interface.c_str());
-
-            auto processorPerfIntf = std::make_shared<ProcessorPerformanceIntf>(
-                bus, inventoryObjPath.c_str());
-
-            auto throttleReasonSensor =
-                std::make_shared<NsmProcessorThrottleReason>(
-                    name, type, processorPerfIntf, inventoryObjPath);
-
-            auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
-                name, type, processorPerfIntf, inventoryObjPath);
-            auto pciRxTxSensor = std::make_shared<NsmPciGroup5>(
-                name, type, processorPerfIntf, deviceId, inventoryObjPath);
-
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(gpuUtilSensor);
-                nsmDevice->prioritySensors.push_back(pciRxTxSensor);
-                nsmDevice->prioritySensors.push_back(throttleReasonSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(gpuUtilSensor);
-                nsmDevice->roundRobinSensors.push_back(pciRxTxSensor);
-                nsmDevice->roundRobinSensors.push_back(throttleReasonSensor);
-            }
-        }
-        else if (type == "NSM_MemCapacityUtil")
-        {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
-                                                                      type);
-            nsmDevice->addStaticSensor(totalMemorySensor);
-            auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-                bus, name, type, inventoryObjPath, totalMemorySensor);
-            nsmDevice->deviceSensors.push_back(sensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensor);
-                nsmDevice->prioritySensors.push_back(totalMemorySensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensor);
-                nsmDevice->roundRobinSensors.push_back(totalMemorySensor);
-            }
-        }
-        else if (type == "NSM_PowerCap")
-        {
-            std::vector<std::string> candidateForList;
-            try
-            {
-                candidateForList =
-                    utils::DBusHandler()
-                        .getDbusProperty<std::vector<std::string>>(
-                            objPath.c_str(), "CompositeNumericSensors",
-                            interface.c_str());
-            }
-            catch (const sdbusplus::exception::SdBusError& e)
-            {}
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            // create power cap , clear power cap and power limit interface
-            auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
-                bus, inventoryObjPath.c_str(), name, candidateForList,
-                nsmDevice);
-
-            auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
-                bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
-
-            auto powerLimitIntf = std::make_shared<PowerLimitIface>(
-                bus, inventoryObjPath.c_str());
-
-            // create sensors for power cap properties
-            auto powerCap = std::make_shared<NsmPowerCap>(
-                name, type, powerCapIntf, candidateForList, inventoryObjPath);
-            nsmDevice->deviceSensors.emplace_back(powerCap);
-            nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
-            manager.powerCapList.emplace_back(powerCap);
-
-            auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
-                name, type, clearPowerCapIntf);
-            manager.defaultPowerCapList.emplace_back(defaultPowerCap);
-
-            auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
-                name, type, powerCapIntf, powerLimitIntf);
-            manager.maxPowerCapList.emplace_back(maxPowerCap);
-
-            auto minPowerCap = std::make_shared<NsmMinPowerCap>(
-                name, type, powerCapIntf, powerLimitIntf);
-            manager.minPowerCapList.emplace_back(minPowerCap);
-
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(powerCap);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(powerCap);
-            }
-
-            nsmDevice->addStaticSensor(defaultPowerCap);
-            nsmDevice->addStaticSensor(maxPowerCap);
-            nsmDevice->addStaticSensor(minPowerCap);
+            auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
+                inventoryObjPath);
+            auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
+                inventoryObjPath);
+            nsmDevice->deviceSensors.push_back(pciPortSensor);
+            nsmDevice->addSensor(sensorGroup2, priority);
+            nsmDevice->addSensor(sensorGroup3, priority);
+            nsmDevice->addSensor(sensorGroup4, priority);
         }
     }
-
-    catch (const std::exception& e)
+    else if (type == "NSM_ECC")
     {
-        lg2::error(
-            "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
-            "PATH", objPath, "INTF", interface, "ERROR", e);
-        return;
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+
+        auto eccIntf = std::make_shared<NsmEccModeIntf>(
+            bus, inventoryObjPath.c_str(), nsmDevice);
+
+        auto eccModeSensor = std::make_shared<NsmEccMode>(name, type, eccIntf,
+                                                          inventoryObjPath);
+
+        nsmDevice->addSensor(eccModeSensor, priority);
+
+        auto eccErrorCntSensor = std::make_shared<NsmEccErrorCounts>(
+            name, type, eccIntf, inventoryObjPath);
+
+        nsmDevice->addSensor(eccErrorCntSensor, priority);
+    }
+    else if (type == "NSM_EDPp")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto sensor = std::make_shared<NsmEDPpScalingFactor>(bus, name, type,
+                                                             inventoryObjPath);
+        nsmDevice->addSensor(sensor, priority);
+    }
+    else if (type == "NSM_CpuOperatingConfig")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto cpuOperatingConfigIntf =
+            std::make_shared<NsmCpuOperatingConfigIntf>(
+                bus, inventoryObjPath.c_str(), nsmDevice, GRAPHICS_CLOCK);
+
+        auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
+            name, type, cpuOperatingConfigIntf, inventoryObjPath);
+        auto clockLimitSensor = std::make_shared<NsmClockLimitGraphics>(
+            name, type, cpuOperatingConfigIntf, inventoryObjPath);
+        auto minGraphicsClockFreq = std::make_shared<NsmMinGraphicsClockLimit>(
+            name, type, cpuOperatingConfigIntf);
+        auto maxGraphicsClockFreq = std::make_shared<NsmMaxGraphicsClockLimit>(
+            name, type, cpuOperatingConfigIntf);
+        auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
+            name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
+            inventoryObjPath);
+
+        nsmDevice->addSensor(clockFreqSensor, priority);
+        nsmDevice->addSensor(clockLimitSensor, priority);
+        nsmDevice->addSensor(currentUtilization, priority);
+
+        nsmDevice->addStaticSensor(minGraphicsClockFreq);
+        nsmDevice->addStaticSensor(maxGraphicsClockFreq);
+    }
+    else if (type == "NSM_ProcessorPerformance")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto deviceId = utils::DBusHandler().getDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceId", interface.c_str());
+
+        auto processorPerfIntf = std::make_shared<ProcessorPerformanceIntf>(
+            bus, inventoryObjPath.c_str());
+
+        auto throttleReasonSensor =
+            std::make_shared<NsmProcessorThrottleReason>(
+                name, type, processorPerfIntf, inventoryObjPath);
+
+        auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
+            name, type, processorPerfIntf, inventoryObjPath);
+        auto pciRxTxSensor = std::make_shared<NsmPciGroup5>(
+            name, type, processorPerfIntf, deviceId, inventoryObjPath);
+
+        nsmDevice->addSensor(gpuUtilSensor, priority);
+        nsmDevice->addSensor(pciRxTxSensor, priority);
+        nsmDevice->addSensor(throttleReasonSensor, priority);
+    }
+    else if (type == "NSM_MemCapacityUtil")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name, type);
+        nsmDevice->addSensor(totalMemorySensor, priority);
+        auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
+            bus, name, type, inventoryObjPath, totalMemorySensor);
+        nsmDevice->addSensor(sensor, priority);
+    }
+    else if (type == "NSM_PowerCap")
+    {
+        std::vector<std::string> candidateForList =
+            utils::DBusHandler().tryGetDbusProperty<std::vector<std::string>>(
+                objPath.c_str(), "CompositeNumericSensors", interface.c_str());
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        // create power cap , clear power cap and power limit interface
+        auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
+            bus, inventoryObjPath.c_str(), name, candidateForList, nsmDevice);
+
+        auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
+            bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
+
+        auto powerLimitIntf =
+            std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
+
+        // create sensors for power cap properties
+        auto powerCap = std::make_shared<NsmPowerCap>(
+            name, type, powerCapIntf, candidateForList, inventoryObjPath);
+        nsmDevice->addSensor(powerCap, priority);
+        nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+        manager.powerCapList.emplace_back(powerCap);
+
+        auto defaultPowerCap =
+            std::make_shared<NsmDefaultPowerCap>(name, type, clearPowerCapIntf);
+        manager.defaultPowerCapList.emplace_back(defaultPowerCap);
+
+        auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
+            name, type, powerCapIntf, powerLimitIntf);
+        manager.maxPowerCapList.emplace_back(maxPowerCap);
+
+        auto minPowerCap = std::make_shared<NsmMinPowerCap>(
+            name, type, powerCapIntf, powerLimitIntf);
+        manager.minPowerCapList.emplace_back(minPowerCap);
+
+        nsmDevice->addStaticSensor(defaultPowerCap);
+        nsmDevice->addStaticSensor(maxPowerCap);
+        nsmDevice->addStaticSensor(minPowerCap);
     }
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor, "xyz.openbmc_project.Configuration.NSM_Processor")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.PCIe")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorPerformance")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.Location")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.LocationCode")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.Asset")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmProcessorSensor,
-    "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap")
+dbus::Interfaces nsmProcessorInterfaces = {
+    "xyz.openbmc_project.Configuration.NSM_Processor",
+    "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode",
+    "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode",
+    "xyz.openbmc_project.Configuration.NSM_Processor.PCIe",
+    "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor",
+    "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorPerformance",
+    "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig",
+    "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil",
+    "xyz.openbmc_project.Configuration.NSM_Processor.Location",
+    "xyz.openbmc_project.Configuration.NSM_Processor.LocationCode",
+    "xyz.openbmc_project.Configuration.NSM_Processor.Asset",
+    "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
+    "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
+};
+
+REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 
 } // namespace nsm
