@@ -176,13 +176,13 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
                 // Mark all the round-robin sensors as unrefreshed.
                 for (auto sensor : nsmDevice->roundRobinSensors)
                 {
-                    sensor->setRefreshed(false);
+                    sensor->isRefreshed = false;
                 }
 
                 // Re-queue the static sensors for updation.
                 for (auto sensor : nsmDevice->standByToDcRefreshSensors)
                 {
-                    sensor->setRefreshed(false);
+                    sensor->isRefreshed = false;
                     nsmDevice->roundRobinSensors.push_back(sensor);
                 }
 
@@ -198,7 +198,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
     }
 }
 
-void SensorManagerImpl::checkAllDevices()
+void SensorManagerImpl::checkAllDevicesReady()
 {
     for (auto nsmDevice : nsmDevices)
     {
@@ -212,7 +212,7 @@ void SensorManagerImpl::checkAllDevices()
             return;
         }
     }
-    lg2::error(
+    lg2::info(
         "SensorManager::checkAllDevices Every Device Checked and Ready. Setting ServiceReady.State to enabled.");
     NsmServiceReadyIntf::getInstance().setStateEnabled();
 }
@@ -356,19 +356,15 @@ requester::Coroutine
         auto toBeUpdated = nsmDevice->roundRobinSensors.size();
         do
         {
-            if (toBeUpdated == 0)
+            if (!toBeUpdated)
             {
-                if (!nsmDevice
-                         ->isDeviceReady) // toBeUpdated can be zero because of
-                                          // two reasons
-                                          // 1. There are no round robin sensors
-                                          // 2. All the round robin sensors were
-                                          // updated. If the case is 2 then
-                                          // device would be already ready.
+                // Either we were able to succesfully update all sensors in one
+                // iteration or there are no sensors in the queue. Mark ready in
+                // both cases.
+                if (!nsmDevice->isDeviceReady)
                 {
-                    // Handle the case where there are no round robin sensors.
                     nsmDevice->isDeviceReady = true;
-                    checkAllDevices();
+                    checkAllDevicesReady();
                 }
                 break;
             }
@@ -377,41 +373,26 @@ requester::Coroutine
             nsmDevice->roundRobinSensors.pop_front();
             toBeUpdated--;
 
-            auto cc = co_await sensor->update(*this, eid);
-
-            if (!(sensor->isStatic() &&
-                  cc == NSM_SUCCESS)) // Filter out the static sensor as it was
-                                      // succesfully updated.
+            // ServiceReady Logic:
+            // The round-robin queue is circular hence encountering the first
+            // refreshed sensor marks a "complete iteration" of the queue.
+            if (!nsmDevice->isDeviceReady && sensor->isRefreshed)
             {
+                // The Device isn't ready but we have found our first
+                // refreshed sensor. Mark the device ready.
+                nsmDevice->isDeviceReady = true;
+                checkAllDevicesReady();
+            }
+
+            auto cc = co_await sensor->update(*this, eid);
+            sensor->isRefreshed = true;
+
+            if (!(sensor->isStatic && cc == NSM_SUCCESS))
+            {
+                // Filter out succesfully updated static sensor.
                 // Only re-queue non-static sensors or static sensors that
                 // failed to update succesfully.
                 nsmDevice->roundRobinSensors.push_back(sensor);
-            }
-
-            if (nsmDevice->roundRobinSensors.size() == 0)
-            {
-                // Meaning there were only static sensors in the round robin
-                // queue and this is the last sensor that we have access to.
-                sensor->setRefreshed(true);
-                if (!nsmDevice->isDeviceReady)
-                {
-                    nsmDevice->isDeviceReady = true;
-                    checkAllDevices();
-                }
-            }
-
-            if (!sensor->isRefreshed())
-            {
-                auto nextSensor = nsmDevice->roundRobinSensors.front();
-                if (nsmDevice->roundRobinSensors.size() == 1 ||
-                    nextSensor->isRefreshed())
-                {
-                    // Implies the current was the last stale sensor and we have
-                    // refreshed all the round robin sensors.
-                    nsmDevice->isDeviceReady = true;
-                    checkAllDevices();
-                }
-                sensor->setRefreshed(true);
             }
 
             if (nsmDevice->pollingTimer &&
