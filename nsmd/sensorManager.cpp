@@ -309,7 +309,7 @@ requester::Coroutine
     uint64_t t0 = 0;
     uint64_t t1 = 0;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
-    eid_t eid = getEid(nsmDevice);
+
     do
     {
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
@@ -317,11 +317,13 @@ requester::Coroutine
         if (!nsmDevice->isDeviceActive)
         {
             lg2::error(
-                "SensorManager::doPollingTask : skip polling due to inactive device, uuid:{UUID}",
-                "UUID", nsmDevice->uuid);
+                "SensorManager::doPollingTask : skip polling due to inactive device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
+                "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
+                nsmDevice->getInstanceNumber());
             co_return NSM_ERR_NOT_READY;
         }
 
+        eid_t eid = getEid(nsmDevice);
 #if false
 //place holder: to be implemented once related specification is available
         if (nsmDevice->getEventMode() == GLOBAL_EVENT_GENERATION_ENABLE_POLLING)
@@ -530,6 +532,13 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
         while (1)
         {
             rc = nsm_recv_any(eid, mctpFd, (uint8_t**)&response, &responseLen);
+            if (rc == (uint8_t)NSM_REQUESTER_EID_MISMATCH)
+            {
+                lg2::info(
+                    "SendRecvNsmMsgSync: received response but not from EID={EID}",
+                    "EID", eid);
+                continue;
+            }
 
             handler.invalidInProgressRequest(eid);
             if (rc == NSM_REQUESTER_SUCCESS)

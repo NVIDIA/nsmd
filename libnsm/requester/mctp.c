@@ -109,6 +109,10 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 		    (mctp_prefix[2] != MCTP_MSG_TYPE_PCI_VDM)) {
 			free(*nsm_resp_msg);
 			*nsm_resp_msg = NULL;
+
+			if (mctp_prefix[1] != eid) {
+				return NSM_REQUESTER_EID_MISMATCH;
+			}
 			return NSM_REQUESTER_NOT_NSM_MSG;
 		}
 		*resp_msg_len = nsm_len;
