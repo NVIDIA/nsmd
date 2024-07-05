@@ -1,15 +1,16 @@
 [Unit]
 Description=MCTP Nvidia System Management Daemon
 After=mctp-pcie-ctrl.service
+After=xyz.openbmc_project.EntityManager.service
 #TDB add After Clause
 
 [Service]
 Restart=always
 Type=dbus
+ExecStartPre=/usr/bin/sleep 20
 ExecStart=/usr/bin/env nsmd
 SyslogIdentifier=nsmd
 BusName=xyz.openbmc_project.NSM
 
 [Install]
 WantedBy=multi-user.target
-

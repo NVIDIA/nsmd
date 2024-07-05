@@ -66,7 +66,6 @@ class NsmDevice
     eid_t eid;
     uuid_t uuid;
     uuid_t deviceUuid;
-    uint8_t refreshRetryCount = 0;
     bool isDeviceActive;
     bool isDeviceReady = false;
     std::unique_ptr<sdbusplus::Timer> pollingTimer;
