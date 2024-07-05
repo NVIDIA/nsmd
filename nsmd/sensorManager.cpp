@@ -31,6 +31,8 @@
 #include <chrono>
 #include <iostream>
 
+const uint8_t MAX_REFRESH_RETRY_COUNT = 2;
+
 namespace nsm
 {
 
@@ -187,6 +189,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
                 }
 
                 nsmDevice->isDeviceReady = false;
+                nsmDevice->refreshRetryCount = 0;
             }
         }
     }
@@ -356,15 +359,23 @@ requester::Coroutine
         auto toBeUpdated = nsmDevice->roundRobinSensors.size();
         do
         {
+            // ServiceReady Logic.
             if (!toBeUpdated)
             {
+                // There is a case where roundRobinSensors are yet to be
+                // populated. refreshRetryCount provides a retry mechanism for
+                // the same.
+                nsmDevice->refreshRetryCount++;
+
                 // Either we were able to succesfully update all sensors in one
-                // iteration or there are no sensors in the queue. Mark ready in
-                // both cases.
-                if (!nsmDevice->isDeviceReady)
+                // iteration or there are no sensors in the queue and we have
+                // reached maximum retry count. Mark ready in both cases.
+                if (!nsmDevice->isDeviceReady &&
+                    nsmDevice->refreshRetryCount == MAX_REFRESH_RETRY_COUNT)
                 {
                     nsmDevice->isDeviceReady = true;
                     checkAllDevicesReady();
+                    break;
                 }
                 break;
             }
