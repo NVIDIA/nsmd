@@ -31,7 +31,12 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
     NsmSwitchDI(const std::string& name, const std::string& inventoryObjPath) :
         NsmInterfaceProvider<IntfType>(name, "NSM_NVSwitch", inventoryObjPath),
         objPath(inventoryObjPath + name)
-    {}
+    {
+        if constexpr (std::is_same_v<IntfType, SwitchIntf>)
+        {
+            updateMetricOnSharedMemory();
+        }
+    }
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     void updateMetricOnSharedMemory() override;
