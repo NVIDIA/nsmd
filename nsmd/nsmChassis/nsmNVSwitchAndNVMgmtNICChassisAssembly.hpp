@@ -20,6 +20,7 @@
 #include "globals.hpp"
 #include "nsmInterface.hpp"
 
+#include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
@@ -32,6 +33,7 @@ namespace nsm
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
+using AreaIntf = object_t<Inventory::Decorator::server::Area>;
 using AssemblyIntf = object_t<Inventory::Item::server::Assembly>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
