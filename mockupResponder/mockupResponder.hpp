@@ -226,6 +226,36 @@ class MockupResponder
         getReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getPowerSmoothingFeatureInfo(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getHwCircuiteryUsage(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getCurrentProfileInfo(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getQueryAdminOverride(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        setActivePresetProfile(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        setupAdminOverride(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        applyAdminOverride(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        toggleImmediateRampDown(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        toggleFeatureState(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getPresetProfileInfo(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;

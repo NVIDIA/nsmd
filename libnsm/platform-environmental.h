@@ -63,7 +63,19 @@ enum nsm_platform_environmental_commands {
 	NSM_SET_POWER_LIMITS = 0x08,
 	NSM_GET_POWER_LIMITS = 0x07,
 	NSM_QUERY_AGGREGATE_GPM_METRICS = 0x49,
-	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A
+	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A,
+	// Power Smoothing Opcodes
+	NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE = 0x75,
+	NSM_PWR_SMOOTHING_GET_FEATURE_INFO = 0x76,
+	NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE = 0x77,
+	NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION = 0x78,
+	NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS = 0x79,
+	NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION = 0x7a,
+	NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE = 0x7b,
+	NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE = 0x71,
+	NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE = 0x72,
+	NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE = 0x73,
+	NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN = 0x74
 };
 
 /** @brief NSM Type3 platform environmental events
@@ -515,6 +527,50 @@ struct nsm_query_per_instance_gpm_metrics_req {
 	uint32_t instance_bitmask;
 } __attribute__((packed));
 
+/** @struct nsm_pwr_smoothing_featureinfo_data
+ * Bit	Description
+ * 0	    Power Smoothing feature is supported.
+ * 1  	Power Smoothing feature is enabled.
+ * 2   	Immediate ramp down is enabled.
+ * 3:31	Reserved
+ */
+struct nsm_pwr_smoothing_featureinfo_data {
+	uint32_t feature_flag;
+	uint32_t currentTmpSetting;
+	uint32_t currentTmpFloorSetting;
+	int16_t maxTmpFloorSettingInPercent;
+	int16_t minTmpFloorSettingInPercent;
+} __attribute__((packed));
+
+/** @struct nsm_get_power_smoothing_feat_resp
+ *  Structure representing NSM get Power Smoothing Feature response.
+ */
+struct nsm_get_power_smoothing_feat_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_pwr_smoothing_featureinfo_data data;
+} __attribute__((packed));
+
+/** @brief Encode a platform env metric request that doesnt have any request
+ * payload
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_platform_env_command_no_payload_req(
+    uint8_t instance_id, struct nsm_msg *msg,
+    enum nsm_platform_environmental_commands command);
+/** @brief Encode a platform env metric request that doesnt have any request
+ * payload
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_get_platform_env_command_no_payload_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    __attribute__((unused)) enum nsm_platform_environmental_commands command);
+
 /** @brief Encode a Get Driver Information request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -710,6 +766,168 @@ struct nsm_set_power_limit_req {
 	uint8_t action;
 	uint8_t persistance;
 	uint32_t power_limit;
+} __attribute__((packed));
+
+/** @struct nsm_hardwareciruitry_data
+ * 32 bit NvUFXP8_24 representing Get Hardware Circuitry Lifetime Usage data
+ */
+struct nsm_hardwareciruitry_data {
+	int32_t reading;
+} __attribute__((packed));
+
+/** @struct nsm_hardwareciruitry_resp
+ *  Structure representing NSM Get Hardware Circuitry Lifetime Usage Response
+ */
+struct nsm_hardwareciruitry_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_hardwareciruitry_data data;
+} __attribute__((packed));
+
+/** @struct
+ *
+ *  Structure representing admin override mask
+ */
+typedef union {
+	uint8_t byte;
+	struct {
+		uint8_t tmp_floor_override : 1;
+		uint8_t rampup_rate_override : 1;
+		uint8_t rampdown_rate_override : 1;
+		uint8_t hysteresis_value_override : 1;
+		uint8_t unused : 4;
+	} __attribute__((packed)) bits;
+} nsm_currentprofile_admin_override_mask;
+
+struct nsm_get_current_profile_data {
+	uint8_t current_active_profile_id;
+	nsm_currentprofile_admin_override_mask admin_override_mask;
+	uint16_t current_percent_tmp_floor;
+	uint32_t current_rampup_rate_in_miliwatts_per_second;
+	uint32_t current_rampdown_rate_in_miliwatts_per_second;
+	uint32_t current_rampdown_hysteresis_value_in_milisec;
+} __attribute__((packed));
+
+/** @struct nsm_get_current_profile_info_req
+ *
+ *  Structure representing NSM get current profile info request.
+ */
+struct nsm_get_current_profile_info_req {
+	struct nsm_common_req hdr;
+} __attribute__((packed));
+
+/** @struct nsm_get_current_profile_info_resp
+ *
+ *  Structure representing NSM get current profile info response.
+ */
+struct nsm_get_current_profile_info_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_get_current_profile_data data;
+} __attribute__((packed));
+
+/** @struct nsm_query_admin_override_data
+ *
+ *  Structure representing NSM query admin override data cached in SW
+ * controller state.
+ */
+struct nsm_admin_override_data {
+	uint16_t admin_override_percent_tmp_floor;
+	uint16_t reserved;
+	uint32_t admin_override_ramup_rate_in_miliwatts_per_second;
+	uint32_t admin_override_rampdown_rate_in_miliwatts_per_second;
+	uint32_t admin_override_rampdown_hysteresis_value_in_milisec;
+} __attribute__((packed));
+
+/** @struct nsm_query_admin_override_resp
+ *
+ *  Structure representing NSM query admin override response.
+ */
+struct nsm_query_admin_override_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_admin_override_data data;
+} __attribute__((packed));
+
+/** @struct nsm_set_active_preset_profile_req
+ *  Structure representing NSM TSet Active Preset Profile.
+ */
+struct nsm_set_active_preset_profile_req {
+	struct nsm_common_req hdr;
+	uint8_t profile_id;
+} __attribute__((packed));
+
+/** @struct nsm_setup_admin_override_req
+ *  Structure representing NSM TSet Active Preset Profile.
+ ParameterID
+      0        	% TMP Floor
+      1        	Ramp-up rate
+      2        	Ramp-down rate
+      3        	Hysteresis for ramp down
+      4-255     reserved
+ */
+struct nsm_setup_admin_override_req {
+	struct nsm_common_req hdr;
+	uint8_t parameter_id;
+	uint8_t reservedByte1;
+	uint8_t reservedByte2;
+	uint8_t reservedByte3;
+	uint32_t param_value;
+} __attribute__((packed));
+
+/** @struct nsm_toggle_immediate_rampdown_req
+ *  Structure representing NSM Toggle Immediate Ramp Down
+ */
+struct nsm_toggle_immediate_rampdown_req {
+	struct nsm_common_req hdr;
+	uint8_t ramp_down_toggle;
+} __attribute__((packed));
+
+/** @struct nsm_toggle_feature_state_req
+ *  Structure representing NSM Toggle Feature State.
+ */
+struct nsm_toggle_feature_state_req {
+	struct nsm_common_req hdr;
+	uint8_t feature_state;
+} __attribute__((packed));
+
+/** @struct nsm_all_preset_profile_meta_data
+ *  Structure representing metadata for "Get Preset Profile Information"
+ */
+struct nsm_get_all_preset_profile_meta_data {
+	uint8_t max_profiles_supported;
+	uint8_t reservedByte1;
+	uint8_t reservedByte2;
+	uint8_t reservedByte3;
+} __attribute__((packed));
+
+/** @struct nsm_all_preset_profile_meta_data
+ *  Structure representing metadata for "Get Preset Profile Information"
+ */
+struct nsm_get_all_preset_profile_resp_metadata {
+	uint8_t max_profiles_supported;
+	uint8_t reservedByte1;
+	uint8_t reservedByte2;
+	uint8_t reservedByte3;
+	uint8_t profiles[1];
+} __attribute__((packed));
+
+/** @struct nsm_preset_profile_data
+ *  Structure representing individual profile info
+ */
+struct nsm_preset_profile_data {
+	int16_t tmp_floor_setting_in_percent;
+	uint8_t reservedByte1;
+	uint8_t reservedByte2;
+	uint32_t ramp_up_rate_in_miliwattspersec;
+	uint32_t ramp_down_rate_in_miliwattspersec;
+	uint32_t ramp_hysterisis_rate_in_miliwattspersec;
+} __attribute__((packed));
+
+/** @struct nsm_all_preset_profile_resp
+ *
+ *  Structure representing NSM query "Get Preset Profile Information" response.
+ */
+struct nsm_get_all_preset_profile_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_get_all_preset_profile_resp_metadata data;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
@@ -2193,6 +2411,189 @@ int encode_aggregate_gpm_metric_bandwidth_data(uint64_t bandwidth,
 int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
 					       size_t data_len,
 					       uint64_t *bandwidth);
+
+/** @brief Encode a Get Power Smoothing Feature Info request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_powersmoothing_featinfo_req(uint8_t instance_id,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Get Power Smoothing Feature Info request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_powersmoothing_featinfo_req(const struct nsm_msg *msg,
+					   size_t msg_len);
+
+/** @brief Encode Get Power Smoothing Feature Info response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] data - feature info
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_powersmoothing_featinfo_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_pwr_smoothing_featureinfo_data *data, struct nsm_msg *msg);
+
+/** @brief Decode Get Power Smoothing Feature Info response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data - feature info
+ *  @return nsm_completion_codes
+ */
+int decode_get_powersmoothing_featinfo_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_pwr_smoothing_featureinfo_data *data);
+
+// ** Get Hardware Circuitry Lifetime Usage **
+int encode_get_hardware_lifetime_cricuitry_req(uint8_t instance_id,
+					       struct nsm_msg *msg);
+int decode_get_hardware_lifetime_cricuitry_req(const struct nsm_msg *msg,
+					       size_t msg_len);
+int encode_get_hardware_lifetime_cricuitry_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_hardwareciruitry_data *data, struct nsm_msg *msg);
+int decode_get_hardware_lifetime_cricuitry_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_hardwareciruitry_data *data);
+
+// ** Get Current Profile Info **
+int encode_get_current_profile_info_req(uint8_t instance_id,
+					struct nsm_msg *msg);
+int decode_get_current_profile_info_req(const struct nsm_msg *msg,
+					size_t msg_len);
+int encode_get_current_profile_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_current_profile_data *data, struct nsm_msg *msg);
+int decode_get_current_profile_info_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_get_current_profile_data *data);
+
+/** @brief Encode Admin Override request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ */
+int encode_query_admin_override_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode Admin Override request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_query_admin_override_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode Admin Override response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] data - admin override data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+
+int encode_query_admin_override_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     struct nsm_admin_override_data *data,
+				     struct nsm_msg *msg);
+
+/** @brief Decode Admin Override response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data - admin override data
+ *  @return nsm_completion_codes
+ */
+int decode_query_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint16_t *data_size,
+				     struct nsm_admin_override_data *data);
+
+// ** Set Active Preset Profile **
+int encode_set_active_preset_profile_req(uint8_t instance_id,
+					 uint8_t profile_id,
+					 struct nsm_msg *msg);
+int decode_set_active_preset_profile_req(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *profile_id);
+int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg);
+int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc);
+
+// ** Setup Admin Override **
+int encode_setup_admin_override_req(uint8_t instance_id, uint8_t parameter_id,
+				    uint32_t param_value, struct nsm_msg *msg);
+int decode_setup_admin_override_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *parameter_id,
+				    uint32_t *param_value);
+int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, struct nsm_msg *msg);
+int decode_setup_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc);
+
+// ** Apply Admin Override **
+int encode_apply_admin_override_req(uint8_t instance_id, struct nsm_msg *msg);
+int decode_apply_admin_override_req(const struct nsm_msg *msg, size_t msg_len);
+int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, struct nsm_msg *msg);
+int decode_apply_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc);
+
+// ** Toggle Immediate Ramp down **
+int encode_toggle_immediate_rampdown_req(uint8_t instance_id,
+					 uint8_t ramp_down_toggle,
+					 struct nsm_msg *msg);
+int decode_toggle_immediate_rampdown_req(const struct nsm_msg *msg,
+					 size_t msg_len,
+					 uint8_t *ramp_down_toggle);
+
+int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg);
+int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc);
+
+// ** Toggle Feature State **
+int encode_toggle_feature_state_req(uint8_t instance_id, uint8_t feature_state,
+				    struct nsm_msg *msg);
+int decode_toggle_feature_state_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *feature_state);
+int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, struct nsm_msg *msg);
+int decode_toggle_feature_state_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc);
+// ** Get Preset Profile Information **
+int encode_get_preset_profile_req(uint8_t instance_id, struct nsm_msg *msg);
+int decode_get_preset_profile_req(const struct nsm_msg *msg, size_t msg_len);
+int encode_get_preset_profile_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_all_preset_profile_meta_data *data,
+    struct nsm_preset_profile_data *profile_data,
+    uint8_t max_number_of_profiles, struct nsm_msg *msg);
+
+int decode_get_preset_profile_metadata_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_get_all_preset_profile_meta_data *data,
+    uint8_t *number_of_profiles);
+int decode_get_preset_profile_data_from_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t max_supported_profile, uint8_t profile_id,
+    struct nsm_preset_profile_data *profle_data);
 #ifdef __cplusplus
 }
 #endif

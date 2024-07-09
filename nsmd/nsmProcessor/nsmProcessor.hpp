@@ -30,6 +30,7 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmMigModeIface.hpp"
 #include "nsmPowerCapIface.hpp"
+#include "nsmPowerSmoothingCurrentProfileIface.hpp"
 #include "nsmSensor.hpp"
 
 #include <stdint.h>

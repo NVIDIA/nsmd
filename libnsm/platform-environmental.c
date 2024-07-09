@@ -150,6 +150,47 @@ int decode_get_inventory_information_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_platform_env_command_no_payload_req(
+    uint8_t instance_id, struct nsm_msg *msg,
+    enum nsm_platform_environmental_commands command)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req*)msg->payload;
+
+	request->command = command;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_platform_env_command_no_payload_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    __attribute__((unused)) enum nsm_platform_environmental_commands command)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
+}
+
+
 uint32_t
 decode_inventory_information_as_uint32(const uint8_t *inventory_information,
 				       const uint16_t data_size)
@@ -3480,6 +3521,1082 @@ int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
 	memcpy(&le_reading, data, sizeof(uint64_t));
 
 	*bandwidth = le64toh(le_reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+
+static void htolePowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
+{
+	data->feature_flag=htole32(data->feature_flag);
+	data->currentTmpSetting=htole32(data->currentTmpSetting);
+	data->currentTmpFloorSetting=htole32(data->currentTmpFloorSetting);
+	data->maxTmpFloorSettingInPercent=htole16(data->maxTmpFloorSettingInPercent);
+	data->minTmpFloorSettingInPercent=htole16(data->minTmpFloorSettingInPercent);
+}
+
+
+int encode_get_powersmoothing_featinfo_req(uint8_t instance_id,
+					   struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg, NSM_PWR_SMOOTHING_GET_FEATURE_INFO);
+}
+
+
+int decode_get_powersmoothing_featinfo_req(const struct nsm_msg *msg,
+					   size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_GET_FEATURE_INFO);
+}
+
+int encode_get_powersmoothing_featinfo_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_pwr_smoothing_featureinfo_data *data,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_GET_FEATURE_INFO, msg);
+	}
+
+	struct nsm_get_power_smoothing_feat_resp *response =
+	    (struct nsm_get_power_smoothing_feat_resp *)msg->payload;
+	response->hdr.command = NSM_PWR_SMOOTHING_GET_FEATURE_INFO;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(struct nsm_pwr_smoothing_featureinfo_data));
+
+	htolePowerSmoothingFeat(data);
+	memcpy(&(response->data), data,
+	       sizeof(struct nsm_pwr_smoothing_featureinfo_data));
+	
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_powersmoothing_featinfo_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code,
+					    uint16_t *data_size,
+					    struct nsm_pwr_smoothing_featureinfo_data *data)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr)) +
+			   sizeof(struct nsm_get_power_smoothing_feat_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_power_smoothing_feat_resp *resp =
+		(struct nsm_get_power_smoothing_feat_resp *)msg->payload;
+    *data_size = le16toh(resp->hdr.data_size);
+	
+	if (resp->hdr.command != NSM_PWR_SMOOTHING_GET_FEATURE_INFO) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	size_t nsm_featureinfo_data_length =
+		sizeof(struct nsm_pwr_smoothing_featureinfo_data);
+	if (*data_size < nsm_featureinfo_data_length) {
+		return NSM_ERR_INVALID_DATA_LENGTH;
+	}
+	
+	memcpy(data, &(resp->data), nsm_featureinfo_data_length);
+	*cc = resp->hdr.completion_code;
+	
+	return NSM_SUCCESS;
+}
+
+int encode_get_hardware_lifetime_cricuitry_req(uint8_t instance_id,
+					   struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
+}
+
+
+int decode_get_hardware_lifetime_cricuitry_req(const struct nsm_msg *msg,
+					   size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
+}
+
+int encode_get_hardware_lifetime_cricuitry_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_hardwareciruitry_data *data,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE, msg);
+	}
+
+	struct nsm_hardwareciruitry_resp *response =
+	    (struct nsm_hardwareciruitry_resp *)msg->payload;
+	response->hdr.command = NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE;
+	response->hdr.completion_code = cc;
+	uint16_t data_size = htole16(sizeof(struct nsm_hardwareciruitry_data));
+	response->hdr.data_size = htole16(data_size);
+    
+	memcpy(&(response->data), data, sizeof(struct nsm_hardwareciruitry_data));
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_hardware_lifetime_cricuitry_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code,
+					    uint16_t *data_size,
+					    struct nsm_hardwareciruitry_data *data)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_hardwareciruitry_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_hardwareciruitry_resp *resp =
+		(struct nsm_hardwareciruitry_resp *)msg->payload;
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if (resp->hdr.command != NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	size_t nsm_hardwareciruitry_data_length =
+		sizeof(struct nsm_hardwareciruitry_data);
+	if (*data_size < nsm_hardwareciruitry_data_length) {
+		return NSM_ERR_INVALID_DATA_LENGTH;
+	}
+
+	memcpy(data, &(resp->data), nsm_hardwareciruitry_data_length);
+	*cc = resp->hdr.completion_code;
+	
+	return NSM_SUCCESS;
+}
+
+
+int encode_get_current_profile_info_req(uint8_t instance_id,
+					struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg,
+	    NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION);
+}
+
+int decode_get_current_profile_info_req(const struct nsm_msg *msg,
+					size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION);
+}
+
+static void
+htole32CurrentProfileInfoResp(struct nsm_get_current_profile_data *profileInfo)
+{
+	profileInfo->current_active_profile_id =
+	    htole32(profileInfo->current_active_profile_id);
+	profileInfo->current_percent_tmp_floor =
+	    htole32(profileInfo->current_percent_tmp_floor);
+	profileInfo->current_rampup_rate_in_miliwatts_per_second =
+	    htole32(profileInfo->current_rampup_rate_in_miliwatts_per_second);
+	profileInfo->current_rampdown_rate_in_miliwatts_per_second =
+	    htole32(profileInfo->current_rampdown_rate_in_miliwatts_per_second);
+	profileInfo->current_rampdown_hysteresis_value_in_milisec =
+	    htole32(profileInfo->current_rampdown_hysteresis_value_in_milisec);
+}
+
+static void
+le32tohCurrentProfileInfoResp(struct nsm_get_current_profile_data *profileInfo)
+{
+	profileInfo->current_active_profile_id =
+	    le32toh(profileInfo->current_active_profile_id);
+	profileInfo->current_percent_tmp_floor =
+	    le32toh(profileInfo->current_percent_tmp_floor);
+	profileInfo->current_rampup_rate_in_miliwatts_per_second =
+	    le32toh(profileInfo->current_rampup_rate_in_miliwatts_per_second);
+	profileInfo->current_rampdown_rate_in_miliwatts_per_second =
+	    le32toh(profileInfo->current_rampdown_rate_in_miliwatts_per_second);
+	profileInfo->current_rampdown_hysteresis_value_in_milisec =
+	    le32toh(profileInfo->current_rampdown_hysteresis_value_in_milisec);
+}
+
+int encode_get_current_profile_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_current_profile_data *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION, msg);
+	}
+
+	struct nsm_get_current_profile_info_resp *response =
+	    (struct nsm_get_current_profile_info_resp *)msg->payload;
+
+	response->hdr.command =
+	    NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_pwr_smoothing_featureinfo_data));
+
+	htole32CurrentProfileInfoResp(data);
+
+	memcpy(&(response->data), data,
+	       sizeof(struct nsm_get_current_profile_data));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_current_profile_info_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_get_current_profile_data *data)
+{
+	if (data == NULL || data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_current_profile_info_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_get_current_profile_info_resp *resp_payload =
+	    (struct nsm_get_current_profile_info_resp *)msg->payload;
+
+	*data_size = le16toh(resp_payload->hdr.data_size);
+	size_t response_data_len = sizeof(struct nsm_get_current_profile_data);
+	memcpy(data, &(resp_payload->data), response_data_len);
+
+	// conversion le32toh for each counter data
+	le32tohCurrentProfileInfoResp(data);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_query_admin_override_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg, NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE);
+}
+
+int decode_query_admin_override_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE);
+}
+
+static void htoleAdminOverrideData(struct nsm_admin_override_data *adminData)
+{
+	adminData->admin_override_percent_tmp_floor =
+	    htole16(adminData->admin_override_percent_tmp_floor);
+	adminData->admin_override_ramup_rate_in_miliwatts_per_second =
+	    htole32(adminData->admin_override_ramup_rate_in_miliwatts_per_second);
+	adminData->admin_override_rampdown_rate_in_miliwatts_per_second =
+	    htole32(adminData
+			->admin_override_rampdown_rate_in_miliwatts_per_second);
+	adminData->admin_override_rampdown_hysteresis_value_in_milisec =
+	    htole32(
+		adminData->admin_override_rampdown_hysteresis_value_in_milisec);
+}
+
+static void letohAdminOverrideData(struct nsm_admin_override_data *adminData)
+{
+	adminData->admin_override_percent_tmp_floor =
+	    le16toh(adminData->admin_override_percent_tmp_floor);
+	adminData->admin_override_ramup_rate_in_miliwatts_per_second =
+	    le32toh(adminData->admin_override_ramup_rate_in_miliwatts_per_second);
+	adminData->admin_override_rampdown_rate_in_miliwatts_per_second =
+	    le32toh(adminData
+			->admin_override_rampdown_rate_in_miliwatts_per_second);
+	adminData->admin_override_rampdown_hysteresis_value_in_milisec =
+	    le32toh(
+		adminData->admin_override_rampdown_hysteresis_value_in_milisec);
+}
+
+int encode_query_admin_override_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     struct nsm_admin_override_data *data,
+				     struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE,
+		    msg);
+	}
+
+	struct nsm_query_admin_override_resp *response =
+	    (struct nsm_query_admin_override_resp *)msg->payload;
+
+	response->hdr.command = NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_admin_override_data));
+
+	// conversion htole32 for each admin override data
+	htoleAdminOverrideData(data);
+
+	memcpy(&(response->data), data, sizeof(struct nsm_admin_override_data));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint16_t *data_size,
+				     struct nsm_admin_override_data *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_query_admin_override_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_admin_override_resp *resp =
+	    (struct nsm_query_admin_override_resp *)msg->payload;
+	size_t admin_data_len = sizeof(struct nsm_admin_override_data);
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < admin_data_len) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(data, &(resp->data), admin_data_len);
+
+	// conversion le32toh for each admin override data
+	letohAdminOverrideData(data);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_active_preset_profile_req(uint8_t instance_id,uint8_t profile_id,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_active_preset_profile_req *request =
+	    (struct nsm_set_active_preset_profile_req *)msg->payload;
+
+	request->hdr.command = NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE;
+	request->hdr.data_size = sizeof(profile_id);
+	request->profile_id = profile_id;
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_set_active_preset_profile_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *profile_id)
+{
+	if (msg == NULL || profile_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_active_preset_profile_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_active_preset_profile_req *request =
+	    (struct nsm_set_active_preset_profile_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->profile_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*profile_id = request->profile_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+int encode_setup_admin_override_req(uint8_t instance_id,uint8_t parameter_id, uint32_t param_value,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_setup_admin_override_req *request =
+	    (struct nsm_setup_admin_override_req *)msg->payload;
+
+	request->hdr.command = NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE;
+	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
+	request->parameter_id = parameter_id;
+	request->param_value = param_value;
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_setup_admin_override_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *parameter_id, uint32_t *param_value)
+{
+	if (msg == NULL || parameter_id == NULL || param_value==NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_setup_admin_override_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_setup_admin_override_req *request =
+	    (struct nsm_setup_admin_override_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->parameter_id)+sizeof(request->param_value)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*parameter_id = request->parameter_id;
+	*param_value = request->param_value;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_setup_admin_override_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+int encode_apply_admin_override_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE);
+}
+
+
+int decode_apply_admin_override_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE);
+}
+
+int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_apply_admin_override_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+
+int encode_toggle_immediate_rampdown_req(
+    uint8_t instance_id, uint8_t ramp_down_toggle, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_toggle_immediate_rampdown_req *request =
+	    (struct nsm_toggle_immediate_rampdown_req *)msg->payload;
+
+	request->hdr.command = NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN;
+	request->hdr.data_size = sizeof(ramp_down_toggle);
+	request->ramp_down_toggle = ramp_down_toggle;
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_toggle_immediate_rampdown_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *ramp_down_toggle)
+{
+	if (msg == NULL || ramp_down_toggle == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_toggle_immediate_rampdown_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_toggle_immediate_rampdown_req *request =
+	    (struct nsm_toggle_immediate_rampdown_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->ramp_down_toggle)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*ramp_down_toggle = request->ramp_down_toggle;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+
+int encode_toggle_feature_state_req(uint8_t instance_id,uint8_t feature_state,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_toggle_feature_state_req *request =
+	    (struct nsm_toggle_feature_state_req *)msg->payload;
+
+	request->hdr.command = NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE;
+	request->hdr.data_size = sizeof(feature_state);
+	request->feature_state = feature_state;
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_toggle_feature_state_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *feature_state)
+{
+	if (msg == NULL || feature_state == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_toggle_feature_state_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_toggle_feature_state_req *request =
+	    (struct nsm_toggle_feature_state_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->feature_state)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*feature_state = request->feature_state;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_toggle_feature_state_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+static void letohgetPresetProfiledata(struct nsm_preset_profile_data *data)
+{
+	data->tmp_floor_setting_in_percent = le16toh(data->tmp_floor_setting_in_percent);
+	data->ramp_up_rate_in_miliwattspersec = le32toh(data->ramp_up_rate_in_miliwattspersec);
+	data->ramp_down_rate_in_miliwattspersec = le32toh(data->ramp_down_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_miliwattspersec = le32toh(data->ramp_hysterisis_rate_in_miliwattspersec);
+}
+
+static void htolegetPresetProfiledata(struct nsm_preset_profile_data *data)
+{
+	data->tmp_floor_setting_in_percent = htole16(data->tmp_floor_setting_in_percent);
+	data->ramp_up_rate_in_miliwattspersec = htole32(data->ramp_up_rate_in_miliwattspersec);
+	data->ramp_down_rate_in_miliwattspersec = htole32(data->ramp_down_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_miliwattspersec = htole32(data->ramp_hysterisis_rate_in_miliwattspersec);
+}
+
+int encode_get_preset_profile_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+   return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION);
+}
+
+int decode_get_preset_profile_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION);
+}
+
+int encode_get_preset_profile_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   struct nsm_get_all_preset_profile_meta_data *meta_data,
+				   struct nsm_preset_profile_data *profile_data,
+				   uint8_t max_number_of_profiles,
+				   struct nsm_msg *msg)
+{
+	if (msg == NULL || profile_data == NULL || meta_data == NULL ) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION,
+		    msg);
+	}
+
+	struct nsm_get_all_preset_profile_resp *response =
+	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
+    
+	
+	uint16_t meta_data_size=sizeof(struct nsm_get_all_preset_profile_meta_data);
+	uint16_t profile_data_size=sizeof(struct nsm_preset_profile_data);
+	// data size is sum of metadata + number of profiles * size of one profile
+	uint16_t data_size=meta_data_size+max_number_of_profiles*profile_data_size;
+
+	response->hdr.command = NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(data_size);
+
+	response->data.max_profiles_supported=max_number_of_profiles;
+    for(int i=0;i<max_number_of_profiles;i++)
+	{
+		htolegetPresetProfiledata(profile_data+i);	
+	}
+	memcpy(&(response->data.profiles), profile_data, profile_data_size*max_number_of_profiles);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_preset_profile_metadata_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   struct nsm_get_all_preset_profile_meta_data *data, uint8_t *number_of_profiles)
+{
+	if (data == NULL ) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_all_preset_profile_resp *resp =
+	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
+	size_t meta_data_len = sizeof(struct nsm_get_all_preset_profile_meta_data);
+
+	uint16_t preset_profile_size = sizeof(struct nsm_preset_profile_data);
+	uint16_t expected_data_size = preset_profile_size*(data->max_profiles_supported);
+	
+	if(le16toh(resp->hdr.data_size) < expected_data_size){
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(data, &(resp->data), meta_data_len);
+    *number_of_profiles=data->max_profiles_supported;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_preset_profile_data_from_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t max_profiles_supported,
+				   uint8_t profile_id,
+				   struct nsm_preset_profile_data *profile_data)
+{
+	if (profile_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_all_preset_profile_resp *resp =
+	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
+
+	uint16_t preset_profile_size = sizeof(struct nsm_preset_profile_data);
+	uint16_t expected_data_size = preset_profile_size*(max_profiles_supported);
+	
+	if(le16toh(resp->hdr.data_size) < expected_data_size){
+		return NSM_SW_ERROR_DATA;
+	}
+	uint8_t profile_data_size=sizeof(struct nsm_preset_profile_data);
+	//uint16_t offset=sizeof(struct nsm_get_all_preset_profile_meta_data) + profile_id*profile_data_size;
+	memcpy(profile_data, &(resp->data.profiles)+profile_id*profile_data_size, profile_data_size);
+
+	// conversion le to he
+	letohgetPresetProfiledata(profile_data);
 
 	return NSM_SW_SUCCESS;
 }
