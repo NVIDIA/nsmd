@@ -210,7 +210,7 @@ class MockupResponder
                                            size_t requestLen);
     std::optional<std::vector<uint8_t>>
         enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
-                                           size_t requestLen);
+                                       size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         readThermalParameterHandler(const nsm_msg* requestMsg,
@@ -222,6 +222,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
 
   private:
     sdeventplus::Event& event;
@@ -235,9 +238,13 @@ class MockupResponder
     std::unique_ptr<sdeventplus::source::IO> io;
     eid_t eventReceiverEid;
     uint8_t globalEventGenerationSetting;
-    struct State {
+    struct State
+    {
         nsm_fpga_diagnostics_settings_wp writeProtected;
         uint8_t istMode;
+        std::map<reconfiguration_permissions_v1_index,
+                 nsm_reconfiguration_permissions_v1>
+            prcKnobs;
     } state;
 };
 

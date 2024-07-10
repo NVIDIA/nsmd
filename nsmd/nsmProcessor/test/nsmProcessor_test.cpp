@@ -15,13 +15,11 @@
  * limitations under the License.
  */
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-using ::testing::_;
-using ::testing::Args;
-using ::testing::ElementsAreArray;
+#include "test/mockDBusHandler.hpp"
+#include "test/mockSensorManager.hpp"
+using namespace ::testing;
 
-#include "base.h"
+#include "device-configuration.h"
 #include "platform-environmental.h"
 
 #include <sdbusplus/bus.hpp>
@@ -29,7 +27,8 @@ using ::testing::ElementsAreArray;
 #define private public
 #define protected public
 
-#include "../nsmProcessor.hpp"
+#include "nsmProcessor.hpp"
+#include "nsmReconfigPermissions.hpp"
 
 using namespace nsm;
 
@@ -983,4 +982,180 @@ TEST(nsmProcessorRevision, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
     rc = sensor.handleResponseMsg(response, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+struct NsmProcessorTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
+{
+    eid_t eid = 0;
+    uint8_t instanceId = 0;
+    const std::string basicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_Processor";
+    const std::string name = "GPU_SXM_1";
+    const std::string objPath = processorsInventoryBasePath / name;
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
+
+    NsmDeviceTable devices{
+        {std::make_shared<NsmDevice>(gpuUuid)},
+    };
+    NsmDevice& gpu = *devices[0];
+
+    NiceMock<MockSensorManager> mockManager{devices};
+
+    const PropertyValuesCollection error = {
+        {"Type", "NSM_processor"},
+        {"UUID", badUuid},
+        {"Features",
+         std::vector<uint64_t>{
+             (uint64_t)ReconfigSettingsIntf::FeatureType::InSystemTest,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::FusingMode,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::CCMode,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::Unknown,
+         }},
+    };
+    const PropertyValuesCollection basic = {
+        {"Name", name},
+        {"Type", "NSM_Processor"},
+        {"UUID", gpuUuid},
+        {"InventoryObjPath", objPath},
+    };
+    const PropertyValuesCollection prcKnobs = {
+        {"Type", "NSM_InbandReconfigPermissions"},
+        {"Priority", false},
+        {"Features", // features are not propertly sorted and some are
+                     // duplicated
+         std::vector<uint64_t>{
+             (uint64_t)ReconfigSettingsIntf::FeatureType::InSystemTest,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::FusingMode,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::CCMode,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::
+                 PowerSmoothingPrivilegeLevel1,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::BAR0Firewall,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::CCDevMode,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPCurrentLimit,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPRatedLimit,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::HBMFrequencyChange,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPMaxLimit,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPMinLimit,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::ClockLimit,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::NVLinkDisable,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::ECCEnable,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::PCIeVFConfiguration,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::RowRemappingAllowed,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::RowRemappingFeature,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::HULKLicenseUpdate,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::ForceTestCoupling,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::BAR0TypeConfig,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::EDPpScalingFactor,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::PowerSmoothing,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::
+                 PowerSmoothingPrivilegeLevel0,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::
+                 PowerSmoothingPrivilegeLevel2,
+             (uint64_t)ReconfigSettingsIntf::FeatureType::
+                 PowerSmoothingPrivilegeLevel1,
+         }},
+    };
+};
+
+namespace nsm
+{
+void createNsmProcessorSensor(SensorManager& manager,
+                              const std::string& interface,
+                              const std::string& objPath);
+};
+
+TEST_F(NsmProcessorTest, badTestTypeError)
+{
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(error, "Type")))
+        .WillOnce(Return(get(basic, "InventoryObjPath")));
+    EXPECT_NO_THROW(
+        createNsmProcessorSensor(mockManager, basicIntfName, objPath));
+    EXPECT_EQ(0, gpu.prioritySensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.deviceSensors.size());
+}
+
+TEST_F(NsmProcessorTest, badTestNoDevideFound)
+{
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(error, "UUID")))
+        .WillOnce(Return(get(basic, "Type")))
+        .WillOnce(Return(get(basic, "InventoryObjPath")));
+    EXPECT_THROW(createNsmProcessorSensor(mockManager, basicIntfName, objPath),
+                 std::runtime_error);
+    EXPECT_EQ(0, gpu.prioritySensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.deviceSensors.size());
+}
+
+TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
+{
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(prcKnobs, "Type")))
+        .WillOnce(Return(get(basic, "InventoryObjPath")))
+        .WillOnce(Return(get(prcKnobs, "Priority")))
+        .WillOnce(Return(get(prcKnobs, "Features")));
+    createNsmProcessorSensor(
+        mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
+
+    const size_t expectedSensorsCount = 24;
+    EXPECT_EQ(0, gpu.prioritySensors.size());
+    EXPECT_EQ(expectedSensorsCount, gpu.roundRobinSensors.size());
+    EXPECT_EQ(expectedSensorsCount, gpu.deviceSensors.size());
+
+    nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0};
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_reconfiguration_permissions_v1_resp),
+                      0);
+    auto msg = reinterpret_cast<nsm_msg*>(response.data());
+    auto rc = encode_get_reconfiguration_permissions_v1_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &data, msg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(expectedSensorsCount)
+        .WillRepeatedly(mockSendRecvNsmMsg(response));
+    for (size_t i = 0; i < expectedSensorsCount; i++)
+    {
+        auto reconfigPermissions =
+            dynamic_pointer_cast<NsmReconfigPermissions>(gpu.deviceSensors[i]);
+        EXPECT_NE(nullptr, reconfigPermissions);
+
+        // Test if added permissions are sorted and unique
+        EXPECT_EQ((ReconfigSettingsIntf::FeatureType)i, reconfigPermissions->feature);
+        reconfigPermissions->update(mockManager, eid).detach();
+        EXPECT_EQ(data.oneshot,
+                  reconfigPermissions->pdi().allowOneShotConfig());
+        EXPECT_EQ(data.persistent,
+                  reconfigPermissions->pdi().allowPersistentConfig());
+        EXPECT_EQ(data.flr_persistent,
+                  reconfigPermissions->pdi().allowFLRPersistentConfig());
+        EXPECT_EQ(reconfigPermissions->feature,
+                  reconfigPermissions->pdi().type());
+    }
+}
+
+TEST_F(NsmProcessorTest, badTestCreateInbandReconfigPermissionsSensors)
+{
+    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
+        .WillOnce(Return(get(basic, "Name")))
+        .WillOnce(Return(get(basic, "UUID")))
+        .WillOnce(Return(get(prcKnobs, "Type")))
+        .WillOnce(Return(get(basic, "InventoryObjPath")))
+        .WillOnce(Return(get(prcKnobs, "Priority")))
+        .WillOnce(Return(get(error, "Features")));
+    EXPECT_THROW(
+        createNsmProcessorSensor(
+            mockManager, basicIntfName + ".InbandReconfigPermissions", objPath),
+        std::invalid_argument);
 }

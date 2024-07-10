@@ -357,3 +357,119 @@ int decode_enable_disable_gpu_ist_mode_resp(const struct nsm_msg *msg,
 	}
 	return rc;
 }
+
+int encode_get_reconfiguration_permissions_v1_req(
+    uint8_t instance_id,
+    enum reconfiguration_permissions_v1_index setting_index,
+    struct nsm_msg *msg)
+{
+
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_reconfiguration_permissions_v1_req *request =
+	    (struct nsm_get_reconfiguration_permissions_v1_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_RECONFIGURATION_PERMISSIONS_V1;
+	request->hdr.data_size = 1;
+	request->setting_index = setting_index;
+
+	return NSM_SW_SUCCESS;
+}
+int decode_get_reconfiguration_permissions_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    enum reconfiguration_permissions_v1_index *setting_index)
+{
+	if (msg == NULL || setting_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_fpga_diagnostics_settings_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_reconfiguration_permissions_v1_req *request =
+	    (struct nsm_get_reconfiguration_permissions_v1_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(struct nsm_get_reconfiguration_permissions_v1_req) -
+		NSM_REQUEST_CONVENTION_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*setting_index = request->setting_index;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_reconfiguration_permissions_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_reconfiguration_permissions_v1 *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_RECONFIGURATION_PERMISSIONS_V1,
+		    msg);
+	}
+
+	struct nsm_get_reconfiguration_permissions_v1_resp *resp =
+	    (struct nsm_get_reconfiguration_permissions_v1_resp *)msg->payload;
+
+	uint16_t data_size = sizeof(struct nsm_reconfiguration_permissions_v1);
+	resp->hdr.command = NSM_GET_RECONFIGURATION_PERMISSIONS_V1;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size = htole16(data_size);
+	resp->data = *data;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_reconfiguration_permissions_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_reconfiguration_permissions_v1 *data)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_reconfiguration_permissions_v1_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_reconfiguration_permissions_v1_resp *resp =
+	    (struct nsm_get_reconfiguration_permissions_v1_resp *)msg->payload;
+
+	*data = resp->data;
+	return NSM_SW_SUCCESS;
+}

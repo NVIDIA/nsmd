@@ -45,7 +45,37 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
     event(event), verbose(verbose), server(server), eventReceiverEid(0),
-    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE), state()
+    globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
+    state({
+        {}, // writeProtected
+        0,  // istMode
+        {
+            {RP_IN_SYSTEM_TEST, {}},
+            {RP_FUSING_MODE, {}},
+            {RP_CONFIDENTIAL_COMPUTE, {}},
+            {RP_BAR0_FIREWALL, {}},
+            {RP_CONFIDENTIAL_COMPUTE_DEV_MODE, {}},
+            {RP_TOTAL_GPU_POWER_CURRENT_LIMIT, {}},
+            {RP_TOTAL_GPU_POWER_RATED_LIMIT, {}},
+            {RP_TOTAL_GPU_POWER_MAX_LIMIT, {}},
+            {RP_TOTAL_GPU_POWER_MIN_LIMIT, {}},
+            {RP_CLOCK_LIMIT, {}},
+            {RP_NVLINK_DISABLE, {}},
+            {RP_ECC_ENABLE, {}},
+            {RP_PCIE_VF_CONFIGURATION, {}},
+            {RP_ROW_REMAPPING_ALLOWED, {}},
+            {RP_ROW_REMAPPING_FEATURE, {}},
+            {RP_HBM_FREQUENCY_CHANGE, {}},
+            {RP_HULK_LICENSE_UPDATE, {}},
+            {RP_FORCE_TEST_COUPLING, {}},
+            {RP_BAR0_TYPE_CONFIG, {}},
+            {RP_EDPP_SCALING_FACTOR, {}},
+            {RP_POWER_SMOOTHING_FEATURE_TOGGLE, {}},
+            {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_0, {}},
+            {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1, {}},
+            {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
+        }, // prcKnobs
+    })
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
     iface = server.add_interface(path, "xyz.openbmc_project.NSM.Device");
@@ -422,6 +452,9 @@ std::optional<std::vector<uint8_t>>
         case NSM_TYPE_DEVICE_CONFIGURATION:
             switch (command)
             {
+                case NSM_GET_RECONFIGURATION_PERMISSIONS_V1:
+                    return getReconfigurationPermissionsV1Handler(request,
+                                                                  requestLen);
                 case NSM_ENABLE_DISABLE_GPU_IST_MODE:
                     return enableDisableGpuIstModeHandler(request, requestLen);
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
@@ -575,7 +608,7 @@ std::optional<std::vector<uint8_t>>
                  {3, {0,  2,  3,  6,  7,  8,  9,  11,  12,  14,  15,  16, 17,
                       70, 71, 73, 74, 77, 78, 79, 124, 125, 126, 127, 173}},
                  {4, {}},
-                 {5, {}},
+                 {5, {65}},
              }},
         };
 
@@ -3097,8 +3130,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
-    lg2::info("enableDisableGpuIstModeHandler: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("enableDisableGpuIstModeHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
     uint8_t device_index;
     uint8_t value = 0;
     [[maybe_unused]] auto rc = decode_enable_disable_gpu_ist_mode_req(
@@ -3124,6 +3160,7 @@ std::optional<std::vector<uint8_t>>
     else
     {
         lg2::error("enableDisableGpuIstModeHandler: Invalid Device Index");
+        return std::nullopt;
     }
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
@@ -3136,6 +3173,52 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error(
             "enableDisableGpuIstModeHandler: encode_enable_disable_gpu_ist_mode_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getReconfigurationPermissionsV1Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "getReconfigurationPermissionsV1Handler: request length={LEN}",
+            "LEN", requestLen);
+    }
+    reconfiguration_permissions_v1_index settingsIndex;
+    [[maybe_unused]] auto rc = decode_get_reconfiguration_permissions_v1_req(
+        requestMsg, requestLen, &settingsIndex);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getReconfigurationPermissionsV1Handler: decode_get_reconfiguration_permissions_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    if (settingsIndex > RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2)
+    {
+        lg2::error(
+            "getReconfigurationPermissionsV1Handler: Invalid Settings Index");
+        return std::nullopt;
+    }
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_reconfiguration_permissions_v1_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reasonCode = ERR_NULL;
+    rc = encode_get_reconfiguration_permissions_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
+        &state.prcKnobs[settingsIndex], responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableGpuIstModeHandler: encode_get_reconfiguration_permissions_v1_resp failed: rc={RC}",
             "RC", rc);
         return std::nullopt;
     }

@@ -171,3 +171,35 @@ TEST_F(MockupResponderTest, goodTestGpuPresenceAndPowerStatusTest)
     EXPECT_EQ(NSM_GET_FPGA_DIAGNOSTICS_SETTINGS, resp->hdr.command);
     EXPECT_EQ(expectedPower, resp->power_status);
 }
+
+TEST_F(MockupResponderTest, goodTestGetReconfigurationPermissionsV1Handler)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_reconfiguration_permissions_v1_req));
+
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    reconfiguration_permissions_v1_index setting_index = RP_IN_SYSTEM_TEST;
+
+    auto rc = encode_get_reconfiguration_permissions_v1_req(0, setting_index,
+                                                            requestMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto resp = mockupResponder->getReconfigurationPermissionsV1Handler(
+        requestMsg, request.size());
+
+    EXPECT_TRUE(resp.has_value());
+    EXPECT_EQ(resp.value().size(),
+              sizeof(nsm_msg_hdr) +
+                  sizeof(nsm_get_reconfiguration_permissions_v1_resp));
+
+    auto msg = reinterpret_cast<nsm_msg*>(resp.value().data());
+    auto response =
+        reinterpret_cast<nsm_get_reconfiguration_permissions_v1_resp*>(
+            msg->payload);
+
+    nsm_reconfiguration_permissions_v1 expected = {0, 0, 0, 0};
+    EXPECT_EQ(NSM_GET_RECONFIGURATION_PERMISSIONS_V1, response->hdr.command);
+    EXPECT_EQ(expected.oneshot, response->data.oneshot);
+    EXPECT_EQ(expected.persistent, response->data.persistent);
+    EXPECT_EQ(expected.flr_persistent, response->data.flr_persistent);
+}
