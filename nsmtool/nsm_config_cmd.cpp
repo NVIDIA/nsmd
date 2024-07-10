@@ -471,9 +471,9 @@ class GetReconfigurationPermissionsV1 : public CommandInterface
         ordered_json result;
         result["Completion Code"] = cc;
         result["PRC Knob"] = settingsDictionary[settingIndex];
-        result["One-shot"] = bool(data.oneshot);
+        result["Oneshot (hot reset)"] = bool(data.oneshot);
         result["Persistent"] = bool(data.persistent);
-        result["FLR Persistent"] = bool(data.flr_persistent);
+        result["Oneshot (FLR)"] = bool(data.flr_persistent);
         nsmtool::helper::DisplayInJson(result);
     }
 

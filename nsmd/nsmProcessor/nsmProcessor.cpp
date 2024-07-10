@@ -1854,9 +1854,9 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     co_return cc;
 }
 
-static void createNsmProcessorSensor(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+void createNsmProcessorSensor(SensorManager& manager,
+                              const std::string& interface,
+                              const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto name = utils::DBusHandler().getDbusProperty<std::string>(
@@ -2109,6 +2109,34 @@ static void createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addStaticSensor(defaultPowerCap);
         nsmDevice->addStaticSensor(maxPowerCap);
         nsmDevice->addStaticSensor(minPowerCap);
+    }
+    else if (type == "NSM_InbandReconfigPermissions")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto features =
+            utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
+                objPath.c_str(), "Features", interface.c_str());
+        // Sorting features by Id
+        std::sort(features.begin(), features.end());
+        // Move duplicates to the end
+        auto lastUnique = std::unique(features.begin(), features.end());
+        // Remove duplicates
+        features.erase(lastUnique, features.end());
+        for (auto featureId : features)
+        {
+            auto feature = ReconfigSettingsIntf::FeatureType(featureId);
+            auto featureName =
+                ReconfigSettingsIntf::convertFeatureTypeToString(feature);
+            featureName = featureName.substr(featureName.find_last_of('.') + 1);
+            NsmInterfaceProvider<ReconfigSettingsIntf> interfaceProvider(
+                featureName, type,
+                path(inventoryObjPath) / "InbandReconfigPermissions");
+            auto reconfigurePermissionsSensor =
+                std::make_shared<NsmReconfigPermissions>(interfaceProvider,
+                                                         feature);
+            nsmDevice->addSensor(reconfigurePermissionsSensor, priority);
+        }
     }
 }
 

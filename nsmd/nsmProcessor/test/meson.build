@@ -1,21 +1,23 @@
 dep_src_files = [
     '../nsmProcessor.cpp',
+    '../nsmReconfigPermissions.cpp',
     '../../nsmDevice.cpp',
-    '../../nsmCommon/nsmCommon.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
+    '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
-    '../../nsmSensor.cpp',
+    '../../nsmChassis/nsmPowerControl.cpp',
+    '../../nsmCommon/nsmCommon.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
+    '../../../libnsm/device-configuration.c',
     '../../../libnsm/pci-links.c',
-    '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
-    '../../nsmChassis/nsmPowerControl.cpp',
+    '../../../libnsm/requester/mctp.c',
 ]
 
 dep_src_headers = [

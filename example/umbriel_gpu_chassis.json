@@ -213,6 +213,43 @@
                 }
             },
             {
+                "Name": "GPU_$INSTANCE_NUMBER + 1 Processor",
+                "Type": "NSM_Processor",
+                "UUID": "$UUID",
+                "DEVICE_UUID": "$DEVICE_UUID",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/processors/GPU_SXM_$INSTANCE_NUMBER + 1",
+                "InbandReconfigPermissions": {
+                    "Type": "NSM_InbandReconfigPermissions",
+                    "Priority": false,
+                    "Features": [
+                        0,
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        6,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17,
+                        18,
+                        19,
+                        20,
+                        21,
+                        22,
+                        23
+                    ]
+                }
+            },
+            {
                 "Name": "HGX_GPU_SXM $INSTANCE_NUMBER + 1 TEMP_0",
                 "Type": "NSM_Temp",
                 "Associations": [

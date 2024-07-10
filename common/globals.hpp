@@ -25,6 +25,8 @@ using std::filesystem::path;
 
 const path chassisInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/chassis";
+const path processorsInventoryBasePath =
+    "/xyz/openbmc_project/inventory/system/processors/";
 const path fabricsInventoryBasePath =
     "/xyz/openbmc_project/inventory/system/fabrics";
 const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";

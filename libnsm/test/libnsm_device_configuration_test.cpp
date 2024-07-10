@@ -933,21 +933,21 @@ void testGetReconfigurationPermissionsV1EncodeResponse(
 
 	size_t msg_len = requestMsg.size();
 
-	reconfiguration_permissions_v1_index dataIndex;
+	reconfiguration_permissions_v1_index settingIndex;
 	auto rc = decode_get_reconfiguration_permissions_v1_req(
-	    request, msg_len, &dataIndex);
+	    request, msg_len, &settingIndex);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(expectedSettingIndex, dataIndex);
+	EXPECT_EQ(expectedSettingIndex, settingIndex);
 }
 
 TEST(getReconfigurationPermissionsV1, testRequests)
 {
 	for (auto di = (uint8_t)RP_IN_SYSTEM_TEST;
-	     di < (uint8_t)RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2; di++) {
-		auto dataIndex = reconfiguration_permissions_v1_index(di);
-		testGetReconfigurationPermissionsV1EncodeRequest(dataIndex);
-		testGetReconfigurationPermissionsV1EncodeResponse(dataIndex);
+	     di <= (uint8_t)RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2; di++) {
+		auto settingIndex = reconfiguration_permissions_v1_index(di);
+		testGetReconfigurationPermissionsV1EncodeRequest(settingIndex);
+		testGetReconfigurationPermissionsV1EncodeResponse(settingIndex);
 	}
 }
 
