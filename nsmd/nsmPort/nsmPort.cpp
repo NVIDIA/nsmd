@@ -470,6 +470,12 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
 
+    nv::sensor_aggregation::DbusVariantType variantBER{
+        iBPortIntf->bitErrorRate()};
+    propName = "BitErrorRate";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantBER);
+
     nv::sensor_aggregation::DbusVariantType variantLERC{
         iBPortIntf->linkErrorRecoveryCounter()};
     propName = "LinkErrorRecoveryCounter";
@@ -517,6 +523,36 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePortOem2Name, propName, rawSmbpbiData, variantTXB);
 #endif
+}
+
+double NsmPortMetrics::getBitErrorRate(uint64_t value)
+{
+    if (value != 0)
+    {
+        uint8_t symbol_ber_magnitude = (value >> 8) & 0xFF; // bits 15-8
+        uint8_t symbol_ber_coef_float = (value >> 4) & 0xF; // bits 7-4
+        uint8_t symbol_ber_coef = value & 0xF;              // bits 3-0
+
+        uint8_t digitCount = 1;
+        if (symbol_ber_coef_float != 0)
+        {
+            digitCount =
+                static_cast<int>(std::log10(std::abs(symbol_ber_coef_float))) +
+                1;
+        }
+
+        // Calculate symbol_ber
+        double symbol_ber = (symbol_ber_coef + (symbol_ber_coef_float /
+                                                std::pow(10.0, digitCount))) *
+                            pow(10, -symbol_ber_magnitude);
+
+        return symbol_ber;
+    }
+    else
+    {
+        lg2::debug("NsmPortMetrics: getBitErrorRate failed");
+        return 0.0;
+    }
 }
 
 void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
@@ -608,6 +644,8 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
             if (portData->supported_counter.symbol_error)
             {
                 iBPortIntf->symbolError(portData->symbol_error);
+                iBPortIntf->bitErrorRate(
+                    getBitErrorRate(portData->symbol_error));
             }
 
             if (portData->supported_counter.link_error_recovery_counter)
