@@ -131,6 +131,7 @@ NsmPortStatus::NsmPortStatus(
     portStateIntf->linkStatus(PortLinkStatus::Starting);
     portStateIntf->linkState(PortLinkStates::Unknown);
     portMetricsOem3Intf->trainingError(false);
+    portMetricsOem3Intf->runtimeError(false);
     updateMetricOnSharedMemory();
 }
 
@@ -170,6 +171,9 @@ uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
         {
             case NSM_PORTSTATE_DOWN:
             case NSM_PORTSTATE_DOWN_LOCK:
+                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
+                portMetricsOem3Intf->runtimeError(true);
+                break;
             case NSM_PORTSTATE_SLEEP:
                 portStateIntf->linkStatus(PortLinkStatus::LinkDown);
                 break;
@@ -226,6 +230,12 @@ void NsmPortStatus::updateMetricOnSharedMemory()
         portMetricsOem3Intf->trainingError()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
                                                  rawSmbpbiData, variantTE);
+
+    propName = "RuntimeError";
+    nv::sensor_aggregation::DbusVariantType variantRE{
+        portMetricsOem3Intf->runtimeError()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 rawSmbpbiData, variantRE);
 #endif
 }
 
