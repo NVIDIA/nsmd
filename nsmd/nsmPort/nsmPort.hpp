@@ -111,6 +111,7 @@ class NsmPortMetrics : public NsmSensor
 
   private:
     void updateCounterValues(struct nsm_port_counter_data* portData);
+    double getBitErrorRate(uint64_t value);
 
     std::unique_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::unique_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
