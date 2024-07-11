@@ -83,6 +83,7 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
     else if (type == "NSM_FirmwareVersion")
     {
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
+        firmwareInventoryVersion.pdi().purpose(VersionIntf::VersionPurpose::Other);
         auto version = std::make_shared<NsmInventoryProperty<VersionIntf>>(
             firmwareInventoryVersion,
             nsm_inventory_property_identifiers(PCIERETIMER_0_EEPROM_VERSION +
