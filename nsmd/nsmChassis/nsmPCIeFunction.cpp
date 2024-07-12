@@ -79,6 +79,10 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
 #define pcieFunction(X)                                                        \
     pdi().function##X##VendorId(hexFormat(data.pci_vendor_id));                \
     pdi().function##X##DeviceId(hexFormat(data.pci_device_id));                \
+    pdi().function##X##ClassCode(hexFormat(0));                                \
+    pdi().function##X##RevisionId(hexFormat(0));                               \
+    pdi().function##X##FunctionType("Physical");                               \
+    pdi().function##X##DeviceClass("Processor");                               \
     pdi().function##X##SubsystemVendorId(                                      \
         hexFormat(data.pci_subsystem_vendor_id));                              \
     pdi().function##X##SubsystemId(hexFormat(data.pci_subsystem_device_id));
