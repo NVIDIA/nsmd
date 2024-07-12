@@ -182,6 +182,12 @@ class SMBPBIPowerSMBusSensorBytesConverter : public SMBusSensorBytesConverter
     std::vector<uint8_t> convert(double val) final;
 };
 
+class SMBPBIEnergySMBusSensorBytesConverter : public SMBusSensorBytesConverter
+{
+  public:
+    std::vector<uint8_t> convert(double val) final;
+};
+
 class Uint64SMBusSensorBytesConverter : public SMBusSensorBytesConverter
 {
   public:
@@ -195,7 +201,6 @@ class SFxP24F8SMBusSensorBytesConverter : public SMBusSensorBytesConverter
 };
 
 using SMBPBITempSMBusSensorBytesConverter = SFxP24F8SMBusSensorBytesConverter;
-using SMBPBIEnergySMBusSensorBytesConverter = Uint64SMBusSensorBytesConverter;
 
 class NsmNumericSensorShmem : public NsmNumericSensorValue
 {

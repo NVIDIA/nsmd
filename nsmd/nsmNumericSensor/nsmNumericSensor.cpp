@@ -160,6 +160,18 @@ std::vector<uint8_t> SMBPBIPowerSMBusSensorBytesConverter::convert(double val)
     return data;
 }
 
+std::vector<uint8_t> SMBPBIEnergySMBusSensorBytesConverter::convert(double val)
+{
+    std::vector<uint8_t> data(sizeof(uint64_t));
+    // unit of energy is millijoules in SMBus Sensors and selected unit
+    // in SensorValue PDI is Joules. Hence it is converted to millijoules.
+    auto smbusVal = static_cast<uint64_t>(val * 1000.0);
+    smbusVal = htole64(smbusVal);
+    std::memcpy(data.data(), &smbusVal, data.size());
+
+    return data;
+}
+
 std::vector<uint8_t> SFxP24F8SMBusSensorBytesConverter::convert(double val)
 {
     std::vector<uint8_t> data(4);
