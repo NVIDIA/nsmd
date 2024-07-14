@@ -538,8 +538,8 @@ struct nsm_pwr_smoothing_featureinfo_data {
 	uint32_t feature_flag;
 	uint32_t currentTmpSetting;
 	uint32_t currentTmpFloorSetting;
-	int16_t maxTmpFloorSettingInPercent;
-	int16_t minTmpFloorSettingInPercent;
+	uint16_t maxTmpFloorSettingInPercent;
+	uint16_t minTmpFloorSettingInPercent;
 } __attribute__((packed));
 
 /** @struct nsm_get_power_smoothing_feat_resp
@@ -768,11 +768,11 @@ struct nsm_set_power_limit_req {
 	uint32_t power_limit;
 } __attribute__((packed));
 
-/** @struct nsm_hardwareciruitry_data
+/** @struct nsm_hardwarecircuitry_data
  * 32 bit NvUFXP8_24 representing Get Hardware Circuitry Lifetime Usage data
  */
-struct nsm_hardwareciruitry_data {
-	int32_t reading;
+struct nsm_hardwarecircuitry_data {
+	uint32_t reading;
 } __attribute__((packed));
 
 /** @struct nsm_hardwareciruitry_resp
@@ -780,7 +780,7 @@ struct nsm_hardwareciruitry_data {
  */
 struct nsm_hardwareciruitry_resp {
 	struct nsm_common_resp hdr;
-	struct nsm_hardwareciruitry_data data;
+	struct nsm_hardwarecircuitry_data data;
 } __attribute__((packed));
 
 /** @struct
@@ -913,7 +913,7 @@ struct nsm_get_all_preset_profile_resp_metadata {
  *  Structure representing individual profile info
  */
 struct nsm_preset_profile_data {
-	int16_t tmp_floor_setting_in_percent;
+	uint16_t tmp_floor_setting_in_percent;
 	uint8_t reservedByte1;
 	uint8_t reservedByte2;
 	uint32_t ramp_up_rate_in_miliwattspersec;
@@ -928,6 +928,24 @@ struct nsm_preset_profile_data {
 struct nsm_get_all_preset_profile_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_get_all_preset_profile_resp_metadata data;
+} __attribute__((packed));
+
+/** @struct nsm_update_preset_profile_req
+ *  Structure representing NSM TSet Active Preset Profile.
+ ParameterID
+      0        	% TMP Floor
+      1        	Ramp-up rate
+      2        	Ramp-down rate
+      3        	Hysteresis for ramp down
+      4-255     reserved
+ */
+struct nsm_update_preset_profile_req {
+	struct nsm_common_req hdr;
+	uint8_t profile_id;
+	uint8_t parameter_id;
+	uint8_t reservedByte1;
+	uint8_t reservedByte2;
+	uint32_t param_value;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
@@ -2462,11 +2480,11 @@ int decode_get_hardware_lifetime_cricuitry_req(const struct nsm_msg *msg,
 					       size_t msg_len);
 int encode_get_hardware_lifetime_cricuitry_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    struct nsm_hardwareciruitry_data *data, struct nsm_msg *msg);
+    struct nsm_hardwarecircuitry_data *data, struct nsm_msg *msg);
 int decode_get_hardware_lifetime_cricuitry_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size,
-    struct nsm_hardwareciruitry_data *data);
+    struct nsm_hardwarecircuitry_data *data);
 
 // ** Get Current Profile Info **
 int encode_get_current_profile_info_req(uint8_t instance_id,
@@ -2533,7 +2551,8 @@ int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 					  uint16_t reason_code,
 					  struct nsm_msg *msg);
 int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
-					  size_t msg_len, uint8_t *cc);
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code);
 
 // ** Setup Admin Override **
 int encode_setup_admin_override_req(uint8_t instance_id, uint8_t parameter_id,
@@ -2544,7 +2563,7 @@ int decode_setup_admin_override_req(const struct nsm_msg *msg, size_t msg_len,
 int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
 				     uint16_t reason_code, struct nsm_msg *msg);
 int decode_setup_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
-				     uint8_t *cc);
+				     uint8_t *cc, uint16_t *reason_code);
 
 // ** Apply Admin Override **
 int encode_apply_admin_override_req(uint8_t instance_id, struct nsm_msg *msg);
@@ -2552,7 +2571,7 @@ int decode_apply_admin_override_req(const struct nsm_msg *msg, size_t msg_len);
 int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc,
 				     uint16_t reason_code, struct nsm_msg *msg);
 int decode_apply_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
-				     uint8_t *cc);
+				     uint8_t *cc, uint16_t *reason_code);
 
 // ** Toggle Immediate Ramp down **
 int encode_toggle_immediate_rampdown_req(uint8_t instance_id,
@@ -2566,7 +2585,8 @@ int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
 					  uint16_t reason_code,
 					  struct nsm_msg *msg);
 int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
-					  size_t msg_len, uint8_t *cc);
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code);
 
 // ** Toggle Feature State **
 int encode_toggle_feature_state_req(uint8_t instance_id, uint8_t feature_state,
@@ -2576,7 +2596,7 @@ int decode_toggle_feature_state_req(const struct nsm_msg *msg, size_t msg_len,
 int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
 				     uint16_t reason_code, struct nsm_msg *msg);
 int decode_toggle_feature_state_resp(const struct nsm_msg *msg, size_t msg_len,
-				     uint8_t *cc);
+				     uint8_t *cc, uint16_t *reason_code);
 // ** Get Preset Profile Information **
 int encode_get_preset_profile_req(uint8_t instance_id, struct nsm_msg *msg);
 int decode_get_preset_profile_req(const struct nsm_msg *msg, size_t msg_len);
@@ -2594,6 +2614,27 @@ int decode_get_preset_profile_data_from_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint8_t max_supported_profile, uint8_t profile_id,
     struct nsm_preset_profile_data *profle_data);
+
+//**Update Preset Profile Parameters**/
+int encode_update_preset_profile_param_req(uint8_t instance_id,
+					   uint8_t profile_id,
+					   uint8_t parameter_id,
+					   uint32_t param_value,
+					   struct nsm_msg *msg);
+int decode_update_preset_profile_param_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *profile_id,
+					   uint8_t *parameter_id,
+					   uint32_t *param_value);
+int encode_update_preset_profile_param_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg);
+int decode_update_preset_profile_param_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code);
+double NvUFXP4_12ToDouble(uint16_t reading);
+uint16_t doubleToNvUFXP4_12(double reading);
+double NvUFXP8_24ToDouble(uint32_t reading);
+uint32_t doubleToNvUFXP8_24(double reading);
 #ifdef __cplusplus
 }
 #endif

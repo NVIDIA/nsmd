@@ -3535,6 +3535,15 @@ static void htolePowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *d
 	data->minTmpFloorSettingInPercent=htole16(data->minTmpFloorSettingInPercent);
 }
 
+static void letohPowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
+{
+	data->feature_flag=le32toh(data->feature_flag);
+	data->currentTmpSetting=le32toh(data->currentTmpSetting);
+	data->currentTmpFloorSetting=le32toh(data->currentTmpFloorSetting);
+	data->maxTmpFloorSettingInPercent=le16toh(data->maxTmpFloorSettingInPercent);
+	data->minTmpFloorSettingInPercent=le16toh(data->minTmpFloorSettingInPercent);
+}
+
 
 int encode_get_powersmoothing_featinfo_req(uint8_t instance_id,
 					   struct nsm_msg *msg)
@@ -3623,7 +3632,8 @@ int decode_get_powersmoothing_featinfo_resp(const struct nsm_msg *msg,
 	
 	memcpy(data, &(resp->data), nsm_featureinfo_data_length);
 	*cc = resp->hdr.completion_code;
-	
+
+	letohPowerSmoothingFeat(data);
 	return NSM_SUCCESS;
 }
 
@@ -3644,7 +3654,7 @@ int decode_get_hardware_lifetime_cricuitry_req(const struct nsm_msg *msg,
 
 int encode_get_hardware_lifetime_cricuitry_resp(uint8_t instance_id, uint8_t cc,
 					    uint16_t reason_code,
-					    struct nsm_hardwareciruitry_data *data,
+					    struct nsm_hardwarecircuitry_data *data,
 					    struct nsm_msg *msg)
 {
 	if (msg == NULL || data == NULL) {
@@ -3670,17 +3680,17 @@ int encode_get_hardware_lifetime_cricuitry_resp(uint8_t instance_id, uint8_t cc,
 	    (struct nsm_hardwareciruitry_resp *)msg->payload;
 	response->hdr.command = NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE;
 	response->hdr.completion_code = cc;
-	uint16_t data_size = htole16(sizeof(struct nsm_hardwareciruitry_data));
+	uint16_t data_size = htole16(sizeof(struct nsm_hardwarecircuitry_data));
 	response->hdr.data_size = htole16(data_size);
-    
-	memcpy(&(response->data), data, sizeof(struct nsm_hardwareciruitry_data));
+	memcpy(&(response->data), data, sizeof(struct nsm_hardwarecircuitry_data));
+	response->data.reading =htole32(response->data.reading);
 	return NSM_SW_SUCCESS;
 }
 
 int decode_get_hardware_lifetime_cricuitry_resp(const struct nsm_msg *msg,
 					    size_t msg_len, uint8_t *cc, uint16_t *reason_code,
 					    uint16_t *data_size,
-					    struct nsm_hardwareciruitry_data *data)
+					    struct nsm_hardwarecircuitry_data *data)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -3704,13 +3714,14 @@ int decode_get_hardware_lifetime_cricuitry_resp(const struct nsm_msg *msg,
 		return NSM_ERR_INVALID_DATA;
 	}
 
-	size_t nsm_hardwareciruitry_data_length =
-		sizeof(struct nsm_hardwareciruitry_data);
-	if (*data_size < nsm_hardwareciruitry_data_length) {
+	size_t nsm_hardwarecircuitry_data_length =
+		sizeof(struct nsm_hardwarecircuitry_data);
+	if (*data_size < nsm_hardwarecircuitry_data_length) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 
-	memcpy(data, &(resp->data), nsm_hardwareciruitry_data_length);
+	memcpy(data, &(resp->data), nsm_hardwarecircuitry_data_length);
+	data->reading=le32toh(data->reading);
 	*cc = resp->hdr.completion_code;
 	
 	return NSM_SUCCESS;
@@ -3735,10 +3746,8 @@ int decode_get_current_profile_info_req(const struct nsm_msg *msg,
 static void
 htole32CurrentProfileInfoResp(struct nsm_get_current_profile_data *profileInfo)
 {
-	profileInfo->current_active_profile_id =
-	    htole32(profileInfo->current_active_profile_id);
 	profileInfo->current_percent_tmp_floor =
-	    htole32(profileInfo->current_percent_tmp_floor);
+	    htole16(profileInfo->current_percent_tmp_floor);
 	profileInfo->current_rampup_rate_in_miliwatts_per_second =
 	    htole32(profileInfo->current_rampup_rate_in_miliwatts_per_second);
 	profileInfo->current_rampdown_rate_in_miliwatts_per_second =
@@ -3750,10 +3759,8 @@ htole32CurrentProfileInfoResp(struct nsm_get_current_profile_data *profileInfo)
 static void
 le32tohCurrentProfileInfoResp(struct nsm_get_current_profile_data *profileInfo)
 {
-	profileInfo->current_active_profile_id =
-	    le32toh(profileInfo->current_active_profile_id);
 	profileInfo->current_percent_tmp_floor =
-	    le32toh(profileInfo->current_percent_tmp_floor);
+	    le16toh(profileInfo->current_percent_tmp_floor);
 	profileInfo->current_rampup_rate_in_miliwatts_per_second =
 	    le32toh(profileInfo->current_rampup_rate_in_miliwatts_per_second);
 	profileInfo->current_rampdown_rate_in_miliwatts_per_second =
@@ -4035,7 +4042,7 @@ int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 }
 
 int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc)
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4044,6 +4051,11 @@ int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
 	struct nsm_common_resp *resp =
@@ -4081,7 +4093,7 @@ int encode_setup_admin_override_req(uint8_t instance_id,uint8_t parameter_id, ui
 	request->hdr.command = NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE;
 	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
 	request->parameter_id = parameter_id;
-	request->param_value = param_value;
+	request->param_value = htole32(param_value);
 	return NSM_SW_SUCCESS;
 }
 
@@ -4106,7 +4118,7 @@ int decode_setup_admin_override_req(const struct nsm_msg *msg,
 	}
 
 	*parameter_id = request->parameter_id;
-	*param_value = request->param_value;
+	*param_value = le32toh(request->param_value);
 
 	return NSM_SW_SUCCESS;
 }
@@ -4144,16 +4156,24 @@ int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
 }
 
 int decode_setup_admin_override_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc)
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
 	}
 
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
+
+
 
 	struct nsm_common_resp *resp =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4211,7 +4231,7 @@ int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc, uint16_t r
 }
 
 int decode_apply_admin_override_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc)
+					    size_t msg_len, uint8_t *cc, uint16_t* reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4220,6 +4240,11 @@ int decode_apply_admin_override_resp(const struct nsm_msg *msg,
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
 	struct nsm_common_resp *resp =
@@ -4319,10 +4344,15 @@ int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
 }
 
 int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc)
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
 	if (msg_len <
@@ -4427,10 +4457,15 @@ int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
 }
 
 int decode_toggle_feature_state_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc)
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
 	if (msg_len <
@@ -4519,7 +4554,7 @@ int encode_get_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 	response->hdr.data_size = htole16(data_size);
 
 	response->data.max_profiles_supported=max_number_of_profiles;
-    for(int i=0;i<max_number_of_profiles;i++)
+	for(int i=0;i<max_number_of_profiles;i++)
 	{
 		htolegetPresetProfiledata(profile_data+i);	
 	}
@@ -4592,11 +4627,149 @@ int decode_get_preset_profile_data_from_resp(const struct nsm_msg *msg, size_t m
 		return NSM_SW_ERROR_DATA;
 	}
 	uint8_t profile_data_size=sizeof(struct nsm_preset_profile_data);
-	//uint16_t offset=sizeof(struct nsm_get_all_preset_profile_meta_data) + profile_id*profile_data_size;
+	
 	memcpy(profile_data, &(resp->data.profiles)+profile_id*profile_data_size, profile_data_size);
 
 	// conversion le to he
 	letohgetPresetProfiledata(profile_data);
 
 	return NSM_SW_SUCCESS;
+}
+int encode_update_preset_profile_param_req(uint8_t instance_id, uint8_t profile_id,uint8_t parameter_id, uint32_t param_value,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_update_preset_profile_req *request =
+	    (struct nsm_update_preset_profile_req *)msg->payload;
+
+	request->hdr.command = NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
+	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
+	request->profile_id = profile_id;
+	request->parameter_id = parameter_id;
+	request->param_value = htole32(param_value);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_update_preset_profile_param_req(const struct nsm_msg *msg,
+					   size_t msg_len,  uint8_t *profile_id, uint8_t *parameter_id, uint32_t *param_value)
+{
+	if (msg == NULL || parameter_id == NULL || param_value==NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_update_preset_profile_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_update_preset_profile_req *request =
+	    (struct nsm_update_preset_profile_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->parameter_id)+sizeof(request->param_value)) {
+		return NSM_SW_ERROR_DATA;
+	}
+    *profile_id= request->profile_id;
+	*parameter_id = request->parameter_id;
+	*param_value = le32toh(request->param_value);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_update_preset_profile_param_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_update_preset_profile_param_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+double NvUFXP4_12ToDouble(uint16_t reading)
+{
+	double value= reading / (double)(1 << 12);
+	return value;
+}
+
+uint16_t doubleToNvUFXP4_12(double reading)
+{
+	uint16_t value= reading * (1 << 12);
+	return value;
+}
+
+double NvUFXP8_24ToDouble(uint32_t reading)
+{
+	double value= reading / (double)(1 << 24);
+	return value;
+}
+
+uint32_t doubleToNvUFXP8_24(double reading)
+{
+	uint32_t value= reading * (1 << 24);
+	return value;
 }

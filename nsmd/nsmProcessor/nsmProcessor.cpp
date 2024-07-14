@@ -2160,8 +2160,9 @@ void createNsmProcessorSensor(SensorManager& manager,
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
 
-        std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf =
-            std::make_shared<PowerSmoothingIntf>(bus, inventoryObjPath.c_str());
+        std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf =
+            std::make_shared<OemPowerSmoothingFeatIntf>(bus, inventoryObjPath,
+                                                        nsmDevice);
         auto controlSensor = std::make_shared<NsmPowerSmoothing>(
             name, type, inventoryObjPath, pwrSmoothingIntf);
         nsmDevice->deviceSensors.emplace_back(controlSensor);
@@ -2195,26 +2196,11 @@ void createNsmProcessorSensor(SensorManager& manager,
                 getAllPowerProfileSensor, adminProfileSensor);
         nsmDevice->deviceSensors.emplace_back(currentProfileSensor);
 
-        nsmDevice->addStaticSensor(getAllPowerProfileSensor);
-        nsmDevice->addStaticSensor(adminProfileSensor);
-        nsmDevice->addStaticSensor(controlSensor);
-
-        if (priority)
-        {
-            // nsmDevice->prioritySensors.emplace_back(getAllPowerProfileSensor);
-            // nsmDevice->prioritySensors.emplace_back(adminProfileSensor);
-            // nsmDevice->prioritySensors.push_back(controlSensor);
-            nsmDevice->prioritySensors.push_back(lifetimeCicuitrySensor);
-            nsmDevice->prioritySensors.push_back(currentProfileSensor);
-        }
-        else
-        {
-            // nsmDevice->roundRobinSensors.emplace_back(getAllPowerProfileSensor);
-            // nsmDevice->roundRobinSensors.emplace_back(adminProfileSensor);
-            // nsmDevice->roundRobinSensors.push_back(controlSensor);
-            nsmDevice->roundRobinSensors.push_back(lifetimeCicuitrySensor);
-            nsmDevice->roundRobinSensors.push_back(currentProfileSensor);
-        }
+        nsmDevice->addSensor(getAllPowerProfileSensor, priority);
+        nsmDevice->addSensor(adminProfileSensor, priority);
+        nsmDevice->addSensor(controlSensor, priority);
+        nsmDevice->addSensor(lifetimeCicuitrySensor, priority);
+        nsmDevice->addSensor(currentProfileSensor, priority);
     }
 }
 

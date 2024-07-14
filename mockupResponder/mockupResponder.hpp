@@ -256,6 +256,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getPresetProfileInfo(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        updatePresetProfileParams(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;

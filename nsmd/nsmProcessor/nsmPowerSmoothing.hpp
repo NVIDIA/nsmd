@@ -20,24 +20,22 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSmoothingAdminProfileIntf.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
+#include "nsmPowerSmoothingFeatureIntf.hpp"
 #include "nsmPowerSmoothingPowerProfileIntf.hpp"
 #include "nsmSensor.hpp"
-
-#include <com/nvidia/Cpu/PowerSmoothing/server.hpp>
 
 #include <cstdint>
 
 namespace nsm
 {
-using PowerSmoothingIntf = sdbusplus::server::object_t<
-    sdbusplus::com::nvidia::Cpu::server::PowerSmoothing>;
+
 //  Power Smoothing Control :  Feature Info
 class NsmPowerSmoothing : public NsmSensor
 {
   public:
-    NsmPowerSmoothing(std::string& name, std::string& type,
-                      std::string& inventoryObjPath,
-                      std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf);
+    NsmPowerSmoothing(
+        std::string& name, std::string& type, std::string& inventoryObjPath,
+        std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -46,7 +44,7 @@ class NsmPowerSmoothing : public NsmSensor
     void updateReading(struct nsm_pwr_smoothing_featureinfo_data* data);
 
   private:
-    std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf;
+    std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf;
     std::string inventoryObjPath;
 };
 
@@ -62,7 +60,7 @@ class NsmHwCircuitryTelemetry : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    void updateReading(struct nsm_hardwareciruitry_data* data);
+    void updateReading(struct nsm_hardwarecircuitry_data* data);
 
   private:
     std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf;

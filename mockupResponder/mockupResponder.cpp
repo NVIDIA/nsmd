@@ -33,6 +33,8 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <cstdint>
+
 using namespace utils;
 
 #include <ctime>
@@ -435,6 +437,8 @@ std::optional<std::vector<uint8_t>>
                     return toggleImmediateRampDown(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION:
                     return getPresetProfileInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS:
+                    return updatePresetProfileParams(request, requestLen);
 
                 default:
                     lg2::error(
@@ -634,7 +638,7 @@ std::optional<std::vector<uint8_t>>
                  {3,
                   {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,  16,
                    17,  70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
-                   116, 119, 120, 121, 122, 124, 125, 126, 127, 173}},
+                   116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 173}},
                  {4, {}},
                  {5, {65}},
              }},
@@ -1601,8 +1605,8 @@ std::optional<std::vector<uint8_t>>
     feat.feature_flag = 7;
     feat.currentTmpSetting = 100000;
     feat.currentTmpFloorSetting = 200000;
-    feat.maxTmpFloorSettingInPercent = 88;
-    feat.minTmpFloorSettingInPercent = 28;
+    feat.maxTmpFloorSettingInPercent = doubleToNvUFXP4_12(0.95);
+    feat.minTmpFloorSettingInPercent = doubleToNvUFXP4_12(0.2);
 
     uint16_t reason_code = ERR_NULL;
 
@@ -1639,8 +1643,8 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    struct nsm_hardwareciruitry_data lifetimeusage;
-    lifetimeusage.reading = 40;
+    struct nsm_hardwarecircuitry_data lifetimeusage;
+    lifetimeusage.reading = doubleToNvUFXP8_24(40.45);
 
     uint16_t reason_code = ERR_NULL;
 
@@ -1683,7 +1687,7 @@ std::optional<std::vector<uint8_t>>
     profileData.admin_override_mask.bits.rampup_rate_override = 1;
     profileData.admin_override_mask.bits.rampdown_rate_override = 0;
     profileData.admin_override_mask.bits.hysteresis_value_override = 0;
-    profileData.current_percent_tmp_floor = 20;
+    profileData.current_percent_tmp_floor = doubleToNvUFXP4_12(0.3);
     profileData.current_rampup_rate_in_miliwatts_per_second = 180;
     profileData.current_rampdown_rate_in_miliwatts_per_second = 200;
     profileData.current_rampdown_hysteresis_value_in_milisec = 150;
@@ -1805,10 +1809,21 @@ std::optional<std::vector<uint8_t>>
                                   0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    lg2::error(
-        "setupAdminOverride: instanceId={INSTANCEID}, parameterId={PARAMETERID}, parameterValue={PARAMETERVALUE}",
-        "INSTANCEID", requestMsg->hdr.instance_id, "PARAMETERID", parameter_id,
-        "PARAMETERVALUE", param_value);
+    if (parameter_id == 0)
+    {
+        uint16_t val = param_value >> 16;
+        lg2::error(
+            "setupAdminOverride: instanceId={INSTANCEID}, parameterId={PARAMETERID}, parameterValue={PARAMETERVALUE}",
+            "INSTANCEID", requestMsg->hdr.instance_id, "PARAMETERID",
+            parameter_id, "PARAMETERVALUE", val);
+    }
+    else
+    {
+        lg2::error(
+            "setupAdminOverride: instanceId={INSTANCEID}, parameterId={PARAMETERID}, parameterValue={PARAMETERVALUE}",
+            "INSTANCEID", requestMsg->hdr.instance_id, "PARAMETERID",
+            parameter_id, "PARAMETERVALUE", param_value);
+    }
 
     rc = encode_setup_admin_override_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
@@ -1905,7 +1920,7 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_toggle_feature_state_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info(
+    lg2::error(
         "toggleFeatureState: feature_state={FEATURE_STATE}, request length={LEN}",
         "LEN", requestLen, "FEATURE_STATE", feature_state);
 
@@ -1915,7 +1930,7 @@ std::optional<std::vector<uint8_t>>
                                   0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    lg2::error("getCurrentProfileInfo: instanceId={INSTANCEID}", "INSTANCEID",
+    lg2::error("toggleFeatureState: instanceId={INSTANCEID}", "INSTANCEID",
                requestMsg->hdr.instance_id);
 
     rc = encode_toggle_feature_state_resp(
@@ -1950,7 +1965,8 @@ std::optional<std::vector<uint8_t>>
     struct nsm_preset_profile_data profiles[supported_number_of_profile];
     for (int i = 0; i < supported_number_of_profile; i++)
     {
-        profiles[i].tmp_floor_setting_in_percent = 10 * (i + 1);
+        profiles[i].tmp_floor_setting_in_percent =
+            doubleToNvUFXP4_12(0.1 * (i + 1));
         profiles[i].ramp_up_rate_in_miliwattspersec = 20 * (i + 1);
         profiles[i].ramp_down_rate_in_miliwattspersec = 30 * (i + 1);
         profiles[i].ramp_hysterisis_rate_in_miliwattspersec = 40 * (i + 1);
@@ -1983,6 +1999,62 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::updatePresetProfileParams(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
+              requestLen);
+    size_t s = sizeof(struct nsm_msg_hdr) +
+               sizeof(struct nsm_update_preset_profile_req);
+    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN", s);
+    uint8_t profile_id;
+    uint8_t parameter_id;
+    uint32_t param_value;
+
+    auto rc = decode_update_preset_profile_param_req(
+        requestMsg, requestLen, &profile_id, &parameter_id, &param_value);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_update_preset_profile_param_req: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
+              requestLen);
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    if (parameter_id == 0)
+    {
+        uint16_t val = param_value >> 16;
+        lg2::error(
+            "updatePresetProfileParams: instanceId={INSTANCEID}, profileId={PROFILEID}, parameterId={PARAMETERID}, parameterValue={PARAMETERVALUE}",
+            "INSTANCEID", requestMsg->hdr.instance_id, "PROFILEID", profile_id,
+            "PARAMETERID", parameter_id, "PARAMETERVALUE", val);
+    }
+    else
+    {
+        lg2::error(
+            "updatePresetProfileParams: instanceId={INSTANCEID}, profileId={PROFILEID}, parameterId={PARAMETERID}, parameterValue={PARAMETERVALUE}",
+            "INSTANCEID", requestMsg->hdr.instance_id, "PROFILEID", profile_id,
+            "PARAMETERID", parameter_id, "PARAMETERVALUE", param_value);
+    }
+
+    rc = encode_update_preset_profile_param_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_update_preset_profile_param_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
 template <class T>
 void Logger(bool verbose, const char* msg, const T& data)
 {

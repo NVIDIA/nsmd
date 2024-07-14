@@ -15,106 +15,48 @@
  * limitations under the License.
  */
 #pragma once
-#include <com/nvidia/PowerSmoothing/CurrentPowerProfile/server.hpp>
+#include <com/nvidia/PowerSmoothing/PowerSmoothing/server.hpp>
+#include <xyz/openbmc_project/Common/Device/error.hpp>
+#include <xyz/openbmc_project/Common/error.hpp>
 namespace nsm
 {
-using CurrentPowerProfileIntf = sdbusplus::server::object_t<
-    sdbusplus::com::nvidia::PowerSmoothing::server::CurrentPowerProfile>;
-class OemCurrentPowerProfileIntf : public CurrentPowerProfileIntf
+using PowerSmoothingIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::PowerSmoothing::server::PowerSmoothing>;
+class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
 {
   private:
     std::shared_ptr<NsmDevice> device;
     std::string inventoryObjPath;
-    //  signal emission is deferred until the initialization is complete
+
   public:
-    OemCurrentPowerProfileIntf(sdbusplus::bus::bus& bus,
-                               const std::string& path,
-                               std::string adminProfilePath,
-                               std::shared_ptr<NsmDevice> device) :
-        CurrentPowerProfileIntf(bus, path.c_str(), action::defer_emit),
-        device(device), inventoryObjPath(path)
+    OemPowerSmoothingFeatIntf(sdbusplus::bus::bus& bus,
+                              const std::string& inventoryObjPath,
+                              std::shared_ptr<NsmDevice> device) :
+        PowerSmoothingIntf(bus, (inventoryObjPath).c_str()),
+        device(device), inventoryObjPath(inventoryObjPath)
+
+    {}
+    std::string getInventoryObjPath()
     {
-        CurrentPowerProfileIntf::appliedProfilePath(path);
-        CurrentPowerProfileIntf::adminProfilePath(adminProfilePath);
+        return inventoryObjPath;
     }
 
-    void activatePresetProfile(uint16_t profileID) override
+    void togglePowerSmoothingOnDevice(bool featureEnabled)
     {
-        lg2::error("activatePresetProfile ProfileId={ID}", "ID", profileID);
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info("activatePresetProfile for EID: {EID} profileID:{ID}", "EID",
-                  eid, "ID", profileID);
-
+        lg2::info("togglePowerSmoothingOnDevice for EID: {EID}", "EID", eid);
         Request request(sizeof(nsm_msg_hdr) +
-                        sizeof(nsm_set_active_preset_profile_req));
+                        sizeof(nsm_toggle_feature_state_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+        uint8_t feature_state = featureEnabled;
         // first argument instanceid=0 is irrelevant
-        auto rc = encode_set_active_preset_profile_req(0, profileID,
-                                                       requestMsg);
+        auto rc = encode_toggle_feature_state_req(0, feature_state, requestMsg);
 
         if (rc)
         {
             lg2::error(
-                "activatePresetProfile: encode_set_active_preset_profile_req failed ProfileId ={ID}. eid={EID}, rc={RC}",
-                "ID", profileID, "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
-        }
-
-        std::shared_ptr<const nsm_msg> responseMsg;
-        size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
-        if (rc_)
-        {
-            lg2::error(
-                "activatePresetProfile SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
-        }
-
-        uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
-        rc = decode_set_active_preset_profile_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code);
-
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-        {
-            // verify setting is applied on the device
-            // verifyOverrideAdminProfileParam(parameterId, paramValue);
-            lg2::info("activatePresetProfile for EID: {EID} completed ", "EID",
-                      eid);
-        }
-        else
-        {
-            lg2::error(
-                "activatePresetProfile decode_set_active_preset_profile_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-        }
-    }
-
-    void applyAdminOverride() override
-    {
-        lg2::error("applyAdminOverride ");
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
-        lg2::info("applyAdminOverride for EID: {EID}", "EID", eid);
-
-        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
-        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-        // first argument instanceid=0 is irrelevant
-        auto rc = encode_apply_admin_override_req(0, requestMsg);
-
-        if (rc)
-        {
-            lg2::error(
-                "applyAdminOverride: encode_apply_admin_override_req failed. eid={EID}, rc={RC}",
+                "togglePowerSmoothingOnDevice: encode_toggle_feature_state_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
@@ -128,7 +70,7 @@ class OemCurrentPowerProfileIntf : public CurrentPowerProfileIntf
         if (rc_)
         {
             lg2::error(
-                "applyAdminOverride SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
+                "togglePowerSmoothingOnDevice SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
@@ -137,22 +79,98 @@ class OemCurrentPowerProfileIntf : public CurrentPowerProfileIntf
 
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
-        rc = decode_apply_admin_override_resp(responseMsg.get(), responseLen,
+        rc = decode_toggle_feature_state_resp(responseMsg.get(), responseLen,
                                               &cc, &reason_code);
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::info("applyAdminOverride for EID: {EID} completed ", "EID",
-                      eid);
+            // verify setting is applied on the device
+            // getPowerCapFromDevice();
+            lg2::info("togglePowerSmoothingOnDevice for EID: {EID} completed",
+                      "EID", eid);
         }
         else
         {
             lg2::error(
-                "activatePresetProfile decode_apply_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
+                "togglePowerSmoothingOnDevice decode_toggle_feature_state_resp "
+                "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
+                "RC = {A} ",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
                 WriteFailure();
         }
+    }
+
+    bool powerSmoothingEnabled(bool featureEnabled) override
+    {
+        togglePowerSmoothingOnDevice(featureEnabled);
+        return PowerSmoothingIntf::powerSmoothingEnabled();
+    }
+
+    void toggleImmediateRampDownOnDevice(bool featureEnabled)
+    {
+        SensorManager& manager = SensorManager::getInstance();
+        auto eid = manager.getEid(device);
+        lg2::info("toggleImmediateRampDownOnDevice for EID: {EID}", "EID", eid);
+        Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_toggle_immediate_rampdown_req));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+        uint8_t feature_state = featureEnabled;
+        // first argument instanceid=0 is irrelevant
+        auto rc = encode_toggle_immediate_rampdown_req(0, feature_state,
+                                                       requestMsg);
+
+        if (rc)
+        {
+            lg2::error(
+                "toggleImmediateRampDownOnDevice: encode_toggle_immediate_rampdown_req failed. eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc);
+            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+                WriteFailure();
+            return;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
+                                              responseLen);
+        if (rc_)
+        {
+            lg2::error(
+                "toggleImmediateRampDownOnDevice SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
+                "EID", eid, "RC", rc_);
+            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+                WriteFailure();
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        rc = decode_toggle_immediate_rampdown_resp(
+            responseMsg.get(), responseLen, &cc, &reason_code);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            lg2::info(
+                "toggleImmediateRampDownOnDevice for EID: {EID} completed",
+                "EID", eid);
+        }
+        else
+        {
+            lg2::error(
+                "toggleImmediateRampDownOnDevice decode_toggle_immediate_rampdown_resp "
+                "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
+                "RC = {A} ",
+                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
+                WriteFailure();
+        }
+    }
+
+    bool immediateRampDownEnabled(bool featureEnabled) override
+    {
+        toggleImmediateRampDownOnDevice(featureEnabled);
+        return PowerSmoothingIntf::immediateRampDownEnabled();
     }
 };
 } // namespace nsm

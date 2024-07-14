@@ -24,7 +24,7 @@ namespace nsm
 {
 NsmPowerSmoothing::NsmPowerSmoothing(
     std::string& name, std::string& type, std::string& inventoryObjPath,
-    std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf) :
+    std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf) :
     NsmSensor(name, type),
     pwrSmoothingIntf(pwrSmoothingIntf), inventoryObjPath(inventoryObjPath)
 {}
@@ -80,22 +80,28 @@ void NsmPowerSmoothing::updateReading(
         return;
     }
     // Update values on iface
-    lg2::error("NsmPowerSmoothing updateReading");
+
+    // For feature Supported : Check if bit0 is set
+    bool featSupported = (data->feature_flag & (1u << 0)) != 0 ? true : false;
+    pwrSmoothingIntf->PowerSmoothingIntf::featureSupported(featSupported);
 
     // For feature Enabled: Check if bit1 is set
     bool featureEnabled = (data->feature_flag & (1u << 1)) != 0 ? true : false;
-    pwrSmoothingIntf->powerSmoothingEnabled(featureEnabled);
+    pwrSmoothingIntf->PowerSmoothingIntf::powerSmoothingEnabled(featureEnabled);
 
     // For RampDwon Enabled: Check if bit2 is set
     bool rampDownEnabled = (data->feature_flag & (1u << 2)) != 0 ? true : false;
-    pwrSmoothingIntf->immediateRampDownEnabled(rampDownEnabled);
+    pwrSmoothingIntf->PowerSmoothingIntf::immediateRampDownEnabled(
+        rampDownEnabled);
 
-    pwrSmoothingIntf->currentTempSetting(data->currentTmpSetting);
-    pwrSmoothingIntf->currentTempFloorSetting(data->currentTmpFloorSetting);
-    pwrSmoothingIntf->maxAllowedTmpFloorPercent(
-        data->maxTmpFloorSettingInPercent);
-    pwrSmoothingIntf->minAllowedTmpFloorPercent(
-        data->minTmpFloorSettingInPercent);
+    pwrSmoothingIntf->PowerSmoothingIntf::currentTempSetting(
+        data->currentTmpSetting);
+    pwrSmoothingIntf->PowerSmoothingIntf::currentTempFloorSetting(
+        data->currentTmpFloorSetting);
+    pwrSmoothingIntf->PowerSmoothingIntf::maxAllowedTmpFloorPercent(
+        NvUFXP4_12ToDouble(data->maxTmpFloorSettingInPercent));
+    pwrSmoothingIntf->PowerSmoothingIntf::minAllowedTmpFloorPercent(
+        NvUFXP4_12ToDouble(data->minTmpFloorSettingInPercent));
 }
 
 // HW lifetime usage
@@ -130,7 +136,7 @@ uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
     uint8_t cc = NSM_ERROR;
     uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
-    nsm_hardwareciruitry_data data{};
+    nsm_hardwarecircuitry_data data{};
 
     auto rc = decode_get_hardware_lifetime_cricuitry_resp(
         responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
@@ -150,16 +156,16 @@ uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
 }
 
 void NsmHwCircuitryTelemetry::updateReading(
-    struct nsm_hardwareciruitry_data* data)
+    struct nsm_hardwarecircuitry_data* data)
 {
     if (data == nullptr)
     {
-        lg2::error("nsm_hardwareciruitry_data data is null");
+        lg2::error("nsm_hardwarecircuitry_data data is null");
         return;
     }
     // Update values on iface
-    lg2::error("NsmHwCircuitryTelemetry updateReading");
-    pwrSmoothingIntf->lifeTimeRemaining(htole32(data->reading));
+    pwrSmoothingIntf->PowerSmoothingIntf::lifeTimeRemaining(
+        NvUFXP8_24ToDouble(data->reading));
 }
 
 //  Power Smoothing Control: Get Current Profile Information
@@ -240,26 +246,27 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
         return;
     }
     // Update values on iface
-    lg2::error("NsmCurrentPowerSmoothingProfile updateReading");
 
-    pwrSmoothingCurProfileIntf->tmpFloorPecent(data->current_percent_tmp_floor);
-    pwrSmoothingCurProfileIntf->tmpFloorPecentApplied(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercent(
+        NvUFXP4_12ToDouble(data->current_percent_tmp_floor));
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercentApplied(
         data->admin_override_mask.bits.tmp_floor_override);
 
-    pwrSmoothingCurProfileIntf->rampUpRate(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRate(
         data->current_rampup_rate_in_miliwatts_per_second);
-    pwrSmoothingCurProfileIntf->rampUpRateApplied(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRateApplied(
         data->admin_override_mask.bits.rampup_rate_override);
 
-    pwrSmoothingCurProfileIntf->rampDownRate(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRate(
         data->current_rampdown_rate_in_miliwatts_per_second);
-    pwrSmoothingCurProfileIntf->rampDownRateApplied(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRateApplied(
         data->admin_override_mask.bits.rampdown_rate_override);
 
-    pwrSmoothingCurProfileIntf->rampDownHysteresis(
+    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownHysteresis(
         data->current_rampdown_hysteresis_value_in_milisec);
-    pwrSmoothingCurProfileIntf->rampDownHysteresisApplied(
-        data->admin_override_mask.bits.hysteresis_value_override);
+    pwrSmoothingCurProfileIntf
+        ->CurrentPowerProfileIntf::rampDownHysteresisApplied(
+            data->admin_override_mask.bits.hysteresis_value_override);
 
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::appliedProfilePath(
         getProfilePath(data->current_active_profile_id));
@@ -325,13 +332,13 @@ void NsmPowerSmoothingAdminOverride::updateReading(
         return;
     }
     // Update values on iface
-    lg2::error("NsmPowerSmoothingAdminOverride updateReading");
-    adminProfileIntf->tmpFloorPecent(data->admin_override_percent_tmp_floor);
-    adminProfileIntf->rampUpRate(
+    adminProfileIntf->AdminPowerProfileIntf::tmpFloorPercent(
+        NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor));
+    adminProfileIntf->AdminPowerProfileIntf::rampUpRate(
         data->admin_override_ramup_rate_in_miliwatts_per_second);
-    adminProfileIntf->rampDownRate(
+    adminProfileIntf->AdminPowerProfileIntf::rampDownRate(
         data->admin_override_rampdown_rate_in_miliwatts_per_second);
-    adminProfileIntf->rampDownHysteresis(
+    adminProfileIntf->AdminPowerProfileIntf::rampDownHysteresis(
         data->admin_override_rampdown_hysteresis_value_in_milisec);
 }
 
@@ -382,10 +389,14 @@ void NsmPowerProfileCollection::updateSupportedProfile(
 {
     if (obj)
     {
-        obj->tmpFloorPecent(data->tmp_floor_setting_in_percent);
-        obj->rampUpRate(data->ramp_up_rate_in_miliwattspersec);
-        obj->rampDownRate(data->ramp_down_rate_in_miliwattspersec);
-        obj->rampDownHysteresis(data->ramp_hysterisis_rate_in_miliwattspersec);
+        obj->PowerProfileIntf::tmpFloorPercent(
+            NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent));
+        obj->PowerProfileIntf::rampUpRate(
+            data->ramp_up_rate_in_miliwattspersec);
+        obj->PowerProfileIntf::rampDownRate(
+            data->ramp_down_rate_in_miliwattspersec);
+        obj->PowerProfileIntf::rampDownHysteresis(
+            data->ramp_hysterisis_rate_in_miliwattspersec);
     }
 }
 
@@ -425,11 +436,9 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
 
     auto rc = decode_get_preset_profile_metadata_resp(
         responseMsg, responseLen, &cc, &reason_code, &data, &numberOfprofiles);
-    lg2::error("NsmPowerProfileCollection");
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::error("NsmPowerProfileCollection updateReading");
         for (int profileId = 0; profileId < numberOfprofiles; profileId++)
         {
             nsm_preset_profile_data profileData{};
@@ -445,24 +454,6 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
             }
             updateSupportedProfile(getSupportedProfileById(profileId),
                                    &profileData);
-
-            int16_t tmp_floor_setting_in_percent =
-                profileData.tmp_floor_setting_in_percent;
-            uint32_t ramp_up_rate_in_miliwattspersec =
-                profileData.ramp_up_rate_in_miliwattspersec;
-            uint32_t ramp_down_rate_in_miliwattspersec =
-                profileData.ramp_down_rate_in_miliwattspersec;
-            uint32_t ramp_hysterisis_rate_in_miliwattspersec =
-                profileData.ramp_hysterisis_rate_in_miliwattspersec;
-            lg2::error("Profile data: {PID}", "PID", profileId);
-            lg2::error("Profile data: {PID}", "PID",
-                       tmp_floor_setting_in_percent);
-            lg2::error("Profile data: {PID}", "PID",
-                       ramp_up_rate_in_miliwattspersec);
-            lg2::error("Profile data: {PID}", "PID",
-                       ramp_down_rate_in_miliwattspersec);
-            lg2::error("Profile data: {PID}", "PID",
-                       ramp_hysterisis_rate_in_miliwattspersec);
         }
     }
     else

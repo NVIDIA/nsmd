@@ -984,6 +984,412 @@ TEST(nsmProcessorRevision, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 
+TEST(nsmPowerSmoothing, GoodGenReq)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
+                                    featIntf);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = controlSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_PWR_SMOOTHING_GET_FEATURE_INFO);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerSmoothing, GoodHandleResp)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
+                                    featIntf);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_pwr_smoothing_featureinfo_data feat;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_powersmoothing_featinfo_resp(
+        0, NSM_SUCCESS, reason_code, &feat, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = controlSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothing, BadHandleResp)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
+                                    featIntf);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_pwr_smoothing_featureinfo_data feat;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_powersmoothing_featinfo_resp(
+        0, NSM_SUCCESS, reason_code, &feat, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = controlSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = controlSensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmPowerSmoothing, GoodUpdateReading)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
+                                    featIntf);
+    struct nsm_pwr_smoothing_featureinfo_data feat;
+    feat.feature_flag = 7;
+    controlSensor.updateReading(&feat);
+    EXPECT_EQ(
+        controlSensor.pwrSmoothingIntf->PowerSmoothingIntf::featureSupported(),
+        true);
+}
+
+TEST(nsmHwCircuitryTelemetry, GoodGenReq)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry lifetimeCicuitrySensor(sensorName, sensorType,
+                                                   inventoryObjPath, featIntf);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = lifetimeCicuitrySensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command,
+              NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmHwCircuitryTelemetry, GoodHandleResp)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry lifetimeCicuitrySensor(sensorName, sensorType,
+                                                   inventoryObjPath, featIntf);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_hardwareciruitry_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_hardwarecircuitry_data lifetimeusage;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_hardware_lifetime_cricuitry_resp(
+        0, NSM_SUCCESS, reason_code, &lifetimeusage, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = lifetimeCicuitrySensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmHwCircuitryTelemetry, BadHandleResp)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry lifetimeCicuitrySensor(sensorName, sensorType,
+                                                   inventoryObjPath, featIntf);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_hardwareciruitry_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_hardwarecircuitry_data lifetimeusage;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_hardware_lifetime_cricuitry_resp(
+        0, NSM_SUCCESS, reason_code, &lifetimeusage, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = lifetimeCicuitrySensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = lifetimeCicuitrySensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmHwCircuitryTelemetry, GoodUpdateReading)
+{
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, nullptr);
+    NsmHwCircuitryTelemetry lifetimeCicuitrySensor(sensorName, sensorType,
+                                                   inventoryObjPath, featIntf);
+    struct nsm_hardwarecircuitry_data data;
+    data.reading = 0;
+    lifetimeCicuitrySensor.updateReading(&data);
+    EXPECT_EQ(lifetimeCicuitrySensor.pwrSmoothingIntf
+                  ->PowerSmoothingIntf::lifeTimeRemaining(),
+              0);
+}
+
+TEST(nsmPowerSmoothingAdminOverride, GoodGenReq)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride adminProfileSensor(
+        sensorName, sensorType, featIntf, inventoryObjPath);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = adminProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerSmoothingAdminOverride, GoodHandleResp)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride adminProfileSensor(
+        sensorName, sensorType, featIntf, inventoryObjPath);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_admin_override_data adminProfileData;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_query_admin_override_resp(0, NSM_SUCCESS, reason_code,
+                                                  &adminProfileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = adminProfileSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverride, BadHandleResp)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride adminProfileSensor(
+        sensorName, sensorType, featIntf, inventoryObjPath);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_admin_override_data adminProfileData;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_query_admin_override_resp(0, NSM_SUCCESS, reason_code,
+                                                  &adminProfileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = adminProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = adminProfileSensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmPowerSmoothingAdminOverride, GoodUpdateReading)
+{
+    auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
+                                                          nullptr);
+    NsmPowerSmoothingAdminOverride adminProfileSensor(
+        sensorName, sensorType, featIntf, inventoryObjPath);
+    struct nsm_admin_override_data adminProfileData;
+    adminProfileData.admin_override_percent_tmp_floor = 0;
+    adminProfileSensor.updateReading(&adminProfileData);
+    EXPECT_EQ(adminProfileSensor.adminProfileIntf
+                  ->AdminPowerProfileIntf::tmpFloorPercent(),
+              0);
+}
+
+TEST(nsmPowerProfileCollection, GoodGenReq)
+{
+    NsmPowerProfileCollection getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = getAllPowerProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command,
+              NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerProfileCollection, GoodHandleResp)
+{
+    NsmPowerProfileCollection getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data;
+    int number_of_profiles = 1;
+    profile_meta_data.max_profiles_supported = number_of_profiles;
+    struct nsm_preset_profile_data profiles[1];
+    uint16_t meta_data_size =
+        sizeof(struct nsm_get_all_preset_profile_meta_data);
+    uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
+    uint16_t data_size = meta_data_size +
+                         number_of_profiles * profile_data_size;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) + data_size, 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_preset_profile_resp(
+        0, NSM_SUCCESS, reason_code, &profile_meta_data, profiles,
+        profile_meta_data.max_profiles_supported, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = getAllPowerProfileSensor.handleResponseMsg(responseMsg, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerProfileCollection, BadHandleResp)
+{
+    NsmPowerProfileCollection getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data;
+    int number_of_profiles = 1;
+    profile_meta_data.max_profiles_supported = number_of_profiles;
+    struct nsm_preset_profile_data profiles[1];
+    uint16_t meta_data_size =
+        sizeof(struct nsm_get_all_preset_profile_meta_data);
+    uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
+    uint16_t data_size = meta_data_size +
+                         number_of_profiles * profile_data_size;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) + data_size, 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_preset_profile_resp(
+        0, NSM_SUCCESS, reason_code, &profile_meta_data, profiles,
+        profile_meta_data.max_profiles_supported, responseMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = response.size();
+    rc = getAllPowerProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = getAllPowerProfileSensor.handleResponseMsg(responseMsg, 2);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
+TEST(nsmCurrentPowerSmoothingProfile, GoodGenReq)
+{
+    std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            nullptr);
+    auto getAllPowerProfileSensor = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = currentProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command,
+              NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmCurrentPowerSmoothingProfile, GoodHandleResp)
+{
+    std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            nullptr);
+    auto getAllPowerProfileSensor = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_get_current_profile_data profileData;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_current_profile_info_resp(
+        0, NSM_SUCCESS, reason_code, &profileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = currentProfileSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
+{
+    std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
+    auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            nullptr);
+    auto getAllPowerProfileSensor = std::make_shared<NsmPowerProfileCollection>(
+        sensorName, sensorType, inventoryObjPath, nullptr);
+    NsmCurrentPowerSmoothingProfile currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    struct nsm_get_current_profile_data profileData;
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t rc = encode_get_current_profile_info_resp(
+        0, NSM_SUCCESS, reason_code, &profileData, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = currentProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = currentProfileSensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
 struct NsmProcessorTest :
     public testing::Test,
     public utils::DBusTest,
