@@ -316,10 +316,10 @@ requester::Coroutine
 
         if (!nsmDevice->isDeviceActive)
         {
-            lg2::error(
+            /*lg2::error(
                 "SensorManager::doPollingTask : skip polling due to inactive device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
                 "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
-                nsmDevice->getInstanceNumber());
+                nsmDevice->getInstanceNumber());*/
             co_return NSM_ERR_NOT_READY;
         }
 

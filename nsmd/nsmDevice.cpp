@@ -148,6 +148,9 @@ void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
 void NsmDevice::setOnline()
 {
     isDeviceActive = true;
+    lg2::info(
+                "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
+                "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     isDeviceReady = false;
     NsmServiceReadyIntf::getInstance().setStateStarting();
 
@@ -163,6 +166,9 @@ void NsmDevice::setOnline()
 void NsmDevice::setOffline()
 {
     isDeviceActive = false;
+    lg2::info(
+                "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
+                "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     SensorManager& sensorManager = SensorManager::getInstance();
     sensorManager.stopPolling(uuid);
 
