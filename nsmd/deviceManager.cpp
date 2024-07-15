@@ -105,6 +105,10 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 nsmDevices.emplace_back(nsmDevice);
             }
             nsmDevice->isDeviceActive = true;
+            lg2::info(
+                "DeviceManager: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets ACTIVE",
+                "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
+                nsmDevice->getInstanceNumber());
             nsmDevice->uuid = mctpUuid;
             nsmDevice->eid = eid;
 
