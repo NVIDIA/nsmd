@@ -1140,3 +1140,370 @@ TEST(pcieFundamentalReset, testBadDecodeResponse)
 					   &reason_code);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(clearScalarDataSource, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_clear_data_source_v1_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t device_index = 1;
+	uint8_t groupId = 8;
+	uint8_t dsId = 2;
+	auto rc = encode_clear_data_source_v1_req(0, device_index, groupId, dsId, request);
+	struct nsm_clear_data_source_v1_req *req =
+	    reinterpret_cast<struct nsm_clear_data_source_v1_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_CLEAR_DATA_SOURCE_V1, req->hdr.command);
+	EXPECT_EQ(3, req->hdr.data_size);
+	EXPECT_EQ(device_index, req->device_index);
+	EXPECT_EQ(groupId, req->groupId);
+	EXPECT_EQ(dsId, req->dsId);
+}
+
+TEST(clearScalarDataSource, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,		      // PCI VID: NVIDIA 0x10DE
+	    0x80,		      // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		      // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK,	      // NVIDIA_MSG_TYPE
+	    NSM_CLEAR_DATA_SOURCE_V1, // command
+	    3,			      // data size
+	    1,			      // device_index
+	    5,			      // groupId
+	    2			      // dsId
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t device_index;
+	uint8_t groupId;
+	uint8_t dsId;
+	auto rc = decode_clear_data_source_v1_req(
+	    request, msg_len, &device_index, &groupId, &dsId);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, device_index);
+	EXPECT_EQ(5, groupId);
+	EXPECT_EQ(2, dsId);
+}
+
+TEST(clearScalarDataSource, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    encode_clear_data_source_v1_resp(0, NSM_SUCCESS, reason_code, response);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_CLEAR_DATA_SOURCE_V1, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(clearScalarDataSource, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_CLEAR_DATA_SOURCE_V1,		     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,
+		0				     // data size
+		};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_clear_data_source_v1_resp(response, msg_len, &cc, &data_size,
+					   &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}
+
+TEST(clearScalarDataSource, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_CLEAR_DATA_SOURCE_V1,		     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    0,                   // data size
+		0				     // data size
+	    };
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_clear_data_source_v1_resp( NULL, msg_len, &cc, &data_size,
+					   &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_clear_data_source_v1_resp(response, msg_len, NULL, &data_size,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_clear_data_source_v1_resp(response, msg_len, &cc, NULL,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_clear_data_source_v1_resp(response, msg_len - 1, &cc, &data_size,
+					   &reason_code);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(QueryAvailableAndClearableScalarDataSource, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t device_index = 1;
+	uint8_t groupId = 8;
+	auto rc = encode_query_available_clearable_scalar_data_sources_v1_req(
+	    0, device_index, groupId, request);
+	struct nsm_query_available_clearable_scalar_data_sources_v1_req *req =
+	    reinterpret_cast<
+		struct nsm_query_available_clearable_scalar_data_sources_v1_req
+		    *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES,
+		  req->hdr.command);
+	EXPECT_EQ(2, req->hdr.data_size);
+	EXPECT_EQ(device_index, req->device_index);
+	EXPECT_EQ(groupId, req->group_id);
+}
+
+TEST(QueryAvailableAndClearableScalarDataSource, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES, // command
+	    2,						       // data size
+	    1,						       // device_index
+	    5						       // groupId
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t device_index;
+	uint8_t groupId;
+	auto rc = decode_query_available_clearable_scalar_data_sources_v1_req(
+	    request, msg_len, &device_index, &groupId);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, device_index);
+	EXPECT_EQ(5, groupId);
+}
+
+TEST(QueryAvailableAndClearableScalarDataSource, testGoodEncodeResponse)
+{
+	uint16_t data_size = 5;
+	bitfield8_t available_source[2];
+	bitfield8_t clearable_source[2];
+	uint8_t mask_length = 2;
+
+	available_source[0].byte = 25;
+	available_source[1].byte = 95;
+	clearable_source[0].byte = 75;
+	clearable_source[1].byte = 35;
+
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(
+		    struct
+		    nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+		mask_length * 2,
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+	    0, NSM_SUCCESS, reason_code, data_size, mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source, response);
+
+	struct nsm_query_available_clearable_scalar_data_sources_v1_resp *resp =
+	    reinterpret_cast<
+		struct nsm_query_available_clearable_scalar_data_sources_v1_resp
+		    *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES,
+		  resp->hdr.command);
+	EXPECT_EQ(5, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(2, resp->mask_length);
+	EXPECT_EQ(25, resp->data[0]);
+	EXPECT_EQ(95, resp->data[1]);
+	EXPECT_EQ(75, resp->data[2]);
+	EXPECT_EQ(35, resp->data[3]);
+}
+
+TEST(QueryAvailableAndClearableScalarDataSource, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES, // command
+	    0, // completion code
+	    0, // reserved
+	    0, // reserved
+	    5,
+	    0,	// data size
+	    2,	// mask length
+	    25, // available data source
+	    95, // available data source
+	    35, // clearable data source
+	    75	// clearable data source
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t mask_length;
+	bitfield8_t available_source[5];
+	bitfield8_t clearable_source[5];
+
+	auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(5, data_size);
+	EXPECT_EQ(25, available_source[0].byte);
+	EXPECT_EQ(95, available_source[1].byte);
+	EXPECT_EQ(35, clearable_source[0].byte);
+	EXPECT_EQ(75, clearable_source[1].byte);
+}
+
+TEST(QueryAvailableAndClearableScalarDataSource, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES, // command
+	    0, // completion code
+	    0, // reserved
+	    0, // reserved
+	    4,
+	    0,	// data size
+	    2,	// mask length
+	    25, // available data source
+	    95, // available data source
+	    35, // clearable data source
+	    75	// clearable data source
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t mask_length;
+	bitfield8_t available_source[2];
+	bitfield8_t clearable_source[2];
+
+	auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, NULL,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &mask_length,
+	    NULL, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, NULL, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len - 5, &cc, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &mask_length,
+	    (uint8_t *)available_source, (uint8_t *)clearable_source);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
