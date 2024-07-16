@@ -2114,21 +2114,18 @@ void createNsmProcessorSensor(SensorManager& manager,
     {
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
-        auto features =
-            utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
+        auto featuresNames =
+            utils::DBusHandler().getDbusProperty<std::vector<std::string>>(
                 objPath.c_str(), "Features", interface.c_str());
-        // Sorting features by Id
-        std::sort(features.begin(), features.end());
-        // Move duplicates to the end
-        auto lastUnique = std::unique(features.begin(), features.end());
-        // Remove duplicates
-        features.erase(lastUnique, features.end());
-        for (auto featureId : features)
+        std::map<ReconfigSettingsIntf::FeatureType, std::string> features;
+        for (auto& featureName : featuresNames)
         {
-            auto feature = ReconfigSettingsIntf::FeatureType(featureId);
-            auto featureName =
-                ReconfigSettingsIntf::convertFeatureTypeToString(feature);
-            featureName = featureName.substr(featureName.find_last_of('.') + 1);
+            auto feature = ReconfigSettingsIntf::convertFeatureTypeFromString(
+                "com.nvidia.InbandReconfigSettings.FeatureType." + featureName);
+            features[feature] = featureName;
+        }
+        for (auto [feature, featureName] : features)
+        {
             NsmInterfaceProvider<ReconfigSettingsIntf> interfaceProvider(
                 featureName, type,
                 path(inventoryObjPath) / "InbandReconfigPermissions");

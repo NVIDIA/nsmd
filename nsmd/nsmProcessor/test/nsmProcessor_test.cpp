@@ -1010,11 +1010,11 @@ struct NsmProcessorTest :
         {"Type", "NSM_processor"},
         {"UUID", badUuid},
         {"Features",
-         std::vector<uint64_t>{
-             (uint64_t)ReconfigSettingsIntf::FeatureType::InSystemTest,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::FusingMode,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::CCMode,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::Unknown,
+         std::vector<std::string>{
+             "InSystemTest",
+             "FusingMode",
+             "CCMode",
+             "Unknown",
          }},
     };
     const PropertyValuesCollection basic = {
@@ -1028,36 +1028,32 @@ struct NsmProcessorTest :
         {"Priority", false},
         {"Features", // features are not propertly sorted and some are
                      // duplicated
-         std::vector<uint64_t>{
-             (uint64_t)ReconfigSettingsIntf::FeatureType::InSystemTest,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::FusingMode,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::CCMode,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::
-                 PowerSmoothingPrivilegeLevel1,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::BAR0Firewall,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::CCDevMode,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPCurrentLimit,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPRatedLimit,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::HBMFrequencyChange,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPMaxLimit,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::TGPMinLimit,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::ClockLimit,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::NVLinkDisable,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::ECCEnable,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::PCIeVFConfiguration,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::RowRemappingAllowed,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::RowRemappingFeature,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::HULKLicenseUpdate,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::ForceTestCoupling,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::BAR0TypeConfig,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::EDPpScalingFactor,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::PowerSmoothing,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::
-                 PowerSmoothingPrivilegeLevel0,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::
-                 PowerSmoothingPrivilegeLevel2,
-             (uint64_t)ReconfigSettingsIntf::FeatureType::
-                 PowerSmoothingPrivilegeLevel1,
+         std::vector<std::string>{
+             "InSystemTest",
+             "FusingMode",
+             "CCMode",
+             "PowerSmoothingPrivilegeLevel1",
+             "BAR0Firewall",
+             "CCDevMode",
+             "TGPCurrentLimit",
+             "TGPRatedLimit",
+             "HBMFrequencyChange",
+             "TGPMaxLimit",
+             "TGPMinLimit",
+             "ClockLimit",
+             "NVLinkDisable",
+             "ECCEnable",
+             "PCIeVFConfiguration",
+             "RowRemappingAllowed",
+             "RowRemappingFeature",
+             "HULKLicenseUpdate",
+             "ForceTestCoupling",
+             "BAR0TypeConfig",
+             "EDPpScalingFactor",
+             "PowerSmoothing",
+             "PowerSmoothingPrivilegeLevel0",
+             "PowerSmoothingPrivilegeLevel2",
+             "PowerSmoothingPrivilegeLevel1",
          }},
     };
 };
@@ -1132,7 +1128,8 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         EXPECT_NE(nullptr, reconfigPermissions);
 
         // Test if added permissions are sorted and unique
-        EXPECT_EQ((ReconfigSettingsIntf::FeatureType)i, reconfigPermissions->feature);
+        EXPECT_EQ((ReconfigSettingsIntf::FeatureType)i,
+                  reconfigPermissions->feature);
         reconfigPermissions->update(mockManager, eid).detach();
         EXPECT_EQ(data.oneshot,
                   reconfigPermissions->pdi().allowOneShotConfig());
