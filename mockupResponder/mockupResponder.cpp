@@ -770,7 +770,7 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             populateFrom(property, "A1");
             break;
         case MAXIMUM_MEMORY_CAPACITY:
-            populateFrom(property, 20000000);
+            populateFrom(property, 200000);
             break;
         default:
             break;

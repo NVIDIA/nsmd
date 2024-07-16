@@ -21,6 +21,8 @@
 #include "platform-environmental.h"
 #include "nsmSensor.hpp"
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
+#include <telemetry_mrd_producer.hpp>
+#include "nsmCommon/sharedMemCommon.hpp"
 namespace nsm
 {
 
@@ -71,6 +73,8 @@ class NsmMemoryCapacityUtil : public NsmSensor
   private:
     std::shared_ptr<NsmTotalMemory> totalMemory;
     void updateReading(const struct nsm_memory_capacity_utilization& data);
+    std::string inventoryObjPath;
+    void updateMetricOnSharedMemory();
     std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
 };
 
