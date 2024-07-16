@@ -17,7 +17,7 @@ void NsmSwitchDI<IntfType>::fetchSpeedAndCalcBandwidth(double& currBandwidth,
     currBandwidth = 0.0;
     maxBandwidth = 0.0;
 
-    try
+    /*try
     {
         auto getAllPortOnSwitch =
             utils::DBusHandler().getAssociatedObjects(objPath, "all_states");
@@ -55,7 +55,7 @@ void NsmSwitchDI<IntfType>::fetchSpeedAndCalcBandwidth(double& currBandwidth,
     {
         lg2::error("Failed to update bandwidth on NVSwitch, {ERROR}.", "ERROR",
                    e);
-    }
+    }*/
 }
 
 template <typename IntfType>
