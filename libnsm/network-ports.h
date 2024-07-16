@@ -24,6 +24,7 @@ extern "C" {
 
 #include "base.h"
 #define PORT_COUNTER_TELEMETRY_DATA_SIZE 204
+#define PORT_MASK_DATA_SIZE 32
 // defined in MBps
 #define MAXLINKBANDWIDTH 50000
 
@@ -45,7 +46,9 @@ enum nsm_port_telemetry_commands {
 	NSM_GET_POWER_PROFILE = 0x0d,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
-	NSM_QUERY_PORT_STATUS = 0x43
+	NSM_QUERY_PORT_STATUS = 0x43,
+	NSM_SET_PORT_DISABLE_FUTURE = 0x44,
+	NSM_GET_PORT_DISABLE_FUTURE = 0x45
 };
 
 /** @brief Port state
@@ -204,6 +207,36 @@ typedef struct nsm_common_req nsm_query_ports_available_req;
 struct nsm_query_ports_available_resp {
 	struct nsm_common_resp hdr;
 	uint8_t number_of_ports;
+} __attribute__((packed));
+
+/** @struct nsm_set_port_disable_future_req
+ *
+ *  Structure representing NSM set port disable future request.
+ */
+struct nsm_set_port_disable_future_req {
+	struct nsm_common_resp hdr;
+	bitfield8_t port_mask[PORT_MASK_DATA_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_set_port_disable_future_resp
+ *
+ *  Structure representing NSM set port disable future response.
+ */
+typedef struct nsm_common_resp nsm_set_port_disable_future_resp;
+
+/** @struct nsm_get_port_disable_future_req
+ *
+ *  Structure representing NSM get port disable future request.
+ */
+typedef struct nsm_common_req nsm_get_port_disable_future_req;
+
+/** @struct nsm_get_port_disable_future_resp
+ *
+ *  Structure representing NSM get port disable future response.
+ */
+struct nsm_get_port_disable_future_resp {
+	struct nsm_common_resp hdr;
+	bitfield8_t port_mask[PORT_MASK_DATA_SIZE];
 } __attribute__((packed));
 
 /** @brief Encode a Get port telemetry counter request message
@@ -400,6 +433,96 @@ int decode_query_ports_available_resp(const struct nsm_msg *msg, size_t msg_len,
 				      uint8_t *cc, uint16_t *reason_code,
 				      uint16_t *data_size,
 				      uint8_t *number_of_ports);
+
+/** @brief Encode a set port disable future request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mask - pointer to array bitfield8_t[32] containing mask
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_port_disable_future_req(uint8_t instance,
+				       const bitfield8_t *mask,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a set port disable future request message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] mask  - pointer to array bitfield8_t[32] for receiving mask
+ *  @return nsm_completion_codes
+ */
+int decode_set_port_disable_future_req(const struct nsm_msg *msg,
+				       size_t msg_len, bitfield8_t *mask);
+
+/** @brief Encode a set port disable future response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_port_disable_future_resp(uint8_t instance, uint8_t cc,
+					uint16_t reason_code,
+					struct nsm_msg *msg);
+
+/** @brief Decode a set port disable future response message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code  - pointer to reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_port_disable_future_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code);
+
+/** @brief Encode a get port disable future request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_port_disable_future_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Decode a get port disable future request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_port_disable_future_req(const struct nsm_msg *msg,
+				       size_t msg_len);
+
+/** @brief Encode a get port disable future response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mask - pointer to array bitfield8_t[32] containing mask
+ *  @param[in] cc - completion code
+ *  @param[in] reason_code - reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_port_disable_future_resp(uint8_t instance, uint8_t cc,
+					uint16_t reason_code,
+					const bitfield8_t *mask,
+					struct nsm_msg *msg);
+
+/** @brief Decode a get port disable future response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code  - pointer to reason code
+ *  @param[out] mask  - pointer to array bitfield8_t[32] for receiving mask
+ *  @return nsm_completion_codes
+ */
+int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					bitfield8_t *mask);
 #ifdef __cplusplus
 }
 #endif

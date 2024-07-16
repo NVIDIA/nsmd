@@ -342,6 +342,10 @@ std::optional<std::vector<uint8_t>>
                     return queryPortStatusHandler(request, requestLen);
                 case NSM_QUERY_PORTS_AVAILABLE:
                     return queryPortsAvailableHandler(request, requestLen);
+                case NSM_SET_PORT_DISABLE_FUTURE:
+                    return setPortDisableFutureHandler(request, requestLen);
+                case NSM_GET_PORT_DISABLE_FUTURE:
+                    return getPortDisableFutureHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -649,7 +653,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
-                 {1, {1}},
+                 {1, {1, 68, 69}},
                  {2, {4}},
                  {3, {12}},
                  {4,
@@ -673,7 +677,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_GPU,
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
-                 {1, {1, 65, 66, 67}},
+                 {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   4,   6,   7,   8,   9,   11,  12,
                       14,  15,  16,  17,  69,  70,  71,  73,  74,  77,
@@ -993,6 +997,89 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_query_ports_available_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setPortDisableFutureHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setPortDisableFutureHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    bitfield8_t portMask[PORT_MASK_DATA_SIZE];
+
+    auto rc = decode_set_port_disable_future_req(requestMsg, requestLen, &portMask[0]);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_port_disable_future_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // mock data to send
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_set_port_disable_future_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_set_port_disable_future_resp(requestMsg->hdr.instance_id,
+                                           NSM_SUCCESS, reason_code,
+                                           responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_ports_available_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPortDisableFutureHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPortDisableFutureHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_port_disable_future_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_port_disable_future_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // mock data to send
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
+        0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_port_disable_future_resp(requestMsg->hdr.instance_id, cc,
+                                             reason_code, mask, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_port_disable_future_resp failed: rc={RC}", "RC",
                    rc);
         return std::nullopt;
     }

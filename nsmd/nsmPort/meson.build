@@ -2,6 +2,7 @@ sources += [
     '../libnsm/network-ports.c',
     '../libnsm/pci-links.c',
     'nsmPort/nsmPort.cpp',
+    'nsmPort/nsmPortDisableFuture.cpp',
     'nsmPort/nsmRetimerPort.cpp',
     'nsmPort/nsmFpgaPort.cpp',
     'nsmPort/nsmGpuPciePort.cpp',

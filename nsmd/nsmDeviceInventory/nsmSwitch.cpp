@@ -1,11 +1,13 @@
 #include "nsmSwitch.hpp"
 
+#include "asyncOperationManager.hpp"
 #include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDebugToken.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmPort/nsmPortDisableFuture.hpp"
 #include "utils.hpp"
 
 namespace nsm
@@ -102,6 +104,31 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
             bus, name, type, inventoryObjPath, device);
         device->deviceSensors.push_back(nvSwitchResetSensor);
     }
+    else if (type == "NSM_PortDisableFuture")
+    {
+        // Port disable future status on NVSwitch
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto nvSwitchPortDisableFuture =
+            std::make_shared<nsm::NsmDevicePortDisableFuture>(name, type,
+                                                              inventoryObjPath);
+
+        nvSwitchPortDisableFuture->pdi().portDisableFuture(
+            std::vector<uint8_t>{});
+        device->addSensor(nvSwitchPortDisableFuture, priority);
+
+        nsm::AsyncSetOperationHandler setPortDisableFutureHandler =
+            std::bind(&NsmDevicePortDisableFuture::setPortDisableFuture,
+                      nvSwitchPortDisableFuture, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(nvSwitchPortDisableFuture->getInventoryObjectPath())
+            ->addAsyncSetOperation(
+                "com.nvidia.NVLink.NVLinkDisableFuture", "PortDisableFuture",
+                AsyncSetOperationInfo{setPortDisableFutureHandler,
+                                      nvSwitchPortDisableFuture, device});
+    }
     else if (type == "NSM_Switch")
     {
         auto nvSwitchObject =
@@ -140,6 +167,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
 
 std::vector<std::string> nvSwitchInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch",
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch.PortDisableFuture",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmSwitchDI, nvSwitchInterfaces)

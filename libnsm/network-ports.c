@@ -620,3 +620,217 @@ int decode_query_ports_available_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_set_port_disable_future_req(uint8_t instance,
+				       const bitfield8_t *mask,
+				       struct nsm_msg *msg)
+{
+	if (mask == NULL || msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_port_disable_future_req *request =
+	    (struct nsm_set_port_disable_future_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_PORT_DISABLE_FUTURE;
+	request->hdr.data_size = PORT_MASK_DATA_SIZE;
+
+	memcpy(request->port_mask, mask, PORT_MASK_DATA_SIZE);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_port_disable_future_req(const struct nsm_msg *msg,
+				       size_t msg_len, bitfield8_t *mask)
+{
+	if (msg == NULL || mask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_port_disable_future_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_port_disable_future_req *request =
+	    (struct nsm_set_port_disable_future_req *)msg->payload;
+
+	if (request->hdr.data_size != PORT_MASK_DATA_SIZE) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(&(mask->byte), request->port_mask, PORT_MASK_DATA_SIZE);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_port_disable_future_resp(uint8_t instance, uint8_t cc,
+					uint16_t reason_code,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_SET_PORT_DISABLE_FUTURE, msg);
+	}
+
+	nsm_set_port_disable_future_resp *response =
+	    (nsm_set_port_disable_future_resp *)msg->payload;
+
+	response->command = NSM_SET_PORT_DISABLE_FUTURE;
+	response->completion_code = cc;
+	response->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_port_disable_future_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code)
+{
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(nsm_set_port_disable_future_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_port_disable_future_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_port_disable_future_req *request =
+	    (nsm_get_port_disable_future_req *)msg->payload;
+
+	request->command = NSM_GET_PORT_DISABLE_FUTURE;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_port_disable_future_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_port_disable_future_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_port_disable_future_req *request =
+	    (nsm_get_port_disable_future_req *)msg->payload;
+
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_port_disable_future_resp(uint8_t instance, uint8_t cc,
+					uint16_t reason_code,
+					const bitfield8_t *mask,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_PORT_DISABLE_FUTURE, msg);
+	}
+
+	struct nsm_get_port_disable_future_resp *response =
+	    (struct nsm_get_port_disable_future_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_PORT_DISABLE_FUTURE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(PORT_MASK_DATA_SIZE);
+
+	memcpy(response->port_mask, mask, PORT_MASK_DATA_SIZE);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code,
+					bitfield8_t *mask)
+{
+	if (mask == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_port_disable_future_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_port_disable_future_resp *resp =
+	    (struct nsm_get_port_disable_future_resp *)msg->payload;
+
+	memcpy(&(mask->byte), resp->port_mask, PORT_MASK_DATA_SIZE);
+
+	return NSM_SW_SUCCESS;
+}

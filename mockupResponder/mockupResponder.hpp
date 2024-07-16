@@ -89,6 +89,12 @@ class MockupResponder
         queryPortsAvailableHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        setPortDisableFutureHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getPortDisableFutureHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
