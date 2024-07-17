@@ -71,7 +71,12 @@ class NsmInventoryProperty :
                          nsm_inventory_property_identifiers property) :
         NsmInventoryPropertyBase(provider, property),
         NsmInterfaceContainer<IntfType>(provider)
-    {}
+    {
+        if constexpr (std::is_same_v<IntfType, AssetIntf>)
+        {
+            this->pdi().buildDate(nullDate);
+        }
+    }
 };
 
 template <>
@@ -93,8 +98,14 @@ inline void
             pdi().partNumber(std::string((char*)data.data(), data.size()));
             break;
         case BUILD_DATE:
-            pdi().buildDate(std::string((char*)data.data(), data.size()));
+        {
+            std::string dateValue((char*)data.data(), data.size());
+            if (dateValue == "0")
+                pdi().buildDate(nullDate);
+            else
+                pdi().buildDate(dateValue);
             break;
+        }
         default:
             throw std::runtime_error("Not implemented PDI");
             break;

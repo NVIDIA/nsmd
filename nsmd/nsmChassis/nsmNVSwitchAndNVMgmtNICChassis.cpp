@@ -156,6 +156,16 @@ void createNsmChassis(SensorManager& manager, const std::string& interface,
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(chassisLocation);
     }
+    else if (type == "NSM_PrettyName")
+    {
+        auto prettyName = utils::DBusHandler().getDbusProperty<std::string>(
+            objPath.c_str(), "Name", interface.c_str());
+        auto chassisPrettyName =
+            std::make_shared<NsmNVSwitchAndNicChassis<ItemIntf>>(name,
+                                                                 baseType);
+        chassisPrettyName->pdi().prettyName(prettyName);
+        device->addStaticSensor(chassisPrettyName);
+    }
 }
 
 void createNsmNVSwitchChassis(SensorManager& manager,
@@ -177,6 +187,7 @@ std::vector<std::string> nvSwitchChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Asset",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Chassis",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Health",
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.PrettyName",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Location"};
 
 std::vector<std::string> nvLinkMgmtNicChassisInterfaces{

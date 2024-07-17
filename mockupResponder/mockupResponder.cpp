@@ -661,7 +661,7 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             populateFrom(property, "NV123");
             break;
         case BUILD_DATE:
-            populateFrom(property, "2024_01_01");
+            populateFrom(property, "2022-08-06T00:00:00Z");
             break;
         case DEVICE_GUID:
             property = std::vector<uint8_t>{0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -25,6 +25,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 
 namespace nsm
@@ -37,6 +38,7 @@ using UuidIntf = object_t<Common::server::UUID>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
+using ItemIntf = object_t<Inventory::server::Item>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 
 template <typename IntfType>
