@@ -33,3 +33,5 @@ const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";
 const path sotwareInventoryBasePath = "/xyz/openbmc_project/inventory_software";
 
 const std::vector<uint8_t> supportedMessageTypes = {0, 1, 2, 3, 4, 5};
+
+const std::string nullDate = "0000-00-00T00:00:00Z";
