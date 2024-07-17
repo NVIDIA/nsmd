@@ -1,6 +1,5 @@
 sources += [
     'nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
-    'nsmDbusIfaceOverride/nsmModeIntf.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']
