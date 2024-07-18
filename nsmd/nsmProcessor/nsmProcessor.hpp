@@ -392,30 +392,6 @@ class NsmCurrClockFreq : public NsmSensor
     std::string inventoryObjPath;
 };
 
-class NsmMinGraphicsClockLimit : public NsmObject
-{
-  public:
-    NsmMinGraphicsClockLimit(
-        std::string& name, std::string& type,
-        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
-
-  private:
-    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
-};
-
-class NsmMaxGraphicsClockLimit : public NsmObject
-{
-  public:
-    NsmMaxGraphicsClockLimit(
-        std::string& name, std::string& type,
-        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
-
-  private:
-    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
-};
-
 class NsmCurrentUtilization : public NsmSensor
 {
   public:
