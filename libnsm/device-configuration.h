@@ -133,7 +133,8 @@ struct nsm_fpga_diagnostics_settings_wp {
 	uint8_t gpu6 : 1;
 	uint8_t gpu7 : 1;
 	uint8_t gpu8 : 1;
-	uint8_t res4 : 4; // 4:7 – Reserved
+	uint8_t hmc : 1;  // 4 - HMC SPI Flash
+	uint8_t res4 : 3; // 5:7 – Reserved
 	/* Bytes 5-7 reserved */
 	uint8_t res5;
 	uint8_t res6;

@@ -3339,8 +3339,10 @@ std::optional<std::vector<uint8_t>>
         case BASEBOARD_FRU_EEPROM:
         case CX7_FRU_EEPROM:
         case HMC_FRU_EEPROM:
-        case HMC_SPI_FLASH:
             writeProtected.baseboard = value;
+            break;
+        case HMC_SPI_FLASH:
+            writeProtected.hmc = value;
             break;
         case PEX_SW_EEPROM:
             writeProtected.pex = value;

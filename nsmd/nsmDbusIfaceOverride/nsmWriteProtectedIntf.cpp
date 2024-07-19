@@ -128,7 +128,7 @@ bool NsmWriteProtectedIntf::getValue(
             }
             else
             {
-                writeProtected = data.baseboard;
+                writeProtected = data.hmc;
             }
             break;
         default:
@@ -194,7 +194,7 @@ int NsmWriteProtectedIntf::getDataIndex(NsmDeviceIdentification deviceType,
             }
             else
             {
-                dataIndex = BASEBOARD_FRU_EEPROM;
+                dataIndex = HMC_SPI_FLASH;
             }
             break;
         default:
