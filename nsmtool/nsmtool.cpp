@@ -21,6 +21,7 @@
 #include "nsm_discovery_cmd.hpp"
 #include "nsm_firmware_cmd.hpp"
 #include "nsm_telemetry_cmd.hpp"
+#include "nsm_passthrough_cmd.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -91,6 +92,7 @@ int main(int argc, char** argv)
         nsmtool::firmware::registerCommand(app);
         nsmtool::discovery::registerCommand(app);
         nsmtool::telemetry::registerCommand(app);
+        nsmtool::passthrough::registerCommand(app);
 
         CLI11_PARSE(app, argc, argv);
         return 0;

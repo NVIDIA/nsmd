@@ -60,6 +60,7 @@ class NsmDevice
     {}
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
+    std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
 
     eid_t eid = 0;
     uuid_t uuid;
