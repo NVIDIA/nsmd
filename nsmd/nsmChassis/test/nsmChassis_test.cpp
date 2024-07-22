@@ -29,7 +29,6 @@ using namespace ::testing;
 #include "nsmInventoryProperty.hpp"
 #include "nsmIstModeEnabled.hpp"
 #include "nsmPowerSupplyStatus.hpp"
-#include "nsmWriteProtectedControl.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 
 namespace nsm
@@ -382,20 +381,15 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
               model->pdi().manufacturer());
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(2, fpga.roundRobinSensors.size());
-    EXPECT_EQ(2, fpga.deviceSensors.size());
+    EXPECT_EQ(1, fpga.roundRobinSensors.size());
+    EXPECT_EQ(1, fpga.deviceSensors.size());
 
     sensors = 0;
-    auto writeProtectedControl = dynamic_pointer_cast<NsmWriteProtectedControl>(
-        fpga.deviceSensors[sensors++]);
     auto writeProtectedJumper = dynamic_pointer_cast<NsmWriteProtectedJumper>(
         fpga.deviceSensors[sensors++]);
     EXPECT_EQ(sensors, fpga.deviceSensors.size());
 
-    EXPECT_NE(nullptr, writeProtectedControl);
     EXPECT_NE(nullptr, writeProtectedJumper);
-
-    EXPECT_TRUE(writeProtectedControl->writeProtectedControl);
 }
 
 TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)

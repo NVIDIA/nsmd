@@ -12,7 +12,6 @@ dep_src_files = [
     '../nsmPCIeLTSSMState.cpp',
     '../nsmWriteProtectedJumper.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
-    '../../nsmSensors/nsmWriteProtectedControl.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
     '../../nsmDbusIfaceOverride/nsmModeIntf.cpp',
     '../../nsmDevice.cpp',

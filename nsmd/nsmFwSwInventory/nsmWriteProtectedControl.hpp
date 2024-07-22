@@ -39,13 +39,11 @@ class NsmWriteProtectedControl :
     NsmDeviceIdentification deviceType;
     uint8_t instanceNumber;
     const bool retimer;
-    const bool writeProtectedControl;
 
   public:
     NsmWriteProtectedControl(const NsmInterfaceProvider<SettingsIntf>& provider,
                              NsmDeviceIdentification deviceType,
-                             uint8_t instanceNumber, bool retimer,
-                             bool writeProtectedControl);
+                             uint8_t instanceNumber, bool retimer);
     NsmWriteProtectedControl() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,

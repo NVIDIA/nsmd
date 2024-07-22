@@ -68,7 +68,7 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
             std::make_shared<NsmFirmwareInventory<SettingsIntf>>(
                 name, dynamic_pointer_cast<SettingsIntf>(writeProtectedIntf));
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            *settingsIntf, deviceType, instanceNumber, retimer, false);
+            *settingsIntf, deviceType, instanceNumber, retimer);
         device->addStaticSensor(settingsIntf);
         device->addSensor(writeProtectControl, false);
     }
@@ -83,7 +83,8 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
     else if (type == "NSM_FirmwareVersion")
     {
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
-        firmwareInventoryVersion.pdi().purpose(VersionIntf::VersionPurpose::Other);
+        firmwareInventoryVersion.pdi().purpose(
+            VersionIntf::VersionPurpose::Other);
         auto version = std::make_shared<NsmInventoryProperty<VersionIntf>>(
             firmwareInventoryVersion,
             nsm_inventory_property_identifiers(PCIERETIMER_0_EEPROM_VERSION +
