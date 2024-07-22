@@ -2,6 +2,7 @@ sources += [
     'nsmProcessor/nsmProcessor.cpp',
     'nsmProcessor/nsmFpgaProcessor.cpp',
     'nsmProcessor/nsmReconfigPermissions.cpp',
+    'nsmProcessor/nsmPowerSmoothing.cpp',
     'nsmProcessor/nsmReset.cpp',
 ]
 

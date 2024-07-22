@@ -1,6 +1,7 @@
 dep_src_files = [
     '../nsmProcessor.cpp',
     '../nsmReconfigPermissions.cpp',
+    '../nsmPowerSmoothing.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
