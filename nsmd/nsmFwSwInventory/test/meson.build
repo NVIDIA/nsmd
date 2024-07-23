@@ -1,12 +1,12 @@
 dep_src_files = [
     '../NVLinkManagementNICSWInventory.cpp',
     '../nsmFirmwareInventory.cpp',
+    '../nsmWriteProtectedControl.cpp',
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
-    '../../nsmSensors/nsmWriteProtectedControl.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',

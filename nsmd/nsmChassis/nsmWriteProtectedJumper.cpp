@@ -61,15 +61,15 @@ uint8_t NsmWriteProtectedJumper::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         pdi().SettingsIntf::writeProtected(data.presence);
+        pdi().SettingsIntf::writeProtectedControl(data.presence);
     }
     else
     {
         lg2::error(
             "handleResponseMsg: encode_get_fpga_diagnostics_settings_wp_jumper_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 } // namespace nsm

@@ -224,6 +224,7 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                 result["GPU 2"] = (int)data.gpu2;
                 result["GPU 3"] = (int)data.gpu3;
                 result["GPU 4"] = (int)data.gpu4;
+                result["HMC SPI Flash"] = (int)data.hmc;
                 result["NVSW 1"] = (int)data.nvSwitch1;
                 result["NVSW 2"] = (int)data.nvSwitch2;
                 result["GPU 5"] = (int)data.gpu5;

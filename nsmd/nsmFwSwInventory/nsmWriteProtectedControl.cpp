@@ -28,11 +28,9 @@ namespace nsm
 
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
-    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer,
-    bool writeProtectedControl) :
+    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer),
-    writeProtectedControl(writeProtectedControl)
+    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer)
 {
     utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
 }
@@ -70,25 +68,16 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
     {
         auto value = NsmWriteProtectedIntf::getValue(data, deviceType,
                                                      instanceNumber, retimer);
-        if (writeProtectedControl)
-        {
-            // Updates Oem.Nvidia.HardwareWriteProtectedControl in Chassis
-            pdi().SettingsIntf::writeProtectedControl(value);
-        }
-        else
-        {
-            // Updates WriteProtected in FirmwareInventory
-            pdi().SettingsIntf::writeProtected(value);
-        }
+        // Updates WriteProtected in FirmwareInventory
+        pdi().SettingsIntf::writeProtected(value);
     }
     else
     {
         lg2::error(
             "handleResponseMsg: decode_get_fpga_diagnostics_settings_wp_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 } // namespace nsm

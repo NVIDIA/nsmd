@@ -193,7 +193,6 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         dynamic_pointer_cast<NsmWriteProtectedControl>(
             fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, gpuWriteProtectedSensor);
-    EXPECT_FALSE(gpuWriteProtectedSensor->writeProtectedControl);
 }
 
 TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)

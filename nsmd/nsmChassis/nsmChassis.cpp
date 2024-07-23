@@ -25,7 +25,6 @@
 #include "nsmModeIntf.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
-#include "nsmWriteProtectedControl.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 #include "utils.hpp"
 
@@ -246,15 +245,10 @@ void nsmChassisCreateSensors(SensorManager& manager,
             throw std::runtime_error(
                 "Cannot use NSM_WriteProtect for different device than Baseboard");
         }
-        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto settings = NsmChassis<SettingsIntf>(name);
-        auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            settings, deviceType, instanceNumber, false, true);
         auto writeProtectJumper =
             std::make_shared<NsmWriteProtectedJumper>(settings);
-        device->addStaticSensor(writeProtectControl);
-        device->addStaticSensor(writeProtectJumper);
+        device->addSensor(writeProtectJumper, false);
     }
     else if (type == "NSM_PrettyName")
     {

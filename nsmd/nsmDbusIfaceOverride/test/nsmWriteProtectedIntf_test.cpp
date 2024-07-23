@@ -94,21 +94,22 @@ TEST_F(NsmWriteProtectedIntfTest, badTestBaseboardWrite)
                                          NSM_ERR_UNSUPPORTED_COMMAND_CODE));
 
     EXPECT_THROW(
-        writeProtectedIntf->setWriteProtected(true),
+        writeProtectedIntf->writeProtected(true),
         sdbusplus::xyz::openbmc_project::Common::Device::Error::WriteFailure);
 }
 
 TEST_F(NsmWriteProtectedIntfTest, goodTestBaseboardWrite)
 {
     init(NSM_DEV_ID_BASEBOARD, 0);
-    const Response enabled{0b00000010, 0x00, 0x00, 0x00,
-                           0x00,       0x00, 0x00, 0x00};
+    const Response enabled{0b00,       0x00, 0b00, 0x00,
+                           0b00010000, 0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsgSync)
         .Times(2)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
+    EXPECT_EQ(1, data().hmc);
 }
 
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer1Write)
@@ -121,8 +122,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer1Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer1);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer2Write)
 {
@@ -134,8 +136,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer2Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer2);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer3Write)
 {
@@ -147,8 +150,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer3Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer3);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer4Write)
 {
@@ -160,8 +164,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer4Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer4);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer5Write)
 {
@@ -173,8 +178,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer5Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer5);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer6Write)
 {
@@ -186,8 +192,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer6Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer6);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer7Write)
 {
@@ -199,8 +206,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer7Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer7);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer8Write)
 {
@@ -212,8 +220,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestRetimer8Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().retimer);
+    EXPECT_EQ(1, data().retimer8);
 }
 
 TEST_F(NsmWriteProtectedIntfTest, goodTestNvSwitch1Write)
@@ -226,8 +235,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestNvSwitch1Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().nvSwitch);
+    EXPECT_EQ(1, data().nvSwitch1);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestNvSwitch2Write)
 {
@@ -239,8 +249,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestNvSwitch2Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().nvSwitch);
+    EXPECT_EQ(1, data().nvSwitch2);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestNvLinkManagementWrite)
 {
@@ -252,7 +263,8 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestNvLinkManagementWrite)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
+    EXPECT_EQ(1, data().pex);
 }
 
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu1Write)
@@ -265,8 +277,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu1Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu1_4);
+    EXPECT_EQ(1, data().gpu1);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu2Write)
 {
@@ -278,8 +291,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu2Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu1_4);
+    EXPECT_EQ(1, data().gpu2);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu3Write)
 {
@@ -291,8 +305,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu3Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu1_4);
+    EXPECT_EQ(1, data().gpu3);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu4Write)
 {
@@ -304,8 +319,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu4Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu1_4);
+    EXPECT_EQ(1, data().gpu4);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu5Write)
 {
@@ -317,8 +333,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu5Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu5_8);
+    EXPECT_EQ(1, data().gpu5);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu6Write)
 {
@@ -330,8 +347,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu6Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu5_8);
+    EXPECT_EQ(1, data().gpu6);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu7Write)
 {
@@ -343,8 +361,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu7Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu5_8);
+    EXPECT_EQ(1, data().gpu7);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGpu8Write)
 {
@@ -356,8 +375,9 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGpu8Write)
         .WillOnce(mockSendRecvNsmMsgSync(enableDisableMsg))
         .WillOnce(mockSendRecvNsmMsgSync(fpgaDiagnosticMsgHeader, enabled));
 
-    EXPECT_EQ(true, writeProtectedIntf->setWriteProtected(true));
+    EXPECT_EQ(true, writeProtectedIntf->writeProtected(true));
     EXPECT_EQ(1, data().gpu5_8);
+    EXPECT_EQ(1, data().gpu8);
 }
 TEST_F(NsmWriteProtectedIntfTest, goodTestGetDataIndex)
 {
@@ -383,7 +403,7 @@ TEST_F(NsmWriteProtectedIntfTest, goodTestGetDataIndex)
               NsmWriteProtectedIntf::getDataIndex(NSM_DEV_ID_SWITCH, 1));
     EXPECT_EQ(PEX_SW_EEPROM,
               NsmWriteProtectedIntf::getDataIndex(NSM_DEV_ID_PCIE_BRIDGE, 0));
-    EXPECT_EQ(BASEBOARD_FRU_EEPROM,
+    EXPECT_EQ(HMC_SPI_FLASH,
               NsmWriteProtectedIntf::getDataIndex(NSM_DEV_ID_BASEBOARD, 0));
     EXPECT_EQ(RETIMER_EEPROM_1, NsmWriteProtectedIntf::getDataIndex(
                                     NSM_DEV_ID_BASEBOARD, 0, true));
