@@ -1806,14 +1806,15 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
     std::string& name, std::string& type,
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type),
-    clearPowerCapIntf(clearPowerCapIntf)
+    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf,
+    std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf) :
+    NsmObject(name, type), defaultPowerCapIntf(clearPowerCapIntf),
+    clearPowerCapAsyncIntf(clearPowerCapAsyncIntf)
 {}
 
 void NsmDefaultPowerCap::updateValue(uint32_t value)
 {
-    clearPowerCapIntf->defaultPowerCap(value);
+    defaultPowerCapIntf->defaultPowerCap(value);
     lg2::info("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
@@ -2200,7 +2201,12 @@ void createNsmProcessorSensor(SensorManager& manager,
             bus, inventoryObjPath.c_str(), name, candidateForList, nsmDevice);
 
         auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
-            bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf);
+            bus, inventoryObjPath.c_str());
+
+        auto clearPowerCapAsyncIntf =
+            std::make_shared<NsmClearPowerCapAsyncIntf>(
+                bus, inventoryObjPath.c_str(), nsmDevice, powerCapIntf,
+                clearPowerCapIntf);
 
         auto powerLimitIntf =
             std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
@@ -2212,8 +2218,8 @@ void createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
         manager.powerCapList.emplace_back(powerCap);
 
-        auto defaultPowerCap =
-            std::make_shared<NsmDefaultPowerCap>(name, type, clearPowerCapIntf);
+        auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
+            name, type, clearPowerCapIntf, clearPowerCapAsyncIntf);
         manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
         auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(

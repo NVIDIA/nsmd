@@ -18,11 +18,12 @@
 #pragma once
 #include "platform-environmental.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmDevice.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "sensorManager.hpp"
 
-#include <com/nvidia/Common/ClearPowerCap/server.hpp>
+#include <com/nvidia/Common/ClearPowerCapAsync/server.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
@@ -37,14 +38,31 @@ using ClearPowerCapIntf = sdbusplus::server::object_t<
 class NsmClearPowerCapIntf : public ClearPowerCapIntf
 {
   public:
-    NsmClearPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
-                         std::shared_ptr<NsmDevice> device,
-                         std::shared_ptr<NsmPowerCapIntf> powerCapIntf) :
-        ClearPowerCapIntf(bus, path), device(device),
-        powerCapIntf(powerCapIntf)
+    using ClearPowerCapIntf::ClearPowerCapIntf;
+
+  private:
+    int32_t clearPowerCap() override
+    {
+        return 0;
+    }
+};
+
+using ClearPowerCapAsyncIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::Common::server::ClearPowerCapAsync>;
+
+class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
+{
+  public:
+    NsmClearPowerCapAsyncIntf(
+        sdbusplus::bus::bus& bus, const char* path,
+        std::shared_ptr<NsmDevice> device,
+        std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+        std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf) :
+        ClearPowerCapAsyncIntf(bus, path), device(device),
+        powerCapIntf(powerCapIntf), clearPowerCapIntf(clearPowerCapIntf)
     {}
 
-    void getPowerCapFromDevice()
+    requester::Coroutine getPowerCapFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -61,13 +79,13 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error("SendRecvNsmMsgSync failed.eid={EID} rc={RC}", "EID",
                        eid, "RC", rc_);
-            return;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         uint8_t cc = NSM_ERROR;
         uint16_t reason_code = ERR_NULL;
@@ -93,9 +111,11 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
                 "getPowerCapFromDevice: decode_get_power_limit_resp with reasonCode = {REASONCODE},cc = {CC}and rc ={RC}",
                 "REASONCODE", reason_code, "CC", cc, "RC", rc);
         }
+
+        co_return NSM_SW_SUCCESS;
     }
 
-    void clearPowerCapOnDevice()
+    requester::Coroutine clearPowerCapOnDevice(AsyncOperationStatusType* status)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -103,7 +123,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant
         auto rc = encode_set_device_power_limit_req(
-            0, DEFAULT_LIMIT, PERSISTENT, ClearPowerCapIntf::defaultPowerCap(),
+            0, DEFAULT_LIMIT, PERSISTENT, clearPowerCapIntf->defaultPowerCap(),
             requestMsg);
 
         if (rc)
@@ -111,23 +131,21 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
             lg2::error(
                 "clearPowerCapOnDevice encode_set_device_power_limit_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
                 "clearPowerCapOnDevice SendRecvNsmMsgSync failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -139,7 +157,7 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
-            getPowerCapFromDevice();
+            co_await getPowerCapFromDevice();
             lg2::info("clearPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
             for (auto it = powerCapIntf->parents.begin(); it != powerCapIntf->parents.end();) {
@@ -167,19 +185,45 @@ class NsmClearPowerCapIntf : public ClearPowerCapIntf
             lg2::error(
                 "clearPowerCapOnDevice decode_set_power_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
+
+        co_return NSM_SW_SUCCESS;
     }
 
-    int32_t clearPowerCap() override
+    requester::Coroutine doClearPowerCapOnDevice(
+        std::shared_ptr<AsyncStatusIntf> statusInterface)
     {
-        clearPowerCapOnDevice();
-        return 0;
+        AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+        const auto rc_ = co_await clearPowerCapOnDevice(&status);
+
+        statusInterface->status(status);
+
+        co_return rc_;
+    }
+
+    sdbusplus::message::object_path clearPowerCap() override
+    {
+        const auto [objectPath, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        if (objectPath.empty())
+        {
+            lg2::error(
+                "ClearPowerCap failed. No available result Object to allocate for the Post request.");
+            throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+        }
+
+        doClearPowerCapOnDevice(statusInterface).detach();
+
+        return objectPath;
     }
 
   private:
     std::shared_ptr<NsmDevice> device;
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
+    std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf = nullptr;
 };
 } // namespace nsm

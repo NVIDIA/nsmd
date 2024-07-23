@@ -593,16 +593,23 @@ class NsmMinPowerCap : public NsmObject
 class NsmDefaultPowerCap : public NsmObject
 {
   public:
-    NsmDefaultPowerCap(std::string& name, std::string& type,
-                       std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf);
+    NsmDefaultPowerCap(
+        std::string& name, std::string& type,
+        std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf,
+        std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     std::shared_ptr<NsmClearPowerCapIntf> getDefaultPowerCapIntf() const
     {
-        return clearPowerCapIntf;
+        return defaultPowerCapIntf;
+    }
+    std::shared_ptr<NsmClearPowerCapAsyncIntf> getClearPowerCapAsyncIntf() const
+    {
+        return clearPowerCapAsyncIntf;
     }
 
   private:
-    std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf = nullptr;
+    std::shared_ptr<NsmClearPowerCapIntf> defaultPowerCapIntf = nullptr;
+    std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf = nullptr;
     void updateValue(uint32_t value);
 };
 using RevisionIntf = sdbusplus::server::object_t<
