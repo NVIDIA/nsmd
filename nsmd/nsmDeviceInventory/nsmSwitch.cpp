@@ -11,72 +11,6 @@ namespace nsm
 {
 
 template <typename IntfType>
-void NsmSwitchDI<IntfType>::fetchSpeedAndCalcBandwidth(double& currBandwidth,
-                                                       double& maxBandwidth)
-{
-    currBandwidth = 0.0;
-    maxBandwidth = 0.0;
-
-    /*try
-    {
-        auto getAllPortOnSwitch =
-            utils::DBusHandler().getAssociatedObjects(objPath, "all_states");
-        auto portObjOnSwitch =
-            std::get<std::vector<std::string>>(getAllPortOnSwitch);
-        for (const auto& object : portObjOnSwitch)
-        {
-            auto getAllAssociatedObjects =
-                utils::DBusHandler().getAssociatedObjects(object,
-                                                          "associated_port");
-            auto associatedPortObjects =
-                std::get<std::vector<std::string>>(getAllAssociatedObjects);
-            for (const auto& associatedObject : associatedPortObjects)
-            {
-                std::string portInfoIntf =
-                    "xyz.openbmc_project.Inventory.Decorator.PortInfo";
-                auto properties = utils::DBusHandler().getDbusProperties(
-                    associatedObject.c_str(), portInfoIntf.c_str());
-
-                for (const auto& pair : properties)
-                {
-                    if (pair.first == "CurrentSpeed")
-                    {
-                        currBandwidth += std::get<double>(pair.second);
-                    }
-                    else if (pair.first == "MaxSpeed")
-                    {
-                        maxBandwidth += std::get<double>(pair.second);
-                    }
-                }
-            }
-        }
-    }
-    catch (const std::exception& e)
-    {
-        lg2::error("Failed to update bandwidth on NVSwitch, {ERROR}.", "ERROR",
-                   e);
-    }*/
-}
-
-template <typename IntfType>
-void NsmSwitchDI<IntfType>::updateMetricOnSharedMemory()
-{
-#ifdef NVIDIA_SHMEM
-    auto ifaceName = std::string(this->pdi().interface);
-    std::vector<uint8_t> rawSmbpbiData = {};
-
-    if constexpr (std::is_same_v<IntfType, SwitchIntf>)
-    {
-        nv::sensor_aggregation::DbusVariantType variant{
-            this->pdi().currentBandwidth()};
-        std::string propName = "CurrentBandwidth";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            objPath, ifaceName, propName, rawSmbpbiData, variant);
-    }
-#endif
-}
-
-template <typename IntfType>
 requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
                                                    eid_t eid)
 {
@@ -92,19 +26,6 @@ requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
                 this->pdi().uuid(nsmDevice->deviceUuid);
             }
         }
-    }
-
-    // currentBandwidth & maxBandwidth on NVSwitch
-    if constexpr (std::is_same_v<IntfType, SwitchIntf>)
-    {
-        double currentBandwidthGbps = 0.0;
-        double maxBandwidth = 0.0;
-
-        fetchSpeedAndCalcBandwidth(currentBandwidthGbps, maxBandwidth);
-
-        this->pdi().currentBandwidth(currentBandwidthGbps);
-        this->pdi().maxBandwidth(maxBandwidth);
-        updateMetricOnSharedMemory();
     }
     co_return NSM_SUCCESS;
 }
@@ -188,8 +109,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
 
 std::vector<std::string> nvSwitchInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Switch"};
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmSwitchDI, nvSwitchInterfaces)
 } // namespace nsm
