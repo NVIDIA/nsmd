@@ -306,6 +306,11 @@ void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
                 throw std::invalid_argument(
                     "Instance number cannot be bigger than 7 for Retimer");
             break;
+        case NSM_DEV_ID_EROT:
+            if (instanceNumber > 4)
+                throw std::invalid_argument(
+                    "Instance number cannot be bigger than 4 for ERoT");
+            break;
         default:
             throw std::invalid_argument("Unknown device type: " +
                                         std::to_string((int)deviceType));
