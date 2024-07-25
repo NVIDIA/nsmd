@@ -1,5 +1,6 @@
 dep_src_files = [
     '../mockupResponder.cpp',
+    '../firmwareUtils.cpp',
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
@@ -10,6 +11,7 @@ dep_src_files = [
     '../../libnsm/platform-environmental.c',
     '../../libnsm/pci-links.c',
     '../../libnsm/requester/mctp.c',
+    '../../libnsm/firmware-utils.c',
 ]
 
 dep_src_headers = [

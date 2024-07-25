@@ -1,6 +1,7 @@
 sources = [
     'nsmMockupResponder.cpp',
     'mockupResponder.cpp',
+    'firmwareUtils.cpp',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
@@ -10,6 +11,7 @@ sources = [
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
     '../libnsm/network-ports.c',
+    '../libnsm/firmware-utils.c',
 ]
 
 nsmMockupResponder_headers = ['.', '..', '../libnsm', '../common']

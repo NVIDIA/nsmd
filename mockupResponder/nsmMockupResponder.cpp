@@ -98,6 +98,10 @@ int main(int argc, char** argv)
                 {
                     deviceType = NSM_DEV_ID_BASEBOARD;
                 }
+                else if (boost::iequals(device, "EROT"))
+                {
+                    deviceType = NSM_DEV_ID_EROT;
+                }
                 else
                 {
                     optionUsage();
