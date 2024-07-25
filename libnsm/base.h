@@ -58,7 +58,7 @@ extern "C" {
 #define NSM_EVENT_DATA_MAX_LEN 256
 #define NSM_EVENT_MAX_EVENT_ID 256
 
-#define NUM_NSM_TYPES 6
+#define NUM_NSM_TYPES 7
 #define NUM_COMMAND_CODES 256
 
 #define UNKNOWN_INSTANCE_ID 255
@@ -70,6 +70,7 @@ enum nsm_type {
 	NSM_TYPE_PLATFORM_ENVIRONMENTAL = 3,
 	NSM_TYPE_DIAGNOSTIC = 4,
 	NSM_TYPE_DEVICE_CONFIGURATION = 5,
+	NSM_TYPE_FIRMWARE = 6,
 };
 
 /** @brief NSM Type0 Device Capability Discovery Commands
@@ -239,6 +240,7 @@ typedef enum {
 	NSM_DEV_ID_SWITCH = 1,
 	NSM_DEV_ID_PCIE_BRIDGE = 2,
 	NSM_DEV_ID_BASEBOARD = 3,
+	NSM_DEV_ID_EROT = 4,
 	NSM_DEV_ID_UNKNOWN = 0xff,
 } NsmDeviceIdentification;
 
@@ -308,6 +310,17 @@ struct nsm_common_non_success_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t reason_code;
+} __attribute__((packed));
+
+/** @struct nsm_common_telemetry_resp
+ *
+ *  Structure representing NSM successful telemetry response.
+ *  It is used with aggregate commands.
+ */
+struct nsm_common_telemetry_resp {
+	uint8_t command;
+	uint8_t completion_code;
+	uint16_t telemetry_count;
 } __attribute__((packed));
 
 /** @struct nsm_event

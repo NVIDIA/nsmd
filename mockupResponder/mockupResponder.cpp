@@ -21,6 +21,7 @@
 #include "device-capability-discovery.h"
 #include "device-configuration.h"
 #include "diagnostics.h"
+#include "firmware-utils.h"
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
@@ -498,7 +499,19 @@ std::optional<std::vector<uint8_t>>
                     return unsupportedCommandHandler(request, requestLen);
             }
             break;
-
+        case NSM_TYPE_FIRMWARE:
+            switch (command)
+            {
+                case NSM_FW_GET_EROT_STATE_INFORMATION:
+                    return queryFirmwareType(request, requestLen);
+                    break;
+                default:
+                    lg2::error(
+                        "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
+                        "CMD", command, "LEN", requestLen, "TYPE",
+                        nvidiaMsgType);
+                    return unsupportedCommandHandler(request, requestLen);
+            }
         default:
             lg2::error("unsupported Message:{TYPE} request length={LEN}",
                        "TYPE", nvidiaMsgType, "LEN", requestLen);
@@ -594,7 +607,7 @@ std::optional<std::vector<uint8_t>>
             requestMsg->payload)
             ->nvidia_message_type;
 
-    if (nvidiaMsgType > NSM_TYPE_DEVICE_CONFIGURATION)
+    if (nvidiaMsgType >= NUM_NSM_TYPES)
     {
         lg2::error(
             "getSupportCommandCodeHandler: request msg type={MSG} is not supported",
@@ -611,6 +624,7 @@ std::optional<std::vector<uint8_t>>
                  {3, {0, 2, 3, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
+                 {6, {1}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -640,7 +654,13 @@ std::optional<std::vector<uint8_t>>
                    17,  70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
                    116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 173}},
                  {4, {}},
-                 {5, {65}},
+                 {5, {}},
+                 {6, {1}},
+             }},
+            {NSM_DEV_ID_EROT,
+             {
+                 {0, {0, 1, 2, 9}},
+                 {6, {1}},
              }},
         };
 

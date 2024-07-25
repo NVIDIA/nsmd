@@ -249,6 +249,9 @@ class QueryDeviceIdentification : public CommandInterface
             case NSM_DEV_ID_BASEBOARD:
                 result["Device Identification"] = "Baseboard";
                 break;
+            case NSM_DEV_ID_EROT:
+                result["Device Identification"] = "Erot";
+                break;
             case NSM_DEV_ID_UNKNOWN:
                 result["Device Identification"] = "Unknown";
                 break;
