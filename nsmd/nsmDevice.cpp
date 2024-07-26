@@ -132,16 +132,23 @@ NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
 }
 
 void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
-                          bool priority)
+                          bool priority, bool isLongRunning)
 {
     deviceSensors.emplace_back(sensor);
-    if (priority)
+    if (isLongRunning)
     {
-        prioritySensors.emplace_back(sensor);
+        longRunningSensors.emplace_back(sensor);
     }
     else
     {
-        roundRobinSensors.emplace_back(sensor);
+        if (priority)
+        {
+            prioritySensors.emplace_back(sensor);
+        }
+        else
+        {
+            roundRobinSensors.emplace_back(sensor);
+        }
     }
 }
 

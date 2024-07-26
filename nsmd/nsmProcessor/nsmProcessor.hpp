@@ -148,8 +148,8 @@ class NsmMigMode : public NsmSensor
 {
   public:
     NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
-               std::string& inventoryObjPath,
-               std::shared_ptr<NsmDevice> device);
+               std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
+               bool isLongRunning);
     NsmMigMode() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -171,7 +171,7 @@ class NsmEccMode : public NsmSensor
   public:
     NsmEccMode(std::string& name, std::string& type,
                std::shared_ptr<EccModeIntf> eccIntf,
-               std::string& inventoryObjPath);
+               std::string& inventoryObjPath, bool isLongRunning);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -412,7 +412,7 @@ class NsmCurrentUtilization : public NsmSensor
     NsmCurrentUtilization(const std::string& name, const std::string& type,
                           std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
                           std::shared_ptr<SMUtilizationIntf> smUtilizationIntf,
-                          std::string& inventoryObjPath);
+                          std::string& inventoryObjPath, bool isLongRunning);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -665,7 +665,7 @@ class NsmProcessorThrottleDuration : public NsmSensor
     NsmProcessorThrottleDuration(
         std::string& name, std::string& type,
         std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-        std::string& inventoryObjPath);
+        std::string& inventoryObjPath, bool isLongRunning);
     NsmProcessorThrottleDuration() = default;
 
     std::optional<std::vector<uint8_t>>

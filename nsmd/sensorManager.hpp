@@ -67,7 +67,7 @@ class SensorManager
     virtual requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen) = 0;
+                       size_t& responseLen, bool isLongRunning = false) = 0;
 
     /** @brief Send request NSM message to eid by blocking socket API directly.
      *         The function will return when received the response message from
@@ -167,6 +167,7 @@ class SensorManagerImpl : public SensorManager
     void stopPolling(uuid_t uuid) override;
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedHandler(sdbusplus::message::message& msg);
+    void doPollingLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
 #ifdef NVIDIA_STANDBYTODC
     void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
 #endif
@@ -175,7 +176,10 @@ class SensorManagerImpl : public SensorManager
     requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen) override;
+                       size_t& responseLen,
+                       bool isLongRunning = false) override;
+    requester::Coroutine
+        doPollingTaskLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
     uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
                                std::shared_ptr<const nsm_msg>& responseMsg,
                                size_t& responseLen) override;

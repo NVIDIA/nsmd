@@ -168,11 +168,11 @@ class Request final : public RequestRetryTimer
      *  @param[in] timeout - time to wait between each retry in milliseconds
      *  @param[in] verbose - verbose tracing flag
      */
-    explicit Request(int fd, eid_t eid, sdeventplus::Event& event,
+    explicit Request(int fd, eid_t eid, uint8_t tag, sdeventplus::Event& event,
                      std::vector<uint8_t>&& requestMsg, uint8_t numRetries,
                      std::chrono::milliseconds timeout, bool verbose) :
-        RequestRetryTimer(event, numRetries, timeout),
-        fd(fd), eid(eid), requestMsg(std::move(requestMsg)), verbose(verbose)
+        RequestRetryTimer(event, numRetries, timeout), fd(fd), eid(eid),
+        tag(tag), requestMsg(std::move(requestMsg)), verbose(verbose)
     {}
 
     uint8_t getInstanceId()
@@ -201,6 +201,7 @@ class Request final : public RequestRetryTimer
   private:
     int fd;    //!< file descriptor of MCTP communications socket
     eid_t eid; //!< endpoint ID of the remote MCTP endpoint
+    uint8_t tag;                     //!< tag mctp message tag to be used
     std::vector<uint8_t> requestMsg; //!< NSM request message
     bool verbose;                    //!< verbose tracing flag
 
@@ -215,7 +216,7 @@ class Request final : public RequestRetryTimer
             utils::printBuffer(utils::Tx, requestMsg);
         }
 
-        auto rc = nsm_send(eid, fd, requestMsg.data(), requestMsg.size());
+        auto rc = nsm_send(eid, tag, fd, requestMsg.data(), requestMsg.size());
         if (rc < 0)
         {
             lg2::error("Failed to send NSM message. RC={RC}, errno={ERRNO}",
@@ -225,10 +226,10 @@ class Request final : public RequestRetryTimer
         return NSM_SW_SUCCESS;
     }
 
-    static int nsm_send(eid_t eid, int mctp_fd, const uint8_t* nsm_req_msg,
-                        size_t nsm_req_len)
+    static int nsm_send(eid_t eid, uint8_t tag, int mctp_fd,
+                        const uint8_t* nsm_req_msg, size_t nsm_req_len)
     {
-        uint8_t hdr[3] = {MCTP_MSG_TAG_REQ, eid,
+        uint8_t hdr[3] = {tag, eid,
                           MCTP_MSG_TYPE_PCI_VDM}; // TO_TAG, EID, MCTP_MSG_TYPE
 
         struct iovec iov[2];
@@ -236,7 +237,6 @@ class Request final : public RequestRetryTimer
         iov[0].iov_len = sizeof(hdr);
         iov[1].iov_base = (uint8_t*)nsm_req_msg;
         iov[1].iov_len = nsm_req_len;
-
         struct msghdr msg = {};
         msg.msg_iov = iov;
         msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);

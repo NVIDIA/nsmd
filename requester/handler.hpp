@@ -62,6 +62,16 @@ using ResponseHandler = fu2::unique_function<void(
 template <class RequestInterface>
 class Handler
 {
+  private:
+    /** @brief Container for storing the details of the NSM request
+     *         message, handler for the corresponding NSM response, the
+     *         timer object for the Instance ID expiration and valid flag
+     */
+    using RequestValue =
+        std::tuple<std::unique_ptr<RequestInterface>, ResponseHandler,
+                   std::unique_ptr<sdbusplus::Timer>, bool>;
+    using RequestQueue = std::queue<RequestValue>;
+
   public:
     Handler() = delete;
     Handler(const Handler&) = delete;
@@ -86,31 +96,35 @@ class Handler
         mctp_socket::Manager& sockManager, bool verbose,
         std::chrono::seconds instanceIdExpiryInterval =
             std::chrono::seconds(INSTANCE_ID_EXPIRATION_INTERVAL),
+        std::chrono::seconds instanceIdExpiryIntervalLongRunning =
+            std::chrono::seconds(INSTANCE_ID_EXPIRATION_INTERVAL_LONG_RUNNING),
         uint8_t numRetries = static_cast<uint8_t>(NUMBER_OF_REQUEST_RETRIES),
         std::chrono::milliseconds responseTimeOut =
-            std::chrono::milliseconds(RESPONSE_TIME_OUT)) :
-        event(event),
-        instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
-        instanceIdExpiryInterval(instanceIdExpiryInterval),
-        numRetries(numRetries), responseTimeOut(responseTimeOut)
+            std::chrono::milliseconds(RESPONSE_TIME_OUT),
+        std::chrono::milliseconds responseTimeOutLongRunning =
+            std::chrono::milliseconds(RESPONSE_TIME_OUT_LONG_RUNNING)) :
+        event(event), instanceIdDb(instanceIdDb), sockManager(sockManager),
+        verbose(verbose),
+        instanceIdExpiryIntervalRegular(instanceIdExpiryInterval),
+        instanceIdExpiryIntervalLongRunning(
+            instanceIdExpiryIntervalLongRunning),
+        numRetries(numRetries), responseTimeOutRegular(responseTimeOut),
+        responseTimeOutLongRunning(responseTimeOutLongRunning)
     {}
 
-    /** @brief Register a NSM request message
-     *
-     *  @param[in] eid - endpoint ID of the remote MCTP endpoint
-     *  @param[in] type - NSM message type
-     *  @param[in] command - NSM command
-     *  @param[in] requestMsg - NSM request message
-     *  @param[in] responseHandler - Response handler for this request
-     *
-     *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
-     */
-    int registerRequest(eid_t eid, uint8_t type, uint8_t command,
-                        std::vector<uint8_t>&& requestMsg,
-                        ResponseHandler&& responseHandler)
+    int registerRequestImpl(
+        uint8_t tag, eid_t eid, uint8_t type, uint8_t command,
+        std::vector<uint8_t>&& requestMsg, ResponseHandler&& responseHandler,
+        std::unordered_map<eid_t, RequestQueue>& handlers,
+        std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>&
+            timerToFree,
+        std::chrono::milliseconds responseTimeOut,
+        std::chrono::seconds instanceIdExpiryInterval)
     {
-        auto instanceIdExpiryCallBack = [eid, type, command, this](void) {
-            if (this->handlers.contains(eid) && !this->handlers[eid].empty())
+        auto instanceIdExpiryCallBack = [eid, type, command, &handlers,
+                                         &timerToFree, instanceIdExpiryInterval,
+                                         this](void) {
+            if (handlers.contains(eid) && !handlers[eid].empty())
             {
                 auto& [request, responseHandler, timerInstance,
                        valid] = handlers[eid].front();
@@ -142,7 +156,9 @@ class Handler
                 this->removeRequestContainer[eid] =
                     std::make_unique<sdeventplus::source::Defer>(
                         event,
-                        std::bind(&Handler::removeRequestEntry, this, eid));
+                        std::bind(&Handler::removeRequestEntry, this, eid,
+                                  std::ref(handlers), std::ref(timerToFree),
+                                  instanceIdExpiryInterval));
 
                 // Call responseHandler after erase it from the handlers to
                 // avoid starting the same request again in
@@ -173,7 +189,7 @@ class Handler
         }
 
         auto request = std::make_unique<RequestInterface>(
-            sockManager.getSocket(eid), eid, event, std::move(requestMsg),
+            sockManager.getSocket(eid), eid, tag, event, std::move(requestMsg),
             numRetries, responseTimeOut, verbose);
         auto timer = std::make_unique<sdbusplus::Timer>(
             event.get(), instanceIdExpiryCallBack);
@@ -181,10 +197,53 @@ class Handler
         handlers[eid].emplace(std::make_tuple(std::move(request),
                                               std::move(responseHandler),
                                               std::move(timer), true));
-        return runRegisteredRequest(eid);
+        return runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
     }
 
-    int runRegisteredRequest(eid_t eid)
+    /** @brief Register a NSM request message
+     *
+     *  @param[in] eid - endpoint ID of the remote MCTP endpoint
+     *  @param[in] type - NSM message type
+     *  @param[in] command - NSM command
+     *  @param[in] requestMsg - NSM request message
+     *  @param[in] responseHandler - Response handler for this request
+     *
+     *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
+     */
+    int registerRequestRegular(eid_t eid, uint8_t type, uint8_t command,
+                               std::vector<uint8_t>&& requestMsg,
+                               ResponseHandler&& responseHandler)
+    {
+        return registerRequestImpl(
+            MCTP_MSG_TAG_REQ, eid, type, command, std::move(requestMsg),
+            std::move(responseHandler), handlersRegular, timerToFreeRegular,
+            responseTimeOutRegular, instanceIdExpiryIntervalRegular);
+    }
+
+    /** @brief Register a NSM Long-running request message
+     *
+     *  @param[in] eid - endpoint ID of the remote MCTP endpoint
+     *  @param[in] type - NSM message type
+     *  @param[in] command - NSM command
+     *  @param[in] requestMsg - NSM request message
+     *  @param[in] responseHandler - Response handler for this request
+     *
+     *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
+     */
+    int registerRequestLongRunning(eid_t eid, uint8_t type, uint8_t command,
+                                   std::vector<uint8_t>&& requestMsg,
+                                   ResponseHandler&& responseHandler)
+    {
+        return registerRequestImpl(
+            MCTP_MSG_TAG_LONG_RUNNING_REQ, eid, type, command,
+            std::move(requestMsg), std::move(responseHandler),
+            handlersLongRunning, timerToFreeLongRunning,
+            responseTimeOutLongRunning, instanceIdExpiryIntervalLongRunning);
+    }
+
+    int runRegisteredRequest(eid_t eid,
+                             std::unordered_map<eid_t, RequestQueue>& handlers,
+                             std::chrono::seconds instanceIdExpiryInterval)
     {
         if (handlers[eid].empty())
         {
@@ -239,6 +298,7 @@ class Handler
 
     /** @brief Handle NSM response message
      *
+     *  @param[in] tag - MCTP message tag of the response
      *  @param[in] eid - endpoint ID of the remote MCTP endpoint
      *  @param[in] instanceId - instance ID to match request and response
      *  @param[in] type - NVIDIA message type
@@ -246,10 +306,39 @@ class Handler
      *  @param[in] response - NSM response message
      *  @param[in] respMsgLen - length of the response message
      */
-    void handleResponse([[maybe_unused]] eid_t eid, uint8_t instanceId,
+    void handleResponse(uint8_t tag, eid_t eid, uint8_t instanceId,
                         [[maybe_unused]] uint8_t type,
                         [[maybe_unused]] uint8_t command,
                         const nsm_msg* response, size_t respMsgLen)
+    {
+        switch (tag)
+        {
+            case MCTP_TAG_NSM:
+                handleResponseImpl(eid, instanceId, type, command, response,
+                                   respMsgLen, handlersRegular,
+                                   instanceIdExpiryIntervalRegular);
+                break;
+
+            case MCTP_TAG_NSM_ASYNC:
+                handleResponseImpl(eid, instanceId, type, command, response,
+                                   respMsgLen, handlersLongRunning,
+                                   instanceIdExpiryIntervalLongRunning);
+                break;
+
+            default:
+                lg2::error(
+                    "Received invalid MCTP Tag {TAG}. EID={EID}, Type={TYPE}, Command={CMD}.",
+                    "TAG", tag, "EID", eid, "TYPE", type, "CMD", command);
+                break;
+        }
+    }
+
+    void handleResponseImpl(eid_t eid, uint8_t instanceId,
+                            [[maybe_unused]] uint8_t type,
+                            [[maybe_unused]] uint8_t command,
+                            const nsm_msg* response, size_t respMsgLen,
+                            std::unordered_map<eid_t, RequestQueue>& handlers,
+                            std::chrono::seconds instanceIdExpiryInterval)
     {
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
@@ -286,28 +375,60 @@ class Handler
             }
         }
 
-        runRegisteredRequest(eid);
+        runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
     }
 
     bool hasInProgressRequest(eid_t eid)
     {
-        if (handlers.contains(eid) && !handlers[eid].empty())
+        bool hasRegularReq{false};
+        bool hasLongRunnigReq{false};
+
+        if (handlersRegular.contains(eid) && !handlersRegular[eid].empty())
         {
-            auto& valid = std::get<3>(handlers[eid].front());
-            auto& timerInstance = std::get<2>(handlers[eid].front());
-            return valid && timerInstance->isRunning();
+            auto& valid = std::get<3>(handlersRegular[eid].front());
+            auto& timerInstance = std::get<2>(handlersRegular[eid].front());
+            hasRegularReq = valid && timerInstance->isRunning();
         }
-        return false;
+
+        if (handlersLongRunning.contains(eid) &&
+            !handlersLongRunning[eid].empty())
+        {
+            auto& valid = std::get<3>(handlersLongRunning[eid].front());
+            auto& timerInstance = std::get<2>(handlersLongRunning[eid].front());
+            hasLongRunnigReq = valid && timerInstance->isRunning();
+        }
+
+        return hasRegularReq || hasLongRunnigReq;
     }
 
-    void invalidInProgressRequest(eid_t eid)
+    void invalidInProgressRequest(eid_t eid, [[maybe_unused]] uint8_t tag)
     {
-        // force timer timeout
-        auto& timerInstance = std::get<2>(handlers[eid].front());
-        timerInstance->start(std::chrono::microseconds(1));
+        if (handlersRegular.contains(eid) && !handlersRegular[eid].empty())
+        {
+            // force timer timeout
+            auto& timerInstance = std::get<2>(handlersRegular[eid].front());
+            if (timerInstance->isRunning())
+            {
+                timerInstance->start(std::chrono::microseconds(1));
 
-        auto& valid = std::get<3>(handlers[eid].front());
-        valid = false;
+                auto& valid = std::get<3>(handlersRegular[eid].front());
+                valid = false;
+            }
+        }
+
+        if (handlersLongRunning.contains(eid) &&
+            !handlersLongRunning[eid].empty())
+        {
+            // force timer timeout
+            auto& timerInstance = std::get<2>(handlersLongRunning[eid].front());
+            if (timerInstance->isRunning())
+            {
+                timerInstance->start(std::chrono::microseconds(1));
+
+                auto& valid = std::get<3>(handlersLongRunning[eid].front());
+                valid = false;
+            }
+        }
     }
 
   private:
@@ -318,22 +439,23 @@ class Handler
 
     bool verbose;                 //!< verbose tracing flag
     std::chrono::seconds
-        instanceIdExpiryInterval; //!< Instance ID expiration interval
+        instanceIdExpiryIntervalRegular; //!< Instance ID expiration interval
+    std::chrono::seconds
+        instanceIdExpiryIntervalLongRunning; //!< Instance ID expiration
+                                             //!< interval for Long Running
+                                             //!< commands
     uint8_t numRetries;           //!< number of request retries
     std::chrono::milliseconds
-        responseTimeOut;          //!< time to wait between each retry
-
-    /** @brief Container for storing the details of the NSM request
-     *         message, handler for the corresponding NSM response, the
-     *         timer object for the Instance ID expiration and valid flag
-     */
-    using RequestValue =
-        std::tuple<std::unique_ptr<RequestInterface>, ResponseHandler,
-                   std::unique_ptr<sdbusplus::Timer>, bool>;
-    using RequestQueue = std::queue<RequestValue>;
+        responseTimeOutRegular;   //!< time to wait between each retry
+    std::chrono::milliseconds
+        responseTimeOutLongRunning; //!< time to wait between each retry for
+                                    //!< Long Running commands
 
     /** @brief Container for storing the NSM request entries */
-    std::unordered_map<eid_t, RequestQueue> handlers;
+    std::unordered_map<eid_t, RequestQueue> handlersRegular;
+
+    /** @brief Container for storing the NSM Long Running request entries */
+    std::unordered_map<eid_t, RequestQueue> handlersLongRunning;
 
     /** @brief Container to store information about the request entries to be
      *         removed after the instance ID timer expires
@@ -341,16 +463,23 @@ class Handler
     std::unordered_map<eid_t, std::unique_ptr<sdeventplus::source::Defer>>
         removeRequestContainer;
 
-    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>> timerToFree;
+    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>
+        timerToFreeRegular;
+    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>
+        timerToFreeLongRunning;
 
     /** @brief Remove request entry for which the instance ID expired
      *
      *  @param[in] eid - eid for the Request
      */
-    void removeRequestEntry(eid_t eid)
+    void removeRequestEntry(
+        eid_t eid, std::unordered_map<eid_t, RequestQueue>& handlers,
+        std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>&
+            timerToFree,
+        std::chrono::seconds instanceIdExpiryInterval)
     {
         timerToFree[eid] = nullptr;
-        runRegisteredRequest(eid);
+        runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
     }
 };
 
@@ -375,6 +504,10 @@ struct SendRecvNsmMsg
     /** @brief The RequesterHandler to send/recv NSM message.
      */
     RequesterHandler& handler;
+
+    /** @brief Whether it is long-running NSM Request.
+     */
+    bool isLongRunning;
 
     /** @brief The EID where NSM message will be sent to.
      */
@@ -416,10 +549,24 @@ struct SendRecvNsmMsg
         }
 
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-        rc = handler.registerRequest(
-            eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
-            std::move(request),
-            std::move(std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
+
+        if (isLongRunning)
+        {
+            rc = handler.registerRequestLongRunning(
+                eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
+                std::move(request),
+                std::move(
+                    std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
+        }
+        else
+        {
+            rc = handler.registerRequestRegular(
+                eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
+                std::move(request),
+                std::move(
+                    std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
+        }
+
         if (rc)
         {
             lg2::error("registerRequest failed, rc={RC}", "RC",
@@ -444,10 +591,10 @@ struct SendRecvNsmMsg
      */
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
-                   size_t* responseLen) :
-        handler(handler),
-        eid(eid), request(request), responseMsg(responseMsg),
-        responseLen(responseLen), rc(NSM_ERROR)
+                   size_t* responseLen, bool isLongRunning) :
+        handler(handler), isLongRunning(isLongRunning), eid(eid),
+        request(request), responseMsg(responseMsg), responseLen(responseLen),
+        rc(NSM_ERROR)
     {}
 
     /** @brief The function will be registered by ReqisterHandler for handling

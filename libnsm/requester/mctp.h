@@ -31,6 +31,7 @@ extern "C" {
 typedef uint8_t mctp_eid_t;
 #define MCTP_MSG_TYPE_PCI_VDM 0x7E
 #define MCTP_MSG_TAG_REQ (MCTP_TAG_NSM | 1 << 3)
+#define MCTP_MSG_TAG_LONG_RUNNING_REQ (MCTP_TAG_NSM_ASYNC | 1 << 3)
 
 typedef enum nsm_requester_error_codes {
 	NSM_REQUESTER_SUCCESS = 0,
@@ -121,12 +122,14 @@ nsm_requester_rc_t nsm_recv(mctp_eid_t eid, int mctp_fd, uint8_t instance_id,
  *             success.
  * @param[out] resp_msg_len - caller owned pointer that will be made point to
  *             the size of the NSM response msg.
+ * @param[out] tag - MCTP msg tag
  *
  * @return nsm_requester_rc_t (errno may be set). failure is returned even
  *         when data was read, but wasn't a NSM response message
  */
 nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
-				uint8_t **nsm_resp_msg, size_t *resp_msg_len);
+				uint8_t **nsm_resp_msg, size_t *resp_msg_len,
+				uint8_t *tag);
 
 #ifdef __cplusplus
 }

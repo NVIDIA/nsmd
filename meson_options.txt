@@ -26,6 +26,14 @@ option(
     description: 'GPIO name for NSM'
 )
 option(
+    'sensor-polling-time-long-running',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'The interval time of sensor polling in milliseconds for NSM Long-running requests',
+    value: 1499,
+)
+option(
     'mockup-responder',
     type: 'feature',
     description: 'Mockup Responder',
@@ -38,6 +46,14 @@ option(
     max: 4294967295,
     description: 'The interval time of NSM instance id expiration in seconds',
     value: 5,
+)
+option(
+    'instance-id-expiration-interval-long-running',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'The interval time of NSM instance id expiration in seconds for NSM Long-running requests. Value of response-time-out-long-running is selected as 3 seconds. With two retries, maximum possible time spent is 9 seconds. Value of 10 seconds is selected here to accommodate for latency.',
+    value: 10,
 )
 option(
     'number-of-request-retries',
@@ -54,6 +70,14 @@ option(
     max: 4294967295,
     description: 'The interval time of NSM response time out in milliseconds',
     value: 2000,
+)
+option(
+    'response-time-out-long-running',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'The interval time of NSM response time out in milliseconds for NSM Long-running requests. The NSM Specification defines Long Running Request timeout as 1 second. Value of 3 seconds is selected here to accommodate for latency.',
+    value: 3000,
 )
 option(
     'local-eid',
