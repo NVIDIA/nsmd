@@ -23,6 +23,7 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "asyncOperationManager.hpp"
 #include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
@@ -136,14 +137,13 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath,
-                       std::shared_ptr<NsmDevice> device) :
+                       [[maybe_unused]] std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type),
     inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
-    migModeIntf =
-        std::make_unique<NsmMigModeIntf>(bus, inventoryObjPath.c_str(), device);
+    migModeIntf = std::make_unique<MigModeIntf>(bus, inventoryObjPath.c_str());
     updateMetricOnSharedMemory();
 }
 
@@ -1970,6 +1970,12 @@ void createNsmProcessorSensor(SensorManager& manager,
         auto sensor = std::make_shared<NsmMigMode>(bus, name, type,
                                                    inventoryObjPath, nsmDevice);
         nsmDevice->addSensor(sensor, priority);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.MigMode", "MIGModeEnabled",
+                AsyncSetOperationInfo{setMigModeEnabled, sensor, nsmDevice});
     }
     if (type == "NSM_PCIe")
     {

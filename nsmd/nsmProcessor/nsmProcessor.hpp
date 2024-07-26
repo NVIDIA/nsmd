@@ -28,12 +28,12 @@
 #include "nsmEccModeIface.hpp"
 #include "nsmInterface.hpp"
 #include "nsmInventoryProperty.hpp"
-#include "nsmMigModeIface.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
 #include "nsmPowerSmoothingFeatureIntf.hpp"
 #include "nsmSensor.hpp"
+#include "nsmSetMigMode.hpp"
 
 #include <stdint.h>
 
@@ -170,7 +170,7 @@ class NsmMigMode : public NsmSensor
   private:
     void updateReading(bitfield8_t flags);
     std::string inventoryObjPath;
-    std::unique_ptr<NsmMigModeIntf> migModeIntf = nullptr;
+    std::unique_ptr<MigModeIntf> migModeIntf = nullptr;
 };
 
 using EccModeIntf = sdbusplus::server::object_t<
