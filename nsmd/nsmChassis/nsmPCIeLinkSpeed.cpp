@@ -77,12 +77,12 @@ uint8_t
 
 PCIeSlotIntf::Generations NsmPCIeLinkSpeedBase::generation(uint32_t value)
 {
-    return (value == 0) || (value > 5) ? PCIeSlotIntf::Generations::Unknown
+    return (value == 0) || (value > 6) ? PCIeSlotIntf::Generations::Unknown
                                        : PCIeSlotIntf::Generations(value - 1);
 }
 PCIeDeviceIntf::PCIeTypes NsmPCIeLinkSpeedBase::pcieType(uint32_t value)
 {
-    return (value == 0) || (value > 5) ? PCIeDeviceIntf::PCIeTypes::Unknown
+    return (value == 0) || (value > 6) ? PCIeDeviceIntf::PCIeTypes::Unknown
                                        : PCIeDeviceIntf::PCIeTypes(value - 1);
 };
 uint32_t NsmPCIeLinkSpeedBase::linkWidth(uint32_t value)

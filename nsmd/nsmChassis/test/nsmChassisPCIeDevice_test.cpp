@@ -523,7 +523,8 @@ TEST(NsmPCIeLinkSpeedTest, testGenerationTypeConvertion)
     EXPECT_EQ(GenType::Gen3, NsmPCIeLinkSpeedBase::generation(3));
     EXPECT_EQ(GenType::Gen4, NsmPCIeLinkSpeedBase::generation(4));
     EXPECT_EQ(GenType::Gen5, NsmPCIeLinkSpeedBase::generation(5));
-    EXPECT_EQ(GenType::Unknown, NsmPCIeLinkSpeedBase::generation(6));
+    EXPECT_EQ(GenType::Gen6, NsmPCIeLinkSpeedBase::generation(6));
+    EXPECT_EQ(GenType::Unknown, NsmPCIeLinkSpeedBase::generation(7));
 }
 TEST(NsmPCIeLinkSpeedTest, testPcieTypeConvertion)
 {
@@ -534,7 +535,8 @@ TEST(NsmPCIeLinkSpeedTest, testPcieTypeConvertion)
     EXPECT_EQ(PCIeType::Gen3, NsmPCIeLinkSpeedBase::pcieType(3));
     EXPECT_EQ(PCIeType::Gen4, NsmPCIeLinkSpeedBase::pcieType(4));
     EXPECT_EQ(PCIeType::Gen5, NsmPCIeLinkSpeedBase::pcieType(5));
-    EXPECT_EQ(PCIeType::Unknown, NsmPCIeLinkSpeedBase::pcieType(6));
+    EXPECT_EQ(PCIeType::Gen6, NsmPCIeLinkSpeedBase::pcieType(6));
+    EXPECT_EQ(PCIeType::Unknown, NsmPCIeLinkSpeedBase::pcieType(7));
 }
 
 struct NsmPCIeLTSSMStateTest : public NsmPCIeDeviceTest
