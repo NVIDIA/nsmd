@@ -16,6 +16,7 @@
  */
 
 #include "platform-environmental.h"
+#include "base.h"
 
 #include <endian.h>
 #include <stdio.h>
@@ -5114,4 +5115,549 @@ uint32_t doubleToNvUFXP8_24(double reading)
 {
 	uint32_t value= reading * (1 << 24);
 	return value;
+}
+
+// ** Enable Workload Power Profiles **
+int encode_enable_workload_power_profile_req(
+    uint8_t instance_id, bitfield32_t profile_mask[], int mask_length,struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_enable_workload_power_profile_req *request =
+	    (struct nsm_enable_workload_power_profile_req *)msg->payload;
+
+	request->hdr.command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
+	request->hdr.data_size = mask_length*sizeof(bitfield32_t);
+	for(int i=0;i<mask_length;i++){
+		request->profile_mask[i].byte = htole32(profile_mask[i].byte);
+	}
+	
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
+					   size_t msg_len, int *mask_length, bitfield32_t *profile_mask)
+{
+	if (msg == NULL || profile_mask == NULL || mask_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(bitfield32_t)*8) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_enable_workload_power_profile_req *request =
+	    (struct nsm_enable_workload_power_profile_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->profile_mask)) {
+		return NSM_SW_ERROR_DATA;
+	}
+    *mask_length = sizeof(request->profile_mask)/sizeof(bitfield32_t);
+	memcpy(profile_mask, request->profile_mask,
+	       sizeof(bitfield32_t[8]));
+	for(int i=0;i<*mask_length;i++){
+		profile_mask[i].byte = le32toh(profile_mask[i].byte);
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int encode_enable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_ENABLE_WORKLOAD_POWER_PROFILE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+
+// ** Enable Workload Power Profiles **
+int encode_disable_workload_power_profile_req(
+    uint8_t instance_id, bitfield32_t profile_mask[], int mask_length,struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_disable_workload_power_profile_req *request =
+	    (struct nsm_disable_workload_power_profile_req *)msg->payload;
+
+	request->hdr.command = NSM_DISABLE_WORKLOAD_POWER_PROFILE;
+	request->hdr.data_size = mask_length*sizeof(bitfield32_t);
+	for(int i=0;i<mask_length;i++){
+		request->profile_mask[i].byte = htole32(profile_mask[i].byte);
+	}
+	
+	return NSM_SW_SUCCESS;
+}
+
+
+int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
+					   size_t msg_len, int *mask_length, bitfield32_t *profile_mask)
+{
+	if (msg == NULL || profile_mask == NULL || mask_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(bitfield32_t)*8) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_disable_workload_power_profile_req *request =
+	    (struct nsm_disable_workload_power_profile_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->profile_mask)) {
+		return NSM_SW_ERROR_DATA;
+	}
+    *mask_length = sizeof(request->profile_mask)/sizeof(bitfield32_t);
+	memcpy(profile_mask, request->profile_mask,
+	       sizeof(bitfield32_t[8]));
+	for(int i=0;i<*mask_length;i++){
+		profile_mask[i].byte = le32toh(profile_mask[i].byte);
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int encode_disable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_DISABLE_WORKLOAD_POWER_PROFILE, msg);
+	}
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+
+	response->command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
+	response->completion_code = cc;
+	response->data_size = 0;
+    
+	return NSM_SW_SUCCESS;
+}
+
+int decode_disable_workload_power_profile_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_common_resp *resp =
+	    (struct nsm_common_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->data_size);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	
+	*cc = resp->completion_code;
+	return NSM_SUCCESS;
+}
+
+
+
+int encode_get_workload_power_profile_status_req(uint8_t instance_id,
+					struct nsm_msg *msg)
+{
+	return encode_get_platform_env_command_no_payload_req(
+	    instance_id, msg,
+	    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO);
+}
+
+int decode_get_workload_power_profile_status_req(const struct nsm_msg *msg,
+					size_t msg_len)
+{
+	return decode_get_platform_env_command_no_payload_req(
+	    msg, msg_len, NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO);
+}
+
+static void
+htole32PresetProfileResp(struct workload_power_profile_status *profileInfo)
+{
+	for(int i=0;i<8;i++)
+	{
+		profileInfo->supported_profile_mask.fields[i].byte = htole32(profileInfo->supported_profile_mask.fields[i].byte);
+	    profileInfo->requested_profile_maks.fields[i].byte = htole32(profileInfo->requested_profile_maks.fields[i].byte);
+	    profileInfo->enforced_profile_mask.fields[i].byte = htole32(profileInfo->enforced_profile_mask.fields[i].byte);
+	}
+	
+}
+
+static void
+le32tohPresetProfileResp(struct workload_power_profile_status *profileInfo)
+{
+	for(int i=0;i<8;i++)
+	{
+		profileInfo->supported_profile_mask.fields[i].byte = le32toh(profileInfo->supported_profile_mask.fields[i].byte);
+	    profileInfo->requested_profile_maks.fields[i].byte = le32toh(profileInfo->requested_profile_maks.fields[i].byte);
+	    profileInfo->enforced_profile_mask.fields[i].byte = le32toh(profileInfo->enforced_profile_mask.fields[i].byte);
+	}
+}
+
+int encode_get_workload_power_profile_status_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct workload_power_profile_status *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code,
+		    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO, msg);
+	}
+
+	struct nsm_get_workload_power_profile_status_info_resp *response =
+	    (struct nsm_get_workload_power_profile_status_info_resp *)msg->payload;
+
+	response->hdr.command =
+	    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct workload_power_profile_status));
+
+	htole32PresetProfileResp(data);
+
+	memcpy(&(response->data), data,
+	       sizeof(struct workload_power_profile_status));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_workload_power_profile_status_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct workload_power_profile_status *data)
+{
+	if (data == NULL || data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_workload_power_profile_status_info_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	struct nsm_get_workload_power_profile_status_info_resp *resp_payload =
+	    (struct nsm_get_workload_power_profile_status_info_resp *)msg->payload;
+
+	*data_size = le16toh(resp_payload->hdr.data_size);
+	size_t response_data_len = sizeof(struct workload_power_profile_status);
+	memcpy(data, &(resp_payload->data), response_data_len);
+
+	// conversion le32toh 
+	le32tohPresetProfileResp(data);
+
+	return NSM_SW_SUCCESS;
+}
+
+static void letohgetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
+{
+	data->profile_id = le16toh(data->profile_id);
+	data->priority = le16toh(data->priority);
+	for(int i=0;i<8;i++)
+	{
+		data->conflict_mask.fields[i].byte = le32toh(data->conflict_mask.fields[i].byte);
+	}
+}
+
+static void htolegetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
+{
+	data->profile_id = htole16(data->profile_id);
+	data->priority = htole16(data->priority);
+	for(int i=0;i<8;i++)
+	{
+		data->conflict_mask.fields[i].byte = htole32(data->conflict_mask.fields[i].byte);
+	}
+}
+
+
+int encode_get_workload_power_profile_info_req(uint8_t instance_id, uint16_t identifier,struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_workload_power_profile_info_req *request =
+	    (struct nsm_get_workload_power_profile_info_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_WORKLOAD_POWER_PROFILE_INFO;
+	request->hdr.data_size = sizeof(identifier);
+	request->identifier = identifier;
+	return NSM_SW_SUCCESS;
+  
+}
+
+int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg, size_t msg_len, uint16_t *identifier)
+{
+	if (msg == NULL || identifier == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_workload_power_profile_info_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_workload_power_profile_info_req *request =
+	    (struct nsm_get_workload_power_profile_info_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->identifier)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*identifier = request->identifier;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_workload_power_profile_info_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   struct nsm_all_workload_power_profile_meta_data *meta_data,
+				   struct nsm_workload_power_profile_data *profile_data,
+				   uint8_t number_of_profiles,
+				   struct nsm_msg *msg)
+{
+	if (msg == NULL || profile_data == NULL || meta_data == NULL ) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_WORKLOAD_POWER_PROFILE_INFO,
+		    msg);
+	}
+
+	struct nsm_workload_power_profile_get_all_preset_profile_resp *response =
+	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
+    
+	
+	uint16_t meta_data_size=sizeof(struct nsm_all_workload_power_profile_meta_data);
+	uint16_t profile_data_size=sizeof(struct nsm_workload_power_profile_data);
+	// data size is sum of metadata + number of profiles * size of one profile
+	uint16_t data_size=meta_data_size+number_of_profiles*profile_data_size;
+
+	response->hdr.command = NSM_GET_WORKLOAD_POWER_PROFILE_INFO;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(data_size);
+    response->data.next_identifier=htole16(meta_data->next_identifier);
+	response->data.number_of_profiles=number_of_profiles;
+	for(int i=0;i<number_of_profiles;i++)
+	{
+		htolegetWorkloadPresetProfiledata(profile_data+i);	
+	}
+	memcpy(&(response->data.profiles), profile_data, profile_data_size*number_of_profiles);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_workload_power_profile_info_metadata_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   struct nsm_all_workload_power_profile_meta_data *data, uint8_t *number_of_profiles)
+{
+	if (data == NULL ) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_workload_power_profile_get_all_preset_profile_resp *resp =
+	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
+	size_t meta_data_len = sizeof(struct nsm_all_workload_power_profile_meta_data);
+
+	uint16_t preset_profile_size = sizeof(struct nsm_workload_power_profile_data);
+	uint16_t expected_data_size = preset_profile_size*(data->number_of_profiles);
+	
+	if(le16toh(resp->hdr.data_size) < expected_data_size){
+		return NSM_SW_ERROR_DATA;
+	}
+
+	memcpy(data, &(resp->data), meta_data_len);
+    *number_of_profiles=data->number_of_profiles;
+	data->next_identifier=le16toh(data->next_identifier);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_workload_power_profile_info_data_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t max_profiles_supported,
+				   uint8_t offset,
+				   struct nsm_workload_power_profile_data *profile_data)
+{
+	if (profile_data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_workload_power_profile_get_all_preset_profile_resp *resp =
+	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
+
+	uint16_t preset_profile_size = sizeof(struct nsm_workload_power_profile_data);
+	uint16_t expected_data_size = preset_profile_size*(max_profiles_supported);
+	
+	if(le16toh(resp->hdr.data_size) < expected_data_size){
+		return NSM_SW_ERROR_DATA;
+	}
+	uint8_t profile_data_size=sizeof(struct nsm_workload_power_profile_data);
+	
+	memcpy(profile_data, &(resp->data.profiles)+offset*profile_data_size, profile_data_size);
+
+	// conversion le to he
+	letohgetWorkloadPresetProfiledata(profile_data);
+
+	return NSM_SW_SUCCESS;
 }

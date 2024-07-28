@@ -37,6 +37,7 @@
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetCpuOperatingConfig.hpp"
 #include "nsmSetECCMode.hpp"
+#include "nsmWorkloadPowerProfile.hpp"
 
 #include <stdint.h>
 
@@ -2525,7 +2526,43 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             name, type, totalNvLinkInterface, inventoryObjPath);
         nsmDevice->addSensor(totalNvLinkSensor, priority);
     }
+    else if (type == "NSM_WorkloadPowerProfile")
+    {
+        lg2::info("NSM_WorkloadPowerProfile added");
+        auto priority = co_await utils::coGetDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto profileIdMap =
+            co_await utils::coGetDbusProperty<std::vector<std::string>>(
+                objPath.c_str(), "ProfileIdMap", interface.c_str());
 
+        auto profileMapper =
+            std::make_shared<NsmWorkLoadProfileEnum>(name, type, profileIdMap);
+        nsmDevice->addStaticSensor(profileMapper);
+
+        std::shared_ptr<OemProfileInfoIntf> profileStatusInfoIntf =
+            std::make_shared<OemProfileInfoIntf>(bus, inventoryObjPath,
+                                                 nsmDevice);
+        auto workloadProfileStatusSensor =
+            std::make_shared<NsmWorkLoadProfileStatus>(
+                name, type, inventoryObjPath, profileStatusInfoIntf);
+        nsmDevice->addSensor(workloadProfileStatusSensor, priority);
+
+        auto getAllPowerProfileSensor =
+            std::make_shared<NsmWorkloadPowerProfileCollection>(
+                name, type, inventoryObjPath, nsmDevice);
+        nsmDevice->addStaticSensor(getAllPowerProfileSensor);
+
+        auto workloadPowerProfilePageCollection =
+            std::make_shared<NsmWorkloadPowerProfilePageCollection>(
+                name, type, inventoryObjPath, nsmDevice);
+        nsmDevice->addStaticSensor(workloadPowerProfilePageCollection);
+
+        uint16_t firstPageIndex = 0;
+        auto firstPage = std::make_shared<NsmWorkloadPowerProfilePage>(
+            name, type, inventoryObjPath, nsmDevice, getAllPowerProfileSensor,
+            workloadPowerProfilePageCollection, profileMapper, firstPageIndex);
+        nsmDevice->addSensor(firstPage, priority);
+    }
     co_return NSM_SUCCESS;
 }
 
@@ -2546,7 +2583,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",
     "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount",
-    "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",
+    "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 
