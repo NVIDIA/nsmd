@@ -22,6 +22,8 @@ std::string convertToPCIeTypeStr(uint32_t link_speed)
             return "xyz.openbmc_project.Inventory.Item.PCIeDevice.PCIeTypes.Gen4";
         case 5:
             return "xyz.openbmc_project.Inventory.Item.PCIeDevice.PCIeTypes.Gen5";
+        case 6:
+            return "xyz.openbmc_project.Inventory.Item.PCIeDevice.PCIeTypes.Gen6";
         default:
             return "xyz.openbmc_project.Inventory.Item.PCIeDevice.PCIeTypes.Unknown";
     }
@@ -29,7 +31,7 @@ std::string convertToPCIeTypeStr(uint32_t link_speed)
 
 size_t convertToLaneCount(uint32_t link_width)
 {
-    if (link_width < 1 || link_width > 6)
+    if (link_width < 1 || link_width > 7)
     {
         // covers unknown link width and unexpected values
         return 0;
@@ -39,7 +41,7 @@ size_t convertToLaneCount(uint32_t link_width)
 
 PCIeSlotIntf::Generations convertToGeneration(uint32_t value)
 {
-    return (value == 0) || (value > 5) ? PCIeSlotIntf::Generations::Unknown
+    return (value == 0) || (value > 6) ? PCIeSlotIntf::Generations::Unknown
                                        : PCIeSlotIntf::Generations(value - 1);
 }
 

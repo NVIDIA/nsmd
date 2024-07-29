@@ -69,6 +69,10 @@ double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
         {
             return 32.0;
         }
+        case 6:
+        {
+            return 64.0;
+        }
         default:
         {
             lg2::error("NsmPCIeECCGroup1: {NAME}, unknown speed {SPEED}",
