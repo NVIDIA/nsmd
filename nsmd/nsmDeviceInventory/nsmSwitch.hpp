@@ -10,6 +10,7 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/NvSwitch/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Switch/server.hpp>
 
 namespace nsm
@@ -22,6 +23,7 @@ using UuidIntf = object_t<Common::server::UUID>;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SwitchIntf = object_t<Inventory::Item::server::Switch>;
+using NvSwitchIntf = object_t<Inventory::Item::server::NvSwitch>;
 
 template <typename IntfType>
 class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
@@ -31,12 +33,16 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
     NsmSwitchDI(const std::string& name, const std::string& inventoryObjPath) :
         NsmInterfaceProvider<IntfType>(name, "NSM_NVSwitch", inventoryObjPath),
         objPath(inventoryObjPath + name)
-    {}
+    {
+      auto& bus = utils::DBusHandler::getBus();
+      nvSwitchIntf = std::make_unique<NvSwitchIntf>(bus, objPath.c_str());
+    }
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::string objPath;
+    std::unique_ptr<NvSwitchIntf> nvSwitchIntf = nullptr;
 };
 
 } // namespace nsm
