@@ -7,7 +7,6 @@ sources += [
     'nsmChassis/nsmChassisPCIeDevice.cpp',
     'nsmChassis/nsmChassisPCIeSlot.cpp',
     'nsmChassis/nsmClockOutputEnableState.cpp',
-    'nsmChassis/nsmIstModeEnabled.cpp',
     'nsmChassis/nsmPowerSupplyStatus.cpp',
     'nsmChassis/nsmGpuPresenceAndPowerStatus.cpp',
     'nsmChassis/nsmPCIeFunction.cpp',

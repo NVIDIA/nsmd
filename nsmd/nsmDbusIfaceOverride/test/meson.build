@@ -1,6 +1,5 @@
 dep_src_files = [
     '../nsmWriteProtectedIntf.cpp',
-    '../nsmModeIntf.cpp',
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
@@ -31,7 +30,6 @@ test_src = declare_dependency(
 
 tests = [
     'nsmWriteProtectedIntf_test',
-    'nsmModeIntf_test',
 ]
 
 tests_deps = [

@@ -21,8 +21,6 @@
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
-#include "nsmIstModeEnabled.hpp"
-#include "nsmModeIntf.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
 #include "nsmWriteProtectedJumper.hpp"
@@ -98,12 +96,6 @@ void nsmChassisCreateSensors(SensorManager& manager,
             auto pCIeRefClock =
                 std::make_shared<NsmChassis<PCIeRefClockIntf>>(name);
             device->addStaticSensor(pCIeRefClock);
-            auto modeIntf = std::make_shared<NsmModeIntf>(manager, device);
-            auto mode = std::make_shared<NsmChassis<ModeIntf>>(
-                name, dynamic_pointer_cast<ModeIntf>(modeIntf));
-            auto istModeEnabled = std::make_shared<NsmIstModeEnabled>(*mode);
-            device->addStaticSensor(mode);
-            device->addSensor(istModeEnabled, false);
         }
     }
     else if (type == "NSM_Asset")
