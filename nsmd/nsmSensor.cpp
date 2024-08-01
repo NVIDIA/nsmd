@@ -25,12 +25,6 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
     }
 
     rc = handleResponseMsg(responseMsg.get(), responseLen);
-    if (rc)
-    {
-        lg2::error(
-            "NsmSensor::update: handleResponseMsg failed, name={NAME} eid={EID}",
-            "NAME", getName(), "EID", eid);
-    }
 
     co_return rc;
 }
