@@ -17,6 +17,7 @@ sources += [
     'nsmChassis/nsmWriteProtectedJumper.cpp',
     'nsmChassis/nsmAERError.cpp',
     'nsmChassis/nsmErot.cpp',
+    'nsmChassis/nsmSecurityRBP.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']

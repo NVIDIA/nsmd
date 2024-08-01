@@ -16,6 +16,7 @@
  */
 
 #include "nsmErot.hpp"
+#include "nsmSecurityRBP.hpp"
 
 #include "sensorManager.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -35,7 +36,8 @@ FirmwareSlot::FirmwareSlot(sdbusplus::bus::bus& bus, const std::string& name,
     StateIntf(bus, slotName(name, slot).c_str()),
     ExtendedVersionIntf(bus, slotName(name, slot).c_str()),
     VersionComparisonIntf(bus, slotName(name, slot).c_str()),
-    SettingsIntf(bus, slotName(name, slot).c_str())
+    SettingsIntf(bus, slotName(name, slot).c_str()),
+    SecurityVersionIntf(bus, slotName(name, slot).c_str())
 {
     std::vector<std::tuple<std::string, std::string, std::string>>
         associations_list;
@@ -100,6 +102,7 @@ void FirmwareSlot::update(
         reinterpret_cast<const char*>(info.firmware_version_string)));
     firmwareComparisonNumber(info.version_comparison_stamp);
     writeProtected(info.write_protect_state);
+    version(info.security_version_number);
 }
 
 NsmBuildTypeObject::NsmBuildTypeObject(
@@ -203,7 +206,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::str
         auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
 
-        if (name.find("_ERoT_") == std::string::npos)
+        if (name.find("RoT_") == std::string::npos)
         {
             co_return NSM_SUCCESS;
         }
@@ -211,11 +214,14 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::str
         std::shared_ptr<NsmBuildTypeObject> firmwareTypeEc = nullptr;
         auto slotCount = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "SlotCount", interface.c_str());
+        std::shared_ptr<NsmMinSecVersionObject> minSecVersionEc = nullptr;
+        std::shared_ptr<NsmMinSecVersionObject> minSecVersionAp = nullptr;
         auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-                objPath.c_str(), "UUID", interface.c_str());
+            objPath.c_str(), "UUID", interface.c_str());
         auto device = manager.getNsmDevice(uuid);
         auto& bus = utils::DBusHandler::getBus();
-        for(size_t slotIndex = 1; slotIndex<= slotCount; slotIndex++)
+        std::shared_ptr<ProgressIntf> rotProgressIntf = nullptr;
+        for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
         {
             auto slotPath = std::string(chassisInventoryBasePath) + "/" + name +
                             "/Slot" + std::to_string(slotIndex);
@@ -225,31 +231,74 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::str
                 slotPath.c_str(), "ComponentClassification", erotSlotInterface);
             auto identifier = co_await utils::coGetDbusProperty<uint64_t>(
                 slotPath.c_str(), "ComponentIdentifier", erotSlotInterface);
+            auto index = co_await utils::coGetDbusProperty<uint64_t>(
+                slotPath.c_str(), "ComponentIndex", erotSlotInterface);
             auto fwType = co_await utils::coGetDbusProperty<std::string>(
                 slotPath.c_str(), "FirmwareType", erotSlotInterface);
             auto associations = utils::getAssociations(
                 slotPath, std::string(erotSlotInterface) + ".Associations");
-            if(fwType == "AP")
+            auto chassisName = co_await utils::coGetDbusProperty<std::string>(
+                slotPath.c_str(), "ChassisName", erotSlotInterface);
+            std::shared_ptr<ProgressIntf> ecProgressIntf = nullptr;
+            std::shared_ptr<ProgressIntf> apProgressIntf = nullptr;
+            if (fwType == "AP")
             {
-                if(firmwareTypeAp == nullptr)
+                if (firmwareTypeAp == nullptr)
                 {
                     firmwareTypeAp = std::make_shared<NsmBuildTypeObject>(
-                        bus, name, associations, type, uuid, extractNumber(slotName),
-                    classification, identifier, SlotIntf::FirmwareType::AP);
+                        bus, name, associations, type, uuid,
+                        extractNumber(slotName), classification, identifier,
+                        SlotIntf::FirmwareType::AP);
                     device->addSensor(firmwareTypeAp, false);
                 }
+                if (minSecVersionAp == nullptr)
+                {
+                    auto progressPath = std::string(chassisInventoryBasePath) +
+                                        "/" + chassisName;
+                    apProgressIntf = std::make_shared<ProgressIntf>(
+                        bus, progressPath.c_str());
+                    if (chassisName == name)
+                    {
+                        rotProgressIntf = apProgressIntf;
+                    }
+                    minSecVersionAp = std::make_shared<NsmMinSecVersionObject>(
+                        bus, chassisName, type, uuid, classification,
+                        identifier, static_cast<uint8_t>(index),
+                        apProgressIntf);
+                    device->addSensor(minSecVersionAp, false);
+                }
             }
-            else //EC
+            else // EC
             {
-                if(firmwareTypeEc == nullptr)
+                if (firmwareTypeEc == nullptr)
                 {
                     firmwareTypeEc = std::make_shared<NsmBuildTypeObject>(
-                        bus, name, associations, type, uuid, extractNumber(slotName),
-                    classification, identifier, SlotIntf::FirmwareType::EC);
+                        bus, name, associations, type, uuid,
+                        extractNumber(slotName), classification, identifier,
+                        SlotIntf::FirmwareType::EC);
                     device->addSensor(firmwareTypeEc, false);
+                }
+                if (minSecVersionEc == nullptr)
+                {
+                    auto progressPath = std::string(chassisInventoryBasePath) +
+                                        "/" + chassisName;
+                    ecProgressIntf = std::make_shared<ProgressIntf>(
+                        bus, progressPath.c_str());
+                    if (chassisName == name)
+                    {
+                        rotProgressIntf = ecProgressIntf;
+                    }
+                    minSecVersionEc = std::make_shared<NsmMinSecVersionObject>(
+                        bus, chassisName, type, uuid, classification,
+                        identifier, static_cast<uint8_t>(index),
+                        ecProgressIntf);
+                    device->addSensor(minSecVersionEc, false);
                 }
             }
         }
+        auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
+            bus, name, type, uuid, rotProgressIntf);
+        device->addSensor(securityCfg, false);
     }
     co_return NSM_SUCCESS;
 }

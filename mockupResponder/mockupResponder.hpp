@@ -330,6 +330,13 @@ class MockupResponder
         queryDeviceIdsHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         resetNetworkDeviceHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryFirmwareSecurityVersion(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        updateMinSecurityVersion(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        irreversibleConfig(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         enableWorkloadPowerProfile(const nsm_msg* requestMsg,

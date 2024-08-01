@@ -23,6 +23,24 @@
 namespace MockupResponder
 {
 
+class FirmwareStateMachine
+{
+  public:
+    // global states to maintain the values for testing
+    static const uint64_t fixedNonce = 123456789;
+    uint8_t configState = 0;
+    struct nsm_firmware_security_version_number_resp sec_respEc
+    {
+        3, 4, 0, 0
+    };
+    struct nsm_firmware_security_version_number_resp sec_respAp
+    {
+        3, 4, 1, 0
+    };
+};
+
+static std::unique_ptr<FirmwareStateMachine> fwStateMachine = nullptr;
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::getRotInformation(const nsm_msg* requestMsg,
                                        size_t requestLen)
@@ -247,6 +265,254 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryFirmwareSecurityVersion(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
+    struct nsm_firmware_security_version_number_req sec_req;
+    auto rc = decode_nsm_query_firmware_security_version_number_req(
+        requestMsg, requestLen, &sec_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_nsm_query_firmware_security_version_number_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    uint16_t msg_size =
+        sizeof(struct nsm_msg_hdr) +
+        sizeof(nsm_firmware_security_version_number_resp_command);
+    std::vector<uint8_t> response(msg_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    if (sec_req.component_identifier == 0xFF00) // EC FW
+    {
+        rc = encode_nsm_query_firmware_security_version_number_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+            &fwStateMachine->sec_respEc, responseMsg);
+    }
+    else
+    {
+        rc = encode_nsm_query_firmware_security_version_number_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+            &fwStateMachine->sec_respAp, responseMsg);
+    }
+
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("nsm_firmware_security_version_number_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::updateMinSecurityVersion(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
+    struct nsm_firmware_update_min_sec_ver_req sec_req;
+    auto rc = decode_nsm_firmware_update_sec_ver_req(requestMsg, requestLen,
+                                                     &sec_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_firmware_update_sec_ver_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    // Sample Update Min Security Version Response
+    struct nsm_firmware_update_min_sec_ver_resp sec_resp
+    {};
+    uint16_t msg_size = sizeof(struct nsm_msg_hdr) +
+                        sizeof(nsm_firmware_update_min_sec_ver_req_command);
+    std::vector<uint8_t> response(msg_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    if (sec_req.request_type == REQUEST_TYPE_SPECIFIED_VALUE &&
+        sec_req.req_min_security_version == 0)
+    {
+        // invalid data
+        rc = encode_nsm_firmware_update_sec_ver_resp(
+            requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+            &sec_resp, responseMsg);
+        return response;
+    }
+    if (sec_req.nonce != fwStateMachine->fixedNonce)
+    {
+        uint8_t cc = 0x88; // nonce mismatch
+        rc = encode_nsm_firmware_update_sec_ver_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, &sec_resp,
+            responseMsg);
+        return response;
+    }
+    if (fwStateMachine->configState == 0)
+    {
+        uint8_t cc = 0x87; // irreversible config disabled
+        rc = encode_nsm_firmware_update_sec_ver_resp(
+            requestMsg->hdr.instance_id, cc, reason_code, &sec_resp,
+            responseMsg);
+        return response;
+    }
+
+    if (sec_req.request_type == REQUEST_TYPE_MOST_RESTRICTIVE_VALUE)
+    {
+        if (sec_req.component_identifier == 0xFF00)
+        {
+            fwStateMachine->sec_respEc.minimum_security_version =
+                fwStateMachine->sec_respEc.active_component_security_version;
+            sec_resp.update_methods = 0x1; // Automatic
+        }
+        else
+        {
+            fwStateMachine->sec_respAp.pending_minimum_security_version =
+                fwStateMachine->sec_respAp.active_component_security_version;
+            sec_resp.update_methods = 0x30; // DC Power cycle & AC Power cycle
+        }
+    }
+    else
+    {
+        if (sec_req.component_identifier == 0xFF00)
+        {
+            if (sec_req.req_min_security_version >=
+                    fwStateMachine->sec_respEc.minimum_security_version &&
+                sec_req.req_min_security_version <=
+                    fwStateMachine->sec_respEc.active_component_security_version)
+            {
+                fwStateMachine->sec_respEc.minimum_security_version =
+                    sec_req.req_min_security_version;
+                sec_resp.update_methods = 0x1; // Automatic
+            }
+            else
+            {
+                // invalid data
+                rc = encode_nsm_firmware_update_sec_ver_resp(
+                    requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA,
+                    reason_code, &sec_resp, responseMsg);
+                return response;
+            }
+        }
+        else
+        {
+            if (sec_req.req_min_security_version >=
+                    fwStateMachine->sec_respAp.minimum_security_version &&
+                sec_req.req_min_security_version <=
+                    fwStateMachine->sec_respAp.active_component_security_version)
+            {
+                fwStateMachine->sec_respAp.pending_minimum_security_version =
+                    sec_req.req_min_security_version;
+                sec_resp.update_methods =
+                    0x30; // DC Power cycle & AC Power cycle
+            }
+            else
+            {
+                // invalid data
+                rc = encode_nsm_firmware_update_sec_ver_resp(
+                    requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA,
+                    reason_code, &sec_resp, responseMsg);
+                return response;
+            }
+        }
+    }
+    rc = encode_nsm_firmware_update_sec_ver_resp(requestMsg->hdr.instance_id,
+                                                 NSM_SUCCESS, reason_code,
+                                                 &sec_resp, responseMsg);
+
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_nsm_firmware_update_sec_ver_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::irreversibleConfig(const nsm_msg* requestMsg,
+                                        size_t requestLen)
+{
+    struct nsm_firmware_irreversible_config_req cfg_req;
+    auto rc = decode_nsm_firmware_irreversible_config_req(requestMsg,
+                                                          requestLen, &cfg_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_nsm_firmware_irreversible_config_req failed: rc={RC}", "RC",
+            rc);
+        return std::nullopt;
+    }
+
+    // Sample Update Irreversible Config Response
+    uint16_t msg_size = sizeof(struct nsm_msg_hdr) + 250;
+    std::vector<uint8_t> response(msg_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    switch (cfg_req.request_type)
+    {
+        case QUERY_IRREVERSIBLE_CFG:
+        {
+            struct nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
+            {};
+            cfg_0_resp.irreversible_config_state = fwStateMachine->configState;
+            rc = encode_nsm_firmware_irreversible_config_request_0_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                &cfg_0_resp, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc)
+            {
+                lg2::error(
+                    "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+            break;
+        }
+        case DISABLE_IRREVERSIBLE_CFG:
+        {
+            fwStateMachine->configState = 0;
+            rc = encode_nsm_firmware_irreversible_config_request_1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                responseMsg);
+            break;
+        }
+        case ENABLE_IRREVERSIBLE_CFG:
+        {
+            fwStateMachine->configState = 1;
+            struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
+            {};
+            cfg_2_resp.nonce = fwStateMachine->fixedNonce;
+            rc = encode_nsm_firmware_irreversible_config_request_2_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                &cfg_2_resp, responseMsg);
+            break;
+        }
+        default:
+            lg2::error("Unknown request type {REQ_TYPE}", "REQ_TYPE",
+                       cfg_req.request_type);
+            break;
+    }
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
     return response;
 }
 

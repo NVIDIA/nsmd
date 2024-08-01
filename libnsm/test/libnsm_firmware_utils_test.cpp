@@ -772,3 +772,291 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	EXPECT_EQ(reason_code, NSM_SW_ERROR_DATA);
 	free(erot_info.slot_info);
 }
+
+TEST(QueryFirmwareSecurityVersion, testEncodeRequest)
+{
+	uint16_t classification = 0xA;
+	uint8_t index = 0x0;
+	uint16_t identifier = 0x10;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_firmware_security_version_number_req_command));
+	nsm_firmware_security_version_number_req nsm_req;
+	nsm_req.component_classification = classification;
+	nsm_req.component_classification_index = index;
+	nsm_req.component_identifier = identifier;
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_query_firmware_security_version_number_req(
+	    0, &nsm_req, request);
+
+	struct nsm_firmware_security_version_number_req_command *requestTest =
+	    (struct nsm_firmware_security_version_number_req_command
+		 *)(request->payload);
+
+	struct nsm_firmware_security_version_number_req *req =
+	    (struct nsm_firmware_security_version_number_req *)&(
+		requestTest->fq_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+		  requestTest->hdr.command);
+	EXPECT_EQ(5, requestTest->hdr.data_size);
+
+	EXPECT_EQ(classification, req->component_classification);
+	EXPECT_EQ(index, req->component_classification_index);
+	EXPECT_EQ(identifier, req->component_identifier);
+
+	// Negative test case
+	rc = encode_nsm_query_firmware_security_version_number_req(0, &nsm_req,
+								   NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(QueryFirmwareSecurityVersion, testDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER, // command
+	    0x5,				      // data size
+	    0x0A, // component classification 0x000A
+	    0x00, //
+	    0x00, // component identifier 0xFF00
+	    0xFF, //
+	    0x0,  // classification index 0x00
+	};
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	size_t msg_len = requestMsg.size();
+
+	struct nsm_firmware_security_version_number_req fw_req;
+	auto rc = decode_nsm_query_firmware_security_version_number_req(
+	    request, msg_len, &fw_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0x0A, fw_req.component_classification);
+	EXPECT_EQ(0xFF00, fw_req.component_identifier);
+	EXPECT_EQ(0x0, fw_req.component_classification_index);
+
+	// Negative test cases
+	rc = decode_nsm_query_firmware_security_version_number_req(
+	    NULL, msg_len, &fw_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_nsm_query_firmware_security_version_number_req(
+	    request, msg_len, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_nsm_query_firmware_security_version_number_req(
+	    request, msg_len - 2, &fw_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(QueryFirmwareSecurityVersion, testEncodeResponse)
+{
+	struct nsm_firmware_security_version_number_resp sec_resp {
+	};
+	sec_resp.active_component_security_version = 3;
+	sec_resp.pending_component_security_version = 4;
+	sec_resp.minimum_security_version = 1;
+	sec_resp.pending_minimum_security_version = 2;
+	uint16_t msg_size =
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_firmware_security_version_number_resp_command);
+
+	std::vector<uint8_t> response(msg_size, 0);
+	auto responseMsg = reinterpret_cast<nsm_msg *>(response.data());
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_nsm_query_firmware_security_version_number_resp(
+	    0, NSM_SUCCESS, reason_code, &sec_resp, responseMsg);
+
+	struct nsm_firmware_security_version_number_resp_command *responseTest =
+	    (struct nsm_firmware_security_version_number_resp_command
+		 *)(responseMsg->payload);
+
+	struct nsm_firmware_security_version_number_resp *resp =
+	    (struct nsm_firmware_security_version_number_resp *)&(
+		responseTest->sec_ver_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, responseMsg->hdr.request);
+	EXPECT_EQ(0, responseMsg->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+		  responseTest->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_common_resp) +
+		      sizeof(struct nsm_firmware_security_version_number_resp),
+		  responseTest->hdr.data_size);
+	EXPECT_EQ(resp->active_component_security_version, 3);
+	EXPECT_EQ(resp->pending_component_security_version, 4);
+	EXPECT_EQ(resp->minimum_security_version, 1);
+	EXPECT_EQ(resp->pending_minimum_security_version, 2);
+
+	// Negative test case
+	rc = encode_nsm_query_firmware_security_version_number_resp(
+	    0, NSM_SUCCESS, reason_code, &sec_resp, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	reason_code = NSM_SW_ERROR_COMMAND_FAIL;
+	rc = encode_nsm_query_firmware_security_version_number_resp(
+	    0, NSM_ERROR, reason_code, &sec_resp, responseMsg);
+	struct nsm_common_non_success_resp *responseFail =
+	    (struct nsm_common_non_success_resp *)responseMsg->payload;
+	EXPECT_EQ(reason_code, responseFail->reason_code);
+}
+
+TEST(QueryFirmwareSecurityVersion, testDecodeResponse)
+{
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	std::vector<uint8_t> response{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER, // command
+	    0x00,				      // completion_code
+	    0x00,
+	    0x00, // reserved
+	    0x08,
+	    0x00, // data size
+	    0x03,
+	    0x00, // active_component_security_version
+	    0x04,
+	    0x00, // pending_component_security_version
+	    0x01,
+	    0x00, // minimum_security_version
+	    0x02,
+	    0x00 // pending_minimum_security_version
+	};
+	auto responseMsg = reinterpret_cast<nsm_msg *>(response.data());
+	size_t msg_len = response.size();
+
+	struct nsm_firmware_security_version_number_resp sec_resp;
+	auto rc = decode_nsm_query_firmware_security_version_number_resp(
+	    responseMsg, msg_len, &cc, &reason_code, &sec_resp);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+	EXPECT_EQ(sec_resp.active_component_security_version, 3);
+	EXPECT_EQ(sec_resp.pending_component_security_version, 4);
+	EXPECT_EQ(sec_resp.minimum_security_version, 1);
+	EXPECT_EQ(sec_resp.pending_minimum_security_version, 2);
+
+	// Negative test cases
+	rc = decode_nsm_query_firmware_security_version_number_resp(
+	    NULL, msg_len, &cc, &reason_code, &sec_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> response1{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER, // command
+	    NSM_ERROR,				      // completion_code
+	    0x00,
+	    0x00, // reserved
+	    0x08,
+	    0x00, // data size
+	    0x03,
+	    0x00, // active_component_security_version
+	    0x04,
+	    0x00, // pending_component_security_version
+	    0x01,
+	    0x00, // minimum_security_version
+	    0x02,
+	    0x00 // pending_minimum_security_version
+	};
+	auto responseMsg1 = reinterpret_cast<nsm_msg *>(response1.data());
+	size_t msg_len1 = response1.size();
+	rc = decode_nsm_query_firmware_security_version_number_resp(
+	    responseMsg1, msg_len1, &cc, &reason_code, &sec_resp);
+	EXPECT_EQ(cc, NSM_ERROR);
+
+	std::vector<uint8_t> response2{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER, // command
+	    0x00,				      // completion_code
+	    0x00,
+	    0x00, // reserved
+	    0x02,
+	    0x00, // data size
+	    0x03,
+	    0x00, // active_component_security_version --> Truncated response
+	};
+	auto responseMsg2 = reinterpret_cast<nsm_msg *>(response2.data());
+	size_t msg_len2 = response2.size();
+	rc = decode_nsm_query_firmware_security_version_number_resp(
+	    responseMsg2, msg_len2, &cc, &reason_code, &sec_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(UpdateFirmwareSecurityVersion, testEncodeRequest)
+{
+	uint8_t requestType = 0x1;
+	uint16_t classification = 0xA;
+	uint8_t index = 0x0;
+	uint16_t identifier = 0x10;
+	uint64_t nonce = 0x12345678;
+	uint16_t reqMinSecVersion = 0x3;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_firmware_update_min_sec_ver_req_command));
+	nsm_firmware_update_min_sec_ver_req nsm_req;
+	nsm_req.request_type = requestType;
+	nsm_req.component_classification = classification;
+	nsm_req.component_classification_index = index;
+	nsm_req.component_identifier = identifier;
+	nsm_req.nonce = nonce;
+	nsm_req.req_min_security_version = reqMinSecVersion;
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_firmware_update_sec_ver_req(0, &nsm_req, request);
+
+	struct nsm_firmware_update_min_sec_ver_req_command *requestTest =
+	    (struct nsm_firmware_update_min_sec_ver_req_command
+		 *)(request->payload);
+
+	struct nsm_firmware_update_min_sec_ver_req *req =
+	    (struct nsm_firmware_update_min_sec_ver_req *)&(
+		requestTest->ver_update_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
+		  requestTest->hdr.command);
+	EXPECT_EQ(sizeof(nsm_firmware_update_min_sec_ver_req),
+		  requestTest->hdr.data_size);
+
+	EXPECT_EQ(requestType, req->request_type);
+	EXPECT_EQ(classification, req->component_classification);
+	EXPECT_EQ(index, req->component_classification_index);
+	EXPECT_EQ(identifier, req->component_identifier);
+	EXPECT_EQ(nonce, req->nonce);
+	EXPECT_EQ(reqMinSecVersion, req->req_min_security_version);
+
+	// Negative test case
+	rc = encode_nsm_firmware_update_sec_ver_req(0, &nsm_req, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}

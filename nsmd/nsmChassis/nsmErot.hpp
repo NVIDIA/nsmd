@@ -30,6 +30,7 @@
 #include <xyz/openbmc_project/Software/ExtendedVersion/server.hpp>
 #include <xyz/openbmc_project/Software/VersionComparison/server.hpp>
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
+#include <xyz/openbmc_project/Software/SecurityVersion/server.hpp>
 
 #include <array>
 #include <memory>
@@ -51,6 +52,8 @@ using VersionComparisonIntf = object_t<
     sdbusplus::server::xyz::openbmc_project::software::VersionComparison>;
 using SettingsIntf = object_t<
     sdbusplus::server::xyz::openbmc_project::software::Settings>;
+using SecurityVersionIntf =
+    object_t<sdbusplus::server::xyz::openbmc_project::software::SecurityVersion>;
 
 class FirmwareSlot :
     public BuildType,
@@ -59,7 +62,8 @@ class FirmwareSlot :
     StateIntf,
     ExtendedVersionIntf,
     VersionComparisonIntf,
-    SettingsIntf
+    SettingsIntf,
+    SecurityVersionIntf
 {
   private:
     static auto slotName(const std::string& name, int slotNum)

@@ -180,6 +180,322 @@ class GetRotInformation : public CommandInterface
     }
 };
 
+class QueryFirmwareSecurityVersion : public CommandInterface
+{
+  public:
+    ~QueryFirmwareSecurityVersion() = default;
+    QueryFirmwareSecurityVersion() = delete;
+    QueryFirmwareSecurityVersion(const QueryFirmwareSecurityVersion&) = delete;
+    QueryFirmwareSecurityVersion(QueryFirmwareSecurityVersion&&) = default;
+    QueryFirmwareSecurityVersion&
+        operator=(const QueryFirmwareSecurityVersion&) = delete;
+    QueryFirmwareSecurityVersion&
+        operator=(QueryFirmwareSecurityVersion&&) = default;
+
+    explicit QueryFirmwareSecurityVersion(const char* type, const char* name,
+                                          CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for Query Minimum Security Version");
+        ccOptionGroup
+            ->add_option("--classification", classification,
+                         "Component classification")
+            ->required();
+        ccOptionGroup
+            ->add_option("--identifier", identifier, "Component identifier")
+            ->required();
+        ccOptionGroup->add_option("--index", index, "Component index")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        printf("createRequestMsg() called");
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_security_version_number_req_command));
+        nsm_firmware_security_version_number_req nsm_req;
+        nsm_req.component_classification = htole16(classification);
+        nsm_req.component_classification_index = index;
+        nsm_req.component_identifier = htole16(identifier);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_query_firmware_security_version_number_req(
+            instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        struct nsm_firmware_security_version_number_resp sec_info;
+
+        auto rc = decode_nsm_query_firmware_security_version_number_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &sec_info);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reason_code;
+        result["Security Version"] = static_cast<uint16_t>(
+            htole16(sec_info.active_component_security_version));
+        result["Pending Security Version"] = static_cast<uint16_t>(
+            htole16(sec_info.pending_component_security_version));
+        result["Minimum Security Version"] =
+            static_cast<uint16_t>(htole16(sec_info.minimum_security_version));
+        result["Pending Minimum Security Version"] = static_cast<uint16_t>(
+            htole16(sec_info.pending_minimum_security_version));
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint16_t classification{};
+    uint16_t identifier{};
+    uint8_t index{};
+};
+
+class UpdateMinSecurityVersion : public CommandInterface
+{
+  public:
+    ~UpdateMinSecurityVersion() = default;
+    UpdateMinSecurityVersion() = delete;
+    UpdateMinSecurityVersion(const UpdateMinSecurityVersion&) = delete;
+    UpdateMinSecurityVersion(UpdateMinSecurityVersion&&) = default;
+    UpdateMinSecurityVersion&
+        operator=(const UpdateMinSecurityVersion&) = delete;
+    UpdateMinSecurityVersion& operator=(UpdateMinSecurityVersion&&) = default;
+
+    explicit UpdateMinSecurityVersion(const char* type, const char* name,
+                                      CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for Update Minimum Security Version");
+        ccOptionGroup
+            ->add_option(
+                "--requestType", requestType,
+                "Request Type. 0 - most restrictive permitted value, 1 - specified value")
+            ->required();
+        ccOptionGroup->add_option("--classification", classification,
+                                  "Component classification");
+        ccOptionGroup->add_option("--identifier", identifier,
+                                  "Component identifier");
+        ccOptionGroup->add_option("--index", index, "Component index");
+        ccOptionGroup
+            ->add_option(
+                "--nonce", nonce,
+                "Nonce obtained from Enable Irreversible Configuration command")
+            ->required();
+        ccOptionGroup->add_option("--reqMinSecVersion", reqMinSecVersion,
+                                  "Required if request type is 1");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_update_min_sec_ver_req_command));
+        nsm_firmware_update_min_sec_ver_req nsm_req;
+        nsm_req.request_type = requestType;
+        nsm_req.component_classification = htole16(classification);
+        nsm_req.component_classification_index = index;
+        nsm_req.component_identifier = htole16(identifier);
+        nsm_req.nonce = nonce;
+        nsm_req.req_min_security_version = htole16(reqMinSecVersion);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_firmware_update_sec_ver_req(instanceId, &nsm_req,
+                                                         request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        struct nsm_firmware_update_min_sec_ver_resp sec_info;
+
+        auto rc = decode_nsm_firmware_update_sec_ver_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &sec_info);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reason_code;
+        // Fill update methods response
+        ordered_json updateMethods;
+        bitfield32_t updateMethodBits = {sec_info.update_methods};
+        if (updateMethodBits.bits.bit0)
+        {
+            updateMethods.push_back("Automatic");
+        }
+        if (updateMethodBits.bits.bit1)
+        {
+            updateMethods.push_back("Self-Contained");
+        }
+        if (updateMethodBits.bits.bit2)
+        {
+            updateMethods.push_back("Medium-specific reset");
+        }
+        if (updateMethodBits.bits.bit3)
+        {
+            updateMethods.push_back("System reboot");
+        }
+        if (updateMethodBits.bits.bit4)
+        {
+            updateMethods.push_back("DC power cycle");
+        }
+        if (updateMethodBits.bits.bit5)
+        {
+            updateMethods.push_back("AC power cycle");
+        }
+        if (updateMethodBits.bits.bit16)
+        {
+            updateMethods.push_back("Warm Reset");
+        }
+        if (updateMethodBits.bits.bit17)
+        {
+            updateMethods.push_back("Hot Reset");
+        }
+        if (updateMethodBits.bits.bit17)
+        {
+            updateMethods.push_back("Function Level Reset");
+        }
+        result["UpdateMethods"] = updateMethods;
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint16_t classification{};
+    uint16_t identifier{};
+    uint8_t index{};
+    uint8_t requestType;
+    uint64_t nonce;
+    uint16_t reqMinSecVersion;
+};
+
+class IrreversibleConfig : public CommandInterface
+{
+  public:
+    ~IrreversibleConfig() = default;
+    IrreversibleConfig() = delete;
+    IrreversibleConfig(const IrreversibleConfig&) = delete;
+    IrreversibleConfig(IrreversibleConfig&&) = default;
+    IrreversibleConfig& operator=(const IrreversibleConfig&) = delete;
+    IrreversibleConfig& operator=(IrreversibleConfig&&) = default;
+
+    explicit IrreversibleConfig(const char* type, const char* name,
+                                CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for Irreversible Config Method");
+        ccOptionGroup
+            ->add_option("--requestType", requestType,
+                         "Request Type. 0 - Query, 1 - Disable, 2 - Enable")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_irreversible_config_req_command));
+        nsm_firmware_irreversible_config_req nsm_req;
+        nsm_req.request_type = requestType;
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_firmware_irreversible_config_req(
+            instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        ordered_json result;
+        switch (requestType)
+        {
+            case QUERY_IRREVERSIBLE_CFG:
+            {
+                struct
+                    nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
+                {};
+                auto rc =
+                    decode_nsm_firmware_irreversible_config_request_0_resp(
+                        responsePtr, payloadLength, &cc, &reason_code,
+                        &cfg_0_resp);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << ", cc=" << (int)cc
+                              << ", reasonCode=" << (int)reason_code << "\n";
+                    return;
+                }
+                result["IrreversibleConfigurationState"] =
+                    cfg_0_resp.irreversible_config_state;
+                break;
+            }
+            case DISABLE_IRREVERSIBLE_CFG:
+            {
+                auto rc =
+                    decode_nsm_firmware_irreversible_config_request_1_resp(
+                        responsePtr, payloadLength, &cc, &reason_code);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << ", cc=" << (int)cc
+                              << ", reasonCode=" << (int)reason_code << "\n";
+                    return;
+                }
+                break;
+            }
+            case ENABLE_IRREVERSIBLE_CFG:
+            {
+                struct
+                    nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
+                {};
+                auto rc =
+                    decode_nsm_firmware_irreversible_config_request_2_resp(
+                        responsePtr, payloadLength, &cc, &reason_code,
+                        &cfg_2_resp);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << ", cc=" << (int)cc
+                              << ", reasonCode=" << (int)reason_code << "\n";
+                    return;
+                }
+                result["Nonce"] = static_cast<uint64_t>(cfg_2_resp.nonce);
+                break;
+            }
+            default:
+                std::cerr << "Unknown request type " << requestType
+                          << "\n";
+                break;
+        }
+        result["Completion code"] = cc;
+        result["Reason code"] = reason_code;
+        DisplayInJson(result);
+    }
+
+  private:
+    uint8_t requestType;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -191,5 +507,19 @@ void registerCommand(CLI::App& app)
         "Get information about a particular firmware set installed on an endpoint");
     commands.push_back(std::make_unique<GetRotInformation>(
         "firmware", "QueryRoTStateInformation", getRotInformation));
+    auto queryFirmwareSecurityVersion = firmware->add_subcommand(
+        "QueryFirmwareSecurityVersion", "Query Firmware Security Version");
+    commands.push_back(std::make_unique<QueryFirmwareSecurityVersion>(
+        "firmware", "QueryFirmwareSecurityVersion",
+        queryFirmwareSecurityVersion));
+    auto updateMinSecurityVersion = firmware->add_subcommand(
+        "UpdateMinSecurityVersion", "Update Minimum Firmware Security Version");
+    commands.push_back(std::make_unique<UpdateMinSecurityVersion>(
+        "firmware", "UpdateMinSecurityVersion", updateMinSecurityVersion));
+    auto irreversibleConfig = firmware->add_subcommand(
+        "IrreversibleConfig",
+        "Query/Disable/Enable Irreversible Configuration");
+    commands.push_back(std::make_unique<IrreversibleConfig>(
+        "firmware", "IrreversibleConfig", irreversibleConfig));
 }
 } // namespace nsmtool::firmware
