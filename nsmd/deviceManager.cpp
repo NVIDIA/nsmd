@@ -534,6 +534,9 @@ void DeviceManager::updateInstanceIdViaRemapping(const uint8_t& deviceType,
         case NSM_DEV_ID_BASEBOARD:
             mappingObjectPath = mappingObjectPath + "BaseboardMapping";
             break;
+        case NSM_DEV_ID_EROT:
+            mappingObjectPath = mappingObjectPath + "ERoTMapping";
+            break;
         default:
             lg2::debug(
                 "Unknown device type no mapping fetched for instance id.");

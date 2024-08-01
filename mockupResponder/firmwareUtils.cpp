@@ -57,7 +57,7 @@ std::optional<std::vector<uint8_t>>
         const char* firmware_version2 = "01.03.0210.0004";
 
         /* Emulate a real answer form EROT device */
-        fq_resp.fq_resp_hdr.active_slot = 0x1;
+        fq_resp.fq_resp_hdr.active_slot = 0x0;
         fq_resp.fq_resp_hdr.firmware_slot_count = 2;
         fq_resp.fq_resp_hdr.background_copy_policy = 1;
         fq_resp.fq_resp_hdr.active_keyset = 1;
@@ -84,7 +84,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.slot_info[1].slot_id = 1;
         strcpy((char*)(&(fq_resp.slot_info[1].firmware_version_string[0])),
                firmware_version2);
-        fq_resp.slot_info[1].build_type = 0;
+        fq_resp.slot_info[1].build_type = 1;
         fq_resp.slot_info[1].version_comparison_stamp = 1;
         fq_resp.slot_info[1].signing_type = 1;
         fq_resp.slot_info[1].write_protect_state = 1;
@@ -129,7 +129,53 @@ std::optional<std::vector<uint8_t>>
         fq_resp.slot_info[1].slot_id = 1;
         strcpy((char*)(&(fq_resp.slot_info[1].firmware_version_string[0])),
                firmware_version2);
-        fq_resp.slot_info[1].build_type = 0;
+        fq_resp.slot_info[1].build_type = 1;
+        fq_resp.slot_info[1].version_comparison_stamp = 1;
+        fq_resp.slot_info[1].signing_type = 1;
+        fq_resp.slot_info[1].write_protect_state = 1;
+        fq_resp.slot_info[1].firmware_state = 1;
+        fq_resp.slot_info[1].security_version_number = 1;
+        fq_resp.slot_info[1].signing_key_index = 1;
+
+        rc = encode_nsm_query_get_erot_state_parameters_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &fq_resp,
+            responseMsg);
+    }
+    else if ((fq_req.component_classification == 0x000A) &&
+             (fq_req.component_identifier == 0x0050))
+    {
+        const char* firmware_version1 = "322e3044";
+        const char* firmware_version2 = "322e3045";
+
+        /* Emulate a real answer form EROT device */
+        fq_resp.fq_resp_hdr.active_slot = 0x0;
+        fq_resp.fq_resp_hdr.firmware_slot_count = 2;
+        fq_resp.fq_resp_hdr.background_copy_policy = 1;
+        fq_resp.fq_resp_hdr.active_keyset = 1;
+        fq_resp.fq_resp_hdr.inband_update_policy = 1;
+        fq_resp.fq_resp_hdr.minimum_security_version = 1;
+
+        fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
+            fq_resp.fq_resp_hdr.firmware_slot_count *
+            sizeof(struct nsm_firmware_slot_info));
+        memset((char*)(fq_resp.slot_info), 0,
+               fq_resp.fq_resp_hdr.firmware_slot_count *
+                   sizeof(struct nsm_firmware_slot_info));
+
+        fq_resp.slot_info[0].slot_id = 0;
+        strcpy((char*)(&(fq_resp.slot_info[0].firmware_version_string[0])),
+               firmware_version1);
+        fq_resp.slot_info[0].build_type = 0;
+        fq_resp.slot_info[0].version_comparison_stamp = 1;
+        fq_resp.slot_info[0].signing_type = 1;
+        fq_resp.slot_info[0].write_protect_state = 0;
+        fq_resp.slot_info[0].firmware_state = 1;
+        fq_resp.slot_info[0].security_version_number = 1;
+        fq_resp.slot_info[0].signing_key_index = 1;
+        fq_resp.slot_info[1].slot_id = 1;
+        strcpy((char*)(&(fq_resp.slot_info[1].firmware_version_string[0])),
+               firmware_version2);
+        fq_resp.slot_info[1].build_type = 1;
         fq_resp.slot_info[1].version_comparison_stamp = 1;
         fq_resp.slot_info[1].signing_type = 1;
         fq_resp.slot_info[1].write_protect_state = 1;

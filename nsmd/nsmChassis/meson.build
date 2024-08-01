@@ -14,6 +14,7 @@ sources += [
     'nsmChassis/nsmPCIeLTSSMState.cpp',
     'nsmChassis/nsmPowerControl.cpp',
     'nsmChassis/nsmWriteProtectedJumper.cpp',
+    'nsmChassis/nsmErot.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']

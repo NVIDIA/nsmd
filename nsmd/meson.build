@@ -2,6 +2,7 @@ sources = [
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
+    '../libnsm/firmware-utils.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
     '../libnsm/diagnostics.c',
