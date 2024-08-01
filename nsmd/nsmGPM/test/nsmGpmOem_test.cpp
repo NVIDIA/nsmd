@@ -137,9 +137,10 @@ TEST(nsmGPMAggregated, GoodHandleResp)
                                                  bandwidth / conversionFactor))
         .Times(1);
 
-    rc = gpm.handleSamples(
-        {{3, static_cast<uint8_t>(percentage_data_len), percentage_data.data()},
-         {9, static_cast<uint8_t>(bandwidth_data_len), bandwidth_data.data()}});
+    rc = gpm.handleSamples({{3, static_cast<uint8_t>(percentage_data_len),
+                             percentage_data.data(), true},
+                            {9, static_cast<uint8_t>(bandwidth_data_len),
+                             bandwidth_data.data(), true}});
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
@@ -232,7 +233,7 @@ TEST(nsmGPMPerIntance, GoodGenReq)
     EXPECT_CALL(*updator, updateMetric(metrics)).Times(1);
 
     rc = gpm.handleSamples(
-        {{2, static_cast<uint8_t>(data_len), data[0].data()},
-         {4, static_cast<uint8_t>(data_len), data[1].data()}});
+        {{2, static_cast<uint8_t>(data_len), data[0].data(), true},
+         {4, static_cast<uint8_t>(data_len), data[1].data(), true}});
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

@@ -67,7 +67,7 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
         rc = decode_aggregate_resp_sample(sample, responseLen, &consumed_len,
                                           &tag, &valid, &data, &data_len);
 
-        if (rc != NSM_SW_SUCCESS || !valid)
+        if (rc != NSM_SW_SUCCESS)
         {
             lg2::error(
                 "responseHandler: decode_aggregate_resp_sample failed. "
@@ -78,7 +78,7 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
             continue;
         }
 
-        samples.emplace_back(tag, data_len, data);
+        samples.emplace_back(tag, data_len, data, valid);
     }
 
     rc = handleSamples(samples);

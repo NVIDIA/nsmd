@@ -50,7 +50,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
   protected:
     int updateSensorReading(uint8_t tag, double reading,
                             uint64_t timestamp = 0);
-    int updateSensorNotWorking(uint8_t tag);
+    int updateSensorNotWorking(uint8_t tag, bool valid);
 
   private:
     std::array<std::shared_ptr<NsmNumericSensorValueAggregate>,
