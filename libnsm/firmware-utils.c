@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
  * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -489,8 +489,8 @@ int decode_nsm_query_firmware_header_information(
 			}
 		} else if (tag == NSM_FIRMWARE_BOOT_STATUS_CODE) {
 			rc_ok = decode_nsm_firmware_aggregate_tag_uint64(
-			    ptr, &tag, &valid,
-			    &(fw_info_hdr->boot_status_code), payload_size);
+			    ptr, &tag, &valid, &(fw_info_hdr->boot_status_code),
+			    payload_size);
 			if (rc_ok) {
 				(*telemetry_count)--;
 				DBG2(printf("Decoded "
@@ -766,255 +766,6 @@ int decode_nsm_query_get_erot_state_parameters_resp(
 	return NSM_SW_SUCCESS;
 }
 
-int encode_nsm_query_firmware_security_version_number_req(
-    uint8_t instance_id,
-    const struct nsm_firmware_security_version_number_req *fw_req,
-    struct nsm_msg *msg)
-{
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SUCCESS) {
-		return rc;
-	}
-
-	struct nsm_firmware_security_version_number_req_command *request =
-	    (struct nsm_firmware_security_version_number_req_command *)msg->payload;
-	request->hdr.command = NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER;
-	request->hdr.data_size =
-	    sizeof(struct nsm_firmware_security_version_number_req);
-	memcpy(&request->fq_req, fw_req,
-	       sizeof(struct nsm_firmware_security_version_number_req));
-
-	return NSM_SW_SUCCESS;
-}
-
-int decode_nsm_query_firmware_security_version_number_req(
-    const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_firmware_security_version_number_req *fw_req)
-{
-	if (msg == NULL || fw_req == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_firmware_security_version_number_req_command)) {
-		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_firmware_security_version_number_req_command *request =
-	    (struct nsm_firmware_security_version_number_req_command *)msg->payload;
-	if (request->hdr.data_size < sizeof(*fw_req)) {
-		return NSM_SW_ERROR_DATA;
-	}
-
-	*fw_req = request->fq_req;
-
-	return NSM_SW_SUCCESS;
-}
-
-int encode_nsm_query_firmware_security_version_number_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    struct nsm_firmware_security_version_number_resp *sec_info,
-    struct nsm_msg *msg)
-{
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SW_SUCCESS) {
-		return rc;
-	}
-
-	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(
-		    cc, reason_code, NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER, msg);
-	}
-
-	struct nsm_firmware_security_version_number_resp_command *response =
-	    (struct nsm_firmware_security_version_number_resp_command *)
-		msg->payload;
-	response->hdr.command = NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER;
-	response->hdr.completion_code = cc;
-
-	uint16_t msg_size =
-	    sizeof(struct nsm_common_resp) +
-	    sizeof(struct nsm_firmware_security_version_number_resp);
-
-	response->hdr.data_size = htole16(msg_size);
-
-	memcpy(&(response->sec_ver_resp), sec_info,
-	       sizeof(struct nsm_firmware_security_version_number_resp));
-
-	return NSM_SW_SUCCESS;
-}
-
-int decode_nsm_query_firmware_security_version_number_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code,
-    struct nsm_firmware_security_version_number_resp *sec_resp)
-{
-	if (msg == NULL || sec_resp == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
-	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
-		return rc;
-	}
-
-	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_firmware_security_version_number_resp_command)) {
-		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_firmware_security_version_number_resp_command *resp =
-	    (struct nsm_firmware_security_version_number_resp_command *)
-		msg->payload;
-
-	memcpy(sec_resp, &(resp->sec_ver_resp),
-	       sizeof(struct nsm_firmware_security_version_number_resp));
-
-	return NSM_SW_SUCCESS;
-}
-
-int encode_nsm_firmware_update_sec_ver_req(
-    uint8_t instance_id,
-    const struct nsm_firmware_update_min_sec_ver_req *fw_req,
-    struct nsm_msg *msg)
-{
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SUCCESS) {
-		return rc;
-	}
-
-	struct nsm_firmware_update_min_sec_ver_req_command *request =
-	    (struct nsm_firmware_update_min_sec_ver_req_command *)msg->payload;
-	request->hdr.command = NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER;
-	request->hdr.data_size =
-	    sizeof(struct nsm_firmware_update_min_sec_ver_req);
-	memcpy(&request->ver_update_req, fw_req,
-	       sizeof(struct nsm_firmware_update_min_sec_ver_req));
-
-	return NSM_SW_SUCCESS;
-}
-
-int decode_nsm_firmware_update_sec_ver_req(
-    const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_firmware_update_min_sec_ver_req *fw_req)
-{
-	if (msg == NULL || fw_req == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_firmware_update_min_sec_ver_req)) {
-		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_firmware_update_min_sec_ver_req_command *request =
-	    (struct nsm_firmware_update_min_sec_ver_req_command *)msg->payload;
-	if (request->hdr.data_size < sizeof(*fw_req)) {
-		return NSM_SW_ERROR_DATA;
-	}
-
-	*fw_req = request->ver_update_req;
-
-	return NSM_SW_SUCCESS;
-}
-
-int encode_nsm_firmware_update_sec_ver_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    struct nsm_firmware_update_min_sec_ver_resp *sec_resp, struct nsm_msg *msg)
-{
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id;
-	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SW_SUCCESS) {
-		return rc;
-	}
-
-	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(cc, reason_code,
-					  NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
-					  msg);
-	}
-
-	struct nsm_firmware_update_min_sec_ver_resp_command *response =
-	    (struct nsm_firmware_update_min_sec_ver_resp_command *)msg->payload;
-	response->hdr.command = NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER;
-	response->hdr.completion_code = cc;
-
-	uint16_t msg_size = sizeof(struct nsm_common_resp) +
-			    sizeof(struct nsm_firmware_update_min_sec_ver_resp);
-
-	response->hdr.data_size = htole16(msg_size);
-
-	memcpy(&(response->sec_ver_resp), sec_resp,
-	       sizeof(struct nsm_firmware_update_min_sec_ver_resp));
-
-	return NSM_SW_SUCCESS;
-}
-
-int decode_nsm_firmware_update_sec_ver_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code,
-    struct nsm_firmware_update_min_sec_ver_resp *sec_resp)
-{
-	if (msg == NULL || sec_resp == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
-	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
-		return rc;
-	}
-
-	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_firmware_update_min_sec_ver_resp)) {
-		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_firmware_update_min_sec_ver_resp_command *resp =
-	    (struct nsm_firmware_update_min_sec_ver_resp_command *)
-		msg->payload;
-
-	memcpy(sec_resp, &(resp->sec_ver_resp),
-	       sizeof(struct nsm_firmware_update_min_sec_ver_resp));
-
-	return NSM_SW_SUCCESS;
-}
-
 int encode_nsm_firmware_irreversible_config_req(
     uint8_t instance_id,
     const struct nsm_firmware_irreversible_config_req *fw_req,
@@ -1208,7 +959,8 @@ int decode_nsm_firmware_irreversible_config_request_0_resp(
 
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_firmware_irreversible_config_request_0_resp)) {
+		sizeof(
+		    struct nsm_firmware_irreversible_config_request_0_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -1269,6 +1021,601 @@ int decode_nsm_firmware_irreversible_config_request_2_resp(
 
 	memcpy(cfg_resp, &(resp->irreversible_cfg_enable_response),
 	       sizeof(struct nsm_firmware_irreversible_config_request_2_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_code_auth_key_perm_query_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    uint16_t *component_classification, uint16_t *component_identifier,
+    uint8_t *component_classification_index)
+{
+	if (msg == NULL || component_classification == NULL ||
+	    component_identifier == NULL ||
+	    component_classification_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_code_auth_key_perm_query_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_code_auth_key_perm_query_req *req =
+	    (struct nsm_code_auth_key_perm_query_req *)msg->payload;
+	if (req->hdr.data_size <
+	    sizeof(struct nsm_code_auth_key_perm_query_req) -
+		NSM_REQUEST_CONVENTION_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*component_classification = req->component_classification;
+	*component_identifier = req->component_identifier;
+	*component_classification_index = req->component_classification_index;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_code_auth_key_perm_query_req(
+    uint8_t instance_id, uint16_t component_classification,
+    uint16_t component_identifier, uint8_t component_classification_index,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_code_auth_key_perm_query_req *req =
+	    (struct nsm_code_auth_key_perm_query_req *)msg->payload;
+	req->hdr.command = NSM_FW_QUERY_CODE_AUTH_KEY_PERM;
+	req->hdr.data_size =
+	    htole16(sizeof(struct nsm_code_auth_key_perm_query_req) -
+		    NSM_REQUEST_CONVENTION_LEN);
+	req->component_classification = component_classification;
+	req->component_identifier = component_identifier;
+	req->component_classification_index = component_classification_index;
+
+	return NSM_SUCCESS;
+}
+
+int decode_nsm_code_auth_key_perm_query_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *active_component_key_index,
+    uint16_t *pending_component_key_index, uint8_t *permission_bitmap_length,
+    uint8_t *active_component_key_perm_bitmap,
+    uint8_t *pending_component_key_perm_bitmap, uint8_t *efuse_key_perm_bitmap,
+    uint8_t *pending_efuse_key_perm_bitmap)
+{
+	if (msg == NULL || active_component_key_index == NULL ||
+	    pending_component_key_index == NULL ||
+	    permission_bitmap_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	size_t expected_bitmap_length =
+	    msg_len - sizeof(struct nsm_msg_hdr) -
+	    sizeof(struct nsm_code_auth_key_perm_query_resp);
+	struct nsm_code_auth_key_perm_query_resp *resp =
+	    (struct nsm_code_auth_key_perm_query_resp *)msg->payload;
+	if (expected_bitmap_length !=
+	    (size_t)resp->permission_bitmap_length * 4u) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	*active_component_key_index = resp->active_component_key_index;
+	*pending_component_key_index = resp->pending_component_key_index;
+	*permission_bitmap_length = resp->permission_bitmap_length;
+	if (active_component_key_perm_bitmap != NULL) {
+		const uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_query_resp);
+		memcpy(active_component_key_perm_bitmap, bitmap_ptr,
+		       resp->permission_bitmap_length);
+	}
+	if (pending_component_key_perm_bitmap != NULL) {
+		const uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_query_resp) +
+		    resp->permission_bitmap_length;
+		memcpy(pending_component_key_perm_bitmap, bitmap_ptr,
+		       resp->permission_bitmap_length);
+	}
+	if (efuse_key_perm_bitmap != NULL) {
+		const uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_query_resp) +
+		    resp->permission_bitmap_length * 2u;
+		memcpy(efuse_key_perm_bitmap, bitmap_ptr,
+		       resp->permission_bitmap_length);
+	}
+	if (pending_efuse_key_perm_bitmap != NULL) {
+		const uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_query_resp) +
+		    resp->permission_bitmap_length * 3u;
+		memcpy(pending_efuse_key_perm_bitmap, bitmap_ptr,
+		       resp->permission_bitmap_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_code_auth_key_perm_query_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint16_t active_component_key_index, uint16_t pending_component_key_index,
+    uint8_t permission_bitmap_length, uint8_t *active_component_key_perm_bitmap,
+    uint8_t *pending_component_key_perm_bitmap, uint8_t *efuse_key_perm_bitmap,
+    uint8_t *pending_efuse_key_perm_bitmap, struct nsm_msg *msg)
+{
+	if (msg == NULL || (permission_bitmap_length != 0 &&
+			    (active_component_key_perm_bitmap == NULL ||
+			     pending_component_key_perm_bitmap == NULL ||
+			     efuse_key_perm_bitmap == NULL ||
+			     pending_efuse_key_perm_bitmap == NULL))) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_QUERY_CODE_AUTH_KEY_PERM, msg);
+	}
+
+	struct nsm_code_auth_key_perm_query_resp *resp =
+	    (struct nsm_code_auth_key_perm_query_resp *)msg->payload;
+	resp->hdr.command = NSM_FW_QUERY_CODE_AUTH_KEY_PERM;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_code_auth_key_perm_query_resp) -
+		    NSM_RESPONSE_CONVENTION_LEN) +
+	    permission_bitmap_length;
+	resp->active_component_key_index = active_component_key_index;
+	resp->pending_component_key_index = pending_component_key_index;
+	resp->permission_bitmap_length = permission_bitmap_length;
+	uint8_t *bitmap_ptr =
+	    msg->payload + sizeof(struct nsm_code_auth_key_perm_query_resp);
+	memcpy(bitmap_ptr, active_component_key_perm_bitmap,
+	       permission_bitmap_length);
+	bitmap_ptr += permission_bitmap_length;
+	memcpy(bitmap_ptr, pending_component_key_perm_bitmap,
+	       permission_bitmap_length);
+	bitmap_ptr += permission_bitmap_length;
+	memcpy(bitmap_ptr, efuse_key_perm_bitmap, permission_bitmap_length);
+	bitmap_ptr += permission_bitmap_length;
+	memcpy(bitmap_ptr, pending_efuse_key_perm_bitmap,
+	       permission_bitmap_length);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_code_auth_key_perm_update_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    enum nsm_code_auth_key_perm_request_type *request_type,
+    uint16_t *component_classification, uint16_t *component_identifier,
+    uint8_t *component_classification_index, uint64_t *nonce,
+    uint8_t *permission_bitmap_length, uint8_t *permission_bitmap)
+{
+	if (msg == NULL || request_type == NULL ||
+	    component_classification == NULL || component_identifier == NULL ||
+	    component_classification_index == NULL || nonce == NULL ||
+	    permission_bitmap_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	size_t expected_bitmap_length =
+	    msg_len - sizeof(struct nsm_msg_hdr) -
+	    sizeof(struct nsm_code_auth_key_perm_update_req);
+	struct nsm_code_auth_key_perm_update_req *req =
+	    (struct nsm_code_auth_key_perm_update_req *)msg->payload;
+	if (expected_bitmap_length != req->permission_bitmap_length) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (req->request_type !=
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
+	    req->request_type !=
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*request_type = req->request_type;
+	*component_classification = req->component_classification;
+	*component_identifier = req->component_identifier;
+	*component_classification_index = req->component_classification_index;
+	*nonce = req->nonce;
+	*permission_bitmap_length = req->permission_bitmap_length;
+	if (permission_bitmap != NULL) {
+		const uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_update_req);
+		memcpy(permission_bitmap, bitmap_ptr, expected_bitmap_length);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_code_auth_key_perm_update_req(
+    uint8_t instance_id, enum nsm_code_auth_key_perm_request_type request_type,
+    uint16_t component_classification, uint16_t component_identifier,
+    uint8_t component_classification_index, uint64_t nonce,
+    uint8_t permission_bitmap_length, uint8_t *permission_bitmap,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || permission_bitmap == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	if (permission_bitmap_length == 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (request_type !=
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
+	    request_type !=
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_code_auth_key_perm_update_req *req =
+	    (struct nsm_code_auth_key_perm_update_req *)msg->payload;
+	req->hdr.command = NSM_FW_UPDATE_CODE_AUTH_KEY_PERM;
+	req->hdr.data_size =
+	    htole16(sizeof(struct nsm_code_auth_key_perm_update_req) -
+		    NSM_REQUEST_CONVENTION_LEN + permission_bitmap_length);
+	req->request_type = request_type;
+	req->component_classification = component_classification;
+	req->component_identifier = component_identifier;
+	req->component_classification_index = component_classification_index;
+	req->nonce = nonce;
+	req->permission_bitmap_length = permission_bitmap_length;
+	uint8_t *bitmap_ptr =
+	    msg->payload + sizeof(struct nsm_code_auth_key_perm_update_req);
+	memcpy(bitmap_ptr, permission_bitmap, permission_bitmap_length);
+
+	return NSM_SUCCESS;
+}
+
+int decode_nsm_code_auth_key_perm_update_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code,
+					      uint32_t *update_method)
+{
+	if (msg == NULL || update_method == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_code_auth_key_perm_update_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_code_auth_key_perm_update_resp *resp =
+	    (struct nsm_code_auth_key_perm_update_resp *)msg->payload;
+	if (resp->hdr.data_size <
+	    sizeof(struct nsm_code_auth_key_perm_update_resp) -
+		NSM_RESPONSE_CONVENTION_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*update_method = resp->update_method;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_code_auth_key_perm_update_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      uint32_t update_method,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, msg);
+	}
+
+	struct nsm_code_auth_key_perm_update_resp *resp =
+	    (struct nsm_code_auth_key_perm_update_resp *)msg->payload;
+	resp->hdr.command = NSM_FW_UPDATE_CODE_AUTH_KEY_PERM;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_code_auth_key_perm_update_resp) -
+		    NSM_RESPONSE_CONVENTION_LEN);
+	resp->update_method = update_method;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_query_firmware_security_version_number_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_security_version_number_req *fw_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_firmware_security_version_number_req_command *request =
+	    (struct nsm_firmware_security_version_number_req_command *)
+		msg->payload;
+	request->hdr.command = NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER;
+	request->hdr.data_size =
+	    sizeof(struct nsm_firmware_security_version_number_req);
+	memcpy(&request->fq_req, fw_req,
+	       sizeof(struct nsm_firmware_security_version_number_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_query_firmware_security_version_number_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_firmware_security_version_number_req *fw_req)
+{
+	if (msg == NULL || fw_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct nsm_firmware_security_version_number_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_firmware_security_version_number_req_command *request =
+	    (struct nsm_firmware_security_version_number_req_command *)
+		msg->payload;
+	if (request->hdr.data_size < sizeof(*fw_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*fw_req = request->fq_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_query_firmware_security_version_number_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_security_version_number_resp *sec_info,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+		    msg);
+	}
+
+	struct nsm_firmware_security_version_number_resp_command *response =
+	    (struct nsm_firmware_security_version_number_resp_command *)
+		msg->payload;
+	response->hdr.command = NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER;
+	response->hdr.completion_code = cc;
+
+	uint16_t msg_size =
+	    sizeof(struct nsm_common_resp) +
+	    sizeof(struct nsm_firmware_security_version_number_resp);
+
+	response->hdr.data_size = htole16(msg_size);
+
+	memcpy(&(response->sec_ver_resp), sec_info,
+	       sizeof(struct nsm_firmware_security_version_number_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_query_firmware_security_version_number_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_security_version_number_resp *sec_resp)
+{
+	if (msg == NULL || sec_resp == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct nsm_firmware_security_version_number_resp_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_firmware_security_version_number_resp_command *resp =
+	    (struct nsm_firmware_security_version_number_resp_command *)
+		msg->payload;
+
+	memcpy(sec_resp, &(resp->sec_ver_resp),
+	       sizeof(struct nsm_firmware_security_version_number_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_firmware_update_sec_ver_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_update_min_sec_ver_req *fw_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_firmware_update_min_sec_ver_req_command *request =
+	    (struct nsm_firmware_update_min_sec_ver_req_command *)msg->payload;
+	request->hdr.command = NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER;
+	request->hdr.data_size =
+	    sizeof(struct nsm_firmware_update_min_sec_ver_req);
+	memcpy(&request->ver_update_req, fw_req,
+	       sizeof(struct nsm_firmware_update_min_sec_ver_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_firmware_update_sec_ver_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_firmware_update_min_sec_ver_req *fw_req)
+{
+	if (msg == NULL || fw_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_firmware_update_min_sec_ver_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_firmware_update_min_sec_ver_req_command *request =
+	    (struct nsm_firmware_update_min_sec_ver_req_command *)msg->payload;
+	if (request->hdr.data_size < sizeof(*fw_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*fw_req = request->ver_update_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_firmware_update_sec_ver_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_update_min_sec_ver_resp *sec_resp, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
+		    msg);
+	}
+
+	struct nsm_firmware_update_min_sec_ver_resp_command *response =
+	    (struct nsm_firmware_update_min_sec_ver_resp_command *)msg->payload;
+	response->hdr.command = NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER;
+	response->hdr.completion_code = cc;
+
+	uint16_t msg_size = sizeof(struct nsm_common_resp) +
+			    sizeof(struct nsm_firmware_update_min_sec_ver_resp);
+
+	response->hdr.data_size = htole16(msg_size);
+
+	memcpy(&(response->sec_ver_resp), sec_resp,
+	       sizeof(struct nsm_firmware_update_min_sec_ver_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_firmware_update_sec_ver_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_update_min_sec_ver_resp *sec_resp)
+{
+	if (msg == NULL || sec_resp == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_firmware_update_min_sec_ver_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_firmware_update_min_sec_ver_resp_command *resp =
+	    (struct nsm_firmware_update_min_sec_ver_resp_command *)msg->payload;
+
+	memcpy(sec_resp, &(resp->sec_ver_resp),
+	       sizeof(struct nsm_firmware_update_min_sec_ver_resp));
 
 	return NSM_SW_SUCCESS;
 }

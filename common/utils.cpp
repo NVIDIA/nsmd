@@ -382,4 +382,42 @@ std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf)
     return bitmap;
 }
 
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+    bitmapToIndices(const std::vector<uint8_t>& bitmap)
+{
+    std::vector<uint8_t> zeroIndices, oneIndices;
+    uint8_t index = 0;
+    for (auto byte : bitmap)
+    {
+        for (auto bit = 0; bit < 8; ++bit)
+        {
+            if (byte & 0x01)
+            {
+                oneIndices.emplace_back(index++);
+            }
+            else
+            {
+                zeroIndices.emplace_back(index++);
+            }
+            byte >>= 1;
+        }
+    }
+
+    return std::make_pair(zeroIndices, oneIndices);
+}
+
+std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices)
+{
+    uint8_t maxIndex = *std::max_element(indices.begin(), indices.end());
+    std::vector<uint8_t> bitmap(maxIndex / 8 + 1, 0);
+    for (auto& index : indices)
+    {
+        size_t bitmapIndex = index / 8;
+        size_t bitmapBit = index % 8;
+        bitmap[bitmapIndex] |= 1 << bitmapBit;
+    }
+
+    return bitmap;
+}
+
 } // namespace utils

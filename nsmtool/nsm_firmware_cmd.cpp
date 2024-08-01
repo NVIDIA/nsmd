@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@
 #include "firmware-utils.h"
 
 #include "cmd_helper.hpp"
+#include "utils.hpp"
 
 #include <CLI/CLI.hpp>
 
@@ -181,6 +182,264 @@ class GetRotInformation : public CommandInterface
     }
 };
 
+class QueryCodeAuthKeyPerm : public CommandInterface
+{
+  public:
+    ~QueryCodeAuthKeyPerm() = default;
+    QueryCodeAuthKeyPerm() = delete;
+    QueryCodeAuthKeyPerm(const QueryCodeAuthKeyPerm&) = delete;
+    QueryCodeAuthKeyPerm(QueryCodeAuthKeyPerm&&) = default;
+    QueryCodeAuthKeyPerm& operator=(const QueryCodeAuthKeyPerm&) = delete;
+    QueryCodeAuthKeyPerm& operator=(QueryCodeAuthKeyPerm&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryCodeAuthKeyPerm(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto optionGroup = app->add_option_group(
+            "Required", "Query firmware code authentication key permissions");
+        optionGroup
+            ->add_option("--classification", classification,
+                         "Component classification")
+            ->required();
+        optionGroup
+            ->add_option("--identifier", identifier, "Component identifier")
+            ->required();
+        optionGroup->add_option("--index", index, "Component index")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_query_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_code_auth_key_perm_query_req(
+            instanceId, classification, identifier, index, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t activeComponentKeyIndex;
+        uint16_t pendingComponentKeyIndex;
+        uint8_t permissionBitmapLength;
+        auto rc = decode_nsm_code_auth_key_perm_query_resp(
+            responsePtr, payloadLength, &cc, &reasonCode,
+            &activeComponentKeyIndex, &pendingComponentKeyIndex,
+            &permissionBitmapLength, NULL, NULL, NULL, NULL);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        std::vector<uint8_t> activeComponentKeyPermBitmap(
+            permissionBitmapLength);
+        std::vector<uint8_t> pendingComponentKeyPermBitmap(
+            permissionBitmapLength);
+        std::vector<uint8_t> efuseKeyPermBitmap(permissionBitmapLength);
+        std::vector<uint8_t> pendingEfuseKeyPermBitmap(permissionBitmapLength);
+
+        rc = decode_nsm_code_auth_key_perm_query_resp(
+            responsePtr, payloadLength, &cc, &reasonCode,
+            &activeComponentKeyIndex, &pendingComponentKeyIndex,
+            &permissionBitmapLength, activeComponentKeyPermBitmap.data(),
+            pendingComponentKeyPermBitmap.data(), efuseKeyPermBitmap.data(),
+            pendingEfuseKeyPermBitmap.data());
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        nlohmann::ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+        result["Active component key index"] = activeComponentKeyIndex;
+        result["Pending component key index"] = pendingComponentKeyIndex;
+        result["Permission bitmap length"] = permissionBitmapLength;
+
+        auto activeComponentKeyPermIndices =
+            utils::bitmapToIndices(activeComponentKeyPermBitmap);
+        auto pendingComponentKeyPermIndices =
+            utils::bitmapToIndices(pendingComponentKeyPermBitmap);
+        auto efuseKeyPermIndices = utils::bitmapToIndices(efuseKeyPermBitmap);
+        auto pendingEfuseKeyPermIndices =
+            utils::bitmapToIndices(pendingEfuseKeyPermBitmap);
+
+        result["Active component trusted key indices"] =
+            std::move(activeComponentKeyPermIndices.first);
+        result["Active component revoked key indices"] =
+            std::move(activeComponentKeyPermIndices.second);
+        result["Pending component trusted key indices"] =
+            std::move(pendingComponentKeyPermIndices.first);
+        result["Pending component revoked key indices"] =
+            std::move(pendingComponentKeyPermIndices.second);
+        result["EFUSE trusted key indices"] =
+            std::move(efuseKeyPermIndices.first);
+        result["EFUSE revoked key indices"] =
+            std::move(efuseKeyPermIndices.second);
+        result["Pending EFUSE trusted key indices"] =
+            std::move(pendingEfuseKeyPermIndices.first);
+        result["Pending EFUSE revoked key indices"] =
+            std::move(pendingEfuseKeyPermIndices.second);
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+};
+
+class UpdateCodeAuthKeyPerm : public CommandInterface
+{
+  public:
+    ~UpdateCodeAuthKeyPerm() = default;
+    UpdateCodeAuthKeyPerm() = delete;
+    UpdateCodeAuthKeyPerm(const UpdateCodeAuthKeyPerm&) = delete;
+    UpdateCodeAuthKeyPerm(UpdateCodeAuthKeyPerm&&) = default;
+    UpdateCodeAuthKeyPerm& operator=(const UpdateCodeAuthKeyPerm&) = delete;
+    UpdateCodeAuthKeyPerm& operator=(UpdateCodeAuthKeyPerm&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit UpdateCodeAuthKeyPerm(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto optionGroup = app->add_option_group(
+            "Required", "Update firmware code authentication key permissions");
+        optionGroup
+            ->add_option(
+                "--requestType", requestType,
+                "Request type - "
+                "0 - most restrictive permitted value, 1 - specified value")
+            ->required();
+        optionGroup
+            ->add_option("-c,--classification", classification,
+                         "component classification")
+            ->required();
+        optionGroup
+            ->add_option("-i,--identifier", identifier, "Component identifier")
+            ->required();
+        optionGroup
+            ->add_option("-d,--index", index, "Component classification index")
+            ->required();
+        optionGroup
+            ->add_option(
+                "--nonce", nonce,
+                "Nonce obtained from Enable Irreversible Configuration command")
+            ->required();
+        optionGroup
+            ->add_option("-p,--perm", permissionBitmapHexstring,
+                         "Hexadecimal string containing permission bitmap data")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_req) +
+            permissionBitmapHexstring.size() / 2);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        std::vector<uint8_t> bitmap;
+        for (size_t i = 0; i < permissionBitmapHexstring.length(); i += 2)
+        {
+            std::string byteString = permissionBitmapHexstring.substr(i, 2);
+            uint8_t byte = (uint8_t)strtoul(byteString.c_str(), NULL, 16);
+            bitmap.push_back(byte);
+        }
+
+        auto rc = encode_nsm_code_auth_key_perm_update_req(
+            0, requestType, classification, identifier, index, nonce,
+            bitmap.size(), bitmap.data(), request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint32_t updateMethod = 0;
+
+        auto rc = decode_nsm_code_auth_key_perm_update_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &updateMethod);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        nlohmann::ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+        // Fill update methods response
+        ordered_json updateMethods;
+        bitfield32_t updateMethodBits = {updateMethod};
+        if (updateMethodBits.bits.bit0)
+        {
+            updateMethods.push_back("Automatic");
+        }
+        if (updateMethodBits.bits.bit1)
+        {
+            updateMethods.push_back("Self-Contained");
+        }
+        if (updateMethodBits.bits.bit2)
+        {
+            updateMethods.push_back("Medium-specific reset");
+        }
+        if (updateMethodBits.bits.bit3)
+        {
+            updateMethods.push_back("System reboot");
+        }
+        if (updateMethodBits.bits.bit4)
+        {
+            updateMethods.push_back("DC power cycle");
+        }
+        if (updateMethodBits.bits.bit5)
+        {
+            updateMethods.push_back("AC power cycle");
+        }
+        if (updateMethodBits.bits.bit16)
+        {
+            updateMethods.push_back("Warm Reset");
+        }
+        if (updateMethodBits.bits.bit17)
+        {
+            updateMethods.push_back("Hot Reset");
+        }
+        if (updateMethodBits.bits.bit18)
+        {
+            updateMethods.push_back("Function Level Reset");
+        }
+        result["UpdateMethods"] = updateMethods;
+
+        DisplayInJson(result);
+    }
+
+  private:
+    nsm_code_auth_key_perm_request_type requestType;
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+    uint64_t nonce;
+    std::string permissionBitmapHexstring;
+};
+
 class QueryFirmwareSecurityVersion : public CommandInterface
 {
   public:
@@ -236,8 +495,8 @@ class QueryFirmwareSecurityVersion : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &sec_info);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -327,8 +586,8 @@ class UpdateMinSecurityVersion : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &sec_info);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -414,7 +673,8 @@ class IrreversibleConfig : public CommandInterface
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(
-            sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_irreversible_config_req_command));
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_irreversible_config_req_command));
         nsm_firmware_irreversible_config_req nsm_req;
         nsm_req.request_type = requestType;
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
@@ -432,8 +692,8 @@ class IrreversibleConfig : public CommandInterface
         {
             case QUERY_IRREVERSIBLE_CFG:
             {
-                struct
-                    nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
+                struct nsm_firmware_irreversible_config_request_0_resp
+                    cfg_0_resp
                 {};
                 auto rc =
                     decode_nsm_firmware_irreversible_config_request_0_resp(
@@ -441,8 +701,8 @@ class IrreversibleConfig : public CommandInterface
                         &cfg_0_resp);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n";
                     return;
                 }
@@ -457,8 +717,8 @@ class IrreversibleConfig : public CommandInterface
                         responsePtr, payloadLength, &cc, &reason_code);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n";
                     return;
                 }
@@ -466,8 +726,8 @@ class IrreversibleConfig : public CommandInterface
             }
             case ENABLE_IRREVERSIBLE_CFG:
             {
-                struct
-                    nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
+                struct nsm_firmware_irreversible_config_request_2_resp
+                    cfg_2_resp
                 {};
                 auto rc =
                     decode_nsm_firmware_irreversible_config_request_2_resp(
@@ -475,8 +735,8 @@ class IrreversibleConfig : public CommandInterface
                         &cfg_2_resp);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n";
                     return;
                 }
@@ -484,8 +744,7 @@ class IrreversibleConfig : public CommandInterface
                 break;
             }
             default:
-                std::cerr << "Unknown request type " << requestType
-                          << "\n";
+                std::cerr << "Unknown request type " << requestType << "\n";
                 break;
         }
         result["Completion code"] = cc;
@@ -508,6 +767,21 @@ void registerCommand(CLI::App& app)
         "Get information about a particular firmware set installed on an endpoint");
     commands.push_back(std::make_unique<GetRotInformation>(
         "firmware", "QueryRoTStateInformation", getRotInformation));
+    auto irreversibleConfig = firmware->add_subcommand(
+        "IrreversibleConfig",
+        "Query/Disable/Enable Irreversible Configuration");
+    commands.push_back(std::make_unique<IrreversibleConfig>(
+        "firmware", "IrreversibleConfig", irreversibleConfig));
+    auto queryCodeAuthKeyPerm = firmware->add_subcommand(
+        "QueryFWCodeAuthKey",
+        "Query firmware code authentication key permissions");
+    commands.push_back(std::make_unique<QueryCodeAuthKeyPerm>(
+        "firmware", "QueryFWCodeAuthKey", queryCodeAuthKeyPerm));
+    auto updateCodeAuthKeyPerm = firmware->add_subcommand(
+        "UpdateCodeAuthKeyPerm",
+        "Update firmware code authentication key permissions");
+    commands.push_back(std::make_unique<UpdateCodeAuthKeyPerm>(
+        "firmware", "UpdateCodeAuthKeyPerm", updateCodeAuthKeyPerm));
     auto queryFirmwareSecurityVersion = firmware->add_subcommand(
         "QueryFirmwareSecurityVersion", "Query Firmware Security Version");
     commands.push_back(std::make_unique<QueryFirmwareSecurityVersion>(
@@ -517,10 +791,5 @@ void registerCommand(CLI::App& app)
         "UpdateMinSecurityVersion", "Update Minimum Firmware Security Version");
     commands.push_back(std::make_unique<UpdateMinSecurityVersion>(
         "firmware", "UpdateMinSecurityVersion", updateMinSecurityVersion));
-    auto irreversibleConfig = firmware->add_subcommand(
-        "IrreversibleConfig",
-        "Query/Disable/Enable Irreversible Configuration");
-    commands.push_back(std::make_unique<IrreversibleConfig>(
-        "firmware", "IrreversibleConfig", irreversibleConfig));
 }
 } // namespace nsmtool::firmware

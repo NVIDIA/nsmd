@@ -5,10 +5,10 @@ dep_src_files = [
     '../device-capability-discovery.c',
     '../device-configuration.c',
     '../diagnostics.c',
+    '../firmware-utils.c',
     '../platform-environmental.c',
     '../network-ports.c',
     '../pci-links.c',
-    '../firmware-utils.c',
 ]
 
 dep_src_headers = [
@@ -26,10 +26,10 @@ tests = [
     'libnsm_device_configuration_test',
     'libnsm_device_capability_discovery_test',
     'libnsm_diagnostics_test',
+    'libnsm_firmware_utils_test',
     'libnsm_platform_environmental_test',
     'libnsm_network_ports_test',
     'libnsm_pci_links_test',
-    'libnsm_firmware_utils_test',
 ]
 
 libnsm_headers = ['.', '..', '../../common']

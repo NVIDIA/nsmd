@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -318,9 +318,6 @@ class MockupResponder
                                                size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
-        getRotInformation(const nsm_msg* requestMsg, size_t requestLen);
-
-    std::optional<std::vector<uint8_t>>
         queryTokenParametersHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
@@ -333,13 +330,6 @@ class MockupResponder
         queryDeviceIdsHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         resetNetworkDeviceHandler(const nsm_msg* requestMsg, size_t requestLen);
-    std::optional<std::vector<uint8_t>>
-        queryFirmwareSecurityVersion(const nsm_msg* requestMsg,
-                                     size_t requestLen);
-    std::optional<std::vector<uint8_t>>
-        updateMinSecurityVersion(const nsm_msg* requestMsg, size_t requestLen);
-    std::optional<std::vector<uint8_t>>
-        irreversibleConfig(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         enableWorkloadPowerProfile(const nsm_msg* requestMsg,
@@ -356,6 +346,22 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getWorkloadPowerProfileInfo(const nsm_msg* requestMsg,
                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getRotInformation(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        irreversibleConfig(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        codeAuthKeyPermQueryHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        codeAuthKeyPermUpdateHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        queryFirmwareSecurityVersion(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        updateMinSecurityVersion(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     sdeventplus::Event& event;

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,7 +48,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event), verbose(verbose), server(server), eventReceiverEid(0),
+    event(event),
+    verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
         {}, // writeProtected
@@ -535,12 +536,11 @@ std::optional<std::vector<uint8_t>>
                                                               requestLen);
                 case NSM_GET_NETWORK_DEVICE_DEBUG_INFO:
                     return getNetworkDeviceDebugInfoHandler(request,
-                                                              requestLen);
+                                                            requestLen);
                 case NSM_ERASE_TRACE:
                     return eraseTraceHandler(request, requestLen);
                 case NSM_GET_NETWORK_DEVICE_LOG_INFO:
-                    return getNetworkDeviceLogInfoHandler(request,
-                                                              requestLen);
+                    return getNetworkDeviceLogInfoHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -589,16 +589,16 @@ std::optional<std::vector<uint8_t>>
             {
                 case NSM_FW_GET_EROT_STATE_INFORMATION:
                     return getRotInformation(request, requestLen);
-                    break;
-                case NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER:
-                    return queryFirmwareSecurityVersion(request, requestLen);
-                    break;
-                case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
-                    return updateMinSecurityVersion(request, requestLen);
-                    break;
                 case NSM_FW_IRREVERSABLE_CONFIGURATION:
                     return irreversibleConfig(request, requestLen);
-                    break;
+                case NSM_FW_QUERY_CODE_AUTH_KEY_PERM:
+                    return codeAuthKeyPermQueryHandler(request, requestLen);
+                case NSM_FW_UPDATE_CODE_AUTH_KEY_PERM:
+                    return codeAuthKeyPermUpdateHandler(request, requestLen);
+                case NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER:
+                    return queryFirmwareSecurityVersion(request, requestLen);
+                case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
+                    return updateMinSecurityVersion(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -763,7 +763,13 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_EROT,
              {
                  {0, {0, 1, 2, 9}},
-                 {6, {1, 2, 3, 4, 5, 6}},
+                 {6,
+                  {NSM_FW_GET_EROT_STATE_INFORMATION,
+                   NSM_FW_IRREVERSABLE_CONFIGURATION,
+                   NSM_FW_QUERY_CODE_AUTH_KEY_PERM,
+                   NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
+                   NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
+                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER}},
              }},
         };
 
@@ -4379,14 +4385,13 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
-    MockupResponder::getNetworkDeviceDebugInfoHandler(
-        const nsm_msg* requestMsg, size_t requestLen)
+    MockupResponder::getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
+                                                      size_t requestLen)
 {
     if (verbose)
     {
-        lg2::info(
-            "getNetworkDeviceDebugInfoHandler: request length={LEN}",
-            "LEN", requestLen);
+        lg2::info("getNetworkDeviceDebugInfoHandler: request length={LEN}",
+                  "LEN", requestLen);
     }
 
     uint8_t debug_type = 0;

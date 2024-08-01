@@ -465,4 +465,32 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
  * @param bf Pointer to the bitfield256_t structure.
  **/
 std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf);
+
+/**
+ * @brief Converts a bitmap into two vectors containing the indices of bits set
+ * to 0 and 1.
+ *
+ * @param[in] bitmap - A vector of bytes representing the bitmap.
+ * @return A pair of vectors, where the first vector contains the indices of
+ * bits that are 0, and the second vector contains the indices of bits that
+ * are 1.
+ *
+ * @note The indices are 0-based, meaning the first bit in the bitmap is index
+ * 0.
+ */
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+    bitmapToIndices(const std::vector<uint8_t>& bitmap);
+
+/**
+ * @brief Converts a list of indices into a bitmap.
+ *
+ * @param[in] indices - A vector of 1-based indices where bits should be set
+ * to 1.
+ * @return A vector of bytes representing the bitmap.
+ *
+ * @note Indices that are not provided in the list will be set to 0 in the
+ * bitmap.
+ */
+std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices);
+
 } // namespace utils
