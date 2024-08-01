@@ -89,9 +89,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         discoverNsmDevice(mctpInfos);
     }
 
-    void onlineMctpEndpoint(const uuid_t& uuid) override;
+    void onlineMctpEndpoint(const MctpInfo& mctpInfo) override;
 
-    void offlineMctpEndpoint(const uuid_t& uuid) override;
+    void offlineMctpEndpoint(const MctpInfo& mctpInfo) override;
 
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,

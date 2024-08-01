@@ -90,11 +90,18 @@ MctpDiscovery::MctpDiscovery(
 
                 // watch PropertiesChanged signal from
                 // xyz.openbmc_project.Object.Enable PDI
-                enableMatches.emplace_back(
-                    bus,
-                    sdbusplus::bus::match::rules::propertiesChanged(
-                        objectPath.str, "xyz.openbmc_project.Object.Enable"),
-                    std::bind_front(&MctpDiscovery::refreshEndpoints, this));
+                if (enableMatches.find(objectPath.str) == enableMatches.end())
+                {
+                    enableMatches.emplace(
+                        objectPath.str,
+                        sdbusplus::bus::match_t(
+                            bus,
+                            sdbusplus::bus::match::rules::propertiesChanged(
+                                objectPath.str,
+                                "xyz.openbmc_project.Object.Enable"),
+                            std::bind_front(&MctpDiscovery::refreshEndpoints,
+                                            this)));
+                }
             }
         }
         catch (const std::exception& e)
@@ -188,11 +195,16 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
     populateMctpInfo(interfaces, mctpInfos);
 
     // watch PropertiesChanged signal from xyz.openbmc_project.Object.Enable PDI
-    enableMatches.emplace_back(
-        bus,
-        sdbusplus::bus::match::rules::propertiesChanged(
-            objPath.str, "xyz.openbmc_project.Object.Enable"),
-        std::bind_front(&MctpDiscovery::refreshEndpoints, this));
+    if (enableMatches.find(objPath.str) == enableMatches.end())
+    {
+        enableMatches.emplace(
+            objPath.str,
+            sdbusplus::bus::match_t(
+                bus,
+                sdbusplus::bus::match::rules::propertiesChanged(
+                    objPath.str, "xyz.openbmc_project.Object.Enable"),
+                std::bind_front(&MctpDiscovery::refreshEndpoints, this)));
+    }
     handleMctpEndpoints(mctpInfos);
 }
 
@@ -211,8 +223,9 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
 {
     std::string interface;
     dbus::PropertyMap properties;
+    dbus::PropertyMap allProperties;
     std::string objPath = msg.get_path();
-    std::string service = msg.get_sender();
+    std::string sender = msg.get_sender();
 
     msg.read(interface, properties);
     auto prop = properties.find("Enabled");
@@ -221,31 +234,70 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
         auto enabled = std::get<bool>(prop->second);
         lg2::info(
             "Received xyz.openbmc_poject.Object.Enabled propertiesChanged signal for "
-            "Enabled=={ENABLED} at PATH={OBJ_PATH} from {SERVICE}",
-            "ENABLED", enabled, "OBJ_PATH", objPath, "SERVICE", service);
+            "Enabled=={ENABLED} at PATH={OBJ_PATH} from sender={SENDER}",
+            "ENABLED", enabled, "OBJ_PATH", objPath, "SENDER", sender);
+        try
+        {
+            std::string service = utils::DBusHandler().getService(
+                objPath.c_str(), "xyz.openbmc_project.MCTP.Endpoint");
 
+            lg2::info("service of PATH={OBJ_PATH} is {SERVICE}", "OBJ_PATH",
+                      objPath, "SERVICE", service);
+            auto method = bus.new_method_call(service.c_str(), objPath.c_str(),
+                                              "org.freedesktop.DBus.Properties",
+                                              "GetAll");
+            method.append("");
+            auto reply = bus.call(method);
+            reply.read(allProperties);
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "refreshEndpoints: failed to get MctpInfo from PATH={OBJ_PATH}, {ERROR}",
+                "OBJ_PATH", objPath, "ERROR", e);
+            return;
+        }
+
+        uint32_t eid{};
+        uint32_t networkId{};
+        std::string mediumType{};
+        std::string uuid{};
+        std::string bindingType{};
+
+        if (allProperties.contains("EID"))
+        {
+            eid = std::get<uint32_t>(allProperties.at("EID"));
+        }
+        if (allProperties.contains("NetworkId"))
+        {
+            networkId = std::get<uint32_t>(allProperties.at("NetworkId"));
+        }
+        if (allProperties.contains("MediumType"))
+        {
+            mediumType = std::get<std::string>(allProperties.at("MediumType"));
+        }
+        if (allProperties.contains("UUID"))
+        {
+            uuid = std::get<std::string>(allProperties.at("UUID"));
+        }
+        if (allProperties.contains("BindingType"))
+        {
+            bindingType = std::get<std::string>(allProperties.at("BindingType"));
+        }
+        lg2::error("refreshEndpoints: EID={EID}, UUID={UUID}", "EID", eid,
+                   "UUID", uuid);
+
+        MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
+                                            bindingType);
         for (MctpDiscoveryHandlerIntf* handler : handlers)
         {
-            try
+            if (enabled)
             {
-                const auto uuid =
-                    utils::DBusHandler().getDbusProperty<std::string>(
-                        objPath.c_str(), "UUID",
-                        "xyz.openbmc_project.Common.UUID");
-
-                if (enabled)
-                {
-                    handler->onlineMctpEndpoint(uuid);
-                }
-                else
-                {
-                    handler->offlineMctpEndpoint(uuid);
-                }
+                handler->onlineMctpEndpoint(mctpInfo);
             }
-            catch (const std::exception& e)
+            else
             {
-                lg2::error("refreshEndpoints: failed to get UUID,  {ERROR}",
-                           "ERROR", e);
+                handler->offlineMctpEndpoint(mctpInfo);
             }
         }
     }
