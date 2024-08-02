@@ -46,9 +46,10 @@ SensorManagerImpl::SensorManagerImpl(
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
     mctp_socket::Manager& sockManager, bool verbose) :
-    SensorManager(nsmDevices, localEid), bus(bus), event(event),
-    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
+    SensorManager(nsmDevices, localEid),
+    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
+    objServer(objServer), eidTable(eidTable), sockManager(sockManager),
+    verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -317,7 +318,8 @@ requester::Coroutine
         if (!nsmDevice->isDeviceActive)
         {
             /*lg2::error(
-                "SensorManager::doPollingTask : skip polling due to inactive device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
+                "SensorManager::doPollingTask : skip polling due to inactive
+               device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
                 "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
                 nsmDevice->getInstanceNumber());*/
             co_return NSM_ERR_NOT_READY;
