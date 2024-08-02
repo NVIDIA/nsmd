@@ -33,16 +33,12 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
     NsmSwitchDI(const std::string& name, const std::string& inventoryObjPath) :
         NsmInterfaceProvider<IntfType>(name, "NSM_NVSwitch", inventoryObjPath),
         objPath(inventoryObjPath + name)
-    {
-      auto& bus = utils::DBusHandler::getBus();
-      nvSwitchIntf = std::make_unique<NvSwitchIntf>(bus, objPath.c_str());
-    }
+    {}
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::string objPath;
-    std::unique_ptr<NvSwitchIntf> nvSwitchIntf = nullptr;
 };
 
 } // namespace nsm

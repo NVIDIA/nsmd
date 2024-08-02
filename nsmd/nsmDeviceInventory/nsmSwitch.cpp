@@ -48,6 +48,8 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
 
     if (type == "NSM_NVSwitch")
     {
+        auto nvSwitchIntf =
+            std::make_shared<NsmSwitchDI<NvSwitchIntf>>(name, inventoryObjPath);
         auto nvSwitchUuid =
             std::make_shared<NsmSwitchDI<UuidIntf>>(name, inventoryObjPath);
         auto nvSwitchAssociation =
@@ -68,6 +70,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
         nvSwitchAssociation->pdi().associations(associations_list);
         nvSwitchUuid->pdi().uuid(uuid);
 
+        device->deviceSensors.emplace_back(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
     }
