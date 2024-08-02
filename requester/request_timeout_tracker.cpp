@@ -61,7 +61,7 @@ bool DeviceRequestTimeOutTracker::isFull()
 {
     return messages.size() == MAXSIZE;
 }
-// push on full queue will remove the oldest message
+// push on a full queue, will remove the oldest message
 void DeviceRequestTimeOutTracker::push(std::string nsm_request)
 {
     if (isFull())
@@ -93,8 +93,6 @@ std::string DeviceRequestTimeOutTracker::front()
 
 void DeviceRequestTimeOutTracker::handleTimeout(std::string nsm_request)
 {
-    // lg2::error("handleTimeout: EID={EID} msg={MSG}", "EID", eid, "MSG",
-    //            nsm_request);
     if (firstTimeoutMessage.has_value())
     {
         // skip further timeout messages as first timeout request has been
@@ -105,8 +103,6 @@ void DeviceRequestTimeOutTracker::handleTimeout(std::string nsm_request)
 }
 void DeviceRequestTimeOutTracker::handleNoTimeout(std::string nsm_request)
 {
-    // lg2::error("handleNoTimeout: EID={EID} msg={MSG}", "EID", eid, "MSG",
-    //            nsm_request);
     if (firstTimeoutMessage.has_value())
     {
         // device responded after a timeout, reset tracker params

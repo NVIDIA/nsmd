@@ -450,7 +450,9 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         handler, eid, request, &response, &responseLen);
     responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
     }); // the memory is allocated and free at sock_handler.cpp
-    if (rc)
+    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
+    // request that timedout
+    if (rc && rc != NSM_SW_ERROR_NULL)
     {
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
                    rc);

@@ -127,7 +127,8 @@ int main(int argc, char** argv)
         nsm::NsmServiceReadyIntf::initialize(bus, "/xyz/openbmc_project/NSM",
                                              nsmDevices);
 
-        // Initialize the singleton instance
+        // Initialize the singleton instance for on demand logging of critical
+        // logs
         nsm::NsmLogDumpTracker::initialize(bus, "/xyz/openbmc_project/NSM");
 
         // Initialize the DeviceManager before getting its instance
