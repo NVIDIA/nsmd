@@ -107,9 +107,11 @@ TEST(nsmSensorAggregator, GoodTest)
         aggregator,
         handleSamples(ElementsAre(
             FieldsAre(tags[0], data_len,
-                      ArrayPointee(data_len, ElementsAreArray(reading[0]))),
+                      ArrayPointee(data_len, ElementsAreArray(reading[0])),
+                      true),
             FieldsAre(tags[1], data_len,
-                      ArrayPointee(data_len, ElementsAreArray(reading[1]))))))
+                      ArrayPointee(data_len, ElementsAreArray(reading[1])),
+                      true))))
         .Times(1);
 
     // Invoke expected method

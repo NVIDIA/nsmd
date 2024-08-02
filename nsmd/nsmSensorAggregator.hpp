@@ -46,6 +46,7 @@ class NsmSensorAggregator : public NsmSensor
         uint8_t tag;
         uint8_t data_len;
         const uint8_t* data;
+        bool valid;
     };
 
   private:

@@ -65,6 +65,12 @@ int NsmThresholdAggregator::handleSamples(
             continue;
         }
 
+        if (!sample.valid)
+        {
+            updateSensorNotWorking(sample.tag, sample.valid);
+            continue;
+        }
+
         auto rc = decode_aggregate_thermal_parameter_data(
             sample.data, sample.data_len, &reading);
 
@@ -78,7 +84,7 @@ int NsmThresholdAggregator::handleSamples(
                 "decode_aggregate_thermal_parameter_data failed. rc={RC}.",
                 "RC", rc);
             returnValue = rc;
-            updateSensorNotWorking(sample.tag);
+            updateSensorNotWorking(sample.tag, sample.valid);
         }
     }
 

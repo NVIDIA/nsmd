@@ -64,6 +64,12 @@ int NsmVoltageAggregator::handleSamples(
             continue;
         }
 
+        if (!sample.valid)
+        {
+            updateSensorNotWorking(sample.tag, sample.valid);
+            continue;
+        }
+
         auto rc = decode_aggregate_voltage_data(sample.data, sample.data_len,
                                                 &reading);
 
@@ -79,7 +85,7 @@ int NsmVoltageAggregator::handleSamples(
             lg2::error("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
                        rc);
             returnValue = rc;
-            updateSensorNotWorking(sample.tag);
+            updateSensorNotWorking(sample.tag, sample.valid);
         }
     }
 

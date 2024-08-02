@@ -60,6 +60,12 @@ int NsmPowerAggregator::handleSamples(
 
     for (const auto& sample : samples)
     {
+        if (!sample.valid)
+        {
+            updateSensorNotWorking(sample.tag, sample.valid);
+            continue;
+        }
+
         if (sample.tag == TIMESTAMP)
         {
             auto rc = decode_aggregate_timestamp_data(
@@ -90,7 +96,7 @@ int NsmPowerAggregator::handleSamples(
                     "decode_aggregate_get_current_power_draw_reading failed. rc={RC}.",
                     "RC", rc);
                 returnValue = rc;
-                updateSensorNotWorking(sample.tag);
+                updateSensorNotWorking(sample.tag, sample.valid);
             }
         }
     }
