@@ -51,6 +51,7 @@ subdir('nsmDumpCollection')
 subdir('nsmSensors')
 subdir('nsmEvent')
 subdir('nsmGPM')
+subdir('nsmFirmwareUtils')
 
 executable(
     'nsmd',

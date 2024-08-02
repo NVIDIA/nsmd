@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,20 +17,9 @@
 
 #pragma once
 
-#include "firmware-utils.h"
-
+#include "nsmFirmwareSlot.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
-
-#include <sdbusplus/asio/object_server.hpp>
-#include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <xyz/openbmc_project/Software/BuildType/server.hpp>
-#include <xyz/openbmc_project/Software/Slot/server.hpp>
-#include <xyz/openbmc_project/Software/State/server.hpp>
-#include <xyz/openbmc_project/Software/ExtendedVersion/server.hpp>
-#include <xyz/openbmc_project/Software/VersionComparison/server.hpp>
-#include <xyz/openbmc_project/Software/Settings/server.hpp>
-#include <xyz/openbmc_project/Software/SecurityVersion/server.hpp>
 
 #include <array>
 #include <memory>
@@ -41,61 +30,16 @@ namespace nsm
 using namespace sdbusplus::server::xyz::openbmc_project::software;
 using namespace sdbusplus::server;
 
-using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
-using BuildTypeIntf = object_t<BuildType>;
-using SlotIntf = object_t<Slot>;
-using StateIntf =
-    object_t<sdbusplus::server::xyz::openbmc_project::software::State>;
-using ExtendedVersionIntf = object_t<
-    sdbusplus::server::xyz::openbmc_project::software::ExtendedVersion>;
-using VersionComparisonIntf = object_t<
-    sdbusplus::server::xyz::openbmc_project::software::VersionComparison>;
-using SettingsIntf = object_t<
-    sdbusplus::server::xyz::openbmc_project::software::Settings>;
-using SecurityVersionIntf =
-    object_t<sdbusplus::server::xyz::openbmc_project::software::SecurityVersion>;
-
-class FirmwareSlot :
-    public BuildType,
-    AssociationDefinitionsIntf,
-    SlotIntf,
-    StateIntf,
-    ExtendedVersionIntf,
-    VersionComparisonIntf,
-    SettingsIntf,
-    SecurityVersionIntf
-{
-  private:
-    static auto slotName(const std::string& name, int slotNum)
-    {
-        using namespace std::string_literals;
-        return name + "/Slots/"s + std::to_string(slotNum);
-    }
-    void updateActiveSlotAssociation();
-
-  public:
-    using getBuildTypeFn = std::function<void(uint16_t, uint8_t, uint16_t)>;
-
-    FirmwareSlot(sdbusplus::bus::bus& bus, const std::string& name,
-                 const std::vector<utils::Association>& _associations, int slot,
-                 SlotIntf::FirmwareType fwType);
-
-    virtual ~FirmwareSlot() = default;
-
-    void update(
-        const struct ::nsm_firmware_slot_info& info,
-        const struct ::nsm_firmware_erot_state_info_hdr_resp& fq_resp_hdr);
-};
-
 class NsmBuildTypeObject : public NsmSensor
 {
   public:
-    NsmBuildTypeObject(sdbusplus::bus::bus& bus, const std::string& name,
-                       const std::vector<utils::Association>& associations,
-                       const std::string& type, const uuid_t& uuid,
-                       int slot, int classification, int identifier,
-                       SlotIntf::FirmwareType fwType
-                       );
+    NsmBuildTypeObject(const std::string& chassisName, const std::string& type,
+                       const uuid_t& uuid, int classification, int identifier);
+
+    void addSlotObject(std::shared_ptr<NsmFirmwareSlot>& slot)
+    {
+        fwSlotObjects.emplace_back(slot);
+    }
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -104,18 +48,10 @@ class NsmBuildTypeObject : public NsmSensor
                               size_t responseLen) override;
 
   private:
-    static constexpr auto numSlots = 2;
+    std::vector<std::shared_ptr<NsmFirmwareSlot>> fwSlotObjects;
 
-    static std::string getName(const std::string& name)
-    {
-        return buildTypeBasePath / name;
-    }
-
-    std::array<std::unique_ptr<FirmwareSlot>, numSlots> fwSlots;
-    std::string objectPath;
     uuid_t uuid;
     nsm_firmware_erot_state_info_req nsmRequest;
-    const int slotNum;
 };
 
 } // namespace nsm

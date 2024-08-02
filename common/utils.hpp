@@ -31,6 +31,7 @@
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
+#include <xyz/openbmc_project/Software/SecurityCommon/common.hpp>
 
 #include <exception>
 #include <filesystem>
@@ -492,5 +493,23 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
  * bitmap.
  */
 std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices);
+
+/**
+ * @brief Converts a bitfield representing update methods into a list of update
+ * method enums.
+ *
+ * @param[in] updateMethodBitfield - A bitfield where each bit represents a
+ * different update method.
+ * @return A vector of SecurityCommon::UpdateMethods enums corresponding to the
+ * set bits in the bitfield.
+ *
+ * @note The function checks specific bits in the bitfield and adds the
+ * corresponding update method enum to the returned vector. Only the bits that
+ * are set in the bitfield will have their corresponding enums included in the
+ * list.
+ */
+std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
+                UpdateMethods>
+    updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield);
 
 } // namespace utils

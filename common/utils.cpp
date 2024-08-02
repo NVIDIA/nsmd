@@ -420,4 +420,48 @@ std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices)
     return bitmap;
 }
 
+std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
+                UpdateMethods>
+    updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield)
+{
+    using namespace sdbusplus::common::xyz::openbmc_project::software;
+
+    std::vector<SecurityCommon::UpdateMethods> updateMethods;
+    if (updateMethodBitfield.bits.bit0)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::Automatic);
+    }
+    if (updateMethodBitfield.bits.bit2)
+    {
+        updateMethods.emplace_back(
+            SecurityCommon::UpdateMethods::MediumSpecificReset);
+    }
+    if (updateMethodBitfield.bits.bit3)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::SystemReboot);
+    }
+    if (updateMethodBitfield.bits.bit4)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::DCPowerCycle);
+    }
+    if (updateMethodBitfield.bits.bit5)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::ACPowerCycle);
+    }
+    if (updateMethodBitfield.bits.bit16)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::WarmReset);
+    }
+    if (updateMethodBitfield.bits.bit17)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::HotReset);
+    }
+    if (updateMethodBitfield.bits.bit18)
+    {
+        updateMethods.emplace_back(SecurityCommon::UpdateMethods::FLR);
+    }
+
+    return updateMethods;
+}
+
 } // namespace utils
