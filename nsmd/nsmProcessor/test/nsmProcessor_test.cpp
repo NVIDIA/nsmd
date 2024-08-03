@@ -555,9 +555,11 @@ TEST(NsmPCIeGroup5, BadHandleResp)
 
 TEST(nsmEDPpScalingFactor, GoodGenReq)
 {
-    nsm::NsmEDPpScalingFactor sensor(bus, sensorName, sensorType,
-                                     inventoryObjPath);
-
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto resetEdppAsyncIntf =
+        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
+                                     eDPpIntf, resetEdppAsyncIntf);
     const uint8_t eid{12};
     const uint8_t instance_id{30};
 
@@ -572,13 +574,16 @@ TEST(nsmEDPpScalingFactor, GoodGenReq)
 
 TEST(nsmEDPpScalingFactor, GoodHandleResp)
 {
-    nsm::NsmEDPpScalingFactor sensor(bus, sensorName, sensorType,
-                                     inventoryObjPath);
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto resetEdppAsyncIntf =
+        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
+                                     eDPpIntf, resetEdppAsyncIntf);
 
     struct nsm_EDPp_scaling_factors scaling_factors;
-    scaling_factors.default_scaling_factor = 70;
-    scaling_factors.maximum_scaling_factor = 90;
-    scaling_factors.minimum_scaling_factor = 60;
+    scaling_factors.persistent_scaling_factor = 70;
+    scaling_factors.oneshot_scaling_factor = 90;
+    scaling_factors.enforced_scaling_factor = 60;
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
@@ -598,29 +603,34 @@ TEST(nsmEDPpScalingFactor, GoodHandleResp)
 
 TEST(nsmEDPpScalingFactor, GoodUpdateReading)
 {
-    nsm::NsmEDPpScalingFactor sensor(bus, sensorName, sensorType,
-                                     inventoryObjPath);
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto resetEdppAsyncIntf =
+        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
+                                     eDPpIntf, resetEdppAsyncIntf);
 
     struct nsm_EDPp_scaling_factors scaling_factors;
-    scaling_factors.default_scaling_factor = 70;
-    scaling_factors.maximum_scaling_factor = 90;
-    scaling_factors.minimum_scaling_factor = 60;
+    scaling_factors.persistent_scaling_factor = 70;
+    scaling_factors.oneshot_scaling_factor = 90;
+    scaling_factors.enforced_scaling_factor = 60;
+    sensor.persistence = true;
     sensor.updateReading(scaling_factors);
-    EXPECT_EQ(sensor.eDPpIntf->allowableMax(),
-              scaling_factors.maximum_scaling_factor);
-    EXPECT_EQ(sensor.eDPpIntf->allowableMin(),
-              scaling_factors.minimum_scaling_factor);
+    EXPECT_EQ(sensor.eDPpIntf->setPoint(),
+              std::make_tuple(scaling_factors.enforced_scaling_factor, sensor.persistence));
 }
 
 TEST(nsmEDPpScalingFactor, BadHandleResp)
 {
-    nsm::NsmEDPpScalingFactor sensor(bus, sensorName, sensorType,
-                                     inventoryObjPath);
+    auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
+    auto resetEdppAsyncIntf =
+        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
+                                     eDPpIntf, resetEdppAsyncIntf);
 
     struct nsm_EDPp_scaling_factors scaling_factors;
-    scaling_factors.default_scaling_factor = 70;
-    scaling_factors.maximum_scaling_factor = 90;
-    scaling_factors.minimum_scaling_factor = 60;
+    scaling_factors.persistent_scaling_factor = 70;
+    scaling_factors.oneshot_scaling_factor = 90;
+    scaling_factors.enforced_scaling_factor = 60;
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +

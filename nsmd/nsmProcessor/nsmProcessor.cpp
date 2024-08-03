@@ -758,15 +758,16 @@ uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-NsmEDPpScalingFactor::NsmEDPpScalingFactor(sdbusplus::bus::bus& bus,
-                                           std::string& name, std::string& type,
-                                           std::string& inventoryObjPath) :
-    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
-
+NsmEDPpScalingFactor::NsmEDPpScalingFactor(
+    std::string& name, std::string& type, std::string& inventoryObjPath,
+    std::shared_ptr<EDPpLocal> eDPpIntf,
+    std::shared_ptr<NsmResetEdppAsyncIntf> resetEdppAsyncIntf) :
+    NsmSensor(name, type), eDPpIntf(eDPpIntf),
+    resetEdppAsyncIntf(resetEdppAsyncIntf), inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmEDPpScalingFactor: create sensor:{NAME}", "NAME",
               name.c_str());
-    eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath.c_str());
+    persistence = false;
     updateMetricOnSharedMemory();
 }
 void NsmEDPpScalingFactor::updateMetricOnSharedMemory()
@@ -792,8 +793,8 @@ void NsmEDPpScalingFactor::updateMetricOnSharedMemory()
 void NsmEDPpScalingFactor::updateReading(
     struct nsm_EDPp_scaling_factors scaling_factors)
 {
-    eDPpIntf->allowableMax(scaling_factors.maximum_scaling_factor);
-    eDPpIntf->allowableMin(scaling_factors.minimum_scaling_factor);
+    eDPpIntf->setPoint(
+        std::tuple(scaling_factors.enforced_scaling_factor, persistence));
     updateMetricOnSharedMemory();
 }
 
@@ -839,6 +840,222 @@ uint8_t
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
+}
+
+requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::tuple<bool, uint32_t>* reqSetPoint =
+        std::get_if<std::tuple<bool, uint32_t> >(&value);
+    if (reqSetPoint == NULL)
+    {
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_DATA;
+    }
+
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    lg2::info("patch EDPp setpoint On Device for EID: {EID}", "EID", eid);
+
+    uint32_t allowableMin = eDPpIntf->allowableMin();
+    uint32_t allowableMax = eDPpIntf->allowableMax();
+
+    uint32_t reqLimit = std::get<1>(*reqSetPoint);
+    bool reqPersistence = std::get<0>(*reqSetPoint);
+
+    if (allowableMin > reqLimit || allowableMax < reqLimit)
+    {
+        lg2::error("req SetPoint Limit not in allowed range");
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_DATA;
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_programmable_EDPp_scaling_factor_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    auto rc = encode_set_programmable_EDPp_scaling_factor_req(
+        0, NEW_SCALING_FACTOR, reqPersistence, static_cast<uint8_t>(reqLimit),
+        requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmEDPpScalingFactor::patchSetPoint  failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "NsmEDPpScalingFactor::patchSetPoint SendRecvNsmMsgSync failed for while setting edpp setpoint "
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t data_size = 0;
+    rc = decode_set_programmable_EDPp_scaling_factor_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code, &data_size);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info(
+            "NsmEDPpScalingFactor::patchSetPoint for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "NsmEDPpScalingFactor::patchSetPoint decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    persistence = reqPersistence;
+
+    co_return NSM_SW_SUCCESS;
+}
+
+NsmMaxEDPpLimit::NsmMaxEDPpLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<EDPpLocal> eDPpIntf) :
+    NsmObject(name, type),
+    eDPpIntf(eDPpIntf)
+{
+    lg2::info("NsmMaxEDPpLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager,
+                                                      eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAXIMUM_EDPP_SCALING_FACTOR;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMaxEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMaxEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint8_t value;
+    std::vector<uint8_t> data(1, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        eDPpIntf->allowableMax(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMaxEDPpLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmMinEDPpLimit::NsmMinEDPpLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<EDPpLocal> eDPpIntf) :
+    NsmObject(name, type),
+    eDPpIntf(eDPpIntf)
+{
+    lg2::info("NsmMinEDPpLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager,
+                                                      eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MINIMUM_EDPP_SCALING_FACTOR;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMinEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMinEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint8_t value;
+    std::vector<uint8_t> data(1, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        eDPpIntf->allowableMin(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMinEDPpLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
 }
 
 NsmClockLimitGraphics::NsmClockLimitGraphics(
@@ -2360,9 +2577,31 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     {
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
-        auto sensor = std::make_shared<NsmEDPpScalingFactor>(bus, name, type,
-                                                             inventoryObjPath);
+        auto eDPpIntf = std::make_shared<EDPpLocal>(bus,
+                                                    inventoryObjPath.c_str());
+        auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+            bus, inventoryObjPath.c_str(), nsmDevice);
+
+        auto sensor = std::make_shared<NsmEDPpScalingFactor>(
+            name, type, inventoryObjPath, eDPpIntf, resetEdppAsyncIntf);
+
+        nsm::AsyncSetOperationHandler patchSetPoint = std::bind(
+        &NsmEDPpScalingFactor::patchSetPoint, sensor,
+        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+
         nsmDevice->addSensor(sensor, priority);
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.Edpp", "SetPoint",
+                AsyncSetOperationInfo{patchSetPoint, sensor, nsmDevice});
+
+        auto maxEdppSensor = std::make_shared<NsmMaxEDPpLimit>(name, type,
+                                                               eDPpIntf);
+        auto minEdppSensor = std::make_shared<NsmMinEDPpLimit>(name, type,
+                                                               eDPpIntf);
+        nsmDevice->addStaticSensor(maxEdppSensor);
+        nsmDevice->addStaticSensor(minEdppSensor);
     }
     else if (type == "NSM_CpuOperatingConfig")
     {

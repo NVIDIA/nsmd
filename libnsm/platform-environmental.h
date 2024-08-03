@@ -56,6 +56,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_ECC_MODE = 0x4f,
 	NSM_GET_ECC_ERROR_COUNTS = 0x7d,
 	NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x09,
+	NSM_SET_PROGRAMMABLE_EDPP_SCALING_FACTOR = 0x0A,
 	NSM_SET_ECC_MODE = 0x7c,
 	NSM_GET_CLOCK_OUTPUT_ENABLE_STATE = 0x61,
 	NSM_GET_MEMORY_CAPACITY_UTILIZATION = 0xAD,
@@ -117,6 +118,8 @@ enum nsm_inventory_property_identifiers {
 	RATED_MODULE_POWER_LIMIT = 20,
 	DEFAULT_BOOST_CLOCKS = 21,
 	DEFAULT_BASE_CLOCKS = 22,
+	MINIMUM_EDPP_SCALING_FACTOR = 24,
+	MAXIMUM_EDPP_SCALING_FACTOR = 25,
 	MINIMUM_GRAPHICS_CLOCK_LIMIT = 26,
 	MAXIMUM_GRAPHICS_CLOCK_LIMIT = 27,
 	MINIMUM_MEMORY_CLOCK_LIMIT = 28,
@@ -740,9 +743,9 @@ struct nsm_get_ECC_error_counts_resp {
  *  Structure representing All the Programmable EDPp scaling factor.
  */
 struct nsm_EDPp_scaling_factors {
-	uint8_t default_scaling_factor;
-	uint8_t maximum_scaling_factor;
-	uint8_t minimum_scaling_factor;
+	uint8_t persistent_scaling_factor;
+	uint8_t oneshot_scaling_factor;
+	uint8_t enforced_scaling_factor;
 } __attribute__((packed));
 
 /** @struct nsm_get_programmable_EDPp_scaling_factor_resp
@@ -752,6 +755,17 @@ struct nsm_EDPp_scaling_factors {
 struct nsm_get_programmable_EDPp_scaling_factor_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_EDPp_scaling_factors scaling_factors;
+} __attribute__((packed));
+
+/** @struct nsm_set_programmable_EDPp_scaling_factor_req
+ *
+ *  Structure representing Set Programmable EDPp Scaling Factor request.
+ */
+struct nsm_set_programmable_EDPp_scaling_factor_req {
+	struct nsm_common_req hdr;
+	uint8_t action;
+	uint8_t persistence;
+	uint32_t scaling_factor;
 } __attribute__((packed));
 
 /** @struct nsm_set_clock_limit_req
@@ -812,6 +826,8 @@ enum power_limit_id { DEVICE = 0, MODULE = 1 };
 /** @brief Operation to be performed on power limits
  */
 enum power_limit_action { NEW_LIMIT = 0, DEFAULT_LIMIT = 1 };
+
+enum edpp_scaling_factor_action {NEW_SCALING_FACTOR = 0, RESET_TO_DEFAULT = 1};
 
 /**
  @brief Lifetime of power limit
@@ -1925,6 +1941,63 @@ int encode_get_programmable_EDPp_scaling_factor_resp(
 int decode_get_programmable_EDPp_scaling_factor_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
     uint16_t *reason_code, struct nsm_EDPp_scaling_factors *scaling_factors);
+
+/** @brief Encode a Set Programmable EDPp Scaling Factor request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] action - Action to be perform on EDPp Scaling factor
+ *  @param[in] persistence - Life Time of EDPp scaling factor
+ *  @param[in] scaling_factor - Requested EDPp scaling factor as an integer
+ * percentage value
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_programmable_EDPp_scaling_factor_req(uint8_t instance_id,
+						    uint8_t action,
+						    uint8_t persistence,
+						    uint32_t scaling_factor,
+						    struct nsm_msg *msg);
+
+/** @brief Decode a Set Programmable EDPp Scaling Factor request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] action - Action to be perform on EDPp Scaling factor
+ *  @param[out] persistence - Life Time of EDPp scaling factor
+ *  @param[out] scaling_factor - Requested EDPp scaling factor as an integer
+ * percentage value
+ *  @return nsm_completion_codes
+ */
+int decode_set_programmable_EDPp_scaling_factor_req(const struct nsm_msg *msg,
+						    size_t msg_len,
+						    uint8_t *action,
+						    uint8_t *persistence,
+						    uint32_t *scaling_factor);
+
+/** @brief Encode a Set Programmable EDPp Scaling Factor response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_programmable_EDPp_scaling_factor_resp(uint8_t instance_id,
+						     uint8_t cc,
+						     uint16_t reason_code,
+						     struct nsm_msg *msg);
+
+/** @brief Dncode a Set Programmable EDPp Scaling Factor response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_programmable_EDPp_scaling_factor_resp(const struct nsm_msg *msg,
+						     size_t msg_len,
+						     uint8_t *cc,
+						     uint16_t *data_size,
+						     uint16_t *reason_code);
 
 /** @brief Encode a Get clock limit request message
  *

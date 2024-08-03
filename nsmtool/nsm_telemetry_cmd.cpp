@@ -921,6 +921,12 @@ class GetInventoryInformation : public CommandInterface
             case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;
+            case MINIMUM_EDPP_SCALING_FACTOR:
+                propRecordResult["Data"] = *(uint8_t*)data.data();
+                break;
+            case MAXIMUM_EDPP_SCALING_FACTOR:
+                propRecordResult["Data"] = *(uint8_t*)data.data();
+                break;
             case PCIERETIMER_0_EEPROM_VERSION:
             case PCIERETIMER_1_EEPROM_VERSION:
             case PCIERETIMER_2_EEPROM_VERSION:
@@ -2167,11 +2173,84 @@ class GetEDPpScalingFactors : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["AllowableMax"] = scaling_factors.maximum_scaling_factor;
-        result["AllowableMin"] = scaling_factors.minimum_scaling_factor;
-
+        result["Requested_Persistent_Scaling_Factor"] =
+            scaling_factors.persistent_scaling_factor;
+        result["Requested_OneShot_Scaling_Factor"] =
+            scaling_factors.oneshot_scaling_factor;
+        result["Persistent_Scaling_Factor"] =
+            scaling_factors.persistent_scaling_factor;
         nsmtool::helper::DisplayInJson(result);
     }
+};
+
+class SetEDPpScalingFactors : public CommandInterface
+{
+  public:
+    ~SetEDPpScalingFactors() = default;
+    SetEDPpScalingFactors() = delete;
+    SetEDPpScalingFactors(const SetEDPpScalingFactors&) = delete;
+    SetEDPpScalingFactors(SetEDPpScalingFactors&&) = default;
+    SetEDPpScalingFactors& operator=(const SetEDPpScalingFactors&) = delete;
+    SetEDPpScalingFactors& operator=(SetEDPpScalingFactors&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetEDPpScalingFactors(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-a, --action", action,
+                        "Action to be perform on EDPp Scaling factor")
+            ->required();
+        app->add_option("-p, --persistence", persistence,
+                        "life Time of EDPp scaling factor")
+            ->required();
+        app->add_option(
+               "-s, --scaling_factor", scaling_factor,
+               "Requested EDPp scaling factor as an integer percentage value")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_set_programmable_EDPp_scaling_factor_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_programmable_EDPp_scaling_factor_req(
+            instanceId, action, persistence, scaling_factor, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_set_programmable_EDPp_scaling_factor_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t action;
+    uint8_t persistence;
+    uint32_t scaling_factor;
 };
 
 class QueryScalarGroupTelemetry : public CommandInterface
@@ -4314,6 +4393,11 @@ void registerCommand(CLI::App& app)
         "GetEDPpScalingFactors", "get programmable EDPp Scaling Factors");
     commands.push_back(std::make_unique<GetEDPpScalingFactors>(
         "telemetry", "GetEDPpScalingFactors", getEDPpScalingFactors));
+
+    auto setEDPpScalingFactors = telemetry->add_subcommand(
+        "SetEDPpScalingFactors", "set programmable EDPp Scaling Factors");
+    commands.push_back(std::make_unique<SetEDPpScalingFactors>(
+        "telemetry", "SetEDPpScalingFactors", setEDPpScalingFactors));
 
     auto queryScalarGroupTelemetry = telemetry->add_subcommand(
         "QueryScalarGroupTelemetry", "retrieve Scalar Data source for group ");

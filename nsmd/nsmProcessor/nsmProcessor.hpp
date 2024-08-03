@@ -31,6 +31,7 @@
 #include "nsmPowerSmoothing.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
 #include "nsmPowerSmoothingFeatureIntf.hpp"
+#include "nsmResetEdppAsyncIface.hpp"
 #include "nsmSensor.hpp"
 #include "nsmSetMigMode.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
@@ -307,17 +308,18 @@ class EDPpLocal : public EDPpIntf
         EDPpIntf(bus, objPath.c_str(), action::emit_interface_added)
     {}
 
-    void reset()
-    {
-        return;
-    }
+    void reset() {
+    } // reset method defined in the pdi, so overloading it. It's not in use,
+      // since we shifted to async methods for post operation
 };
 
 class NsmEDPpScalingFactor : public NsmSensor
 {
   public:
-    NsmEDPpScalingFactor(sdbusplus::bus::bus& bus, std::string& name,
-                         std::string& type, std::string& inventoryObjPath);
+    NsmEDPpScalingFactor(std::string& name, std::string& type,
+                         std::string& inventoryObjPath,
+                         std::shared_ptr<EDPpLocal> eDPpIntf,
+                         std::shared_ptr<NsmResetEdppAsyncIntf> resetEdppAsyncIntf);
     NsmEDPpScalingFactor() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -326,11 +328,39 @@ class NsmEDPpScalingFactor : public NsmSensor
                               size_t responseLen) override;
     void updateMetricOnSharedMemory() override;
 
+    requester::Coroutine
+    patchSetPoint(const AsyncSetOperationValueType& value,
+                            [[maybe_unused]] AsyncOperationStatusType* status,
+                            std::shared_ptr<NsmDevice> device);
+
   private:
     void updateReading(struct nsm_EDPp_scaling_factors scaling_factor);
-
+    bool persistence;
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
+    std::shared_ptr<NsmResetEdppAsyncIntf>resetEdppAsyncIntf;
     std::string inventoryObjPath;
+};
+
+class NsmMaxEDPpLimit : public NsmObject
+{
+  public:
+    NsmMaxEDPpLimit(std::string& name, std::string& type,
+                    std::shared_ptr<EDPpLocal> eDPpIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
+};
+
+class NsmMinEDPpLimit : public NsmObject
+{
+  public:
+    NsmMinEDPpLimit(std::string& name, std::string& type,
+                    std::shared_ptr<EDPpLocal> eDPpIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+   std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
 };
 
 using CpuOperatingConfigIntf =
