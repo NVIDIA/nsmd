@@ -997,6 +997,282 @@ TEST(queryScalarGroupTelemetryV1Group6, testBadDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+TEST(queryScalarGroupTelemetryV1Group8, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_query_scalar_group_telemetry_v1_group_8_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	struct nsm_query_scalar_group_telemetry_group_8 data;
+	for (int idx = 1; idx <= TOTAL_PCIE_LANE_COUNT; idx++) {
+		data.error_counts[idx - 1] = 200 * idx;
+	}
+	struct nsm_query_scalar_group_telemetry_group_8 data_test = data;
+
+	auto rc = encode_query_scalar_group_telemetry_v1_group8_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+
+	struct nsm_query_scalar_group_telemetry_v1_group_8_resp *resp =
+	    reinterpret_cast<
+		struct nsm_query_scalar_group_telemetry_v1_group_8_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_query_scalar_group_telemetry_group_8),
+		  le16toh(resp->hdr.data_size));
+	EXPECT_EQ(data_test.error_counts[0], le32toh(data.error_counts[0]));
+}
+
+TEST(queryScalarGroupTelemetryV1Group8, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte;
+	for(int idx = 0; idx< TOTAL_PCIE_LANE_COUNT ;idx++)
+	{
+		data_byte.push_back(idx*0);
+		data_byte.push_back(idx*1);
+		data_byte.push_back(idx*2);
+		data_byte.push_back(idx*3);
+	}
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    TOTAL_PCIE_LANE_COUNT*4,
+	    0 // data size
+	};
+	auto data =
+	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_8 *>(
+		data_byte.data());
+	auto data_test = data;
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	auto rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+
+	EXPECT_EQ(data_size, TOTAL_PCIE_LANE_COUNT*4);
+	EXPECT_EQ(le32toh(data_test->error_counts[0]), data->error_counts[0]);
+}
+
+TEST(queryScalarGroupTelemetryV1Group8, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte;
+	for(int idx = 0; idx< TOTAL_PCIE_LANE_COUNT ;idx++)
+	{
+		data_byte.push_back(idx*0);
+		data_byte.push_back(idx*1);
+		data_byte.push_back(idx*2);
+		data_byte.push_back(idx*3);
+	}
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    TOTAL_PCIE_LANE_COUNT*4 -1 ,
+	    0 // data size
+	};
+	auto data =
+	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_8 *>(
+		data_byte.data());
+	
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	auto rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    response, msg_len, &cc, NULL, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
+	    data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	
+}
+
+TEST(queryScalarGroupTelemetryV1Group9, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(nsm_query_scalar_group_telemetry_v1_group_9_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	struct nsm_query_scalar_group_telemetry_group_9 data;
+	data.aer_uncorrectable_error_status = 2456;
+	data.aer_correctable_error_status = 3425;
+	struct nsm_query_scalar_group_telemetry_group_9 data_test = data;
+
+	auto rc = encode_query_scalar_group_telemetry_v1_group9_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+
+	struct nsm_query_scalar_group_telemetry_v1_group_9_resp *resp =
+	    reinterpret_cast<
+		struct nsm_query_scalar_group_telemetry_v1_group_9_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(nsm_query_scalar_group_telemetry_group_9),
+		  le16toh(resp->hdr.data_size));
+	EXPECT_EQ(data_test.aer_correctable_error_status,
+		  le32toh(data.aer_correctable_error_status));
+	EXPECT_EQ(data_test.aer_uncorrectable_error_status,
+		  le32toh(data.aer_uncorrectable_error_status));
+}
+
+TEST(queryScalarGroupTelemetryV1Group9, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    8,
+	    0 // data size
+	};
+	auto data =
+	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_9 *>(
+		data_byte.data());
+	auto data_test = data;
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+
+	EXPECT_EQ(data_size, 8);
+	EXPECT_EQ(le32toh(data_test->aer_uncorrectable_error_status),
+		  data->aer_uncorrectable_error_status);
+	EXPECT_EQ(le32toh(data_test->aer_correctable_error_status),
+		  data->aer_correctable_error_status);
+}
+
+TEST(queryScalarGroupTelemetryV1Group9, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, // command
+	    0,					 // completion code
+	    0,
+	    0,
+	    9,
+	    0 // data size
+	};
+	auto data =
+	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_9 *>(
+		data_byte.data());
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    response, msg_len, &cc, NULL, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    response, msg_len - data_byte.size(), &cc, &data_size, &reason_code,
+	    data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
 TEST(pcieFundamentalReset, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +

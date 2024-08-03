@@ -1,4 +1,5 @@
 #include "nsmRetimerPort.hpp"
+#include "nsmGpuPriorityMapping.h"
 
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>
@@ -88,9 +89,6 @@ class NsmClearPCIeIntf : public ClearPCIeIntf
         ClearPCIeIntf(bus, path), deviceIndex(deviceIndex), device(device)
     {}
 
-    // TO DO:  overriding the dbus method. Complete implementation will be done
-    // for post
-    //  operation.
     sdbusplus::message::object_path clearCounter(std::string Counter) override;
     requester::Coroutine
         clearPCIeErrorCounter(AsyncOperationStatusType* status,

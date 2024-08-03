@@ -146,7 +146,7 @@ uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->nonfeCount(data.non_fatal_errors);
         pcieEccIntf->feCount(data.fatal_errors);
         pcieEccIntf->ceCount(data.correctable_errors);
-        // pcieEccIntf->ueReqCount(data.unsupported_request_count);
+        pcieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
     }
     else
     {
@@ -233,6 +233,66 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     }
     return NSM_SW_SUCCESS;
 }
+
+NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
+                                   const std::string& type,
+                                   std::shared_ptr<LaneErrorIntf> laneErrorIntf,
+                                   uint8_t deviceIndex,
+                                   const std::string& inventoryObjPath) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_8),
+    laneErrorIntf(laneErrorIntf), inventoryObjPath(inventoryObjPath)
+{
+    lg2::info("NsmPCIeECCGroup8: create sensor:{NAME}", "NAME", name.c_str());
+    updateMetricOnSharedMemory();
+}
+
+uint8_t NsmPCIeECCGroup8::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    nsm_query_scalar_group_telemetry_group_8 data = {};
+    uint16_t size = 0;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+        responseMsg, responseLen, &cc, &size, &reasonCode, &data);
+
+    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+    {
+        std::vector<uint32_t> error_counts;
+
+        for (int idx = 0; idx < TOTAL_PCIE_LANE_COUNT; idx++)
+        {
+            error_counts.push_back(data.error_counts[idx]);
+        }
+
+        laneErrorIntf->rxErrorsPerLane(error_counts);
+        updateMetricOnSharedMemory();
+    }
+    else
+    {
+        lg2::error(
+            "NsmPCIeECCGroup8: decode_query_scalar_group_telemetry_v1_group8_resp failed. rc={RC}, cc={CC}",
+            "RC", rc, "CC", cc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return NSM_SW_SUCCESS;
+}
+
+void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(laneErrorIntf->interface);
+    nv::sensor_aggregation::DbusVariantType valueVariant{
+        laneErrorIntf->rxErrorsPerLane()};
+    std::vector<uint8_t> smbusData = {};
+    std::string propName = "RXErrorsPerLane";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
+#endif
+}
+
 
 static requester::Coroutine
     createNsmPCIeRetimerPorts(SensorManager& manager,

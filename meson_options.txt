@@ -63,3 +63,17 @@ option(
     description: 'The default local EID',
     value: 9,
 )
+
+option(
+    'aer-error-status-priority',
+    type: 'boolean',
+    value: false,
+    description: 'Aer Error Status Sensor Priority',
+)
+
+option(
+    'per-lan-error-count-priority',
+    type: 'boolean',
+    value: false,
+    description: 'Per Lane Error Count Sensor Priority',
+)

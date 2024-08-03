@@ -451,12 +451,17 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ceCountVal{pCieEccIntf->ceCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
+    
+    propName = "UnsupportedRequestCount";
+    nv::sensor_aggregation::DbusVariantType unsupportedRequestCount{pCieEccIntf->ceCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, unsupportedRequestCount);
 
     // pcie port metrics
     ifaceName = std::string(pCiePortIntf->interface);
     propName = "nonfeCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
+        inventoryObjPath, ifaceName, propName, smbusData, nonfeCountVal);
 
     ifaceName = std::string(pCiePortIntf->interface);
     propName = "feCount";
@@ -467,6 +472,12 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
     propName = "ceCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
+    
+    ifaceName = std::string(pCiePortIntf->interface);
+    propName = "UnsupportedRequestCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, unsupportedRequestCount);
+    
 #endif
 }
 
@@ -476,11 +487,12 @@ void NsmPciGroup2::updateReading(
     pCieEccIntf->nonfeCount(data.non_fatal_errors);
     pCieEccIntf->feCount(data.fatal_errors);
     pCieEccIntf->ceCount(data.correctable_errors);
+    pCieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
     // pcie port metrics
     pCiePortIntf->nonfeCount(data.non_fatal_errors);
     pCiePortIntf->feCount(data.fatal_errors);
     pCiePortIntf->ceCount(data.correctable_errors);
-
+    pCiePortIntf->unsupportedRequestCount(data.unsupported_request_count);
     updateMetricOnSharedMemory();
 }
 

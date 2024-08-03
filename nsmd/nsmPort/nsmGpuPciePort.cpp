@@ -346,6 +346,12 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                         name, type, groupId, deviceIndex, clearPCIeIntf);
                 nsmDevice->addStaticSensor(clearPCIeSensorGroup);
             }
+
+            auto laneErrorIntf =
+                std::make_shared<LaneErrorIntf>(bus, inventoryObjPath.c_str());
+            auto perLanErrorSensor = std::make_shared<NsmPCIeECCGroup8>(
+                name, type, laneErrorIntf, deviceIndex, inventoryObjPath);
+            nsmDevice->addSensor(perLanErrorSensor, PER_LANE_ERROR_COUNT_PRIORITY);
         }
         else if (type == "NSM_PortInfo")
         {

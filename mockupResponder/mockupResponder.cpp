@@ -2762,6 +2762,22 @@ void getScalarTelemetryGroup6Data(
     data->invalid_flit_counter = 111;
 }
 
+void getScalarTelemetryGroup8Data(
+    struct nsm_query_scalar_group_telemetry_group_8* data)
+{
+    for (int idx = 1; idx <= TOTAL_PCIE_LANE_COUNT; idx++)
+    {
+        data->error_counts[idx - 1] = 200 * idx;
+    }
+}
+
+void getScalarTelemetryGroup9Data(
+    struct nsm_query_scalar_group_telemetry_group_9* data)
+{
+    data->aer_uncorrectable_error_status = 500;
+    data->aer_correctable_error_status = 590;
+}
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
@@ -2949,6 +2965,55 @@ std::optional<std::vector<uint8_t>>
             }
             return response;
         }
+
+        case GROUP_ID_8:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_group_8_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_query_scalar_group_telemetry_group_8 data;
+            getScalarTelemetryGroup8Data(&data);
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_query_scalar_group_telemetry_v1_group8_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_scalar_group_telemetry_v1_group8_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+
+        case GROUP_ID_9:
+        {
+            std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_group_9_resp),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            struct nsm_query_scalar_group_telemetry_group_9 data;
+            getScalarTelemetryGroup9Data(&data);
+            uint16_t reason_code = ERR_NULL;
+            rc = encode_query_scalar_group_telemetry_v1_group9_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &data,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_scalar_group_telemetry_v1_group9_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+
         default:
             break;
     }
