@@ -834,3 +834,230 @@ int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_power_mode_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_power_mode_req *request =
+	    (nsm_get_power_mode_req *)msg->payload;
+
+	request->command = NSM_GET_POWER_MODE;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_mode_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_power_mode_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_power_mode_req *request =
+	    (nsm_get_power_mode_req *)msg->payload;
+
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_power_mode_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code,
+			       struct nsm_power_mode_data *data,
+			       struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_POWER_MODE,
+					  msg);
+	}
+
+	struct nsm_get_power_mode_resp *response =
+	    (struct nsm_get_power_mode_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_POWER_MODE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(sizeof(struct nsm_power_mode_data));
+
+	response->data.l1_hw_mode_control = data->l1_hw_mode_control;
+	response->data.l1_hw_mode_threshold =
+	    htole32(data->l1_hw_mode_threshold);
+	response->data.l1_fw_throttling_mode = data->l1_fw_throttling_mode;
+	response->data.l1_prediction_mode = data->l1_prediction_mode;
+	response->data.l1_hw_active_time = htole16(data->l1_hw_active_time);
+	response->data.l1_hw_inactive_time = htole16(data->l1_hw_inactive_time);
+	response->data.l1_prediction_inactive_time =
+	    htole16(data->l1_prediction_inactive_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_power_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *data_size,
+			       struct nsm_power_mode_data *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_power_mode_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_power_mode_resp *resp =
+	    (struct nsm_get_power_mode_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < sizeof(struct nsm_power_mode_data)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	data->l1_hw_mode_control = resp->data.l1_hw_mode_control;
+	data->l1_hw_mode_threshold = le32toh(resp->data.l1_hw_mode_threshold);
+	data->l1_fw_throttling_mode = resp->data.l1_fw_throttling_mode;
+	data->l1_prediction_mode = resp->data.l1_prediction_mode;
+	data->l1_hw_active_time = le16toh(resp->data.l1_hw_active_time);
+	data->l1_hw_inactive_time = le16toh(resp->data.l1_hw_inactive_time);
+	data->l1_prediction_inactive_time =
+	    le16toh(resp->data.l1_prediction_inactive_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_power_mode_req(uint8_t instance_id, struct nsm_msg *msg,
+			      struct nsm_power_mode_data data)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_power_mode_req *request =
+	    (struct nsm_set_power_mode_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_POWER_MODE;
+	request->hdr.data_size =
+	    sizeof(struct nsm_power_mode_data) + sizeof(uint8_t);
+
+	request->l1_hw_mode_control = data.l1_hw_mode_control;
+	request->reserved = 0x00; // reserved as per spec
+	request->l1_hw_mode_threshold = htole32(data.l1_hw_mode_threshold);
+	request->l1_fw_throttling_mode = data.l1_fw_throttling_mode;
+	request->l1_prediction_mode = data.l1_prediction_mode;
+	request->l1_hw_active_time = htole16(data.l1_hw_active_time);
+	request->l1_hw_inactive_time = htole16(data.l1_hw_inactive_time);
+	request->l1_prediction_inactive_time =
+	    htole16(data.l1_prediction_inactive_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_power_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			      struct nsm_power_mode_data *data)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_power_mode_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_power_mode_req *request =
+	    (struct nsm_set_power_mode_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    (sizeof(struct nsm_power_mode_data) + sizeof(uint8_t))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	data->l1_hw_mode_control = request->l1_hw_mode_control;
+	data->l1_hw_mode_threshold = le32toh(request->l1_hw_mode_threshold);
+	data->l1_fw_throttling_mode = request->l1_fw_throttling_mode;
+	data->l1_prediction_mode = request->l1_prediction_mode;
+	data->l1_hw_active_time = le16toh(request->l1_hw_active_time);
+	data->l1_hw_inactive_time = le16toh(request->l1_hw_inactive_time);
+	data->l1_prediction_inactive_time =
+	    le16toh(request->l1_prediction_inactive_time);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_power_mode_resp(uint8_t instance_id, uint16_t reason_code,
+			       struct nsm_msg *msg)
+{
+	return encode_cc_only_resp(instance_id, NSM_TYPE_NETWORK_PORT,
+				   NSM_SET_POWER_MODE, NSM_SUCCESS, reason_code,
+				   msg);
+}
+
+int decode_set_power_mode_resp(const struct nsm_msg *msg, size_t msgLen,
+			       uint8_t *cc, uint16_t *reason_code)
+{
+	int rc = decode_reason_code_and_cc(msg, msgLen, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msgLen <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_set_power_mode_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_set_power_mode_resp *resp = (nsm_set_power_mode_resp *)msg->payload;
+	if (resp->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}

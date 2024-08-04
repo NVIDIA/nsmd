@@ -635,6 +635,178 @@ class GetPortDisableFuture : public CommandInterface
     }
 };
 
+class GetPowerMode : public CommandInterface
+{
+  public:
+    ~GetPowerMode() = default;
+    GetPowerMode() = delete;
+    GetPowerMode(const GetPowerMode&) = delete;
+    GetPowerMode(GetPowerMode&&) = default;
+    GetPowerMode& operator=(const GetPowerMode&) = delete;
+    GetPowerMode& operator=(GetPowerMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_power_mode_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_power_mode_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataLen = 0;
+        struct nsm_power_mode_data powerModeData;
+
+        auto rc = decode_get_power_mode_resp(responsePtr, payloadLength, &cc,
+                                             &reasonCode, &dataLen,
+                                             &powerModeData);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Completion Code"] = cc;
+            result["Data Length"] = dataLen;
+            result["L1 HW Mode Control"] =
+                static_cast<uint8_t>(powerModeData.l1_hw_mode_control);
+            result["L1 HW Mode Threshold"] =
+                static_cast<uint32_t>(powerModeData.l1_hw_mode_threshold);
+            result["L1 FW Throttling Mode"] =
+                static_cast<uint8_t>(powerModeData.l1_fw_throttling_mode);
+            result["L1 Prediction Mode"] =
+                static_cast<uint8_t>(powerModeData.l1_prediction_mode);
+            result["L1 HW Active Time"] =
+                static_cast<uint16_t>(powerModeData.l1_hw_active_time);
+            result["L1 HW Inactive Time"] =
+                static_cast<uint16_t>(powerModeData.l1_hw_inactive_time);
+            result["L1 Prediction Inactive Time"] = static_cast<uint16_t>(
+                powerModeData.l1_prediction_inactive_time);
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_power_mode_resp fail "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
+    }
+};
+
+class SetPowerMode : public CommandInterface
+{
+  public:
+    ~SetPowerMode() = default;
+    SetPowerMode() = delete;
+    SetPowerMode(const SetPowerMode&) = delete;
+    SetPowerMode(SetPowerMode&&) = default;
+    SetPowerMode& operator=(const SetPowerMode&) = delete;
+    SetPowerMode& operator=(SetPowerMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetPowerMode(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto powerModeOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which counter value is to be retrieved.");
+
+        l1HWModeControl = false;
+        l1HWThreshold = 0;
+        l1FWThrottlingMode = false;
+        l1PredictionMode = false;
+        l1HWActiveTime = 0;
+        l1HWInactiveTime = 0;
+        l1HWPredictionInactiveTime = 0;
+
+        powerModeOptionGroup->add_option("-C, --modeControl", l1HWModeControl,
+                                         "L1 hardware control mode");
+
+        powerModeOptionGroup->add_option("-T, --modeThrottle",
+                                         l1FWThrottlingMode,
+                                         "L1 firmware throttling mode");
+
+        powerModeOptionGroup->add_option("-P, --modePrediction",
+                                         l1PredictionMode,
+                                         "L1 prediction mechanism mode");
+
+        powerModeOptionGroup->add_option("-t, --threshold", l1HWThreshold,
+                                         "L1 state threshold bytes");
+
+        powerModeOptionGroup->add_option("-a, --activeTime", l1HWActiveTime,
+                                         "L1 state active time");
+
+        powerModeOptionGroup->add_option("-i, --inactiveTime", l1HWInactiveTime,
+                                         "L1 state inactive time");
+
+        powerModeOptionGroup->add_option("-p, --predictionInactiveTime",
+                                         l1HWPredictionInactiveTime,
+                                         "L1 state prediction inactive time");
+
+        powerModeOptionGroup->require_option(7);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        struct nsm_power_mode_data powerModeData;
+        powerModeData.l1_hw_mode_control = l1HWModeControl;
+        powerModeData.l1_hw_mode_threshold = l1HWThreshold;
+        powerModeData.l1_fw_throttling_mode = l1FWThrottlingMode;
+        powerModeData.l1_prediction_mode = l1PredictionMode;
+        powerModeData.l1_hw_active_time = l1HWActiveTime;
+        powerModeData.l1_hw_inactive_time = l1HWInactiveTime;
+        powerModeData.l1_prediction_inactive_time = l1HWPredictionInactiveTime;
+
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_power_mode_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_power_mode_req(instanceId, request, powerModeData);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_set_power_mode_resp(responsePtr, payloadLength, &cc,
+                                             &reasonCode);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Completion Code"] = cc;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_set_power_mode_resp fail "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
+    }
+
+  private:
+    bool l1HWModeControl;
+    uint32_t l1HWThreshold;
+    bool l1FWThrottlingMode;
+    bool l1PredictionMode;
+    uint16_t l1HWActiveTime;
+    uint16_t l1HWInactiveTime;
+    uint16_t l1HWPredictionInactiveTime;
+};
+
 class GetInventoryInformation : public CommandInterface
 {
   public:
@@ -3984,6 +4156,16 @@ void registerCommand(CLI::App& app)
         "GetPortDisableFuture", "query ports available");
     commands.push_back(std::make_unique<GetPortDisableFuture>(
         "telemetry", "GetPortDisableFuture", getPortDisableFuture));
+
+    auto getPowerMode = telemetry->add_subcommand(
+        "GetPowerMode", "Get L1 power mode");
+    commands.push_back(std::make_unique<GetPowerMode>(
+        "telemetry", "GetPowerMode", getPowerMode));
+
+    auto setPowerMode = telemetry->add_subcommand(
+        "SetPowerMode", "Set L1 power mode");
+    commands.push_back(std::make_unique<SetPowerMode>(
+        "telemetry", "SetPowerMode", setPowerMode));
 
     auto getInventoryInformation = telemetry->add_subcommand(
         "GetInventoryInformation", "get inventory information");
