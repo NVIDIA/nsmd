@@ -1874,6 +1874,93 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     co_return cc;
 }
 
+NsmProcessorThrottleDuration::NsmProcessorThrottleDuration(
+    std::string& name, std::string& type,
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+    std::string& inventoryObjPath) :
+    NsmSensor(name, type), processorPerformanceIntf(processorPerfIntf),
+    inventoryObjPath(inventoryObjPath)
+
+{
+    lg2::info("NsmProcessorThrottleDuration: create sensor:{NAME}", "NAME",
+              name.c_str());
+    updateMetricOnSharedMemory();
+}
+void NsmProcessorThrottleDuration::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+
+    auto ifaceName = std::string(processorPerformanceIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+    std::string propName = "PowerLimitThrottleDuration";
+    nv::sensor_aggregation::DbusVariantType powerLimitThrottleDuration{
+        processorPerformanceIntf->powerLimitThrottleDuration()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 powerLimitThrottleDuration);
+
+    propName = "ThermalLimitThrottleDuration";
+    nv::sensor_aggregation::DbusVariantType thermalLimitThrottleDuration{
+        processorPerformanceIntf->thermalLimitThrottleDuration()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 thermalLimitThrottleDuration);
+
+#endif
+}
+
+void NsmProcessorThrottleDuration::updateReading(
+    const nsm_violation_duration& data)
+{
+    processorPerformanceIntf->powerLimitThrottleDuration(
+        data.power_violation_duration);
+    processorPerformanceIntf->thermalLimitThrottleDuration(
+        data.thermal_violation_duration);
+    updateMetricOnSharedMemory();
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmProcessorThrottleDuration::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_violation_duration_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_violation_duration_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmProcessorThrottleDuration::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    nsm_violation_duration data;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    auto rc = decode_get_violation_duration_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(data);
+    }
+    else
+    {
+        lg2::error(
+            "handleResponseMsg: decode_get_violation_duration_resp  "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
 void createNsmProcessorSensor(SensorManager& manager,
                               const std::string& interface,
                               const std::string& objPath)
@@ -2076,6 +2163,10 @@ void createNsmProcessorSensor(SensorManager& manager,
         auto throttleReasonSensor =
             std::make_shared<NsmProcessorThrottleReason>(
                 name, type, processorPerfIntf, inventoryObjPath);
+        
+        auto throttleDurationSensor =
+                std::make_shared<NsmProcessorThrottleDuration>(
+                    name, type, processorPerfIntf, inventoryObjPath);
 
         auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
             name, type, processorPerfIntf, inventoryObjPath);
@@ -2085,6 +2176,7 @@ void createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addSensor(gpuUtilSensor, priority);
         nsmDevice->addSensor(pciRxTxSensor, priority);
         nsmDevice->addSensor(throttleReasonSensor, priority);
+        nsmDevice->addSensor(throttleDurationSensor, priority);
     }
     else if (type == "NSM_MemCapacityUtil")
     {

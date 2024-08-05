@@ -5103,3 +5103,216 @@ TEST(queryPerInstanceGPMMetrics, testGoodDecodeRequest)
 	EXPECT_EQ(metric_id, 45);
 	EXPECT_EQ(instance_bitfield, 17716);
 }
+
+TEST(getViolationDuration, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_violation_duration_req(0, request);
+	struct nsm_common_req *req =
+	    reinterpret_cast<struct nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_VIOLATION_DURATION, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getViolationDuration, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_VIOLATION_DURATION,   // command
+	    0				     // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_get_violation_duration_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getViolationDuration, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_violation_duration_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	struct nsm_violation_duration data;
+	data.supported_counter.byte = 255;
+	data.hw_violation_duration = 20000;
+	data.global_sw_violation_duration = 30000;
+	data.power_violation_duration = 40000;
+	data.thermal_violation_duration = 50000;
+	data.counter4 = 60000;
+	data.counter5 = 70000;
+	data.counter6 = 80000;
+	data.counter7 = 90000;
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_violation_duration_resp(
+	    0, NSM_SUCCESS, reason_code, &data, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_violation_duration_resp *resp =
+	    reinterpret_cast<struct nsm_get_violation_duration_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_VIOLATION_DURATION, resp->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_violation_duration),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(resp->data.supported_counter.byte,
+		  htole64(data.supported_counter.byte));
+	EXPECT_EQ(resp->data.thermal_violation_duration,
+		  htole64(data.thermal_violation_duration));
+	EXPECT_EQ(resp->data.power_violation_duration,
+		  htole64(data.power_violation_duration));
+	EXPECT_EQ(resp->data.hw_violation_duration,
+		  htole64(data.hw_violation_duration));
+	EXPECT_EQ(resp->data.counter4, htole64(data.counter4));
+}
+
+
+TEST(getViolationDuration, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	struct nsm_violation_duration* data =
+	      reinterpret_cast<struct nsm_violation_duration *>(data_byte.data());
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_VIOLATION_DURATION,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    72,
+	    0 // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_violation_duration data_resp;
+
+	auto rc = decode_get_violation_duration_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(72, data_size);
+    EXPECT_EQ(le64toh(data->supported_counter.byte),
+	 	  data_resp.supported_counter.byte);
+	EXPECT_EQ(le64toh(data->thermal_violation_duration),
+	 	  data_resp.thermal_violation_duration);
+	EXPECT_EQ(le64toh(data->power_violation_duration),
+		  data_resp.power_violation_duration);
+	EXPECT_EQ(le64toh(data->hw_violation_duration),
+		  data_resp.hw_violation_duration);
+	EXPECT_EQ(le64toh(data->counter4),
+		  data_resp.counter4);
+	EXPECT_EQ(le64toh(data->counter7),
+		  data_resp.counter7); 
+}
+
+
+TEST(getViolationDuration, testBadDecodeResponse)
+{
+	std::vector<uint8_t> data_byte{
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
+	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_VIOLATION_DURATION,	     // command
+	    0,				     // completion code
+	    0,				     // reserved
+	    0,				     // reserved
+	    77,				     // wrong data size
+	    0				     // data size
+	};
+
+	responseMsg.insert(responseMsg.end(), data_byte.begin(),
+			   data_byte.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_violation_duration data_resp;
+
+	auto rc = decode_get_violation_duration_resp(NULL, msg_len, &cc, &data_size,
+					      &reason_code, &data_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_violation_duration_resp(response, msg_len, NULL, &data_size,
+					 &reason_code, &data_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_violation_duration_resp(response, msg_len, &cc, NULL,
+					 &reason_code, &data_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_violation_duration_resp(response, msg_len - 1, &cc, &data_size,
+					 &reason_code, &data_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_violation_duration_resp(response, msg_len, &cc, &data_size,
+					 &reason_code, &data_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

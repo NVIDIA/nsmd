@@ -640,4 +640,26 @@ class NsmGpuHealth : public NsmObject
     std::shared_ptr<GpuHealthIntf> healthIntf;
 };
 
+class NsmProcessorThrottleDuration : public NsmSensor
+{
+  public:
+    NsmProcessorThrottleDuration(
+        std::string& name, std::string& type,
+        std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
+        std::string& inventoryObjPath);
+    NsmProcessorThrottleDuration() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
+
+  private:
+    void updateReading(const nsm_violation_duration& data);
+    std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
+        nullptr;
+    std::string inventoryObjPath;
+};
+
 } // namespace nsm

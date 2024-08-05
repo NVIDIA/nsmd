@@ -3183,6 +3183,69 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     uint32_t instanceBitfield;
 };
 
+class GetViolationDuration : public CommandInterface
+{
+  public:
+    ~GetViolationDuration() = default;
+    GetViolationDuration() = delete;
+    GetViolationDuration(const GetViolationDuration&) = delete;
+    GetViolationDuration(GetViolationDuration&&) = default;
+    GetViolationDuration& operator=(const GetViolationDuration&) = delete;
+    GetViolationDuration& operator=(GetViolationDuration&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_violation_duration_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        struct nsm_violation_duration violationDuration;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_get_violation_duration_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &violationDuration);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_violation_duration_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["SupportedCounter"] =
+            static_cast<uint64_t>(violationDuration.supported_counter.byte);
+        result["HwViolationDuration"] =
+            static_cast<uint64_t>(violationDuration.hw_violation_duration);
+        result["GlobalSwViolationDuration"] = static_cast<uint64_t>(
+            violationDuration.global_sw_violation_duration);
+        result["PowerViolationDuration"] =
+            static_cast<uint64_t>(violationDuration.power_violation_duration);
+        result["ThermalViolationDuration"] =
+            static_cast<uint64_t>(violationDuration.thermal_violation_duration);
+        result["Counter4"] = static_cast<uint64_t>(violationDuration.counter4);
+        result["Counter5"] = static_cast<uint64_t>(violationDuration.counter5);
+        result["Counter6"] = static_cast<uint64_t>(violationDuration.counter6);
+        result["Counter7"] = static_cast<uint64_t>(violationDuration.counter7);
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -3354,6 +3417,11 @@ void registerCommand(CLI::App& app)
         "QueryPerInstanceGPMMetrics", "Query Per-instance GPM Metrics");
     commands.push_back(std::make_unique<QueryPerInstanceGPMMetrics>(
         "telemetry", "QueryPerInstanceGPMMetrics", queryPerInstanceGPMMetrics));
+
+    auto getViolationDuration = telemetry->add_subcommand("GetViolationDuration",
+                                                      "get processor throttle duration");
+    commands.push_back(std::make_unique<GetViolationDuration>(
+        "telemetry", "GetViolationDuration", getViolationDuration));
 }
 
 } // namespace telemetry

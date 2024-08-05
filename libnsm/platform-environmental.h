@@ -64,6 +64,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_POWER_LIMITS = 0x07,
 	NSM_QUERY_AGGREGATE_GPM_METRICS = 0x49,
 	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A,
+	NSM_GET_VIOLATION_DURATION = 0x45,
 	// Power Smoothing Opcodes
 	NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE = 0x75,
 	NSM_PWR_SMOOTHING_GET_FEATURE_INFO = 0x76,
@@ -526,6 +527,23 @@ struct nsm_query_per_instance_gpm_metrics_req {
 	uint8_t metric_id;
 	uint32_t instance_bitmask;
 } __attribute__((packed));
+
+struct nsm_violation_duration {
+	bitfield64_t supported_counter;
+	uint64_t hw_violation_duration;
+	uint64_t global_sw_violation_duration;
+	uint64_t power_violation_duration;
+	uint64_t thermal_violation_duration;
+	uint64_t counter4;
+	uint64_t counter5;
+	uint64_t counter6;
+	uint64_t counter7;
+}__attribute__((packed));
+
+struct nsm_get_violation_duration_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_violation_duration data;
+}__attribute__((packed));
 
 /** @struct nsm_pwr_smoothing_featureinfo_data
  * Bit	Description
@@ -2429,6 +2447,51 @@ int encode_aggregate_gpm_metric_bandwidth_data(uint64_t bandwidth,
 int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
 					       size_t data_len,
 					       uint64_t *bandwidth);
+
+/** @brief Encode a Get Violation Duration request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_violation_duration_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get Violation Duration request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_violation_duration_req(const struct nsm_msg *msg,
+				      size_t msg_len);
+
+/** @brief Encode a Get Violation Duration response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct representing violation duration
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_violation_duration *data,
+					    struct nsm_msg *msg);
+
+/** @brief Dncode a Get Violation Duration response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] data - struct representing violation duration
+ *  @return nsm_completion_codes
+ */
+int decode_get_violation_duration_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *data_size,
+				       uint16_t *reason_code,
+				       struct nsm_violation_duration *data);
 
 /** @brief Encode a Get Power Smoothing Feature Info request message
  *
