@@ -459,6 +459,10 @@ std::optional<std::vector<uint8_t>>
                                                             requestLen);
                 case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
                     return pcieFundamentalResetHandler(request, requestLen);
+                case NSM_CLEAR_DATA_SOURCE_V1:
+                    return clearScalarDataSourceHandler(request, requestLen);
+                case NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES:
+                    return queryAvailableAndClearableScalarGroupHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -649,7 +653,7 @@ std::optional<std::vector<uint8_t>>
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
                  {1, {1, 65, 66, 67}},
-                 {2, {4}},
+                 {2, {2,4,5}},
                  {3,
                   {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,  16,
                    17,  69, 70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
@@ -2654,6 +2658,166 @@ std::optional<std::vector<uint8_t>>
     return std::nullopt;
 }
 
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryAvailableAndClearableScalarGroupHandler(const nsm_msg* requestMsg,
+                                                      size_t requestLen)
+{
+    uint8_t device_index;
+    uint8_t group_id;
+    auto rc = decode_query_available_clearable_scalar_data_sources_v1_req(
+        requestMsg, requestLen, &device_index, &group_id);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_query_available_clearable_scalar_data_sources_v1_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    
+    uint16_t reason_code = ERR_NULL;
+
+    switch (group_id)
+    {
+        case GROUP_ID_2:
+        {
+            uint8_t mask_length = 1;
+            bitfield8_t available_source[1];
+            bitfield8_t clearable_source[1];
+            available_source[0].byte = 5;
+            clearable_source[0].byte = 63;
+            uint16_t data_size = 3;
+             std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_available_clearable_scalar_data_sources_v1_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GROUP_ID_3:
+        {
+            uint8_t mask_length = 1;
+            bitfield8_t available_source[1];
+            bitfield8_t clearable_source[1];
+            available_source[0].byte = 15;
+            clearable_source[0].byte = 63;
+            uint16_t data_size = 3;
+             std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_available_clearable_scalar_data_sources_v1_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+        case GROUP_ID_4:
+        {
+            uint8_t mask_length = 1;
+            bitfield8_t available_source[1];
+            bitfield8_t clearable_source[1];
+            available_source[0].byte = 32;
+            clearable_source[0].byte = 63;
+            uint16_t data_size = 3;
+             std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_available_clearable_scalar_data_sources_v1_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+
+        case GROUP_ID_8:
+        {
+            uint8_t mask_length = 1;
+            bitfield8_t available_source[1];
+            bitfield8_t clearable_source[1];
+            available_source[0].byte = 9;
+            clearable_source[0].byte = 63;
+            uint16_t data_size = 3;
+             std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp) + 2*mask_length*sizeof(uint8_t),
+                0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_available_clearable_scalar_data_sources_v1_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        }
+
+        case GROUP_ID_9:
+        {
+            uint8_t mask_length = 1;
+            bitfield8_t available_source[1];
+            bitfield8_t clearable_source[1];
+            available_source[0].byte = 21;
+            clearable_source[0].byte = 63;
+            uint16_t data_size = 3;
+             std::vector<uint8_t> response(
+                sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp) + 2*mask_length*sizeof(uint8_t),
+                0);
+           auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "encode_query_available_clearable_scalar_data_sources_v1_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+        } 
+       
+        default:
+            break;
+    }
+    return std::nullopt;
+} 
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::pcieFundamentalResetHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
@@ -2681,6 +2845,38 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_assert_pcie_fundamental_reset_resp failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::clearScalarDataSourceHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    uint8_t device_index;
+    uint8_t groupId;
+    uint8_t dsId;
+    auto rc = decode_clear_data_source_v1_req(requestMsg, requestLen,
+                                              &device_index, &groupId, &dsId);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_clear_data_source_v1_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_clear_data_source_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_clear_data_source_v1_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
     return response;

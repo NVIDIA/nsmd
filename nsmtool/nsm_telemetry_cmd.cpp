@@ -2054,6 +2054,361 @@ class QueryScalarGroupTelemetry : public CommandInterface
     uint8_t groupId;
 };
 
+class QueryAvailableAndClearableScalarGroup : public CommandInterface
+{
+  public:
+    ~QueryAvailableAndClearableScalarGroup() = default;
+    QueryAvailableAndClearableScalarGroup() = delete;
+    QueryAvailableAndClearableScalarGroup(const QueryAvailableAndClearableScalarGroup&) = delete;
+    QueryAvailableAndClearableScalarGroup(QueryAvailableAndClearableScalarGroup&&) = default;
+    QueryAvailableAndClearableScalarGroup&
+        operator=(const QueryAvailableAndClearableScalarGroup&) = delete;
+    QueryAvailableAndClearableScalarGroup& operator=(QueryAvailableAndClearableScalarGroup&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit QueryAvailableAndClearableScalarGroup(const char* type, const char* name,
+                                       CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto scalarTelemetryOptionGroup = app->add_option_group(
+            "Required", "Group Id for which data source is to be retrieved.");
+
+        scalarTelemetryOptionGroup->add_option("-d, --deviceIndex", deviceIndex,
+                                               "retrieve deviceIndex");
+        scalarTelemetryOptionGroup->add_option(
+            "-g, --groupId", groupId, "retrieve data source for groupId");
+        scalarTelemetryOptionGroup->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_query_scalar_group_telemetry_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_query_available_clearable_scalar_data_sources_v1_req(
+            instanceId, deviceIndex, groupId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        std::vector<std::string> clearableSource;
+        std::vector<std::string> availableSource;
+        switch (groupId)
+        {
+            case GROUP_ID_2:
+            {
+                bitfield8_t available_source[1];
+                bitfield8_t clearable_source[1];
+                uint8_t mask_length;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(nsm_msg_hdr) +
+                            sizeof(
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp
+                                ));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                if(available_source[0].bits.bit0)
+                {
+                    availableSource.push_back("TotalNonFatalErrors");
+                }
+                if(available_source[0].bits.bit1)
+                {
+                    availableSource.push_back("TotalFatalErrors");
+                }
+                if(available_source[0].bits.bit2)
+                {
+                    availableSource.push_back("UnsupportedRequestCounts");
+                }
+                if(available_source[0].bits.bit3)
+                {
+                    availableSource.push_back("CorrectableErrorCount");
+                }
+                result["AvailableSource"] = availableSource;
+
+                if(clearable_source[0].bits.bit0)
+                {
+                    clearableSource.push_back("TotalNonFatalErrors");
+                }
+                if(clearable_source[0].bits.bit1)
+                {
+                    clearableSource.push_back("TotalFatalErrors");
+                }
+                if(clearable_source[0].bits.bit2)
+                {
+                    clearableSource.push_back("UnsupportedRequestCounts");
+                }
+                if(clearable_source[0].bits.bit3)
+                {
+                    clearableSource.push_back("CorresctableErrorCount");
+                }
+                result["ClearableSource"] = clearableSource;
+
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+           case GROUP_ID_3:
+           {
+                bitfield8_t available_source[1];
+                bitfield8_t clearable_source[1];
+                uint8_t mask_length;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(nsm_msg_hdr) +
+                            sizeof(
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp
+                                ));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                if(available_source[0].bits.bit0)
+                {
+                    availableSource.push_back("L0ToRecoveryCount");
+                }
+                result["AvailableSource"] = availableSource;
+
+                if(clearable_source[0].bits.bit0)
+                {
+                    clearableSource.push_back("L0ToRecoveryCount");
+                }
+                result["ClearableSource"] = clearableSource;
+
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+           case GROUP_ID_4:
+            {
+                bitfield8_t available_source[1];
+                bitfield8_t clearable_source[1];
+                uint8_t mask_length;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(nsm_msg_hdr) +
+                            sizeof(
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp
+                                ));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                
+                if(available_source[0].bits.bit0)
+                {
+                    availableSource.push_back("RecieverErrorCount");
+                }
+                if(available_source[0].bits.bit1)
+                {
+                    availableSource.push_back("NaksRecievedCount");
+                }
+                if(available_source[0].bits.bit2)
+                {
+                    availableSource.push_back("NaksSentCount");
+                }
+                if(available_source[0].bits.bit3)
+                {
+                    availableSource.push_back("BadTlpCount");
+                }
+                if(available_source[0].bits.bit4)
+                {
+                    availableSource.push_back("ReplayRollOverCount");
+                }
+                if(available_source[0].bits.bit5)
+                {
+                    availableSource.push_back("FcTimeoutErrorCount");
+                }
+                if(available_source[0].bits.bit6)
+                {
+                    availableSource.push_back("ReplayCount");
+                }
+                result["AvailableSource"] = availableSource;
+
+               if(clearable_source[0].bits.bit0)
+                {
+                    clearableSource.push_back("RecieverErrorCount");
+                }
+                if(clearable_source[0].bits.bit1)
+                {
+                    clearableSource.push_back("NaksRecievedCount");
+                }
+                if(available_source[0].bits.bit2)
+                {
+                    clearableSource.push_back("NaksSentCount");
+                }
+                if(clearable_source[0].bits.bit3)
+                {
+                    clearableSource.push_back("BadTlpCount");
+                }
+                if(clearable_source[0].bits.bit4)
+                {
+                    clearableSource.push_back("ReplayRollOverCount");
+                }
+                if(clearable_source[0].bits.bit5)
+                {
+                    clearableSource.push_back("FcTimeoutErrorCount");
+                }
+                if(clearable_source[0].bits.bit6)
+                {
+                    clearableSource.push_back("ReplayCount");
+                }
+                result["clearableSource"] = clearableSource;
+              
+                
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+           case GROUP_ID_8:
+           {
+                bitfield8_t available_source[1];
+                bitfield8_t clearable_source[1];
+                uint8_t mask_length;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(nsm_msg_hdr) +
+                            sizeof(
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp
+                                ));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                if(available_source[0].bits.bit0)
+                {
+                    availableSource.push_back("PerLaneErrorCounts");
+                }
+                result["AvailableSource"] = availableSource;
+
+                if(clearable_source[0].bits.bit0)
+                {
+                    clearableSource.push_back("PerLaneErrorCounts");
+                }
+                result["ClearableSource"] = clearableSource;
+
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+            
+            case GROUP_ID_9:
+           {
+                bitfield8_t available_source[1];
+                bitfield8_t clearable_source[1];
+                uint8_t mask_length;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(nsm_msg_hdr) +
+                            sizeof(
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp
+                                ));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                if(available_source[0].bits.bit0)
+                {
+                    availableSource.push_back("AerUncorrectableErrorStatus");
+                }
+                if(available_source[0].bits.bit1)
+                {
+                    availableSource.push_back("AerCorrectableErrorStatus");
+                }
+                result["AvailableSource"] = availableSource;
+                if(clearable_source[0].bits.bit0)
+                {
+                    clearableSource.push_back("AerUncorrectableErrorStatus");
+                }
+
+                if(clearable_source[0].bits.bit1)
+                {
+                    clearableSource.push_back("AerCorrectableErrorStatus");
+                }
+                result["ClearableSource"] = clearableSource;
+
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+          
+            default:
+            {
+                std::cerr << "Invalid Group Id \n";
+                break;
+            }
+        }
+    }
+
+  private:
+    uint8_t deviceIndex;
+    uint8_t groupId;
+};
+
 class PcieFundamentalReset : public CommandInterface
 {
   public:
@@ -2115,6 +2470,72 @@ class PcieFundamentalReset : public CommandInterface
 
     uint8_t device_index;
     uint8_t action;
+};
+
+class ClearScalarDataSource : public CommandInterface
+{
+  public:
+    ~ClearScalarDataSource() = default;
+    ClearScalarDataSource() = delete;
+    ClearScalarDataSource(const ClearScalarDataSource&) = delete;
+    ClearScalarDataSource(ClearScalarDataSource&&) = default;
+    ClearScalarDataSource& operator=(const ClearScalarDataSource&) = delete;
+    ClearScalarDataSource& operator=(ClearScalarDataSource&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit ClearScalarDataSource(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-d, --device_index", device_index,
+                        "Device Index for which reset is performed")
+            ->required();
+        app->add_option("-g, --groupId", groupId,
+                        "Identifier of group to query")
+            ->required();
+        app->add_option("-i, --dsId", dsId,
+                        "Index of data source within the group")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_clear_data_source_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_clear_data_source_v1_req(instanceId, device_index,
+                                                  groupId, dsId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_clear_data_source_v1_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint8_t device_index;
+    uint8_t groupId;
+    uint8_t dsId;
 };
 
 class GetClockLimit : public CommandInterface
@@ -3349,10 +3770,21 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<QueryScalarGroupTelemetry>(
         "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
 
+    auto queryAvailableAndClearableScalarGroup = telemetry->add_subcommand(
+        "QueryAvailableAndClearableScalarGroup", "retrieve available and clearable Scalar Data source for the group");
+    commands.push_back(std::make_unique<QueryAvailableAndClearableScalarGroup>(
+        "telemetry", "QueryAvailableAndClearableScalarGroup", queryAvailableAndClearableScalarGroup));
+
     auto pcieFundamentalReset = telemetry->add_subcommand(
         "PcieFundamentalReset", "Assert PCIe Fundamental Reset action");
     commands.push_back(std::make_unique<PcieFundamentalReset>(
         "telemetry", "PcieFundamentalReset", pcieFundamentalReset));
+
+    auto clearScalarDataSource = telemetry->add_subcommand(
+        "ClearScalarDataSource", "Clear Scalar Data Source");
+    commands.push_back(std::make_unique<ClearScalarDataSource>(
+        "telemetry", "ClearScalarDataSource", clearScalarDataSource));
+        
     auto getClockLimit = telemetry->add_subcommand(
         "GetClockLimit", "retrieve clock Limit for clockId");
     commands.push_back(std::make_unique<GetClockLimit>(

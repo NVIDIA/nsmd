@@ -23,8 +23,14 @@ extern "C" {
 #define GROUP_ID_8 8
 #define GROUP_ID_9 9
 
-enum pci_links_command { NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04,
-                         NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60 };
+#define MAX_SUPPORTED_DATA_MASK_LENGTH 1
+
+enum pci_links_command {
+	NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04,
+	NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES = 0x02,
+	NSM_CLEAR_DATA_SOURCE_V1 = 0x05,
+	NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60
+};
 
 /** @struct nsm_query_scalar_group_telemetry_v1_req
  *
@@ -519,6 +525,150 @@ int encode_assert_pcie_fundamental_reset_resp(uint8_t instance_id, uint8_t cc,
  *  @return nsm_completion_codes
  */
 int decode_assert_pcie_fundamental_reset_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code);
+
+/** @struct nsm_query_available_clearable_scalar_data_sources_v1_req
+ *
+ *  Structure representing Query Scalable and Clearable Scalar data sources v1
+ * request.
+ */
+struct nsm_query_available_clearable_scalar_data_sources_v1_req {
+	struct nsm_common_req hdr;
+	uint8_t device_index;
+	uint8_t group_id;
+} __attribute__((packed));
+
+/** @struct nsm_query_available_clearable_scalar_data_sources_v1_resp
+ *
+ *  Structure representing Query Scalable and Clearable Scalar data sources v1
+ * response.
+ */
+struct nsm_query_available_clearable_scalar_data_sources_v1_resp {
+	struct nsm_common_resp hdr;
+	uint8_t mask_length;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @brief Encode a Query Scalable and Clearable Scalar data sources v1 request
+ * message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_index - device index for the query
+ *  @param[in] group_id - id of group
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_available_clearable_scalar_data_sources_v1_req(
+    uint8_t instance_id, uint8_t device_index, uint8_t group_id,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Query Scalable and Clearable Scalar data sources v1 request
+ * message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_index - device id for the query
+ *  @param[out] group_id - id of group
+ *  @return nsm_completion_codes
+ */
+int decode_query_available_clearable_scalar_data_sources_v1_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *device_index,
+    uint8_t *group_id);
+
+/** @brief Encode a Query Scalable and Clearable Scalar data sources v1 response
+ * message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] mask_length - length of supported masks
+ *  @param[in] available_data_source_mask -  mask representing available data
+ * sources
+ *  @param[in] clearable_data_source_mask -  mask representing clearable data
+ * sources
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_query_available_clearable_scalar_data_sources_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const uint16_t data_size, uint8_t mask_length,
+    uint8_t *available_data_source_mask, uint8_t *clearable_data_source_mask,
+    struct nsm_msg *msg);
+
+/** @brief Decode Query Scalable and Clearable Scalar data sources v1 message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size
+ *  @param[out] mask_length - length of supported masks
+ *  @param[out] available_data_source_mask -  mask representing available data
+ * sources
+ *  @param[out] clearable_data_source_mask -  mask representing clearable data
+ * sources
+ *  @return nsm_completion_codes
+ */
+
+int decode_query_available_clearable_scalar_data_sources_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint8_t *mask_length,
+    uint8_t *available_data_source_mask, uint8_t *clearable_data_source_mask);
+
+/** @struct nsm_clear_data_source_v1_req
+ *
+ *  Structure representing NSM Clear Data Source V1 Request.
+ */
+struct nsm_clear_data_source_v1_req {
+	struct nsm_common_req hdr;
+	uint8_t device_index;
+	uint8_t groupId;
+	uint8_t dsId;
+} __attribute__((packed));
+
+/** @brief Encode a NSM Clear Data Source V1 Request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_index - Device Index
+ *  @param[in] groupId - Identifier of group to query
+ *  @param[in] dsId - Index of data source within the group.
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_clear_data_source_v1_req(uint8_t instance_id, uint8_t device_index, uint8_t groupId, uint8_t dsId,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a NSM Clear Data Source V1 Request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_index - Device Index
+ *  @param[out] groupId - Identifier of group to query
+ *  @param[out] dsId - Index of data source within the group.
+ *  @return nsm_completion_codes
+ */
+int decode_clear_data_source_v1_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *device_index, uint8_t *groupId, uint8_t *dsId);
+
+/** @brief Encode a NSM Clear Data Source V1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_clear_data_source_v1_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a NSM Clear Data Source V1 Response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size
+ *  @param[out] reason_code - reason code
+ *  @return nsm_completion_codes
+ */
+int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code);
 
