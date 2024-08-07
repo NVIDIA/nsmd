@@ -83,8 +83,8 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
                                                    responseLen);
         if (rc_)
         {
-            lg2::error("SendRecvNsmMsgSync failed.eid={EID} rc={RC}", "EID",
-                       eid, "RC", rc_);
+            lg2::error("SendRecvNsmMsg failed.eid={EID} rc={RC}", "EID", eid,
+                       "RC", rc_);
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         uint8_t cc = NSM_ERROR;
@@ -142,7 +142,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
         if (rc_)
         {
             lg2::error(
-                "clearPowerCapOnDevice SendRecvNsmMsgSync failed for while setting power limit for eid = {EID} rc = {RC}",
+                "clearPowerCapOnDevice SendRecvNsmMsg failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;

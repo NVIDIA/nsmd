@@ -31,6 +31,8 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmReconfigPermissions.hpp"
+#include "nsmSetCpuOperatingConfig.hpp"
+#include "nsmSetECCMode.hpp"
 
 #include <stdint.h>
 
@@ -211,10 +213,9 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
-                       std::shared_ptr<NsmEccModeIntf> eccIntf,
+                       std::shared_ptr<EccModeIntf> eccIntf,
                        std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     eccModeIntf = eccIntf;
@@ -292,10 +293,9 @@ void NsmEccMode::updateReading(bitfield8_t flags)
 }
 
 NsmEccErrorCounts::NsmEccErrorCounts(std::string& name, std::string& type,
-                                     std::shared_ptr<NsmEccModeIntf> eccIntf,
+                                     std::shared_ptr<EccModeIntf> eccIntf,
                                      std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
@@ -831,10 +831,9 @@ uint8_t
 
 NsmClockLimitGraphics::NsmClockLimitGraphics(
     const std::string& name, const std::string& type,
-    std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmClockLimitGraphics: create sensor:{NAME}", "NAME",
@@ -866,18 +865,17 @@ void NsmClockLimitGraphics::updateMetricOnSharedMemory()
 void NsmClockLimitGraphics::updateReading(
     const struct nsm_clock_limit& clockLimit)
 {
-    cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLimit(
-        clockLimit.present_limit_max);
+    cpuOperatingConfigIntf->speedLimit(clockLimit.present_limit_max);
     if (clockLimit.present_limit_max == clockLimit.present_limit_min)
     {
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLocked(true);
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig(
+        cpuOperatingConfigIntf->speedLocked(true);
+        cpuOperatingConfigIntf->speedConfig(
             std::make_tuple(true, (uint32_t)clockLimit.present_limit_max));
     }
     else
     {
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLocked(false);
-        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig(
+        cpuOperatingConfigIntf->speedLocked(false);
+        cpuOperatingConfigIntf->speedConfig(
             std::make_tuple(false, (uint32_t)clockLimit.present_limit_max),
             true);
     }
@@ -2085,8 +2083,8 @@ void createNsmProcessorSensor(SensorManager& manager,
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
 
-        auto eccIntf = std::make_shared<NsmEccModeIntf>(
-            bus, inventoryObjPath.c_str(), nsmDevice);
+        auto eccIntf = std::make_shared<EccModeIntf>(bus,
+                                                     inventoryObjPath.c_str());
 
         auto eccModeSensor = std::make_shared<NsmEccMode>(name, type, eccIntf,
                                                           inventoryObjPath);
@@ -2097,6 +2095,13 @@ void createNsmProcessorSensor(SensorManager& manager,
             name, type, eccIntf, inventoryObjPath);
 
         nsmDevice->addSensor(eccErrorCntSensor, priority);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(eccIntf->interface, "ECCModeEnabled",
+                                   AsyncSetOperationInfo{setECCModeEnabled,
+                                                         eccModeSensor,
+                                                         nsmDevice});
     }
     else if (type == "NSM_EDPp")
     {
@@ -2110,9 +2115,8 @@ void createNsmProcessorSensor(SensorManager& manager,
     {
         auto priority = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
-        auto cpuOperatingConfigIntf =
-            std::make_shared<NsmCpuOperatingConfigIntf>(
-                bus, inventoryObjPath.c_str(), nsmDevice, GRAPHICS_CLOCK);
+        auto cpuOperatingConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
+            bus, inventoryObjPath.c_str());
 
         auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
             name, type, cpuOperatingConfigIntf, inventoryObjPath);
@@ -2132,6 +2136,14 @@ void createNsmProcessorSensor(SensorManager& manager,
 
         nsmDevice->addStaticSensor(minGraphicsClockFreq);
         nsmDevice->addStaticSensor(maxGraphicsClockFreq);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                cpuOperatingConfigIntf->interface, "SpeedConfig",
+                AsyncSetOperationInfo{
+                    std::bind_front(setCPUSpeedConfig, GRAPHICS_CLOCK),
+                    clockLimitSensor, nsmDevice});
     }
     else if (type == "NSM_ProcessorPerformance")
     {
@@ -2181,6 +2193,16 @@ void createNsmProcessorSensor(SensorManager& manager,
         // create power cap , clear power cap and power limit interface
         auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
             bus, inventoryObjPath.c_str(), name, candidateForList, nsmDevice);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                powerCapIntf->interface, "PowerCap",
+                AsyncSetOperationInfo{
+                    std::bind_front(&NsmPowerCapIntf::setPowerCap,
+                                    powerCapIntf),
+                    {},
+                    nsmDevice});
 
         auto clearPowerCapIntf = std::make_shared<NsmClearPowerCapIntf>(
             bus, inventoryObjPath.c_str());

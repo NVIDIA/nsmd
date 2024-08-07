@@ -38,5 +38,6 @@ class NsmReset : public NsmObject
 
   private:
     std::shared_ptr<ResetIntf> resetIntf = nullptr;
+    std::shared_ptr<NsmResetAsyncIntf> resetAsyncIntf = nullptr;
 };
 } // namespace nsm

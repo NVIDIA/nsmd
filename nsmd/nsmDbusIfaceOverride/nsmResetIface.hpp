@@ -1,6 +1,7 @@
 #pragma once
 #include "pci-links.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
 
@@ -8,6 +9,7 @@
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Control/Processor/Reset/server.hpp>
+#include <xyz/openbmc_project/Control/Processor/ResetAsync/server.hpp>
 
 #include <cstdint>
 
@@ -16,16 +18,29 @@ namespace nsm
 using ResetIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::control::processor::Reset>;
 
+using ResetAsyncIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::processor::ResetAsync>;
+
 class NsmResetIntf : public ResetIntf
 {
   public:
-    NsmResetIntf(sdbusplus::bus::bus& bus, const char* path, std::shared_ptr<NsmDevice> device,
-                 uint8_t deviceIndex) :
-        ResetIntf(bus, path),
-        device(device), deviceIndex(deviceIndex)
+    using ResetIntf::ResetIntf;
+
+    int reset() override
+    {
+        return 0;
+    }
+};
+
+class NsmResetAsyncIntf : public ResetAsyncIntf
+{
+  public:
+    NsmResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                      std::shared_ptr<NsmDevice> device, uint8_t deviceIndex) :
+        ResetAsyncIntf(bus, path), device(device), deviceIndex(deviceIndex)
     {}
 
-    int assertFundamentalReset(uint8_t action)
+    requester::Coroutine assertFundamentalReset(uint8_t action)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -41,20 +56,19 @@ class NsmResetIntf : public ResetIntf
                 "assertFundamentalReset encode_assert_pcie_fundamental_reset_req failed. "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
-            return rc;
+            co_return rc;
         }
         std::shared_ptr<const nsm_msg> responseMsg = NULL;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
-
-            lg2::error("SendRecvNsmMsgSync failed for gpuFundamentalReset"
+            lg2::error("SendRecvNsmMsg failed for gpuFundamentalReset"
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
 
-            return rc_;
+            co_return rc_;
         }
 
         uint8_t cc = NSM_ERROR;
@@ -68,7 +82,7 @@ class NsmResetIntf : public ResetIntf
             lg2::info(
                 "assertFundamentalReset for EID: {EID} completed for action {ACTION}",
                 "EID", eid, "ACTION", action);
-            return NSM_SW_SUCCESS;
+            co_return NSM_SW_SUCCESS;
         }
         else
         {
@@ -77,31 +91,51 @@ class NsmResetIntf : public ResetIntf
                 "ACTION", action, "REASONCODE", reason_code, "CC", cc, "RC",
                 rc);
         }
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    int reset() override
+
+    requester::Coroutine
+        doResetOnDevice(std::shared_ptr<AsyncStatusIntf> statusInterface)
     {
-        auto rc = assertFundamentalReset(RESET);
+        AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+        auto rc = co_await assertFundamentalReset(RESET);
         if (rc != 0)
         {
             lg2::error("assertFundamentalReset failed while doing RESET");
-            throw sdbusplus::xyz::openbmc_project::Common::Error::
-                InternalFailure();
-            return 1;
+            status = AsyncOperationStatusType::InternalFailure;
         }
         else
         {
-            auto rc_ = assertFundamentalReset(NOT_RESET);
+            auto rc_ = co_await assertFundamentalReset(NOT_RESET);
             if (rc_ != 0)
             {
                 lg2::error(
                     "assertFundamentalReset failed while doing NOT_RESET");
-                throw sdbusplus::xyz::openbmc_project::Common::Error::
-                    InternalFailure();
-                return 1;
+                status = AsyncOperationStatusType::InternalFailure;
             }
         }
-        return 0;
+
+        statusInterface->status(status);
+
+        co_return NSM_SW_SUCCESS;
+    }
+
+    sdbusplus::message::object_path reset() override
+    {
+        const auto [objectPath, statusInterface, _] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        if (objectPath.empty())
+        {
+            lg2::error(
+                "Reset failed. No available result Object to allocate for the Post Request.");
+            throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+        }
+
+        doResetOnDevice(statusInterface).detach();
+
+        return objectPath;
     }
 
   private:

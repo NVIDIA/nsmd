@@ -1,6 +1,8 @@
 sources += [
     'nsmSetAsync/asyncOperationManager.cpp',
     'nsmSetAsync/nsmSetMigMode.cpp',
+    'nsmSetAsync/nsmSetECCMode.cpp',
+    'nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmSetAsync']
