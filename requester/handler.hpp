@@ -26,6 +26,7 @@
 #include "nsmd/instance_id.hpp"
 #include "nsmd/socket_manager.hpp"
 #include "request.hpp"
+#include "request_timeout_tracker.hpp"
 
 #include <function2/function2.hpp>
 #include <phosphor-logging/lg2.hpp>
@@ -88,8 +89,9 @@ class Handler
         uint8_t numRetries = static_cast<uint8_t>(NUMBER_OF_REQUEST_RETRIES),
         std::chrono::milliseconds responseTimeOut =
             std::chrono::milliseconds(RESPONSE_TIME_OUT)) :
-        event(event), instanceIdDb(instanceIdDb), sockManager(sockManager),
-        verbose(verbose), instanceIdExpiryInterval(instanceIdExpiryInterval),
+        event(event),
+        instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
+        instanceIdExpiryInterval(instanceIdExpiryInterval),
         numRetries(numRetries), responseTimeOut(responseTimeOut)
     {}
 
@@ -112,11 +114,19 @@ class Handler
             {
                 auto& [request, responseHandler, timerInstance,
                        valid] = handlers[eid].front();
-                lg2::error("Response not received for the request, instance ID "
-                           "expired. EID={EID}, INSTANCE_ID={INSTANCE_ID} ,"
-                           "TYPE={TYPE}, COMMAND={COMMAND}",
-                           "EID", eid, "INSTANCE_ID", request->getInstanceId(),
-                           "TYPE", type, "COMMAND", command);
+
+                // Note1: timeOutTracker object can be updated through
+                // TimeoutEvent or a succesfull responseMsg, for  handling
+                // please refer handleResponse as well.
+
+                // Note2: timeoutTracker code should be above request->stop() or
+                // any operation that can change requestMsg as part of cleanup
+                nsm::DeviceRequestTimeOutTracker& timeoutTracker =
+                    nsm::TimeOutTracker::getInstance().getDeviceTimeOutTracker(
+                        eid);
+                std::string msg = request->requestMsgToString();
+                timeoutTracker.handleTimeout(msg);
+
                 request->stop();
                 auto rc = timerInstance->stop();
                 if (rc)
@@ -135,7 +145,8 @@ class Handler
                         std::bind(&Handler::removeRequestEntry, this, eid));
 
                 // Call responseHandler after erase it from the handlers to
-                // avoid starting the same request again in runRegisteredRequest()
+                // avoid starting the same request again in
+                // runRegisteredRequest()
                 auto unique_handler = std::move(responseHandler);
 
                 instanceIdDb.free(eid, request->getInstanceId());
@@ -235,7 +246,7 @@ class Handler
      *  @param[in] response - NSM response message
      *  @param[in] respMsgLen - length of the response message
      */
-    void handleResponse(eid_t eid, uint8_t instanceId,
+    void handleResponse([[maybe_unused]] eid_t eid, uint8_t instanceId,
                         [[maybe_unused]] uint8_t type,
                         [[maybe_unused]] uint8_t command,
                         const nsm_msg* response, size_t respMsgLen)
@@ -246,6 +257,18 @@ class Handler
                    valid] = handlers[eid].front();
             if (request->getInstanceId() == instanceId)
             {
+                // Note1: timeOutTracker can be updated through TimeoutEvent or
+                // a succesfull responseMsg, for better handling please refer
+                // instanceIdExpiryCallBack as well
+
+                // Note2: timeoutTracker code should be above request->stop() or
+                // any operation that can change requestMsg as part of cleanup
+                nsm::DeviceRequestTimeOutTracker& timeoutTracker =
+                    nsm::TimeOutTracker::getInstance().getDeviceTimeOutTracker(
+                        eid);
+                std::string msg = request->requestMsgToString();
+                timeoutTracker.handleNoTimeout(msg);
+
                 request->stop();
                 auto rc = timerInstance->stop();
                 if (rc)
@@ -422,17 +445,18 @@ struct SendRecvNsmMsg
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
                    size_t* responseLen) :
-        handler(handler), eid(eid), request(request), responseMsg(responseMsg),
+        handler(handler),
+        eid(eid), request(request), responseMsg(responseMsg),
         responseLen(responseLen), rc(NSM_ERROR)
     {}
 
     /** @brief The function will be registered by ReqisterHandler for handling
      * NSM response message. */
-    void HandleResponse(eid_t eid, const nsm_msg* response, size_t length)
+    void HandleResponse([[maybe_unused]] eid_t eid, const nsm_msg* response,
+                        size_t length)
     {
         if (response == nullptr || !length)
         {
-            lg2::error("No response received, EID={EID}", "EID", eid);
             rc = NSM_SW_ERROR_NULL;
         }
         else

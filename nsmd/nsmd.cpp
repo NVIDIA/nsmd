@@ -22,12 +22,13 @@
 #include "eventType0Handler.hpp"
 #include "eventType3Handler.hpp"
 #include "instance_id.hpp"
+#include "nsmDbusIfaceOverride/nsmLogDumpOnDemand.hpp"
 #include "nsmDevice.hpp"
+#include "nsmServiceReadyInterface.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "socket_handler.hpp"
 #include "socket_manager.hpp"
-#include "nsmServiceReadyInterface.hpp"
 
 #include <err.h>
 #include <getopt.h>
@@ -103,7 +104,8 @@ int main(int argc, char** argv)
         auto event = sdeventplus::Event::get_default();
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
         sdbusplus::server::manager::manager rootObjManager(bus, "/");
-        sdbusplus::server::manager::manager inventoryObjManager(bus, "/xyz/openbmc_project/inventory");
+        sdbusplus::server::manager::manager inventoryObjManager(
+            bus, "/xyz/openbmc_project/inventory");
 
         bus.request_name("xyz.openbmc_project.NSM");
         nsm::InstanceIdDb instanceIdDb;
@@ -122,7 +124,12 @@ int main(int argc, char** argv)
         nsm::NsmDeviceTable nsmDevices;
 
         // Initialize the singleton instance
-        nsm::NsmServiceReadyIntf::initialize(bus, "/xyz/openbmc_project/NSM", nsmDevices);
+        nsm::NsmServiceReadyIntf::initialize(bus, "/xyz/openbmc_project/NSM",
+                                             nsmDevices);
+
+        // Initialize the singleton instance for on demand logging of critical
+        // logs
+        nsm::NsmLogDumpTracker::initialize(bus, "/xyz/openbmc_project/NSM");
 
         // Initialize the DeviceManager before getting its instance
         nsm::DeviceManager::initialize(event, reqHandler, instanceIdDb,

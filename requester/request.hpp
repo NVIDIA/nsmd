@@ -18,6 +18,7 @@
 #pragma once
 
 #include "libnsm/base.h"
+#include "libnsm/requester/mctp.h"
 
 #include "common/types.hpp"
 #include "common/utils.hpp"
@@ -66,7 +67,8 @@ class RequestRetryTimer
     explicit RequestRetryTimer(sdeventplus::Event& event, uint8_t numRetries,
                                std::chrono::milliseconds timeout) :
 
-        event(event), numRetries(numRetries), timeout(timeout),
+        event(event),
+        numRetries(numRetries), timeout(timeout),
         timer(event.get(), std::bind_front(&RequestRetryTimer::callback, this))
     {}
 
@@ -169,8 +171,8 @@ class Request final : public RequestRetryTimer
     explicit Request(int fd, eid_t eid, sdeventplus::Event& event,
                      std::vector<uint8_t>&& requestMsg, uint8_t numRetries,
                      std::chrono::milliseconds timeout, bool verbose) :
-        RequestRetryTimer(event, numRetries, timeout), fd(fd), eid(eid),
-        requestMsg(std::move(requestMsg)), verbose(verbose)
+        RequestRetryTimer(event, numRetries, timeout),
+        fd(fd), eid(eid), requestMsg(std::move(requestMsg)), verbose(verbose)
     {}
 
     uint8_t getInstanceId()
@@ -183,6 +185,17 @@ class Request final : public RequestRetryTimer
     {
         auto nsmMsg = reinterpret_cast<nsm_msg*>(requestMsg.data());
         nsmMsg->hdr.instance_id = instanceId;
+    }
+
+    std::string requestMsgToString() const
+    {
+        std::ostringstream oss;
+        for (const auto& byte : requestMsg)
+        {
+            oss << std::setfill('0') << std::setw(2) << std::hex
+                << static_cast<int>(byte) << " ";
+        }
+        return oss.str();
     }
 
   private:

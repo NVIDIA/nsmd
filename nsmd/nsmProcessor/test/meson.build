@@ -21,6 +21,7 @@ dep_src_files = [
     '../../../libnsm/pci-links.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
+    '../../../requester/request_timeout_tracker.cpp'
 ]
 
 dep_src_headers = [

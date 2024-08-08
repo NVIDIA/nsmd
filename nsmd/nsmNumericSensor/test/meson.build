@@ -27,6 +27,7 @@ dep_src_files = [
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
+    '../../../requester/request_timeout_tracker.cpp'
 ]
 
 dep_src_headers = [
