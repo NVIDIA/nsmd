@@ -151,6 +151,83 @@ TEST(nsmRowRemappingCounts, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 
+TEST(nsmRemappingAvailabilityBankCount, GoodGenReq)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmRemappingAvailabilityBankCount sensor(
+        sensorName, sensorType, rowRemapIntf, inventoryObjPath);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_GET_ROW_REMAP_AVAILABILITY);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmRemappingAvailabilityBankCount, GoodHandleResp)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmRemappingAvailabilityBankCount sensor(
+        sensorName, sensorType, rowRemapIntf, inventoryObjPath);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_get_row_remap_availability_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_row_remap_availability data;
+    data.high_remapping = 100;
+    data.low_remapping = 200;
+    data.max_remapping = 300;
+    data.no_remapping = 400;
+    data.partial_remapping = 500;
+
+    uint8_t rc = encode_get_row_remap_availability_resp(
+        0, NSM_SUCCESS, reason_code, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmRemappingAvailabilityBankCount, BadHandleResp)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    nsm::NsmRemappingAvailabilityBankCount sensor(
+        sensorName, sensorType, rowRemapIntf, inventoryObjPath);
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_get_row_remap_availability_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_row_remap_availability data;
+    data.high_remapping = 100;
+    data.low_remapping = 200;
+    data.max_remapping = 300;
+    data.no_remapping = 400;
+    data.partial_remapping = 500;
+
+    uint8_t rc = encode_get_row_remap_availability_resp(
+        0, NSM_SUCCESS, reason_code, &data, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    rc = sensor.handleResponseMsg(response, 0);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}
+
 TEST(nsmEccErrorCountsDram, GoodGenReq)
 {
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
@@ -170,7 +247,7 @@ TEST(nsmEccErrorCountsDram, GoodGenReq)
     EXPECT_EQ(command->data_size, 0);
 }
 
-TEST(nsmEccErrorCountsDram_GoodGenReq_Test, GoodHandleResp)
+TEST(nsmEccErrorCountsDram, GoodHandleResp)
 {
     auto eccIntf = std::make_shared<EccModeIntfDram>(bus,
                                                      inventoryObjPath.c_str());

@@ -3093,6 +3093,58 @@ class GetRowRemappingCounts : public CommandInterface
     }
 };
 
+class GetRowRemapAvailability : public CommandInterface
+{
+  public:
+    ~GetRowRemapAvailability() = default;
+    GetRowRemapAvailability() = delete;
+    GetRowRemapAvailability(const GetRowRemapAvailability&) = delete;
+    GetRowRemapAvailability(GetRowRemapAvailability&&) = default;
+    GetRowRemapAvailability& operator=(const GetRowRemapAvailability&) = delete;
+    GetRowRemapAvailability& operator=(GetRowRemapAvailability&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_row_remap_availability_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        struct nsm_row_remap_availability data;
+        uint16_t data_size;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_get_row_remap_availability_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code, &data);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_row_remap_availability_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["NoRemappingAvailability"] = (uint16_t)data.no_remapping;
+        result["LowRemappingAvaialability"] = (uint16_t)data.low_remapping;
+        result["PartialRemappingAvailability"] = (uint16_t)data.partial_remapping;
+        result["HighRemappingAvailability"] = (uint16_t)data.high_remapping;
+        result["MaxRemappingAvailability"] = (uint16_t)data.max_remapping;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 class GetMemoryCapacityUtil : public CommandInterface
 {
   public:
@@ -3824,6 +3876,11 @@ void registerCommand(CLI::App& app)
         "GetRowRemappingCounts", "get Row Remapping Error Counts");
     commands.push_back(std::make_unique<GetRowRemappingCounts>(
         "telemetry", "GetRowRemappingCounts", getRowRemappingCounts));
+    
+    auto getRowRemapAvailability = telemetry->add_subcommand(
+        "GetRowRemapAvailability", "get Row Remapping Availability ");
+    commands.push_back(std::make_unique<GetRowRemapAvailability>(
+        "telemetry", "GetRowRemapAvailability", getRowRemapAvailability));
 
     auto getMemoryCapacityUtil = telemetry->add_subcommand(
         "GetMemoryCapacityUtil", "Get memory Capacity Capacity Utilization");
