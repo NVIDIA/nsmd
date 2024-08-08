@@ -32,7 +32,10 @@ FirmwareSlot::FirmwareSlot(sdbusplus::bus::bus& bus, const std::string& name,
     BuildType(bus, slotName(name, slot).c_str()),
     AssociationDefinitionsIntf(bus, slotName(name, slot).c_str()),
     SlotIntf(bus, slotName(name, slot).c_str()),
-    StateIntf(bus, slotName(name, slot).c_str())
+    StateIntf(bus, slotName(name, slot).c_str()),
+    ExtendedVersionIntf(bus, slotName(name, slot).c_str()),
+    VersionComparisonIntf(bus, slotName(name, slot).c_str()),
+    SettingsIntf(bus, slotName(name, slot).c_str())
 {
     std::vector<std::tuple<std::string, std::string, std::string>>
         associations_list;
@@ -93,6 +96,10 @@ void FirmwareSlot::update(
     slotId(info.slot_id);
     isActive(fq_resp_hdr.active_slot == info.slot_id);
     updateActiveSlotAssociation();
+    extendedVersion(std::string(
+        reinterpret_cast<const char*>(info.firmware_version_string)));
+    firmwareComparisonNumber(info.version_comparison_stamp);
+    writeProtected(info.write_protect_state);
 }
 
 NsmBuildTypeObject::NsmBuildTypeObject(

@@ -27,6 +27,9 @@
 #include <xyz/openbmc_project/Software/BuildType/server.hpp>
 #include <xyz/openbmc_project/Software/Slot/server.hpp>
 #include <xyz/openbmc_project/Software/State/server.hpp>
+#include <xyz/openbmc_project/Software/ExtendedVersion/server.hpp>
+#include <xyz/openbmc_project/Software/VersionComparison/server.hpp>
+#include <xyz/openbmc_project/Software/Settings/server.hpp>
 
 #include <array>
 #include <memory>
@@ -42,12 +45,21 @@ using BuildTypeIntf = object_t<BuildType>;
 using SlotIntf = object_t<Slot>;
 using StateIntf =
     object_t<sdbusplus::server::xyz::openbmc_project::software::State>;
+using ExtendedVersionIntf = object_t<
+    sdbusplus::server::xyz::openbmc_project::software::ExtendedVersion>;
+using VersionComparisonIntf = object_t<
+    sdbusplus::server::xyz::openbmc_project::software::VersionComparison>;
+using SettingsIntf = object_t<
+    sdbusplus::server::xyz::openbmc_project::software::Settings>;
 
 class FirmwareSlot :
     public BuildType,
     AssociationDefinitionsIntf,
     SlotIntf,
-    StateIntf
+    StateIntf,
+    ExtendedVersionIntf,
+    VersionComparisonIntf,
+    SettingsIntf
 {
   private:
     static auto slotName(const std::string& name, int slotNum)
