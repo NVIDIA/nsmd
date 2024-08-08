@@ -63,6 +63,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.active_keyset = 1;
         fq_resp.fq_resp_hdr.inband_update_policy = 1;
         fq_resp.fq_resp_hdr.minimum_security_version = 1;
+        fq_resp.fq_resp_hdr.boot_status_code = 1;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -108,6 +109,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.active_keyset = 1;
         fq_resp.fq_resp_hdr.inband_update_policy = 1;
         fq_resp.fq_resp_hdr.minimum_security_version = 1;
+        fq_resp.fq_resp_hdr.boot_status_code = 1;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -200,6 +202,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.minimum_security_version = 0x3334;
         fq_resp.fq_resp_hdr.inband_update_policy = 0x35;
         fq_resp.fq_resp_hdr.firmware_slot_count = 2;
+        fq_resp.fq_resp_hdr.boot_status_code = 0x0102030405060708;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *

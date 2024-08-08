@@ -173,6 +173,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse)
 	fq_resp.fq_resp_hdr.active_keyset = 0x32;
 	fq_resp.fq_resp_hdr.minimum_security_version = 0x3334;
 	fq_resp.fq_resp_hdr.inband_update_policy = 0x35;
+	fq_resp.fq_resp_hdr.boot_status_code = 0x0102030405060708;
 	fq_resp.fq_resp_hdr.firmware_slot_count = 2;
 
 	fq_resp.slot_info = (struct nsm_firmware_slot_info *)malloc(
@@ -220,7 +221,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(24, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
 }
 
 TEST(QueryFirmwareType, testGoodEncodeResponse2)
@@ -246,6 +247,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse2)
 	fq_resp.fq_resp_hdr.active_keyset = 0x32;
 	fq_resp.fq_resp_hdr.minimum_security_version = 0x3334;
 	fq_resp.fq_resp_hdr.inband_update_policy = 0x35;
+	fq_resp.fq_resp_hdr.boot_status_code = 0x0102030405060708;
 	fq_resp.fq_resp_hdr.firmware_slot_count = 2;
 
 	fq_resp.slot_info = (struct nsm_firmware_slot_info *)malloc(
@@ -293,7 +295,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse2)
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, responseMsg->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_FW_GET_EROT_STATE_INFORMATION, responseTest->hdr.command);
-	EXPECT_EQ(24, responseTest->hdr.telemetry_count);
+	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
 }
 
 TEST(QueryFirmwareType, testGoodDecodeResponse)
@@ -307,14 +309,14 @@ TEST(QueryFirmwareType, testGoodDecodeResponse)
 	    NSM_FW_GET_EROT_STATE_INFORMATION, // command
 	    0,
 	    10,
-	    0, // number of tags: 10
+	    0, // number of tags: 11
 	    NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT,
 	    1,
 	    1, // active slot: 1
 	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
 	    1,
 	    2, // number of slots: 2
-	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+		NSM_FIRMWARE_FIRMWARE_SLOT_ID,
 	    1,
 	    0, // slot 0 tag
 	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
@@ -423,6 +425,143 @@ TEST(QueryFirmwareType, testGoodDecodeResponse)
 	free(erot_info.slot_info);
 }
 
+TEST(QueryFirmwareType, testGoodDecodeResponseRealErot213v)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x81,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_GET_EROT_STATE_INFORMATION, // command
+	    0,
+	    11,
+	    0, // number of tags: 11
+	    NSM_FIRMWARE_BOOT_STATUS_CODE,
+	    7,
+	    0x00,
+	    0x05,
+	    0x01,
+	    0xFD,
+	    0x00,
+	    0x40,
+	    0x11,
+	    0x20,
+	    NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT,
+	    1,
+	    0, // active slot: 1
+	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
+	    1,
+	    2, // number of slots: 2
+		NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    1,
+	    0, // slot 0 tag
+	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
+	    0x0B,
+	    0x30,
+	    0x31,
+	    0x2E,
+	    0x30,
+	    0x33,
+	    0x2E,
+	    0x30,
+	    0x32,
+	    0x31,
+	    0x30,
+	    0x2E,
+	    0x30,
+	    0x30,
+	    0x30,
+	    0x33,
+	    0x5F,
+	    0x6E,
+	    0x30,
+	    0x33,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    NSM_FIRMWARE_BUILD_TYPE,
+	    1,
+	    1, // build type: 1
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    1,
+	    1, // firmware state: 1
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    1,
+	    1, // slot 1 tag
+	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
+	    0x0B,
+	    0x30,
+	    0x31,
+	    0x2E,
+	    0x30,
+	    0x33,
+	    0x2E,
+	    0x30,
+	    0x32,
+	    0x31,
+	    0x30,
+	    0x2E,
+	    0x30,
+	    0x30,
+	    0x30,
+	    0x33,
+	    0x5F,
+	    0x6E,
+	    0x30,
+	    0x33,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    NSM_FIRMWARE_BUILD_TYPE,
+	    1,
+	    2, // build type: 2
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    1,
+	    2 // firmware state: 2
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	struct nsm_firmware_erot_state_info_resp erot_info = {};
+
+	auto rc = decode_nsm_query_get_erot_state_parameters_resp(
+	    response, msg_len, &cc, &reason_code, &erot_info);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+
+	EXPECT_EQ(2, erot_info.fq_resp_hdr.firmware_slot_count);
+	EXPECT_EQ(0, erot_info.fq_resp_hdr.active_slot);
+	EXPECT_EQ(1, erot_info.slot_info[0].build_type);
+	EXPECT_EQ(2, erot_info.slot_info[1].build_type);
+
+	free(erot_info.slot_info);
+}
+
 TEST(QueryFirmwareType, testBadDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
@@ -433,7 +572,7 @@ TEST(QueryFirmwareType, testBadDecodeResponse)
 	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
 	    NSM_FW_GET_EROT_STATE_INFORMATION, // command
 	    0,				       // completion code
-	    25,
+	    26,
 	    0, // number of tags
 	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY,
 	    1,
@@ -448,6 +587,16 @@ TEST(QueryFirmwareType, testBadDecodeResponse)
 	    NSM_FIRMWARE_INBAND_UPDATE_POLICY,
 	    1,
 	    99,
+	    NSM_FIRMWARE_BOOT_STATUS_CODE,
+	    7,
+	    0x08,
+	    0x07,
+	    0x06,
+	    0x05,
+	    0x04,
+	    0x03,
+	    0x02,
+	    0x01,
 	    NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT,
 	    1,
 	    1, // active slot: 1
@@ -611,6 +760,8 @@ TEST(QueryFirmwareType, testBadDecodeResponse)
 	/* In this case there is not enough data to decode one of the tags
 	 * properly */
 	EXPECT_EQ(reason_code, NSM_SW_ERROR_LENGTH);
+	/* Though, some tags should be decoded properly */
+	EXPECT_EQ(0x0102030405060708, erot_info.fq_resp_hdr.boot_status_code);
 	free(erot_info.slot_info);
 
 	cc = NSM_SUCCESS;

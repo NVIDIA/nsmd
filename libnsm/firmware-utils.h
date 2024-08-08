@@ -47,7 +47,7 @@ enum nsm_firmware_state_information_fields {
 	NSM_FIRMWARE_WRITE_PROTECT_STATE = 4,		   // Enum8
 	NSM_FIRMWARE_FIRMWARE_SLOT_COUNT = 5,		   // NvU8
 	NSM_FIRMWARE_FIRMWARE_SLOT_ID = 6,		   // NvU8
-	NSM_FIRMWARE_FIRMWARE_VERSION_STRING = 7,	   // char[16]
+	NSM_FIRMWARE_FIRMWARE_VERSION_STRING = 7,	   // char[]
 	NSM_FIRMWARE_VERSION_COMPARISON_STAMP = 8,	   // NvU32
 	NSM_FIRMWARE_BUILD_TYPE = 9,			   // Enum8
 	NSM_FIRMWARE_SIGNING_TYPE = 10,			   // Enum8
@@ -56,6 +56,7 @@ enum nsm_firmware_state_information_fields {
 	NSM_FIRMWARE_MINIMUM_SECURITY_VERSION_NUMBER = 13, // NvU16
 	NSM_FIRMWARE_SIGNING_KEY_INDEX = 14,		   // NvU16
 	NSM_FIRMWARE_INBAND_UPDATE_POLICY = 15,		   // Enum8
+	NSM_FIRMWARE_BOOT_STATUS_CODE = 16,		   // NvU64
 };
 
 /** @struct nsm_firmware_erot_state_info_hdr_resp
@@ -70,6 +71,7 @@ struct nsm_firmware_erot_state_info_hdr_resp {
 	uint16_t minimum_security_version;
 	uint8_t inband_update_policy;
 	uint8_t firmware_slot_count;
+	uint64_t boot_status_code;
 };
 
 /* This is the maximum string length for firmware

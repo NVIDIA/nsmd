@@ -101,6 +101,8 @@ class QueryFirmwareType : public CommandInterface
             erot_info.fq_resp_hdr.minimum_security_version);
         result["Update policy"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.inband_update_policy);
+        result["Boot status code"] =
+            static_cast<uint64_t>(erot_info.fq_resp_hdr.boot_status_code);
         result["Firmware slot count"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.firmware_slot_count);
 

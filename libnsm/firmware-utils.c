@@ -95,6 +95,24 @@ void encode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t tag,
 	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint32_t) - 1;
 }
 
+void encode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t tag,
+					      uint64_t value,
+					      uint16_t *buffer_size)
+{
+	struct nsm_firmware_aggregate_tag *field =
+	    (struct nsm_firmware_aggregate_tag *)*buffer;
+	field->tag = tag;
+	field->valid = 1;
+	field->length = 3;
+	field->reserved = 0;
+	value = htole64(value);
+	memcpy(field->data, &value, sizeof(uint64_t));
+	*buffer +=
+	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint64_t) - 1;
+	*buffer_size +=
+	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint64_t) - 1;
+}
+
 void encode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
 						   uint8_t tag, uint8_t *value,
 						   uint16_t *buffer_size)
@@ -175,6 +193,29 @@ bool decode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t *tag,
 	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint32_t) - 1;
 	*buffer_size -=
 	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint32_t) - 1;
+	return true;
+}
+
+bool decode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint64_t *value,
+					      uint16_t *buffer_size)
+{
+	if (*buffer_size <
+	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint64_t) - 1) {
+		return false;
+	}
+	struct nsm_firmware_aggregate_tag *field =
+	    (struct nsm_firmware_aggregate_tag *)*buffer;
+	*tag = field->tag;
+	*valid = field->valid;
+	if (field->valid) {
+		memcpy(value, field->data, sizeof(uint64_t));
+		*value = le64toh(*value);
+	}
+	*buffer +=
+	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint64_t) - 1;
+	*buffer_size -=
+	    sizeof(struct nsm_firmware_aggregate_tag) + sizeof(uint64_t) - 1;
 	return true;
 }
 
@@ -313,6 +354,10 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 	    &ptr, NSM_FIRMWARE_INBAND_UPDATE_POLICY,
 	    fw_info->fq_resp_hdr.inband_update_policy, &msg_size);
 	telemetry_count++;
+	encode_nsm_firmware_aggregate_tag_uint64(
+	    &ptr, NSM_FIRMWARE_BOOT_STATUS_CODE,
+	    fw_info->fq_resp_hdr.boot_status_code, &msg_size);
+	telemetry_count++;
 	encode_nsm_firmware_aggregate_tag_uint8(
 	    &ptr, NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
 	    fw_info->fq_resp_hdr.firmware_slot_count, &msg_size);
@@ -441,6 +486,17 @@ int decode_nsm_query_firmware_header_information(
 					    "NSM_FIRMWARE_INBAND_UPDATE_POLICY,"
 					    " value = 0x%02x\n",
 					    fw_info_hdr->inband_update_policy);)
+			}
+		} else if (tag == NSM_FIRMWARE_BOOT_STATUS_CODE) {
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint64(
+			    ptr, &tag, &valid,
+			    &(fw_info_hdr->boot_status_code), payload_size);
+			if (rc_ok) {
+				(*telemetry_count)--;
+				DBG2(printf("Decoded "
+					    "NSM_FIRMWARE_BOOT_STATUS_CODE,"
+					    " value = 0x%016lx\n",
+					    fw_info_hdr->boot_status_code);)
 			}
 		} else if (tag == NSM_FIRMWARE_FIRMWARE_SLOT_COUNT) {
 			if (decode_nsm_firmware_aggregate_tag_uint8(
