@@ -60,6 +60,16 @@ uint8_t pack_nsm_header(const struct nsm_header_info *hdr,
 	return NSM_SW_SUCCESS;
 }
 
+uint8_t pack_nsm_header_v2(const struct nsm_header_info *hdr,
+			   struct nsm_msg_hdr *msg)
+{
+	uint8_t rc = pack_nsm_header(hdr, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		msg->ocp_version = OCP_VERSION_V2;
+	}
+	return rc;
+}
+
 uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 			  struct nsm_header_info *hdr)
 {
@@ -75,7 +85,8 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	if (msg->ocp_version != OCP_VERSION) {
+	if (msg->ocp_version != OCP_VERSION &&
+	    msg->ocp_version != OCP_VERSION_V2) {
 		return NSM_SW_ERROR_DATA;
 	}
 

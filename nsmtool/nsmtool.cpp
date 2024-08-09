@@ -86,11 +86,11 @@ int main(int argc, char** argv)
         app.require_subcommand(1)->ignore_case();
 
         nsmtool::raw::registerCommand(app);
+        nsmtool::config::registerCommand(app);
+        nsmtool::diag::registerCommand(app);
+        nsmtool::firmware::registerCommand(app);
         nsmtool::discovery::registerCommand(app);
         nsmtool::telemetry::registerCommand(app);
-        nsmtool::diag::registerCommand(app);
-        nsmtool::config::registerCommand(app);
-        nsmtool::firmware::registerCommand(app);
 
         CLI11_PARSE(app, argc, argv);
         return 0;
