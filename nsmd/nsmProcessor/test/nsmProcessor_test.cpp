@@ -1649,3 +1649,71 @@ TEST_F(NsmProcessorTest, badTestCreateInbandReconfigPermissionsSensors)
             mockManager, basicIntfName + ".InbandReconfigPermissions", objPath),
         std::invalid_argument);
 }
+
+TEST(nsmTotalNvLinks, GoodGenReq)
+{
+    auto totalNvLinkInterface =
+        std::make_shared<TotalNvLinkInterface>(bus, inventoryObjPath.c_str());
+    nsm::NsmTotalNvLinks sensor(sensorName, sensorType, totalNvLinkInterface,
+                                inventoryObjPath);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = sensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const nsm_query_ports_available_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_QUERY_PORTS_AVAILABLE);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmTotalNvLinks, GoodHandleResp)
+{
+    auto totalNvLinkInterface = std::make_shared<TotalNvLinkInterface>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmTotalNvLinks sensor(
+        sensorName, sensorType, totalNvLinkInterface, inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_query_ports_available_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t nvLinkCount = 144;    
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_query_ports_available_resp(
+        0, NSM_SUCCESS, reason_code, nvLinkCount, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+
+TEST(nsmTotalNvLinks, BadHandleResp)
+{
+    auto totalNvLinkInterface = std::make_shared<TotalNvLinkInterface>(
+        bus, inventoryObjPath.c_str());
+    nsm::NsmTotalNvLinks sensor(
+        sensorName, sensorType, totalNvLinkInterface, inventoryObjPath);
+
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) +
+            sizeof(struct nsm_query_ports_available_resp),
+        0);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t nvLinkCount = 144;    
+    uint16_t reason_code = ERR_NULL;
+    uint8_t rc = encode_query_ports_available_resp(
+        0, NSM_SUCCESS, reason_code, nvLinkCount, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = sensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+
+    rc = sensor.handleResponseMsg(response, msg_len - 1);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+}

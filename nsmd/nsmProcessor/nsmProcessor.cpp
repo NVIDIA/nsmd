@@ -1427,45 +1427,140 @@ uint8_t
     return cc;
 }
 
-NsmTotalCacheMemory::NsmTotalCacheMemory(
-    const std::string& name, const std::string& type,
-    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface,
-    std::string& inventoryObjPath) :
-    NsmMemoryCapacity(name, type),
-    persistentMemoryInterface(persistentMemoryInterface),
-    inventoryObjPath(inventoryObjPath)
+NsmTotalMemorySize::NsmTotalMemorySize(
+    std::string& name, std::string& type,
+    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface) :
+    NsmObject(name, type), persistentMemoryInterface(persistentMemoryInterface)
 {
-    lg2::info("NsmTotalCacheMemory : create sensor:{NAME}", "NAME",
-              name.c_str());
+    lg2::info("NsmTotalMemorySize: create sensor:{NAME}", "NAME", name.c_str());
+}
+
+requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
+                                                eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAXIMUM_MEMORY_CAPACITY;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmTotalMemorySize: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmTotalMemorySize: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        persistentMemoryInterface->volatileSizeInKiB(value*1024);
+    }
+    else
+    {
+        lg2::error(
+            "NsmTotalMemorySize: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmTotalNvLinks::NsmTotalNvLinks(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<TotalNvLinkInterface> totalNvLinkInterface,
+    std::string& inventoryObjPath) :
+    NsmSensor(name, type), totalNvLinkInterface(totalNvLinkInterface),
+    inventoryObjPath(inventoryObjPath)
+
+{
+    lg2::info("NsmTotalNvLinks: create sensor:{NAME}", "NAME", name.c_str());
     updateMetricOnSharedMemory();
 }
 
-void NsmTotalCacheMemory::updateMetricOnSharedMemory()
+void NsmTotalNvLinks::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    auto ifaceName = std::string(persistentMemoryInterface->interface);
+    auto ifaceName = std::string(totalNvLinkInterface->interface);
     std::vector<uint8_t> smbusData = {};
 
-    std::string propName = "CapacityUtilizationPercent";
-    nv::sensor_aggregation::DbusVariantType cacheSizeInKiBVal{
-        persistentMemoryInterface->cacheSizeInKiB()};
+    std::string propName = "TotalNvLinksCount";
+    nv::sensor_aggregation::DbusVariantType totalNvLinksCount{
+        totalNvLinkInterface->totalNumberNVLinks()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, cacheSizeInKiBVal);
+        inventoryObjPath, ifaceName, propName, smbusData, totalNvLinksCount);
 
 #endif
 }
 
-void NsmTotalCacheMemory::updateReading(uint32_t* maximumMemoryCapacity)
+std::optional<std::vector<uint8_t>>
+    NsmTotalNvLinks::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    if (maximumMemoryCapacity == NULL)
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_query_ports_available_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_query_ports_available_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_query_ports_available_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmTotalNvLinks::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint8_t totalNvLinks;
+    uint16_t data_size;
+    uint16_t reason_code;
+
+    auto rc = decode_query_ports_available_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &totalNvLinks);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+       totalNvLinkInterface->totalNumberNVLinks(totalNvLinks);
+       updateMetricOnSharedMemory();
+    }
+    else
     {
         lg2::error(
-            "NsmTotalCacheMemory::updateReading unable to fetch Maximum Memory Capacity");
-        return;
+            "NsmTotalNvLinks::handleResponseMsg  decode_query_ports_available_resp "
+            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    uint64_t cacheSize = *maximumMemoryCapacity;
-    persistentMemoryInterface->cacheSizeInKiB(cacheSize * 1024);
-    updateMetricOnSharedMemory();
+    return cc;
 }
 
 NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus::bus& bus,
@@ -1907,6 +2002,20 @@ void NsmProcessorThrottleDuration::updateMetricOnSharedMemory()
                                                  propName, smbusData,
                                                  thermalLimitThrottleDuration);
 
+    propName = "GlobalSoftwareViolationThrottleDuration";
+    nv::sensor_aggregation::DbusVariantType globalSoftwareViolationThrottleDuration{
+        processorPerformanceIntf->globalSoftwareViolationThrottleDuration()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        globalSoftwareViolationThrottleDuration);
+
+    propName = "HardwareViolationThrottleDuration";
+    nv::sensor_aggregation::DbusVariantType hardwareViolationThrottleDuration{
+        processorPerformanceIntf->hardwareViolationThrottleDuration()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        hardwareViolationThrottleDuration);
+
 #endif
 }
 
@@ -1917,6 +2026,10 @@ void NsmProcessorThrottleDuration::updateReading(
         data.power_violation_duration);
     processorPerformanceIntf->thermalLimitThrottleDuration(
         data.thermal_violation_duration);
+    processorPerformanceIntf->hardwareViolationThrottleDuration(
+        data.hw_violation_duration);
+    processorPerformanceIntf->globalSoftwareViolationThrottleDuration(
+        data.global_sw_violation_duration);
     updateMetricOnSharedMemory();
 }
 
@@ -2005,9 +2118,10 @@ void createNsmProcessorSensor(SensorManager& manager,
 
         auto persistentMemoryIntf = std::make_shared<PersistentMemoryInterface>(
             bus, inventoryObjPath.c_str());
-        auto cacheMemorySensor = std::make_shared<NsmTotalCacheMemory>(
-            name, type, persistentMemoryIntf, inventoryObjPath);
-        nsmDevice->addStaticSensor(cacheMemorySensor);
+
+        auto totalMemorySizeSensor = std::make_shared<NsmTotalMemorySize>(
+            name, type, persistentMemoryIntf);
+        nsmDevice->addStaticSensor(totalMemorySizeSensor);
 
         auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
                                                            inventoryObjPath);
@@ -2306,6 +2420,16 @@ void createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addSensor(lifetimeCicuitrySensor, priority);
         nsmDevice->addSensor(currentProfileSensor, priority);
     }
+    else if (type == "NSM_TotalNvLinksCount")
+    {
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+        auto  totalNvLinkInterface = std::make_shared<TotalNvLinkInterface>(
+            bus, inventoryObjPath.c_str());
+        auto totalNvLinkSensor = std::make_shared<NsmTotalNvLinks>(
+            name, type, totalNvLinkInterface, inventoryObjPath);
+        nsmDevice->addSensor(totalNvLinkSensor, priority); 
+    } 
 }
 
 dbus::Interfaces nsmProcessorInterfaces = {
@@ -2322,7 +2446,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.Asset",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
     "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
-    "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",
+    "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 

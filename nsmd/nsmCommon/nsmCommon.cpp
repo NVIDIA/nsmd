@@ -98,13 +98,30 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
     std::string& inventoryObjPath,
     std::shared_ptr<NsmTotalMemory> totalMemory) :
     NsmSensor(name, type),
-    totalMemory(totalMemory)
+    totalMemory(totalMemory),inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
               name.c_str());
     dimmMemoryMetricsIntf =
         std::make_unique<DimmMemoryMetricsIntf>(bus, inventoryObjPath.c_str());
+    updateMetricOnSharedMemory();
+}
+
+void NsmMemoryCapacityUtil::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(dimmMemoryMetricsIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "CapacityUtilizationPercent";
+    nv::sensor_aggregation::DbusVariantType capacityUtilizationPercent{
+        dimmMemoryMetricsIntf->capacityUtilizationPercent()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 capacityUtilizationPercent);
+
+#endif
 }
 
 void NsmMemoryCapacityUtil::updateReading(
@@ -128,6 +145,7 @@ void NsmMemoryCapacityUtil::updateReading(
     uint8_t usedMemoryPercent = (data.used_memory + data.reserved_memory) *
                                 100 / (*totalMemoryCapacity);
     dimmMemoryMetricsIntf->capacityUtilizationPercent(usedMemoryPercent);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>

@@ -19,6 +19,7 @@
 #include "base.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
+#include "network-ports.h"
 
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
@@ -55,6 +56,7 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
+#include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
 
 #include <cstdint>
 
@@ -508,19 +510,37 @@ class NsmPciGroup5 : public NsmPcieGroup
 using PersistentMemoryInterface = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::inventory::item::PersistentMemory>;
 
-class NsmTotalCacheMemory : public NsmMemoryCapacity
+class NsmTotalMemorySize : public NsmObject
 {
   public:
-    NsmTotalCacheMemory(
-        const std::string& name, const std::string& type,
-        std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface,
-        std::string& inventoryObjPath);
-    NsmTotalCacheMemory() = default;
+    NsmTotalMemorySize(
+        std::string& name, std::string& type,
+        std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface;
+};
+
+using TotalNvLinkInterface = sdbusplus::server::object_t<
+    sdbusplus::server::com::nvidia::nv_link::NvLinkTotalCount>;
+class NsmTotalNvLinks : public NsmSensor
+{
+  public:
+    NsmTotalNvLinks(const std::string& name, const std::string& type,
+                    std::shared_ptr<TotalNvLinkInterface> totalNvLinkInterface,
+                    std::string& inventoryObjPath);
+    NsmTotalNvLinks() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
     void updateMetricOnSharedMemory() override;
 
   private:
-    void updateReading(uint32_t* maximumMemoryCapacity) override;
-    std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface;
+    std::shared_ptr<TotalNvLinkInterface> totalNvLinkInterface;
     std::string inventoryObjPath;
 };
 
