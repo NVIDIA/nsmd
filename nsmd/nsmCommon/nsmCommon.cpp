@@ -193,4 +193,134 @@ uint8_t
     return cc;
 }
 
+NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
+                                                      eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MINIMUM_GRAPHICS_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf->minSpeed(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
+                                                      eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAXIMUM_GRAPHICS_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf->maxSpeed(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
 } // namespace nsm

@@ -21,10 +21,14 @@
 #include "platform-environmental.h"
 #include "nsmSensor.hpp"
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <telemetry_mrd_producer.hpp>
 #include "nsmCommon/sharedMemCommon.hpp"
 namespace nsm
 {
+
+using namespace sdbusplus::xyz::openbmc_project;
+using namespace sdbusplus::server;
 
 class NsmMemoryCapacity : public NsmSensor
 {
@@ -76,6 +80,32 @@ class NsmMemoryCapacityUtil : public NsmSensor
     std::string inventoryObjPath;
     void updateMetricOnSharedMemory();
     std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
+};
+
+using CpuOperatingConfigIntf =
+    object_t<Inventory::Item::Cpu::server::OperatingConfig>;
+class NsmMinGraphicsClockLimit : public NsmObject
+{
+  public:
+    NsmMinGraphicsClockLimit(
+        std::string& name, std::string& type,
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+};
+
+class NsmMaxGraphicsClockLimit : public NsmObject
+{
+  public:
+    NsmMaxGraphicsClockLimit(
+        std::string& name, std::string& type,
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
 
 } // namespace nsm

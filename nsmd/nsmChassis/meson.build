@@ -13,6 +13,7 @@ sources += [
     'nsmChassis/nsmPCIeLinkSpeed.cpp',
     'nsmChassis/nsmPCIeLTSSMState.cpp',
     'nsmChassis/nsmPowerControl.cpp',
+    'nsmChassis/nsmGpuClockControl.cpp',
     'nsmChassis/nsmWriteProtectedJumper.cpp',
     'nsmChassis/nsmErot.cpp',
 ]
