@@ -47,6 +47,28 @@ FirmwareSlot::FirmwareSlot(sdbusplus::bus::bus& bus, const std::string& name,
     type(fwType);
 }
 
+void FirmwareSlot::updateActiveSlotAssociation()
+{
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associations_list;
+    for (const auto& association : associations())
+    {
+        if (std::get<0>(association) == "software")
+        {
+            const auto backwardAssoc = isActive() ? "ActiveSlot"
+                                                  : "InactiveSlot";
+            associations_list.emplace_back(std::get<0>(association),
+                                           backwardAssoc,
+                                           std::get<2>(association));
+        }
+        else
+        {
+            associations_list.emplace_back(association);
+        }
+    }
+    associations(associations_list);
+}
+
 void FirmwareSlot::update(
     const struct ::nsm_firmware_slot_info& info,
     const struct ::nsm_firmware_erot_state_info_hdr_resp& fq_resp_hdr)
@@ -70,6 +92,7 @@ void FirmwareSlot::update(
     state(fstate);
     slotId(info.slot_id);
     isActive(fq_resp_hdr.active_slot == info.slot_id);
+    updateActiveSlotAssociation();
 }
 
 NsmBuildTypeObject::NsmBuildTypeObject(

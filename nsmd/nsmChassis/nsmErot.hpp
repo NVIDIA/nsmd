@@ -55,6 +55,7 @@ class FirmwareSlot :
         using namespace std::string_literals;
         return name + "/Slots/"s + std::to_string(slotNum);
     }
+    void updateActiveSlotAssociation();
 
   public:
     using getBuildTypeFn = std::function<void(uint16_t, uint8_t, uint16_t)>;
