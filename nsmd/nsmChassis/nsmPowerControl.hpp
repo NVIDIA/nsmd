@@ -22,6 +22,7 @@
 #include <stdint.h>
 
 #include <com/nvidia/Common/ClearPowerCap/server.hpp>
+#include <com/nvidia/Common/ClearPowerCapAsync/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Cap/server.hpp>
@@ -46,6 +47,17 @@ using Mode = sdbusplus::xyz::openbmc_project::Control::Power::server::Mode;
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using ClearPowerCapIntf =
     object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCap>;
+using ClearPowerCapAsyncIntf =
+    object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCapAsync>;
+
+class NsmChassisClearPowerCapAsyncIntf : ClearPowerCapAsyncIntf
+{
+  public:
+    using ClearPowerCapAsyncIntf::ClearPowerCapAsyncIntf;
+
+  private:
+    sdbusplus::message::object_path clearPowerCap() override;
+};
 
 class NsmPowerControl :
     public NsmObject,
@@ -68,6 +80,8 @@ class NsmPowerControl :
         nullptr;
     std::unique_ptr<PowerModeIntf> powerModeIntf = nullptr;
     std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
+    std::unique_ptr<NsmChassisClearPowerCapAsyncIntf> clearPowerCapAsyncIntf =
+        nullptr;
     std::map<std::string, double> powerCapChildValues;
 };
 } // namespace nsm
