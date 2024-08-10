@@ -468,83 +468,136 @@ uint8_t
     return cc;
 }
 
-NsmClockLimitMemory::NsmClockLimitMemory(const std::string& name,
-                                         const std::string& type,
-                                         std::shared_ptr<DimmIntf> dimmIntf,
-                                         std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
-
+NsmMinMemoryClockLimit::NsmMinMemoryClockLimit(
+    std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf) :
+    NsmObject(name, type), dimmIntf(dimmIntf)
 {
-    lg2::info("NsmClockLimitMemory: create sensor:{NAME}", "NAME",
+    lg2::info("NsmMinMemoryClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
-    updateMetricOnSharedMemory();
-}
-void NsmClockLimitMemory::updateMetricOnSharedMemory()
-{
-#ifdef NVIDIA_SHMEM
-    auto ifaceName = std::string(dimmIntf->interface);
-    nv::sensor_aggregation::DbusVariantType valueVariant{
-        dimmIntf->allowedSpeedsMT()};
-    std::vector<uint8_t> smbusData = {};
-    std::string propName = "AllowedSpeedsMT";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
-#endif
-}
-void NsmClockLimitMemory::updateReading(
-    const struct nsm_clock_limit& clockLimit)
-{
-    std::vector<uint16_t> speedLimit{
-        static_cast<uint16_t>(clockLimit.present_limit_min),
-        static_cast<uint16_t>(clockLimit.present_limit_max)};
-    dimmIntf->allowedSpeedsMT(speedLimit);
-    updateMetricOnSharedMemory();
 }
 
-std::optional<std::vector<uint8_t>>
-    NsmClockLimitMemory::genRequestMsg(eid_t eid, uint8_t instanceId)
+requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
+                                                    eid_t eid)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_get_clock_limit_req));
-    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    uint8_t clock_id = MEMORY_CLOCK;
-    auto rc = encode_get_clock_limit_req(instanceId, clock_id, requestPtr);
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MINIMUM_MEMORY_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_clock_limit_req failed. "
-                   "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
-        return std::nullopt;
+        lg2::error(
+            "NsmMinMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
     }
-    return request;
-}
 
-uint8_t
-    NsmClockLimitMemory::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                           size_t responseLen)
-{
-    uint8_t cc = NSM_ERROR;
-    struct nsm_clock_limit clockLimit;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
-
-    auto rc = decode_get_clock_limit_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockLimit);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
     {
-        updateReading(clockLimit);
+        lg2::error(
+            "NsmMinMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
+        allowedSpeedMT[0] = static_cast<uint16_t>(value);
+        dimmIntf->allowedSpeedsMT(allowedSpeedMT);
     }
     else
     {
         lg2::error(
-            "handleResponseMsg: decode_get_clock_limit_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmMaxMemoryClockLimit::NsmMaxMemoryClockLimit(
+    std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf) :
+    NsmObject(name, type), dimmIntf(dimmIntf)
+{
+    lg2::info("NsmMaxMemoryClockLimit: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
+                                                    eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = MAXIMUM_MEMORY_CLOCK_LIMIT;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmMaxMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
     }
 
-    return cc;
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmMaxMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
+        allowedSpeedMT[1] = static_cast<uint16_t>(value);
+        dimmIntf->allowedSpeedsMT(allowedSpeedMT);
+    }
+    else
+    {
+        lg2::error(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
 }
 
 NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
@@ -710,19 +763,24 @@ static void createNsmMemorySensor(SensorManager& manager,
 
             auto priority = utils::DBusHandler().getDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
-            auto clockLimitSensor = std::make_shared<NsmClockLimitMemory>(
-                name, type, dimmIntf, inventoryObjPath);
+
+            dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
+            auto minMemoryClockSensor =
+                std::make_shared<NsmMinMemoryClockLimit>(name, type, dimmIntf);
+            nsmDevice->addStaticSensor(minMemoryClockSensor);
+            auto maxMemoryClockSensor =
+                std::make_shared<NsmMaxMemoryClockLimit>(name, type, dimmIntf);
+            nsmDevice->addStaticSensor(maxMemoryClockSensor);
+
             auto currClockFreqSensor = std::make_shared<NsmMemCurrClockFreq>(
                 name, type, dimmIntf, inventoryObjPath);
 
             if (priority)
             {
-                nsmDevice->prioritySensors.push_back(clockLimitSensor);
                 nsmDevice->prioritySensors.push_back(currClockFreqSensor);
             }
             else
             {
-                nsmDevice->roundRobinSensors.push_back(clockLimitSensor);
                 nsmDevice->roundRobinSensors.push_back(currClockFreqSensor);
             }
             auto memCapacitySensor =

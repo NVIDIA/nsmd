@@ -615,6 +615,12 @@ class GetInventoryInformation : public CommandInterface
             case DEVICE_GUID:
                 propRecordResult["Data"] = utils::convertUUIDToString(data);
                 break;
+            case MINIMUM_MEMORY_CLOCK_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case MAXIMUM_MEMORY_CLOCK_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
             case MINIMUM_GRAPHICS_CLOCK_LIMIT:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;

@@ -190,26 +190,6 @@ class NsmEccErrorCountsDram : public NsmSensor
     std::string inventoryObjPath;
 };
 
-class NsmClockLimitMemory : public NsmSensor
-{
-  public:
-    NsmClockLimitMemory(const std::string& name, const std::string& type,
-                        std::shared_ptr<DimmIntf> dimmIntf,
-                        std::string& inventoryObjPath);
-    NsmClockLimitMemory() = default;
-
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
-
-    void updateMetricOnSharedMemory() override;
-
-  private:
-    void updateReading(const struct nsm_clock_limit&);
-    std::shared_ptr<DimmIntf> dimmIntf;
-    std::string inventoryObjPath;
-};
 class NsmMemCurrClockFreq : public NsmSensor
 {
   public:
@@ -242,4 +222,27 @@ class NsmMemCapacity : public NsmMemoryCapacity
     void updateReading(uint32_t* maximumMemoryCapacity);
     std::shared_ptr<DimmIntf> dimmIntf;
 };
+
+class NsmMinMemoryClockLimit : public NsmObject
+{
+  public:
+    NsmMinMemoryClockLimit(std::string& name, std::string& type,
+                           std::shared_ptr<DimmIntf> dimmIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<DimmIntf> dimmIntf;
+};
+
+class NsmMaxMemoryClockLimit : public NsmObject
+{
+  public:
+    NsmMaxMemoryClockLimit(std::string& name, std::string& type,
+                           std::shared_ptr<DimmIntf> dimmIntf);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<DimmIntf> dimmIntf;
+};
+
 } // namespace nsm

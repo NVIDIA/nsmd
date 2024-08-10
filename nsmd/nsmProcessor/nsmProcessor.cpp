@@ -2305,7 +2305,7 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.MIGMode",
     "xyz.openbmc_project.Configuration.NSM_Processor.ECCMode",
     "xyz.openbmc_project.Configuration.NSM_Processor.PCIe",
-    "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor",
+    "xyz.openbmc_project.Configuration.NSM_Processor.EDPpScalingFactor",   
     "xyz.openbmc_project.Configuration.NSM_Processor.ProcessorPerformance",
     "xyz.openbmc_project.Configuration.NSM_Processor.CpuOperatingConfig",
     "xyz.openbmc_project.Configuration.NSM_Processor.MemCapacityUtil",
