@@ -770,6 +770,12 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
             populateFrom(property, 5000);
             break;
+         case MINIMUM_MEMORY_CLOCK_LIMIT:
+            populateFrom(property, 150);
+            break;
+        case MAXIMUM_MEMORY_CLOCK_LIMIT:
+            populateFrom(property, 1500);
+            break;
         case PCIERETIMER_0_EEPROM_VERSION:
         case PCIERETIMER_1_EEPROM_VERSION:
         case PCIERETIMER_2_EEPROM_VERSION:
