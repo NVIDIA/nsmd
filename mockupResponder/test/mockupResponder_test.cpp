@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "device-configuration.h"
+#include "diagnostics.h"
 #include "platform-environmental.h"
 
 #include "mockupResponder.hpp"

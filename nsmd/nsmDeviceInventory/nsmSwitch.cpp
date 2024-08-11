@@ -11,6 +11,23 @@
 namespace nsm
 {
 
+NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus::bus& bus,
+                                   const std::string& name,
+                                   const std::string& type,
+                                   std::string& inventoryObjPath,
+                                   std::shared_ptr<NsmDevice> device) :
+    NsmObject(name, type)
+{
+    lg2::info("NsmSwitchDIReset: create sensor:{NAME}", "NAME", name.c_str());
+
+    objPath = inventoryObjPath + name;
+    resetIntf = std::make_shared<NsmResetIntf>(bus, objPath.c_str());
+    resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
+                             processor::Reset::ResetTypes::ForceRestart);
+    resetAsyncIntf =
+        std::make_shared<NsmSwitchResetAsyncIntf>(bus, objPath.c_str(), device);
+}
+
 template <typename IntfType>
 requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
                                                    eid_t eid)
@@ -79,6 +96,11 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
         auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
             bus, name, associations, type, uuid);
         device->addStaticSensor(debugTokenObject);
+
+        // Device Reset for NVSwitch
+        auto nvSwitchResetSensor = std::make_shared<NsmSwitchDIReset>(
+            bus, name, type, inventoryObjPath, device);
+        device->deviceSensors.push_back(nvSwitchResetSensor);
     }
     else if (type == "NSM_Switch")
     {

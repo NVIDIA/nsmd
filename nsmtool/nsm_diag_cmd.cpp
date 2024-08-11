@@ -495,6 +495,64 @@ class EnableDisableWriteProtected : public CommandInterface
     uint8_t value;
 };
 
+class ResetNetworkDevice : public CommandInterface
+{
+  public:
+    ~ResetNetworkDevice() = default;
+    ResetNetworkDevice() = delete;
+    ResetNetworkDevice(const ResetNetworkDevice&) = delete;
+    ResetNetworkDevice(ResetNetworkDevice&&) = default;
+    ResetNetworkDevice& operator=(const ResetNetworkDevice&) = delete;
+    ResetNetworkDevice& operator=(ResetNetworkDevice&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit ResetNetworkDevice(const char* type, const char* name,
+                                CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto resetNDOptionGroup = app->add_option_group(
+            "Required", "Mode for reseting the network device.");
+
+        mode = 0;
+        resetNDOptionGroup->add_option(
+            "-M, --mode", mode, "set mode while resetting network device");
+        resetNDOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_reset_network_device_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_reset_network_device_req(instanceId, mode, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_reset_network_device_resp(responsePtr, payloadLength,
+                                                   &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t mode;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto diag = app.add_subcommand("diag", "Diagnostics type command");
@@ -528,6 +586,11 @@ void registerCommand(CLI::App& app)
         "EnableDisableWriteProtected", "Enable/Disable WriteProtected");
     commands.push_back(std::make_unique<EnableDisableWriteProtected>(
         "diag", "EnableDisableWriteProtected", enableDisableWriteProtected));
+
+    auto resetNetworkDevice = diag->add_subcommand("ResetNetworkDevice",
+                                                   "Reset Network Device");
+    commands.push_back(std::make_unique<ResetNetworkDevice>(
+        "diag", "ResetNetworkDevice", resetNetworkDevice));
 }
 
 } // namespace diag
