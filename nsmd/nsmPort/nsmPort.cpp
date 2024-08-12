@@ -239,6 +239,14 @@ void NsmPortStatus::updateMetricOnSharedMemory()
         portMetricsOem3Intf->runtimeError()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
                                                  rawSmbpbiData, variantRE);
+
+    propName = "LinkStatus";
+    ifaceName = std::string(portStateIntf->interface);
+    nv::sensor_aggregation::DbusVariantType variantLS{
+        portStateIntf->convertLinkStatusTypeToString(
+            portStateIntf->linkStatus())};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 rawSmbpbiData, variantLS);
 #endif
 }
 
@@ -331,6 +339,11 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
 
+    nv::sensor_aggregation::DbusVariantType variantMS{portInfoIntf->maxSpeed()};
+    propName = "MaxSpeed";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantMS);
+
     nv::sensor_aggregation::DbusVariantType variantTX{
         portMetricsOem3Intf->txNoProtocolBytes()};
     propName = "TXNoProtocolBytes";
@@ -342,6 +355,18 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
     propName = "RXNoProtocolBytes";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRX);
+
+    nv::sensor_aggregation::DbusVariantType variantTXW{
+        portMetricsOem3Intf->txWidth()};
+    propName = "TXWidth";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantTXW);
+
+    nv::sensor_aggregation::DbusVariantType variantRXW{
+        portMetricsOem3Intf->rxWidth()};
+    propName = "RXWidth";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRXW);
 #endif
 }
 
