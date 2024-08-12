@@ -30,6 +30,7 @@
 #include "types.hpp"
 #include "utils.hpp"
 
+#include <endian.h>
 #include <sys/socket.h>
 
 #include <phosphor-logging/lg2.hpp>
@@ -500,6 +501,14 @@ std::optional<std::vector<uint8_t>>
                 case NSM_ENABLE_DISABLE_WP:
                     return enableDisableWriteProtectedHandler(request,
                                                               requestLen);
+                case NSM_GET_NETWORK_DEVICE_DEBUG_INFO:
+                    return getNetworkDeviceDebugInfoHandler(request,
+                                                              requestLen);
+                case NSM_ERASE_TRACE:
+                    return eraseTraceHandler(request, requestLen);
+                case NSM_GET_NETWORK_DEVICE_LOG_INFO:
+                    return getNetworkDeviceLogInfoHandler(request,
+                                                              requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -661,9 +670,11 @@ std::optional<std::vector<uint8_t>>
                  {2, {4}},
                  {3, {12}},
                  {4,
-                  {NSM_RESET_NETWORK_DEVICE, NSM_QUERY_TOKEN_PARAMETERS,
-                   NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
-                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
+                  {NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
+                   NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_RESET_NETWORK_DEVICE,
+                   NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
+                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
+                   NSM_QUERY_DEVICE_IDS}},
                  {5, {}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
@@ -673,9 +684,10 @@ std::optional<std::vector<uint8_t>>
                  {2, {4}},
                  {3, {12, 14}},
                  {4,
-                  {NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
-                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
-                   NSM_QUERY_DEVICE_IDS}},
+                  {NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
+                   NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
+                   NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
                  {5, {}},
              }},
             {NSM_DEV_ID_GPU,
@@ -3967,6 +3979,151 @@ std::optional<std::vector<uint8_t>>
         lg2::error(
             "enableDisableWriteProtectedHandler: encode_enable_disable_wp_resp failed: rc={RC}",
             "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getNetworkDeviceDebugInfoHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "getNetworkDeviceDebugInfoHandler: request length={LEN}",
+            "LEN", requestLen);
+    }
+
+    uint8_t debug_type = 0;
+    uint32_t handle = 0;
+    auto rc = decode_get_network_device_debug_info_req(requestMsg, requestLen,
+                                                       &debug_type, &handle);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_network_device_debug_info_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // this is some dummy data segment with random size
+    // It says Hello World, this is device debug info data.
+    std::vector<uint8_t> segment_data{
+        0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64,
+        0x2c, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64,
+        0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x65, 0x62, 0x75, 0x67,
+        0x20, 0x69, 0x6e, 0x66, 0x6f, 0x20, 0x64, 0x61, 0x74, 0x61, 0x2e};
+    uint16_t reason_code = ERR_NULL;
+    uint32_t nxt_handle = 01;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      NSM_RESPONSE_CONVENTION_LEN +
+                                      segment_data.size() + sizeof(nxt_handle),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_network_device_debug_info_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        (uint8_t*)segment_data.data(), segment_data.size(), nxt_handle,
+        responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_network_device_debug_info_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::eraseTraceHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("eraseTraceHandler: request length={LEN}", "LEN", requestLen);
+    }
+
+    uint8_t info_type = 0;
+    auto rc = decode_erase_trace_req(requestMsg, requestLen, &info_type);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_erase_trace_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_erase_trace_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                 reason_code, ERASE_TRACE_DATA_ERASED,
+                                 responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_erase_trace_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getNetworkDeviceLogInfoHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getNetworkDeviceLogInfoHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint32_t handle = 0;
+    auto rc = decode_get_network_device_log_info_req(requestMsg, requestLen,
+                                                     &handle);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_network_device_log_info_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // this is some dummy data segment with random size
+    // It says "Hello World, this is device log info data."
+    std::vector<uint8_t> log_data{
+        0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64,
+        0x2c, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64,
+        0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x6c, 0x6f, 0x67, 0x20, 0x69,
+        0x6e, 0x66, 0x6f, 0x20, 0x64, 0x61, 0x74, 0x61, 0x2e};
+    uint16_t reason_code = ERR_NULL;
+    uint32_t nxt_handle = 01;
+    struct nsm_device_log_info_breakdown log_info;
+    log_info.lost_events = 02;
+    log_info.unused = 00;
+    log_info.synced_time = 00;
+    log_info.reserved = 00;
+    log_info.time_high = 100;
+    log_info.time_low = 200;
+    log_info.entry_prefix = 33;
+    log_info.length = (log_data.size() / 4);
+    log_info.entry_suffix = 444;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      sizeof(nsm_device_log_info) +
+                                      log_data.size() + sizeof(nxt_handle),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_network_device_log_info_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, nxt_handle,
+        log_info, (uint8_t*)log_data.data(), log_data.size(), responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_network_device_log_info_resp failed: rc={RC}",
+                   "RC", rc);
         return std::nullopt;
     }
     return response;
