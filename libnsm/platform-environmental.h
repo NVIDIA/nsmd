@@ -39,6 +39,7 @@ enum nsm_platform_environmental_commands {
 	NSM_GET_TEMPERATURE_READING = 0x00,
 	NSM_READ_THERMAL_PARAMETER = 0x02,
 	NSM_GET_POWER = 0x03,
+	NSM_GET_MAX_OBSERVED_POWER = 0x04,
 	NSM_GET_ENERGY_COUNT = 0x06,
 	NSM_GET_VOLTAGE = 0x0F,
 	NSM_GET_ALTITUDE_PRESSURE = 0x6A,
@@ -328,6 +329,19 @@ struct nsm_get_current_power_draw_req {
  */
 typedef struct nsm_get_numeric_sensor_reading_uint32_resp
     nsm_get_current_power_draw_resp;
+
+/** @struct nsm_get_max_observed_power_req
+ *
+ *  Structure representing NSM get max observed power request.
+ */
+typedef struct nsm_get_current_power_draw_req nsm_get_max_observed_power_req;
+
+/** @struct nsm_get_max_observed_power_req
+ *
+ *  Structure representing NSM get max observed power response.
+ */
+typedef struct nsm_get_numeric_sensor_reading_uint32_resp
+    nsm_get_max_observed_power_resp;
 
 /** @struct nsm_get_current_energy_count_req
  *
@@ -1245,6 +1259,57 @@ int encode_aggregate_get_current_power_draw_reading(uint32_t reading,
 int decode_aggregate_get_current_power_draw_reading(const uint8_t *data,
 						    size_t data_len,
 						    uint32_t *reading);
+
+/** @brief Encode a Get max observed power request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] sensor_id - sensor id
+ *  @param[in] averaging_interval - averaging interval
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_max_observed_power_req(uint8_t instance_id, uint8_t sensor_id,
+				      uint8_t averaging_interval,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a Get max observed power request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] sensor_id - sensor id
+ *  @param[out] averaging_interval - averaging interval
+ *  @return nsm_completion_codes
+ */
+int decode_get_max_observed_power_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *sensor_id,
+				      uint8_t *averaging_interval);
+
+/** @brief Encode a Get max observed power response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] reading - current power draw reading
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_max_observed_power_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code, uint32_t reading,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Get max observed power response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] reading - current power draw reading
+ *  @return nsm_completion_codes
+ */
+int decode_get_max_observed_power_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code,
+				       uint32_t *reading);
 
 /** @brief Encode a Get Current Energy Counter Value request message
  *

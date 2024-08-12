@@ -41,7 +41,8 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& associations,
     const std::string& physicalContext, const std::string* implementation,
-    const double maxAllowableValue) :
+    const double maxAllowableValue, const std::string* readingBasis,
+    const std::string* description) :
     valueIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str()),
@@ -73,6 +74,28 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
                     *implementation));
     }
 
+    if (readingBasis)
+    {
+        readingBasisIntf = std::make_unique<ReadingBasisIntf>(
+            bus, ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name)
+                     .c_str());
+
+        readingBasisIntf->readingBasis(
+            sdbusplus::common::xyz::openbmc_project::sensor::ReadingBasis::
+                convertReadingBasisTypeFromString(
+                    "xyz.openbmc_project.Sensor.ReadingBasis.ReadingBasisType." +
+                    *readingBasis));
+    }
+
+    if (description)
+    {
+        descriptionIntf = std::make_unique<DescriptionIntf>(
+            bus, ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name)
+                     .c_str());
+
+        descriptionIntf->description(*description);
+    }
+
     std::vector<std::tuple<std::string, std::string, std::string>>
         associations_list;
     for (const auto& association : associations)
@@ -97,10 +120,11 @@ NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
     const std::string& sensor_type, const SensorUnit unit,
     const std::vector<utils::Association>& association,
     const std::string& physicalContext, const std::string* implementation,
-    const double maxAllowableValue) :
+    const double maxAllowableValue, const std::string* readingBasis,
+    const std::string* description) :
     NsmNumericSensorDbusValue(bus, name, sensor_type, unit, association,
                               physicalContext, implementation,
-                              maxAllowableValue),
+                              maxAllowableValue, readingBasis, description),
     timestampIntf(
         bus,
         ("/xyz/openbmc_project/sensors/"s + sensor_type + '/' + name).c_str())
@@ -111,6 +135,18 @@ void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
 {
     timestampIntf.elapsed(timestamp);
     NsmNumericSensorDbusValue::updateReading(value);
+}
+
+NsmNumericSensorDbusPeakValueTimestamp::NsmNumericSensorDbusPeakValueTimestamp(
+    sdbusplus::bus::bus& bus, const char* objectPath) :
+    peakValueIntf(bus, objectPath)
+{}
+
+void NsmNumericSensorDbusPeakValueTimestamp::updateReading(double value,
+                                                           uint64_t timestamp)
+{
+    peakValueIntf.peakValue(value);
+    peakValueIntf.timestamp(timestamp);
 }
 
 void NsmNumericSensorValueAggregate::append(

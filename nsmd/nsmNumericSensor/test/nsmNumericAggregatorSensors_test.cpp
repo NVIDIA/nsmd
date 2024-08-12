@@ -29,6 +29,7 @@ using ::testing::DoubleNear;
 #define protected public
 
 #include "nsmEnergyAggregator.hpp"
+#include "nsmPeakPowerAggregator.hpp"
 #include "nsmPowerAggregator.hpp"
 #include "nsmTempAggregator.hpp"
 #include "nsmThresholdAggregator.hpp"
@@ -151,6 +152,81 @@ TEST(nsmPowerSensorAggregator, BadHandleSampleData)
 {
     NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
                                   0};
+
+    const uint32_t reading{903484034};
+    std::array<uint8_t, sizeof(reading)> reading_sample;
+    size_t reading_datasize;
+
+    auto rc = encode_aggregate_get_current_power_draw_reading(
+        reading, reading_sample.data(), &reading_datasize);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = aggregator.handleSamples(
+        {{1, static_cast<uint8_t>(reading_datasize), nullptr, true}});
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+    rc = aggregator.handleSamples(
+        {{1, static_cast<uint8_t>(reading_datasize - 1), reading_sample.data(),
+          true}});
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(nsmPeakPowerSensorAggregator, GoodGenReq)
+{
+    NsmPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate", true,
+                                  0};
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = aggregator.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command =
+        reinterpret_cast<const nsm_get_current_power_draw_req*>(msg->payload);
+
+    EXPECT_EQ(command->hdr.command, NSM_GET_POWER);
+    EXPECT_EQ(command->hdr.data_size, 2);
+    EXPECT_EQ(command->sensor_id, 255);
+    EXPECT_EQ(command->averaging_interval, 0);
+}
+
+TEST(nsmPeakPowerSensorAggregator, GoodHandleSampleData)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
+    auto sensor = std::make_shared<MockNsmNumericSensorValueAggregate>();
+
+    aggregator.addSensor(1, sensor);
+
+    const uint32_t reading{903484034};
+    const uint64_t timestamp{10945847};
+    std::array<uint8_t, sizeof(timestamp)> timestamp_sample;
+    std::array<uint8_t, sizeof(reading)> reading_sample;
+    size_t timestamp_datasize;
+    size_t reading_datasize;
+
+    EXPECT_CALL(*sensor, updateReading(reading / 1000.0, 10945847)).Times(1);
+
+    auto rc = encode_aggregate_timestamp_data(
+        timestamp, timestamp_sample.data(), &timestamp_datasize);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    rc = encode_aggregate_get_current_power_draw_reading(
+        reading, reading_sample.data(), &reading_datasize);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    aggregator.handleSamples(
+        {{aggregator.TIMESTAMP, static_cast<uint8_t>(timestamp_datasize),
+          timestamp_sample.data(), true},
+         {1, static_cast<uint8_t>(reading_datasize), reading_sample.data(),
+          true}});
+}
+
+TEST(nsmPeakPowerSensorAggregator, BadHandleSampleData)
+{
+    NsmPeakPowerAggregator aggregator{"Sensor", "GetSensorReadingAggregate",
+                                      true, 0};
 
     const uint32_t reading{903484034};
     std::array<uint8_t, sizeof(reading)> reading_sample;

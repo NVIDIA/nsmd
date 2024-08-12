@@ -1125,6 +1125,108 @@ class GetCurrentPowerDraw : public CommandInterface
     uint8_t averagingInterval;
 };
 
+class GetMaxObservedPower : public CommandInterface
+{
+  public:
+    GetMaxObservedPower() = delete;
+    GetMaxObservedPower(const GetMaxObservedPower&) = delete;
+    GetMaxObservedPower(GetMaxObservedPower&&) = default;
+    GetMaxObservedPower& operator=(const GetMaxObservedPower&) = delete;
+    GetMaxObservedPower& operator=(GetMaxObservedPower&&) = delete;
+
+    explicit GetMaxObservedPower(const char* type, const char* name,
+                                 CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --sensorId", sensorId, "sensor Id")->required();
+
+        app->add_option("-a, --averagingInterval", averagingInterval,
+                        "averaging interval of current power draw reading")
+            ->required();
+    }
+
+  private:
+    void parseRegularResponse(nsm_msg* responsePtr, size_t payloadLength)
+    {
+        const size_t msg_len = payloadLength + sizeof(nsm_msg_hdr);
+        uint8_t cc;
+        uint16_t reason_code;
+        uint32_t reading;
+
+        auto rc = decode_get_max_observed_power_resp(responsePtr, msg_len, &cc,
+                                                     &reason_code, &reading);
+        if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(nsm_get_current_power_draw_resp))
+                      << '\n';
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Sensor Id"] = sensorId;
+        result["Averaging Interval"] = averagingInterval;
+        result["Max Observed Power"] = reading;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    class GetMaxObservedPowerAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint32_t reading;
+            auto rc = decode_aggregate_get_current_power_draw_reading(
+                data, data_len, &reading);
+            if (rc == NSM_SUCCESS)
+            {
+                sample_json["Sensor Id"] = tag;
+                sample_json["Max Observed Power"] = reading;
+            }
+
+            return rc;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_current_power_draw_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_max_observed_power_req(instanceId, sensorId,
+                                                    averagingInterval, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (sensorId == AggregateSensorId)
+        {
+            GetMaxObservedPowerAggregateResponseParser{}.parseAggregateResponse(
+                responsePtr, payloadLength);
+        }
+        else
+        {
+            parseRegularResponse(responsePtr, payloadLength);
+        }
+    }
+
+  private:
+    uint8_t sensorId;
+    static constexpr uint8_t AggregateSensorId{255};
+    uint8_t averagingInterval;
+};
+
 class GetCurrentEnergyCount : public CommandInterface
 {
   public:
@@ -3770,6 +3872,11 @@ void registerCommand(CLI::App& app)
         "GetCurrentPowerDraw", "get current power draw of a device");
     commands.push_back(std::make_unique<GetCurrentPowerDraw>(
         "telemetry", "GetCurrentPowerDraw", getCurrentPowerDraw));
+
+    auto getMaxObservedPower = telemetry->add_subcommand(
+        "GetMaxObservedPower", "get peak power observed of a device");
+    commands.push_back(std::make_unique<GetMaxObservedPower>(
+        "telemetry", "GetMaxObservedPower", getMaxObservedPower));
 
     auto getCurrentEnergyCount = telemetry->add_subcommand(
         "GetCurrentEnergyCount",

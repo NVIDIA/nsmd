@@ -41,6 +41,8 @@ static const std::vector<utils::Association>
                    "/xyz/openbmc_project/inventory/dummy_device"}});
 static const std::string physicalContexnt("GPU");
 static const double maxAllowableValue{std::numeric_limits<double>::infinity()};
+static const std::string readingBasis("Headroom");
+static const std::string description("dummy_sensor");
 
 static const double val{32432.8970};
 static const uint64_t timestamp{13432548};
@@ -48,8 +50,9 @@ static const uint64_t timestamp{13432548};
 TEST(NsmNumericSensorDbusValue, GoodTest)
 {
     nsm::NsmNumericSensorDbusValue value{
-        bus,          sensorName,       sensorType, nsm::SensorUnit::DegreesC,
-        associations, physicalContexnt, nullptr,    maxAllowableValue};
+        bus,           sensorName,       sensorType, nsm::SensorUnit::DegreesC,
+        associations,  physicalContexnt, nullptr,    maxAllowableValue,
+        &readingBasis, &description};
     value.updateReading(val);
 
     EXPECT_EQ(value.valueIntf.value(), val);
@@ -59,8 +62,9 @@ TEST(NsmNumericSensorDbusValue, GoodTest)
 TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
 {
     nsm::NsmNumericSensorDbusValueTimestamp value{
-        bus,          sensorName,       sensorType, nsm::SensorUnit::DegreesC,
-        associations, physicalContexnt, nullptr,    maxAllowableValue};
+        bus,           sensorName,       sensorType, nsm::SensorUnit::DegreesC,
+        associations,  physicalContexnt, nullptr,    maxAllowableValue,
+        &readingBasis, &description};
     value.updateReading(val, timestamp);
 
     EXPECT_EQ(value.timestampIntf.elapsed(), timestamp);

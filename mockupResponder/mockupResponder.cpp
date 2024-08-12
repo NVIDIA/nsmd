@@ -363,6 +363,8 @@ std::optional<std::vector<uint8_t>>
                     return readThermalParameterHandler(request, requestLen);
                 case NSM_GET_POWER:
                     return getCurrentPowerDrawHandler(request, requestLen);
+                case NSM_GET_MAX_OBSERVED_POWER:
+                    return getMaxObservedPowerHandler(request, requestLen);
                 case NSM_GET_ENERGY_COUNT:
                     return getCurrentEnergyCountHandler(request, requestLen);
                 case NSM_GET_VOLTAGE:
@@ -638,7 +640,7 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 9, 10}},
                  {1, {}},
                  {2, {4, 96}},
-                 {3, {0, 2, 3, 12, 15, 97, 106}},
+                 {3, {0, 2, 3, 4, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
                  {6, {1}},
@@ -671,11 +673,11 @@ std::optional<std::vector<uint8_t>>
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
                  {1, {1, 65, 66, 67}},
-                 {2, {2,4,5}},
-                 {3,
-                  {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,  16,
-                   17,  69, 70,  71,  73,  74,  77,  78,  79,  118, 113, 114, 115,
-                   116, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 172, 173}},
+                 {2, {2, 4, 5}},
+                 {3, {0,   2,   3,   4,   6,   7,   8,   9,   11,  12,
+                      14,  15,  16,  17,  69,  70,  71,  73,  74,  77,
+                      78,  79,  118, 113, 114, 115, 116, 117, 119, 120,
+                      121, 122, 123, 124, 125, 126, 127, 172, 173}},
                  {4, {}},
                  {5, {}},
                  {6, {1}},
@@ -1292,6 +1294,93 @@ std::optional<std::vector<uint8_t>>
         uint16_t reason_code = ERR_NULL;
         uint32_t power{15870};
         [[maybe_unused]] auto rc = encode_get_current_power_draw_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, power,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        return response;
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getMaxObservedPowerHandler(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    auto request = reinterpret_cast<const nsm_get_max_observed_power_req*>(
+        requestMsg->payload);
+    uint8_t sensor_id{request->sensor_id};
+    if (verbose)
+    {
+        lg2::info(
+            "getMaxObservedPowerHandler: Sensor_Id={ID}, request length={LEN}",
+            "LEN", requestLen, "ID", sensor_id);
+    }
+
+    if (sensor_id == 255)
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        [[maybe_unused]] auto rc = encode_aggregate_resp(
+            requestMsg->hdr.instance_id, request->hdr.command, NSM_SUCCESS, 3,
+            responseMsg);
+
+        const auto now = std::chrono::system_clock::now();
+        std::time_t newt = std::chrono::system_clock::to_time_t(now);
+        const auto timestamp = static_cast<uint64_t>(newt);
+        const uint32_t power[2]{701890, 682023};
+        uint8_t reading[8]{};
+        size_t consumed_len;
+        std::array<uint8_t, 50> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        // add sample 1
+        rc = encode_aggregate_timestamp_data(timestamp, reading, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0xFF, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 2
+        rc = encode_aggregate_get_current_power_draw_reading(power[0], reading,
+                                                             &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(0, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        // add sample 3
+        rc = encode_aggregate_get_current_power_draw_reading(power[1], reading,
+                                                             &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(10, true, reading, consumed_len,
+                                          nsm_sample, &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
+
+        return response;
+    }
+    else
+    {
+        std::vector<uint8_t> response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_max_observed_power_resp), 0);
+
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        uint16_t reason_code = ERR_NULL;
+        uint32_t power{692870};
+        [[maybe_unused]] auto rc = encode_get_max_observed_power_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, power,
             responseMsg);
         assert(rc == NSM_SW_SUCCESS);

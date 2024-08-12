@@ -817,6 +817,228 @@ TEST(getCurrentPowerDraw, testBadDecodeResponseDataLength)
 	EXPECT_EQ(reading, 0);
 }
 
+TEST(getMaxObservedPower, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_get_max_observed_power_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t sensor_id = 0;
+	uint8_t averaging_interval = 0;
+
+	auto rc = encode_get_max_observed_power_req(
+	    0, sensor_id, averaging_interval, request);
+
+	nsm_get_max_observed_power_req *req =
+	    reinterpret_cast<nsm_get_max_observed_power_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_MAX_OBSERVED_POWER, req->hdr.command);
+	EXPECT_EQ(sizeof(sensor_id) + sizeof(averaging_interval),
+		  req->hdr.data_size);
+	EXPECT_EQ(sensor_id, req->sensor_id);
+	EXPECT_EQ(averaging_interval, req->averaging_interval);
+}
+
+TEST(getMaxObservedPower, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MAX_OBSERVED_POWER,	     // command
+	    2,				     // data size
+	    1,				     // sensor_id
+	    1				     // averaging_interval
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t sensor_id = 0;
+	uint8_t averaging_interval = 0;
+
+	auto rc = decode_get_max_observed_power_req(
+	    request, msg_len, &sensor_id, &averaging_interval);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sensor_id, 1);
+	EXPECT_EQ(averaging_interval, 1);
+}
+
+TEST(getMaxObservedPower, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_power_draw_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint32_t reading = 12456;
+	uint16_t reasonCode = 0;
+
+	auto rc = encode_get_max_observed_power_resp(0, NSM_SUCCESS, reasonCode,
+						     reading, response);
+
+	nsm_get_max_observed_power_resp *resp =
+	    reinterpret_cast<nsm_get_max_observed_power_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_MAX_OBSERVED_POWER, resp->hdr.command);
+	EXPECT_EQ(sizeof(resp->reading), le16toh(resp->hdr.data_size));
+	EXPECT_EQ(reading, resp->reading);
+}
+
+TEST(getMaxObservedPower, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MAX_OBSERVED_POWER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_max_observed_power_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 4203351);
+}
+
+TEST(getMaxObservedPower, testBadDecodeResponseLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MAX_OBSERVED_POWER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_max_observed_power_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
+TEST(getMaxObservedPower, testBadDecodeResponseNull)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MAX_OBSERVED_POWER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    4,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_get_max_observed_power_resp(response, msg_len, &cc,
+						     &reasonCode, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	EXPECT_EQ(cc, NSM_ERROR);
+}
+
+TEST(getMaxObservedPower, testBadDecodeResponseDataLength)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_MAX_OBSERVED_POWER,	     // command
+	    0,				     // completion code
+	    0,
+	    0,
+	    3,
+	    0, // data size
+	    0x57,
+	    0x23,
+	    0x40,
+	    0x00 // reading
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reasonCode = ERR_NULL;
+	uint32_t reading = 0;
+
+	auto rc = decode_get_max_observed_power_resp(response, msg_len, &cc,
+						     &reasonCode, &reading);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reading, 0);
+}
+
 TEST(getCurrentEnergyCount, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(

@@ -22,6 +22,9 @@
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
+#include <xyz/openbmc_project/Sensor/Description/server.hpp>
+#include <xyz/openbmc_project/Sensor/PeakValue/server.hpp>
+#include <xyz/openbmc_project/Sensor/ReadingBasis/server.hpp>
 #include <xyz/openbmc_project/Sensor/Type/server.hpp>
 #include <xyz/openbmc_project/Sensor/Value/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Availability/server.hpp>
@@ -43,6 +46,12 @@ using ValueIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Value>;
 using TypeIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Sensor::server::Type>;
+using PeakValueIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Sensor::server::PeakValue>;
+using ReadingBasisIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Sensor::server::ReadingBasis>;
+using DescriptionIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Sensor::server::Description>;
 using AvailabilityIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::State::Decorator::server::Availability>;
 using DecoratorAreaIntf = sdbusplus::server::object_t<
@@ -77,7 +86,8 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
-        const double maxAllowableValue);
+        const double maxAllowableValue, const std::string* readingBasis,
+        const std::string* description);
     void updateReading(double value, uint64_t timestamp = 0) override;
 
   private:
@@ -85,6 +95,8 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     AssociationDefinitionsInft associationDefinitionsIntf;
     DecoratorAreaIntf decoratorAreaIntf;
     std::unique_ptr<TypeIntf> typeIntf{};
+    std::unique_ptr<ReadingBasisIntf> readingBasisIntf{};
+    std::unique_ptr<DescriptionIntf> descriptionIntf{};
 };
 
 class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
@@ -95,11 +107,24 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
         const std::string& sensor_type, const SensorUnit unit,
         const std::vector<utils::Association>& association,
         const std::string& physicalContext, const std::string* implementation,
-        const double maxAllowableValue);
+        const double maxAllowableValue, const std::string* readingBasis,
+        const std::string* description);
     void updateReading(double value, uint64_t timestamp = 0) final;
 
   private:
     TimestampIntf timestampIntf;
+};
+
+class NsmNumericSensorDbusPeakValueTimestamp : public NsmNumericSensorValue
+{
+  public:
+    NsmNumericSensorDbusPeakValueTimestamp(sdbusplus::bus::bus& bus,
+                                           const char* objectPath);
+
+    void updateReading(double value, uint64_t timestamp = 0) final;
+
+  private:
+    PeakValueIntf peakValueIntf;
 };
 
 class NsmNumericSensorValueAggregate : public NsmNumericSensorValue

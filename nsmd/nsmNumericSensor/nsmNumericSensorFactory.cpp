@@ -19,6 +19,7 @@
 
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmPeakPower.hpp"
 #include "nsmThresholdFactory.hpp"
 #include "utils.hpp"
 
@@ -80,6 +81,24 @@ void NumericSensorFactory::make(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
+    try
+    {
+        info.readingBasis = std::make_unique<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "ReadingBasis", interface.c_str()));
+    }
+    catch (const std::exception& e)
+    {}
+
+    try
+    {
+        info.description = std::make_unique<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
+                objPath.c_str(), "Description", interface.c_str()));
+    }
+    catch (const std::exception& e)
+    {}
+
     info.associations = utils::getAssociations(objPath,
                                                interface + ".Associations");
 
@@ -120,7 +139,60 @@ void NumericSensorFactory::make(SensorManager& manager,
     makeAggregatorAndAddSensor(builder.get(), info, sensor, uuid,
                                nsmDevice.get());
 
+    try
+    {
+        makePeakValueAndAdd(interface, objPath, info, uuid, nsmDevice.get());
+    }
+    catch (const std::exception& e)
+    {}
+
     NsmThresholdFactory{manager, interface, objPath, sensor, info, uuid}.make();
+}
+
+void NumericSensorFactory::makePeakValueAndAdd(const std::string& interface,
+                                               const std::string& objPath,
+                                               const NumericSensorInfo& info,
+                                               const uuid_t& uuid,
+                                               NsmDevice* nsmDevice)
+{
+    auto& bus = utils::DBusHandler::getBus();
+
+    const auto peakValueInterface = interface + ".PeakValue";
+
+    NumericSensorInfo peakValueInfo{};
+
+    peakValueInfo.name = info.name;
+
+    peakValueInfo.type = info.type + "_PeakValue";
+
+    peakValueInfo.sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
+        objPath.c_str(), "SensorId", peakValueInterface.c_str());
+
+    peakValueInfo.priority = utils::DBusHandler().getDbusProperty<bool>(
+        objPath.c_str(), "Priority", peakValueInterface.c_str());
+
+    peakValueInfo.aggregated = utils::DBusHandler().getDbusProperty<bool>(
+        objPath.c_str(), "Aggregated", peakValueInterface.c_str());
+
+    if (info.type == "NSM_Power")
+    {
+        PeakPowerSensorBuilder builder;
+
+        auto sensor = builder.makeSensor(peakValueInterface, objPath, bus,
+                                         peakValueInfo);
+        lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
+                  "UUID", uuid, "NAME", peakValueInfo.name, "TYPE",
+                  peakValueInfo.type);
+
+        makeAggregatorAndAddSensor(&builder, peakValueInfo, sensor, uuid,
+                                   nsmDevice);
+    }
+    else
+    {
+        lg2::error(
+            "The Numeric Sensor Type {TYPE} does not support Reading Peak Value : UUID={UUID}, Name={NAME}",
+            "UUID", uuid, "NAME", info.name, "TYPE", info.type);
+    }
 }
 
 void NumericSensorFactory::makeAggregatorAndAddSensor(
