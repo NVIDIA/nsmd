@@ -28,6 +28,7 @@
 #include <com/nvidia/ClockMode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
+#include <com/nvidia/Common/ClearClockLimAsync/server.hpp>
 #include "asyncOperationManager.hpp"
 #include <cstdint>
 #include <iostream>
@@ -44,6 +45,24 @@ using Mode = sdbusplus::server::com::nvidia::ClockMode::Mode;
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using CpuOperatingConfigIntf =
     object_t<Inventory::Item::Cpu::server::OperatingConfig>;
+using clearClockLimAsyncIntf =
+    object_t<sdbusplus::server::com::nvidia::common::ClearClockLimAsync>;
+
+class NsmClearClockLimAsyncIntf : public clearClockLimAsyncIntf
+{
+  public:
+    NsmClearClockLimAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                              std::shared_ptr<NsmDevice> device);
+
+    sdbusplus::message::object_path clearClockLimit() override;
+    requester::Coroutine doClearClockLimitOnDevice(
+        std::shared_ptr<AsyncStatusIntf> statusInterface);
+    requester::Coroutine
+        clearReqClockLimit(AsyncOperationStatusType* status);
+
+  private:
+    std::shared_ptr<NsmDevice> device;
+};
 
 class NsmChassisClockControl : public NsmSensor
 {
@@ -51,6 +70,7 @@ class NsmChassisClockControl : public NsmSensor
     NsmChassisClockControl(
         sdbusplus::bus::bus& bus, const std::string& name,
         std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf,
+        std::shared_ptr<NsmClearClockLimAsyncIntf>nsmClearClockLimAsyncIntf,
         const std::vector<utils::Association>& associations, std::string& type,
         const std::string& inventoryObjPath,
         const std::string& physicalContext,
@@ -78,6 +98,7 @@ class NsmChassisClockControl : public NsmSensor
     std::shared_ptr<ProcessorModeIntf> processorModeIntf = nullptr;
     std::shared_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf;
+    std::shared_ptr<NsmClearClockLimAsyncIntf>nsmClearClockLimAsyncIntf;
     std::string inventoryObjPath;
 };
 

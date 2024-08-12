@@ -34,16 +34,110 @@ enum class clockLimitFlag{
     CLEAR = 1
 };
 
+NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
+    sdbusplus::bus::bus& bus, const char* path,
+    std::shared_ptr<NsmDevice> device) :
+    clearClockLimAsyncIntf(bus, path), device(device)
+{};
+
+requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
+    std::shared_ptr<AsyncStatusIntf> statusInterface)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    auto rc_ = co_await clearReqClockLimit(&status);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+}
+requester::Coroutine 
+NsmClearClockLimAsyncIntf::clearReqClockLimit(AsyncOperationStatusType* status)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    // first argument instanceid=0 is irrelevant
+    auto rc = encode_set_clock_limit_req(
+        0, GRAPHICS_CLOCK, static_cast<uint8_t>(clockLimitFlag::CLEAR), 0, 0,
+        requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "clearReqClockLimit  encode_set_clock_limit_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "clearReqClockLimit SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t data_size = 0;
+    rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
+                                     &data_size, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("clearReqClockLimit for EID: {EID} completed", "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "clearReqClockLimit decode_set_clock_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+sdbusplus::message::object_path
+    NsmClearClockLimAsyncIntf::clearClockLimit()
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmClearClockLimAsyncIntf::clearPCIeErrorCounter failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    doClearClockLimitOnDevice(statusInterface).detach();
+
+    return objectPath;
+}
+
 NsmChassisClockControl::NsmChassisClockControl(
     sdbusplus::bus::bus& bus, const std::string& name,
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf,
+    std::shared_ptr<NsmClearClockLimAsyncIntf> nsmClearClockLimAsyncIntf,
     const std::vector<utils::Association>& associations, std::string& type,
     const std::string& inventoryObjPath, const std::string& physicalContext,
     const std::string& clockMode) :
     NsmSensor(name, type), cpuOperatingConfigIntf(cpuOperatingConfigIntf),
+    nsmClearClockLimAsyncIntf(nsmClearClockLimAsyncIntf),
     inventoryObjPath(inventoryObjPath)
 {
-    decoratorAreaIntf = std::make_shared<DecoratorAreaIntf>(bus, inventoryObjPath.c_str());
+    decoratorAreaIntf =
+        std::make_shared<DecoratorAreaIntf>(bus, inventoryObjPath.c_str());
     decoratorAreaIntf->physicalContext(
         sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
             convertPhysicalContextTypeFromString(physicalContext));
@@ -341,9 +435,13 @@ static void CreateControlGpuClock(SensorManager& manager,
     auto cpuOperatingConfigIntf =
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
 
+    auto nsmClearClockLimAsyncIntf =
+        std::make_shared<NsmClearClockLimAsyncIntf>(bus, inventoryObjPath.c_str(),
+                                                    nsmDevice);
+
     auto nsmChassisControlSensor = std::make_shared<NsmChassisClockControl>(
-        bus, name, cpuOperatingConfigIntf, associations, type, inventoryObjPath,
-        physicalContext, clockMode);
+        bus, name, cpuOperatingConfigIntf, nsmClearClockLimAsyncIntf,
+        associations, type, inventoryObjPath, physicalContext, clockMode);
     nsmDevice->addSensor(nsmChassisControlSensor, priority);
     auto minGraphicsClockFreq = std::make_shared<NsmMinGraphicsClockLimit>(
         name, type, cpuOperatingConfigIntf);

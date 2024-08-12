@@ -1,4 +1,6 @@
 #include "nsmGpuPciePort.hpp"
+#include <cstdint>
+#include "asyncOperationManager.hpp"
 #define GPU_PCIe_INTERFACE "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0"
 namespace nsm
 {
@@ -183,6 +185,102 @@ void NsmClearPCIeCounters::updateReading(const bitfield8_t clearableSource[])
     clearPCIeIntf->clearableCounters(clearableCounters);
 }
 
+requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
+    AsyncOperationStatusType* status, const uint8_t deviceIndex,
+    const uint8_t groupId, const uint8_t dsId)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_clear_data_source_v1_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    // first argument instanceid=0 is irrelevant
+    auto rc = encode_clear_data_source_v1_req(0, deviceIndex, groupId, dsId,
+                                              requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "clearPCIeErrorCounter encode_clear_data_source_v1_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "clearPCIeErrorCounter SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t data_size = 0;
+    rc = decode_clear_data_source_v1_resp(responseMsg.get(), responseLen, &cc,
+                                          &data_size, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("clearPCIeErrorCounter for EID: {EID} completed", "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "clearPCIeErrorCounter decode_clear_data_source_v1_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
+    std::shared_ptr<AsyncStatusIntf> statusInterface,
+    const std::string& Counter)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    const uint8_t groupId = std::get<0>(counterToGroupIdMap[Counter]);
+    const uint8_t dsId = std::get<1>(counterToGroupIdMap[Counter]);
+
+    auto rc_ = co_await clearPCIeErrorCounter(&status, deviceIndex, groupId, dsId);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+};
+
+sdbusplus::message::object_path
+    NsmClearPCIeIntf::clearCounter(std::string Counter)
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmClearPCIeCounters::clearCounter failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    if (counterToGroupIdMap.find(Counter) == counterToGroupIdMap.end())
+    {
+        lg2::error("Invalid Counter Name. Counter: {A}", "A", Counter);
+        throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
+    }
+
+    doClearPCIeCountersOnDevice(statusInterface, Counter).detach();
+
+    return objectPath;
+}
+
 static void createNsmGpuPcieSensor(SensorManager& manager,
                                    const std::string& interface,
                                    const std::string& objPath)
@@ -235,7 +333,7 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
                     GPU_PCIe_INTERFACE);
 
             auto clearPCIeIntf = std::make_shared<NsmClearPCIeIntf>(
-                bus, inventoryObjPath.c_str());
+                bus, inventoryObjPath.c_str(), deviceIndex, nsmDevice);
 
             for (auto groupId : clearableScalarGroup)
             {

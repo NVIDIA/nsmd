@@ -8,6 +8,7 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
+#include "asyncOperationManager.hpp"
 
 #define MAX_SCALAR_SOURCE_MASK_SIZE 4
 
@@ -36,6 +37,17 @@ using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
 using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortInfo::PortProtocol;
+
+std::map<std::string, std::tuple<uint8_t, uint8_t>> counterToGroupIdMap = {
+    {"CorrectableErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_3)},
+    {"NonFatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_0)},
+    {"FatalErrorCount", std::make_tuple(GROUP_ID_2, DS_ID_1)},
+    {"L0ToRecoveryCount", std::make_tuple(GROUP_ID_3, DS_ID_0)},
+    {"ReplayCount", std::make_tuple(GROUP_ID_4, DS_ID_6)},
+    {"ReplayRolloverCount", std::make_tuple(GROUP_ID_4, DS_ID_4)},
+    {"NAKSentCount", std::make_tuple(GROUP_ID_4, DS_ID_2)},
+    {"NAKReceivedCount", std::make_tuple(GROUP_ID_4, DS_ID_1)},
+    {"UnsupportedRequestCount", std::make_tuple(GROUP_ID_2, DS_ID_2)}};
 
 class NsmGpuPciePort : public NsmObject
 {
@@ -70,16 +82,25 @@ using CounterType = sdbusplus::common::xyz::openbmc_project::pc_ie::
 class NsmClearPCIeIntf : public ClearPCIeIntf
 {
   public:
-    NsmClearPCIeIntf(sdbusplus::bus::bus& bus, const char* path) :
-        ClearPCIeIntf(bus, path)
+    NsmClearPCIeIntf(sdbusplus::bus::bus& bus, const char* path,
+                     const uint8_t deviceIndex,
+                     std::shared_ptr<NsmDevice> device) :
+        ClearPCIeIntf(bus, path), deviceIndex(deviceIndex), device(device)
     {}
 
-    //TO DO:  overriding the dbus method. Complete implementation will be done for post
-    // operation.
-    void clearCounter(CounterType Counter) override
-    {
-        lg2::info("CounterType is {A}", "A", Counter);
-    };
+    // TO DO:  overriding the dbus method. Complete implementation will be done
+    // for post
+    //  operation.
+    sdbusplus::message::object_path clearCounter(std::string Counter) override;
+    requester::Coroutine
+        clearPCIeErrorCounter(AsyncOperationStatusType* status,
+                              const uint8_t deviceIndex, const uint8_t groupId,
+                              const uint8_t dsId);
+    requester::Coroutine doClearPCIeCountersOnDevice(
+        std::shared_ptr<AsyncStatusIntf> statusInterface, const std::string& Counter);
+
+    uint8_t deviceIndex;
+    std::shared_ptr<NsmDevice> device;
 };
 
 class NsmClearPCIeCounters : public NsmObject

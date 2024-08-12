@@ -23,6 +23,14 @@ extern "C" {
 #define GROUP_ID_8 8
 #define GROUP_ID_9 9
 
+#define DS_ID_0 0
+#define DS_ID_1 1
+#define DS_ID_2 2
+#define DS_ID_3 3
+#define DS_ID_4 4
+#define DS_ID_5 5
+#define DS_ID_6 6
+
 #define MAX_SUPPORTED_DATA_MASK_LENGTH 1
 
 enum pci_links_command {
