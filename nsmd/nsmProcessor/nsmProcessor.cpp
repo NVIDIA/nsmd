@@ -1006,6 +1006,137 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
+NsmDefaultBaseClockSpeed::NsmDefaultBaseClockSpeed(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmDefaultBaseClockSpeed: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
+                                                      eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = DEFAULT_BASE_CLOCKS;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmDefaultBaseClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmDefaultBaseClockSpeed SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::baseSpeed(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
+NsmDefaultBoostClockSpeed::NsmDefaultBoostClockSpeed(
+    std::string& name, std::string& type,
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+{
+    lg2::info("NsmDefaultBoostClockSpeed: create sensor:{NAME}", "NAME",
+              name.c_str());
+}
+
+requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
+                                                       eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    uint8_t propertyIdentifier = DEFAULT_BOOST_CLOCKS;
+    auto rc = encode_get_inventory_information_req(0, propertyIdentifier,
+                                                   requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmDefaultBoostClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmDefaultBoostClockSpeed: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint32_t value;
+    std::vector<uint8_t> data(4, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code, &dataSize,
+                                               data.data());
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    {
+        memcpy(&value, &data[0], sizeof(value));
+        value = le32toh(value);
+        cpuOperatingConfigIntf
+            ->CpuOperatingConfigIntf::defaultBoostClockSpeedMHz(value);
+    }
+    else
+    {
+        lg2::error(
+            "NsmDefaultBoostClockSpeed: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
+            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return cc;
+}
+
 NsmCurrentUtilization::NsmCurrentUtilization(
     const std::string& name, const std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
@@ -2129,6 +2260,14 @@ void createNsmProcessorSensor(SensorManager& manager,
         auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
             name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
             inventoryObjPath);
+
+        auto defaultBoostClockSpeed =
+            std::make_shared<NsmDefaultBoostClockSpeed>(name, type,
+                                                        cpuOperatingConfigIntf);
+        auto defaultBaseClockSpeed = std::make_shared<NsmDefaultBaseClockSpeed>(
+            name, type, cpuOperatingConfigIntf);
+        nsmDevice->addStaticSensor(defaultBaseClockSpeed);
+        nsmDevice->addStaticSensor(defaultBoostClockSpeed);
 
         nsmDevice->addSensor(clockFreqSensor, priority);
         nsmDevice->addSensor(clockLimitSensor, priority);

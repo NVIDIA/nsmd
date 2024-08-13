@@ -116,7 +116,7 @@ void NsmMemoryCapacityUtil::updateMetricOnSharedMemory()
 
     std::string propName = "CapacityUtilizationPercent";
     nv::sensor_aggregation::DbusVariantType capacityUtilizationPercent{
-        dimmMemoryMetricsIntf->capacityUtilizationPercent()};
+        static_cast<uint16_t>(dimmMemoryMetricsIntf->capacityUtilizationPercent())};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
                                                  propName, smbusData,
                                                  capacityUtilizationPercent);
