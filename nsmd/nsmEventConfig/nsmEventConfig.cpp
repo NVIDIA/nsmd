@@ -56,10 +56,10 @@ void NsmEventConfig::convertIdsToMask(std::vector<uint64_t>& eventIds,
     }
 }
 
-uint8_t NsmEventConfig::updateSync(SensorManager& manager, eid_t eid)
+requester::Coroutine NsmEventConfig::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    rc = setCurrentEventSources(manager, eid, messageType, srcEventMask);
+    rc = co_await setCurrentEventSources(manager, eid, messageType, srcEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -67,18 +67,17 @@ uint8_t NsmEventConfig::updateSync(SensorManager& manager, eid_t eid)
             lg2::error("setCurrentEventSources failed, eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
         }
-        return rc;
     }
-    return rc;
+    co_return rc;
 }
 
-uint8_t NsmEventConfig::setCurrentEventSources(
+requester::Coroutine NsmEventConfig::setCurrentEventSources(
     SensorManager& manager, eid_t eid, uint8_t nvidiaMessageType,
     std::vector<bitfield8_t>& eventIdMasks)
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
-        return NSM_ERR_INVALID_DATA_LENGTH;
+        co_return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
     Request request(sizeof(nsm_msg_hdr) +
@@ -92,15 +91,15 @@ uint8_t NsmEventConfig::setCurrentEventSources(
         lg2::error(
             "encode_nsm_set_current_event_sources_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        return rc;
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
     if (rc)
     {
-        return rc;
+        co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
@@ -113,16 +112,16 @@ uint8_t NsmEventConfig::setCurrentEventSources(
             "EID", eid, "RC", rc);
     }
 
-    return cc;
+    co_return cc;
 }
 
-uint8_t NsmEventConfig::configureEventAcknowledgement(
+requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
     SensorManager& manager, eid_t eid, uint8_t nvidiaMessageType,
     std::vector<bitfield8_t>& eventIdMasks)
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
-        return NSM_ERR_INVALID_DATA_LENGTH;
+        co_return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
     Request request(sizeof(nsm_msg_hdr) +
@@ -136,15 +135,15 @@ uint8_t NsmEventConfig::configureEventAcknowledgement(
         lg2::error(
             "encode_nsm_configure_event_acknowledgement_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        return rc;
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
     if (rc)
     {
-        return rc;
+        co_return rc;
     }
 
     bitfield8_t* newEventIdMasks;
@@ -159,7 +158,7 @@ uint8_t NsmEventConfig::configureEventAcknowledgement(
             "EID", eid, "RC", rc);
     }
 
-    return cc;
+    co_return cc;
 }
 
 static void createNsmEventConfig(SensorManager& manager,
@@ -195,11 +194,10 @@ static void createNsmEventConfig(SensorManager& manager,
     std::vector<uint64_t> ackIds{};
     auto sensor = std::make_shared<NsmEventConfig>(name, type, messageType,
                                                    subscribedEventIds, ackIds);
-    nsmDevice->deviceSensors.emplace_back(sensor);
+    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
 
     // update sensor
-    auto eid = manager.getEid(nsmDevice);
-    sensor->update(manager, eid);
+    nsmDevice->addStaticSensor(sensor);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

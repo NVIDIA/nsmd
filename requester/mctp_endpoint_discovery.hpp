@@ -37,8 +37,8 @@ class MctpDiscoveryHandlerIntf
 {
   public:
     virtual void handleMctpEndpoints(const MctpInfos& mctpInfos) = 0;
-    virtual void onlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid) {}
-    virtual void offlineMctpEndpoint([[maybe_unused]] const uuid_t& uuid) {}
+    virtual void onlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo) {}
+    virtual void offlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo) {}
     virtual ~MctpDiscoveryHandlerIntf() {}
 };
 
@@ -79,7 +79,7 @@ class MctpDiscovery
      * @brief matcher rule for property changes of
      * xyz.openbmc_project.Object.Enable dbus object
      */
-    std::vector<sdbusplus::bus::match_t> enableMatches;
+    std::map<std::string, sdbusplus::bus::match_t> enableMatches;
 
     /** @brief handler for mctpEndpointRemovedSignal */
     void cleanEndpoints(sdbusplus::message::message& msg);

@@ -36,11 +36,11 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
     nsmDevice(nsmDevice)
 {}
 
-uint8_t NsmEventSetting::updateSync(SensorManager& manager, eid_t eid)
+requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
     auto localEid = manager.getLocalEid();
-    rc = setEventSubscription(manager, eid, eventGenerationSetting, localEid);
+    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting, localEid);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -48,15 +48,15 @@ uint8_t NsmEventSetting::updateSync(SensorManager& manager, eid_t eid)
             lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
                        eid, "RC", rc);
         }
-        return rc;
     }
     nsmDevice->setEventMode(eventGenerationSetting);
-    return rc;
+    co_return rc;
 }
 
-uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
-                                              uint8_t globalSettting,
-                                              eid_t receiverEid)
+requester::Coroutine
+    NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
+                                          uint8_t globalSettting,
+                                          eid_t receiverEid)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_event_subscription_req));
@@ -69,15 +69,15 @@ uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
         lg2::error(
             "encode_nsm_set_event_subscription_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        return rc;
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = manager.SendRecvNsmMsgSync(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
     if (rc)
     {
-        return rc;
+        co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
@@ -90,7 +90,7 @@ uint8_t NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
             "EID", eid, "RC", rc);
     }
 
-    return cc;
+    co_return cc;
 }
 
 static void createNsmEventSetting(SensorManager& manager,
@@ -128,11 +128,10 @@ static void createNsmEventSetting(SensorManager& manager,
 
     auto sensor = std::make_shared<NsmEventSetting>(
         name, type, eventGenerationSetting, nsmDevice);
-    nsmDevice->deviceSensors.emplace_back(sensor);
+    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
 
     // update sensor
-    auto eid = manager.getEid(nsmDevice);
-    sensor->update(manager, eid);
+    nsmDevice->addStaticSensor(sensor);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

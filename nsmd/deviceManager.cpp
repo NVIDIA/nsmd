@@ -79,6 +79,9 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                 lg2::info(
                     "The NSM device has been discovered before, uuid={UUID}",
                     "UUID", mctpUuid);
+                // call updateNsmDevice to resume setting.
+                rc = co_await updateNsmDevice(nsmDevice, eid);
+                nsmDevice->setOnline();
                 continue;
             }
 
@@ -100,8 +103,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                                                       instanceNumber);
             if (!nsmDevice)
             {
-                nsmDevice =
-                    std::make_shared<NsmDevice>(deviceType, instanceNumber);
+                nsmDevice = std::make_shared<NsmDevice>(deviceType,
+                                                        instanceNumber);
                 nsmDevices.emplace_back(nsmDevice);
             }
             nsmDevice->isDeviceActive = true;
@@ -123,7 +126,6 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             // update eid table [from UUID from MCTP dbus property]
             eidTable.insert(std::make_pair(
                 mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
-
 
             rc = co_await updateFruDeviceIntf(nsmDevice, eid);
             if (rc)
@@ -461,8 +463,8 @@ requester::Coroutine DeviceManager::getInventoryInformation(
 
 template <typename TypeOfKey, typename TypeOfVector>
 uint8_t DeviceManager::fetchInstanceIdFromEM(const std::string& path,
-                                            const std::string& intf,
-                                            const TypeOfKey& keyToUse)
+                                             const std::string& intf,
+                                             const TypeOfKey& keyToUse)
 {
     try
     {
@@ -624,7 +626,8 @@ requester::Coroutine
     }
 
     // update the instanceId if mapping available for the device
-    updateInstanceIdViaRemapping(deviceIdentification, deviceInstance, eid, uuid);
+    updateInstanceIdViaRemapping(deviceIdentification, deviceInstance, eid,
+                                 uuid);
 
     co_return NSM_SW_SUCCESS;
 }
@@ -643,17 +646,15 @@ requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
     co_return rc;
 }
 
-void DeviceManager::onlineMctpEndpoint(const uuid_t& uuid)
+void DeviceManager::onlineMctpEndpoint(const MctpInfo& mctpInfo)
 {
-    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
-    if (nsmDevice)
-    {
-        nsmDevice->setOnline();
-    }
+    MctpInfos mctpInfos{mctpInfo};
+    discoverNsmDevice(mctpInfos);
 }
 
-void DeviceManager::offlineMctpEndpoint(const uuid_t& uuid)
+void DeviceManager::offlineMctpEndpoint(const MctpInfo& mctpInfo)
 {
+    const std::string uuid = std::get<1>(mctpInfo);
     auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
     if (nsmDevice)
     {
@@ -706,7 +707,7 @@ requester::Coroutine
             "BUILD_DATE", std::get<std::string>(properties[BUILD_DATE]));
     }
 
-    //set deviceUuid to mctp uuid as default value
+    // set deviceUuid to mctp uuid as default value
     nsmDevice->deviceUuid = nsmDevice->uuid;
     if (properties.find(DEVICE_GUID) != properties.end())
     {
