@@ -61,19 +61,42 @@ NsmPowerControl::NsmPowerControl(
 }
 
 // customer set for power cap
-uint32_t NsmPowerControl::powerCap(uint32_t power_limit)
+requester::Coroutine NsmPowerControl::setPowerCap(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    [[maybe_unused]] std::shared_ptr<NsmDevice> device)
 {
-	if (power_limit > maxPowerCapValue() ||
-	    power_limit < minPowerCapValue()) {
-		throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-		    WriteFailure();
-	}
-	SensorManager &manager = SensorManager::getInstance();
-	auto size = manager.powerCapList.size();
-	for (const auto &powerCapSensor : manager.powerCapList) {
-		powerCapSensor->getPowerCapIntf()->powerCap(power_limit / size);
-	}
-	return PowerCapIntf::powerCap();
+    const uint32_t* powerLimit = std::get_if<uint32_t>(&value);
+
+    if (!powerLimit)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    if (*powerLimit > maxPowerCapValue() || *powerLimit < minPowerCapValue())
+    {
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    SensorManager& manager = SensorManager::getInstance();
+
+    auto size = manager.powerCapList.size();
+
+    for (const auto& powerCapSensor : manager.powerCapList)
+    {
+        AsyncOperationStatusType deviceStatus{
+            AsyncOperationStatusType::Success};
+
+        co_await powerCapSensor->getPowerCapIntf()->setPowerCapOnDevice(
+            *powerLimit / size, &deviceStatus);
+
+        if (deviceStatus != AsyncOperationStatusType::Success)
+        {
+            *status = deviceStatus;
+        }
+    }
+
+    co_return NSM_SW_SUCCESS;
 }
 
 // called when individual gpu processor is updated
@@ -213,6 +236,15 @@ static void CreateControlGpuPower(SensorManager& manager,
     nsmDevice->deviceSensors.emplace_back(fpgaControlTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGAControlTotalGPUPowerPath] =
         fpgaControlTotalGpuPower;
+
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(nsmFPGAControlTotalGPUPowerPath)
+        ->addAsyncSetOperation(
+            fpgaControlTotalGpuPower->PowerCapIntf::interface, "PowerCap",
+            AsyncSetOperationInfo{std::bind_front(&NsmPowerControl::setPowerCap,
+                                                  fpgaControlTotalGpuPower),
+                                  {},
+                                  nsmDevice});
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

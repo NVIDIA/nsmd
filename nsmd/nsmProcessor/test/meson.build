@@ -13,6 +13,8 @@ dep_src_files = [
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSetAsync/asyncOperationManager.cpp',
     '../../nsmSetAsync/nsmSetMigMode.cpp',
+    '../../nsmSetAsync/nsmSetECCMode.cpp',
+    '../../nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

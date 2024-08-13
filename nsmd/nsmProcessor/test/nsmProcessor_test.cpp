@@ -107,8 +107,7 @@ TEST(nsmMigMode, GoodUpdateReading)
 
 TEST(nsmEccErrorCounts, GoodGenReq)
 {
-    auto eccIntf = std::make_shared<NsmEccModeIntf>(
-        bus, inventoryObjPath.c_str(), nullptr);
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmEccErrorCounts eccErrorCntSensor(sensorName, sensorType, eccIntf,
                                              inventoryObjPath);
 
@@ -126,8 +125,7 @@ TEST(nsmEccErrorCounts, GoodGenReq)
 
 TEST(nsmEccErrorCounts, GoodHandleResp)
 {
-    auto eccIntf = std::make_shared<NsmEccModeIntf>(
-        bus, inventoryObjPath.c_str(), nullptr);
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
 
@@ -154,8 +152,7 @@ TEST(nsmEccErrorCounts, GoodHandleResp)
 
 TEST(nsmEccErrorCounts, GoodUpdateReading)
 {
-    auto eccIntf = std::make_shared<NsmEccModeIntf>(
-        bus, inventoryObjPath.c_str(), nullptr);
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
     struct nsm_ECC_error_counts errorCounts;
@@ -174,8 +171,7 @@ TEST(nsmEccErrorCounts, GoodUpdateReading)
 
 TEST(nsmEccErrorCounts, BadHandleResp)
 {
-    auto eccIntf = std::make_shared<NsmEccModeIntf>(
-        bus, inventoryObjPath.c_str(), nullptr);
+    auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
 
@@ -643,8 +639,8 @@ TEST(nsmEDPpScalingFactor, BadHandleResp)
 
 TEST(NsmClockLimitGraphics, GoodGenReq)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
                                       cpuOperatingConfigIntf, inventoryObjPath);
     const uint8_t eid{12};
@@ -661,8 +657,8 @@ TEST(NsmClockLimitGraphics, GoodGenReq)
 
 TEST(NsmClockLimitGraphics, GoodHandleResp)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
                                       cpuOperatingConfigIntf, inventoryObjPath);
 
@@ -688,8 +684,8 @@ TEST(NsmClockLimitGraphics, GoodHandleResp)
 
 TEST(NsmClockLimitGraphics, BadHandleResp)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
                                       cpuOperatingConfigIntf, inventoryObjPath);
 
@@ -716,8 +712,8 @@ TEST(NsmClockLimitGraphics, BadHandleResp)
 
 TEST(NsmCurrClockFreq, GoodGenReq)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
                                  inventoryObjPath);
     const uint8_t eid{12};
@@ -735,8 +731,8 @@ TEST(NsmCurrClockFreq, GoodGenReq)
 
 TEST(NsmCurrClockFreq, GoodHandleResp)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
                                  inventoryObjPath);
 
@@ -758,8 +754,8 @@ TEST(NsmCurrClockFreq, GoodHandleResp)
 
 TEST(NsmCurrClockFreq, BadHandleResp)
 {
-    auto cpuOperatingConfigIntf = std::make_shared<NsmCpuOperatingConfigIntf>(
-        bus, inventoryObjPath.c_str(), nullptr, GRAPHICS_CLOCK);
+    auto cpuOperatingConfigIntf =
+        std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmCurrClockFreq sensor(sensorName, sensorType, cpuOperatingConfigIntf,
                                  inventoryObjPath);
 

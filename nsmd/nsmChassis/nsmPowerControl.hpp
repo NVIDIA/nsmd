@@ -16,6 +16,7 @@
  */
 
 #pragma once
+#include "asyncOperationManager.hpp"
 #include "nsmObject.hpp"
 #include "utils.hpp"
 
@@ -72,7 +73,10 @@ class NsmPowerControl :
     virtual uint32_t maxPowerCapValue() const override;
     virtual uint32_t defaultPowerCap() const override;
     int32_t clearPowerCap() override;
-    virtual uint32_t powerCap(uint32_t value) override;
+    requester::Coroutine
+        setPowerCap(const AsyncSetOperationValueType& value,
+                    AsyncOperationStatusType* status,
+                    [[maybe_unused]] std::shared_ptr<NsmDevice> device);
     void updatePowerCapValue(const std::string &childName, uint32_t value);
 
   private:

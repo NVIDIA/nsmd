@@ -17,15 +17,19 @@
 
 #pragma once
 #include "platform-environmental.h"
+
+#include "asyncOperationManager.hpp"
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
-#include <cstdint>
-#include <memory>
+
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Control/Power/Cap/server.hpp>
+
+#include <cstdint>
+#include <memory>
 
 namespace nsm
 {
@@ -35,12 +39,13 @@ using PowerCapIntf = sdbusplus::server::object_t<
 class NsmPowerCapIntf : public PowerCapIntf
 {
   public:
-    NsmPowerCapIntf(sdbusplus::bus::bus &bus, const char *path,
-		    std::string &name, const std::vector<std::string> &parents, std::shared_ptr<NsmDevice> device)
-	: PowerCapIntf(bus, path), name(name), parents(parents), device(device)
+    NsmPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
+                    std::string& name, const std::vector<std::string>& parents,
+                    std::shared_ptr<NsmDevice> device) :
+        PowerCapIntf(bus, path), name(name), parents(parents), device(device)
     {}
 
-    void getPowerCapFromDevice()
+    requester::Coroutine getPowerCapFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -54,17 +59,18 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "getPowerCapFromDevice encode_get_device_power_limit_req failed.eid = {EID} rc ={RC}",
                 "EID", eid, "RC", rc);
+            co_return rc;
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
-            return;
+            co_return rc_;
         }
         uint8_t cc = NSM_ERROR;
         uint16_t reason_code = ERR_NULL;
@@ -90,10 +96,14 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "getPowerCapFromDevice: decode_get_power_limit_resp with reasonCode = {REASONCODE},cc = {CC}and rc = {RC} ",
                 "REASONCODE", reason_code, "CC", cc, "RC", rc);
+            co_return rc;
         }
+
+        co_return NSM_SW_SUCCESS;
     }
 
-    void setPowerCapOnDevice(uint32_t power_limit)
+    requester::Coroutine setPowerCapOnDevice(uint32_t power_limit,
+                                             AsyncOperationStatusType* status)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -109,23 +119,21 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "setPowerCapOnDevice encode_set_device_power_limit_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
-                "setPowerCapOnDevice SendRecvNsmMsgSync failed for whilesetting power limit for eid = {EID} rc = {RC}",
+                "setPowerCapOnDevice SendRecvNsmMsg failed for whilesetting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -137,18 +145,20 @@ class NsmPowerCapIntf : public PowerCapIntf
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
-            getPowerCapFromDevice();
+            co_await getPowerCapFromDevice();
             lg2::info("setPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
 
-	    for (auto it = parents.begin(); it != parents.end();) {
+            for (auto it = parents.begin(); it != parents.end();)
+            {
                 auto sensorIt = manager.objectPathToSensorMap.find(*it);
-		    if (sensorIt != manager.objectPathToSensorMap.end()) {
+                if (sensorIt != manager.objectPathToSensorMap.end())
+                {
                     auto sensor = sensorIt->second;
-			    if (sensor) {
+                    if (sensor)
+                    {
                         sensorCache.emplace_back(
-					std::dynamic_pointer_cast<
-					    NsmPowerControl>(sensor));
+                            std::dynamic_pointer_cast<NsmPowerControl>(sensor));
                         it = parents.erase(it);
                         continue;
                     }
@@ -157,34 +167,53 @@ class NsmPowerCapIntf : public PowerCapIntf
             }
 
             // update each cached sensor
-	    for (const auto &sensor : sensorCache) {
+            for (const auto& sensor : sensorCache)
+            {
                 sensor->updatePowerCapValue(name, PowerCapIntf::powerCap());
             }
-	} else {
+        }
+        else
+        {
             lg2::error("setPowerCapOnDevice decode_set_power_limit_resp "
                        "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
                        "RC = {A} ",
                        "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-		throw sdbusplus::xyz::openbmc_project::Common::Device::
-			Error::WriteFailure();
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
+
+        co_return NSM_SW_SUCCESS;
     }
 
-    uint32_t powerCap(uint32_t power_limit) override
+    requester::Coroutine
+        setPowerCap(const AsyncSetOperationValueType& value,
+                    AsyncOperationStatusType* status,
+                    [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        if (power_limit > PowerCapIntf::maxPowerCapValue() ||
-            power_limit < PowerCapIntf::minPowerCapValue())
+        const uint32_t* powerLimit = std::get_if<uint32_t>(&value);
+
+        if (!powerLimit)
         {
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
         }
-        setPowerCapOnDevice(power_limit);
-        return PowerCapIntf::powerCap();
+
+        if (*powerLimit > PowerCapIntf::maxPowerCapValue() ||
+            *powerLimit < PowerCapIntf::minPowerCapValue())
+        {
+            *status = AsyncOperationStatusType::InvalidArgument;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        const auto rc = co_await setPowerCapOnDevice(*powerLimit, status);
+
+        co_return rc;
     }
 
     std::string name;
     std::vector<std::string> parents;
     std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
+
   private:
     std::shared_ptr<NsmDevice> device;
 };

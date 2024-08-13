@@ -25,8 +25,6 @@
 #include "nsmClearPowerCapIface.hpp"
 #include "nsmCommon/nsmCommon.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
-#include "nsmCpuOperatingConfigInterface.hpp"
-#include "nsmEccModeIface.hpp"
 #include "nsmInterface.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPowerCapIface.hpp"
@@ -49,6 +47,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Accelerator/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PersistentMemory/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
@@ -181,7 +180,7 @@ class NsmEccMode : public NsmSensor
 {
   public:
     NsmEccMode(std::string& name, std::string& type,
-               std::shared_ptr<NsmEccModeIntf> eccIntf,
+               std::shared_ptr<EccModeIntf> eccIntf,
                std::string& inventoryObjPath);
 
     std::optional<std::vector<uint8_t>>
@@ -192,7 +191,7 @@ class NsmEccMode : public NsmSensor
 
   private:
     void updateReading(bitfield8_t flags);
-    std::shared_ptr<NsmEccModeIntf> eccModeIntf = nullptr;
+    std::shared_ptr<EccModeIntf> eccModeIntf = nullptr;
     std::string inventoryObjPath;
 };
 
@@ -200,7 +199,7 @@ class NsmEccErrorCounts : public NsmSensor
 {
   public:
     NsmEccErrorCounts(std::string& name, std::string& type,
-                      std::shared_ptr<NsmEccModeIntf> eccIntf,
+                      std::shared_ptr<EccModeIntf> eccIntf,
                       std::string& inventoryObjPath);
     NsmEccErrorCounts() = default;
 
@@ -214,7 +213,7 @@ class NsmEccErrorCounts : public NsmSensor
     void updateReading(struct nsm_ECC_error_counts);
     std::string inventoryObjPath;
 
-    std::shared_ptr<NsmEccModeIntf> eccErrorCountIntf = nullptr;
+    std::shared_ptr<EccModeIntf> eccErrorCountIntf = nullptr;
 };
 
 using PciePortIntf = sdbusplus::server::object_t<
@@ -351,10 +350,9 @@ using CpuOperatingConfigIntf =
 class NsmClockLimitGraphics : public NsmSensor
 {
   public:
-    NsmClockLimitGraphics(
-        const std::string& name, const std::string& type,
-        std::shared_ptr<NsmCpuOperatingConfigIntf> cpuConfigIntf,
-        std::string& inventoryObjPath);
+    NsmClockLimitGraphics(const std::string& name, const std::string& type,
+                          std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+                          std::string& inventoryObjPath);
     NsmClockLimitGraphics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -366,7 +364,7 @@ class NsmClockLimitGraphics : public NsmSensor
   private:
     void updateReading(const struct nsm_clock_limit&);
 
-    std::shared_ptr<NsmCpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
     std::string inventoryObjPath;
 };
 

@@ -35,8 +35,9 @@ NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
     NsmObject(name, type)
 {
     lg2::info("NsmReset: create sensor:{NAME}", "NAME", name.c_str());
-    resetIntf = std::make_shared<NsmResetIntf>(bus, inventoryObjPath.c_str(),
-                                               device, deviceIndex);
+    resetIntf = std::make_shared<NsmResetIntf>(bus, inventoryObjPath.c_str());
+    resetAsyncIntf = std::make_shared<NsmResetAsyncIntf>(
+        bus, inventoryObjPath.c_str(), device, deviceIndex);
     resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
                              processor::Reset::ResetTypes::ForceRestart);
 }
