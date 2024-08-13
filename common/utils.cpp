@@ -19,6 +19,8 @@
 
 #include "base.h"
 
+#include "dBusAsyncUtils.hpp"
+
 #include <boost/regex.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
@@ -315,6 +317,41 @@ void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
             throw std::invalid_argument("Unknown device type: " +
                                         std::to_string((int)deviceType));
     }
+}
+
+requester::Coroutine coGetAssociations(const std::string& objPath,
+                                       const std::string& interfaceSubStr,
+                                       std::vector<Association>& associations)
+{
+    auto mapperResponse = co_await utils::coGetServiceMap(objPath, dbus::Interfaces{});
+
+    for (const auto& [service, interfaces] : mapperResponse)
+    {
+        for (const auto& interface : interfaces)
+        {
+            if (interface.find(interfaceSubStr) != std::string::npos)
+            {
+                associations.push_back({});
+                auto& association = associations.back();
+
+                association.forward =
+                    co_await utils::coGetDbusProperty<std::string>(
+                        objPath.c_str(), "Forward", interface.c_str());
+
+                association.backward =
+                    co_await utils::coGetDbusProperty<std::string>(
+                        objPath.c_str(), "Backward", interface.c_str());
+
+                association.absolutePath =
+                    co_await utils::coGetDbusProperty<std::string>(
+                        objPath.c_str(), "AbsolutePath", interface.c_str());
+                association.absolutePath =
+                    utils::makeDBusNameValid(association.absolutePath);
+            }
+        }
+    }
+
+    co_return NSM_SUCCESS;
 }
 
 } // namespace utils

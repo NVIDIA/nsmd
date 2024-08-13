@@ -17,6 +17,7 @@
 
 #include "nsmChassisPCIeDevice.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmClockOutputEnableState.hpp"
 #include "nsmDevice.hpp"
@@ -51,31 +52,33 @@ requester::Coroutine NsmChassisPCIeDevice<IntfType>::update(
     co_return NSM_SUCCESS;
 }
 
-void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
-                                       const std::string& interface,
-                                       const std::string& objPath)
+requester::Coroutine
+    nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
+                                      const std::string& interface,
+                                      const std::string& objPath)
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice";
 
-    auto chassisName = utils::DBusHandler().getDbusProperty<std::string>(
+    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ChassisName", baseInterface.c_str());
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_ChassisPCIeDevice")
     {
-        auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
         auto uuidObject =
             std::make_shared<NsmChassisPCIeDevice<UuidIntf>>(chassisName, name);
-        auto associations =
-            utils::getAssociations(objPath, baseInterface + ".Associations");
+        std::vector<utils::Association> associations{};
+        co_await utils::coGetAssociations(
+            objPath, baseInterface + ".Associations", associations);
         auto associationsObject =
             std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
                 chassisName, name);
@@ -90,7 +93,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     else if (type == "NSM_Asset")
     {
         auto assetObject = NsmChassisPCIeDevice<AssetIntf>(chassisName, name);
-        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         assetObject.pdi().manufacturer(manufacturer);
         // create sensor
@@ -106,7 +109,7 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Health")
     {
-        auto health = utils::DBusHandler().getDbusProperty<std::string>(
+        auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
         auto healthObject = std::make_shared<NsmChassisPCIeDevice<HealthIntf>>(
             chassisName, name);
@@ -116,14 +119,14 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PCIeDevice")
     {
-        auto deviceType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto deviceType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "DeviceType", interface.c_str());
-        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "DeviceIndex", interface.c_str());
         auto functionIds =
-            utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
+            co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
                 objPath.c_str(), "Functions", interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto pcieDeviceObject =
             NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
@@ -141,13 +144,12 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_LTSSMState")
     {
-        auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "DeviceIndex", interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", interface.c_str());
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", interface.c_str());
 
         auto ltssmStateObject = NsmChassisPCIeDevice<LTSSMStateIntf>(
             name, dbus::Interfaces{inventoryObjPath});
@@ -159,13 +161,12 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_ClockOutputEnableState")
     {
-        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
-                              .getDbusProperty<uint64_t>(objPath.c_str(),
-                                                         "DeviceType",
-                                                         interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", interface.c_str());
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto pcieRefClockObject =
             NsmChassisPCIeDevice<PCIeRefClockIntf>(chassisName, name);
@@ -183,6 +184,8 @@ void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
         device->addSensor(pcieRefClock, priority);
         device->addSensor(nvLinkRefClock, priority);
     }
+
+    co_return NSM_SUCCESS;
 }
 
 dbus::Interfaces chassisPCIeDeviceInterfaces{

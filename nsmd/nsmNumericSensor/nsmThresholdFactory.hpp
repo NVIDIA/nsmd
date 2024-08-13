@@ -36,7 +36,7 @@ class NsmThresholdFactory
                         const std::string& objPath,
                         std::shared_ptr<NsmNumericSensor> numericSensor,
                         const NumericSensorInfo& info, const uuid_t& uuid);
-    void make();
+    requester::Coroutine make();
 
   private:
     struct ThresholdsPairInfo
@@ -50,11 +50,11 @@ class NsmThresholdFactory
     template <typename DBusIntf,
               std::derived_from<NsmThresholdValue> ThresholdValueLow,
               std::derived_from<NsmThresholdValue> ThresholdValueHigh>
-    void processThresholdsPair(
+    requester::Coroutine processThresholdsPair(
         const std::unordered_map<std::string, std::string>& thresholdInterfaces,
         const ThresholdsPairInfo& thresholdsPairInfo);
 
-    void createNsmThreshold(const std::string& intfName,
+    requester::Coroutine createNsmThreshold(const std::string& intfName,
                             const std::string& thresholdType,
                             std::unique_ptr<NsmThresholdValue> thresholdValue);
 

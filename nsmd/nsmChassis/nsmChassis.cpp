@@ -50,28 +50,26 @@ requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
-void nsmChassisCreateSensors(SensorManager& manager,
-                             const std::string& interface,
-                             const std::string& objPath)
+requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath)
 {
     std::string baseInterface = "xyz.openbmc_project.Configuration.NSM_Chassis";
 
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_Chassis")
     {
-        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
-                              .getDbusProperty<uint64_t>(objPath.c_str(),
-                                                         "DeviceType",
-                                                         baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceType", baseInterface.c_str());
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
-        auto deviceUuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
         chassisUuid->pdi().uuid(deviceUuid);
         device->addStaticSensor(chassisUuid);
@@ -80,8 +78,9 @@ void nsmChassisCreateSensors(SensorManager& manager,
         mctpUuid->pdi().uuid(uuid);
         device->addStaticSensor(mctpUuid);
 
-        auto associations =
-            utils::getAssociations(objPath, baseInterface + ".Associations");
+        std::vector<utils::Association> associations{};
+        co_await utils::coGetAssociations(
+            objPath, baseInterface + ".Associations", associations);
         if (!associations.empty())
         {
             auto associationsObject =
@@ -101,7 +100,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     else if (type == "NSM_Asset")
     {
         auto chassisAsset = NsmChassis<AssetIntf>(name);
-        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.pdi().manufacturer(manufacturer);
         // create sensor
@@ -117,7 +116,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_ChassisType")
     {
-        auto chassisType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto chassisType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "ChassisType", interface.c_str());
         auto chassis = std::make_shared<NsmChassis<ChassisIntf>>(name);
         chassis->pdi().type(
@@ -139,7 +138,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Health")
     {
-        auto health = utils::DBusHandler().getDbusProperty<std::string>(
+        auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
         auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
         chassisHealth->pdi().health(
@@ -148,7 +147,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Location")
     {
-        auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto locationType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
         auto chassisLocation = std::make_shared<NsmChassis<LocationIntf>>(name);
         chassisLocation->pdi().locationType(
@@ -157,7 +156,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_LocationCode")
     {
-        auto locationCode = utils::DBusHandler().getDbusProperty<std::string>(
+        auto locationCode = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationCode", interface.c_str());
         auto chassisLocationCode =
             std::make_shared<NsmChassis<LocationCodeIntf>>(name);
@@ -167,7 +166,7 @@ void nsmChassisCreateSensors(SensorManager& manager,
     else if (type == "NSM_PowerLimit")
     {
         auto chassisPowerLimit = NsmChassis<PowerLimitIntf>(name);
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         device->addSensor(
             std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
@@ -180,21 +179,19 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_OperationalStatus")
     {
-        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
-                              .getDbusProperty<uint64_t>(objPath.c_str(),
-                                                         "DeviceType",
-                                                         baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
                 "Cannot use NSM_OperationalStatus for different device than Baseboard");
         }
-        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
-            utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
+            co_await utils::coGetDbusProperty<dbus::Interfaces>(
                 objPath.c_str(), "InventoryObjPaths", interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto gpuOperationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
             name, type, inventoryObjPaths);
@@ -204,21 +201,19 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PowerState")
     {
-        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
-                              .getDbusProperty<uint64_t>(objPath.c_str(),
-                                                         "DeviceType",
-                                                         baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
                 "Cannot use NSM_PowerState for different device than Baseboard");
         }
-        auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto inventoryObjPaths =
-            utils::DBusHandler().getDbusProperty<dbus::Interfaces>(
+            co_await utils::coGetDbusProperty<dbus::Interfaces>(
                 objPath.c_str(), "InventoryObjPaths", interface.c_str());
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto gpuPowerState =
             NsmInterfaceProvider<PowerStateIntf>(name, type, inventoryObjPaths);
@@ -228,10 +223,8 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_WriteProtect")
     {
-        auto deviceType = (NsmDeviceIdentification)utils::DBusHandler()
-                              .getDbusProperty<uint64_t>(objPath.c_str(),
-                                                         "DeviceType",
-                                                         baseInterface.c_str());
+        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
+            objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -244,12 +237,13 @@ void nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PrettyName")
     {
-        auto prettyName = utils::DBusHandler().getDbusProperty<std::string>(
+        auto prettyName = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
         auto chassisPrettyName = std::make_shared<NsmChassis<ItemIntf>>(name);
         chassisPrettyName->pdi().prettyName(prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
+    co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> chassisInterfaces{

@@ -34,40 +34,40 @@ CreationFunction NumericSensorFactory::getCreationFunction()
     return std::bind_front(&NumericSensorFactory::make, this);
 }
 
-void NumericSensorFactory::make(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
 
 {
     auto& bus = utils::DBusHandler::getBus();
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
     NumericSensorInfo info{};
 
-    info.name = utils::DBusHandler().getDbusProperty<std::string>(
+    info.name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
     info.name = utils::makeDBusNameValid(info.name);
 
     info.type = interface.substr(interface.find_last_of('.') + 1);
 
-    info.sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
+    info.sensorId = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "SensorId", interface.c_str());
 
-    info.priority = utils::DBusHandler().getDbusProperty<bool>(
+    info.priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
 
-    info.aggregated = utils::DBusHandler().getDbusProperty<bool>(
+    info.aggregated = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Aggregated", interface.c_str());
 
-    info.physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+    info.physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
 
     try
     {
         info.implementation = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
+            co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Implementation", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -75,7 +75,7 @@ void NumericSensorFactory::make(SensorManager& manager,
 
     try
     {
-        info.maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
+        info.maxAllowableValue = co_await utils::coGetDbusProperty<double>(
             objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
     }
     catch (const std::exception& e)
@@ -84,7 +84,7 @@ void NumericSensorFactory::make(SensorManager& manager,
     try
     {
         info.readingBasis = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
+            co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "ReadingBasis", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -93,14 +93,14 @@ void NumericSensorFactory::make(SensorManager& manager,
     try
     {
         info.description = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
+            co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Description", interface.c_str()));
     }
     catch (const std::exception& e)
     {}
 
-    info.associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      info.associations);
 
     for (const auto& association : info.associations)
     {
@@ -118,7 +118,7 @@ void NumericSensorFactory::make(SensorManager& manager,
             "Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
             "NAME", info.name, "TYPE", info.type, "OBJPATH", objPath);
 
-        return;
+        co_return NSM_ERROR;
     }
 
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -129,7 +129,7 @@ void NumericSensorFactory::make(SensorManager& manager,
         lg2::error(
             "The UUID of Numeric Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", info.name, "TYPE", info.type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto sensor = builder->makeSensor(interface, objPath, bus, info);
@@ -146,7 +146,9 @@ void NumericSensorFactory::make(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
-    NsmThresholdFactory{manager, interface, objPath, sensor, info, uuid}.make();
+    co_await NsmThresholdFactory{manager, interface, objPath, sensor, info, uuid}.make();
+
+    co_return NSM_SUCCESS;
 }
 
 void NumericSensorFactory::makePeakValueAndAdd(const std::string& interface,

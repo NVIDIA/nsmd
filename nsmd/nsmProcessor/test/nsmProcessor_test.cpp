@@ -1549,20 +1549,20 @@ struct NsmProcessorTest :
 
 namespace nsm
 {
-void createNsmProcessorSensor(SensorManager& manager,
-                              const std::string& interface,
-                              const std::string& objPath);
+requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
+                                              const std::string& interface,
+                                              const std::string& objPath);
 };
 
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(error, "Type")))
-        .WillOnce(Return(get(basic, "InventoryObjPath")));
-    EXPECT_NO_THROW(
-        createNsmProcessorSensor(mockManager, basicIntfName, objPath));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "UUID"));
+    values.push(get(error, "Type"));
+    values.push(get(basic, "InventoryObjPath"));
+    createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(0, gpu.deviceSensors.size());
@@ -1570,13 +1570,13 @@ TEST_F(NsmProcessorTest, badTestTypeError)
 
 TEST_F(NsmProcessorTest, badTestNoDevideFound)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(error, "UUID")))
-        .WillOnce(Return(get(basic, "Type")))
-        .WillOnce(Return(get(basic, "InventoryObjPath")));
-    EXPECT_THROW(createNsmProcessorSensor(mockManager, basicIntfName, objPath),
-                 std::runtime_error);
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "Name"));
+    values.push(get(error, "UUID"));
+    values.push(get(basic, "Type"));
+    values.push(get(basic, "InventoryObjPath"));
+    createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(0, gpu.deviceSensors.size());
@@ -1584,13 +1584,14 @@ TEST_F(NsmProcessorTest, badTestNoDevideFound)
 
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(prcKnobs, "Type")))
-        .WillOnce(Return(get(basic, "InventoryObjPath")))
-        .WillOnce(Return(get(prcKnobs, "Priority")))
-        .WillOnce(Return(get(prcKnobs, "Features")));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "UUID"));
+    values.push(get(prcKnobs, "Type"));
+    values.push(get(basic, "InventoryObjPath"));
+    values.push(get(prcKnobs, "Priority"));
+    values.push(get(prcKnobs, "Features"));
     createNsmProcessorSensor(
         mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
 
@@ -1633,17 +1634,17 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 
 TEST_F(NsmProcessorTest, badTestCreateInbandReconfigPermissionsSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(prcKnobs, "Type")))
-        .WillOnce(Return(get(basic, "InventoryObjPath")))
-        .WillOnce(Return(get(prcKnobs, "Priority")))
-        .WillOnce(Return(get(error, "Features")));
-    EXPECT_THROW(
-        createNsmProcessorSensor(
-            mockManager, basicIntfName + ".InbandReconfigPermissions", objPath),
-        std::invalid_argument);
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "UUID"));
+    values.push(get(prcKnobs, "Type"));
+    values.push(get(basic, "InventoryObjPath"));
+    values.push(get(prcKnobs, "Priority"));
+    values.push(get(error, "Features"));
+
+    createNsmProcessorSensor(
+        mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)

@@ -27,7 +27,7 @@ NsmObjectFactory& NsmObjectFactory::instance()
     return instance;
 }
 
-void NsmObjectFactory::createObjects(SensorManager& manager,
+requester::Coroutine NsmObjectFactory::createObjects(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath)
 {
@@ -36,7 +36,7 @@ void NsmObjectFactory::createObjects(SensorManager& manager,
     {
         try
         {
-            it->second(manager, interface, objPath);
+            co_await it->second(manager, interface, objPath);
         }
         catch (const std::exception& e)
         {
@@ -45,6 +45,7 @@ void NsmObjectFactory::createObjects(SensorManager& manager,
                 "ERROR", e, "INTF", interface, "PATH", objPath);
         }
     }
+    co_return NSM_SUCCESS;
 }
 
 void NsmObjectFactory::registerCreationFunction(const CreationFunction& func,

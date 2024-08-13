@@ -16,6 +16,7 @@
  */
 
 #include "nsmPowerSubSystem.hpp"
+
 #include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -30,15 +31,14 @@ namespace nsm
 NsmPowerPowerSupply::NsmPowerPowerSupply(
     sdbusplus::bus::bus& bus, std::string& name,
     const std::vector<utils::Association>& associations, std::string& type,
-    std::string& path, std::string& powerSupplyType) :
-    NsmObject(name, type)
+    std::string& path, std::string& powerSupplyType) : NsmObject(name, type)
 {
     // add all interfaces
     associationDefinitionsInft =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
     // handle associations
     std::vector<std::tuple<std::string, std::string, std::string>>
-	associations_list;
+        associations_list;
     for (const auto& association : associations)
     {
         associations_list.emplace_back(association.forward,
@@ -46,29 +46,33 @@ NsmPowerPowerSupply::NsmPowerPowerSupply(
                                        association.absolutePath);
     }
     associationDefinitionsInft->associations(associations_list);
-    powerSupplyInfoIntf = std::make_unique<PowerSupplyInfoIntf>(bus, path.c_str());
-    powerSupplyInfoIntf->powerSupplyType(PowerSupplyInfoIntf::convertPowerSupplyTypesFromString(powerSupplyType));
+    powerSupplyInfoIntf = std::make_unique<PowerSupplyInfoIntf>(bus,
+                                                                path.c_str());
+    powerSupplyInfoIntf->powerSupplyType(
+        PowerSupplyInfoIntf::convertPowerSupplyTypesFromString(
+            powerSupplyType));
     powerSupplyIntf = std::make_unique<PowerSupplyIntf>(bus, path.c_str());
 }
 
-static void CreatePowerSubSystem(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
+static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
+                                                 const std::string& interface,
+                                                 const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
 
-    auto powerSupplyType = utils::DBusHandler().getDbusProperty<std::string>(
+    auto powerSupplyType = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PowerSupplyType", interface.c_str());
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                    associations);
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -78,18 +82,19 @@ static void CreatePowerSubSystem(SensorManager& manager,
         lg2::error(
             "The UUID of CreatePowerSubSystem PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto nsmPowerSubSystemPath =
-        "/xyz/openbmc_project/inventory/system/PowerSubsystem/PowerSupplies/" + name;
+        "/xyz/openbmc_project/inventory/system/PowerSubsystem/PowerSupplies/" +
+        name;
 
     auto fpgaPowerSubSystem = std::make_shared<NsmPowerPowerSupply>(
         bus, name, associations, type, nsmPowerSubSystemPath, powerSupplyType);
     nsmDevice->deviceSensors.emplace_back(fpgaPowerSubSystem);
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(
-    CreatePowerSubSystem,
-    "xyz.openbmc_project.Configuration.NSM_PowerSupply")
+    CreatePowerSubSystem, "xyz.openbmc_project.Configuration.NSM_PowerSupply")
 } // namespace nsm

@@ -29,9 +29,10 @@ using namespace ::testing;
 
 namespace nsm
 {
-void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath);
+requester::Coroutine
+    nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath);
 }
 
 using namespace nsm;
@@ -73,14 +74,16 @@ struct NsmChassisPCIeSlotTest : public testing::Test, public utils::DBusTest
 
 TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 {
-    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(serviceMap));
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(basic, "DeviceIndex")))
-        .WillOnce(Return(get(basic, "SlotType")))
-        .WillOnce(Return(get(basic, "Priority")));
+    auto& map = utils::MockDbusAsync::getServiceMap();
+    map = serviceMap;
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "UUID"));
+    values.push(get(basic, "DeviceIndex"));
+    values.push(get(basic, "SlotType"));
+    values.push(get(basic, "Priority"));
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(0, baseboard.prioritySensors.size());
@@ -102,16 +105,16 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 }
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(error, "UUID")))
-        .WillOnce(Return(get(basic, "DeviceIndex")))
-        .WillOnce(Return(get(basic, "SlotType")))
-        .WillOnce(Return(get(basic, "Priority")));
-    EXPECT_THROW(
-        nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(error, "UUID"));
+    values.push(get(basic, "DeviceIndex"));
+    values.push(get(basic, "SlotType"));
+    values.push(get(basic, "Priority"));
+
+    nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, baseboard.prioritySensors.size());
     EXPECT_EQ(0, baseboard.roundRobinSensors.size());
     EXPECT_EQ(0, baseboard.deviceSensors.size());

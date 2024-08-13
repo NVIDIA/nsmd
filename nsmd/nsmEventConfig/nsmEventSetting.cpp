@@ -20,6 +20,7 @@
 #include "base.h"
 #include "device-capability-discovery.h"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
@@ -93,21 +94,20 @@ requester::Coroutine
     co_return cc;
 }
 
-static void createNsmEventSetting(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
+static requester::Coroutine createNsmEventSetting(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name",
         "xyz.openbmc_project.Configuration.NSM_EventSetting");
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID",
         "xyz.openbmc_project.Configuration.NSM_EventSetting");
-    auto eventGenerationSetting =
-        utils::DBusHandler().getDbusProperty<uint64_t>(
-            objPath.c_str(), "EventGenerationSetting",
-            "xyz.openbmc_project.Configuration.NSM_EventSetting");
+    auto eventGenerationSetting = co_await utils::coGetDbusProperty<uint64_t>(
+        objPath.c_str(), "EventGenerationSetting",
+        "xyz.openbmc_project.Configuration.NSM_EventSetting");
 
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
@@ -115,7 +115,7 @@ static void createNsmEventSetting(SensorManager& manager,
         lg2::error(
             "found NSM_EventSetting [{NAME}] but not applied since no NsmDevice UUID={UUID}",
             "NAME", name, "UUID", uuid);
-        return;
+        co_return NSM_ERROR;
     }
 
     if (eventGenerationSetting > GLOBAL_EVENT_GENERATION_ENABLE_PUSH)
@@ -123,7 +123,7 @@ static void createNsmEventSetting(SensorManager& manager,
         lg2::error(
             "NSM_EventSetting: Found an invalid setting={SETTING} for eventGenerationSetting",
             "SETTING", eventGenerationSetting);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto sensor = std::make_shared<NsmEventSetting>(
@@ -132,6 +132,8 @@ static void createNsmEventSetting(SensorManager& manager,
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

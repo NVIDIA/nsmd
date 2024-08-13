@@ -2,6 +2,7 @@
 
 #include "platform-environmental.h"
 
+#include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
@@ -698,25 +699,24 @@ void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
     dimmIntf->memorySizeInKB(*maximumMemoryCapacity * 1024);
 }
 
-static void createNsmMemorySensor(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
+static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", MEMORY_INTERFACE);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", MEMORY_INTERFACE);
 
-        auto type = utils::DBusHandler().getDbusProperty<std::string>(
+        auto type = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", MEMORY_INTERFACE);
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", MEMORY_INTERFACE);
         inventoryObjPath = inventoryObjPath + "_DRAM_0";
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -725,7 +725,7 @@ static void createNsmMemorySensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
-            return;
+            co_return NSM_ERROR;
         }
 
         if (type == "NSM_Memory")
@@ -738,13 +738,13 @@ static void createNsmMemorySensor(SensorManager& manager,
                     sensorObjectPath, manager, bus, inventoryObjPath.c_str());
 
             auto correctionType =
-                utils::DBusHandler().getDbusProperty<std::string>(
+                co_await utils::coGetDbusProperty<std::string>(
                     objPath.c_str(), "ErrorCorrection", interface.c_str());
             auto sensorErrorCorrection =
                 std::make_shared<NsmMemoryErrorCorrection>(
                     name, type, dimmIntf, correctionType, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorErrorCorrection);
-            auto deviceType = utils::DBusHandler().getDbusProperty<std::string>(
+            auto deviceType = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "DeviceType", interface.c_str());
             auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
                 name, type, dimmIntf, deviceType, inventoryObjPath);
@@ -755,13 +755,14 @@ static void createNsmMemorySensor(SensorManager& manager,
             auto sensorMemoryLocation = std::make_shared<NsmLocationIntfMemory>(
                 bus, name, type, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorMemoryLocation);
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
+            std::vector<utils::Association> associations{};
+            co_await utils::coGetAssociations(
+                objPath, interface + ".Associations", associations);
             auto associationSensor = std::make_shared<NsmMemoryAssociation>(
                 bus, name, type, inventoryObjPath, associations);
             nsmDevice->deviceSensors.push_back(associationSensor);
 
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
             dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
@@ -791,24 +792,24 @@ static void createNsmMemorySensor(SensorManager& manager,
         {
             auto rowRemapIntf = std::make_shared<MemoryRowRemappingIntf>(
                 bus, inventoryObjPath.c_str());
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
             auto sensorRowRemapState = std::make_shared<NsmRowRemapState>(
                 name, type, rowRemapIntf, inventoryObjPath);
             auto sensorRowRemappingCounts =
                 std::make_shared<NsmRowRemappingCounts>(
                     name, type, rowRemapIntf, inventoryObjPath);
-             auto remappingAvailabilitySensor =
+            auto remappingAvailabilitySensor =
                 std::make_shared<NsmRemappingAvailabilityBankCount>(
                     name, type, rowRemapIntf, inventoryObjPath);
 
             nsmDevice->addSensor(sensorRowRemapState, priority);
             nsmDevice->addSensor(sensorRowRemappingCounts, priority);
-            nsmDevice->addSensor(remappingAvailabilitySensor, priority);        
+            nsmDevice->addSensor(remappingAvailabilitySensor, priority);
         }
         else if (type == "NSM_ECC")
         {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
             auto eccModeIntf = std::make_shared<EccModeIntfDram>(
                 bus, inventoryObjPath.c_str());
@@ -825,7 +826,7 @@ static void createNsmMemorySensor(SensorManager& manager,
         }
         else if (type == "NSM_MemCapacityUtil")
         {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);
@@ -851,8 +852,9 @@ static void createNsmMemorySensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
-        return;
+        co_return NSM_ERROR;
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmMemorySensor,

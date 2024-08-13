@@ -2,12 +2,12 @@
 
 #include "platform-environmental.h"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 #include <telemetry_mrd_producer.hpp>
-
 namespace nsm
 {
 NsmAltitudePressure::NsmAltitudePressure(
@@ -72,32 +72,32 @@ uint8_t
     return NSM_SW_SUCCESS;
 }
 
-void makeNsmAltitudePressure(SensorManager& manager,
-                             const std::string& interface,
-                             const std::string& objPath)
+requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
     name = utils::makeDBusNameValid(name);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
 
-    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+    auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
 
     std::unique_ptr<std::string> implementation{};
     try
     {
         implementation = std::make_unique<std::string>(
-            utils::DBusHandler().getDbusProperty<std::string>(
+            co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Implementation", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -106,14 +106,15 @@ void makeNsmAltitudePressure(SensorManager& manager,
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
     try
     {
-        maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
+        maxAllowableValue = co_await utils::coGetDbusProperty<double>(
             objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
     }
     catch (const std::exception& e)
     {}
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -123,7 +124,7 @@ void makeNsmAltitudePressure(SensorManager& manager,
         lg2::error(
             "The UUID of Altitude Pressure Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto sensor = std::make_shared<NsmAltitudePressure>(
@@ -142,6 +143,8 @@ void makeNsmAltitudePressure(SensorManager& manager,
     {
         nsmDevice->roundRobinSensors.emplace_back(sensor);
     }
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

@@ -17,6 +17,8 @@
 
 #include "nsmPCIeRetimer.hpp"
 
+#include "dBusAsyncUtils.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -62,19 +64,21 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"));
 }
 
-static void CreatePCIeRetimerChassis(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+static requester::Coroutine
+    CreatePCIeRetimerChassis(SensorManager& manager,
+                             const std::string& interface,
+                             const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -85,12 +89,14 @@ static void CreatePCIeRetimerChassis(SensorManager& manager,
         lg2::error(
             "The UUID of NsmPCIeRetimerChassis PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto retimer_chassis =
         std::make_shared<NsmPCIeRetimerChassis>(bus, name, associations, type);
     nsmDevice->deviceSensors.emplace_back(retimer_chassis);
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

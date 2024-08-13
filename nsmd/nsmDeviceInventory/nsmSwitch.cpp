@@ -1,6 +1,7 @@
 #include "nsmSwitch.hpp"
 
 #include "asyncOperationManager.hpp"
+#include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDebugToken.hpp"
@@ -420,20 +421,21 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime(
     co_return rc;
 }
 
-void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
-                       const std::string& objPath)
+requester::Coroutine createNsmSwitchDI(SensorManager& manager,
+                                       const std::string& interface,
+                                       const std::string& objPath)
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_NVSwitch";
 
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
@@ -447,8 +449,9 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
             std::make_shared<NsmSwitchDI<AssociationDefinitionsInft>>(
                 name, inventoryObjPath);
 
-        auto associations = utils::getAssociations(objPath,
-                                                   interface + ".Associations");
+        std::vector<utils::Association> associations{};
+        co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                          associations);
 
         std::vector<std::tuple<std::string, std::string, std::string>>
             associations_list;
@@ -477,7 +480,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     else if (type == "NSM_PortDisableFuture")
     {
         // Port disable future status on NVSwitch
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto nvSwitchPortDisableFuture =
             std::make_shared<nsm::NsmDevicePortDisableFuture>(name, type,
@@ -501,7 +504,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     }
     else if (type == "NSM_PowerMode")
     {
-        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+        auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
         auto nvSwitchL1PowerMode =
             std::make_shared<NsmSwitchDIPowerMode>(name, inventoryObjPath);
@@ -598,10 +601,10 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     {
         auto nvSwitchObject =
             std::make_shared<NsmSwitchDI<SwitchIntf>>(name, inventoryObjPath);
-        auto switchType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto switchType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "SwitchType", interface.c_str());
         auto switchProtocols =
-            utils::DBusHandler().getDbusProperty<std::vector<std::string>>(
+            co_await utils::coGetDbusProperty<std::vector<std::string>>(
                 objPath.c_str(), "SwitchSupportedProtocols", interface.c_str());
 
         std::vector<SwitchIntf::SwitchType> supported_protocols;
@@ -622,12 +625,14 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     {
         auto nvSwitchAsset =
             std::make_shared<NsmSwitchDI<AssetIntf>>(name, inventoryObjPath);
-        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
 
         nvSwitchAsset->pdi().manufacturer(manufacturer);
         device->addStaticSensor(nvSwitchAsset);
     }
+
+    co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> nvSwitchInterfaces{

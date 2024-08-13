@@ -34,9 +34,10 @@ using namespace ::testing;
 
 namespace nsm
 {
-void nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
-                                       const std::string& interface,
-                                       const std::string& objPath);
+requester::Coroutine
+    nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
+                                      const std::string& interface,
+                                      const std::string& objPath);
 }
 
 using namespace nsm;
@@ -133,13 +134,14 @@ struct NsmChassisPCIeDeviceTest :
 
 TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(error, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
-    EXPECT_NO_THROW(
-        nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(error, "Type"));
+    values.push(get(basic, "UUID"));
+
+    nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
@@ -149,26 +151,30 @@ TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 }
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 {
-    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(gpuServiceMap));
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(basic, "DEVICE_UUID")))
-        .WillOnce(Return(get(associations[0], "Forward")))
-        .WillOnce(Return(get(associations[0], "Backward")))
-        .WillOnce(Return(get(associations[0], "AbsolutePath")))
-        .WillOnce(Return(get(associations[1], "Forward")))
-        .WillOnce(Return(get(associations[1], "Backward")))
-        .WillOnce(Return(get(associations[1], "AbsolutePath")));
+    auto& map = utils::MockDbusAsync::getServiceMap();
+    map = gpuServiceMap;
+
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(basic, "DEVICE_UUID"));
+    values.push(get(associations[0], "Forward"));
+    values.push(get(associations[0], "Backward"));
+    values.push(get(associations[0], "AbsolutePath"));
+    values.push(get(associations[1], "Forward"));
+    values.push(get(associations[1], "Backward"));
+    values.push(get(associations[1], "AbsolutePath"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(health, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(health, "Health")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(health, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(health, "Health"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Health",
                                       objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -198,43 +204,47 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(asset, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(asset, "Manufacturer")));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(asset, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(asset, "Manufacturer"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(pcieDevice, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(pcieDevice, "DeviceType")))
-        .WillOnce(Return(get(pcieDevice, "DeviceIndex")))
-        .WillOnce(Return(get(pcieDevice, "Functions")))
-        .WillOnce(Return(get(pcieDevice, "Priority")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(pcieDevice, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(pcieDevice, "DeviceType"));
+    values.push(get(pcieDevice, "DeviceIndex"));
+    values.push(get(pcieDevice, "Functions"));
+    values.push(get(pcieDevice, "Priority"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(ltssmState, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(ltssmState, "DeviceIndex")))
-        .WillOnce(Return(get(ltssmState, "Priority")))
-        .WillOnce(Return(get(ltssmState, "InventoryObjPath")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(ltssmState, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(ltssmState, "DeviceIndex"));
+    values.push(get(ltssmState, "Priority"));
+    values.push(get(ltssmState, "InventoryObjPath"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(clockOutputEnableState, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(clockOutputEnableState, "DeviceType")))
-        .WillOnce(Return(get(clockOutputEnableState, "InstanceNumber")))
-        .WillOnce(Return(get(clockOutputEnableState, "Priority")));
+                                      
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(clockOutputEnableState, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(clockOutputEnableState, "DeviceType"));
+    values.push(get(clockOutputEnableState, "InstanceNumber"));
+    values.push(get(clockOutputEnableState, "Priority"));
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 

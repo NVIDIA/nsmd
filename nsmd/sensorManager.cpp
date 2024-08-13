@@ -46,10 +46,9 @@ SensorManagerImpl::SensorManagerImpl(
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
     mctp_socket::Manager& sockManager, bool verbose) :
-    SensorManager(nsmDevices, localEid),
-    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable), sockManager(sockManager),
-    verbose(verbose)
+    SensorManager(nsmDevices, localEid), bus(bus), event(event),
+    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -58,7 +57,7 @@ SensorManagerImpl::SensorManagerImpl(
         sdbusplus::bus::match::rules::interfacesAdded(
             "/xyz/openbmc_project/inventory"),
         [this](sdbusplus::message::message& msg) {
-        this->interfaceAddedhandler(msg);
+        this->interfaceAddedHandler(msg);
     });
 
 #ifdef NVIDIA_STANDBYTODC
@@ -106,8 +105,10 @@ void SensorManagerImpl::scanInventory()
             {
                 for (const auto& interface : interfaces)
                 {
-                    NsmObjectFactory::instance().createObjects(*this, interface,
-                                                               objPath);
+                    if (NsmObjectFactory::instance().isSupported(interface))
+                    {
+                        queuedAddedInterfaces.emplace(objPath, interface);
+                    }
                 }
             }
         }
@@ -120,12 +121,23 @@ void SensorManagerImpl::scanInventory()
         return;
     }
 
-    newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
-        event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
-                         std::placeholders::_1));
+    if (interfaceAddedTaskHandle)
+    {
+        if (!interfaceAddedTaskHandle.done())
+        {
+            return;
+        }
+        interfaceAddedTaskHandle.destroy();
+    }
+    auto co = interfaceAddedTask();
+    interfaceAddedTaskHandle = co.handle;
+    if (interfaceAddedTaskHandle.done())
+    {
+        interfaceAddedTaskHandle = nullptr;
+    }
 }
 
-void SensorManagerImpl::interfaceAddedhandler(sdbusplus::message::message& msg)
+void SensorManagerImpl::interfaceAddedHandler(sdbusplus::message::message& msg)
 {
     sdbusplus::message::object_path objPath;
     dbus::InterfaceMap interfaces;
@@ -133,12 +145,41 @@ void SensorManagerImpl::interfaceAddedhandler(sdbusplus::message::message& msg)
     msg.read(objPath, interfaces);
     for (const auto& [interface, _] : interfaces)
     {
-        NsmObjectFactory::instance().createObjects(*this, interface, objPath);
+        if (NsmObjectFactory::instance().isSupported(interface))
+        {
+            queuedAddedInterfaces.emplace(objPath, interface);
+        }
     }
 
+    if (interfaceAddedTaskHandle)
+    {
+        if (!interfaceAddedTaskHandle.done())
+        {
+            return;
+        }
+        interfaceAddedTaskHandle.destroy();
+    }
+    auto co = interfaceAddedTask();
+    interfaceAddedTaskHandle = co.handle;
+    if (interfaceAddedTaskHandle.done())
+    {
+        interfaceAddedTaskHandle = nullptr;
+    }
+}
+
+requester::Coroutine SensorManagerImpl::interfaceAddedTask()
+{
+    while (!queuedAddedInterfaces.empty())
+    {
+        auto [objPath, interface] = queuedAddedInterfaces.front();
+        queuedAddedInterfaces.pop();
+
+        co_await NsmObjectFactory::instance().createObjects(*this, interface, objPath);
+    }
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
                          std::placeholders::_1));
+    co_return NSM_SUCCESS;
 }
 
 void SensorManagerImpl::gpioStatusPropertyChangedHandler(

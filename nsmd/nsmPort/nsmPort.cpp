@@ -1,6 +1,8 @@
 #include "nsmPort.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
+#include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -38,33 +40,18 @@ static std::string getTopologyObjPath(const std::string& deviceName,
     return topologyObjPath;
 }
 
-static std::map<std::string,
-                std::pair<uint8_t, std::vector<utils::Association>>>
-    getTopologyData(const std::string& topoObjPath,
-                    const std::string& topoIntfSubStr)
+using LogicalPortNumber = uint8_t;
+using TopologyData =
+    std::map<ObjectPath,
+             std::pair<LogicalPortNumber, std::vector<utils::Association>>>;
+
+static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
+                                              const std::string& topoIntfSubStr,
+                                              TopologyData& topologyData)
 {
-    auto& bus = utils::DBusHandler::getBus();
-    std::map<std::string, std::vector<std::string>> mapperResponse;
-
-    auto mapper = bus.new_method_call(utils::mapperService, utils::mapperPath,
-                                      utils::mapperInterface, "GetObject");
-    mapper.append(topoObjPath, std::vector<std::string>{});
-
-    std::map<std::string, std::pair<uint8_t, std::vector<utils::Association>>>
-        topoInformation;
-    try
-    {
-        auto mapperResponseMsg = bus.call(mapper);
-        mapperResponseMsg.read(mapperResponse);
-    }
-    catch (const std::exception& e)
-    {
-        lg2::error(
-            "GetTopology:: Error: '{ERROR}' for interface: {INTF} and path: {PATH}",
-            "ERROR", e, "INTF", topoIntfSubStr, "PATH", topoObjPath);
-        return topoInformation;
-    }
-
+    auto mapperResponse = co_await utils::coGetServiceMap(topoObjPath,
+                                                          dbus::Interfaces{});
+    topologyData.clear();
     std::vector<utils::Association> associationTmp;
     for (const auto& [service, interfaces] : mapperResponse)
     {
@@ -73,18 +60,16 @@ static std::map<std::string,
             if (interface.find(topoIntfSubStr) != std::string::npos)
             {
                 auto inventoryObjPath =
-                    utils::DBusHandler().getDbusProperty<std::string>(
+                    co_await utils::coGetDbusProperty<std::string>(
                         topoObjPath.c_str(), "InventoryObjPath",
                         interface.c_str());
                 auto logicalPortNumber =
-                    utils::DBusHandler().getDbusProperty<uint64_t>(
+                    co_await utils::coGetDbusProperty<uint64_t>(
                         topoObjPath.c_str(), "LogicalPortNumber",
                         interface.c_str());
                 auto associations =
-                    utils::DBusHandler()
-                        .getDbusProperty<std::vector<std::string>>(
-                            topoObjPath.c_str(), "Associations",
-                            interface.c_str());
+                    co_await utils::coGetDbusProperty<std::vector<std::string>>(
+                        topoObjPath.c_str(), "Associations", interface.c_str());
 
                 if (associations.size() % 3 != 0)
                 {
@@ -107,13 +92,13 @@ static std::map<std::string,
                 }
 
                 inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
-                topoInformation[inventoryObjPath] = {logicalPortNumber,
-                                                     associationTmp};
+                topologyData[inventoryObjPath] = {logicalPortNumber,
+                                                  associationTmp};
             }
         }
     }
 
-    return topoInformation;
+    co_return NSM_SUCCESS;
 }
 
 NsmPortStatus::NsmPortStatus(
@@ -797,22 +782,22 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
-static void createNsmPortSensor(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+static requester::Coroutine createNsmPortSensor(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto parentObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto parentObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ParentObjPath", interface.c_str());
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
-    auto count = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto count = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "Count", interface.c_str());
-    auto deviceType = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto deviceType = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceType", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
@@ -823,7 +808,7 @@ static void createNsmPortSensor(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_NVlink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     // get topology information from EM
@@ -832,8 +817,9 @@ static void createNsmPortSensor(SensorManager& manager,
     std::string topologyIntfSubStr =
         "xyz.openbmc_project.Configuration.NVLinkTopology.Topology";
     std::string topologyObjPath = getTopologyObjPath(deviceName, deviceType);
-    auto deviceTopologies = getTopologyData(topologyObjPath,
-                                            topologyIntfSubStr);
+    TopologyData deviceTopologies{};
+    co_await coGetTopologyData(topologyObjPath, topologyIntfSubStr,
+                               deviceTopologies);
 
     // create nvlink [as per count and also they are 1-based]
     for (uint64_t i = 0; i < count; i++)
@@ -936,6 +922,7 @@ static void createNsmPortSensor(SensorManager& manager,
             }
         }
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmPortSensor,
