@@ -1,5 +1,7 @@
 #include "nsmNetworkAdapter.hpp"
 
+#include "nsmDebugToken.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -53,15 +55,19 @@ static void createNSMNetworkAdapter(SensorManager& manager,
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of NSM_NetworkAdapter PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
+        lg2::error("The UUID of NSM_NetworkAdapter PDI matches no NsmDevice : "
+                   "UUID={UUID}, Name={NAME}, Type={TYPE}",
+                   "UUID", uuid, "NAME", name, "TYPE", type);
         return;
     }
 
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
         bus, name, associations, type, inventoryObjPath);
     nsmDevice->deviceSensors.emplace_back(networkAdapterDI);
+
+    auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
+        bus, name, associations, type, uuid);
+    nsmDevice->addStaticSensor(debugTokenObject);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

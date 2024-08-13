@@ -2,6 +2,7 @@
 
 #include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
+#include "nsmDebugToken.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -36,6 +37,7 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_NVSwitch";
 
+    auto& bus = utils::DBusHandler::getBus();
     auto name = utils::DBusHandler().getDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
     auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
@@ -73,6 +75,10 @@ void createNsmSwitchDI(SensorManager& manager, const std::string& interface,
         device->deviceSensors.emplace_back(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
+
+        auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
+            bus, name, associations, type, uuid);
+        device->addStaticSensor(debugTokenObject);
     }
     else if (type == "NSM_Switch")
     {

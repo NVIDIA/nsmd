@@ -2,6 +2,7 @@ sources = [
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
+    '../libnsm/debug-token.c',
     '../libnsm/firmware-utils.c',
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
@@ -38,6 +39,7 @@ subdir('nsmFwSwInventory')
 subdir('nsmProcessor')
 subdir('nsmEventConfig')
 subdir('nsmChassis')
+subdir('nsmDebugToken')
 subdir('nsmPort')
 subdir('nsmDbusIfaceOverride')
 subdir('nsmSetAsync')
