@@ -3,7 +3,7 @@ sources += [
     'nsmCommon/sharedMemCommon.cpp',
 ]
 
-nsmd_headers += ['.', '..']
+nsmd_headers += ['.', '..', 'nsmCommon']
 
 if get_option('tests').enabled()
     subdir('test')

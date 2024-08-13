@@ -54,6 +54,8 @@ class NsmGpuPresenceAndPowerStatus :
         GetPresence,
         GetPowerStatus
     } state;
+
+    void updateMetricOnSharedMemory() override;
 };
 
 } // namespace nsm

@@ -38,9 +38,10 @@ class NsmFirmwareInventory : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory",
                                        firmwareInventoryBasePath)
     {}
-    NsmFirmwareInventory(const std::string& name,
+    NsmFirmwareInventory(const std::string& name, const path& inventoryPath,
                          const std::shared_ptr<IntfType>& pdi) :
-        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory", {pdi})
+        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory",
+                                       inventoryPath, pdi)
     {}
 };
 

@@ -69,7 +69,7 @@ uint8_t
 
     if (cc == NSM_SUCCESS)
     {
-        for (auto pdi : interfaces)
+        for (auto& [_, pdi] : interfaces)
         {
             pdi->currentPowerState(((status >> gpuInstanceId) & 0x01) != 0
                                        ? PowerStateIntf::PowerState::On
@@ -78,7 +78,7 @@ uint8_t
     }
     else
     {
-        for (auto pdi : interfaces)
+        for (auto& [_, pdi] : interfaces)
         {
             pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
         }
