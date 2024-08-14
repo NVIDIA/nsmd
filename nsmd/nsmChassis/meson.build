@@ -14,6 +14,7 @@ sources += [
     'nsmChassis/nsmPCIeLTSSMState.cpp',
     'nsmChassis/nsmPowerControl.cpp',
     'nsmChassis/nsmGpuClockControl.cpp',
+    'nsmChassis/nsmPowerSubSystem.cpp',
     'nsmChassis/nsmWriteProtectedJumper.cpp',
     'nsmChassis/nsmErot.cpp',
 ]
