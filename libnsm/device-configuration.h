@@ -25,8 +25,10 @@ extern "C" {
 #include "base.h"
 
 enum device_configuration_command {
+	NSM_SET_ERROR_INJECTION_MODE_V1 = 0x03,
 	NSM_GET_ERROR_INJECTION_MODE_V1 = 0x04,
 	NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1 = 0x05,
+	NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1 = 0x06,
 	NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1 = 0x07,
 	NSM_SET_RECONFIGURATION_PERMISSIONS_V1 = 0x40,
 	NSM_GET_RECONFIGURATION_PERMISSIONS_V1 = 0x41,
@@ -105,6 +107,19 @@ struct nsm_error_injection_mode_v1 {
 	bitfield32_t flags;
 } __attribute__((packed));
 
+/** @struct nsm_set_error_injection_mode_v1_req
+ *
+ * Structure representing Set Error Injection Mode v1 request.
+ */
+struct nsm_set_error_injection_mode_v1_req {
+	struct nsm_common_req hdr;
+	uint8_t mode; /*!< Global error injection mode knob.
+	   The following values are valid:
+	   0 – Disable error injection for device
+	   1 – Enable error injection for device
+	   */
+} __attribute__((packed));
+
 /** @struct nsm_get_error_injection_mode_v1_resp
  *
  * Structure representing Get Error Injection Mode v1 response.
@@ -121,6 +136,21 @@ struct nsm_get_error_injection_mode_v1_resp {
  */
 struct nsm_error_injection_types_mask {
 	uint8_t mask[8]; // Error injection types mask
+} __attribute__((packed));
+
+/** @struct nsm_set_error_injection_types_mask_req
+ *
+ * Structure representing Set Current Error Injection Types v1.
+ */
+struct nsm_set_error_injection_types_mask_req {
+	struct nsm_common_req hdr;
+	struct nsm_error_injection_types_mask data; /*!<
+	Current Error Injection Types
+    Each bit represents whether the given error injection type will be enabled.
+    Bits values:
+    0 – Disable error injection type
+    1 – Enable error injection type
+    */
 } __attribute__((packed));
 
 /** @struct nsm_get_error_injection_types_mask_resp
@@ -324,6 +354,51 @@ struct nsm_set_reconfiguration_permissions_v1_req {
 	uint8_t permission;
 } __attribute__((packed));
 
+/** @brief Encode a Set Error Injection Mode v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mode - Error injection mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_error_injection_mode_v1_req(uint8_t instance_id,
+					   const uint8_t mode,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a Set Error Injection Mode v1 request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] mode  - pointer to error injection mode
+ *  @return nsm_completion_codes
+ */
+int decode_set_error_injection_mode_v1_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *mode);
+
+/** @brief Encode a Set Error Injection Mode v1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_error_injection_mode_v1_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a Set Error Injection Mode v1 response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to NSM reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_error_injection_mode_v1_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code);
+
 /** @brief Encode a Get Error Injection Mode v1 request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -367,6 +442,55 @@ int encode_get_error_injection_mode_v1_resp(
 int decode_get_error_injection_mode_v1_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_error_injection_mode_v1 *data);
+
+/** @brief Encode a Set Current Error Injection Types v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] data - pointer to supported error injection types data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_current_error_injection_types_v1_req(
+    uint8_t instance_id, const struct nsm_error_injection_types_mask *data,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Set Current Error Injection Types v1
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] data  - pointer to supported error injection types data
+ *  @return nsm_completion_codes
+ */
+int decode_set_current_error_injection_types_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_error_injection_types_mask *data);
+
+/** @brief Encode a Set Current Error Injection Types v1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_current_error_injection_types_v1_resp(uint8_t instance_id,
+						     uint8_t cc,
+						     uint16_t reason_code,
+						     struct nsm_msg *msg);
+
+/** @brief Decode a Set Supported Error Injection Types v1 response message Set
+ * Current Error Injection Types v1 response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to NSM reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_current_error_injection_types_v1_resp(const struct nsm_msg *msg,
+						     size_t msg_len,
+						     uint8_t *cc,
+						     uint16_t *reason_code);
 
 /** @brief Encode a Get Supported Error Injection Types v1 request message
  *

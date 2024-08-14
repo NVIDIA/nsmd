@@ -299,11 +299,17 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         updatePresetProfileParams(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        setErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getSupportedErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
                                                  size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setCurrentErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getCurrentErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);

@@ -96,6 +96,8 @@ class MockupResponderTest : public testing::Test
         EXPECT_GE(sizeof(ResponseStruct), sizeof(nsm_common_resp));
         auto common = reinterpret_cast<nsm_common_resp*>(msg->payload);
         EXPECT_EQ(command, common->command);
+        EXPECT_EQ(sizeof(ResponseStruct) - sizeof(nsm_common_resp),
+                  common->data_size);
         response = *reinterpret_cast<ResponseStruct*>(msg->payload);
 
         // Bad tests
@@ -121,6 +123,21 @@ class MockupResponderTest : public testing::Test
         auto rc = encodeRequestFunction(instanceId, requestPayload, requestMsg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
         test(requestMsg, request.size(), handlerFunction, command, response);
+    }
+    template <typename RequestPayload>
+    void test(std::function<int(uint8_t, RequestPayload, nsm_msg*)>
+                  encodeRequestFunction,
+              RequestPayload requestPayload,
+              MockupResponderFunction handlerFunction, uint8_t command)
+    {
+        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                        sizeof(RequestPayload));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+        auto rc = encodeRequestFunction(instanceId, requestPayload, requestMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        nsm_common_resp response;
+        test(requestMsg, request.size(), handlerFunction, command, response);
+        EXPECT_EQ(NSM_SUCCESS, response.completion_code);
     }
     template <typename ResponseStruct>
     void test(std::function<int(uint8_t, nsm_msg*)> encodeRequestFunction,
@@ -309,27 +326,44 @@ TEST_F(MockupResponderTest, testGetErrorInjectionModeV1Handler)
               response.data.flags.byte);
 }
 
-TEST_F(MockupResponderTest, testSupportedErrorInjectionTypesHandler)
+TEST_F(MockupResponderTest, testGetSupportedErrorInjectionTypesHandler)
 {
     nsm_get_error_injection_types_mask_resp response;
     test(&encode_get_supported_error_injection_types_v1_req,
          &MockupResponder::MockupResponder::
              getSupportedErrorInjectionTypesV1Handler,
          NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, response);
-    for (const auto& [type, _] : mockupResponder->state.errorInjection)
+    for (const auto& [type, _] :
+         mockupResponder->state.errorInjection[NSM_DEV_ID_GPU])
     {
         EXPECT_TRUE(response.data.mask[type / 8] & (1 << (type % 8)));
     }
 }
 
-TEST_F(MockupResponderTest, testCurrentErrorInjectionTypesHandler)
+TEST_F(MockupResponderTest, testSetCurrentErrorInjectionTypesHandler)
+{
+    nsm_error_injection_types_mask data = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (const auto& [type, _] :
+         mockupResponder->state.errorInjection[NSM_DEV_ID_GPU])
+    {
+        data.mask[type / 8] |= (1 << (type % 8));
+    }
+    test<const nsm_error_injection_types_mask*>(
+        &encode_set_current_error_injection_types_v1_req,
+        const_cast<const nsm_error_injection_types_mask*>(&data),
+        &MockupResponder::MockupResponder::
+            setCurrentErrorInjectionTypesV1Handler,
+        NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+}
+TEST_F(MockupResponderTest, testGetCurrentErrorInjectionTypesHandler)
 {
     nsm_get_error_injection_types_mask_resp response;
     test(&encode_get_current_error_injection_types_v1_req,
          &MockupResponder::MockupResponder::
              getCurrentErrorInjectionTypesV1Handler,
          NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, response);
-    for (const auto& [type, enabled] : mockupResponder->state.errorInjection)
+    for (const auto& [type, enabled] :
+         mockupResponder->state.errorInjection[NSM_DEV_ID_GPU])
     {
         EXPECT_EQ(enabled, response.data.mask[type / 8] & (1 << (type % 8)));
     }

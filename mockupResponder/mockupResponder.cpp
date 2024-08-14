@@ -552,9 +552,14 @@ std::optional<std::vector<uint8_t>>
             {
                 case NSM_GET_ERROR_INJECTION_MODE_V1:
                     return getErrorInjectionModeV1Handler(request, requestLen);
+                case NSM_SET_ERROR_INJECTION_MODE_V1:
+                    return setErrorInjectionModeV1Handler(request, requestLen);
                 case NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1:
                     return getSupportedErrorInjectionTypesV1Handler(request,
                                                                     requestLen);
+                case NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1:
+                    return setCurrentErrorInjectionTypesV1Handler(request,
+                                                                  requestLen);
                 case NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1:
                     return getCurrentErrorInjectionTypesV1Handler(request,
                                                                   requestLen);
@@ -716,7 +721,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
                    NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
                    NSM_QUERY_DEVICE_IDS}},
-                 {5, {4, 5, 7}},
+                 {5, {3, 4, 5, 6, 7}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
@@ -729,7 +734,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {4, 5, 7}},
+                 {5, {3, 4, 5, 6, 7}},
              }},
             {NSM_DEV_ID_GPU,
              {
@@ -741,7 +746,7 @@ std::optional<std::vector<uint8_t>>
                       113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
                       125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
-                 {5, {4, 5, 7, 64, 65}},
+                 {5, {3, 4, 5, 6, 7, 64, 65}},
                  {6, {1}},
              }},
             {NSM_DEV_ID_EROT,
@@ -4821,6 +4826,32 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 std::optional<std::vector<uint8_t>>
+    MockupResponder::setErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setErrorInjectionModeV1Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint8_t mode = 0;
+    auto rc = decode_set_error_injection_mode_v1_req(requestMsg, requestLen,
+                                                     &mode);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "setErrorInjectionModeV1Handler: decode_set_error_injection_mode_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    state.errorInjectionMode.mode = mode;
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_set_error_injection_mode_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, responseMsg);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
     MockupResponder::getErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
@@ -4879,6 +4910,64 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_supported_error_injection_types_v1_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &supportedTypes,
         responseMsg);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setCurrentErrorInjectionTypesV1Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "setCurrentdErrorInjectionTypesV1Handler: request length={LEN}",
+            "LEN", requestLen);
+    }
+    nsm_error_injection_types_mask data;
+    auto rc = decode_set_current_error_injection_types_v1_req(
+        requestMsg, requestLen, &data);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "setCurrentErrorInjectionTypesV1Handler: decode_set_error_injection_types_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto errorInjectionIt = state.errorInjection.find(mockDeviceType);
+    if (errorInjectionIt != state.errorInjection.end())
+    {
+        bool error = false;
+        auto& errorInjectionTypes = errorInjectionIt->second;
+        // check for errors;
+        for (size_t i = 0; i < 64 && !error; i++)
+        {
+            bool enabled = (data.mask[i / 8] >> (i % 8)) & 0x01;
+            // set error if bit is enabled, but not supported
+            error = enabled &&
+                    errorInjectionTypes.find(error_injection_type(i)) ==
+                        errorInjectionTypes.end();
+        }
+        if (error)
+        {
+            response.resize(sizeof(nsm_msg_hdr) +
+                            sizeof(nsm_common_non_success_resp));
+            rc = encode_common_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, ERR_NULL,
+                NSM_TYPE_DEVICE_CONFIGURATION,
+                NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, responseMsg);
+            return response;
+        }
+        else
+        {
+            for (auto& [type, enabled] : errorInjectionTypes)
+            {
+                enabled = (data.mask[type / 8] >> (type % 8)) & 0x01;
+            }
+        }
+    }
+    rc = encode_set_current_error_injection_types_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, responseMsg);
     return response;
 }
 std::optional<std::vector<uint8_t>>

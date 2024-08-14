@@ -48,6 +48,67 @@ std::vector<std::unique_ptr<CommandInterface>> commands;
 
 } // namespace
 
+class SetErrorInjectionModeV1 : public CommandInterface
+{
+  public:
+    ~SetErrorInjectionModeV1() = default;
+    SetErrorInjectionModeV1() = delete;
+    SetErrorInjectionModeV1(const SetErrorInjectionModeV1&) = delete;
+    SetErrorInjectionModeV1(SetErrorInjectionModeV1&&) = default;
+    SetErrorInjectionModeV1& operator=(const SetErrorInjectionModeV1&) = delete;
+    SetErrorInjectionModeV1& operator=(SetErrorInjectionModeV1&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetErrorInjectionModeV1(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto modeGroup = app->add_option_group(
+            "Required", "Global error injection mode knob");
+
+        mode = 0;
+        modeGroup->add_option("-M, --mode", mode, "Disable - 0 / Enable - 1");
+        modeGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_error_injection_mode_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_error_injection_mode_v1_req(instanceId, mode,
+                                                         request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_set_error_injection_mode_v1_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t mode;
+};
+
 class GetErrorInjectionModeV1 : public CommandInterface
 {
   public:
@@ -166,6 +227,75 @@ class GetSupportedErrorInjectionTypesV1 : public CommandInterface
             bool((data.mask[0] >> EI_THERMAL_ERRORS) & 0x01);
         nsmtool::helper::DisplayInJson(result);
     }
+};
+
+class SetCurrentErrorInjectionTypesV1 : public CommandInterface
+{
+  public:
+    ~SetCurrentErrorInjectionTypesV1() = default;
+    SetCurrentErrorInjectionTypesV1() = delete;
+    SetCurrentErrorInjectionTypesV1(const SetCurrentErrorInjectionTypesV1&) =
+        delete;
+    SetCurrentErrorInjectionTypesV1(SetCurrentErrorInjectionTypesV1&&) =
+        default;
+    SetCurrentErrorInjectionTypesV1&
+        operator=(const SetCurrentErrorInjectionTypesV1&) = delete;
+    SetCurrentErrorInjectionTypesV1&
+        operator=(SetCurrentErrorInjectionTypesV1&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetCurrentErrorInjectionTypesV1(const char* type, const char* name,
+                                             CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-d,--data", rawData, "raw data")
+            ->required()
+            ->expected(-3);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_set_error_injection_types_mask_req));
+        nsm_error_injection_types_mask data;
+        for (size_t i = 0; i < 8 && i < rawData.size(); i++)
+        {
+            data.mask[i] = rawData[i];
+        }
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_current_error_injection_types_v1_req(
+            instanceId, &data, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_set_current_error_injection_types_v1_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: " << "rc=" << rc
+                      << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    std::vector<uint8_t> rawData;
 };
 
 class GetCurrentErrorInjectionTypesV1 : public CommandInterface
@@ -777,6 +907,11 @@ void registerCommand(CLI::App& app)
                                      "Device configuration type command");
     config->require_subcommand(1);
 
+    auto setErrorInjectionModeV1 = config->add_subcommand(
+        "SetErrorInjectionModeV1", "Set Error Injection Mode v1");
+    commands.push_back(std::make_unique<SetErrorInjectionModeV1>(
+        "config", "SetErrorInjectionModeV1", setErrorInjectionModeV1));
+
     auto getErrorInjectionModeV1 = config->add_subcommand(
         "GetErrorInjectionModeV1", "Get Error Injection Mode v1");
     commands.push_back(std::make_unique<GetErrorInjectionModeV1>(
@@ -788,6 +923,13 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<GetSupportedErrorInjectionTypesV1>(
         "config", "GetSupportedErrorInjectionTypesV1",
         getSupportedErrorInjectionTypesV1));
+
+    auto setCurrentErrorInjectionTypesV1 =
+        config->add_subcommand("SetCurrentErrorInjectionTypesV1",
+                               "Set Current Error Injection Types v1");
+    commands.push_back(std::make_unique<SetCurrentErrorInjectionTypesV1>(
+        "config", "SetCurrentErrorInjectionTypesV1",
+        setCurrentErrorInjectionTypesV1));
 
     auto getCurrentErrorInjectionTypesV1 =
         config->add_subcommand("GetCurrentErrorInjectionTypesV1",

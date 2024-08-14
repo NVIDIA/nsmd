@@ -24,11 +24,12 @@ using ::testing::ElementsAre;
 void testEncodeRequest(
     std::function<int(uint8_t, const uint8_t *, nsm_msg *)> function,
     uint8_t nvidiaMsgType, uint8_t command, uint8_t payloadSize,
-    const uint8_t *payload)
+    const uint8_t *expectedPayload, uint8_t *payload)
 {
 	uint8_t instanceId = 0;
 	Request requestMsg(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
-	requestMsg.insert(requestMsg.end(), payload, payload + payloadSize);
+	requestMsg.insert(requestMsg.end(), expectedPayload,
+			  expectedPayload + payloadSize);
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	nsm_common_req *data =
@@ -37,13 +38,13 @@ void testEncodeRequest(
 	// Bad tests
 	auto rc = function(instanceId, nullptr, request);
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
-	rc = function(instanceId, payload, nullptr);
+	rc = function(instanceId, expectedPayload, nullptr);
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
-	rc = function(NSM_INSTANCE_MAX + 1, payload, request);
+	rc = function(NSM_INSTANCE_MAX + 1, expectedPayload, request);
 	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 
 	// Good test
-	rc = function(instanceId, payload, request);
+	rc = function(instanceId, expectedPayload, request);
 	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
@@ -51,12 +52,16 @@ void testEncodeRequest(
 	EXPECT_EQ(nvidiaMsgType, request->hdr.nvidia_msg_type);
 	EXPECT_EQ(command, data->command);
 	EXPECT_EQ(payloadSize, data->data_size);
+	if (payload != nullptr) {
+		memcpy(payload, request->payload + sizeof(nsm_common_req),
+		       payloadSize);
+	}
 }
 
 void testEncodeCommonRequest(std::function<int(uint8_t, nsm_msg *)> function,
 			     uint8_t nvidiaMsgType, uint8_t command)
 {
-	const uint8_t payload = 0;
+	uint8_t payload = 0;
 	testEncodeRequest(
 	    [function](uint8_t instanceId, const uint8_t *data, nsm_msg *msg) {
 		    if (data == nullptr) {
@@ -65,13 +70,13 @@ void testEncodeCommonRequest(std::function<int(uint8_t, nsm_msg *)> function,
 		    }
 		    return function(instanceId, msg);
 	    },
-	    nvidiaMsgType, command, 0, &payload);
+	    nvidiaMsgType, command, 0, &payload, nullptr);
 }
 
 void testDecodeRequest(
     std::function<int(nsm_msg *, uint16_t, uint8_t *)> function,
     uint8_t nvidiaMsgType, uint8_t command, uint8_t payloadSize,
-    uint8_t *payload)
+    const uint8_t *expectedPayload, uint8_t *payload)
 {
 	const uint8_t instanceId = 0;
 	Request requestMsg{
@@ -83,7 +88,8 @@ void testDecodeRequest(
 	    command,			// command
 	    payloadSize			// data size
 	};
-	requestMsg.insert(requestMsg.end(), payload, payload + payloadSize);
+	requestMsg.insert(requestMsg.end(), expectedPayload,
+			  expectedPayload + payloadSize);
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	auto data = reinterpret_cast<nsm_common_req *>(request->payload);
 	auto len = requestMsg.size();
@@ -96,7 +102,7 @@ void testDecodeRequest(
 	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 	EXPECT_EQ(nvidiaMsgType, header.nvidia_msg_type);
 	EXPECT_EQ(command, data->command);
-	EXPECT_EQ(0, data->data_size);
+	EXPECT_EQ(payloadSize, data->data_size);
 	EXPECT_EQ(instanceId, header.instance_id);
 
 	// Bad tests
@@ -123,7 +129,7 @@ void testDecodeCommonRequest(std::function<int(nsm_msg *, uint16_t)> function,
 		    }
 		    return function(msg, len);
 	    },
-	    nvidiaMsgType, command, 0, &payload);
+	    nvidiaMsgType, command, 0, &payload, &payload);
 }
 
 void testEncodeResponse(

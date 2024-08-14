@@ -29,12 +29,13 @@
  * @param[in] nvidiaMsgType Expected nvidia msg type
  * @param[in] command Expected command
  * @param[in] payloadSize Payload size
- * @param[in] payload Payload to encode
+ * @param[in] expectedPayload Palyoad used in encode request function
+ * @param[out] payload Payload copied from request after nsm_common_req
  */
 void testEncodeRequest(
     std::function<int(uint8_t, const uint8_t *, nsm_msg *)> function,
     uint8_t nvidiaMsgType, uint8_t command, uint8_t payloadSize,
-    const uint8_t *payload);
+    const uint8_t *expectedPayload, uint8_t *payload);
 
 /**
  * @brief Tests common request encoding function
@@ -47,18 +48,47 @@ void testEncodeCommonRequest(std::function<int(uint8_t, nsm_msg *)> function,
 			     uint8_t nvidiaMsgType, uint8_t command);
 
 /**
+ * @brief Tests custom request encoding function
+ *
+ * @tparam RequestPayload Type of C request structure palyoad after struct
+ * nsm_common_req hdr
+ * @param[in] function Encode request function to be tested
+ * @param[in] nvidiaMsgType Expected nvidia msg type
+ * @param[in] command Expected command
+ * @param[in] expectedPayload Palyoad used in encode request function
+ * @param[out] payload Encoded payload
+ */
+template <typename RequestPayload>
+void testEncodeRequest(
+    std::function<int(uint8_t, const RequestPayload *, nsm_msg *)> function,
+    uint8_t nvidiaMsgType, uint8_t command,
+    const RequestPayload &expectedPayload, RequestPayload &payload)
+{
+	testEncodeRequest(
+	    [function](uint8_t instanceId, const uint8_t *data, nsm_msg *msg) {
+		    return function(
+			instanceId,
+			reinterpret_cast<const RequestPayload *>(data), msg);
+	    },
+	    nvidiaMsgType, command, sizeof(RequestPayload),
+	    reinterpret_cast<const uint8_t *>(&expectedPayload),
+	    reinterpret_cast<uint8_t *>(&payload));
+}
+
+/**
  * @brief Tests request decoding function
  *
  * @param[in] function Decode request function to be tested
  * @param[in] nvidiaMsgType Expected nvidia msg type
  * @param[in] command Expected command
  * @param[in] payloadSize Palyoad structure size
+ * @param[in] expectedPayload Palyoad used in decode request function
  * @param[out] payload Palyoad decoded from request function
  */
 void testDecodeRequest(
     std::function<int(nsm_msg *, uint16_t, uint8_t *)> function,
     uint8_t nvidiaMsgType, uint8_t command, uint8_t payloadSize,
-    uint8_t *payload);
+    const uint8_t *expectedPayload, uint8_t *payload);
 
 /**
  * @brief Tests common request decoding function
@@ -71,6 +101,33 @@ void testDecodeCommonRequest(std::function<int(nsm_msg *, uint16_t)> function,
 			     uint8_t nvidiaMsgType, uint8_t command);
 
 /**
+ * @brief Tests custom request decoding function
+ *
+ * @tparam RequestPayload Type of C request structure palyoad after struct
+ * nsm_common_req hdr
+ * @param[in] function Decode request function to be tested
+ * @param[in] nvidiaMsgType Expected nvidia msg type
+ * @param[in] command Expected command
+ * @param[in] expectedPayload Palyoad used in decode request function
+ * @param[out] payload Palyoad decoded from request function
+ */
+template <typename RequestPayload>
+void testDecodeRequest(
+    std::function<int(nsm_msg *, uint16_t, RequestPayload *)> function,
+    uint8_t nvidiaMsgType, uint8_t command,
+    const RequestPayload &expectedPayload, RequestPayload &payload)
+{
+	testDecodeRequest(
+	    [function](nsm_msg *msg, uint16_t len, uint8_t *data) {
+		    return function(msg, len,
+				    reinterpret_cast<RequestPayload *>(data));
+	    },
+	    nvidiaMsgType, command, sizeof(RequestPayload),
+	    reinterpret_cast<const uint8_t *>(&expectedPayload),
+	    reinterpret_cast<uint8_t *>(&payload));
+}
+
+/**
  * @brief Tests custom response encoding function
  *
  * @param[in] function Encode response function to be tested
@@ -78,7 +135,6 @@ void testDecodeCommonRequest(std::function<int(nsm_msg *, uint16_t)> function,
  * @param[in] command expected command
  * @param[in] payloadSize Palyoad size used in encode response function
  * @param[in] expectedPayload Palyoad used in encode response function
- * @param[in] responseSize Response structure size
  * @param[out] payload Payload copied from response after nsm_common_resp
  */
 void testEncodeResponse(

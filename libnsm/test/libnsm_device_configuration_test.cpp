@@ -22,6 +22,39 @@
 #include <gtest/gtest.h>
 #include <types.hpp>
 
+TEST(setErrorInjectionMode, testRequest)
+{
+	const uint8_t mode = 1;
+	nsm_set_error_injection_mode_v1_req req;
+	auto encodeSetErrorInjectionModeV1Req =
+	    [&mode](uint8_t instanceId, const uint8_t *data, nsm_msg *msg) {
+		    if (data == nullptr) {
+			    return (int)NSM_SW_ERROR_NULL;
+		    }
+		    return encode_set_error_injection_mode_v1_req(instanceId,
+								  *data, msg);
+	    };
+	testEncodeRequest<uint8_t>(
+	    encodeSetErrorInjectionModeV1Req, NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_ERROR_INJECTION_MODE_V1, mode, req.mode);
+	EXPECT_EQ(mode, req.mode);
+
+	testDecodeRequest<uint8_t>(&decode_set_error_injection_mode_v1_req,
+				   NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_ERROR_INJECTION_MODE_V1, mode,
+				   req.mode);
+	EXPECT_EQ(mode, req.mode);
+}
+TEST(setErrorInjectionMode, testResponse)
+{
+	testEncodeCommonResponse(encode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_MODE_V1);
+
+	testDecodeCommonResponse(&decode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_MODE_V1);
+}
 TEST(getErrorInjectionMode, testRequest)
 {
 	testEncodeCommonRequest(&encode_get_error_injection_mode_v1_req,
@@ -83,6 +116,39 @@ TEST(getSupportedErrorInjection, testResponse)
 	}
 }
 
+TEST(setCurrentErrorInjection, testRequest)
+{
+
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_set_error_injection_types_mask_req req;
+	testEncodeRequest<nsm_error_injection_types_mask>(
+	    &encode_set_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, data, req.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], req.data.mask[i]);
+	}
+
+	testDecodeRequest<nsm_error_injection_types_mask>(
+	    &decode_set_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, data, req.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], req.data.mask[i]);
+	}
+}
+TEST(setCurrentErrorInjection, testResponse)
+{
+	testEncodeCommonResponse(
+	    &encode_set_current_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonResponse(&decode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+}
 TEST(getCurrentErrorInjection, testRequest)
 {
 	testEncodeCommonRequest(
