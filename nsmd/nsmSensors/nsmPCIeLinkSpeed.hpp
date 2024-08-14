@@ -20,17 +20,22 @@
 #include "libnsm/pci-links.h"
 
 #include "nsmInterface.hpp"
+#include "sharedMemCommon.hpp"
 
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
+#include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
+using namespace nsm_shmem_utils;
 
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
 using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
+using PCIeEccIntf = object_t<PCIe::server::PCIeECC>;
+
 class NsmPCIeLinkSpeedBase : public NsmSensor
 {
   public:
@@ -57,6 +62,9 @@ class NsmPCIeLinkSpeed :
     public NsmPCIeLinkSpeedBase,
     public NsmInterfaceContainer<IntfType>
 {
+  private:
+    void updateMetricOnSharedMemory() override;
+
   protected:
     void handleResponse(
         const nsm_query_scalar_group_telemetry_group_1& data) override;
@@ -67,9 +75,14 @@ class NsmPCIeLinkSpeed :
                      uint8_t deviceIndex) :
         NsmPCIeLinkSpeedBase(provider, deviceIndex),
         NsmInterfaceContainer<IntfType>(provider)
-    {}
+    {
+        updateMetricOnSharedMemory();
+    }
 };
 
+template <>
+inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::updateMetricOnSharedMemory()
+{}
 template <>
 inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
@@ -82,11 +95,38 @@ inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
 }
 
 template <>
+inline void NsmPCIeLinkSpeed<PCIeSlotIntf>::updateMetricOnSharedMemory()
+{}
+template <>
 inline void NsmPCIeLinkSpeed<PCIeSlotIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
     pdi().generation(generation(data.negotiated_link_speed));
     pdi().lanes(linkWidth(data.negotiated_link_width));
+}
+
+template <>
+inline void NsmPCIeLinkSpeed<PCIeEccIntf>::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> data;
+    updateSharedMemoryOnSuccess(
+        pdiPath(), pdi().interface, "PCIeType", data,
+        PCIeEccIntf::convertPCIeTypesToString(pdi().pcIeType()));
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().interface, "LanesInUse", data,
+                                pdi().lanesInUse());
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().interface, "MaxLanes", data,
+                                pdi().maxLanes());
+#endif
+}
+template <>
+inline void NsmPCIeLinkSpeed<PCIeEccIntf>::handleResponse(
+    const nsm_query_scalar_group_telemetry_group_1& data)
+{
+    pdi().pcIeType((PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
+    pdi().lanesInUse(linkWidth(data.negotiated_link_width));
+    pdi().maxLanes(linkWidth(data.max_link_width));
+    updateMetricOnSharedMemory();
 }
 
 } // namespace nsm

@@ -30,6 +30,7 @@
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
+#include "nsmPCIeLinkSpeed.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetCpuOperatingConfig.hpp"
@@ -2216,12 +2217,17 @@ void createNsmProcessorSensor(SensorManager& manager,
             objPath.c_str(), "DeviceId", interface.c_str());
         int count = utils::DBusHandler().getDbusProperty<uint64_t>(
             objPath.c_str(), "Count", interface.c_str());
+        auto pcieDeviceProvider = NsmInterfaceProvider<PCieEccIntf>(
+            name, type, dbus::Interfaces{inventoryObjPath});
+        auto pCieECCIntf =
+            pcieDeviceProvider.interfaces[path(inventoryObjPath)];
+        nsmDevice->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
+                                 pcieDeviceProvider, deviceId),
+                             priority);
         for (auto idx = 0; idx < count; idx++)
         {
             auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_" +
                                std::to_string(idx); // port metrics dbus path
-            auto pCieECCIntf =
-                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
             auto pCiePortIntf =
                 std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
             auto pciPortSensor =
@@ -2511,7 +2517,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
     "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",
-    "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount",
+    "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 
