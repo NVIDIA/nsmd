@@ -1,6 +1,7 @@
 dep_src_files = [
     '../nsmTemp.cpp',
     '../nsmPower.cpp',
+    '../nsmPeakPower.cpp',
     '../nsmEnergy.cpp',
     '../nsmVoltage.cpp',
     '../nsmThreshold.cpp',
@@ -8,6 +9,7 @@ dep_src_files = [
     '../nsmAltitudePressure.cpp',
     '../nsmTempAggregator.cpp',
     '../nsmPowerAggregator.cpp',
+    '../nsmPeakPowerAggregator.cpp',
     '../nsmEnergyAggregator.cpp',
     '../nsmVoltageAggregator.cpp',
     '../nsmThresholdAggregator.cpp',

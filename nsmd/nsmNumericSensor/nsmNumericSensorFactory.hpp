@@ -40,6 +40,8 @@ struct NumericSensorInfo
     bool priority;
     bool aggregated;
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
+    std::unique_ptr<std::string> readingBasis{};
+    std::unique_ptr<std::string> description{};
 };
 
 class NumericSensorAggregatorBuilder
@@ -80,6 +82,11 @@ class NumericSensorFactory
                                    const NumericSensorInfo& info,
                                    std::shared_ptr<NsmNumericSensor> sensor,
                                    const uuid_t& uuid, NsmDevice* nsmDevice);
+
+    static void makePeakValueAndAdd(const std::string& interface,
+                                    const std::string& objPath,
+                                    const NumericSensorInfo& info,
+                                    const uuid_t& uuid, NsmDevice* nsmDevice);
 
   private:
     std::unique_ptr<NumericSensorBuilder> builder;

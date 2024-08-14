@@ -18,21 +18,17 @@
 #pragma once
 
 #include "nsmNumericSensor.hpp"
+#include "nsmNumericSensorFactory.hpp"
 #include "nsmSensor.hpp"
 
 namespace nsm
 {
-class NsmPower : public NsmNumericSensor
+class NsmPeakPower : public NsmNumericSensor
 {
   public:
-    NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
-             const std::string& type, uint8_t sensorId,
-             uint8_t averagingInterval,
-             const std::vector<utils::Association>& association,
-             const std::string& chassis_association,
-             const std::string& physicalContext,
-             const std::string* implementation, const double maxAllowableValue,
-             const std::string* readingBasis, const std::string* description);
+    NsmPeakPower(sdbusplus::bus::bus& bus, const std::string& name,
+                 const std::string& type, uint8_t sensorId,
+                 uint8_t averagingInterval);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -41,11 +37,24 @@ class NsmPower : public NsmNumericSensor
 
     std::string getSensorType() override
     {
-        return "power";
+        return "peak_power";
     }
 
   private:
     uint8_t averagingInterval;
+};
+
+class PeakPowerSensorBuilder : public NumericSensorBuilder
+{
+  public:
+    std::shared_ptr<NsmNumericSensor>
+        makeSensor([[maybe_unused]] const std::string& interface,
+                   [[maybe_unused]] const std::string& objPath,
+                   sdbusplus::bus::bus& bus,
+                   const NumericSensorInfo& info) override;
+
+    std::shared_ptr<NsmNumericAggregator>
+        makeAggregator(const NumericSensorInfo& info) override;
 };
 
 } // namespace nsm

@@ -17,35 +17,25 @@
 
 #pragma once
 
-#include "nsmNumericSensor.hpp"
-#include "nsmSensor.hpp"
+#include "nsmNumericAggregator.hpp"
 
 namespace nsm
 {
-class NsmPower : public NsmNumericSensor
+class NsmPeakPowerAggregator : public NsmNumericAggregator
 {
   public:
-    NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
-             const std::string& type, uint8_t sensorId,
-             uint8_t averagingInterval,
-             const std::vector<utils::Association>& association,
-             const std::string& chassis_association,
-             const std::string& physicalContext,
-             const std::string* implementation, const double maxAllowableValue,
-             const std::string* readingBasis, const std::string* description);
+    NsmPeakPowerAggregator(const std::string& name, const std::string& type,
+                           bool priority, uint8_t averagingInterval);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
-
-    std::string getSensorType() override
-    {
-        return "power";
-    }
 
   private:
+    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+
+    static constexpr uint8_t sensorId = 255;
     uint8_t averagingInterval;
+    uint64_t timestamp{};
 };
 
 } // namespace nsm

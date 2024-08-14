@@ -15,12 +15,12 @@ NsmAltitudePressure::NsmAltitudePressure(
     const std::vector<utils::Association>& association,
     const std::string& physicalContext, const std::string* implementation,
     const double maxAllowableValue) :
-    NsmNumericSensor(
-        name, type, 0,
-        std::make_shared<NsmNumericSensorValueAggregate>(
-            std::make_unique<NsmNumericSensorDbusValue>(
-                bus, name, getSensorType(), SensorUnit::Pascals, association,
-                physicalContext, implementation, maxAllowableValue)))
+    NsmNumericSensor(name, type, 0,
+                     std::make_shared<NsmNumericSensorValueAggregate>(
+                         std::make_unique<NsmNumericSensorDbusValue>(
+                             bus, name, getSensorType(), SensorUnit::Pascals,
+                             association, physicalContext, implementation,
+                             maxAllowableValue, nullptr, nullptr)))
 {}
 
 std::optional<std::vector<uint8_t>>

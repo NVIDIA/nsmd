@@ -109,6 +109,9 @@ class MockupResponder
         getCurrentPowerDrawHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getMaxObservedPowerHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getDriverInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
