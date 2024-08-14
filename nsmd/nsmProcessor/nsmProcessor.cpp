@@ -1141,9 +1141,12 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
 NsmCurrentUtilization::NsmCurrentUtilization(
     const std::string& name, const std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+    std::shared_ptr<SMUtilizationIntf> smUtilizationIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    smUtilizationIntf(smUtilizationIntf), inventoryObjPath(inventoryObjPath),
+    smUtilizationIntfName(smUtilizationIntf->interface),
+    smUtilizationPropertyName("SMUtilization")
 {
     updateMetricOnSharedMemory();
 }
@@ -1179,6 +1182,9 @@ void NsmCurrentUtilization::updateMetricOnSharedMemory()
         cpuOperatingConfigIntf->utilization()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, utilizationVal);
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, smUtilizationIntfName, smUtilizationPropertyName,
+        smbusData, utilizationVal);
 #endif
 }
 
@@ -1199,6 +1205,7 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         cpuOperatingConfigIntf->utilization(gpu_utilization);
+        smUtilizationIntf->smUtilization(gpu_utilization);
         updateMetricOnSharedMemory();
     }
     else
@@ -2284,6 +2291,8 @@ void createNsmProcessorSensor(SensorManager& manager,
             objPath.c_str(), "Priority", interface.c_str());
         auto cpuOperatingConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
             bus, inventoryObjPath.c_str());
+        auto smUtilizationIntf =
+            std::make_shared<SMUtilizationIntf>(bus, inventoryObjPath.c_str());
 
         auto clockFreqSensor = std::make_shared<NsmCurrClockFreq>(
             name, type, cpuOperatingConfigIntf, inventoryObjPath);
@@ -2295,7 +2304,7 @@ void createNsmProcessorSensor(SensorManager& manager,
             name, type, cpuOperatingConfigIntf);
         auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
             name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
-            inventoryObjPath);
+            smUtilizationIntf, inventoryObjPath);
 
         auto defaultBoostClockSpeed =
             std::make_shared<NsmDefaultBoostClockSpeed>(name, type,
