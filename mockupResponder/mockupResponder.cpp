@@ -769,6 +769,12 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MINIMUM_GRAPHICS_CLOCK_LIMIT:
             populateFrom(property, 100);
             break;
+        case DEFAULT_BOOST_CLOCKS:
+            populateFrom(property, 30000);
+            break;
+        case DEFAULT_BASE_CLOCKS:
+            populateFrom(property, 300);
+            break;
         case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
             populateFrom(property, 5000);
             break;
