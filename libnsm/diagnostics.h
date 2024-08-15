@@ -24,7 +24,10 @@ extern "C" {
 
 #include "base.h"
 
-enum diagnostics_command { NSM_ENABLE_DISABLE_WP = 0x65 };
+enum diagnostics_command {
+	NSM_RESET_NETWORK_DEVICE = 0x53,
+	NSM_ENABLE_DISABLE_WP = 0x65
+};
 
 enum diagnostics_enable_disable_wp_data_index {
 	RETIMER_EEPROM = 128,
@@ -56,6 +59,30 @@ enum diagnostics_enable_disable_wp_data_index {
 	HMC_FRU_EEPROM = 233,
 };
 
+/** @brief Modes allowed on reset network device cmd
+ */
+enum reset_network_device_mode {
+	START_AFTER_RESPONSE = 0,
+	ALL_HOST_PERST_LOW = 1,
+	ALL_HOST_PCIE_LINK_DISABLE = 2,
+	ALLOWED_BY_ALL_HOST = 3
+};
+
+/** @struct nsm_reset_network_device_req
+ *
+ *  Structure representing NSM reset network device request.
+ */
+struct nsm_reset_network_device_req {
+	struct nsm_common_req hdr;
+	uint8_t mode;
+} __attribute__((packed));
+
+/** @struct nsm_reset_network_device_resp
+ *
+ *  Structure representing NSM reset network device response.
+ */
+typedef struct nsm_common_resp nsm_reset_network_device_resp;
+
 /** @struct nsm_enable_disable_wp_req
  *
  *  Structure representing Diagnostics Enable/Disable WP request.
@@ -78,6 +105,47 @@ int encode_enable_disable_wp_req(
     uint8_t instance_id,
     enum diagnostics_enable_disable_wp_data_index data_index, uint8_t value,
     struct nsm_msg *msg);
+
+/** @brief Encode Reset network device request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mode - Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_reset_network_device_req(uint8_t instance_id, uint8_t mode,
+				    struct nsm_msg *msg);
+
+/** @brief Decode Reset network device request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] mode - Mode
+ *  @return nsm_completion_codes
+ */
+int decode_reset_network_device_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *mode);
+
+/** @brief Encode a NSM Reset network device response message
+ *
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_reset_network_device_resp(uint8_t instance, uint16_t reason_code,
+				     struct nsm_msg *req);
+
+/** @brief Decode a NSM Reset network device response message
+ *
+ *  @param[in] resp    - Response message
+ *  @param[in] respLen - Length of response message
+ *  @param[out] cc     - Completion Code
+ *  @param[out] reason_code  - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_reset_network_device_resp(const struct nsm_msg *msg, size_t msgLen,
+				     uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Decode a Diagnostics Enable/Disable WP request message
  *

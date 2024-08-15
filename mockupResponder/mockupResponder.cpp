@@ -47,8 +47,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
         {}, // writeProtected
@@ -488,6 +487,8 @@ std::optional<std::vector<uint8_t>>
                     return queryTokenStatusHandler(request, requestLen);
                 case NSM_QUERY_DEVICE_IDS:
                     return queryDeviceIdsHandler(request, requestLen);
+                case NSM_RESET_NETWORK_DEVICE:
+                    return resetNetworkDeviceHandler(request, requestLen);
                 case NSM_ENABLE_DISABLE_WP:
                     return enableDisableWriteProtectedHandler(request,
                                                               requestLen);
@@ -652,9 +653,9 @@ std::optional<std::vector<uint8_t>>
                  {2, {4}},
                  {3, {12}},
                  {4,
-                  {NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
-                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
-                   NSM_QUERY_DEVICE_IDS}},
+                  {NSM_RESET_NETWORK_DEVICE, NSM_QUERY_TOKEN_PARAMETERS,
+                   NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
                  {5, {}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
@@ -4134,4 +4135,44 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::resetNetworkDeviceHandler(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("resetNetworkDeviceHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t mode = 0;
+    auto rc = decode_reset_network_device_req(requestMsg, requestLen, &mode);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (verbose)
+        {
+            lg2::error("decode_reset_network_device_req failed: rc={RC}", "RC",
+                       rc);
+        }
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_reset_network_device_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_reset_network_device_resp(requestMsg->hdr.instance_id,
+                                               reason_code, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_reset_network_device_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
 } // namespace MockupResponder

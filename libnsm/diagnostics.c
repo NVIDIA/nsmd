@@ -20,6 +20,87 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_reset_network_device_req(uint8_t instance_id, uint8_t mode,
+				    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_reset_network_device_req *request =
+	    (struct nsm_reset_network_device_req *)msg->payload;
+
+	request->hdr.command = NSM_RESET_NETWORK_DEVICE;
+	request->hdr.data_size = sizeof(mode);
+	request->mode = mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_reset_network_device_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *mode)
+{
+	if (msg == NULL || mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_reset_network_device_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_reset_network_device_req *request =
+	    (struct nsm_reset_network_device_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->mode)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*mode = request->mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_reset_network_device_resp(uint8_t instance_id, uint16_t reason_code,
+				     struct nsm_msg *msg)
+{
+	return encode_cc_only_resp(instance_id, NSM_TYPE_DIAGNOSTIC,
+				   NSM_RESET_NETWORK_DEVICE, NSM_SUCCESS,
+				   reason_code, msg);
+}
+
+int decode_reset_network_device_resp(const struct nsm_msg *msg, size_t msgLen,
+				     uint8_t *cc, uint16_t *reason_code)
+{
+	int rc = decode_reason_code_and_cc(msg, msgLen, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msgLen < sizeof(struct nsm_msg_hdr) +
+			 sizeof(nsm_reset_network_device_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_reset_network_device_resp *resp =
+	    (nsm_reset_network_device_resp *)msg->payload;
+	if (resp->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_enable_disable_wp_req(
     uint8_t instance_id,
     enum diagnostics_enable_disable_wp_data_index data_index, uint8_t value,

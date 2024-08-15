@@ -19,6 +19,7 @@
 
 #include "base.h"
 #include "device-configuration.h"
+#include "diagnostics.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
 #include "requester/mctp.h"
@@ -289,6 +290,8 @@ class MockupResponder
         queryTokenStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryDeviceIdsHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        resetNetworkDeviceHandler(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     sdeventplus::Event& event;

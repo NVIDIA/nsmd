@@ -1,4 +1,5 @@
 #pragma once
+#include "diagnostics.h"
 #include "pci-links.h"
 
 #include "asyncOperationManager.hpp"
@@ -141,5 +142,96 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
   private:
     std::shared_ptr<NsmDevice> device;
     uint8_t deviceIndex;
+};
+
+class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
+{
+  public:
+    NsmSwitchResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                            std::shared_ptr<NsmDevice> device) :
+        ResetAsyncIntf(bus, path), device(device)
+    {}
+
+    requester::Coroutine resetOnDevice(AsyncOperationStatusType* status)
+    {
+        SensorManager& manager = SensorManager::getInstance();
+        auto eid = manager.getEid(device);
+        Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_reset_network_device_req));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+        // first argument instanceid=0 is irrelevant
+        auto rc = encode_reset_network_device_req(0, START_AFTER_RESPONSE,
+                                                  requestMsg);
+
+        if (rc)
+        {
+            lg2::error(
+                "resetOnDevice encode_reset_network_device_req failed. eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
+        if (rc_)
+        {
+            lg2::error(
+                "resetOnDevice SendRecvNsmMsgSync failed for while setting power limit for eid = {EID} rc = {RC}",
+                "EID", eid, "RC", rc_);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        rc = decode_reset_network_device_resp(responseMsg.get(), responseLen,
+                                              &cc, &reason_code);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            lg2::info("resetOnDevice for EID: {EID} completed", "EID", eid);
+        }
+        else
+        {
+            lg2::error(
+                "resetOnDevice decode_reset_network_device_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        co_return NSM_SW_SUCCESS;
+    }
+
+    requester::Coroutine
+        doResetOnDevice(std::shared_ptr<AsyncStatusIntf> statusInterface)
+    {
+        AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+        const auto rc_ = co_await resetOnDevice(&status);
+        statusInterface->status(status);
+        co_return rc_;
+    }
+
+    sdbusplus::message::object_path reset() override
+    {
+        const auto [objectPath, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        if (objectPath.empty())
+        {
+            lg2::error(
+                "Reset failed. No available result Object to allocate for the Post request.");
+            throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+        }
+
+        doResetOnDevice(statusInterface).detach();
+        return objectPath;
+    }
+
+  private:
+    std::shared_ptr<NsmDevice> device;
 };
 } // namespace nsm
