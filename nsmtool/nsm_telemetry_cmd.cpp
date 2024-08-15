@@ -35,6 +35,7 @@
 
 #include <CLI/CLI.hpp>
 
+#include <cstdint>
 #include <ctime>
 
 namespace nsmtool
@@ -505,6 +506,127 @@ class QueryPortsAvailable : public CommandInterface
         {
             std::cerr
                 << "Response message error: decode_query_ports_available_resp fail"
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        return;
+    }
+};
+
+class SetPortDisableFuture : public CommandInterface
+{
+  public:
+    ~SetPortDisableFuture() = default;
+    SetPortDisableFuture() = delete;
+    SetPortDisableFuture(const SetPortDisableFuture&) = delete;
+    SetPortDisableFuture(SetPortDisableFuture&&) = default;
+    SetPortDisableFuture& operator=(const SetPortDisableFuture&) = delete;
+    SetPortDisableFuture& operator=(SetPortDisableFuture&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetPortDisableFuture(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto setPortDisableFutureOptionGroup =
+            app->add_option_group("Required", "Port mask [32 bytes].");
+
+        portMask = {};
+        setPortDisableFutureOptionGroup->add_option(
+            "-p, --portMask", portMask, "Port mask from next reset");
+        setPortDisableFutureOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_port_disable_future_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        std::vector<bitfield8_t> portMaskBitfield;
+        for (const auto& value : portMask)
+        {
+            portMaskBitfield.emplace_back(value);
+        }
+        auto rc = encode_set_port_disable_future_req(
+            instanceId, portMaskBitfield.data(), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_set_port_disable_future_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Completion Code"] = cc;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_query_ports_available_resp fail"
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        return;
+    }
+
+  private:
+    std::vector<uint8_t> portMask;
+};
+
+
+class GetPortDisableFuture : public CommandInterface
+{
+  public:
+    ~GetPortDisableFuture() = default;
+    GetPortDisableFuture() = delete;
+    GetPortDisableFuture(const GetPortDisableFuture&) = delete;
+    GetPortDisableFuture(GetPortDisableFuture&&) = default;
+    GetPortDisableFuture& operator=(const GetPortDisableFuture&) = delete;
+    GetPortDisableFuture& operator=(GetPortDisableFuture&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_port_disable_future_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        bitfield8_t portMask[PORT_MASK_DATA_SIZE];
+
+        auto rc = decode_get_port_disable_future_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &portMask[0]);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Completion Code"] = cc;
+            std::string key("Port Mask Disable Future");
+
+            parseBitfieldVar(result, key, &portMask[0], PORT_MASK_DATA_SIZE);
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_port_disable_future_resp fail"
                 << "rc=" << rc << ", cc=" << (int)cc
                 << ", reasonCode=" << (int)reason_code << "\n";
             return;
@@ -3852,6 +3974,16 @@ void registerCommand(CLI::App& app)
         "QueryPortsAvailable", "query ports available");
     commands.push_back(std::make_unique<QueryPortsAvailable>(
         "telemetry", "QueryPortsAvailable", queryPortsAvailable));
+
+    auto setPortDisableFuture = telemetry->add_subcommand(
+        "SetPortDisableFuture", "query ports available");
+    commands.push_back(std::make_unique<SetPortDisableFuture>(
+        "telemetry", "SetPortDisableFuture", setPortDisableFuture));
+
+    auto getPortDisableFuture = telemetry->add_subcommand(
+        "GetPortDisableFuture", "query ports available");
+    commands.push_back(std::make_unique<GetPortDisableFuture>(
+        "telemetry", "GetPortDisableFuture", getPortDisableFuture));
 
     auto getInventoryInformation = telemetry->add_subcommand(
         "GetInventoryInformation", "get inventory information");

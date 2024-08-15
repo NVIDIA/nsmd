@@ -29,6 +29,7 @@
 #include "nsmDevice.hpp"
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmPort/nsmPortDisableFuture.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetCpuOperatingConfig.hpp"
@@ -2124,6 +2125,41 @@ void createNsmProcessorSensor(SensorManager& manager,
                                                            inventoryObjPath);
         nsmDevice->deviceSensors.push_back(healthSensor);
     }
+    else if (type == "NSM_PortDisableFuture")
+    {
+        // Port disable future status on Processor
+        auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+
+        size_t pos = inventoryObjPath.find_last_of('/');
+        std::string basePath = inventoryObjPath;
+        std::string processorName = name;
+        if (pos != std::string::npos)
+        {
+            basePath = inventoryObjPath.substr(0, pos);
+            processorName = inventoryObjPath.substr(pos + 1);
+        }
+
+        auto nvProcessorPortDisableFuture =
+            std::make_shared<NsmDevicePortDisableFuture>(processorName, type,
+                                                         basePath);
+
+        nvProcessorPortDisableFuture->pdi().portDisableFuture(
+            std::vector<uint8_t>{});
+        nsmDevice->addSensor(nvProcessorPortDisableFuture, priority);
+
+        nsm::AsyncSetOperationHandler setPortDisableFutureHandler =
+            std::bind(&NsmDevicePortDisableFuture::setPortDisableFuture,
+                      nvProcessorPortDisableFuture, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.NVLink.NVLinkDisableFuture", "PortDisableFuture",
+                AsyncSetOperationInfo{setPortDisableFutureHandler,
+                                      nvProcessorPortDisableFuture, nsmDevice});
+    }
     else if (type == "NSM_Location")
     {
         auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
@@ -2473,6 +2509,7 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.Location",
     "xyz.openbmc_project.Configuration.NSM_Processor.LocationCode",
     "xyz.openbmc_project.Configuration.NSM_Processor.Asset",
+    "xyz.openbmc_project.Configuration.NSM_Processor.PortDisableFuture",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
     "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",

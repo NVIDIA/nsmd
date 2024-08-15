@@ -383,6 +383,7 @@ NsmPortMetrics::NsmPortMetrics(
 
     iBPortIntf = std::make_unique<IBPortIntf>(bus, inventoryObjPath.c_str());
     portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
+    portIntf->portNumber(portNum);
 
     portMetricsOem2Intf =
         std::make_unique<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
