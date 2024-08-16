@@ -95,6 +95,12 @@ class MockupResponder
         getPortDisableFutureHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getPowerModeHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setPowerModeHandler(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>

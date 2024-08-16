@@ -1615,3 +1615,520 @@ TEST(getPortDisableFuture, testBadEncodeResponse)
 						    mask, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+TEST(getPowerMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_power_mode_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_get_power_mode_req(0, request);
+
+	nsm_get_power_mode_req *req =
+	    reinterpret_cast<nsm_get_power_mode_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_POWER_MODE, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getPowerMode, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_get_power_mode_req));
+
+	auto rc = encode_get_power_mode_req(0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPowerMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_GET_POWER_MODE,	   // command
+	    0			   // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+
+	auto rc = decode_get_power_mode_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getPowerMode, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_GET_POWER_MODE,	   // command
+	    1			   // data size [it should not be 1]
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_power_mode_req);
+
+	auto rc = decode_get_power_mode_req(nullptr, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_mode_req(request, msg_len - 2);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_power_mode_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getPowerMode, testGoodEncodeResponseCCSuccess)
+{
+	std::vector<uint8_t> data{0x01, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01,
+				  0x05, 0x00, 0x06, 0x00, 0x07, 0x00};
+	auto power_mode_data =
+	    reinterpret_cast<nsm_power_mode_data *>(data.data());
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_mode_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x0 [NSM_SUCCESS]
+	auto rc = encode_get_power_mode_resp(0, NSM_SUCCESS, reason_code,
+					     power_mode_data, response);
+
+	struct nsm_get_power_mode_resp *resp =
+	    reinterpret_cast<struct nsm_get_power_mode_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_POWER_MODE, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(htole16(data.size()), resp->hdr.data_size);
+}
+
+TEST(getPowerMode, testGoodEncodeResponseCCError)
+{
+	std::vector<uint8_t> data{0x01, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01,
+				  0x05, 0x00, 0x06, 0x00, 0x07, 0x00};
+	auto power_mode_data =
+	    reinterpret_cast<nsm_power_mode_data *>(data.data());
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x1 [NSM_ERROR]
+	auto rc = encode_get_power_mode_resp(0, NSM_ERROR, reason_code,
+					     power_mode_data, response);
+
+	struct nsm_common_non_success_resp *resp =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_POWER_MODE, resp->command);
+	EXPECT_EQ(NSM_ERROR, resp->completion_code);
+	EXPECT_EQ(htole16(reason_code), resp->reason_code);
+}
+
+TEST(getPowerMode, testBadEncodeResponse)
+{
+	std::vector<uint8_t> data(sizeof(nsm_power_mode_data), 0);
+	auto power_mode_data =
+	    reinterpret_cast<nsm_power_mode_data *>(data.data());
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_mode_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	auto rc = encode_get_power_mode_resp(0, NSM_SUCCESS, reason_code,
+					     power_mode_data, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_get_power_mode_resp(0, NSM_SUCCESS, reason_code, nullptr,
+					response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPowerMode, testGoodDecodeResponseCCSuccess)
+{
+	// test when CC is NSM_SUCCESS and data payload is correct
+	std::vector<uint8_t> data_orig{0x01, 0x02, 0x00, 0x00, 0x00, 0x01, 0x01,
+				       0x05, 0x00, 0x06, 0x00, 0x07, 0x00};
+	auto power_mode_data_orig =
+	    reinterpret_cast<nsm_power_mode_data *>(data_orig.data());
+
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x00,		   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_GET_POWER_MODE,	   // command
+	    0x00,		   // completion code
+	    0x00,		   // reserved
+	    0x00,
+	    0x0D, // data size
+	    0x00};
+	response_msg.insert(response_msg.end(), data_orig.begin(),
+			    data_orig.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_power_mode_data power_mode_data;
+
+	auto rc = decode_get_power_mode_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &power_mode_data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 0x000D);
+	EXPECT_EQ(power_mode_data.l1_hw_mode_control,
+		  power_mode_data_orig->l1_hw_mode_control);
+	// just checking some starting data and ending data
+	EXPECT_EQ(power_mode_data.l1_prediction_inactive_time,
+		  le16toh(power_mode_data_orig->l1_prediction_inactive_time));
+}
+
+TEST(getPowerMode, testGoodDecodeResponseCCError)
+{
+	// test when CC is NSM_ERROR and data payload is empty
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x00,		   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_GET_POWER_MODE,	   // command
+	    0x01,		   // completion code
+	    0x00,		   // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_power_mode_data power_mode_data;
+
+	auto rc = decode_get_power_mode_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &power_mode_data);
+
+	EXPECT_EQ(cc, NSM_ERROR);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, 0x0000);
+}
+
+TEST(getPowerMode, testBadDecodeResponseWithPayload)
+{
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x00,		   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_GET_POWER_MODE,	   // command
+	    0x01,		   // completion code [0x01 - NSM_ERROR]
+	    0x00,		   // reserved
+	    0x00,
+	    0x00, // data size [it should not 00]
+	    0x00,
+	    0x09,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x67,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x13,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x06};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_power_mode_data power_mode_data;
+
+	auto rc = decode_get_power_mode_resp(
+	    nullptr, msg_len, &cc, &reason_code, &data_size, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc =
+	    decode_get_power_mode_resp(response, msg_len, nullptr, &reason_code,
+				       &data_size, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_mode_resp(response, msg_len, &cc, nullptr,
+					&data_size, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_mode_resp(response, msg_len, &cc, &reason_code,
+					nullptr, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_mode_resp(response, msg_len, &cc, &reason_code,
+					&data_size, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_power_mode_resp(response, msg_len, &cc, &reason_code,
+					&data_size, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_ERROR);
+
+	response_msg[6] = 0x00; // making CC - NSM_SUCCESS
+	rc =
+	    decode_get_power_mode_resp(response, msg_len - 3, &cc, &reason_code,
+				       &data_size, &power_mode_data);
+	//-3 from total size which means we should get error
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_power_mode_resp(response, msg_len, &cc, &reason_code,
+					&data_size, &power_mode_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(setPowerMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_set_power_mode_req));
+
+	struct nsm_power_mode_data data;
+	data.l1_hw_mode_control = 01;
+	data.l1_fw_throttling_mode = 01;
+	data.l1_prediction_mode = 01;
+	data.l1_hw_mode_threshold = 02;
+	data.l1_hw_active_time = 03;
+	data.l1_hw_inactive_time = 04;
+	data.l1_prediction_inactive_time = 05;
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_set_power_mode_req(0, request, data);
+
+	nsm_set_power_mode_req *req =
+	    reinterpret_cast<nsm_set_power_mode_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_POWER_MODE, req->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_power_mode_data) + sizeof(uint8_t),
+		  req->hdr.data_size);
+	EXPECT_EQ(data.l1_hw_mode_control, req->l1_hw_mode_control);
+	EXPECT_EQ(data.l1_prediction_inactive_time,
+		  le16toh(req->l1_prediction_inactive_time));
+}
+
+TEST(setPowerMode, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_set_power_mode_req));
+	struct nsm_power_mode_data data;
+
+	auto rc = encode_set_power_mode_req(0, nullptr, data);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setPowerMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_SET_POWER_MODE,	   // command
+	    0x0E,		   // data size
+	    0x00,
+	    0x01,
+	    0x02,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x01,
+	    0x01,
+	    0x03,
+	    0x00,
+	    0x04,
+	    0x00,
+	    0x05,
+	    0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	struct nsm_power_mode_data data;
+
+	size_t msg_len = request_msg.size();
+
+	auto rc = decode_set_power_mode_req(request, msg_len, &data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(setPowerMode, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_SET_POWER_MODE,	   // command
+	    0x00,		   // data size [it shouldn't be 0]
+	    0x00,
+	    0x01,
+	    0x00,
+	    0x02,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x01,
+	    0x01,
+	    0x03,
+	    0x00,
+	    0x04,
+	    0x00,
+	    0x05,
+	    0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	struct nsm_power_mode_data data;
+	size_t msg_len =
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_set_power_mode_req);
+
+	auto rc = decode_set_power_mode_req(nullptr, 0, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_power_mode_req(request, msg_len, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_power_mode_req(request, msg_len - 2, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_set_power_mode_req(request, msg_len, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(setPowerMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_set_power_mode_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t instance_id = 0x12;
+	uint16_t reason_code = 0;
+	auto rc =
+	    encode_set_power_mode_resp(instance_id, reason_code, response);
+
+	nsm_set_power_mode_resp *resp =
+	    reinterpret_cast<nsm_set_power_mode_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(instance_id, response->hdr.instance_id);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_POWER_MODE, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setPowerMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x00,		   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_SET_POWER_MODE,	   // command
+	    0,			   // completion code
+	    0,
+	    0,
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc =
+	    decode_set_power_mode_resp(response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+}
+
+TEST(setPowerMode, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		   // PCI VID: NVIDIA 0x10DE
+	    0x00,		   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
+	    NSM_SET_POWER_MODE,	   // command
+	    0,			   // completion code
+	    0,
+	    0,
+	    0,
+	    1 // data size [should not be non zero]
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc =
+	    decode_set_power_mode_resp(nullptr, msg_len, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_power_mode_resp(response, msg_len, nullptr,
+					&reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_power_mode_resp(response, msg_len, &cc, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_power_mode_resp(response, msg_len - 2, &cc,
+					&reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_set_power_mode_resp(response, msg_len, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

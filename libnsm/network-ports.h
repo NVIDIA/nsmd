@@ -139,6 +139,16 @@ struct nsm_port_characteristics_data {
 	uint32_t status_lane_info;
 } __attribute__((packed));
 
+struct nsm_power_mode_data {
+	uint8_t l1_hw_mode_control;
+	uint32_t l1_hw_mode_threshold;
+	uint8_t l1_fw_throttling_mode;
+	uint8_t l1_prediction_mode;
+	uint16_t l1_hw_active_time;
+	uint16_t l1_hw_inactive_time;
+	uint16_t l1_prediction_inactive_time;
+} __attribute__((packed));
+
 /** @struct nsm_common_port_req
  *
  *  Structure representing NSM common port request.
@@ -238,6 +248,43 @@ struct nsm_get_port_disable_future_resp {
 	struct nsm_common_resp hdr;
 	bitfield8_t port_mask[PORT_MASK_DATA_SIZE];
 } __attribute__((packed));
+
+/** @struct nsm_get_power_mode_req
+ *
+ *  Structure representing NSM get power mode request.
+ */
+typedef struct nsm_common_req nsm_get_power_mode_req;
+
+/** @struct nsm_get_power_mode_resp
+ *
+ *  Structure representing NSM get power mode response.
+ */
+struct nsm_get_power_mode_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_power_mode_data data;
+} __attribute__((packed));
+
+/** @struct nsm_set_power_mode_req
+ *
+ *  Structure representing NSM set power mode request.
+ */
+struct nsm_set_power_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t l1_hw_mode_control;
+	uint8_t reserved;
+	uint32_t l1_hw_mode_threshold;
+	uint8_t l1_fw_throttling_mode;
+	uint8_t l1_prediction_mode;
+	uint16_t l1_hw_active_time;
+	uint16_t l1_hw_inactive_time;
+	uint16_t l1_prediction_inactive_time;
+} __attribute__((packed));
+
+/** @struct nsm_set_power_mode_resp
+ *
+ *  Structure representing NSM set power mode response.
+ */
+typedef struct nsm_common_resp nsm_set_power_mode_resp;
 
 /** @brief Encode a Get port telemetry counter request message
  *
@@ -523,6 +570,92 @@ int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
 					size_t msg_len, uint8_t *cc,
 					uint16_t *reason_code,
 					bitfield8_t *mask);
+
+/** @brief Create a Get power mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_mode_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode Get power mode request message
+ *
+ *  @param[in] msg    - Request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_mode_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a get power mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Response message completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[in] data - Power mode data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_power_mode_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code,
+			       struct nsm_power_mode_data *data,
+			       struct nsm_msg *msg);
+
+/** @brief Decode a get power mode response message
+ *
+ *  @param[in] msg    - Response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - Pointer to response message completion code
+ *  @param[out] reason_code     - Pointer to reason code
+ *  @param[out] data_size - Data size in bytes
+ *  @param[out] data - Power mode data
+ *  @return nsm_completion_codes
+ */
+int decode_get_power_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *data_size,
+			       struct nsm_power_mode_data *data);
+
+/** @brief Encode Set Power Mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] data - Power Mode data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_power_mode_req(uint8_t instance, struct nsm_msg *msg,
+			      struct nsm_power_mode_data data);
+
+/** @brief Decode a Set Power Mode request request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] data - Power Mode data
+ *  @return nsm_completion_codes
+ */
+int decode_set_power_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			      struct nsm_power_mode_data *data);
+
+/** @brief Encode Set Power Mode response message
+ *
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_power_mode_resp(uint8_t instance, uint16_t reason_code,
+			       struct nsm_msg *req);
+
+/** @brief Decode Set Power Mode response message
+ *
+ *  @param[in] resp    - response message
+ *  @param[in] respLen - Length of response message
+ *  @param[out] cc     - Completion Code
+ *  @param[out] reason_code  - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_set_power_mode_resp(const struct nsm_msg *msg, size_t msgLen,
+			       uint8_t *cc, uint16_t *reason_code);
 #ifdef __cplusplus
 }
 #endif
