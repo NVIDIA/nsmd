@@ -17,9 +17,9 @@
 
 #pragma once
 #include "base.h"
+#include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
-#include "network-ports.h"
 
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
@@ -38,6 +38,8 @@
 
 #include <com/nvidia/Edpp/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
+#include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
+#include <com/nvidia/SMUtilization/server.hpp>
 #include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
@@ -55,7 +57,6 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
-#include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
 
 #include <cstdint>
 
@@ -346,6 +347,8 @@ class NsmEDPpScalingFactor : public NsmSensor
 using CpuOperatingConfigIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Cpu::server::OperatingConfig>;
+using SMUtilizationIntf =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::server::SMUtilization>;
 
 class NsmClockLimitGraphics : public NsmSensor
 {
@@ -419,6 +422,7 @@ class NsmCurrentUtilization : public NsmSensor
   public:
     NsmCurrentUtilization(const std::string& name, const std::string& type,
                           std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+                          std::shared_ptr<SMUtilizationIntf> smUtilizationIntf,
                           std::string& inventoryObjPath);
 
     std::optional<std::vector<uint8_t>>
@@ -430,10 +434,11 @@ class NsmCurrentUtilization : public NsmSensor
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf{nullptr};
+    std::shared_ptr<SMUtilizationIntf> smUtilizationIntf{nullptr};
 
     std::string inventoryObjPath;
-    static const std::string dBusIntf;
-    static const std::string dBusProperty;
+    std::string smUtilizationIntfName;
+    std::string smUtilizationPropertyName;
 };
 
 using ProcessorPerformanceIntf = sdbusplus::server::object_t<
