@@ -289,7 +289,7 @@ class MockupResponder
         updatePresetProfileParams(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
-        queryFirmwareType(const nsm_msg* requestMsg, size_t requestLen);
+        getRotInformation(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         queryTokenParametersHandler(const nsm_msg* requestMsg,

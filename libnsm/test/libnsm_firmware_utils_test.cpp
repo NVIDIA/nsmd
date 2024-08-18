@@ -20,7 +20,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-TEST(QueryFirmwareType, testGoodEncodeRequest)
+TEST(GetRotInformation, testGoodEncodeRequest)
 {
 	uint16_t classification = 0x1234;
 	uint8_t classification_index = 0x56;
@@ -56,7 +56,7 @@ TEST(QueryFirmwareType, testGoodEncodeRequest)
 	EXPECT_EQ(component_identifier, req->component_identifier);
 }
 
-TEST(QueryFirmwareType, testGoodDecodeRequest)
+TEST(GetRotInformation, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
@@ -87,7 +87,7 @@ TEST(QueryFirmwareType, testGoodDecodeRequest)
 	EXPECT_EQ(0x7856, fw_req.component_identifier);
 }
 
-TEST(QueryFirmwareType, testBadDecodeRequest)
+TEST(GetRotInformation, testBadDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
@@ -115,7 +115,7 @@ TEST(QueryFirmwareType, testBadDecodeRequest)
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
-TEST(QueryFirmwareType, testTooShortDecodeRequest)
+TEST(GetRotInformation, testTooShortDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
@@ -143,14 +143,14 @@ TEST(QueryFirmwareType, testTooShortDecodeRequest)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-TEST(QueryFirmwareType, testNullDecodeRequest)
+TEST(GetRotInformation, testNullDecodeRequest)
 {
 	auto rc = decode_nsm_query_get_erot_state_parameters_req(NULL, 0, NULL);
 
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
-TEST(QueryFirmwareType, testGoodEncodeResponse)
+TEST(GetRotInformation, testGoodEncodeResponse)
 {
 	const char *firmware_version1 = "Version ABCDE";
 	const char *firmware_version2 = "Version 12345";
@@ -224,7 +224,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse)
 	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
 }
 
-TEST(QueryFirmwareType, testGoodEncodeResponse2)
+TEST(GetRotInformation, testGoodEncodeResponse2)
 {
 	const char *firmware_version1 = "Version ABCDE";
 	const char *firmware_version2 = "Version 12345";
@@ -298,7 +298,7 @@ TEST(QueryFirmwareType, testGoodEncodeResponse2)
 	EXPECT_EQ(25, responseTest->hdr.telemetry_count);
 }
 
-TEST(QueryFirmwareType, testGoodDecodeResponse)
+TEST(GetRotInformation, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
@@ -425,7 +425,7 @@ TEST(QueryFirmwareType, testGoodDecodeResponse)
 	free(erot_info.slot_info);
 }
 
-TEST(QueryFirmwareType, testGoodDecodeResponseRealErot213v)
+TEST(GetRotInformation, testGoodDecodeResponseRealErot213v)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
@@ -562,7 +562,7 @@ TEST(QueryFirmwareType, testGoodDecodeResponseRealErot213v)
 	free(erot_info.slot_info);
 }
 
-TEST(QueryFirmwareType, testBadDecodeResponse)
+TEST(GetRotInformation, testBadDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,

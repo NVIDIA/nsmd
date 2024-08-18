@@ -531,7 +531,7 @@ std::optional<std::vector<uint8_t>>
             switch (command)
             {
                 case NSM_FW_GET_EROT_STATE_INFORMATION:
-                    return queryFirmwareType(request, requestLen);
+                    return getRotInformation(request, requestLen);
                     break;
                 default:
                     lg2::error(
