@@ -112,16 +112,6 @@ class NsmUuidIntf : public NsmObject
 using AssetIntfProcessor = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 
-template <typename IntfType>
-class NsmAssetIntfProcessor : public NsmInterfaceProvider<IntfType>
-{
-  public:
-    NsmAssetIntfProcessor(const std::string& name, const std::string& type,
-                          const std::shared_ptr<AssetIntfProcessor> assetIntf) :
-        NsmInterfaceProvider<IntfType>(name, type, assetIntf)
-    {}
-};
-
 using LocationIntfProcessor = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Location>;
 using LocationTypes = sdbusplus::xyz::openbmc_project::Inventory::Decorator::

@@ -7,10 +7,11 @@ dep_src_files = [
     '../nsmPowerSupplyStatus.cpp',
     '../nsmGpuPresenceAndPowerStatus.cpp',
     '../nsmPCIeFunction.cpp',
-    '../nsmPCIeLinkSpeed.cpp',
     '../nsmPCIeLTSSMState.cpp',
     '../nsmWriteProtectedJumper.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
+    '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
@@ -26,13 +27,14 @@ dep_src_files = [
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
-    '../../../requester/request_timeout_tracker.cpp'
+    '../../../requester/request_timeout_tracker.cpp',
 ]
 
 dep_src_headers = [
     '.',
     '..',
     '../../',
+    '../../nsmCommon',
     '../../nsmSensors',
     '../../nsmDbusIfaceOverride',
     '../../../',

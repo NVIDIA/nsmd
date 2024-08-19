@@ -20,6 +20,7 @@
 #include "device-configuration.h"
 
 #include "sensorManager.hpp"
+#include "sharedMemCommon.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -31,7 +32,9 @@ NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
     uint8_t gpuInstanceId) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
     gpuInstanceId(gpuInstanceId)
-{}
+{
+    updateMetricOnSharedMemory();
+}
 
 requester::Coroutine
     NsmGpuPresenceAndPowerStatus::update(SensorManager& manager, eid_t eid)
@@ -53,7 +56,7 @@ requester::Coroutine
         bool power = ((gpusPower >> (gpuInstanceId)) & 0x1) != 0;
         bool presence = ((gpusPresence >> (gpuInstanceId)) & 0x1) != 0;
 
-        for (auto pdi : interfaces)
+        for (auto& [_, pdi] : interfaces)
         {
             if (power && presence)
                 pdi->state(OperationalStatusIntf::StateType::Enabled);
@@ -66,7 +69,7 @@ requester::Coroutine
     }
     else
     {
-        for (auto pdi : interfaces)
+        for (auto& [_, pdi] : interfaces)
         {
             pdi->state(OperationalStatusIntf::StateType::Fault);
         }
@@ -74,8 +77,22 @@ requester::Coroutine
             "responseHandler: decode_get_gpu_power_status_resp is not success CC. rc={RC}",
             "RC", rc);
     }
+    updateMetricOnSharedMemory();
 
     co_return rc;
+}
+
+void NsmGpuPresenceAndPowerStatus::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> data;
+    for (auto& [path, pdi] : interfaces)
+    {
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            path, pdi->interface, "State", data,
+            OperationalStatusIntf::convertStateTypeToString(pdi->state()));
+    }
+#endif
 }
 
 std::optional<Request>

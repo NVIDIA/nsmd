@@ -10,7 +10,6 @@ sources += [
     'nsmChassis/nsmPowerSupplyStatus.cpp',
     'nsmChassis/nsmGpuPresenceAndPowerStatus.cpp',
     'nsmChassis/nsmPCIeFunction.cpp',
-    'nsmChassis/nsmPCIeLinkSpeed.cpp',
     'nsmChassis/nsmPCIeLTSSMState.cpp',
     'nsmChassis/nsmPowerControl.cpp',
     'nsmChassis/nsmGpuClockControl.cpp',

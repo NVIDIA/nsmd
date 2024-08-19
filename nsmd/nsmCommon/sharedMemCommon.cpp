@@ -23,9 +23,9 @@
 namespace nsm_shmem_utils
 {
 void updateSharedMemoryOnSuccess(
-    [[maybe_unused]] std::string& inventoryObjPath,
-    [[maybe_unused]] std::string& ifaceName,
-    [[maybe_unused]] std::string& propName,
+    [[maybe_unused]] const std::string& inventoryObjPath,
+    [[maybe_unused]] const std::string& ifaceName,
+    [[maybe_unused]] const std::string& propName,
     [[maybe_unused]] std::vector<uint8_t>& smbusData,
     [[maybe_unused]] nv::sensor_aggregation::DbusVariantType propValue)
 {

@@ -32,7 +32,7 @@ namespace nsm
 {
 
 template <typename IntfType>
-using Interfaces = std::vector<std::shared_ptr<IntfType>>;
+using Interfaces = std::unordered_map<path, std::shared_ptr<IntfType>>;
 
 /**
  * @brief Base class for NsmInterfaceContainer and NsmInterfaceProvider
@@ -54,13 +54,23 @@ struct NsmInterfaces
         }
     }
     /**
+     * @brief Returns first pdi path from interfaces collection
+     *
+     * @return First PDI path in interfaces collection
+     */
+    std::string pdiPath() const
+    {
+        return interfaces.begin()->first.string();
+    }
+
+    /**
      * @brief Returns first pdi pointer from interfaces collection
      *
      * @return Reference to IntfType First PDI in interfaces collection
      */
     IntfType& pdi()
     {
-        return *interfaces.front();
+        return *interfaces.begin()->second;
     }
 };
 
@@ -78,8 +88,9 @@ class NsmInterfaceProvider : public NsmObject, public NsmInterfaces<IntfType>
         Interfaces<IntfType> interfaces;
         for (const auto& path : objectsPaths)
         {
-            interfaces.emplace_back(std::make_shared<IntfType>(
-                utils::DBusHandler::getBus(), path.c_str()));
+            interfaces.insert(std::make_pair(
+                path, std::make_shared<IntfType>(utils::DBusHandler::getBus(),
+                                                 path.c_str())));
         }
         return interfaces;
     }
@@ -101,9 +112,9 @@ class NsmInterfaceProvider : public NsmObject, public NsmInterfaces<IntfType>
         NsmObject(name, type), NsmInterfaces<IntfType>(interfaces)
     {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
-                         std::shared_ptr<IntfType> pdi) :
+                         const path& path, std::shared_ptr<IntfType> pdi) :
         NsmObject(name, type),
-        NsmInterfaces<IntfType>(Interfaces<IntfType>{pdi})
+        NsmInterfaces<IntfType>(Interfaces<IntfType>{{path, pdi}})
     {}
 };
 
