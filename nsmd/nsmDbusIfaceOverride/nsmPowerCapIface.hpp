@@ -103,7 +103,8 @@ class NsmPowerCapIntf : public PowerCapIntf
     }
 
     requester::Coroutine setPowerCapOnDevice(uint32_t power_limit,
-                                             AsyncOperationStatusType* status)
+                                             AsyncOperationStatusType* status,
+                                             bool persistency = true)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -112,7 +113,7 @@ class NsmPowerCapIntf : public PowerCapIntf
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant
         auto rc = encode_set_device_power_limit_req(
-            0, NEW_LIMIT, PERSISTENT, power_limit * 1000, requestMsg);
+            0, NEW_LIMIT, persistency, power_limit * 1000, requestMsg);
 
         if (rc)
         {
@@ -190,22 +191,26 @@ class NsmPowerCapIntf : public PowerCapIntf
                     AsyncOperationStatusType* status,
                     [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        const uint32_t* powerLimit = std::get_if<uint32_t>(&value);
+    const std::tuple<bool, uint32_t>* reqPowerLimit =
+        std::get_if<std::tuple<bool, uint32_t>>(&value);
 
-        if (!powerLimit)
-        {
-            throw sdbusplus::error::xyz::openbmc_project::common::
-                InvalidArgument{};
+    if (!reqPowerLimit)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    uint32_t powerLimit = std::get<1>(*reqPowerLimit);
+    bool persistency = std::get<0>(*reqPowerLimit);
+
+    if (powerLimit > PowerCapIntf::maxPowerCapValue() ||
+        powerLimit < PowerCapIntf::minPowerCapValue())
+    {
+        *status = AsyncOperationStatusType::InvalidArgument;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
-
-        if (*powerLimit > PowerCapIntf::maxPowerCapValue() ||
-            *powerLimit < PowerCapIntf::minPowerCapValue())
-        {
-            *status = AsyncOperationStatusType::InvalidArgument;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
-        }
-
-        const auto rc = co_await setPowerCapOnDevice(*powerLimit, status);
+  
+        const auto rc = co_await setPowerCapOnDevice(powerLimit, status,
+                                                     persistency);
 
         co_return rc;
     }
