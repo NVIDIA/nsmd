@@ -22,6 +22,8 @@ using ::testing::ElementsAre;
 #include "base.h"
 #include "platform-environmental.h"
 
+#include "nsmAssetIntf.hpp"
+
 #include <sdbusplus/bus.hpp>
 
 #define private public

@@ -20,6 +20,7 @@
 #include "libnsm/platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -34,7 +35,6 @@ namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
@@ -72,7 +72,7 @@ class NsmInventoryProperty :
         NsmInventoryPropertyBase(provider, property),
         NsmInterfaceContainer<IntfType>(provider)
     {
-        if constexpr (std::is_same_v<IntfType, AssetIntf>)
+        if constexpr (std::is_same_v<IntfType, NsmAssetIntf>)
         {
             this->pdi().buildDate(nullDate);
         }
@@ -81,7 +81,7 @@ class NsmInventoryProperty :
 
 template <>
 inline void
-    NsmInventoryProperty<AssetIntf>::handleResponse(const Response& data)
+    NsmInventoryProperty<NsmAssetIntf>::handleResponse(const Response& data)
 {
     switch (property)
     {

@@ -1,6 +1,7 @@
 #include "GPUSWInventory.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmAssetIntf.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -36,7 +37,7 @@ NsmGPUSWInventoryDriverVersionAndStatus::
                                        association.absolutePath);
     }
     associationDef->associations(associations_list);
-    asset = std::make_unique<AssetIntf>(bus, GPUFWInvBasePath.c_str());
+    asset = std::make_unique<NsmAssetIntf>(bus, GPUFWInvBasePath.c_str());
     asset->manufacturer(manufacturer);
 }
 

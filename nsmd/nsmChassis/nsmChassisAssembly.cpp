@@ -75,17 +75,18 @@ requester::Coroutine
         auto partNumberId = deviceAssembly ? DEVICE_PART_NUMBER
                                            : BOARD_PART_NUMBER;
 
-        auto assetObject = NsmChassisAssembly<AssetIntf>(chassisName, name);
+        auto assetObject = NsmChassisAssembly<NsmAssetIntf>(chassisName, name);
         assetObject.pdi().manufacturer(vendor);
         assetObject.pdi().name(assetsName);
         //  create sensor
-        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, partNumberId);
-        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            assetObject, SERIAL_NUMBER);
-        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto serialNumber =
+            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
+                                                                 SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, MARKETING_NAME);
-        auto buildDate = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, BUILD_DATE);
         device->addStaticSensor(partNumber);
         device->addStaticSensor(serialNumber);

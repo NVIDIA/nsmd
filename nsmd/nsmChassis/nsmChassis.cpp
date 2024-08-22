@@ -66,8 +66,9 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 
     if (type == "NSM_Chassis")
     {
-        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceType", baseInterface.c_str());
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
@@ -99,16 +100,17 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Asset")
     {
-        auto chassisAsset = NsmChassis<AssetIntf>(name);
+        auto chassisAsset = NsmChassis<NsmAssetIntf>(name);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.pdi().manufacturer(manufacturer);
         // create sensor
-        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             chassisAsset, BOARD_PART_NUMBER);
-        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            chassisAsset, SERIAL_NUMBER);
-        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto serialNumber =
+            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(chassisAsset,
+                                                                 SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             chassisAsset, MARKETING_NAME);
         device->addStaticSensor(partNumber);
         device->addStaticSensor(serialNumber);
@@ -179,8 +181,9 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_OperationalStatus")
     {
-        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceType", baseInterface.c_str());
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -201,8 +204,9 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PowerState")
     {
-        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceType", baseInterface.c_str());
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -223,8 +227,9 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_WriteProtect")
     {
-        auto deviceType = (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceType", baseInterface.c_str());
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(

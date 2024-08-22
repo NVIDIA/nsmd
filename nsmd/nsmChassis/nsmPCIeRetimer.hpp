@@ -19,6 +19,7 @@
 #include "platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -41,7 +42,6 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
 
@@ -54,7 +54,7 @@ class NsmPCIeRetimerChassis : public NsmObject
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
-    std::unique_ptr<AssetIntf> asset_ = nullptr;
+    std::unique_ptr<NsmAssetIntf> asset_ = nullptr;
     std::unique_ptr<LocationIntf> location_ = nullptr;
     std::unique_ptr<ChassisIntf> chassis_ = nullptr;
 };

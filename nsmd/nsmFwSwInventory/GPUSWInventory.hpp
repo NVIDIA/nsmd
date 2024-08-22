@@ -6,7 +6,7 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
-
+#include "nsmAssetIntf.hpp"
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -23,7 +23,6 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SoftwareIntf = object_t<Software::server::Version>;
 
 class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
@@ -41,7 +40,7 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
     std::unique_ptr<SoftwareIntf> softwareVer = nullptr;
     std::unique_ptr<OperationalStatusIntf> operationalStatus = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef = nullptr;
-    std::unique_ptr<AssetIntf> asset = nullptr;
+    std::unique_ptr<NsmAssetIntf> asset = nullptr;
 
     // to be consumed by unit tests
     enum8 driverState = 0;

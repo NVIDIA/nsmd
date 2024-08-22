@@ -109,8 +109,6 @@ class NsmUuidIntf : public NsmObject
     std::string inventoryObjPath;
 };
 
-using AssetIntfProcessor = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 
 using LocationIntfProcessor = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Location>;

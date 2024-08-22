@@ -18,6 +18,7 @@
 #include "nsmPCIeRetimer.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmAssetIntf.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -29,7 +30,8 @@ namespace nsm
 NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
-    const std::string& type) : NsmObject(name, type)
+    const std::string& type) :
+    NsmObject(name, type)
 {
     auto pcieRetimerChaasisBasePath = std::string(chassisInventoryBasePath) +
                                       "/" + name;
@@ -51,8 +53,8 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     }
     associationDef_->associations(associations_list);
 
-    asset_ = std::make_unique<AssetIntf>(bus,
-                                         pcieRetimerChaasisBasePath.c_str());
+    asset_ = std::make_unique<NsmAssetIntf>(bus,
+                                            pcieRetimerChaasisBasePath.c_str());
     asset_->sku("");
     location_ =
         std::make_unique<LocationIntf>(bus, pcieRetimerChaasisBasePath.c_str());

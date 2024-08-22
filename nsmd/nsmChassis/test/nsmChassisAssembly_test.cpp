@@ -21,15 +21,16 @@ using namespace ::testing;
 
 #define private public
 #define protected public
-
+#include "nsmAssetIntf.hpp"
 #include "nsmChassisAssembly.hpp"
 #include "nsmInventoryProperty.hpp"
 
 namespace nsm
 {
-requester::Coroutine nsmChassisAssemblyCreateSensors(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath);
+requester::Coroutine
+    nsmChassisAssemblyCreateSensors(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath);
 };
 
 using namespace nsm;
@@ -61,10 +62,8 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
         {"UUID", "a3b0bdf6-8661-4d8e-8268-0e59415f2076"},
     };
     const PropertyValuesCollection basic = {
-        {"ChassisName", chassisName},
-        {"Name", name},
-        {"Type", "NSM_ChassisAssembly"},
-        {"UUID", gpuUuid},
+        {"ChassisName", chassisName},    {"Name", name},
+        {"Type", "NSM_ChassisAssembly"}, {"UUID", gpuUuid},
         {"DeviceAssembly", true},
     };
     const PropertyValuesCollection area = {
@@ -196,13 +195,13 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     {
         auto& sensor = gpu.deviceSensors[i];
         auto inventorySensor =
-            dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(sensor);
+            dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(sensor);
         EXPECT_NE(nullptr, inventorySensor);
     }
-    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu.deviceSensors[0]);
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
-    auto model = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+    auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu.deviceSensors[2]);
     EXPECT_EQ(get<std::string>(asset, "Vendor"), model->pdi().manufacturer());
     EXPECT_EQ(get<std::string>(asset, "Name"), model->pdi().name());

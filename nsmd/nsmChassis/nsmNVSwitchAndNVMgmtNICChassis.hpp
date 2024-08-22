@@ -19,7 +19,7 @@
 
 #include "globals.hpp"
 #include "nsmInterface.hpp"
-
+#include "nsmAssetIntf.hpp"
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -35,7 +35,6 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
 using UuidIntf = object_t<Common::server::UUID>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
 using ItemIntf = object_t<Inventory::server::Item>;

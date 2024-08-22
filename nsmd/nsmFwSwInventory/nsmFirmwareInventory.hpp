@@ -21,12 +21,11 @@
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
-
+#include "nsmAssetIntf.hpp"
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 
 template <typename IntfType>

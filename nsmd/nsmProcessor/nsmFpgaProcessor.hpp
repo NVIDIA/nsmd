@@ -1,6 +1,7 @@
 #pragma once
 #include "base.h"
 
+#include "nsmAssetIntf.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 
@@ -17,8 +18,6 @@ using AcceleratorIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Accelerator>;
 using accelaratorType = sdbusplus::xyz::openbmc_project::Inventory::Item::
     server::Accelerator::AcceleratorType;
-using AssetIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
 using AssociationDefIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::association::Definitions>;
 using LocationIntf = sdbusplus::server::object_t<
@@ -39,7 +38,7 @@ class NsmFpgaProcessor : public NsmObject
 
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf;
-    std::unique_ptr<AssetIntf> assetIntf;
+    std::unique_ptr<NsmAssetIntf> assetIntf;
     std::unique_ptr<AssociationDefIntf> associationDefIntf;
     std::unique_ptr<LocationIntf> locationIntf;
     std::unique_ptr<FpgaTypeIntf> fpgaTypeIntf;
