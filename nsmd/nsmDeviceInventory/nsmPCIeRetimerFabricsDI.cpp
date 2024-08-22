@@ -1,5 +1,7 @@
 #include "nsmPCIeRetimerFabricsDI.hpp"
 
+#include "dBusAsyncUtils.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -34,19 +36,21 @@ NsmPCIeRetimerFabricDI::NsmPCIeRetimerFabricDI(
         FabricIntf::convertFabricTypeFromString(fabricsType));
 }
 
-static void createNSMPCIeRetimerFabrics(SensorManager& manager,
-                                        const std::string& interface,
-                                        const std::string& objPath)
+static requester::Coroutine
+    createNSMPCIeRetimerFabrics(SensorManager& manager,
+                                const std::string& interface,
+                                const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto fabricType = utils::DBusHandler().getDbusProperty<std::string>(
+    auto fabricType = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "FabricType", interface.c_str());
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -57,7 +61,7 @@ static void createNSMPCIeRetimerFabrics(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_PCIeRetimer_Fabrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto retimerFabricsDi = std::make_shared<NsmPCIeRetimerFabricDI>(
@@ -68,9 +72,11 @@ static void createNSMPCIeRetimerFabrics(SensorManager& manager,
             "Failed to create pcie retimer fabric device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}, Name={NAME}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath, "NAME", name);
 
-        return;
+        co_return NSM_ERROR;
     }
     nsmDevice->deviceSensors.emplace_back(retimerFabricsDi);
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

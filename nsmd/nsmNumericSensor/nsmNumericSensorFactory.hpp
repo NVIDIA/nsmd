@@ -74,7 +74,7 @@ class NumericSensorFactory
 
     CreationFunction getCreationFunction();
 
-    void make(SensorManager& manager, const std::string& interface,
+    requester::Coroutine make(SensorManager& manager, const std::string& interface,
               const std::string& objPath);
 
     static void

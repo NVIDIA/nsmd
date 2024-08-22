@@ -1,5 +1,7 @@
 #include "nsmPCIeRetimerSwitchDI.hpp"
 
+#include "dBusAsyncUtils.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -188,23 +190,25 @@ bool NsmPCIeRetimerSwitchGetClockState::getRetimerClockState(
     }
 }
 
-static void CreatePCIeRetimerSwitch(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+static requester::Coroutine
+    CreatePCIeRetimerSwitch(SensorManager& manager,
+                            const std::string& interface,
+                            const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
-    auto deviceInstance = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto deviceInstance = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceInstance", interface.c_str());
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -220,7 +224,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_PCIeRetimer_Switch PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto retimerSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
@@ -231,7 +235,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
             "Failed to create pcie retimer switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
 
-        return;
+        co_return NSM_ERROR;
     }
     nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
 
@@ -247,7 +251,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
             "Failed to create pcie retimer switch reference clock: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
 
-        return;
+        co_return NSM_ERROR;
     }
 
     if (priority)
@@ -258,6 +262,7 @@ static void CreatePCIeRetimerSwitch(SensorManager& manager,
     {
         nsmDevice->roundRobinSensors.emplace_back(retimerSwitchRefClock);
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

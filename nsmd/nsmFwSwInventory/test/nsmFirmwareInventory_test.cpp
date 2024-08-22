@@ -31,7 +31,7 @@ using namespace ::testing;
 
 namespace nsm
 {
-void nsmFirmwareInventoryCreateSensors(SensorManager&, const std::string&,
+requester::Coroutine nsmFirmwareInventoryCreateSensors(SensorManager&, const std::string&,
                                        const std::string&);
 }
 
@@ -105,47 +105,53 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(retimer, "Name")))
-        .WillOnce(Return(get(retimerAsset, "Type")))
-        .WillOnce(Return(get(retimer, "UUID")))
-        .WillOnce(Return(get(retimer, "DeviceType")))
-        .WillOnce(Return(get(retimer, "InstanceNumber")))
-        .WillOnce(Return(get(retimerAsset, "Manufacturer")));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(retimer, "Name"));
+    values.push(get(retimerAsset, "Type"));
+    values.push(get(retimer, "UUID"));
+    values.push(get(retimer, "DeviceType"));
+    values.push(get(retimer, "InstanceNumber"));
+    values.push(get(retimerAsset, "Manufacturer"));
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(retimer, "Name")))
-        .WillOnce(Return(get(retimer, "Type")))
-        .WillOnce(Return(get(retimer, "UUID")))
-        .WillOnce(Return(get(retimer, "DeviceType")))
-        .WillOnce(Return(get(retimer, "InstanceNumber")))
-        .WillOnce(Return(get(retimerAssociations[0], "Forward")))
-        .WillOnce(Return(get(retimerAssociations[0], "Backward")))
-        .WillOnce(Return(get(retimerAssociations[0], "AbsolutePath")))
-        .WillOnce(Return(get(retimerAssociations[1], "Forward")))
-        .WillOnce(Return(get(retimerAssociations[1], "Backward")))
-        .WillOnce(Return(get(retimerAssociations[1], "AbsolutePath")))
-        .WillOnce(Return(get(retimer, "IsRetimer")));
-    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(serviceMap));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(retimer, "Name"));
+    values.push(get(retimer, "Type"));
+    values.push(get(retimer, "UUID"));
+    values.push(get(retimer, "DeviceType"));
+    values.push(get(retimer, "InstanceNumber"));
+    values.push(get(retimerAssociations[0], "Forward"));
+    values.push(get(retimerAssociations[0], "Backward"));
+    values.push(get(retimerAssociations[0], "AbsolutePath"));
+    values.push(get(retimerAssociations[1], "Forward"));
+    values.push(get(retimerAssociations[1], "Backward"));
+    values.push(get(retimerAssociations[1], "AbsolutePath"));
+    values.push(get(retimer, "IsRetimer"));
+
+    auto& map = utils::MockDbusAsync::getServiceMap();
+    map = serviceMap;
+
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(retimer, "Name")))
-        .WillOnce(Return(get(retimerVersion, "Type")))
-        .WillOnce(Return(get(retimer, "UUID")))
-        .WillOnce(Return(get(retimer, "DeviceType")))
-        .WillOnce(Return(get(retimer, "InstanceNumber")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(retimer, "Name"));
+    values.push(get(retimerVersion, "Type"));
+    values.push(get(retimer, "UUID"));
+    values.push(get(retimer, "DeviceType"));
+    values.push(get(retimer, "InstanceNumber"));
     nsmFirmwareInventoryCreateSensors(
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(gpu, "Name")))
-        .WillOnce(Return(get(gpu, "Type")))
-        .WillOnce(Return(get(gpu, "UUID")))
-        .WillOnce(Return(get(gpu, "DeviceType")))
-        .WillOnce(Return(get(gpu, "InstanceNumber")))
-        .WillOnce(Throw(utils::SdBusTestError(
-            int(sdbusplus::UnpackErrorReason::missingProperty))));
-    EXPECT_CALL(mockDBus, getServiceMap).WillOnce(Return(emtpyServiceMap));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(gpu, "Name"));
+    values.push(get(gpu, "Type"));
+    values.push(get(gpu, "UUID"));
+    values.push(get(gpu, "DeviceType"));
+    values.push(get(gpu, "InstanceNumber"));
+
+    map = emtpyServiceMap;
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(7, fpga.roundRobinSensors.size());
@@ -197,15 +203,15 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 
 TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(retimer, "Name")))
-        .WillOnce(Return(get(retimer, "Type")))
-        .WillOnce(Return(get(error, "UUID")))
-        .WillOnce(Return(get(retimer, "DeviceType")))
-        .WillOnce(Return(get(retimer, "InstanceNumber")));
-    EXPECT_THROW(
-        nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath),
-        std::runtime_error);
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(retimer, "Name"));
+    values.push(get(retimer, "Type"));
+    values.push(get(error, "UUID"));
+    values.push(get(retimer, "DeviceType"));
+    values.push(get(retimer, "InstanceNumber"));
+
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());

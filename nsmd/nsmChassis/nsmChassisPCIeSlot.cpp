@@ -17,6 +17,7 @@
 
 #include "nsmChassisPCIeSlot.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInterface.hpp"
@@ -27,21 +28,22 @@
 namespace nsm
 {
 
-void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+requester::Coroutine
+    nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath)
 {
-    auto chassisName = utils::DBusHandler().getDbusProperty<std::string>(
+    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ChassisName", interface.c_str());
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceIndex", interface.c_str());
-    auto slotType = utils::DBusHandler().getDbusProperty<std::string>(
+    auto slotType = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "SlotType", interface.c_str());
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
@@ -52,14 +54,17 @@ void nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
                           pcieSlotProvider, deviceIndex),
                       priority);
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
     auto associationsObject =
         std::make_shared<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
             chassisName, name);
     associationsObject->pdi().associations(
         utils::getAssociations(associations));
     device->addStaticSensor(associationsObject);
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

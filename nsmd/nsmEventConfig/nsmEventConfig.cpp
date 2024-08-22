@@ -19,6 +19,7 @@
 
 #include "device-capability-discovery.h"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
@@ -161,22 +162,22 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
     co_return cc;
 }
 
-static void createNsmEventConfig(SensorManager& manager,
-                                 const std::string& interface,
-                                 const std::string& objPath)
+static requester::Coroutine createNsmEventConfig(SensorManager& manager,
+                                                 const std::string& interface,
+                                                 const std::string& objPath)
 {
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name",
         "xyz.openbmc_project.Configuration.NSM_EventConfig");
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID",
         "xyz.openbmc_project.Configuration.NSM_EventConfig");
-    auto messageType = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto messageType = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "MessageType",
         "xyz.openbmc_project.Configuration.NSM_EventConfig");
     auto subscribedEventIds =
-        utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
+        co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
             objPath.c_str(), "SubscribedEventIDs",
             "xyz.openbmc_project.Configuration.NSM_EventConfig");
 
@@ -186,7 +187,7 @@ static void createNsmEventConfig(SensorManager& manager,
         lg2::error(
             "found NSM_EventConfig [{NAME}] but not applied since no NsmDevice UUID={UUID}",
             "NAME", name, "UUID", uuid);
-        return;
+        co_return NSM_ERROR;
     }
 
     // ack support to be added in future. JIRA
@@ -198,6 +199,8 @@ static void createNsmEventConfig(SensorManager& manager,
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

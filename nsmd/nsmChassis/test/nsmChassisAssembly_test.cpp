@@ -27,7 +27,7 @@ using namespace ::testing;
 
 namespace nsm
 {
-void nsmChassisAssemblyCreateSensors(SensorManager& manager,
+requester::Coroutine nsmChassisAssemblyCreateSensors(SensorManager& manager,
                                      const std::string& interface,
                                      const std::string& objPath);
 };
@@ -90,13 +90,14 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
 
 TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(error, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
-    EXPECT_NO_THROW(
-        nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(error, "Type"));
+    values.push(get(basic, "UUID"));
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
+
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
@@ -106,34 +107,38 @@ TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 }
 TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(basic, "Type")))
-        .WillOnce(Return(get(basic, "UUID")));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "Type"));
+    values.push(get(basic, "UUID"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(area, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(area, "PhysicalContext")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(area, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(area, "PhysicalContext"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Area",
                                     objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(health, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(health, "Health")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(health, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(health, "Health"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Health",
                                     objPath);
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(location, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(location, "LocationType")));
+
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(location, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(location, "LocationType"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Location",
                                     objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -170,14 +175,15 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(asset, "Type")))
-        .WillOnce(Return(get(basic, "UUID")))
-        .WillOnce(Return(get(asset, "Vendor")))
-        .WillOnce(Return(get(asset, "Name")))
-        .WillOnce(Return(get(basic, "DeviceAssembly")));
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(asset, "Type"));
+    values.push(get(basic, "UUID"));
+    values.push(get(asset, "Vendor"));
+    values.push(get(asset, "Name"));
+    values.push(get(basic, "DeviceAssembly"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -204,14 +210,15 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
 
 TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
 {
-    EXPECT_CALL(mockDBus, getDbusPropertyVariant)
-        .WillOnce(Return(get(basic, "ChassisName")))
-        .WillOnce(Return(get(basic, "Name")))
-        .WillOnce(Return(get(asset, "Type")))
-        .WillOnce(Return(get(error, "UUID")));
-    EXPECT_THROW(nsmChassisAssemblyCreateSensors(
-                     mockManager, basicIntfName + ".Asset", objPath),
-                 std::runtime_error);
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "ChassisName"));
+    values.push(get(basic, "Name"));
+    values.push(get(asset, "Type"));
+    values.push(get(error, "UUID"));
+    nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
+                                    objPath);
+
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());

@@ -1,5 +1,6 @@
 #include "nsmRetimerPort.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
 #include "nsmProcessor/nsmProcessor.hpp"
 
@@ -82,10 +83,9 @@ double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
     }
 }
 
-size_t
-    NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(const uint32_t& width)
+size_t NsmPCIeECCGroup1::convertEncodedWidthToActualWidth(const uint32_t& width)
 {
-    return (width > 0 && width <=6) ? (uint32_t)pow(2, width - 1) : 0;
+    return (width > 0 && width <= 6) ? (uint32_t)pow(2, width - 1) : 0;
 }
 
 uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -104,8 +104,10 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
         portInfoIntf->maxSpeed(convertEncodedSpeedToGbps(data.max_link_speed));
         portInfoIntf->currentSpeed(
             convertEncodedSpeedToGbps(data.negotiated_link_speed));
-        portWidthIntf->width(convertEncodedWidthToActualWidth(data.max_link_width));
-        portWidthIntf->activeWidth(convertEncodedWidthToActualWidth(data.negotiated_link_width));
+        portWidthIntf->width(
+            convertEncodedWidthToActualWidth(data.max_link_width));
+        portWidthIntf->activeWidth(
+            convertEncodedWidthToActualWidth(data.negotiated_link_width));
     }
     else
     {
@@ -232,29 +234,31 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
-static void createNsmPCIeRetimerPorts(SensorManager& manager,
-                                      const std::string& interface,
-                                      const std::string& objPath)
+static requester::Coroutine
+    createNsmPCIeRetimerPorts(SensorManager& manager,
+                              const std::string& interface,
+                              const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
-    auto count = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto count = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "Count", interface.c_str());
-    auto deviceInstance = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto deviceInstance = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "DeviceInstance", interface.c_str());
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto portProtocol = utils::DBusHandler().getDbusProperty<std::string>(
+    auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PortProtocol", interface.c_str());
-    auto portType = utils::DBusHandler().getDbusProperty<std::string>(
+    auto portType = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PortType", interface.c_str());
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
     // device_index are between [1 to 8] for retimers, which is
@@ -269,7 +273,7 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_PCIeRetimer_PCIeLink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     // create pcie link [as per count]
@@ -286,7 +290,7 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                 "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
                 objPath);
-            return;
+            co_return NSM_ERROR;
         }
         nsmDevice->addStaticSensor(pciePortIntfSensor);
 
@@ -316,7 +320,7 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                 "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
                 objPath);
-            return;
+            co_return NSM_ERROR;
         }
 
         nsmDevice->addSensor(pcieSensorGroup1, priority);
@@ -324,6 +328,7 @@ static void createNsmPCIeRetimerPorts(SensorManager& manager,
         nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

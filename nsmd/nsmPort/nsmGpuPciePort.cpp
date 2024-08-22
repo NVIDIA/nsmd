@@ -1,6 +1,10 @@
 #include "nsmGpuPciePort.hpp"
-#include <cstdint>
+
 #include "asyncOperationManager.hpp"
+#include "dBusAsyncUtils.hpp"
+
+#include <cstdint>
+
 #define GPU_PCIe_INTERFACE "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0"
 namespace nsm
 {
@@ -250,7 +254,8 @@ requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
     const uint8_t groupId = std::get<0>(counterToGroupIdMap[Counter]);
     const uint8_t dsId = std::get<1>(counterToGroupIdMap[Counter]);
 
-    auto rc_ = co_await clearPCIeErrorCounter(&status, deviceIndex, groupId, dsId);
+    auto rc_ = co_await clearPCIeErrorCounter(&status, deviceIndex, groupId,
+                                              dsId);
 
     statusInterface->status(status);
 
@@ -281,25 +286,24 @@ sdbusplus::message::object_path
     return objectPath;
 }
 
-static void createNsmGpuPcieSensor(SensorManager& manager,
-                                   const std::string& interface,
-                                   const std::string& objPath)
+static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
+                                                   const std::string& interface,
+                                                   const std::string& objPath)
 {
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", GPU_PCIe_INTERFACE);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", GPU_PCIe_INTERFACE);
 
-        auto type = utils::DBusHandler().getDbusProperty<std::string>(
+        auto type = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", GPU_PCIe_INTERFACE);
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", GPU_PCIe_INTERFACE);
         inventoryObjPath = inventoryObjPath + "/Ports/PCIe_0";
 
         auto nsmDevice = manager.getNsmDevice(uuid);
@@ -309,26 +313,26 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_GPU_PCIe_0 PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
-            return;
+            co_return NSM_ERROR;
         }
         if (type == "NSM_GPU_PCIe_0")
         {
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
-            auto health = utils::DBusHandler().getDbusProperty<std::string>(
+            std::vector<utils::Association> associations{};
+            co_await utils::coGetAssociations(
+                objPath, interface + ".Associations", associations);
+            auto health = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Health", interface.c_str());
-            auto chasisState =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "ChasisPowerState", interface.c_str());
+            auto chasisState = co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "ChasisPowerState", interface.c_str());
             auto sensor = std::make_shared<NsmGpuPciePort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
             nsmDevice->deviceSensors.emplace_back(sensor);
-            auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
                 objPath.c_str(), "DeviceIndex", GPU_PCIe_INTERFACE);
 
             auto clearableScalarGroup =
-                utils::DBusHandler().getDbusProperty<std::vector<uint64_t>>(
+                co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
                     objPath.c_str(), "ClearableScalarGroup",
                     GPU_PCIe_INTERFACE);
 
@@ -345,15 +349,14 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
         }
         else if (type == "NSM_PortInfo")
         {
-            auto portType = utils::DBusHandler().getDbusProperty<std::string>(
+            auto portType = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "PortType", interface.c_str());
-            auto portProtocol =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "PortProtocol", interface.c_str());
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "PortProtocol", interface.c_str());
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
                 objPath.c_str(), "DeviceIndex", GPU_PCIe_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
@@ -383,8 +386,9 @@ static void createNsmGpuPcieSensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
-        return;
+        co_return NSM_ERROR;
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

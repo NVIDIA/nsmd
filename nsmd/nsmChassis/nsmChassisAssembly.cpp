@@ -17,6 +17,7 @@
 
 #include "nsmChassisAssembly.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -27,20 +28,21 @@
 namespace nsm
 {
 
-void nsmChassisAssemblyCreateSensors(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+requester::Coroutine
+    nsmChassisAssemblyCreateSensors(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath)
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_ChassisAssembly";
 
-    auto chassisName = utils::DBusHandler().getDbusProperty<std::string>(
+    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ChassisName", baseInterface.c_str());
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
@@ -53,9 +55,8 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Area")
     {
-        auto physicalContext =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "PhysicalContext", interface.c_str());
+        auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "PhysicalContext", interface.c_str());
         auto chassisArea =
             std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
         chassisArea->pdi().physicalContext(
@@ -64,12 +65,12 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Asset")
     {
-        auto vendor = utils::DBusHandler().getDbusProperty<std::string>(
+        auto vendor = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Vendor", interface.c_str());
-        auto assetsName = utils::DBusHandler().getDbusProperty<std::string>(
+        auto assetsName = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
         // default part number for asset is Board part number
-        auto deviceAssembly = utils::DBusHandler().tryGetDbusProperty<bool>(
+        auto deviceAssembly = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
         auto partNumberId = deviceAssembly ? DEVICE_PART_NUMBER
                                            : BOARD_PART_NUMBER;
@@ -93,7 +94,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Health")
     {
-        auto health = utils::DBusHandler().getDbusProperty<std::string>(
+        auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
         auto healthObject =
             std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
@@ -103,7 +104,7 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Location")
     {
-        auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto locationType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
         auto locationObject =
             std::make_shared<NsmChassisAssembly<LocationIntf>>(chassisName,
@@ -112,7 +113,9 @@ void nsmChassisAssemblyCreateSensors(SensorManager& manager,
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }
+    co_return NSM_SUCCESS;
 }
+
 std::vector<std::string> chassisAssemblyInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisAssembly",
     "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.Area",

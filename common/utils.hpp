@@ -19,6 +19,7 @@
 
 #include "base.h"
 
+#include "coroutine.hpp"
 #include "types.hpp"
 
 #include <stdint.h>
@@ -27,12 +28,14 @@
 
 #include <boost/asio.hpp>
 #include <nlohmann/json.hpp>
+#include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
 
 #include <exception>
 #include <filesystem>
 #include <iostream>
+#include <queue>
 #include <string>
 #include <variant>
 #include <vector>
@@ -442,4 +445,17 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
  */
 void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
                                    uint8_t instanceNumber, bool retimer);
+
+/** @brief Get associations of a configuration PDI by coroutine
+ *
+ *  @param[in] objPath - D-Bus Object Path of configuration PDI
+ *  @param[in] interfaceSubStr - Sub string to identify association interfaces
+ * at objPath
+ *  @param[out] - associations
+ */
+
+requester::Coroutine coGetAssociations(const std::string& objPath,
+                                       const std::string& interfaceSubStr,
+                                       std::vector<Association>& associations);
+
 } // namespace utils

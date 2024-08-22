@@ -17,19 +17,21 @@
 
 #pragma once
 
+#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
 #include "instance_id.hpp"
-#include "nsmServiceReadyInterface.hpp"
 #include "nsmDevice.hpp"
+#include "nsmObject.hpp"
+#include "nsmServiceReadyInterface.hpp"
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
-#include "nsmObject.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 #include <sdbusplus/timer.hpp>
 
 #include <memory>
+#include <queue>
 
 namespace nsm
 {
@@ -164,7 +166,7 @@ class SensorManagerImpl : public SensorManager
     void startPolling(uuid_t uuid) override;
     void stopPolling(uuid_t uuid) override;
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
-    void interfaceAddedhandler(sdbusplus::message::message& msg);
+    void interfaceAddedHandler(sdbusplus::message::message& msg);
 #ifdef NVIDIA_STANDBYTODC
     void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
 #endif
@@ -208,5 +210,10 @@ class SensorManagerImpl : public SensorManager
     mctp_socket::Manager& sockManager;
 
     bool verbose;
+
+    std::queue<std::pair<dbus::ObjectPath, dbus::Interface>>
+        queuedAddedInterfaces;
+    std::coroutine_handle<> interfaceAddedTaskHandle;
+    requester::Coroutine interfaceAddedTask();
 };
 } // namespace nsm

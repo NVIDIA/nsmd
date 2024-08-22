@@ -1,4 +1,7 @@
 #include "nsmFpgaProcessor.hpp"
+
+#include "dBusAsyncUtils.hpp"
+
 #define FPGA_PROCESSOR_INTERFACE                                               \
     "xyz.openbmc_project.Configuration.NSM_FpgaProcessor"
 namespace nsm
@@ -39,25 +42,25 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     healthIntf->health(HealthIntf::convertHealthTypeFromString(health));
 }
 
-static void createNsmFpgaProcessorSensor(SensorManager& manager,
-                                         const std::string& interface,
-                                         const std::string& objPath)
+static requester::Coroutine
+    createNsmFpgaProcessorSensor(SensorManager& manager,
+                                 const std::string& interface,
+                                 const std::string& objPath)
 {
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", FPGA_PROCESSOR_INTERFACE);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", FPGA_PROCESSOR_INTERFACE);
 
-        auto type = utils::DBusHandler().getDbusProperty<std::string>(
+        auto type = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", FPGA_PROCESSOR_INTERFACE);
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", FPGA_PROCESSOR_INTERFACE);
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -66,18 +69,18 @@ static void createNsmFpgaProcessorSensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
-            return;
+            co_return NSM_ERROR;
         }
         if (type == "NSM_FpgaProcessor")
         {
-            auto locationType =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "LocationType", interface.c_str());
-            auto fpgaType = utils::DBusHandler().getDbusProperty<std::string>(
+            auto locationType = co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "LocationType", interface.c_str());
+            auto fpgaType = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "FpgaType", interface.c_str());
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
-            auto health = utils::DBusHandler().getDbusProperty<std::string>(
+            std::vector<utils::Association> associations{};
+            co_await utils::coGetAssociations(
+                objPath, interface + ".Associations", associations);
+            auto health = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Health", interface.c_str());
 
             auto processorSensor = std::make_shared<NsmFpgaProcessor>(
@@ -92,8 +95,8 @@ static void createNsmFpgaProcessorSensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
-        return;
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

@@ -15,12 +15,15 @@
  * limitations under the License.
  */
 
-#include "sensorManager.hpp"
 #include "nsmGpuClockControl.hpp"
-#include <phosphor-logging/lg2.hpp>
+
+#include "asyncOperationManager.hpp"
+#include "dBusAsyncUtils.hpp"
+#include "sensorManager.hpp"
+
 #include <nsmCommon/nsmCommon.hpp>
 #include <nsmCommon/sharedMemCommon.hpp>
-#include "asyncOperationManager.hpp"
+#include <phosphor-logging/lg2.hpp>
 
 #include <cmath>
 #include <optional>
@@ -29,7 +32,8 @@
 namespace nsm
 {
 
-enum class clockLimitFlag{
+enum class clockLimitFlag
+{
     PERSISTENCE = 0,
     CLEAR = 1
 };
@@ -37,8 +41,7 @@ enum class clockLimitFlag{
 NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
     sdbusplus::bus::bus& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
-    clearClockLimAsyncIntf(bus, path), device(device)
-{};
+    clearClockLimAsyncIntf(bus, path), device(device) {};
 
 requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
     std::shared_ptr<AsyncStatusIntf> statusInterface)
@@ -51,8 +54,8 @@ requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
 
     co_return rc_;
 }
-requester::Coroutine 
-NsmClearClockLimAsyncIntf::clearReqClockLimit(AsyncOperationStatusType* status)
+requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
+    AsyncOperationStatusType* status)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto eid = manager.getEid(device);
@@ -107,8 +110,7 @@ NsmClearClockLimAsyncIntf::clearReqClockLimit(AsyncOperationStatusType* status)
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path
-    NsmClearClockLimAsyncIntf::clearClockLimit()
+sdbusplus::message::object_path NsmClearClockLimAsyncIntf::clearClockLimit()
 {
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -161,7 +163,6 @@ NsmChassisClockControl::NsmChassisClockControl(
 
 void NsmChassisClockControl::updateMetricOnSharedMemory()
 {
-
 #ifdef NVIDIA_SHMEM
     auto ifaceName = std::string(cpuOperatingConfigIntf->interface);
     std::vector<uint8_t> smbusData = {};
@@ -176,9 +177,8 @@ void NsmChassisClockControl::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType settingMax{
         cpuOperatingConfigIntf->requestedSpeedLimitMax()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, settingMax); 
+        inventoryObjPath, ifaceName, propName, smbusData, settingMax);
 #endif
-
 }
 
 std::optional<std::vector<uint8_t>>
@@ -255,7 +255,7 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
         *status = AsyncOperationStatusType::WriteFailure;
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-    
+
     maxReqSpeed = std::max(maxReqSpeed, *minReqSpeed);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -336,7 +336,7 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
         *status = AsyncOperationStatusType::WriteFailure;
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-    
+
     minReqSpeed = std::min(minReqSpeed, *maxReqSpeed);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -392,32 +392,32 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
     co_return NSM_SW_SUCCESS;
 }
 
-
-static void CreateControlGpuClock(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
+static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
 
-    auto priority = utils::DBusHandler().getDbusProperty<bool>(
+    auto priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", interface.c_str());
 
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
-    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
+    auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
-    auto clockMode = utils::DBusHandler().getDbusProperty<std::string>(
+    auto clockMode = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ClockMode", interface.c_str());
 
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -428,7 +428,7 @@ static void CreateControlGpuClock(SensorManager& manager,
         lg2::error(
             "The UUID of CreateControlGpuClock PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     inventoryObjPath += "/Controls/ClockLimit_0";
@@ -436,8 +436,8 @@ static void CreateControlGpuClock(SensorManager& manager,
         std::make_shared<CpuOperatingConfigIntf>(bus, inventoryObjPath.c_str());
 
     auto nsmClearClockLimAsyncIntf =
-        std::make_shared<NsmClearClockLimAsyncIntf>(bus, inventoryObjPath.c_str(),
-                                                    nsmDevice);
+        std::make_shared<NsmClearClockLimAsyncIntf>(
+            bus, inventoryObjPath.c_str(), nsmDevice);
 
     auto nsmChassisControlSensor = std::make_shared<NsmChassisClockControl>(
         bus, name, cpuOperatingConfigIntf, nsmClearClockLimAsyncIntf,
@@ -474,6 +474,7 @@ static void CreateControlGpuClock(SensorManager& manager,
             "RequestedSpeedLimitMax",
             AsyncSetOperationInfo{setMaxClockLimHandler,
                                   nsmChassisControlSensor, nsmDevice});
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

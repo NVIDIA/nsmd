@@ -18,7 +18,7 @@
 #include "nsmErot.hpp"
 
 #include "sensorManager.hpp"
-
+#include "dBusAsyncUtils.hpp"
 #include <fstream>
 #include <iostream>
 #include <charconv>
@@ -184,27 +184,27 @@ static int extractNumber(const std::string& str)
     return number;
 }
 
-void nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
+requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
                           const std::string& objPath)
 {
     auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_ERoT_Slot";
 
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
     if (type == "NSM_Chassis")
     {
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
 
         if (name.find("_ERoT_") == std::string::npos)
         {
-            return;
+            co_return NSM_SUCCESS;
         }
         std::shared_ptr<NsmBuildTypeObject> firmwareTypeAp = nullptr;
         std::shared_ptr<NsmBuildTypeObject> firmwareTypeEc = nullptr;
-        auto slotCount = utils::DBusHandler().getDbusProperty<uint64_t>(
+        auto slotCount = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "SlotCount", interface.c_str());
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
                 objPath.c_str(), "UUID", interface.c_str());
         auto device = manager.getNsmDevice(uuid);
         auto& bus = utils::DBusHandler::getBus();
@@ -212,13 +212,13 @@ void nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
         {
             auto slotPath = std::string(chassisInventoryBasePath) + "/" + name +
                             "/Slot" + std::to_string(slotIndex);
-            auto slotName = utils::DBusHandler().getDbusProperty<std::string>(
+            auto slotName = co_await utils::coGetDbusProperty<std::string>(
                 slotPath.c_str(), "Name", erotSlotInterface);
-            auto classification = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto classification = co_await utils::coGetDbusProperty<uint64_t>(
                 slotPath.c_str(), "ComponentClassification", erotSlotInterface);
-            auto identifier = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto identifier = co_await utils::coGetDbusProperty<uint64_t>(
                 slotPath.c_str(), "ComponentIdentifier", erotSlotInterface);
-            auto fwType = utils::DBusHandler().getDbusProperty<std::string>(
+            auto fwType = co_await utils::coGetDbusProperty<std::string>(
                 slotPath.c_str(), "FirmwareType", erotSlotInterface);
             auto associations = utils::getAssociations(
                 slotPath, std::string(erotSlotInterface) + ".Associations");
@@ -244,6 +244,7 @@ void nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
             }
         }
     }
+    co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> erotInterfaces{

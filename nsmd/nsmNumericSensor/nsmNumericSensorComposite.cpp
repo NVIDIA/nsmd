@@ -32,8 +32,7 @@ NsmNumericSensorComposite::NsmNumericSensorComposite(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& path,
-    const std::string& physicalContext,
-    const std::string& implementation
+    const std::string& physicalContext, const std::string& implementation
 #ifdef NVIDIA_SHMEM
     ,
     std::unique_ptr<NsmNumericSensorShmem> shmemSensor
@@ -107,28 +106,30 @@ void NsmNumericSensorComposite::updateCompositeReading(std::string childName,
 #endif
 }
 
-static void CreateFPGATotalGPUPower(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+static requester::Coroutine
+    CreateFPGATotalGPUPower(SensorManager& manager,
+                            const std::string& interface,
+                            const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto sensorType = utils::DBusHandler().getDbusProperty<std::string>(
+    auto sensorType = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "SensorType", interface.c_str());
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                    associations);
 
-    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+    auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
-    auto implementation = utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "Implementation", interface.c_str());
+    auto implementation = co_await utils::coGetDbusProperty<std::string>(
+        objPath.c_str(), "Implementation", interface.c_str());
 #ifdef NVIDIA_SHMEM
     std::string chassis_association;
     for (const auto& association : associations)
@@ -147,7 +148,7 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
             "Name={NAME}, Type={TYPE}",
             "NAME", name, "TYPE", type);
 
-        return;
+        co_return NSM_ERROR;
     }
 #endif
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -158,7 +159,7 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
         lg2::error(
             "The UUID of CreateFPGATotalGPUPower PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto nsmFPGATotalGPUPowerSensorPath = "/xyz/openbmc_project/sensors/" +
@@ -169,7 +170,8 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
         std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>());
 #endif
     auto fpgaTotalGpuPower = std::make_shared<NsmNumericSensorComposite>(
-        bus, name, associations, type, nsmFPGATotalGPUPowerSensorPath, physicalContext, implementation
+        bus, name, associations, type, nsmFPGATotalGPUPowerSensorPath,
+        physicalContext, implementation
 #ifdef NVIDIA_SHMEM
         ,
         std::move(shmemSensor)
@@ -178,6 +180,8 @@ static void CreateFPGATotalGPUPower(SensorManager& manager,
     nsmDevice->deviceSensors.emplace_back(fpgaTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGATotalGPUPowerSensorPath] =
         fpgaTotalGpuPower;
+
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

@@ -61,25 +61,25 @@ NsmFpgaPortState::NsmFpgaPortState(sdbusplus::bus::bus& bus,
         PortStateIntf::convertLinkStatusTypeFromString(linkStatus));
 }
 
-static void createNsmFpgaPortSensor(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+static requester::Coroutine
+    createNsmFpgaPortSensor(SensorManager& manager,
+                            const std::string& interface,
+                            const std::string& objPath)
 {
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = utils::DBusHandler().getDbusProperty<std::string>(
+        auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", FPGA_PORT_INTERFACE);
 
-        auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "UUID", FPGA_PORT_INTERFACE);
 
-        auto type = utils::DBusHandler().getDbusProperty<std::string>(
+        auto type = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
-        auto inventoryObjPath =
-            utils::DBusHandler().getDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", FPGA_PORT_INTERFACE);
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", FPGA_PORT_INTERFACE);
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -88,17 +88,17 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_FpgaPort PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
-            return;
+            co_return NSM_ERROR;
         }
         if (type == "NSM_FpgaPort")
         {
-            auto associations =
-                utils::getAssociations(objPath, interface + ".Associations");
-            auto health = utils::DBusHandler().getDbusProperty<std::string>(
+            std::vector<utils::Association> associations{};
+            co_await utils::coGetAssociations(
+                objPath, interface + ".Associations", associations);
+            auto health = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "Health", interface.c_str());
-            auto chasisState =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "ChasisPowerState", interface.c_str());
+            auto chasisState = co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "ChasisPowerState", interface.c_str());
             auto sensor = std::make_shared<NsmFpgaPort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
@@ -106,15 +106,14 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
         }
         else if (type == "NSM_PortInfo")
         {
-            auto portType = utils::DBusHandler().getDbusProperty<std::string>(
+            auto portType = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "PortType", interface.c_str());
-            auto portProtocol =
-                utils::DBusHandler().getDbusProperty<std::string>(
-                    objPath.c_str(), "PortProtocol", interface.c_str());
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "PortProtocol", interface.c_str());
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
                 objPath.c_str(), "DeviceIndex", FPGA_PORT_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
@@ -139,7 +138,7 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
         }
         else if (type == "NSM_PortState")
         {
-            auto linkStatus = utils::DBusHandler().getDbusProperty<std::string>(
+            auto linkStatus = co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "LinkStatus", interface.c_str());
             auto portStateSensor = std::make_shared<NsmFpgaPortState>(
                 bus, name, type, linkStatus, inventoryObjPath);
@@ -147,9 +146,9 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
         }
         else if (type == "NSM_PCIe")
         {
-            auto priority = utils::DBusHandler().getDbusProperty<bool>(
+            auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
-            auto deviceIndex = utils::DBusHandler().getDbusProperty<uint64_t>(
+            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
                 objPath.c_str(), "DeviceIndex", FPGA_PORT_INTERFACE);
 
             auto pcieECCIntf =
@@ -169,7 +168,7 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
                     "Failed to create NSM PCIe ECC Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                     "UUID", uuid, "NAME", name, "TYPE", type, "OBJPATH",
                     objPath);
-                return;
+                co_return NSM_ERROR;
             }
             if (priority)
             {
@@ -197,8 +196,9 @@ static void createNsmFpgaPortSensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
-        return;
+        co_return NSM_ERROR;
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmFpgaPortSensor,

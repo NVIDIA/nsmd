@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmGpmOem.hpp"
 #include "nsmObjectFactory.hpp"
@@ -95,11 +96,10 @@ static std::vector<std::string>
     return interfaces;
 }
 
-void createNsmPerInstanceGPMMetric(std::shared_ptr<GPMMetricsIntf> gpmInf,
-                                   std::shared_ptr<NsmDevice> nsmDevice,
-                                   const std::string& inventoryObjPath,
-                                   const std::string& interface,
-                                   const std::string& objPath)
+requester::Coroutine createNsmPerInstanceGPMMetric(
+    std::shared_ptr<GPMMetricsIntf> gpmInf,
+    std::shared_ptr<NsmDevice> nsmDevice, const std::string& inventoryObjPath,
+    const std::string& interface, const std::string& objPath)
 {
     auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
                                                              interface.c_str());
@@ -147,7 +147,7 @@ void createNsmPerInstanceGPMMetric(std::shared_ptr<GPMMetricsIntf> gpmInf,
         lg2::error(
             "Failed to create NSM GPM PerInstance Metrics. Unsupported GPM PerInstance Metic {METRIC}. Config={INTF}",
             "METRIC", metric, "INTF", interface);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto gpmPerInstanceMetric = std::make_shared<NsmGPMPerInstance>(
@@ -168,11 +168,12 @@ void createNsmPerInstanceGPMMetric(std::shared_ptr<GPMMetricsIntf> gpmInf,
     {
         nsmDevice->roundRobinSensors.emplace_back(gpmPerInstanceMetric);
     }
+    co_return NSM_SUCCESS;
 }
 
-static void createNsmGPMMetrics(SensorManager& manager,
-                                const std::string& interface,
-                                const std::string& objPath)
+static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 
@@ -224,7 +225,7 @@ static void createNsmGPMMetrics(SensorManager& manager,
         lg2::error(
             "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto gpmIntf = std::make_shared<GPMMetricsIntf>(bus,
@@ -276,14 +277,16 @@ static void createNsmGPMMetrics(SensorManager& manager,
     auto perInstanceInterfaces = getPerInstanceInterfaces(interface, objPath);
     for (const auto& intf : perInstanceInterfaces)
     {
-        createNsmPerInstanceGPMMetric(gpmIntf, nsmDevice, inventoryObjPath,
-                                      intf, objPath);
+        co_await createNsmPerInstanceGPMMetric(gpmIntf, nsmDevice,
+                                               inventoryObjPath, intf, objPath);
     }
+    co_return NSM_SUCCESS;
 }
 
-static void createNsmPerPortGPMMetrics(SensorManager& manager,
-                                       const std::string& interface,
-                                       const std::string& objPath)
+static requester::Coroutine
+    createNsmPerPortGPMMetrics(SensorManager& manager,
+                               const std::string& interface,
+                               const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
 
@@ -330,7 +333,7 @@ static void createNsmPerPortGPMMetrics(SensorManager& manager,
         lg2::error(
             "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     std::vector<NVLinkMetricsUpdatorInfo> updatorInfos;
@@ -405,6 +408,7 @@ static void createNsmPerPortGPMMetrics(SensorManager& manager,
             nsmDevice->roundRobinSensors.emplace_back(gpmPerPortMetric);
         }
     }
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

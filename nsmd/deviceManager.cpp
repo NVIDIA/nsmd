@@ -80,7 +80,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
                     "The NSM device has been discovered before, uuid={UUID}",
                     "UUID", mctpUuid);
                 // call updateNsmDevice to resume setting.
-                rc = co_await updateNsmDevice(nsmDevice, eid);
+                co_await updateNsmDevice(nsmDevice, eid);
                 nsmDevice->setOnline();
                 continue;
             }

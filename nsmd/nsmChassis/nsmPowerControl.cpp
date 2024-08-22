@@ -16,6 +16,8 @@
  */
 
 #include "nsmPowerControl.hpp"
+
+#include "dBusAsyncUtils.hpp"
 #include "nsmd/nsmProcessor/nsmProcessor.hpp"
 #include "sensorManager.hpp"
 
@@ -48,7 +50,7 @@ NsmPowerControl::NsmPowerControl(
     powerModeIntf->powerMode(Mode::PowerMode::MaximumPerformance);
     // handle associations
     std::vector<std::tuple<std::string, std::string, std::string>>
-	associations_list;
+        associations_list;
     for (const auto& association : associations)
     {
         associations_list.emplace_back(association.forward,
@@ -100,17 +102,18 @@ requester::Coroutine NsmPowerControl::setPowerCap(
 }
 
 // called when individual gpu processor is updated
-void NsmPowerControl::updatePowerCapValue(const std::string &childName,
-					  uint32_t value)
+void NsmPowerControl::updatePowerCapValue(const std::string& childName,
+                                          uint32_t value)
 {
-	powerCapChildValues[childName] = value;
-	uint32_t totalValue = 0;
+    powerCapChildValues[childName] = value;
+    uint32_t totalValue = 0;
 
-	for (const auto &pair : powerCapChildValues) {
-		totalValue += pair.second;
-	}
-	// calling parent powercap to initialize the value on dbus
-	PowerCapIntf::powerCap(totalValue);
+    for (const auto& pair : powerCapChildValues)
+    {
+        totalValue += pair.second;
+    }
+    // calling parent powercap to initialize the value on dbus
+    PowerCapIntf::powerCap(totalValue);
 }
 
 // custom get for maxPowerValue
@@ -199,22 +202,23 @@ sdbusplus::message::object_path
     return objectPath;
 }
 
-static void CreateControlGpuPower(SensorManager& manager,
-                                  const std::string& interface,
-                                  const std::string& objPath)
+static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
 
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
-    auto physicalContext = utils::DBusHandler().getDbusProperty<std::string>(
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
+    auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
 
     auto nsmDevice = manager.getNsmDevice(uuid);
@@ -225,14 +229,15 @@ static void CreateControlGpuPower(SensorManager& manager,
         lg2::error(
             "The UUID of CreateFPGATotalGPUPower PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto nsmFPGAControlTotalGPUPowerPath =
         "/xyz/openbmc_project/inventory/system/chassis/power/control/" + name;
 
     auto fpgaControlTotalGpuPower = std::make_shared<NsmPowerControl>(
-        bus, name, associations, type, nsmFPGAControlTotalGPUPowerPath, physicalContext);
+        bus, name, associations, type, nsmFPGAControlTotalGPUPowerPath,
+        physicalContext);
     nsmDevice->deviceSensors.emplace_back(fpgaControlTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGAControlTotalGPUPowerPath] =
         fpgaControlTotalGpuPower;
@@ -245,6 +250,7 @@ static void CreateControlGpuPower(SensorManager& manager,
                                                   fpgaControlTotalGpuPower),
                                   {},
                                   nsmDevice});
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

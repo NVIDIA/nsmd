@@ -18,7 +18,7 @@
 #include "nsmResetRequiredEvent.hpp"
 
 #include "platform-environmental.h"
-
+#include "dBusAsyncUtils.hpp"
 #include "sensorManager.hpp"
 
 #include <fmt/args.h>
@@ -79,39 +79,39 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-static void createNsmResetRequiredEvent(SensorManager& manager,
+static requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
                                         const std::string& interface,
                                         const std::string& objPath)
 {
     NsmResetRequiredEventInfo info{};
 
-    info.uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
 
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
     name = utils::makeDBusNameValid(name);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    info.originOfCondition = utils::DBusHandler().getDbusProperty<std::string>(
+    info.originOfCondition = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "OriginOfCondition", interface.c_str());
 
-    info.messageId = utils::DBusHandler().getDbusProperty<std::string>(
+    info.messageId = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "MessageId", interface.c_str());
 
-    info.loggingNamespace = utils::DBusHandler().getDbusProperty<std::string>(
+    info.loggingNamespace = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "LoggingNamespace", interface.c_str());
     info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace); 
 
-    info.resolution = utils::DBusHandler().getDbusProperty<std::string>(
+    info.resolution = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Resolution", interface.c_str());
 
     info.messageArgs =
-        utils::DBusHandler().getDbusProperty<std::vector<std::string>>(
+        co_await utils::coGetDbusProperty<std::vector<std::string>>(
             objPath.c_str(), "MessageArgs", interface.c_str());
 
-    auto severityStr = utils::DBusHandler().getDbusProperty<std::string>(
+    auto severityStr = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Severity", interface.c_str());
 
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
@@ -127,7 +127,7 @@ static void createNsmResetRequiredEvent(SensorManager& manager,
         lg2::error(
             "The UUID of Reset Required Event PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", info.uuid, "NAME", name, "TYPE", type);
-        return;
+        co_return NSM_ERROR;
     }
 
     auto event = std::make_shared<NsmResetRequiredEvent>(name, type, info);
@@ -139,6 +139,7 @@ static void createNsmResetRequiredEvent(SensorManager& manager,
     nsmDevice->deviceEvents.push_back(event);
     nsmDevice->eventDispatcher.addEvent(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                                         NSM_RESET_REQUIRED_EVENT, event);
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

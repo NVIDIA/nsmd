@@ -16,7 +16,7 @@
  */
 
 #include "nsmNVSwitchAndNVMgmtNICChassisAssembly.hpp"
-
+#include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -26,20 +26,20 @@
 namespace nsm
 {
 
-void createNsmChassisAssembly(SensorManager& manager,
+requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
                               const std::string& interface,
                               const std::string& objPath,
                               const std::string baseType)
 {
     std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;
 
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto chassisName = utils::DBusHandler().getDbusProperty<std::string>(
+    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ChassisName", baseInterface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
@@ -63,7 +63,7 @@ void createNsmChassisAssembly(SensorManager& manager,
     else if (type == "NSM_Area")
     {
         auto physicalContext =
-            utils::DBusHandler().getDbusProperty<std::string>(
+            co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "PhysicalContext", interface.c_str());
         auto assemblyArea =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<AreaIntf>>(
@@ -80,9 +80,9 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto assetObject = NsmNVSwitchAndNicChassisAssembly<AssetIntf>(
             chassisName, name, baseType);
 
-        auto assemblyName = utils::DBusHandler().getDbusProperty<std::string>(
+        auto assemblyName = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
-        auto vendor = utils::DBusHandler().getDbusProperty<std::string>(
+        auto vendor = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Vendor", interface.c_str());
 
         // initial value update
@@ -114,7 +114,7 @@ void createNsmChassisAssembly(SensorManager& manager,
         auto healthObject =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<HealthIntf>>(
                 chassisName, name, baseType);
-        auto health = utils::DBusHandler().getDbusProperty<std::string>(
+        auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
 
         healthObject->pdi().health(
@@ -130,29 +130,32 @@ void createNsmChassisAssembly(SensorManager& manager,
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<LocationIntf>>(
                 chassisName, name, baseType);
 
-        auto locationType = utils::DBusHandler().getDbusProperty<std::string>(
+        auto locationType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
 
         locationObject->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }
+    co_return NSM_SUCCESS;
 }
 
-void createNsmNVSwitchChassisAssembly(SensorManager& manager,
+requester::Coroutine createNsmNVSwitchChassisAssembly(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath)
 {
-    createNsmChassisAssembly(manager, interface, objPath,
+    co_await createNsmChassisAssembly(manager, interface, objPath,
                              "NSM_NVSwitch_ChassisAssembly");
+    co_return NSM_SUCCESS;
 }
 
-void createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
+requester::Coroutine createNsmNVLinkMgmtNicChassisAssembly(SensorManager& manager,
                                            const std::string& interface,
                                            const std::string& objPath)
 {
-    createNsmChassisAssembly(manager, interface, objPath,
+    co_await createNsmChassisAssembly(manager, interface, objPath,
                              "NSM_NVLinkMgmtNic_ChassisAssembly");
+    co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> nvSwitchChassisAssemblyInterfaces{

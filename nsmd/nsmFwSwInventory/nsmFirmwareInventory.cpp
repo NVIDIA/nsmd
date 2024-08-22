@@ -17,6 +17,7 @@
 
 #include "nsmFirmwareInventory.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmWriteProtectedControl.hpp"
@@ -26,30 +27,32 @@
 namespace nsm
 {
 
-void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
-                                       const std::string& interface,
-                                       const std::string& objPath)
+requester::Coroutine
+    nsmFirmwareInventoryCreateSensors(SensorManager& manager,
+                                      const std::string& interface,
+                                      const std::string& objPath)
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_FirmwareInventory";
 
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
     auto deviceType =
-        (NsmDeviceIdentification)utils::DBusHandler().getDbusProperty<uint64_t>(
+        (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "DeviceType", baseInterface.c_str());
-    auto instanceNumber = utils::DBusHandler().getDbusProperty<uint64_t>(
+    auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "InstanceNumber", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_FirmwareInventory")
     {
-        auto associations = utils::getAssociations(objPath,
-                                                   interface + ".Associations");
+        std::vector<utils::Association> associations{};
+        co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                          associations);
         if (!associations.empty())
         {
             auto associationsObject = std::make_shared<
@@ -59,7 +62,7 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
             device->addStaticSensor(associationsObject);
         }
 
-        auto retimer = utils::DBusHandler().tryGetDbusProperty<bool>(
+        auto retimer = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "IsRetimer", interface.c_str());
         auto retimerInventoryPath = firmwareInventoryBasePath / name;
         auto writeProtectedIntf = std::make_shared<NsmWriteProtectedIntf>(
@@ -76,7 +79,7 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Asset")
     {
-        auto manufacturer = utils::DBusHandler().getDbusProperty<std::string>(
+        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         auto asset = std::make_shared<NsmFirmwareInventory<AssetIntf>>(name);
         asset->pdi().manufacturer(manufacturer);
@@ -93,6 +96,8 @@ void nsmFirmwareInventoryCreateSensors(SensorManager& manager,
                                                instanceNumber));
         device->addStaticSensor(version);
     }
+
+    co_return NSM_SUCCESS;
 }
 
 dbus::Interfaces firmwareInventoryInterfaces = {

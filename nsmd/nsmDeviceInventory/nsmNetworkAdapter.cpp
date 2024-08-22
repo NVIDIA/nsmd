@@ -1,5 +1,6 @@
 #include "nsmNetworkAdapter.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmDebugToken.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -35,30 +36,32 @@ NsmNetworkAdapterDI::NsmNetworkAdapterDI(
     associationDefIntf->associations(associations_list);
 }
 
-static void createNSMNetworkAdapter(SensorManager& manager,
-                                    const std::string& interface,
-                                    const std::string& objPath)
+static requester::Coroutine
+    createNSMNetworkAdapter(SensorManager& manager,
+                            const std::string& interface,
+                            const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = utils::DBusHandler().getDbusProperty<std::string>(
+    auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
-    auto uuid = utils::DBusHandler().getDbusProperty<uuid_t>(
+    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto type = utils::DBusHandler().getDbusProperty<std::string>(
+    auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    auto inventoryObjPath = utils::DBusHandler().getDbusProperty<std::string>(
+    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "InventoryObjPath", interface.c_str());
-    auto associations = utils::getAssociations(objPath,
-                                               interface + ".Associations");
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath,
+                                               interface + ".Associations", associations);
     auto nsmDevice = manager.getNsmDevice(uuid);
 
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor
-        lg2::error("The UUID of NSM_NetworkAdapter PDI matches no NsmDevice : "
-                   "UUID={UUID}, Name={NAME}, Type={TYPE}",
-                   "UUID", uuid, "NAME", name, "TYPE", type);
-        return;
+        lg2::error(
+            "The UUID of NSM_NetworkAdapter PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
+            "UUID", uuid, "NAME", name, "TYPE", type);
+        co_return NSM_ERROR;
     }
 
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
@@ -68,6 +71,7 @@ static void createNSMNetworkAdapter(SensorManager& manager,
     auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
         bus, name, associations, type, uuid);
     nsmDevice->addStaticSensor(debugTokenObject);
+    co_return NSM_SUCCESS;
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

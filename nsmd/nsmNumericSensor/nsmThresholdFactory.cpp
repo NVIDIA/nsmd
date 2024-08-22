@@ -49,28 +49,31 @@ NsmThresholdFactory::NsmThresholdFactory(
     nsmDevice(manager.getNsmDevice(uuid))
 {}
 
-void NsmThresholdFactory::make()
+requester::Coroutine NsmThresholdFactory::make()
 {
     std::unordered_map<std::string, std::string> thresholdInterfaces =
         getThresholdInterfaces();
 
-    processThresholdsPair<ThresholdWarningIntf, NsmThresholdValueWarningLow,
-                          NsmThresholdValueWarningHigh>(
+    co_await processThresholdsPair<ThresholdWarningIntf,
+                                   NsmThresholdValueWarningLow,
+                                   NsmThresholdValueWarningHigh>(
         thresholdInterfaces,
         ThresholdsPairInfo{.lowerThreshold{"LowerCaution"},
                            .upperThreshold{"UpperCaution"}});
 
-    processThresholdsPair<ThresholdCriticalIntf, NsmThresholdValueCriticalLow,
-                          NsmThresholdValueCriticalHigh>(
+    co_await processThresholdsPair<ThresholdCriticalIntf,
+                                   NsmThresholdValueCriticalLow,
+                                   NsmThresholdValueCriticalHigh>(
         thresholdInterfaces,
         ThresholdsPairInfo{.lowerThreshold{"LowerCritical"},
                            .upperThreshold{"UpperCritical"}});
 
-    processThresholdsPair<ThresholdHardShutdownIntf,
-                          NsmThresholdValueHardShutdownLow,
-                          NsmThresholdValueHardShutdownHigh>(
+    co_await processThresholdsPair<ThresholdHardShutdownIntf,
+                                   NsmThresholdValueHardShutdownLow,
+                                   NsmThresholdValueHardShutdownHigh>(
         thresholdInterfaces, ThresholdsPairInfo{.lowerThreshold{"LowerFatal"},
                                                 .upperThreshold{"UpperFatal"}});
+    co_return NSM_SUCCESS;
 }
 
 std::unordered_map<std::string, std::string>
@@ -108,7 +111,7 @@ std::unordered_map<std::string, std::string>
 template <typename DBusIntf,
           std::derived_from<NsmThresholdValue> ThresholdValueLow,
           std::derived_from<NsmThresholdValue> ThresholdValueHigh>
-void NsmThresholdFactory::processThresholdsPair(
+requester::Coroutine NsmThresholdFactory::processThresholdsPair(
     const std::unordered_map<std::string, std::string>& thresholdInterfaces,
     const ThresholdsPairInfo& thresholdsPairInfo)
 {
@@ -131,9 +134,9 @@ void NsmThresholdFactory::processThresholdsPair(
             auto thresholdValue = std::make_unique<ThresholdValueLow>(
                 info.name + '_' + thresholdsPairInfo.lowerThreshold,
                 "NSM_ThermalParameter", dbusInterface);
-            createNsmThreshold(lowerThresholdIntf->second,
-                               thresholdsPairInfo.lowerThreshold,
-                               std::move(thresholdValue));
+            co_await createNsmThreshold(lowerThresholdIntf->second,
+                                        thresholdsPairInfo.lowerThreshold,
+                                        std::move(thresholdValue));
         }
 
         if (upperThresholdIntf != thresholdInterfaces.end())
@@ -141,14 +144,15 @@ void NsmThresholdFactory::processThresholdsPair(
             auto thresholdValue = std::make_unique<ThresholdValueHigh>(
                 info.name + '_' + thresholdsPairInfo.upperThreshold,
                 "NSM_ThermalParameter", dbusInterface);
-            createNsmThreshold(upperThresholdIntf->second,
-                               thresholdsPairInfo.upperThreshold,
-                               std::move(thresholdValue));
+            co_await createNsmThreshold(upperThresholdIntf->second,
+                                        thresholdsPairInfo.upperThreshold,
+                                        std::move(thresholdValue));
         }
     }
+    co_return NSM_SUCCESS;
 }
 
-void NsmThresholdFactory::createNsmThreshold(
+requester::Coroutine NsmThresholdFactory::createNsmThreshold(
     const std::string& intfName, const std::string& thresholdType,
     std::unique_ptr<NsmThresholdValue> thresholdValue)
 {
@@ -156,12 +160,12 @@ void NsmThresholdFactory::createNsmThreshold(
 
     thresholdInfo.name = info.name + "_" + thresholdType;
 
-    bool dynamic = utils::DBusHandler().getDbusProperty<bool>(
+    bool dynamic = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Dynamic", intfName.c_str());
 
     if (!dynamic)
     {
-        double threshold = utils::DBusHandler().getDbusProperty<double>(
+        double threshold = co_await utils::coGetDbusProperty<double>(
             objPath.c_str(), "Value", intfName.c_str());
 
         std::cout << "Value : " << threshold << '\n';
@@ -173,10 +177,10 @@ void NsmThresholdFactory::createNsmThreshold(
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type=Static",
                   "UUID", uuid, "NAME", thresholdInfo.name);
 
-        return;
+        co_return NSM_SUCCESS;
     }
 
-    thresholdInfo.type = utils::DBusHandler().getDbusProperty<std::string>(
+    thresholdInfo.type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", intfName.c_str());
 
     if (thresholdInfo.type != "NSM_ThermalParameter")
@@ -186,17 +190,17 @@ void NsmThresholdFactory::createNsmThreshold(
             "UUID", uuid, "NAME", thresholdInfo.name, "TYPE",
             thresholdInfo.type);
 
-        return;
+        co_return NSM_ERROR;
     }
 
-    thresholdInfo.sensorId = utils::DBusHandler().getDbusProperty<uint64_t>(
+    thresholdInfo.sensorId = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "ParameterId", intfName.c_str());
 
     bool periodicUpdate{false};
 
     try
     {
-        periodicUpdate = utils::DBusHandler().getDbusProperty<bool>(
+        periodicUpdate = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "PeriodicUpdate", intfName.c_str());
     }
     catch (const std::exception& e)
@@ -215,18 +219,20 @@ void NsmThresholdFactory::createNsmThreshold(
     {
         nsmDevice->addStaticSensor(sensor);
         nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
-        return;
+        co_return NSM_SUCCESS;
     }
 
-    thresholdInfo.priority = utils::DBusHandler().getDbusProperty<bool>(
+    thresholdInfo.priority = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Priority", intfName.c_str());
 
-    thresholdInfo.aggregated = utils::DBusHandler().getDbusProperty<bool>(
+    thresholdInfo.aggregated = co_await utils::coGetDbusProperty<bool>(
         objPath.c_str(), "Aggregated", intfName.c_str());
 
     NumericSensorFactory::makeAggregatorAndAddSensor(
         std::make_unique<NsmThresholdAggregatorBuilder>().get(), thresholdInfo,
         sensor, uuid, nsmDevice.get());
+
+    co_return NSM_SUCCESS;
 }
 
 } // namespace nsm
