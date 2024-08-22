@@ -97,7 +97,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     try
     {
         implementation = std::make_unique<std::string>(
-            co_await utils::coGetDbusProperty<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "Implementation", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -106,7 +106,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     double maxAllowableValue{std::numeric_limits<double>::infinity()};
     try
     {
-        maxAllowableValue = co_await utils::coGetDbusProperty<double>(
+        maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
             objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
     }
     catch (const std::exception& e)
