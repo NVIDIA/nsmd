@@ -16,10 +16,105 @@
  */
 
 #include "base.h"
+#include "common-tests.hpp"
 #include "device-configuration.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <types.hpp>
+
+TEST(getErrorInjectionMode, testRequest)
+{
+	testEncodeCommonRequest(&encode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_ERROR_INJECTION_MODE_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_ERROR_INJECTION_MODE_V1);
+}
+TEST(getErrorInjectionMode, testResponse)
+{
+	const nsm_error_injection_mode_v1 data = {1, 1};
+	nsm_get_error_injection_mode_v1_resp resp;
+	testEncodeResponse<nsm_error_injection_mode_v1>(
+	    &encode_get_error_injection_mode_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_MODE_V1,
+	    data, resp.data);
+	EXPECT_EQ(data.mode, resp.data.mode);
+	EXPECT_EQ(data.flags.byte, resp.data.flags.byte);
+
+	testDecodeResponse<nsm_error_injection_mode_v1>(
+	    &decode_get_error_injection_mode_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_MODE_V1,
+	    data, resp.data);
+	EXPECT_EQ(data.mode, resp.data.mode);
+	EXPECT_EQ(data.flags.byte, resp.data.flags.byte);
+}
+
+TEST(getSupportedErrorInjection, testRequest)
+{
+	testEncodeCommonRequest(
+	    &encode_get_supported_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1);
+}
+TEST(getSupportedErrorInjection, testResponse)
+{
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_get_error_injection_types_mask_resp resp;
+	testEncodeResponse<nsm_error_injection_types_mask>(
+	    &encode_get_supported_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+
+	testDecodeResponse<nsm_error_injection_types_mask>(
+	    &decode_get_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+}
+
+TEST(getCurrentErrorInjection, testRequest)
+{
+	testEncodeCommonRequest(
+	    &encode_get_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1);
+}
+TEST(getCurrentErrorInjection, testResponse)
+{
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_get_error_injection_types_mask_resp resp;
+	testEncodeResponse<nsm_error_injection_types_mask>(
+	    &encode_get_current_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+
+	testDecodeResponse<nsm_error_injection_types_mask>(
+	    &decode_get_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+}
 
 void testGetFpgaDiagnosticSettingsEncodeRequest(
     fpga_diagnostics_settings_data_index dataIndex)

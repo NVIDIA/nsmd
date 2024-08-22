@@ -1,4 +1,5 @@
 dep_src_files = [
+    'common-tests.cpp',
     '../base.c',
     '../debug-token.c',
     '../device-capability-discovery.c',

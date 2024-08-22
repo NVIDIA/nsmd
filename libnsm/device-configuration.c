@@ -21,6 +21,153 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_get_error_injection_mode_v1_req(uint8_t instance_id,
+					   struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_ERROR_INJECTION_MODE_V1, msg);
+}
+
+int decode_get_error_injection_mode_v1_req(const struct nsm_msg *msg,
+					   size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_error_injection_mode_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_mode_v1 *data, struct nsm_msg *msg)
+{
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_ERROR_INJECTION_MODE_V1, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_get_error_injection_mode_v1_resp *resp =
+		    (struct nsm_get_error_injection_mode_v1_resp *)msg->payload;
+		resp->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_mode_v1));
+		resp->data.mode = data->mode;
+		resp->data.flags.byte = htole32(data->flags.byte);
+	}
+	return rc;
+}
+
+int decode_get_error_injection_mode_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_error_injection_mode_v1 *data)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_error_injection_mode_v1_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size != sizeof(struct nsm_error_injection_mode_v1)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_mode_v1_resp *resp =
+		    (struct nsm_get_error_injection_mode_v1_resp *)msg->payload;
+		data->mode = resp->data.mode;
+		data->flags.byte = le32toh(resp->data.flags.byte);
+	}
+	return rc;
+}
+int encode_get_supported_error_injection_types_v1_req(uint8_t instance_id,
+						      struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1,
+				 msg);
+}
+
+int encode_get_current_error_injection_types_v1_req(uint8_t instance_id,
+						    struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, msg);
+}
+
+int decode_get_error_injection_types_v1_req(const struct nsm_msg *msg,
+					    size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+static int encode_get_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t command,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	int rc =
+	    encode_common_resp(instance_id, cc, reason_code,
+			       NSM_TYPE_DEVICE_CONFIGURATION, command, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_get_error_injection_types_mask_resp *resp =
+		    (struct nsm_get_error_injection_types_mask_resp *)
+			msg->payload;
+		resp->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_types_mask));
+		resp->data = *data;
+	}
+	return rc;
+}
+
+int encode_get_supported_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	return encode_get_error_injection_types_v1_resp(
+	    instance_id, cc, reason_code,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, msg);
+}
+
+int encode_get_current_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	return encode_get_error_injection_types_v1_resp(
+	    instance_id, cc, reason_code,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, msg);
+}
+
+int decode_get_error_injection_types_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_error_injection_types_mask *data)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(
+			    struct nsm_get_error_injection_types_mask_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size !=
+		    sizeof(struct nsm_error_injection_types_mask)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_types_mask_resp *resp =
+		    (struct nsm_get_error_injection_types_mask_resp *)
+			msg->payload;
+		*data = resp->data;
+	}
+	return rc;
+}
+
 int encode_get_fpga_diagnostics_settings_req(
     uint8_t instance_id, enum fpga_diagnostics_settings_data_index data_index,
     struct nsm_msg *msg)

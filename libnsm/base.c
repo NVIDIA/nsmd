@@ -590,10 +590,38 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 	return NSM_SUCCESS;
 }
 
+int encode_common_req(uint8_t instance_id, uint8_t nvidia_msg_type,
+		      uint8_t command, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 nvidia_msg_type};
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+
+	request->command = command;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
 int decode_common_req(const struct nsm_msg *msg, size_t msg_len)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
 	}
 
 	if (msg_len <
@@ -611,11 +639,8 @@ int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
-	header.nvidia_msg_type = nvidia_msg_type;
-
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 nvidia_msg_type};
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
@@ -645,7 +670,7 @@ int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 		return rc;
 	}
 
-	if (msg_len !=
+	if (msg_len <
 	    (sizeof(struct nsm_msg_hdr)) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}

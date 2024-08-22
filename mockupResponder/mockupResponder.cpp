@@ -76,7 +76,27 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             {RP_EDPP_SCALING_FACTOR, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
-        }, // prcKnobs
+        },     // prcKnobs
+        {
+            0, // mode
+            0, // persistent
+        },     // errorInjectionMode
+        {
+            {NSM_DEV_ID_GPU,
+             {
+                 {EI_MEMORY_ERRORS, false},
+                 {EI_THERMAL_ERRORS, false},
+             }},
+            {NSM_DEV_ID_SWITCH,
+             {
+                 {EI_NVLINK_ERRORS, false},
+             }},
+            {NSM_DEV_ID_PCIE_BRIDGE,
+             {
+                 {EI_PCI_ERRORS, false},
+                 {EI_NVLINK_ERRORS, false},
+             }},
+        }, // errorInjection
     })
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -530,6 +550,14 @@ std::optional<std::vector<uint8_t>>
         case NSM_TYPE_DEVICE_CONFIGURATION:
             switch (command)
             {
+                case NSM_GET_ERROR_INJECTION_MODE_V1:
+                    return getErrorInjectionModeV1Handler(request, requestLen);
+                case NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1:
+                    return getSupportedErrorInjectionTypesV1Handler(request,
+                                                                    requestLen);
+                case NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1:
+                    return getCurrentErrorInjectionTypesV1Handler(request,
+                                                                  requestLen);
                 case NSM_GET_RECONFIGURATION_PERMISSIONS_V1:
                     return getReconfigurationPermissionsV1Handler(request,
                                                                   requestLen);
@@ -688,7 +716,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
                    NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
                    NSM_QUERY_DEVICE_IDS}},
-                 {5, {}},
+                 {5, {4, 5, 7}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
@@ -701,7 +729,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {}},
+                 {5, {4, 5, 7}},
              }},
             {NSM_DEV_ID_GPU,
              {
@@ -713,7 +741,7 @@ std::optional<std::vector<uint8_t>>
                       113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
                       125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
-                 {5, {64, 65}},
+                 {5, {4, 5, 7, 64, 65}},
                  {6, {1}},
              }},
             {NSM_DEV_ID_EROT,
@@ -1614,8 +1642,8 @@ std::optional<std::vector<uint8_t>>
     {
         driver_info_data[index++] = static_cast<uint8_t>(c);
     }
-    // Add null character at the end, position is data.length() + 1 due to
-    // starting at index 0
+    // Add null character at the end, position is data.length() + 1 due
+    // to starting at index 0
     driver_info_data[data.length() + 1] = static_cast<uint8_t>('\0');
 
     if (verbose)
@@ -2309,7 +2337,8 @@ std::optional<std::vector<uint8_t>>
     uint16_t meta_data_size =
         sizeof(struct nsm_get_all_preset_profile_meta_data);
     uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
-    // data size is sum of metadata + number of profiles * size of one profile
+    // data size is sum of metadata + number of profiles * size of one
+    // profile
     uint16_t data_size = meta_data_size +
                          supported_number_of_profile * profile_data_size;
 
@@ -4595,9 +4624,10 @@ std::optional<std::vector<uint8_t>>
 
                 case GPMMetricsUnit::BANDWIDTH:
                 {
-                    // To obtain a unique value for each instance Metric, base
-                    // Metric value is multiplied by instance number and then
-                    // the module of base 10 is taken on that number.
+                    // To obtain a unique value for each instance
+                    // Metric, base Metric value is multiplied by
+                    // instance number and then the module of base 10 is
+                    // taken on that number.
                     constexpr uint64_t mod = 10 * 1024 * 1024 * 128;
                     auto val = info->second.mockValue * (i + 1);
                     val -= mod * (static_cast<uint64_t>(val) / mod);
@@ -4721,7 +4751,7 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "enableDisableGpuIstModeHandler: encode_get_reconfiguration_permissions_v1_resp failed: rc={RC}",
+            "getReconfigurationPermissionsV1Handler: encode_get_reconfiguration_permissions_v1_resp failed: rc={RC}",
             "RC", rc);
         return std::nullopt;
     }
@@ -4788,6 +4818,103 @@ std::optional<std::vector<uint8_t>>
                 "CONF", int(configuration));
             return std::nullopt;
     }
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getErrorInjectionModeV1Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    auto rc = decode_get_error_injection_mode_v1_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getErrorInjectionModeV1Handler: decode_get_error_injection_mode_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_error_injection_mode_v1_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_error_injection_mode_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        &state.errorInjectionMode, responseMsg);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getSupportedErrorInjectionTypesV1Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "getSupportedErrorInjectionTypesV1Handler: request length={LEN}",
+            "LEN", requestLen);
+    }
+    auto rc = decode_get_error_injection_types_v1_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getSupportedErrorInjectionTypesV1Handler: decode_get_error_injection_types_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_error_injection_types_mask_resp),
+                      0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_error_injection_types_mask supportedTypes = {0, 0, 0, 0, 0, 0, 0, 0};
+    auto errorInjectionIt = state.errorInjection.find(mockDeviceType);
+    if (errorInjectionIt != state.errorInjection.end())
+    {
+        for (const auto& [type, _] : errorInjectionIt->second)
+        {
+            supportedTypes.mask[type / 8] |= (1 << (type % 8));
+        }
+    }
+    rc = encode_get_supported_error_injection_types_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &supportedTypes,
+        responseMsg);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentErrorInjectionTypesV1Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "getCurrentdErrorInjectionTypesV1Handler: request length={LEN}",
+            "LEN", requestLen);
+    }
+    auto rc = decode_get_error_injection_types_v1_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getCurrentErrorInjectionTypesV1Handler: decode_get_error_injection_types_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_error_injection_types_mask_resp),
+                      0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    nsm_error_injection_types_mask enabledTypes = {0, 0, 0, 0, 0, 0, 0, 0};
+    auto errorInjectionIt = state.errorInjection.find(mockDeviceType);
+    if (errorInjectionIt != state.errorInjection.end())
+    {
+        for (const auto& [type, enabled] : errorInjectionIt->second)
+        {
+            enabledTypes.mask[type / 8] |= (uint8_t(enabled) << (type % 8));
+        }
+    }
+    rc = encode_get_current_error_injection_types_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &enabledTypes,
+        responseMsg);
     return response;
 }
 
