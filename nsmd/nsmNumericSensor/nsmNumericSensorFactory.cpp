@@ -67,7 +67,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
     try
     {
         info.implementation = std::make_unique<std::string>(
-            co_await utils::coGetDbusProperty<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "Implementation", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -75,7 +75,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
 
     try
     {
-        info.maxAllowableValue = co_await utils::coGetDbusProperty<double>(
+        info.maxAllowableValue = utils::DBusHandler().getDbusProperty<double>(
             objPath.c_str(), "MaxAllowableOperatingValue", interface.c_str());
     }
     catch (const std::exception& e)
@@ -84,7 +84,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
     try
     {
         info.readingBasis = std::make_unique<std::string>(
-            co_await utils::coGetDbusProperty<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "ReadingBasis", interface.c_str()));
     }
     catch (const std::exception& e)
@@ -93,7 +93,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
     try
     {
         info.description = std::make_unique<std::string>(
-            co_await utils::coGetDbusProperty<std::string>(
+            utils::DBusHandler().getDbusProperty<std::string>(
                 objPath.c_str(), "Description", interface.c_str()));
     }
     catch (const std::exception& e)

@@ -200,7 +200,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
 
     try
     {
-        periodicUpdate = co_await utils::coGetDbusProperty<bool>(
+        periodicUpdate = utils::DBusHandler().getDbusProperty<bool>(
             objPath.c_str(), "PeriodicUpdate", intfName.c_str());
     }
     catch (const std::exception& e)
