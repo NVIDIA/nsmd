@@ -23,10 +23,8 @@
 
 namespace nsm
 {
-using namespace sdbusplus::xyz::openbmc_project;
-using namespace sdbusplus::server;
-using SettingsIntf = object_t<Software::server::Settings>;
-
+using SettingsIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Software::server::Settings>;
 /**
  * @brief Sensor for updating Oem.Nvidia.HardwareWriteProtectedControl in
  * Chassis and WriteProtected in FirmwareInventory

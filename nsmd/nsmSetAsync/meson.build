@@ -4,6 +4,7 @@ sources += [
     'nsmSetAsync/nsmSetECCMode.cpp',
     'nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
     'nsmSetAsync/nsmSetReconfigSettings.cpp',
+    'nsmSetAsync/nsmSetWriteProtected.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmSetAsync']

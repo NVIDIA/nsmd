@@ -21,8 +21,8 @@
 #include "nsmAssetIntf.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmSetWriteProtected.hpp"
 #include "nsmWriteProtectedControl.hpp"
-#include "nsmWriteProtectedIntf.hpp"
 #include "utils.hpp"
 
 namespace nsm
@@ -63,20 +63,24 @@ requester::Coroutine
             device->addStaticSensor(associationsObject);
         }
 
+        auto pdiObjPath = (firmwareInventoryBasePath / name).string();
         auto retimer = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "IsRetimer", interface.c_str());
-        auto retimerInventoryPath = firmwareInventoryBasePath / name;
-        auto writeProtectedIntf = std::make_shared<NsmWriteProtectedIntf>(
-            manager, device, instanceNumber, deviceType,
-            retimerInventoryPath.string().c_str(), retimer);
-        auto settingsIntf =
-            std::make_shared<NsmFirmwareInventory<SettingsIntf>>(
-                name, retimerInventoryPath,
-                dynamic_pointer_cast<SettingsIntf>(writeProtectedIntf));
+        auto settingsIntf = std::make_shared<NsmSetWriteProtected>(
+            name, manager, instanceNumber, deviceType, pdiObjPath, retimer);
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
             *settingsIntf, deviceType, instanceNumber, retimer);
-        device->addStaticSensor(settingsIntf);
+        device->deviceSensors.emplace_back(settingsIntf);
         device->addSensor(writeProtectControl, false);
+
+        auto& asyncDispatcher =
+            *AsyncOperationManager::getInstance()->getDispatcher(pdiObjPath);
+        asyncDispatcher.addAsyncSetOperation(
+            "xyz.openbmc_project.Software.Settings", "WriteProtected",
+            AsyncSetOperationInfo{
+                std::bind_front(&NsmSetWriteProtected::writeProtected,
+                                settingsIntf.get()),
+                writeProtectControl, device});
     }
     else if (type == "NSM_Asset")
     {

@@ -1,6 +1,7 @@
 dep_src_files = [
     '../asyncOperationManager.cpp',
     '../nsmSetReconfigSettings.cpp',
+    '../nsmSetWriteProtected.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../sensorManager.cpp',
@@ -10,6 +11,7 @@ dep_src_files = [
     '../../../libnsm/base.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/device-configuration.c',
+    '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
 ]
@@ -27,6 +29,7 @@ test_src = declare_dependency(sources: dep_src_files, include_directories: dep_s
 tests = [
     'asyncOperationManager_test',
     'nsmSetReconfigSettings_test',
+    'nsmSetWriteProtected_test',
 ]
 
 tests_deps = [

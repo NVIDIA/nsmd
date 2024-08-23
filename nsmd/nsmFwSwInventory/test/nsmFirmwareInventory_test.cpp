@@ -26,8 +26,8 @@ using namespace ::testing;
 
 #include "nsmFirmwareInventory.hpp"
 #include "nsmInventoryProperty.hpp"
+#include "nsmSetWriteProtected.hpp"
 #include "nsmWriteProtectedControl.hpp"
-#include "nsmWriteProtectedIntf.hpp"
 
 namespace nsm
 {
@@ -154,7 +154,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     map = emtpyServiceMap;
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(7, fpga.roundRobinSensors.size());
+    EXPECT_EQ(5, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(7, fpga.deviceSensors.size());
     auto sensors = 0;
@@ -170,12 +170,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, retimerAssociation);
     EXPECT_EQ(2, retimerAssociation->pdi().associations().size());
 
-    auto retimerSettings =
-        dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
-            fpga.deviceSensors[sensors++]);
+    auto retimerSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
+        fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerSettings);
-    EXPECT_NE(nullptr,
-              dynamic_cast<NsmWriteProtectedIntf*>(&retimerSettings->pdi()));
 
     auto retimerWriteProtectedSensor =
         dynamic_pointer_cast<NsmWriteProtectedControl>(
@@ -189,11 +186,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
                   get<uint64_t>(retimer, "InstanceNumber"),
               version->property);
 
-    auto gpuSettings = dynamic_pointer_cast<NsmFirmwareInventory<SettingsIntf>>(
+    auto gpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, gpuSettings);
-    EXPECT_NE(nullptr,
-              dynamic_cast<NsmWriteProtectedIntf*>(&gpuSettings->pdi()));
 
     auto gpuWriteProtectedSensor =
         dynamic_pointer_cast<NsmWriteProtectedControl>(
