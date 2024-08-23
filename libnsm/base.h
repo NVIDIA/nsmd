@@ -64,6 +64,7 @@ extern "C" {
 
 #define UNKNOWN_INSTANCE_ID 255
 
+
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,

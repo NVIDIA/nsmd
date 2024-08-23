@@ -2443,6 +2443,77 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
+
+            case GROUP_ID_8:
+            {
+                struct nsm_query_scalar_group_telemetry_group_8 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group8_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_8_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                std::vector<uint32_t> error_counts;
+                for (int idx = 0; idx < TOTAL_PCIE_LANE_COUNT; idx++)
+                {
+                    error_counts.push_back((uint32_t)data.error_counts[idx]);
+                }
+                result["Per_Lane_Error_Counts"] = error_counts;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
+            case GROUP_ID_9:
+            {
+                struct nsm_query_scalar_group_telemetry_group_9 data;
+                uint16_t data_size;
+                uint16_t reason_code = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+                    responsePtr, payloadLength, &cc, &data_size, &reason_code,
+                    &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: " << "rc=" << rc
+                        << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reason_code << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_9_resp));
+
+                    return;
+                }
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["AER_Uncorrectable_Error_status"] =
+                    (uint32_t)data.aer_uncorrectable_error_status;
+                result["AER_Correctable_Error_status"] =
+                    (uint32_t)data.aer_correctable_error_status;
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
             default:
             {
                 std::cerr << "Invalid Group Id \n";

@@ -17,6 +17,7 @@
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem1/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
+#include <xyz/openbmc_project/Metrics/LanError/server.hpp>
 
 namespace nsm
 {
@@ -30,6 +31,9 @@ using PortIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::inventory::item::Port>;
 using PCIeEccIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::PCIe::server::PCIeECC>;
+
+using LaneErrorIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::metrics::LanError>;
 
 using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
@@ -114,5 +118,24 @@ class NsmPCIeECCGroup4 : public NsmPcieGroup
   private:
     std::shared_ptr<PCIeEccIntf> pcieEccIntf = nullptr;
 };
+
+class NsmPCIeECCGroup8 : public NsmPcieGroup
+{
+  public:
+    NsmPCIeECCGroup8(const std::string& name, const std::string& type,
+                     std::shared_ptr<LaneErrorIntf> laneErrorIntf,
+                     uint8_t deviceIndex,
+                     const std::string& inventoryObjPath);
+    NsmPCIeECCGroup8() = default;
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::shared_ptr<LaneErrorIntf> laneErrorIntf;
+    const std::string inventoryObjPath;
+    void updateMetricOnSharedMemory();
+};
+
 
 } // namespace nsm

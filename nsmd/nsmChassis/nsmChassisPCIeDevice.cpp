@@ -28,7 +28,8 @@
 #include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "utils.hpp"
-
+#include "nsmAERError.hpp"
+#include "nsmGpuPriorityMapping.h"
 namespace nsm
 {
 
@@ -143,6 +144,16 @@ requester::Coroutine
                                                               deviceIndex, id);
             device->addStaticSensor(function);
         }
+
+        const std::string inventoyObjPath = chassisInventoryBasePath /
+                                            chassisName / "PCIeDevices" / name;
+        auto aerErrorIntf = std::make_shared<NsmAERErrorStatusIntf>(
+            utils::DBusHandler::getBus(), inventoyObjPath.c_str(), deviceIndex,
+            device);
+        auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
+            name, "PCIeAerErrorStatus", aerErrorIntf, deviceIndex);
+        device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
+
     }
     else if (type == "NSM_LTSSMState")
     {
@@ -196,7 +207,8 @@ dbus::Interfaces chassisPCIeDeviceInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Health",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState",
-    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ClockOutputEnableState"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ClockOutputEnableState",
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.AERErrorStatus"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisPCIeDeviceCreateSensors,
                                chassisPCIeDeviceInterfaces)

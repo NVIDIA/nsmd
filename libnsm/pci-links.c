@@ -317,6 +317,56 @@ int decode_query_scalar_group_telemetry_v1_group6_resp(
 	return ret;
 }
 
+int encode_query_scalar_group_telemetry_v1_group8_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_query_scalar_group_telemetry_group_8 *data, struct nsm_msg *msg)
+{
+	return encode_query_scalar_group_telemetry_v1_resp(
+	    instance_id, cc, reason_code,
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_8),
+	    (uint8_t *)data, msg);
+}
+
+int decode_query_scalar_group_telemetry_v1_group8_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_8 *data)
+{
+	int ret = decode_query_scalar_group_telemetry_v1_resp(
+	    msg, msg_len, cc, data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (*data_size !=
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_8))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
+int encode_query_scalar_group_telemetry_v1_group9_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_query_scalar_group_telemetry_group_9 *data, struct nsm_msg *msg)
+{
+	return encode_query_scalar_group_telemetry_v1_resp(
+	    instance_id, cc, reason_code,
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_9),
+	    (uint8_t *)data, msg);
+}
+
+int decode_query_scalar_group_telemetry_v1_group9_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_9 *data)
+{
+	int ret = decode_query_scalar_group_telemetry_v1_resp(
+	    msg, msg_len, cc, data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (*data_size !=
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_9))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
 int encode_assert_pcie_fundamental_reset_req(uint8_t instance_id,
 					     uint8_t device_index,
 					     uint8_t action,
@@ -681,3 +731,4 @@ int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
 }
+

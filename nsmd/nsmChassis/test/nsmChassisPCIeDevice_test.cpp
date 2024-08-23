@@ -252,8 +252,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(8, gpu.roundRobinSensors.size());
-    EXPECT_EQ(8, gpu.deviceSensors.size());
+    EXPECT_EQ(9, gpu.roundRobinSensors.size());
+    EXPECT_EQ(9, gpu.deviceSensors.size());
 
     auto sensors = 0;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
@@ -268,6 +268,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
             gpu.deviceSensors[sensors++]);
     auto functionSensor =
         dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
+    sensors++;
     auto ltssmStateSensor =
         dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.deviceSensors[sensors++]);
     auto pcieRefClock =
@@ -283,6 +284,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, model);
     EXPECT_NE(nullptr, pcieDeviceObject);
     EXPECT_NE(nullptr, functionSensor);
+
     EXPECT_NE(nullptr, ltssmStateSensor);
     EXPECT_NE(nullptr, pcieRefClock);
     EXPECT_NE(nullptr, nvLinkRefClock);
@@ -314,7 +316,7 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
 {
   protected:
     uint8_t deviceIndex = 1;
-    NsmChassisPCIeDevice<PCIeDeviceIntf> pcieDevice{chassisName, name};
+    NsmChassisPCIeDevice<PCIeDeviceIntf> pcieDevice{"HGX_GPU_SXM_9", name};
 
   private:
     std::shared_ptr<NsmPCIeLinkSpeed<PCIeDeviceIntf>> sensor =
@@ -331,6 +333,7 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
         EXPECT_EQ(sensor->deviceIndex, deviceIndex);
     }
 };
+
 
 TEST_F(NsmPCIeDeviceTest, goodTestRequest)
 {
