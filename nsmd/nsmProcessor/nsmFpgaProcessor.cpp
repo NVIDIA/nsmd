@@ -17,7 +17,7 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::FPGA);
-    assetIntf = std::make_unique<AssetIntf>(bus, inventoryObjPath.c_str());
+    assetIntf = std::make_unique<NsmAssetIntf>(bus, inventoryObjPath.c_str());
     assetIntf->manufacturer("NVIDIA");
     associationDefIntf =
         std::make_unique<AssociationDefIntf>(bus, inventoryObjPath.c_str());

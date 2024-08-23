@@ -17,6 +17,7 @@ dep_src_files = [
     '../../nsmSetAsync/nsmSetMigMode.cpp',
     '../../nsmSetAsync/nsmSetECCMode.cpp',
     '../../nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
+    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

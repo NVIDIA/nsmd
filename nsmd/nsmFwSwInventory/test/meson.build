@@ -8,6 +8,7 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
+    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

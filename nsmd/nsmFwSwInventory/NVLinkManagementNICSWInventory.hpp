@@ -19,6 +19,7 @@
 #include "platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -39,7 +40,6 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SoftwareIntf = object_t<Software::server::Version>;
 
 class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
@@ -60,7 +60,7 @@ class NsmSWInventoryDriverVersionAndStatus : public NsmSensor
     std::unique_ptr<SoftwareIntf> softwareVer_ = nullptr;
     std::unique_ptr<OperationalStatusIntf> operationalStatus_ = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
-    std::unique_ptr<AssetIntf> asset_ = nullptr;
+    std::unique_ptr<NsmAssetIntf> asset_ = nullptr;
     std::string assoc;
 
     // to be consumed by unit tests

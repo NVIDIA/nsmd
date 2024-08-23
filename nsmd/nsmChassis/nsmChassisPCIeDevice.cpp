@@ -92,16 +92,18 @@ requester::Coroutine
     }
     else if (type == "NSM_Asset")
     {
-        auto assetObject = NsmChassisPCIeDevice<AssetIntf>(chassisName, name);
+        auto assetObject = NsmChassisPCIeDevice<NsmAssetIntf>(chassisName,
+                                                              name);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         assetObject.pdi().manufacturer(manufacturer);
         // create sensor
-        auto partNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, DEVICE_PART_NUMBER);
-        auto serialNumber = std::make_shared<NsmInventoryProperty<AssetIntf>>(
-            assetObject, SERIAL_NUMBER);
-        auto model = std::make_shared<NsmInventoryProperty<AssetIntf>>(
+        auto serialNumber =
+            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
+                                                                 SERIAL_NUMBER);
+        auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, MARKETING_NAME);
         device->addStaticSensor(partNumber);
         device->addStaticSensor(serialNumber);

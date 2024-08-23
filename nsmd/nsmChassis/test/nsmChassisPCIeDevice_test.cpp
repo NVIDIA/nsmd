@@ -24,6 +24,7 @@ using namespace ::testing;
 
 #include "pci-links.h"
 
+#include "nsmAssetIntf.hpp"
 #include "nsmChassisPCIeDevice.hpp"
 #include "nsmClockOutputEnableState.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
@@ -31,7 +32,6 @@ using namespace ::testing;
 #include "nsmPCIeFunction.hpp"
 #include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
-
 namespace nsm
 {
 requester::Coroutine
@@ -236,7 +236,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     values.push(get(ltssmState, "InventoryObjPath"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
-                                      
+
     values = std::queue<PropertyValue>();
     values.push(get(basic, "ChassisName"));
     values.push(get(basic, "Name"));
@@ -256,11 +256,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(8, gpu.deviceSensors.size());
 
     auto sensors = 0;
-    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+    auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu.deviceSensors[sensors++]);
-    auto serialNumber = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
-        gpu.deviceSensors[sensors++]);
-    auto model = dynamic_pointer_cast<NsmInventoryProperty<AssetIntf>>(
+    auto serialNumber =
+        dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+            gpu.deviceSensors[sensors++]);
+    auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu.deviceSensors[sensors++]);
     auto pcieDeviceObject =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(

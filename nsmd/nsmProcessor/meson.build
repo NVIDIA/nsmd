@@ -6,7 +6,7 @@ sources += [
     'nsmProcessor/nsmReset.cpp',
 ]
 
-nsmd_headers += ['.', '..']
+nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']
 
 if get_option('tests').enabled()
     subdir('test')

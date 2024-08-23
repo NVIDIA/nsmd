@@ -3,6 +3,7 @@
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDebugInfo.hpp"
 #include "nsmDebugToken.hpp"
@@ -13,7 +14,6 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #include "utils.hpp"
-
 namespace nsm
 {
 
@@ -640,7 +640,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
     else if (type == "NSM_Asset")
     {
         auto nvSwitchAsset =
-            std::make_shared<NsmSwitchDI<AssetIntf>>(name, inventoryObjPath);
+            std::make_shared<NsmSwitchDI<NsmAssetIntf>>(name, inventoryObjPath);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
 

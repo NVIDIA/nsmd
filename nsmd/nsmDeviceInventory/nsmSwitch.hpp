@@ -7,7 +7,7 @@
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmInterface.hpp"
 #include "utils.hpp"
-
+#include "nsmAssetIntf.hpp"
 #include <com/nvidia/PowerMode/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <tal.hpp>
@@ -26,7 +26,6 @@ using namespace sdbusplus::server;
 
 using UuidIntf = object_t<Common::server::UUID>;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using SwitchIntf = object_t<Inventory::Item::server::Switch>;
 using NvSwitchIntf = object_t<Inventory::Item::server::NvSwitch>;
 using ResetIntf = sdbusplus::server::object_t<

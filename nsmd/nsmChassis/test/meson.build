@@ -13,6 +13,7 @@ dep_src_files = [
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../nsmDbusIfaceOverride/nsmWriteProtectedIntf.cpp',
+    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',

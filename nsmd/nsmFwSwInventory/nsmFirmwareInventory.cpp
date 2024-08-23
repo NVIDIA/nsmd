@@ -18,6 +18,7 @@
 #include "nsmFirmwareInventory.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmWriteProtectedControl.hpp"
@@ -81,7 +82,7 @@ requester::Coroutine
     {
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        auto asset = std::make_shared<NsmFirmwareInventory<AssetIntf>>(name);
+        auto asset = std::make_shared<NsmFirmwareInventory<NsmAssetIntf>>(name);
         asset->pdi().manufacturer(manufacturer);
         device->addStaticSensor(asset);
     }

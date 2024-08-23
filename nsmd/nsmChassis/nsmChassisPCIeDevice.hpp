@@ -19,7 +19,7 @@
 
 #include "globals.hpp"
 #include "nsmInterface.hpp"
-
+#include "nsmAssetIntf.hpp"
 #include <com/nvidia/NVLink/NVLinkRefClock/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
@@ -37,7 +37,6 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::com::nvidia;
 using namespace sdbusplus::server;
 using UuidIntf = object_t<Common::server::UUID>;
-using AssetIntf = object_t<Inventory::Decorator::server::Asset>;
 using NVLinkRefClockIntf = object_t<NVLink::server::NVLinkRefClock>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
