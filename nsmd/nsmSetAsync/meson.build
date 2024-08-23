@@ -1,5 +1,6 @@
 sources += [
     'nsmSetAsync/asyncOperationManager.cpp',
+    'nsmSetAsync/nsmSetErrorInjection.cpp',
     'nsmSetAsync/nsmSetMigMode.cpp',
     'nsmSetAsync/nsmSetECCMode.cpp',
     'nsmSetAsync/nsmSetCpuOperatingConfig.cpp',

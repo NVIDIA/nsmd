@@ -46,7 +46,6 @@ if get_option('stanbyToDC').enabled()
     conf_data.set('NVIDIA_STANDBYTODC', 0)
 endif
 
-
 if get_option('aer-error-status-priority')
    conf_data.set('AER_ERR_SENSOR_PRIORITY', 1)
 else
@@ -57,6 +56,12 @@ if get_option('per-lan-error-count-priority')
    conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 1)
 else
    conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 0)
+endif
+
+if get_option('error-injection-priority')
+   conf_data.set('ERROR_INJECTION_PRIORITY', 1)
+else
+   conf_data.set('ERROR_INJECTION_PRIORITY', 0)
 endif
 
 conf_data.set('LOCAL_EID', get_option('local-eid'))

@@ -733,7 +733,7 @@ TEST(commonResp, testCommonResponse)
 	testDecodeCommonResponse(
 	    [](const nsm_msg *msg, size_t len, uint8_t *cc,
 	       uint16_t *reasonCode) {
-		    uint16_t size;
+		    uint16_t size = 0;
 		    auto rc =
 			decode_common_resp(msg, len, cc, &size, reasonCode);
 		    EXPECT_EQ(0, size);

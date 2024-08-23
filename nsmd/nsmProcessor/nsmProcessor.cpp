@@ -27,8 +27,8 @@
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
-#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
+#include "nsmErrorInjectionCommon.hpp"
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
@@ -39,6 +39,7 @@
 #include "nsmSetECCMode.hpp"
 #include "nsmSetReconfigSettings.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
+#include "sharedMemCommon.hpp"
 
 #include <stdint.h>
 
@@ -2138,6 +2139,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
                                                            inventoryObjPath);
         nsmDevice->deviceSensors.push_back(healthSensor);
+
+        createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
     }
     else if (type == "NSM_PortDisableFuture")
     {

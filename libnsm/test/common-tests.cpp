@@ -230,8 +230,8 @@ void testDecodeResponse(std::function<int(const nsm_msg *, size_t, uint8_t *,
 	auto len = responseMsg.size();
 
 	// Good test
-	uint8_t cc;
-	uint16_t reasonCode;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reasonCode = ERR_NULL;
 	auto rc = function(response, len, &cc, &reasonCode, payload);
 	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 	EXPECT_EQ(NSM_SUCCESS, cc);

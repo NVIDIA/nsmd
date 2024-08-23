@@ -29,6 +29,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "nsmErrorInjectionCommon.hpp"
 #include "nsmProcessor.hpp"
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetReconfigSettings.hpp"
@@ -1490,12 +1491,16 @@ struct NsmProcessorTest :
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
 
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>(gpuUuid)},
-    };
-    NsmDevice& gpu = *devices[0];
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    NsmDeviceTable devices{{gpuPtr}};
+    NsmDevice& gpu = *gpuPtr;
 
     NiceMock<MockSensorManager> mockManager{devices};
+
+    void SetUp() override
+    {
+        AsyncOperationManager::getInstance()->dispatchers.clear();
+    }
 
     const PropertyValuesCollection error = {
         {"Type", "NSM_processor"},
@@ -1638,6 +1643,158 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         EXPECT_EQ(reconfigPermissions->feature,
                   reconfigPermissions->pdi().type());
     }
+}
+
+TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
+{
+    auto& values = utils::MockDbusAsync::getValues();
+    values = std::queue<PropertyValue>();
+    values.push(get(basic, "Name"));
+    values.push(get(basic, "UUID"));
+    values.push(get(basic, "Type"));
+    values.push(get(basic, "InventoryObjPath"));
+    createNsmProcessorSensor(mockManager, basicIntfName, objPath);
+
+    auto capabilitiesCount =
+        size_t(ErrorInjectionCapabilityIntf::Type::Unknown);
+    EXPECT_EQ(0, gpu.prioritySensors.size());
+    EXPECT_EQ(5, gpu.roundRobinSensors.size());
+    EXPECT_EQ(10 + capabilitiesCount, gpu.deviceSensors.size());
+
+    int si = 6;
+
+    auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown);
+    auto setErrorInjection =
+        dynamic_pointer_cast<NsmSetErrorInjection>(gpu.deviceSensors[si++]);
+    EXPECT_NE(nullptr, setErrorInjection);
+    auto errorInjectionSensor =
+        dynamic_pointer_cast<NsmErrorInjection>(gpu.deviceSensors[si++]);
+    EXPECT_NE(nullptr, errorInjectionSensor);
+    auto errorInjectionSupported =
+        dynamic_pointer_cast<NsmErrorInjectionSupported>(
+            gpu.deviceSensors[si++]);
+    EXPECT_NE(nullptr, errorInjectionSupported);
+    EXPECT_EQ(expectedInterfaces, errorInjectionSupported->interfaces.size());
+    EXPECT_TRUE(errorInjectionSupported->isStatic);
+    auto errorInjectionEnabled =
+        dynamic_pointer_cast<NsmErrorInjectionEnabled>(gpu.deviceSensors[si++]);
+    EXPECT_NE(nullptr, errorInjectionEnabled);
+    EXPECT_EQ(expectedInterfaces, errorInjectionEnabled->interfaces.size());
+
+    std::vector<std::shared_ptr<NsmSetErrorInjectionEnabled>>
+        setErrorInjectionEnabled(capabilitiesCount, nullptr);
+    for (size_t i = 0; i < capabilitiesCount; i++)
+    {
+        setErrorInjectionEnabled[i] =
+            dynamic_pointer_cast<NsmSetErrorInjectionEnabled>(
+                gpu.deviceSensors[si++]);
+        EXPECT_NE(nullptr, setErrorInjectionEnabled[i]);
+        EXPECT_EQ(expectedInterfaces,
+                  setErrorInjectionEnabled[i]->interfaces.size());
+    }
+
+    nsm_error_injection_types_mask supportedData = {0b00001001, 0, 0, 0,
+                                                    0,          0, 0, 0};
+
+    Response supportedResponse(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_error_injection_types_mask_resp),
+        0);
+    auto supportedResponseMsg =
+        reinterpret_cast<nsm_msg*>(supportedResponse.data());
+    auto rc = encode_get_supported_error_injection_types_v1_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &supportedData,
+        supportedResponseMsg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    Response setModeResponse(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto setModeResponseMsg =
+        reinterpret_cast<nsm_msg*>(setModeResponse.data());
+    rc = encode_set_error_injection_mode_v1_resp(instanceId, NSM_SUCCESS,
+                                                 ERR_NULL, setModeResponseMsg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    nsm_error_injection_mode_v1 mode = {1, 1};
+    Response modeResponse(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_error_injection_mode_v1_resp), 0);
+    auto modeResponseMsg = reinterpret_cast<nsm_msg*>(modeResponse.data());
+    rc = encode_get_error_injection_mode_v1_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &mode, modeResponseMsg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    Response setEnableResponse(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                               0);
+    auto setEnableResponseMsg =
+        reinterpret_cast<nsm_msg*>(setEnableResponse.data());
+    rc = encode_set_current_error_injection_types_v1_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, setEnableResponseMsg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    nsm_error_injection_types_mask enabledData = {0b00001000, 0, 0, 0,
+                                                  0,          0, 0, 0};
+    Response enableResponse(sizeof(nsm_msg_hdr) +
+                                sizeof(nsm_get_error_injection_types_mask_resp),
+                            0);
+    auto enableResponseMsg = reinterpret_cast<nsm_msg*>(enableResponse.data());
+    rc = encode_get_current_error_injection_types_v1_resp(
+        instanceId, NSM_SUCCESS, ERR_NULL, &enabledData, enableResponseMsg);
+    EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(supportedResponse))
+        .WillOnce(mockSendRecvNsmMsg(setModeResponse))
+        .WillOnce(mockSendRecvNsmMsg(modeResponse));
+
+    errorInjectionSupported->update(mockManager, eid).detach();
+
+    auto errorInjectionBasePath = processorsInventoryBasePath / name /
+                                  "ErrorInjection";
+    EXPECT_TRUE(errorInjectionSupported
+                    ->interfaces[errorInjectionBasePath / "MemoryErrors"]
+                    ->supported());
+    EXPECT_FALSE(errorInjectionSupported
+                     ->interfaces[errorInjectionBasePath / "NVLinkErrors"]
+                     ->supported());
+    EXPECT_FALSE(errorInjectionSupported
+                     ->interfaces[errorInjectionBasePath / "PCIeErrors"]
+                     ->supported());
+    EXPECT_TRUE(errorInjectionSupported
+                    ->interfaces[errorInjectionBasePath / "ThermalErrors"]
+                    ->supported());
+
+    auto status = AsyncOperationStatusType::Success;
+    setErrorInjection->errorInjectionModeEnabled(true, &status, gpuPtr)
+        .detach();
+    EXPECT_EQ(AsyncOperationStatusType::Success, status);
+    errorInjectionSensor->update(mockManager, eid).detach();
+
+    EXPECT_TRUE(errorInjectionSensor->pdi().errorInjectionModeEnabled());
+    EXPECT_TRUE(errorInjectionSensor->pdi().persistentDataModified());
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(capabilitiesCount)
+        .WillRepeatedly(mockSendRecvNsmMsg(setEnableResponse));
+    for (size_t i = 0; i < capabilitiesCount; i++)
+    {
+        status = AsyncOperationStatusType::Success;
+        setErrorInjectionEnabled[i]->enabled(true, &status, gpuPtr).detach();
+        EXPECT_EQ(AsyncOperationStatusType::Success, status);
+    }
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableResponse));
+    errorInjectionEnabled->update(mockManager, eid).detach();
+
+    EXPECT_FALSE(errorInjectionEnabled
+                     ->interfaces[errorInjectionBasePath / "MemoryErrors"]
+                     ->enabled());
+    EXPECT_FALSE(errorInjectionEnabled
+                     ->interfaces[errorInjectionBasePath / "NVLinkErrors"]
+                     ->enabled());
+    EXPECT_FALSE(
+        errorInjectionEnabled->interfaces[errorInjectionBasePath / "PCIeErrors"]
+            ->enabled());
+    EXPECT_TRUE(errorInjectionEnabled
+                    ->interfaces[errorInjectionBasePath / "ThermalErrors"]
+                    ->enabled());
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)
