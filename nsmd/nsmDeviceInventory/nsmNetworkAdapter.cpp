@@ -1,7 +1,10 @@
 #include "nsmNetworkAdapter.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmDebugInfo.hpp"
 #include "nsmDebugToken.hpp"
+#include "nsmEraseTrace.hpp"
+#include "nsmLogInfo.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -71,6 +74,19 @@ static requester::Coroutine
     auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
         bus, name, associations, type, uuid);
     nsmDevice->addStaticSensor(debugTokenObject);
+
+    auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
+        bus, name, inventoryObjPath, type, uuid);
+    nsmDevice->addStaticSensor(networkAdapterDebugInfoObject);
+
+    auto networkAdapterEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
+        bus, name, inventoryObjPath, type, uuid);
+    nsmDevice->addStaticSensor(networkAdapterEraseTraceObject);
+
+    auto networkAdapterLogInfoObject = std::make_shared<NsmLogInfoObject>(
+        bus, name, inventoryObjPath, type, uuid);
+    nsmDevice->addStaticSensor(networkAdapterLogInfoObject);
+
     co_return NSM_SUCCESS;
 }
 

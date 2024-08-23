@@ -239,6 +239,15 @@ class MockupResponder
         enableDisableWriteProtectedHandler(const nsm_msg* requestMsg,
                                            size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
+                                           size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getNetworkDeviceLogInfoHandler(const nsm_msg* requestMsg,
+                                           size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        eraseTraceHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
 

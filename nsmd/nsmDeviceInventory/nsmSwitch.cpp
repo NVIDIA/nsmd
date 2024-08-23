@@ -4,8 +4,11 @@
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
+#include "nsmDebugInfo.hpp"
 #include "nsmDebugToken.hpp"
 #include "nsmDevice.hpp"
+#include "nsmEraseTrace.hpp"
+#include "nsmLogInfo.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
@@ -471,6 +474,19 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
             bus, name, associations, type, uuid);
         device->addStaticSensor(debugTokenObject);
+
+        // NetIR dump for NVSwitch
+        auto nvSwitchDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
+            bus, name, inventoryObjPath, type, uuid);
+        device->addStaticSensor(nvSwitchDebugInfoObject);
+
+        auto nvSwitchEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
+            bus, name, inventoryObjPath, type, uuid);
+        device->addStaticSensor(nvSwitchEraseTraceObject);
+
+        auto nvSwitchLogInfoObject = std::make_shared<NsmLogInfoObject>(
+            bus, name, inventoryObjPath, type, uuid);
+        device->addStaticSensor(nvSwitchLogInfoObject);
 
         // Device Reset for NVSwitch
         auto nvSwitchResetSensor = std::make_shared<NsmSwitchDIReset>(
