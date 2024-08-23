@@ -17,16 +17,16 @@
 
 #pragma once
 
+#include "device-configuration.h"
+
 #include "nsmInterface.hpp"
 
 #include <com/nvidia/InbandReconfigSettings/server.hpp>
 
 namespace nsm
 {
-using namespace sdbusplus::com::nvidia;
-using namespace sdbusplus::server;
-
-using ReconfigSettingsIntf = object_t<server::InbandReconfigSettings>;
+using ReconfigSettingsIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::server::InbandReconfigSettings>;
 
 class NsmReconfigPermissions :
     public NsmSensor,
@@ -34,6 +34,7 @@ class NsmReconfigPermissions :
 {
   private:
     ReconfigSettingsIntf::FeatureType feature;
+    reconfiguration_permissions_v1_index index;
 
   public:
     NsmReconfigPermissions(
@@ -45,5 +46,15 @@ class NsmReconfigPermissions :
                                          uint8_t instanceNumber) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+
+    /**
+     * @brief Get the mapped Settings Index for Reconfiguration Permission
+     * Feature
+     *
+     * @param feature PDI enumeration feature type
+     * @return reconfiguration_permissions_v1_index Specification settings index
+     */
+    static reconfiguration_permissions_v1_index
+        getIndex(ReconfigSettingsIntf::FeatureType feature);
 };
 } // namespace nsm

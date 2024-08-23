@@ -70,10 +70,14 @@ enum reconfiguration_permissions_v1_index {
 	RP_FORCE_TEST_COUPLING = 17,
 	RP_BAR0_TYPE_CONFIG = 18,
 	RP_EDPP_SCALING_FACTOR = 19,
-	RP_POWER_SMOOTHING_FEATURE_TOGGLE = 20,
-	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_0 = 21,
-	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1 = 22,
-	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2 = 23,
+	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1 = 20,
+	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2 = 21,
+};
+
+enum reconfiguration_permissions_v1_setting {
+	RP_ONESHOOT_HOT_RESET = 0,
+	RP_PERSISTENT = 1,
+	RP_ONESHOT_FLR = 2,
 };
 
 #define ALL_GPUS_DEVICE_INDEX 0xA
@@ -250,6 +254,17 @@ struct nsm_get_reconfiguration_permissions_v1_req {
 struct nsm_get_reconfiguration_permissions_v1_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_reconfiguration_permissions_v1 data;
+} __attribute__((packed));
+
+/** @struct nsm_set_reconfiguration_permissions_v1_req
+ *
+ *  Structure representing Set Reconfiguration Permissions v1 request.
+ */
+struct nsm_set_reconfiguration_permissions_v1_req {
+	struct nsm_common_req hdr;
+	uint8_t setting_index;
+	uint8_t configuration;
+	uint8_t permission;
 } __attribute__((packed));
 
 /** @brief Encode a Get FPGA Diagnostics Settings request message
@@ -565,6 +580,61 @@ int encode_get_reconfiguration_permissions_v1_resp(
 int decode_get_reconfiguration_permissions_v1_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_reconfiguration_permissions_v1 *data);
+
+/** @brief Encode a Set Reconfiguration Permissions v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] setting_index - Setting ID
+ *  @param[in] configuration - Configuration
+ *  @param[in] permission - Permission - 0:Disallow - 1:Allow
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_reconfiguration_permissions_v1_req(
+    uint8_t instance_id,
+    enum reconfiguration_permissions_v1_index setting_index,
+    enum reconfiguration_permissions_v1_setting configuration,
+    uint8_t permission, struct nsm_msg *msg);
+
+/** @brief Decode a Set Reconfiguration Permissions v1 request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] setting_index - Setting ID
+ *  @param[out] configuration - Configuration
+ *  @param[out] permission - Permission - 0:Disallow - 1:Allow
+ *  @return nsm_completion_codes
+ */
+int decode_set_reconfiguration_permissions_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    enum reconfiguration_permissions_v1_index *setting_index,
+    enum reconfiguration_permissions_v1_setting *configuration,
+    uint8_t *permission);
+
+/** @brief Encode a Set Reconfiguration Permissions v1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_set_reconfiguration_permissions_v1_resp(uint8_t instance_id,
+						   uint8_t cc,
+						   uint16_t reason_code,
+						   struct nsm_msg *msg);
+
+/** @brief Decode a Set Reconfiguration Permissions v1 response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ * @return nsm_completion_codes
+ */
+int decode_set_reconfiguration_permissions_v1_resp(const struct nsm_msg *msg,
+						   size_t msg_len, uint8_t *cc,
+						   uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

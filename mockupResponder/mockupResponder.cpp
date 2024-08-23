@@ -74,8 +74,6 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             {RP_FORCE_TEST_COUPLING, {}},
             {RP_BAR0_TYPE_CONFIG, {}},
             {RP_EDPP_SCALING_FACTOR, {}},
-            {RP_POWER_SMOOTHING_FEATURE_TOGGLE, {}},
-            {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_0, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
         }, // prcKnobs
@@ -535,6 +533,9 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_RECONFIGURATION_PERMISSIONS_V1:
                     return getReconfigurationPermissionsV1Handler(request,
                                                                   requestLen);
+                case NSM_SET_RECONFIGURATION_PERMISSIONS_V1:
+                    return setReconfigurationPermissionsV1Handler(request,
+                                                                  requestLen);
                 case NSM_ENABLE_DISABLE_GPU_IST_MODE:
                     return enableDisableGpuIstModeHandler(request, requestLen);
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
@@ -712,7 +713,7 @@ std::optional<std::vector<uint8_t>>
                       113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
                       125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
-                 {5, {}},
+                 {5, {64, 65}},
                  {6, {1}},
              }},
             {NSM_DEV_ID_EROT,
@@ -1042,7 +1043,8 @@ std::optional<std::vector<uint8_t>>
     }
     bitfield8_t portMask[PORT_MASK_DATA_SIZE];
 
-    auto rc = decode_set_port_disable_future_req(requestMsg, requestLen, &portMask[0]);
+    auto rc = decode_set_port_disable_future_req(requestMsg, requestLen,
+                                                 &portMask[0]);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_port_disable_future_req failed: rc={RC}", "RC",
@@ -1058,9 +1060,8 @@ std::optional<std::vector<uint8_t>>
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
-    rc = encode_set_port_disable_future_resp(requestMsg->hdr.instance_id,
-                                           NSM_SUCCESS, reason_code,
-                                           responseMsg);
+    rc = encode_set_port_disable_future_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -1113,7 +1114,6 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
-
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::getPowerModeHandler(const nsm_msg* requestMsg,
@@ -1178,8 +1178,8 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_mode_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
-    rc = encode_set_power_mode_resp(requestMsg->hdr.instance_id,
-                                         reason_code, responseMsg);
+    rc = encode_set_power_mode_resp(requestMsg->hdr.instance_id, reason_code,
+                                    responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -4729,6 +4729,69 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::setReconfigurationPermissionsV1Handler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "setReconfigurationPermissionsV1Handler: request length={LEN}",
+            "LEN", requestLen);
+    }
+    reconfiguration_permissions_v1_index settingsIndex;
+    reconfiguration_permissions_v1_setting configuration;
+    uint8_t permission;
+    [[maybe_unused]] auto rc = decode_set_reconfiguration_permissions_v1_req(
+        requestMsg, requestLen, &settingsIndex, &configuration, &permission);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "setReconfigurationPermissionsV1Handler: decode_set_reconfiguration_permissions_v1_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    if (settingsIndex > RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2)
+    {
+        lg2::error(
+            "setReconfigurationPermissionsV1Handler: Invalid Settings Index");
+        return std::nullopt;
+    }
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reasonCode = ERR_NULL;
+    rc = encode_set_reconfiguration_permissions_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "enableDisableGpuIstModeHandler: encode_set_reconfiguration_permissions_v1_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    switch (configuration)
+    {
+        case RP_ONESHOOT_HOT_RESET:
+            state.prcKnobs[settingsIndex].oneshot = permission;
+            break;
+        case RP_PERSISTENT:
+            state.prcKnobs[settingsIndex].persistent = permission;
+            break;
+        case RP_ONESHOT_FLR:
+            state.prcKnobs[settingsIndex].flr_persistent = permission;
+            break;
+        default:
+            lg2::error(
+                "setReconfigurationPermissionsV1Handler: invalid configuration: configuration={CONF}",
+                "CONF", int(configuration));
+            return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getViolationDurationHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
@@ -4797,7 +4860,7 @@ std::optional<std::vector<uint8_t>>
     uint16_t reason_code = ERR_NULL;
 
     rc = encode_reset_network_device_resp(requestMsg->hdr.instance_id,
-                                               reason_code, responseMsg);
+                                          reason_code, responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {

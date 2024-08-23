@@ -204,3 +204,30 @@ TEST_F(MockupResponderTest, goodTestGetReconfigurationPermissionsV1Handler)
     EXPECT_EQ(expected.persistent, response->data.persistent);
     EXPECT_EQ(expected.flr_persistent, response->data.flr_persistent);
 }
+
+TEST_F(MockupResponderTest, goodTestSetReconfigurationPermissionsV1Handler)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_reconfiguration_permissions_v1_req));
+
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto settingIndex = RP_IN_SYSTEM_TEST;
+    auto configuration = RP_ONESHOOT_HOT_RESET;
+    uint8_t permission = 0;
+
+    auto rc = encode_set_reconfiguration_permissions_v1_req(
+        0, settingIndex, configuration, permission, requestMsg);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+    auto resp = mockupResponder->setReconfigurationPermissionsV1Handler(
+        requestMsg, request.size());
+
+    EXPECT_TRUE(resp.has_value());
+    EXPECT_EQ(resp.value().size(),
+              sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+
+    auto msg = reinterpret_cast<nsm_msg*>(resp.value().data());
+    auto response = reinterpret_cast<nsm_common_resp*>(msg->payload);
+
+    EXPECT_EQ(NSM_SET_RECONFIGURATION_PERMISSIONS_V1, response->command);
+}

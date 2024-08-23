@@ -31,6 +31,7 @@ using namespace ::testing;
 
 #include "nsmProcessor.hpp"
 #include "nsmReconfigPermissions.hpp"
+#include "nsmSetReconfigSettings.hpp"
 
 using namespace nsm;
 
@@ -1474,7 +1475,6 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
     rc = currentProfileSensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
-
 struct NsmProcessorTest :
     public testing::Test,
     public utils::DBusTest,
@@ -1500,12 +1500,13 @@ struct NsmProcessorTest :
     const PropertyValuesCollection error = {
         {"Type", "NSM_processor"},
         {"UUID", badUuid},
-        {"Features",
+        {"UnknownFeature",
          std::vector<std::string>{
-             "InSystemTest",
-             "FusingMode",
-             "CCMode",
              "Unknown",
+         }},
+        {"InvalidFeatures",
+         std::vector<std::string>{
+             "InSystemTestt",
          }},
     };
     const PropertyValuesCollection basic = {
@@ -1541,8 +1542,6 @@ struct NsmProcessorTest :
              "ForceTestCoupling",
              "BAR0TypeConfig",
              "EDPpScalingFactor",
-             "PowerSmoothing",
-             "PowerSmoothingPrivilegeLevel0",
              "PowerSmoothingPrivilegeLevel2",
              "PowerSmoothingPrivilegeLevel1",
          }},
@@ -1594,12 +1593,13 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     values.push(get(basic, "InventoryObjPath"));
     values.push(get(prcKnobs, "Priority"));
     values.push(get(prcKnobs, "Features"));
+    ;
     createNsmProcessorSensor(
         mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
 
-    const size_t expectedSensorsCount = 24;
+    const size_t expectedSensorsCount = 22 * 2;
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(expectedSensorsCount, gpu.roundRobinSensors.size());
+    EXPECT_EQ(22, gpu.roundRobinSensors.size());
     EXPECT_EQ(expectedSensorsCount, gpu.deviceSensors.size());
 
     nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0};
@@ -1611,17 +1611,23 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, &data, msg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(expectedSensorsCount)
+        .Times(expectedSensorsCount / 2)
         .WillRepeatedly(mockSendRecvNsmMsg(response));
-    for (size_t i = 0; i < expectedSensorsCount; i++)
+
+    for (size_t i = 0; i < expectedSensorsCount / 2; i++)
     {
-        auto reconfigPermissions =
-            dynamic_pointer_cast<NsmReconfigPermissions>(gpu.deviceSensors[i]);
+        auto baseReconfigPermissionsIntf =
+            dynamic_pointer_cast<NsmInterfaceProvider<ReconfigSettingsIntf>>(
+                gpu.deviceSensors[2 * i]);
+        EXPECT_NE(nullptr, baseReconfigPermissionsIntf);
+        auto reconfigPermissions = dynamic_pointer_cast<NsmReconfigPermissions>(
+            gpu.deviceSensors[2 * i + 1]);
         EXPECT_NE(nullptr, reconfigPermissions);
 
         // Test if added permissions are sorted and unique
-        EXPECT_EQ((ReconfigSettingsIntf::FeatureType)i,
-                  reconfigPermissions->feature);
+        EXPECT_EQ(
+            reconfiguration_permissions_v1_index(i),
+            NsmReconfigPermissions::getIndex(reconfigPermissions->feature));
         reconfigPermissions->update(mockManager, eid).detach();
         EXPECT_EQ(data.oneshot,
                   reconfigPermissions->pdi().allowOneShotConfig());
@@ -1632,21 +1638,6 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         EXPECT_EQ(reconfigPermissions->feature,
                   reconfigPermissions->pdi().type());
     }
-}
-
-TEST_F(NsmProcessorTest, badTestCreateInbandReconfigPermissionsSensors)
-{
-    auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "UUID"));
-    values.push(get(prcKnobs, "Type"));
-    values.push(get(basic, "InventoryObjPath"));
-    values.push(get(prcKnobs, "Priority"));
-    values.push(get(error, "Features"));
-
-    createNsmProcessorSensor(
-        mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)

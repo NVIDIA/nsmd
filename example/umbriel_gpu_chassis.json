@@ -242,8 +242,6 @@
                         "ForceTestCoupling",
                         "BAR0TypeConfig",
                         "EDPpScalingFactor",
-                        "PowerSmoothing",
-                        "PowerSmoothingPrivilegeLevel0",
                         "PowerSmoothingPrivilegeLevel1",
                         "PowerSmoothingPrivilegeLevel2"
                     ]

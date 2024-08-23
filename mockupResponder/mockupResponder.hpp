@@ -262,6 +262,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getPowerSmoothingFeatureInfo(const nsm_msg* requestMsg,
