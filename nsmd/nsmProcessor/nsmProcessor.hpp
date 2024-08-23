@@ -33,6 +33,7 @@
 #include "nsmPowerSmoothingFeatureIntf.hpp"
 #include "nsmSensor.hpp"
 #include "nsmSetMigMode.hpp"
+#include "nsmWorkloadPowerProfile.hpp"
 
 #include <stdint.h>
 

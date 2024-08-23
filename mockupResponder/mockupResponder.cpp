@@ -453,6 +453,17 @@ std::optional<std::vector<uint8_t>>
                     return getPresetProfileInfo(request, requestLen);
                 case NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS:
                     return updatePresetProfileParams(request, requestLen);
+                /*
+                ** Workload Power profile mock responder
+                */
+                case NSM_ENABLE_WORKLOAD_POWER_PROFILE:
+                    return enableWorkloadPowerProfile(request, requestLen);
+                case NSM_DISABLE_WORKLOAD_POWER_PROFILE:
+                    return disableWorkloadPowerProfile(request, requestLen);
+                case NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO:
+                    return getWorkLoadProfileStatusInfo(request, requestLen);
+                case NSM_GET_WORKLOAD_POWER_PROFILE_INFO:
+                    return getWorkloadPowerProfileInfo(request, requestLen);
 
                 default:
                     lg2::error(
@@ -474,7 +485,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_CLEAR_DATA_SOURCE_V1:
                     return clearScalarDataSourceHandler(request, requestLen);
                 case NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES:
-                    return queryAvailableAndClearableScalarGroupHandler(request, requestLen);
+                    return queryAvailableAndClearableScalarGroupHandler(
+                        request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -695,10 +707,10 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 5, 6, 9, 10}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   4,   6,   7,   8,   9,   11,  12,
-                      14,  15,  16,  17,  69,  70,  71,  73,  74,  77,
-                      78,  79,  118, 113, 114, 115, 116, 117, 119, 120,
-                      121, 122, 123, 124, 125, 126, 127, 172, 173}},
+                 {3, {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,
+                      16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  118,
+                      113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
+                      125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
                  {5, {}},
                  {6, {1}},
@@ -799,7 +811,7 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case MAXIMUM_GRAPHICS_CLOCK_LIMIT:
             populateFrom(property, 5000);
             break;
-         case MINIMUM_MEMORY_CLOCK_LIMIT:
+        case MINIMUM_MEMORY_CLOCK_LIMIT:
             populateFrom(property, 150);
             break;
         case MAXIMUM_MEMORY_CLOCK_LIMIT:
@@ -2377,6 +2389,221 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::enableWorkloadPowerProfile(const nsm_msg* requestMsg,
+                                                size_t requestLen)
+{
+    bitfield32_t profile_mask[8];
+    int mask_length;
+    auto rc = decode_enable_workload_power_profile_req(
+        requestMsg, requestLen, &mask_length, profile_mask);
+
+    lg2::info("enableWorkloadPowerProfile: request length={LEN}", "LEN",
+              requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_enable_workload_power_profile_req: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    lg2::error(
+        "enableWorkloadPowerProfile: instanceId={INSTANCEID}, mask_length={MASKLEN}",
+        "INSTANCEID", requestMsg->hdr.instance_id, "MASKLEN", mask_length);
+    for (int i = 0; i < mask_length; i++)
+    {
+        lg2::error("ProfileMask = {MASK}", "MASK", lg2::hex,
+                   profile_mask[i].byte);
+    }
+
+    rc = encode_enable_workload_power_profile_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_enable_workload_power_profile_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::disableWorkloadPowerProfile(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    bitfield32_t profile_mask[8];
+    int mask_length;
+    auto rc = decode_disable_workload_power_profile_req(
+        requestMsg, requestLen, &mask_length, profile_mask);
+
+    lg2::info("disableWorkloadPowerProfile: request length={LEN}", "LEN",
+              requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_disable_workload_power_profile_req: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    lg2::error(
+        "disableWorkloadPowerProfile: instanceId={INSTANCEID}, mask_length={MASKLEN}",
+        "INSTANCEID", requestMsg->hdr.instance_id, "MASKLEN", mask_length);
+    for (int i = 0; i < mask_length; i++)
+    {
+        lg2::error("ProfileMask = {MASK}", "MASK", lg2::hex,
+                   profile_mask[i].byte);
+    }
+
+    rc = encode_disable_workload_power_profile_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_enable_workload_power_profile_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getWorkLoadProfileStatusInfo(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    lg2::info("getWorkLoadProfileStatusInfo: request length={LEN}", "LEN",
+              requestLen);
+
+    auto rc = decode_get_workload_power_profile_status_req(requestMsg,
+                                                           requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_current_profile_info_req: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    struct workload_power_profile_status profileData;
+    for (int i = 0; i < 8; i++)
+    {
+        profileData.supported_profile_mask.fields[i].byte = 0x0000000a;
+        profileData.requested_profile_maks.fields[i].byte = 0x0000000b;
+        profileData.enforced_profile_mask.fields[i].byte = 0x0000000c;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_workload_power_profile_status_info_resp),
+        0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    lg2::error("getWorkLoadProfileStatusInfo: instanceId={INSTANCEID}",
+               "INSTANCEID", requestMsg->hdr.instance_id);
+
+    rc = encode_get_workload_power_profile_status_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &profileData,
+        responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_workload_power_profile_status_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getWorkloadPowerProfileInfo(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    lg2::info("getWorkloadPowerProfileInfo: request length={LEN}", "LEN",
+              requestLen);
+    uint16_t identifier;
+    uint16_t LAST_PAGE_ID = 3;
+
+    auto rc = decode_get_workload_power_profile_info_req(requestMsg, requestLen,
+                                                         &identifier);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_workload_power_profile_info_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    const int supported_number_of_profile_per_page = 5;
+    lg2::info("getWorkloadPowerProfileInfo: identifier in req = {ID}", "ID",
+              identifier);
+
+    struct nsm_all_workload_power_profile_meta_data profile_meta_data;
+    profile_meta_data.number_of_profiles = supported_number_of_profile_per_page;
+    if (identifier == LAST_PAGE_ID)
+    {
+        profile_meta_data.next_identifier =
+            0; // last page will have next_identifier as 0
+    }
+    else
+    {
+        profile_meta_data.next_identifier = identifier + 1;
+    }
+
+    struct nsm_workload_power_profile_data
+        profiles[supported_number_of_profile_per_page];
+    int startIdentifier = identifier * supported_number_of_profile_per_page;
+    int endIdentifier = (identifier + 1) * supported_number_of_profile_per_page;
+    for (int i = startIdentifier; i < endIdentifier; i++)
+    {
+        profiles[i - startIdentifier].profile_id = i;
+        profiles[i - startIdentifier].priority = i + 1;
+        for (int nthbyte = 0; nthbyte < 8; nthbyte++)
+        {
+            profiles[i - startIdentifier].conflict_mask.fields[nthbyte].byte =
+                0x0000000a;
+        }
+    }
+
+    uint16_t meta_data_size =
+        sizeof(struct nsm_all_workload_power_profile_meta_data);
+    uint16_t profile_data_size = sizeof(struct nsm_workload_power_profile_data);
+    // data size is sum of metadata + number of profiles * size of one profile
+    uint16_t data_size = meta_data_size + supported_number_of_profile_per_page *
+                                              profile_data_size;
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) + data_size, 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_workload_power_profile_info_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        &profile_meta_data, profiles, profile_meta_data.number_of_profiles,
+        responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_workload_power_profile_info_resp failed: rc={RC}", "RC",
+            rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
 template <class T>
 void Logger(bool verbose, const char* msg, const T& data)
 {
@@ -2955,10 +3182,9 @@ std::optional<std::vector<uint8_t>>
     return std::nullopt;
 }
 
-
 std::optional<std::vector<uint8_t>>
-    MockupResponder::queryAvailableAndClearableScalarGroupHandler(const nsm_msg* requestMsg,
-                                                      size_t requestLen)
+    MockupResponder::queryAvailableAndClearableScalarGroupHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
 {
     uint8_t device_index;
     uint8_t group_id;
@@ -2967,11 +3193,12 @@ std::optional<std::vector<uint8_t>>
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_query_available_clearable_scalar_data_sources_v1_req failed: rc={RC}",
-                   "RC", rc);
+        lg2::error(
+            "decode_query_available_clearable_scalar_data_sources_v1_req failed: rc={RC}",
+            "RC", rc);
         return std::nullopt;
     }
-    
+
     uint16_t reason_code = ERR_NULL;
 
     switch (group_id)
@@ -2984,14 +3211,17 @@ std::optional<std::vector<uint8_t>>
             available_source[0].byte = 5;
             clearable_source[0].byte = 63;
             uint16_t data_size = 3;
-             std::vector<uint8_t> response(
+            std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                    sizeof(
+                        nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                    2 * mask_length * sizeof(uint8_t),
                 0);
             auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
             rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                data_size, mask_length, (uint8_t*)available_source,
+                (uint8_t*)clearable_source, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -3010,14 +3240,17 @@ std::optional<std::vector<uint8_t>>
             available_source[0].byte = 15;
             clearable_source[0].byte = 63;
             uint16_t data_size = 3;
-             std::vector<uint8_t> response(
+            std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                    sizeof(
+                        nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                    2 * mask_length * sizeof(uint8_t),
                 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
             rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                data_size, mask_length, (uint8_t*)available_source,
+                (uint8_t*)clearable_source, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -3036,14 +3269,17 @@ std::optional<std::vector<uint8_t>>
             available_source[0].byte = 32;
             clearable_source[0].byte = 63;
             uint16_t data_size = 3;
-             std::vector<uint8_t> response(
+            std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp)+ 2*mask_length*sizeof(uint8_t),
+                    sizeof(
+                        nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                    2 * mask_length * sizeof(uint8_t),
                 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
             rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                data_size, mask_length, (uint8_t*)available_source,
+                (uint8_t*)clearable_source, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -3063,14 +3299,17 @@ std::optional<std::vector<uint8_t>>
             available_source[0].byte = 9;
             clearable_source[0].byte = 63;
             uint16_t data_size = 3;
-             std::vector<uint8_t> response(
+            std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp) + 2*mask_length*sizeof(uint8_t),
+                    sizeof(
+                        nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                    2 * mask_length * sizeof(uint8_t),
                 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
             rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                data_size, mask_length, (uint8_t*)available_source,
+                (uint8_t*)clearable_source, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -3090,14 +3329,17 @@ std::optional<std::vector<uint8_t>>
             available_source[0].byte = 21;
             clearable_source[0].byte = 63;
             uint16_t data_size = 3;
-             std::vector<uint8_t> response(
+            std::vector<uint8_t> response(
                 sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_available_clearable_scalar_data_sources_v1_resp) + 2*mask_length*sizeof(uint8_t),
+                    sizeof(
+                        nsm_query_available_clearable_scalar_data_sources_v1_resp) +
+                    2 * mask_length * sizeof(uint8_t),
                 0);
-           auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
             rc = encode_query_available_clearable_scalar_data_sources_v1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, data_size, mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source,
-                responseMsg);
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                data_size, mask_length, (uint8_t*)available_source,
+                (uint8_t*)clearable_source, responseMsg);
             assert(rc == NSM_SW_SUCCESS);
             if (rc != NSM_SW_SUCCESS)
             {
@@ -3107,13 +3349,13 @@ std::optional<std::vector<uint8_t>>
                 return std::nullopt;
             }
             return response;
-        } 
-       
+        }
+
         default:
             break;
     }
     return std::nullopt;
-} 
+}
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::pcieFundamentalResetHandler(const nsm_msg* requestMsg,
@@ -4423,16 +4665,17 @@ std::optional<std::vector<uint8_t>>
 
 std::optional<std::vector<uint8_t>>
     MockupResponder::getViolationDurationHandler(const nsm_msg* requestMsg,
-                                          size_t requestLen)
+                                                 size_t requestLen)
 {
     auto rc = decode_get_violation_duration_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
-        lg2::error("decode_get_violation_duration_req failed: rc={RC}", "RC", rc);
+        lg2::error("decode_get_violation_duration_req failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
-   
+
     struct nsm_violation_duration data;
     data.supported_counter.byte = 255;
     data.hw_violation_duration = 2000000;
@@ -4448,12 +4691,14 @@ std::optional<std::vector<uint8_t>>
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_violation_duration_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
-    rc = encode_get_violation_duration_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                     reason_code, &data, responseMsg);
+    rc = encode_get_violation_duration_resp(requestMsg->hdr.instance_id,
+                                            NSM_SUCCESS, reason_code, &data,
+                                            responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
-        lg2::error("encode_get_violation_duration_resp failed: rc={RC}", "RC", rc);
+        lg2::error("encode_get_violation_duration_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
     return response;

@@ -78,7 +78,12 @@ enum nsm_platform_environmental_commands {
 	NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE = 0x72,
 	NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE = 0x73,
 	NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN = 0x74,
-	NSM_GET_ROW_REMAP_AVAILABILITY = 0xAC
+	NSM_GET_ROW_REMAP_AVAILABILITY = 0xAC,
+	// Workload Power Profile Opcode
+	NSM_GET_WORKLOAD_POWER_PROFILE_INFO = 0xA3,
+	NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO = 0xA4,
+	NSM_ENABLE_WORKLOAD_POWER_PROFILE = 0xA5,
+	NSM_DISABLE_WORKLOAD_POWER_PROFILE = 0xA6
 };
 
 /** @brief NSM Type3 platform environmental events
@@ -555,12 +560,12 @@ struct nsm_violation_duration {
 	uint64_t counter5;
 	uint64_t counter6;
 	uint64_t counter7;
-}__attribute__((packed));
+} __attribute__((packed));
 
 struct nsm_get_violation_duration_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_violation_duration data;
-}__attribute__((packed));
+} __attribute__((packed));
 
 /** @struct nsm_pwr_smoothing_featureinfo_data
  * Bit	Description
@@ -1002,6 +1007,88 @@ struct nsm_update_preset_profile_req {
 	uint8_t reservedByte1;
 	uint8_t reservedByte2;
 	uint32_t param_value;
+} __attribute__((packed));
+
+/** @struct workload_power_profile_status
+ *  Structure representing workload_power_profile_status
+ */
+struct workload_power_profile_status {
+	bitfield256_t supported_profile_mask;
+	bitfield256_t requested_profile_maks;
+	bitfield256_t enforced_profile_mask;
+} __attribute__((packed));
+
+/** @struct nsm_get_workload_power_profile_status_info_resp
+ *
+ *  Structure representing NSM Get Pre-set profile Status Information
+ */
+struct nsm_get_workload_power_profile_status_info_resp {
+	struct nsm_common_resp hdr;
+	struct workload_power_profile_status data;
+} __attribute__((packed));
+
+/** @struct nsm_enable_workload_power_profile_req
+ *  Structure representing NSM Enable Workload Power Profile
+ */
+struct nsm_enable_workload_power_profile_req {
+	struct nsm_common_req hdr;
+	bitfield32_t profile_mask[8];
+} __attribute__((packed));
+
+/** @struct nsm_disable_workload_power_profile_req
+ *  Structure representing NSM Enable Workload Power Profile
+ */
+struct nsm_disable_workload_power_profile_req {
+	struct nsm_common_req hdr;
+	bitfield32_t profile_mask[8];
+} __attribute__((packed));
+
+/** @struct nsm_get_workload_power_profile_info_req
+ *  Structure representing NSM Get Pre-set profile Information
+ */
+struct nsm_get_workload_power_profile_info_req {
+	struct nsm_common_req hdr;
+	uint16_t identifier;
+} __attribute__((packed));
+
+/** @struct nsm_all_workload_profile_meta_data
+ *  Structure representing metadata for "Workload Power Profile Get Pre-set
+ * profile Information"
+ */
+struct nsm_all_workload_power_profile_meta_data {
+	uint16_t next_identifier;
+	uint8_t number_of_profiles;
+	uint8_t reservedByte1;
+} __attribute__((packed));
+
+/** @struct nsm_all_workload_power_profile_resp_meta_data
+ *  Structure representing metadata for "Workload Power Profile Get Pre-set
+ * profile Information"
+ */
+struct nsm_all_workload_power_profile_resp_meta_data {
+	uint16_t next_identifier;
+	uint8_t number_of_profiles;
+	uint8_t reservedByte1;
+	uint8_t profiles[1];
+} __attribute__((packed));
+
+/** @struct nsm_workload_power_profile_data
+ *  Structure representing individual profile info
+ */
+struct nsm_workload_power_profile_data {
+	uint16_t profile_id;
+	uint16_t priority;
+	bitfield256_t conflict_mask;
+} __attribute__((packed));
+
+/** @struct nsm_workload_power_profile_get_all_preset_profile_resp
+ *
+ *  Structure representing NSM query "Workload Power profile Get Preset Profile
+ * Information" response.
+ */
+struct nsm_workload_power_profile_get_all_preset_profile_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_all_workload_power_profile_resp_meta_data data;
 } __attribute__((packed));
 
 /** @brief Encode a Get Inventory Information request message
@@ -2564,9 +2651,9 @@ int decode_get_violation_duration_req(const struct nsm_msg *msg,
  *  @return nsm_completion_codes
  */
 int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_violation_duration *data,
-					    struct nsm_msg *msg);
+				       uint16_t reason_code,
+				       struct nsm_violation_duration *data,
+				       struct nsm_msg *msg);
 
 /** @brief Dncode a Get Violation Duration response message
  *  @param[in] msg    - response message
@@ -2795,7 +2882,7 @@ uint32_t doubleToNvUFXP8_24(double reading);
  *  @return nsm_completion_codes
  */
 int encode_get_row_remap_availability_req(uint8_t instance_id,
-					struct nsm_msg *msg);
+					  struct nsm_msg *msg);
 
 /** @brief Decode a Get Row Remap Availability request message
  *
@@ -2804,7 +2891,7 @@ int encode_get_row_remap_availability_req(uint8_t instance_id,
  *  @return nsm_completion_codes
  */
 int decode_get_row_remap_availability_req(const struct nsm_msg *msg,
-					size_t msg_len);
+					  size_t msg_len);
 
 /** @brief Encode a Get Row Remap Availability response message
  *
@@ -2815,10 +2902,9 @@ int decode_get_row_remap_availability_req(const struct nsm_msg *msg,
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_row_remap_availability_resp(uint8_t instance_id, uint8_t cc,
-					 uint16_t reason_code,
-					 struct nsm_row_remap_availability* data,
-					 struct nsm_msg *msg);
+int encode_get_row_remap_availability_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_row_remap_availability *data, struct nsm_msg *msg);
 
 /** @brief Dncode a Get Row Remap Availability response message
  *  @param[in] msg    - response message
@@ -2829,12 +2915,77 @@ int encode_get_row_remap_availability_resp(uint8_t instance_id, uint8_t cc,
  *  @param[out] data - struct representing row remap availability data
  *  @return nsm_completion_codes
  */
-int decode_get_row_remap_availability_resp(const struct nsm_msg *msg,
-					 size_t msg_len, uint8_t *cc,
-					 uint16_t *data_size,
-					 uint16_t *reason_code,
-					 struct nsm_row_remap_availability* data);
-					 
+int decode_get_row_remap_availability_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_row_remap_availability *data);
+
+// ** Get Workload Power Profile Information  **
+int encode_get_workload_power_profile_info_req(uint8_t instance_id,
+					       uint16_t identifier,
+					       struct nsm_msg *msg);
+int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg,
+					       size_t msg_len,
+					       uint16_t *identifier);
+int encode_get_workload_power_profile_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_all_workload_power_profile_meta_data *data,
+    struct nsm_workload_power_profile_data *profile_data,
+    uint8_t max_number_of_profiles, struct nsm_msg *msg);
+
+int decode_get_workload_power_profile_info_metadata_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_all_workload_power_profile_meta_data *data,
+    uint8_t *number_of_profiles);
+int decode_get_workload_power_profile_info_data_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t max_supported_profile, uint8_t offset,
+    struct nsm_workload_power_profile_data *profle_data);
+
+// ** Get Workload Power Profiles Status Information  **
+int encode_get_workload_power_profile_status_req(uint8_t instance_id,
+						 struct nsm_msg *msg);
+int decode_get_workload_power_profile_status_req(const struct nsm_msg *msg,
+						 size_t msg_len);
+int encode_get_workload_power_profile_status_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct workload_power_profile_status *data, struct nsm_msg *msg);
+
+int decode_get_workload_power_profile_status_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct workload_power_profile_status *data);
+
+// ** Enable Workload Power Profiles **
+int encode_enable_workload_power_profile_req(uint8_t instance_id,
+					     bitfield32_t profile_mask[],
+					     int mask_length,
+					     struct nsm_msg *msg);
+int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
+					     size_t msg_len, int *mask_length,
+					     bitfield32_t *profile_mask);
+int encode_enable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      struct nsm_msg *msg);
+int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code);
+
+// ** Disable Workload Power Profiles **
+int encode_disable_workload_power_profile_req(uint8_t instance_id,
+					      bitfield32_t profile_mask[],
+					      int mask_length,
+					      struct nsm_msg *msg);
+int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
+					      size_t msg_len, int *mask_length,
+					      bitfield32_t *profile_mask);
+int encode_disable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
+					       uint16_t reason_code,
+					       struct nsm_msg *msg);
+int decode_disable_workload_power_profile_resp(const struct nsm_msg *msg,
+					       size_t msg_len, uint8_t *cc,
+					       uint16_t *reason_code);
+
 #ifdef __cplusplus
 }
 #endif

@@ -90,16 +90,14 @@ class MockupResponder
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setPortDisableFutureHandler(const nsm_msg* requestMsg,
-                                   size_t requestLen);
+                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getPortDisableFutureHandler(const nsm_msg* requestMsg,
-                                   size_t requestLen);
+                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
-        getPowerModeHandler(const nsm_msg* requestMsg,
-                                   size_t requestLen);
+        getPowerModeHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
-        setPowerModeHandler(const nsm_msg* requestMsg,
-                                   size_t requestLen);
+        setPowerModeHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
@@ -175,7 +173,8 @@ class MockupResponder
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
-        getViolationDurationHandler(const nsm_msg* requestMsg, size_t requestLen);
+        getViolationDurationHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
 
     // send rediscovery event
     void sendRediscoveryEvent(uint8_t eid, bool ackr);
@@ -196,7 +195,7 @@ class MockupResponder
                                          size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryAvailableAndClearableScalarGroupHandler(const nsm_msg* requestMsg,
-                                         size_t requestLen);
+                                                     size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         pcieFundamentalResetHandler(const nsm_msg* requestMsg,
@@ -223,7 +222,7 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getRowRemapAvailabilityHandler(const nsm_msg* requestMsg,
-                                     size_t requestLen);
+                                       size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getAltitudePressureHandler(const nsm_msg* requestMsg,
@@ -313,6 +312,22 @@ class MockupResponder
         queryDeviceIdsHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         resetNetworkDeviceHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        enableWorkloadPowerProfile(const nsm_msg* requestMsg,
+                                   size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        disableWorkloadPowerProfile(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getWorkLoadProfileStatusInfo(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getWorkloadPowerProfileInfo(const nsm_msg* requestMsg,
+                                    size_t requestLen);
 
   private:
     sdeventplus::Event& event;

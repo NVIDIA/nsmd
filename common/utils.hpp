@@ -458,4 +458,11 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
                                        const std::string& interfaceSubStr,
                                        std::vector<Association>& associations);
 
+// Function to convert bitfield256_t to a bitmap
+/**
+ * Converts a bitfield256_t structure to a bitmap.
+ *
+ * @param bf Pointer to the bitfield256_t structure.
+ **/
+std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf);
 } // namespace utils

@@ -292,6 +292,9 @@ typedef union {
 		uint8_t bit63 : 1;
 	} __attribute__((packed)) bits;
 } bitfield64_t;
+typedef struct {
+	bitfield32_t fields[8];
+} bitfield256_t;
 
 // command(1byte) + data_size(1byte)
 #define NSM_REQUEST_CONVENTION_LEN 2

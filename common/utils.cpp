@@ -353,5 +353,32 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
 
     co_return NSM_SUCCESS;
 }
+// Function to convert bitfield256_t to bitmap
+std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf)
+{
+    // struct workload_power_profile_status profileData;
+    //  memcpy(&profileData, data, sizeof(struct
+    //  workload_power_profile_status));
+    std::vector<uint8_t> bitmap(32, 0); // 32 bytes = 256 bits
+
+    // Iterate over each bitfield32_t in the bitfield256_t
+    for (int i = 0; i < 8; i++)
+    {
+        uint32_t byte = bf.fields[i].byte;
+        // Iterate over each bit in the bitfield32_t
+        for (int j = 0; j < 32; j++)
+        {
+            // If the bit is set, set the corresponding bit in the bitmap
+            // i * 4 accounts for the 4 bytes (32 bits) per bitfield32_t
+            // element j / 8 determines which byte within the 4 bytes the
+            // current bit belongs to.
+            if (byte & (1 << j))
+            {
+                bitmap[i * 4 + j / 8] |= (1 << (j % 8));
+            }
+        }
+    }
+    return bitmap;
+}
 
 } // namespace utils
