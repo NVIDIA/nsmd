@@ -122,6 +122,11 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
         lg2::error("DebugToken: disableTokens SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
+        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
+                                      "Unsupported Command"));
+        }
         finishOperation(Progress::OperationStatus::Aborted);
         co_return sendRc;
     }
@@ -163,6 +168,11 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
         lg2::error("DebugToken: getRequest SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
+        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
+                                      "Unsupported Command"));
+        }
         finishOperation(Progress::OperationStatus::Aborted);
         co_return sendRc;
     }
@@ -227,6 +237,11 @@ requester::Coroutine
         lg2::error("DebugToken: getStatus SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
+        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
+                                      "Unsupported Command"));
+        }
         finishOperation(Progress::OperationStatus::Aborted);
         co_return sendRc;
     }
@@ -344,6 +359,11 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
         lg2::error("DebugToken: installToken SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
+        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
+                                      "Unsupported Command"));
+        }
         finishOperation(Progress::OperationStatus::Aborted);
         co_return sendRc;
     }
@@ -538,7 +558,13 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
         lg2::error("DebugToken: queryDeviceId SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
-        co_return rc;
+        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
+                                      "Unsupported Command"));
+        }
+        finishOperation(Progress::OperationStatus::Aborted);
+        co_return sendRc;
     }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
