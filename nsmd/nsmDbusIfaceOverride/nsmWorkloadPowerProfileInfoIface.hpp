@@ -17,6 +17,7 @@
 #pragma once
 #include <com/nvidia/PowerProfile/Profile/server.hpp>
 #include <com/nvidia/PowerProfile/ProfileInfo/server.hpp>
+#include <com/nvidia/PowerProfile/ProfileInfoAsync/server.hpp>
 namespace nsm
 {
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
@@ -24,6 +25,8 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
 
 using ProfileInfoIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::PowerProfile::server::ProfileInfo>;
+using ProfileInfoAsyncIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::PowerProfile::server::ProfileInfoAsync>;
 class OemProfileInfoIntf : public ProfileInfoIntf
 {
   private:
@@ -36,20 +39,6 @@ class OemProfileInfoIntf : public ProfileInfoIntf
         ProfileInfoIntf(bus, path.c_str()),
         device(device), inventoryObjPath(path)
     {}
-
-    void enablePresetProfile(std::vector<uint8_t> profileMask) override
-    {
-        for (uint8_t a : profileMask)
-            lg2::info("enablePresetProfile for EID: {EID}", "EID", a);
-        return;
-    }
-
-    void disablePresetProfile(std::vector<uint8_t> profileMask) override
-    {
-        for (uint8_t a : profileMask)
-            lg2::info("disablePresetProfile for EID: {EID}", "EID", a);
-        return;
-    }
 };
 
 using WorkLoadPowerProfileIntf = sdbusplus::server::object_t<

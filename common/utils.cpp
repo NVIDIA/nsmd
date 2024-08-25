@@ -563,4 +563,36 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
 
     return updateMethods;
 }
+// Function to convert bitmap to bitfield256_t
+bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap)
+{
+    bitfield256_t bf = {0}; // Initialize all fields to 0
+
+    // Ensure the bitmap has the correct size
+    if (bitmap.size() != 32)
+    {
+        return bf;
+    }
+
+    // Iterate over each bitfield32_t in the bitfield256_t
+    for (int i = 0; i < 8; i++)
+    {
+        uint32_t& byte = bf.fields[i].byte;
+        // Iterate over each bit in the bitfield32_t
+        for (int j = 0; j < 32; j++)
+        {
+            // Check if the corresponding bit in the bitmap is set
+            // i * 4 accounts for the 4 bytes (32 bits) per bitfield32_t
+            // j / 8 determines which byte within the 4 bytes the current bit
+            // belongs to
+            if (bitmap[i * 4 + j / 8] & (1 << (j % 8)))
+            {
+                byte |= (1U << j);
+            }
+        }
+    }
+
+    return bf;
+}
+
 } // namespace utils

@@ -3140,9 +3140,14 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         std::shared_ptr<OemProfileInfoIntf> profileStatusInfoIntf =
             std::make_shared<OemProfileInfoIntf>(bus, inventoryObjPath,
                                                  nsmDevice);
+
+        std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsyncIntf =
+            std::make_shared<NsmWorkloadProfileInfoAsyncIntf>(
+                bus, inventoryObjPath.c_str(), nsmDevice);
         auto workloadProfileStatusSensor =
             std::make_shared<NsmWorkLoadProfileStatus>(
-                name, type, inventoryObjPath, profileStatusInfoIntf);
+                name, type, inventoryObjPath, profileStatusInfoIntf,
+                profileInfoAsyncIntf);
         nsmDevice->addSensor(workloadProfileStatusSensor, priority);
 
         auto getAllPowerProfileSensor =

@@ -27,12 +27,222 @@
 namespace nsm
 {
 
+NsmWorkloadProfileInfoAsyncIntf::NsmWorkloadProfileInfoAsyncIntf(
+    sdbusplus::bus::bus& bus, const char* path,
+    std::shared_ptr<NsmDevice> device) :
+    ProfileInfoAsyncIntf(bus, path),
+    device(device)
+{}
+
+requester::Coroutine
+    NsmWorkloadProfileInfoAsyncIntf::requestEnablePresetProfile(
+        AsyncOperationStatusType* status, std::vector<uint8_t>& bytes)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_enable_workload_power_profile_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    // first argument instanceid=0 is irrelevant
+    bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
+    auto rc = encode_enable_workload_power_profile_req(0, profile_mask,
+                                                       requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "requestEnablePresetProfile  encode_enable_workload_power_profile_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "requestEnablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_enable_workload_power_profile_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("requestEnablePresetProfile for EID: {EID} completed", "EID",
+                  eid);
+    }
+    else
+    {
+        lg2::error(
+            "requestEnablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmWorkloadProfileInfoAsyncIntf::doEnablePresetProfile(
+    std::shared_ptr<AsyncStatusIntf> statusInterface,
+    std::vector<uint8_t>& bytes)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    auto rc_ = co_await requestEnablePresetProfile(&status, bytes);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+}
+
+sdbusplus::message::object_path
+    NsmWorkloadProfileInfoAsyncIntf::enablePresetProfile(
+        std::vector<uint8_t> bytes)
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmWorkloadProfileInfoAsyncIntf::enablePresetProfile failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+    if (bytes.size() != 32)
+    {
+        lg2::error("Invalid Profile Mask");
+        for (auto byte : bytes)
+        {
+            lg2::error("{A}", "A", byte);
+        }
+        throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
+    }
+
+    doEnablePresetProfile(statusInterface, bytes).detach();
+
+    return objectPath;
+}
+
+requester::Coroutine
+    NsmWorkloadProfileInfoAsyncIntf::requestDisablePresetProfile(
+        AsyncOperationStatusType* status, std::vector<uint8_t>& bytes)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_disable_workload_power_profile_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    // first argument instanceid=0 is irrelevant
+    bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
+    auto rc = encode_disable_workload_power_profile_req(0, profile_mask,
+                                                        requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "requestDisablePresetProfile  encode_disable_workload_power_profile_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "requestDisablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_disable_workload_power_profile_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("requestDisablePresetProfile for EID: {EID} completed", "EID",
+                  eid);
+    }
+    else
+    {
+        lg2::error(
+            "requestDisablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmWorkloadProfileInfoAsyncIntf::doDisablePresetProfile(
+    std::shared_ptr<AsyncStatusIntf> statusInterface,
+    std::vector<uint8_t>& bytes)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    auto rc_ = co_await requestDisablePresetProfile(&status, bytes);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+}
+
+sdbusplus::message::object_path
+    NsmWorkloadProfileInfoAsyncIntf::disablePresetProfile(
+        std::vector<uint8_t> bytes)
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmWorkloadProfileInfoAsyncIntf::disablePresetProfile failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    if (bytes.size() != 32)
+    {
+        lg2::error("Invalid Profile Mask");
+        for (auto byte : bytes)
+        {
+            lg2::error("{A}", "A", byte);
+        }
+        throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
+    }
+
+    doDisablePresetProfile(statusInterface, bytes).detach();
+
+    return objectPath;
+}
+
 //  Power Smoothing Control: Get Current Profile Information
 NsmWorkLoadProfileStatus::NsmWorkLoadProfileStatus(
     std::string& name, std::string& type, std::string& inventoryObjPath,
-    std::shared_ptr<OemProfileInfoIntf> profileStatusInfo) :
+    std::shared_ptr<OemProfileInfoIntf> profileStatusInfo,
+    std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsync) :
     NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), profileStatusInfo(profileStatusInfo)
+    inventoryObjPath(inventoryObjPath), profileStatusInfo(profileStatusInfo),
+    profileInfoAsync(profileInfoAsync)
 
 {}
 
@@ -237,16 +447,17 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        uint16_t firstProfileIdOnPage = pageId * numberOfprofiles;
-        uint16_t lastProfileIdOnPage = (pageId + 1) * numberOfprofiles;
+        uint16_t firstProfileIndex = pageId * numberOfprofiles;
+        uint16_t lastProfileIndex = (pageId + 1) * numberOfprofiles;
         uint8_t offset = 0;
-        for (int profileId = firstProfileIdOnPage;
-             profileId < lastProfileIdOnPage; profileId++)
+        for (int itertor = firstProfileIndex; itertor < lastProfileIndex;
+             itertor++)
         {
             nsm_workload_power_profile_data profileData{};
             decode_get_workload_power_profile_info_data_resp(
                 responseMsg, responseLen, &cc, &reason_code, numberOfprofiles,
                 offset, &profileData);
+            uint16_t profileId = profileData.profile_id;
             if (!profileCollection->hasProfileId(profileId))
             {
                 auto profileName = profileMapper->toString(profileId);

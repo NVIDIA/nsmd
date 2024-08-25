@@ -17,15 +17,47 @@
 #pragma once
 #include "platform-environmental.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "nsmWorkloadPowerProfileInfoIface.hpp"
+
+#include <sdbusplus/asio/object_server.hpp>
 
 #include <cstdint>
 #include <memory>
 
 namespace nsm
 {
+// Enable/Disable PowerProfiles
+class NsmWorkloadProfileInfoAsyncIntf : public ProfileInfoAsyncIntf
+{
+  public:
+    NsmWorkloadProfileInfoAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                                    std::shared_ptr<NsmDevice> device);
+
+    sdbusplus::message::object_path
+        enablePresetProfile(std::vector<uint8_t> bytes) override;
+    requester::Coroutine
+        doEnablePresetProfile(std::shared_ptr<AsyncStatusIntf> statusInterface,
+                              std::vector<uint8_t>& bytes);
+    requester::Coroutine
+        requestEnablePresetProfile(AsyncOperationStatusType* status,
+                                   std::vector<uint8_t>& bytes);
+
+    sdbusplus::message::object_path
+        disablePresetProfile(std::vector<uint8_t> bytes) override;
+    requester::Coroutine
+        doDisablePresetProfile(std::shared_ptr<AsyncStatusIntf> statusInterface,
+                               std::vector<uint8_t>& bytes);
+    requester::Coroutine
+        requestDisablePresetProfile(AsyncOperationStatusType* status,
+                                    std::vector<uint8_t>& bytes);
+
+  private:
+    std::shared_ptr<NsmDevice> device;
+    std::string inventoryObjPath;
+};
 // Enum for ProfileID Mapping
 class NsmWorkLoadProfileEnum : public NsmObject
 {
@@ -157,7 +189,8 @@ class NsmWorkLoadProfileStatus : public NsmSensor
   public:
     NsmWorkLoadProfileStatus(
         std::string& name, std::string& type, std::string& inventoryObjPath,
-        std::shared_ptr<OemProfileInfoIntf> profileStatusInfo);
+        std::shared_ptr<OemProfileInfoIntf> profileStatusInfo,
+        std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsync);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -168,6 +201,7 @@ class NsmWorkLoadProfileStatus : public NsmSensor
   private:
     std::string inventoryObjPath;
     std::shared_ptr<OemProfileInfoIntf> profileStatusInfo;
+    std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsync;
 };
 
 } // namespace nsm
