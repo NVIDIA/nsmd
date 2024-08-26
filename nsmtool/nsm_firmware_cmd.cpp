@@ -30,17 +30,17 @@ namespace nsmtool::firmware
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
 
-class QueryFirmwareType : public CommandInterface
+class GetRotInformation : public CommandInterface
 {
   public:
-    ~QueryFirmwareType() = default;
-    QueryFirmwareType() = delete;
-    QueryFirmwareType(const QueryFirmwareType&) = delete;
-    QueryFirmwareType(QueryFirmwareType&&) = default;
-    QueryFirmwareType& operator=(const QueryFirmwareType&) = delete;
-    QueryFirmwareType& operator=(QueryFirmwareType&&) = default;
+    ~GetRotInformation() = default;
+    GetRotInformation() = delete;
+    GetRotInformation(const GetRotInformation&) = delete;
+    GetRotInformation(GetRotInformation&&) = default;
+    GetRotInformation& operator=(const GetRotInformation&) = delete;
+    GetRotInformation& operator=(GetRotInformation&&) = default;
 
-    explicit QueryFirmwareType(const char* type, const char* name,
+    explicit GetRotInformation(const char* type, const char* name,
                                CLI::App* app) :
         CommandInterface(type, name, app)
     {
@@ -91,8 +91,9 @@ class QueryFirmwareType : public CommandInterface
         ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        result["Background copy policy"] =
-            static_cast<uint32_t>(erot_info.fq_resp_hdr.background_copy_policy);
+        result["Background copy policy"] = mapEnumToString(
+            static_cast<uint32_t>(erot_info.fq_resp_hdr.background_copy_policy),
+            bgCopyPolicyMap);
         result["Active Slot"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.active_slot);
         result["Active Keyset"] =
@@ -116,14 +117,19 @@ class QueryFirmwareType : public CommandInterface
                 (char*)(&(erot_info.slot_info[i].firmware_version_string[0]));
             slot_info["Version comp stamp"] = static_cast<uint32_t>(
                 erot_info.slot_info[i].version_comparison_stamp);
-            slot_info["Build type"] =
-                static_cast<uint32_t>(erot_info.slot_info[i].build_type);
-            slot_info["Signing type"] =
-                static_cast<uint32_t>(erot_info.slot_info[i].signing_type);
-            slot_info["WR Protect State"] = static_cast<uint32_t>(
-                erot_info.slot_info[i].write_protect_state);
-            slot_info["Firmware state"] =
-                static_cast<uint32_t>(erot_info.slot_info[i].firmware_state);
+            slot_info["Build type"] = mapEnumToString(
+                static_cast<uint32_t>(erot_info.slot_info[i].build_type),
+                buildTypeMap);
+            slot_info["Signing type"] = mapEnumToString(
+                static_cast<uint32_t>(erot_info.slot_info[i].signing_type),
+                signingTypeMap);
+            slot_info["WR Protect State"] =
+                mapEnumToString(static_cast<uint32_t>(
+                                    erot_info.slot_info[i].write_protect_state),
+                                writeProtectMap);
+            slot_info["Firmware state"] = mapEnumToString(
+                static_cast<uint32_t>(erot_info.slot_info[i].firmware_state),
+                firmwareStateMap);
             slot_info["Security version number"] = static_cast<uint32_t>(
                 erot_info.slot_info[i].security_version_number);
             slot_info["Signing key index"] =
@@ -143,6 +149,35 @@ class QueryFirmwareType : public CommandInterface
     uint16_t classification{};
     uint16_t identifier{};
     uint8_t index{};
+
+    const std::unordered_map<uint32_t, std::string> bgCopyPolicyMap = {
+        {0, "Disabled"}, {1, "Enabled"}};
+
+    const std::unordered_map<uint32_t, std::string> buildTypeMap = {
+        {0, "Development"}, {1, "Release"}};
+
+    const std::unordered_map<uint32_t, std::string> signingTypeMap = {
+        {0, "Debug"}, {1, "Production"}, {2, "External"}, {4, "DOT"}};
+
+    const std::unordered_map<uint32_t, std::string> writeProtectMap = {
+        {0, "Disabled"}, {1, "Enabled"}};
+
+    const std::unordered_map<uint32_t, std::string> firmwareStateMap = {
+        {0, "Unknown"},
+        {1, "Activated"},
+        {2, "Pending Activation"},
+        {3, "Staged"},
+        {4, "Write in progress"},
+        {5, "Inactive"},
+        {6, "Failed authentication"}};
+
+    std::string mapEnumToString(
+        uint32_t value,
+        const std::unordered_map<uint32_t, std::string>& mapping) const
+    {
+        auto it = mapping.find(value);
+        return it != mapping.end() ? it->second : "Not Defined";
+    }
 };
 
 void registerCommand(CLI::App& app)
@@ -151,10 +186,10 @@ void registerCommand(CLI::App& app)
                                        "Device firmware type commands");
     firmware->require_subcommand(1);
 
-    auto queryFirmwareType = firmware->add_subcommand(
-        "QueryFirmwareType",
-        "Query information about a particular firmware set installed on an endpoint");
-    commands.push_back(std::make_unique<QueryFirmwareType>(
-        "firmware", "QueryRoTStateInformation", queryFirmwareType));
+    auto getRotInformation = firmware->add_subcommand(
+        "GetRotInformation",
+        "Get information about a particular firmware set installed on an endpoint");
+    commands.push_back(std::make_unique<GetRotInformation>(
+        "firmware", "QueryRoTStateInformation", getRotInformation));
 }
 } // namespace nsmtool::firmware

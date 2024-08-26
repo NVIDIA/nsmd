@@ -24,7 +24,7 @@ namespace MockupResponder
 {
 
 std::optional<std::vector<uint8_t>>
-    MockupResponder::queryFirmwareType(const nsm_msg* requestMsg,
+    MockupResponder::getRotInformation(const nsm_msg* requestMsg,
                                        size_t requestLen)
 {
     struct nsm_firmware_erot_state_info_req fq_req;
