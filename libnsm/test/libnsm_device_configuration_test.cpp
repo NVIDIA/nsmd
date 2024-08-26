@@ -16,9 +16,171 @@
  */
 
 #include "base.h"
+#include "common-tests.hpp"
 #include "device-configuration.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <types.hpp>
+
+TEST(setErrorInjectionMode, testRequest)
+{
+	const uint8_t mode = 1;
+	nsm_set_error_injection_mode_v1_req req;
+	auto encodeSetErrorInjectionModeV1Req =
+	    [&mode](uint8_t instanceId, const uint8_t *data, nsm_msg *msg) {
+		    if (data == nullptr) {
+			    return (int)NSM_SW_ERROR_NULL;
+		    }
+		    return encode_set_error_injection_mode_v1_req(instanceId,
+								  *data, msg);
+	    };
+	testEncodeRequest<uint8_t>(
+	    encodeSetErrorInjectionModeV1Req, NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_ERROR_INJECTION_MODE_V1, mode, req.mode);
+	EXPECT_EQ(mode, req.mode);
+
+	testDecodeRequest<uint8_t>(&decode_set_error_injection_mode_v1_req,
+				   NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_ERROR_INJECTION_MODE_V1, mode,
+				   req.mode);
+	EXPECT_EQ(mode, req.mode);
+}
+TEST(setErrorInjectionMode, testResponse)
+{
+	testEncodeCommonResponse(encode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_MODE_V1);
+
+	testDecodeCommonResponse(&decode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_MODE_V1);
+}
+TEST(getErrorInjectionMode, testRequest)
+{
+	testEncodeCommonRequest(&encode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_ERROR_INJECTION_MODE_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_ERROR_INJECTION_MODE_V1);
+}
+TEST(getErrorInjectionMode, testResponse)
+{
+	const nsm_error_injection_mode_v1 data = {1, 1};
+	nsm_get_error_injection_mode_v1_resp resp;
+	testEncodeResponse<nsm_error_injection_mode_v1>(
+	    &encode_get_error_injection_mode_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_MODE_V1,
+	    data, resp.data);
+	EXPECT_EQ(data.mode, resp.data.mode);
+	EXPECT_EQ(data.flags.byte, resp.data.flags.byte);
+
+	testDecodeResponse<nsm_error_injection_mode_v1>(
+	    &decode_get_error_injection_mode_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_MODE_V1,
+	    data, resp.data);
+	EXPECT_EQ(data.mode, resp.data.mode);
+	EXPECT_EQ(data.flags.byte, resp.data.flags.byte);
+}
+
+TEST(getSupportedErrorInjection, testRequest)
+{
+	testEncodeCommonRequest(
+	    &encode_get_supported_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1);
+}
+TEST(getSupportedErrorInjection, testResponse)
+{
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_get_error_injection_types_mask_resp resp;
+	testEncodeResponse<nsm_error_injection_types_mask>(
+	    &encode_get_supported_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+
+	testDecodeResponse<nsm_error_injection_types_mask>(
+	    &decode_get_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+}
+
+TEST(setCurrentErrorInjection, testRequest)
+{
+
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_set_error_injection_types_mask_req req;
+	testEncodeRequest<nsm_error_injection_types_mask>(
+	    &encode_set_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, data, req.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], req.data.mask[i]);
+	}
+
+	testDecodeRequest<nsm_error_injection_types_mask>(
+	    &decode_set_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, data, req.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], req.data.mask[i]);
+	}
+}
+TEST(setCurrentErrorInjection, testResponse)
+{
+	testEncodeCommonResponse(
+	    &encode_set_current_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonResponse(&decode_set_error_injection_mode_v1_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+}
+TEST(getCurrentErrorInjection, testRequest)
+{
+	testEncodeCommonRequest(
+	    &encode_get_current_error_injection_types_v1_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1);
+	testDecodeCommonRequest(&decode_get_error_injection_mode_v1_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1);
+}
+TEST(getCurrentErrorInjection, testResponse)
+{
+	const nsm_error_injection_types_mask data = {0xF, 0, 0, 0, 0, 0, 0, 0};
+	nsm_get_error_injection_types_mask_resp resp;
+	testEncodeResponse<nsm_error_injection_types_mask>(
+	    &encode_get_current_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+
+	testDecodeResponse<nsm_error_injection_types_mask>(
+	    &decode_get_error_injection_types_v1_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, resp.data);
+	for (size_t i = 0; i < 8; i++) {
+
+		EXPECT_EQ(data.mask[i], resp.data.mask[i]);
+	}
+}
 
 void testGetFpgaDiagnosticSettingsEncodeRequest(
     fpga_diagnostics_settings_data_index dataIndex)
@@ -1059,5 +1221,215 @@ TEST(getReconfigurationPermissionsV1, testBadDecodeResponse)
 
 	rc = decode_get_reconfiguration_permissions_v1_resp(
 	    response, msg_len, &cc, &reason_code, &data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+void testSetReconfigurationPermissionsV1EncodeRequest(
+    reconfiguration_permissions_v1_index settingIndex,
+    reconfiguration_permissions_v1_setting configuration, uint8_t permission)
+{
+	Request requestMsg(sizeof(nsm_msg_hdr) +
+			   sizeof(nsm_set_reconfiguration_permissions_v1_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_set_reconfiguration_permissions_v1_req(
+	    0, settingIndex, configuration, permission, request);
+
+	auto req =
+	    reinterpret_cast<nsm_set_reconfiguration_permissions_v1_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_RECONFIGURATION_PERMISSIONS_V1, req->hdr.command);
+	EXPECT_EQ(3, req->hdr.data_size);
+	EXPECT_EQ(settingIndex, req->setting_index);
+	EXPECT_EQ(configuration, req->configuration);
+	EXPECT_EQ(permission, req->permission);
+}
+
+TEST(setReconfigurationPermissionsV1, testGoodEncodeRequest)
+{
+	for (auto si = 0; si <= int(RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2);
+	     si++) {
+		for (auto ci = 0; ci < int(RP_ONESHOT_FLR); ci++) {
+			auto settingIndex =
+			    reconfiguration_permissions_v1_index(si);
+			auto configuration =
+			    reconfiguration_permissions_v1_setting(ci);
+			testSetReconfigurationPermissionsV1EncodeRequest(
+			    settingIndex, configuration, 1);
+			testSetReconfigurationPermissionsV1EncodeRequest(
+			    settingIndex, configuration, 0);
+		}
+	}
+}
+
+TEST(setReconfigurationPermissionsV1, testGoodDecodeRequest)
+{
+	Request requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    3,					    // data size
+	    3,					    // settingIndex
+	    1,					    // configuration
+	    1,					    // set
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto msg_len = requestMsg.size();
+
+	auto settingIndex = RP_IN_SYSTEM_TEST;
+	auto configuration = RP_ONESHOOT_HOT_RESET;
+	uint8_t permission = 0;
+	auto rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len, &settingIndex, &configuration, &permission);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(RP_BAR0_FIREWALL, settingIndex);
+	EXPECT_EQ(RP_PERSISTENT, configuration);
+	EXPECT_EQ(1, permission);
+}
+
+TEST(setReconfigurationPermissionsV1, testBadDecodeRequest)
+{
+	Request requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    0,					    // incorect data size
+	};
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto msg_len = requestMsg.size();
+
+	auto settingIndex = RP_IN_SYSTEM_TEST;
+	auto configuration = RP_ONESHOOT_HOT_RESET;
+	uint8_t permission = 0;
+
+	auto rc = decode_set_reconfiguration_permissions_v1_req(
+	    NULL, msg_len, &settingIndex, &configuration, &permission);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len, NULL, &configuration, &permission);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len, &settingIndex, NULL, &permission);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len, &settingIndex, &configuration, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len, &settingIndex, &configuration, &permission);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	rc = decode_set_reconfiguration_permissions_v1_req(
+	    request, msg_len - 1, &settingIndex, &configuration, &permission);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(setReconfigurationPermissionsV1, testGoodEncodeResponse)
+{
+	Response responseMsg(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_set_reconfiguration_permissions_v1_resp(
+	    0, NSM_SUCCESS, reason_code, response);
+
+	auto resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_RECONFIGURATION_PERMISSIONS_V1, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setReconfigurationPermissionsV1, testGoodDecodeResponse)
+{
+	Response responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    0,					    // completion code
+	    0,
+	    0,
+	    0,
+	    0 // data size
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	auto rc = decode_set_reconfiguration_permissions_v1_resp(
+	    response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+}
+
+TEST(setReconfigurationPermissionsV1, testBadDecodeResponse)
+{
+	Response responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_RECONFIGURATION_PERMISSIONS_V1, // command
+	    0,					    // completion code
+	    0,
+	    0,
+	    1, // incorrect data size
+	    0, // data size
+	    0, // invalid data byte
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_set_reconfiguration_permissions_v1_resp(
+	    NULL, msg_len, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_resp(response, msg_len,
+							    NULL, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_resp(response, msg_len,
+							    &cc, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_reconfiguration_permissions_v1_resp(response, msg_len,
+							    &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	rc = decode_set_reconfiguration_permissions_v1_resp(
+	    response, msg_len - 1, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

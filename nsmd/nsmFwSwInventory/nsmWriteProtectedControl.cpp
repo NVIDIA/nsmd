@@ -19,7 +19,7 @@
 
 #include "device-configuration.h"
 
-#include "nsmWriteProtectedIntf.hpp"
+#include "nsmSetWriteProtected.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -66,10 +66,10 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        auto value = NsmWriteProtectedIntf::getValue(data, deviceType,
-                                                     instanceNumber, retimer);
+        auto value = NsmSetWriteProtected::getValue(data, deviceType,
+                                                    instanceNumber, retimer);
         // Updates WriteProtected in FirmwareInventory
-        pdi().SettingsIntf::writeProtected(value);
+        pdi().writeProtected(value);
     }
     else
     {

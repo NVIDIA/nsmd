@@ -19,37 +19,38 @@
 
 #include "device-configuration.h"
 
-#include "nsmDevice.hpp"
+#include "asyncOperationManager.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
 
 namespace nsm
 {
-using namespace sdbusplus::xyz::openbmc_project;
-using namespace sdbusplus::server;
-using SettingsIntf = object_t<Software::server::Settings>;
+using SettingsIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Software::server::Settings>;
 
-class NsmWriteProtectedIntf : public SettingsIntf
+class NsmSetWriteProtected : public NsmInterfaceProvider<SettingsIntf>
 {
   private:
     SensorManager& manager;
-    std::shared_ptr<NsmDevice> device;
     uint8_t instanceNumber;
     NsmDeviceIdentification deviceType;
     bool retimer;
 
-    bool writeProtected(bool value) override;
-    bool setWriteProtected(bool value);
-    bool getWriteProtected() const;
+    requester::Coroutine setWriteProtected(bool value,
+                                           AsyncOperationStatusType& status,
+                                           std::shared_ptr<NsmDevice> device);
 
   public:
-    NsmWriteProtectedIntf() = delete;
-    NsmWriteProtectedIntf(SensorManager& manager,
-                          std::shared_ptr<NsmDevice> device,
-                          uint8_t instanceNumber,
-                          NsmDeviceIdentification deviceType, const char* path,
-                          bool retimer = false);
+    NsmSetWriteProtected() = delete;
+    NsmSetWriteProtected(const std::string& name, SensorManager& manager,
+                         uint8_t instanceNumber,
+                         NsmDeviceIdentification deviceType,
+                         std::string objPath, bool retimer = false);
+
+    requester::Coroutine writeProtected(const AsyncSetOperationValueType& value,
+                                        AsyncOperationStatusType* status,
+                                        std::shared_ptr<NsmDevice> device);
 
     /**
      * @brief Get the Write Protected value from

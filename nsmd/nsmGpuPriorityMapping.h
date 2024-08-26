@@ -15,14 +15,16 @@
  * limitations under the License.
  */
 
-#include "config.h"
-
 #pragma once
 
-#ifndef  AER_ERR_SENSOR_PRIORITY
-  #define AER_ERR_SENSOR_PRIORITY false
+#ifndef AER_ERR_SENSOR_PRIORITY
+#define AER_ERR_SENSOR_PRIORITY false
 #endif
 
-#ifndef  PER_LANE_ERROR_COUNT_PRIORITY
-  #define PER_LANE_ERROR_COUNT_PRIORITY false
+#ifndef PER_LANE_ERROR_COUNT_PRIORITY
+#define PER_LANE_ERROR_COUNT_PRIORITY false
+#endif
+
+#ifndef ERROR_INJECTION_PRIORITY
+#define ERROR_INJECTION_PRIORITY false
 #endif

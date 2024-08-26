@@ -21,6 +21,284 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_set_error_injection_mode_v1_req(uint8_t instance_id,
+					   const uint8_t mode,
+					   struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_ERROR_INJECTION_MODE_V1, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		struct nsm_set_error_injection_mode_v1_req *req =
+		    (struct nsm_set_error_injection_mode_v1_req *)msg->payload;
+		req->hdr.data_size = htole16(sizeof(uint8_t));
+		req->mode = mode;
+	}
+	return rc;
+}
+
+int decode_set_error_injection_mode_v1_req(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *mode)
+{
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (mode == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_set_error_injection_mode_v1_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_set_error_injection_mode_v1_req *req =
+		    (struct nsm_set_error_injection_mode_v1_req *)msg->payload;
+
+		if (req->hdr.data_size != sizeof(uint8_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		*mode = req->mode;
+	}
+	return rc;
+}
+
+int encode_set_error_injection_mode_v1_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_ERROR_INJECTION_MODE_V1, msg);
+}
+
+int decode_set_error_injection_mode_v1_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
+
+int encode_get_error_injection_mode_v1_req(uint8_t instance_id,
+					   struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_ERROR_INJECTION_MODE_V1, msg);
+}
+
+int decode_get_error_injection_mode_v1_req(const struct nsm_msg *msg,
+					   size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_error_injection_mode_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_mode_v1 *data, struct nsm_msg *msg)
+{
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_ERROR_INJECTION_MODE_V1, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_get_error_injection_mode_v1_resp *resp =
+		    (struct nsm_get_error_injection_mode_v1_resp *)msg->payload;
+		resp->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_mode_v1));
+		resp->data.mode = data->mode;
+		resp->data.flags.byte = htole32(data->flags.byte);
+	}
+	return rc;
+}
+
+int decode_get_error_injection_mode_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_error_injection_mode_v1 *data)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_error_injection_mode_v1_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size != sizeof(struct nsm_error_injection_mode_v1)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_mode_v1_resp *resp =
+		    (struct nsm_get_error_injection_mode_v1_resp *)msg->payload;
+		data->mode = resp->data.mode;
+		data->flags.byte = le32toh(resp->data.flags.byte);
+	}
+	return rc;
+}
+
+int encode_set_current_error_injection_types_v1_req(
+    uint8_t instance_id, const struct nsm_error_injection_types_mask *data,
+    struct nsm_msg *msg)
+{
+	int rc =
+	    encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+			      NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_set_error_injection_types_mask_req *req =
+		    (struct nsm_set_error_injection_types_mask_req *)
+			msg->payload;
+		req->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_types_mask));
+		req->data = *data;
+	}
+	return rc;
+}
+
+int decode_set_current_error_injection_types_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_error_injection_types_mask *data)
+{
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_set_error_injection_types_mask_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_set_error_injection_types_mask_req *req =
+		    (struct nsm_set_error_injection_types_mask_req *)
+			msg->payload;
+		if (req->hdr.data_size !=
+		    sizeof(struct nsm_error_injection_types_mask)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		*data = req->data;
+	}
+	return rc;
+}
+
+int encode_set_current_error_injection_types_v1_resp(uint8_t instance_id,
+						     uint8_t cc,
+						     uint16_t reason_code,
+						     struct nsm_msg *msg)
+{
+	return encode_common_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, msg);
+}
+
+int decode_set_current_error_injection_types_v1_resp(const struct nsm_msg *msg,
+						     size_t msg_len,
+						     uint8_t *cc,
+						     uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+	return rc;
+}
+
+int encode_get_supported_error_injection_types_v1_req(uint8_t instance_id,
+						      struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1,
+				 msg);
+}
+
+int encode_get_current_error_injection_types_v1_req(uint8_t instance_id,
+						    struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, msg);
+}
+
+int decode_get_error_injection_types_v1_req(const struct nsm_msg *msg,
+					    size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+static int encode_get_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t command,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	int rc =
+	    encode_common_resp(instance_id, cc, reason_code,
+			       NSM_TYPE_DEVICE_CONFIGURATION, command, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_get_error_injection_types_mask_resp *resp =
+		    (struct nsm_get_error_injection_types_mask_resp *)
+			msg->payload;
+		resp->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_types_mask));
+		resp->data = *data;
+	}
+	return rc;
+}
+
+int encode_get_supported_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	return encode_get_error_injection_types_v1_resp(
+	    instance_id, cc, reason_code,
+	    NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1, data, msg);
+}
+
+int encode_get_current_error_injection_types_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_types_mask *data, struct nsm_msg *msg)
+{
+	return encode_get_error_injection_types_v1_resp(
+	    instance_id, cc, reason_code,
+	    NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1, data, msg);
+}
+
+int decode_get_error_injection_types_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_error_injection_types_mask *data)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(
+			    struct nsm_get_error_injection_types_mask_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size !=
+		    sizeof(struct nsm_error_injection_types_mask)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_types_mask_resp *resp =
+		    (struct nsm_get_error_injection_types_mask_resp *)
+			msg->payload;
+		*data = resp->data;
+	}
+	return rc;
+}
+
 int encode_get_fpga_diagnostics_settings_req(
     uint8_t instance_id, enum fpga_diagnostics_settings_data_index data_index,
     struct nsm_msg *msg)
@@ -397,7 +675,7 @@ int decode_get_reconfiguration_permissions_v1_req(
 
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_get_fpga_diagnostics_settings_req)) {
+		sizeof(struct nsm_get_reconfiguration_permissions_v1_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -472,4 +750,92 @@ int decode_get_reconfiguration_permissions_v1_resp(
 
 	*data = resp->data;
 	return NSM_SW_SUCCESS;
+}
+
+int encode_set_reconfiguration_permissions_v1_req(
+    uint8_t instance_id,
+    enum reconfiguration_permissions_v1_index setting_index,
+    enum reconfiguration_permissions_v1_setting configuration,
+    uint8_t permission, struct nsm_msg *msg)
+{
+
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_reconfiguration_permissions_v1_req *request =
+	    (struct nsm_set_reconfiguration_permissions_v1_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_RECONFIGURATION_PERMISSIONS_V1;
+	request->hdr.data_size = 3;
+	request->setting_index = setting_index;
+	request->configuration = configuration;
+	request->permission = permission;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_reconfiguration_permissions_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    enum reconfiguration_permissions_v1_index *setting_index,
+    enum reconfiguration_permissions_v1_setting *configuration,
+    uint8_t *permission)
+{
+	if (msg == NULL || setting_index == NULL || configuration == NULL ||
+	    permission == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_set_reconfiguration_permissions_v1_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_reconfiguration_permissions_v1_req *request =
+	    (struct nsm_set_reconfiguration_permissions_v1_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(struct nsm_set_reconfiguration_permissions_v1_req) -
+		NSM_REQUEST_CONVENTION_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*setting_index = request->setting_index;
+	*configuration = request->configuration;
+	*permission = request->permission;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_reconfiguration_permissions_v1_resp(uint8_t instance_id,
+						   uint8_t cc,
+						   uint16_t reason_code,
+						   struct nsm_msg *msg)
+{
+
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_RECONFIGURATION_PERMISSIONS_V1, msg);
+}
+
+int decode_set_reconfiguration_permissions_v1_resp(const struct nsm_msg *msg,
+						   size_t msg_len, uint8_t *cc,
+						   uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
 }

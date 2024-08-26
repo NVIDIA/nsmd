@@ -262,6 +262,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getPowerSmoothingFeatureInfo(const nsm_msg* requestMsg,
@@ -295,6 +298,21 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         updatePresetProfileParams(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getSupportedErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
+                                                 size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setCurrentErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getCurrentErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
+                                               size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getRotInformation(const nsm_msg* requestMsg, size_t requestLen);
@@ -348,6 +366,9 @@ class MockupResponder
         std::map<reconfiguration_permissions_v1_index,
                  nsm_reconfiguration_permissions_v1>
             prcKnobs;
+        nsm_error_injection_mode_v1 errorInjectionMode;
+        std::map<uint8_t, std::map<error_injection_type, bool>>
+            errorInjection;
     } state;
 };
 

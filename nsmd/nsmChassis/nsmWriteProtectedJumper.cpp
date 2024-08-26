@@ -60,8 +60,8 @@ uint8_t NsmWriteProtectedJumper::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        pdi().SettingsIntf::writeProtected(data.presence);
-        pdi().SettingsIntf::writeProtectedControl(data.presence);
+        pdi().writeProtected(data.presence);
+        pdi().writeProtectedControl(data.presence);
     }
     else
     {

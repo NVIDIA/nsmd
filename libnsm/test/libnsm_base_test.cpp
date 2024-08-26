@@ -16,6 +16,7 @@
  */
 
 #include "base.h"
+#include "common-tests.hpp"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -710,90 +711,33 @@ TEST(decodeReasonCode, testBadDecodeReasonCode)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-TEST(decodeCommonReq, testGoodDecodeCommonRequest)
+TEST(commonReq, testCommonRequest)
 {
-	std::vector<uint8_t> requestMsg{
-	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
-	    32,				     // command
-	    0				     // data size
-	};
-
-	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
-	size_t msg_len = requestMsg.size();
-	auto rc = decode_common_req(request, msg_len);
-	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	testEncodeCommonRequest(
+	    [](uint8_t instanceId, struct nsm_msg *msg) {
+		    return encode_common_req(instanceId, 0, 0, msg);
+	    },
+	    0, 0);
+	testDecodeCommonRequest(&decode_common_req, 0, 0);
 }
 
-TEST(decodeCommonResp, testGoodDecodeResponse)
+TEST(commonResp, testCommonResponse)
 {
-	std::vector<uint8_t> responseMsg{
-	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
-	    24,				     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
-	    0,
-	    0 // data size
-	};
-
-	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
-	size_t msg_len = responseMsg.size();
-
-	uint8_t cc = NSM_SUCCESS;
-	uint16_t reason_code = ERR_NULL;
-	uint16_t data_size = 0;
-
-	auto rc = decode_common_resp(response, msg_len, &cc, &data_size,
-				     &reason_code);
-
-	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(0, data_size);
-}
-
-TEST(decodeCommonResp, testBadDecodeResponse)
-{
-	std::vector<uint8_t> responseMsg{
-	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
-	    24,				     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
-	    0,				     // data size
-	    0				     // data size
-	};
-
-	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
-	size_t msg_len = responseMsg.size();
-
-	uint8_t cc = NSM_SUCCESS;
-	uint16_t reason_code = ERR_NULL;
-	uint16_t data_size = 0;
-
-	auto rc =
-	    decode_common_resp(NULL, msg_len, &cc, &data_size, &reason_code);
-	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-
-	rc = decode_common_resp(response, msg_len, NULL, &data_size,
-				&reason_code);
-	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-
-	rc = decode_common_resp(response, msg_len, &cc, NULL, &reason_code);
-	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-
-	rc = decode_common_resp(response, msg_len - 1, &cc, &data_size,
-				&reason_code);
-	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	testEncodeCommonResponse(
+	    [](uint8_t instanceId, uint8_t cc, uint16_t reasonCode,
+	       nsm_msg *msg) {
+		    return encode_common_resp(instanceId, cc, reasonCode, 0, 0,
+					      msg);
+	    },
+	    0, 0);
+	testDecodeCommonResponse(
+	    [](const nsm_msg *msg, size_t len, uint8_t *cc,
+	       uint16_t *reasonCode) {
+		    uint16_t size = 0;
+		    auto rc =
+			decode_common_resp(msg, len, cc, &size, reasonCode);
+		    EXPECT_EQ(0, size);
+		    return rc;
+	    },
+	    0, 0);
 }

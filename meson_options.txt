@@ -70,10 +70,15 @@ option(
     value: false,
     description: 'Aer Error Status Sensor Priority',
 )
-
 option(
     'per-lan-error-count-priority',
     type: 'boolean',
     value: false,
     description: 'Per Lane Error Count Sensor Priority',
+)
+option(
+    'error-injection-priority',
+    type: 'boolean',
+    value: false,
+    description: 'Error Injection Priority',
 )
