@@ -46,7 +46,7 @@ using PortLinkStates = sdbusplus::server::xyz::openbmc_project::inventory::
 using PortLinkStatus = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortState::LinkStatusType;
 
-class NsmPortStatus : public NsmSensor
+class NsmPortStatus : public NsmObject
 {
   public:
     NsmPortStatus(sdbusplus::bus::bus& bus, std::string& portName,
@@ -55,14 +55,14 @@ class NsmPortStatus : public NsmSensor
                   std::string& inventoryObjPath);
     NsmPortStatus() = default;
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
     void updateMetricOnSharedMemory() override;
     std::string portName;
 
   private:
+    requester::Coroutine
+        checkPortCharactersticRCAndPopulateRuntimeErr(SensorManager& manager,
+                                                      eid_t eid);
     std::unique_ptr<PortStateIntf> portStateIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     uint8_t portNumber;
