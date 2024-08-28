@@ -572,8 +572,10 @@ class NsmMaxPowerCap : public NsmObject
   public:
     NsmMaxPowerCap(std::string& name, std::string& type,
                    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf,
+                   std::string& inventoryObjPath);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    void updateMetricOnSharedMemory() override;
     std::shared_ptr<NsmPowerCapIntf> getMaxPowerCapIntf() const
     {
         return powerCapIntf;
@@ -583,6 +585,7 @@ class NsmMaxPowerCap : public NsmObject
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
     std::shared_ptr<PowerLimitIface> powerLimitIntf = nullptr;
     void updateValue(uint32_t value);
+    std::string inventoryObjPath;
 };
 
 class NsmMinPowerCap : public NsmObject
@@ -590,8 +593,10 @@ class NsmMinPowerCap : public NsmObject
   public:
     NsmMinPowerCap(std::string& name, std::string& type,
                    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-                   std::shared_ptr<PowerLimitIface> powerLimitIntf);
+                   std::shared_ptr<PowerLimitIface> powerLimitIntf,
+                   std::string& inventoryObjPath);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    void updateMetricOnSharedMemory() override;
     std::shared_ptr<NsmPowerCapIntf> getMinPowerCapIntf() const
     {
         return powerCapIntf;
@@ -601,6 +606,7 @@ class NsmMinPowerCap : public NsmObject
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
     std::shared_ptr<PowerLimitIface> powerLimitIntf = nullptr;
     void updateValue(uint32_t value);
+    std::string inventoryObjPath;
 };
 class NsmDefaultPowerCap : public NsmObject
 {

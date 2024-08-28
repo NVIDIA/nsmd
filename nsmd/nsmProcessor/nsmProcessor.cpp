@@ -871,6 +871,12 @@ void NsmClockLimitGraphics::updateMetricOnSharedMemory()
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, speedConfigVal);
+
+    propName = "SpeedLimit";
+    nv::sensor_aggregation::DbusVariantType speedLimitVal{
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLimit()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, speedLimitVal);
 #endif
 }
 
@@ -1768,19 +1774,35 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc;
 }
 
-NsmMaxPowerCap::NsmMaxPowerCap(
-    std::string& name, std::string& type,
-    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
+                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                               std::shared_ptr<PowerLimitIface> powerLimitIntf,
+                               std::string& inventoryObjPath) :
     NsmObject(name, type), powerCapIntf(powerCapIntf),
-    powerLimitIntf(powerLimitIntf)
-{}
+    powerLimitIntf(powerLimitIntf), inventoryObjPath(inventoryObjPath)
+{
+    updateMetricOnSharedMemory();
+}
 
 void NsmMaxPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->maxPowerCapValue(value);
     powerLimitIntf->maxPowerWatts(value);
     lg2::info("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
+}
+
+void NsmMaxPowerCap::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(powerLimitIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "MaxPowerWatts";
+    nv::sensor_aggregation::DbusVariantType maxPowerVal{
+        powerLimitIntf->maxPowerWatts()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, maxPowerVal);
+#endif
 }
 
 requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
@@ -1839,19 +1861,35 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     co_return cc;
 }
 
-NsmMinPowerCap::NsmMinPowerCap(
-    std::string& name, std::string& type,
-    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-    std::shared_ptr<PowerLimitIface> powerLimitIntf) :
+NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
+                               std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+                               std::shared_ptr<PowerLimitIface> powerLimitIntf,
+                               std::string& inventoryObjPath) :
     NsmObject(name, type), powerCapIntf(powerCapIntf),
-    powerLimitIntf(powerLimitIntf)
-{}
+    powerLimitIntf(powerLimitIntf), inventoryObjPath(inventoryObjPath)
+{
+    updateMetricOnSharedMemory();
+}
 
 void NsmMinPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->minPowerCapValue(value);
     powerLimitIntf->minPowerWatts(value);
     lg2::info("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
+}
+
+void NsmMinPowerCap::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(powerLimitIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "MinPowerWatts";
+    nv::sensor_aggregation::DbusVariantType minPowerVal{
+        powerLimitIntf->minPowerWatts()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, minPowerVal);
+#endif
 }
 
 requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
@@ -2340,9 +2378,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto clockLimitSensor = std::make_shared<NsmClockLimitGraphics>(
             name, type, cpuOperatingConfigIntf, inventoryObjPath);
         auto minGraphicsClockFreq = std::make_shared<NsmMinGraphicsClockLimit>(
-            name, type, cpuOperatingConfigIntf);
+            name, type, cpuOperatingConfigIntf, inventoryObjPath);
         auto maxGraphicsClockFreq = std::make_shared<NsmMaxGraphicsClockLimit>(
-            name, type, cpuOperatingConfigIntf);
+            name, type, cpuOperatingConfigIntf, inventoryObjPath);
 
         bool isCurrentUtilizationLongRunning{false};
 
@@ -2492,11 +2530,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         manager.defaultPowerCapList.emplace_back(defaultPowerCap);
 
         auto maxPowerCap = std::make_shared<NsmMaxPowerCap>(
-            name, type, powerCapIntf, powerLimitIntf);
+            name, type, powerCapIntf, powerLimitIntf, inventoryObjPath);
         manager.maxPowerCapList.emplace_back(maxPowerCap);
 
         auto minPowerCap = std::make_shared<NsmMinPowerCap>(
-            name, type, powerCapIntf, powerLimitIntf);
+            name, type, powerCapIntf, powerLimitIntf, inventoryObjPath);
         manager.minPowerCapList.emplace_back(minPowerCap);
 
         nsmDevice->addStaticSensor(defaultPowerCap);

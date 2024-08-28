@@ -10,7 +10,8 @@
 #include <optional>
 #include <vector>
 
-namespace nsm{
+namespace nsm
+{
 
 NsmMemoryCapacity::NsmMemoryCapacity(const std::string& name,
                                      const std::string& type) :
@@ -41,7 +42,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     std::vector<uint8_t> data(65535, 0);
     uint16_t data_size;
@@ -116,7 +116,8 @@ void NsmMemoryCapacityUtil::updateMetricOnSharedMemory()
 
     std::string propName = "CapacityUtilizationPercent";
     nv::sensor_aggregation::DbusVariantType capacityUtilizationPercent{
-        static_cast<uint16_t>(dimmMemoryMetricsIntf->capacityUtilizationPercent())};
+        static_cast<uint16_t>(
+            dimmMemoryMetricsIntf->capacityUtilizationPercent())};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
                                                  propName, smbusData,
                                                  capacityUtilizationPercent);
@@ -195,11 +196,15 @@ uint8_t
 
 NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     std::string& name, std::string& type,
-    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+    std::string& inventoryObjPath) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
+
+    updateMetricOnSharedMemory();
 }
 
 requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
@@ -247,6 +252,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->minSpeed(value);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -258,13 +264,31 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
     co_return cc;
 }
 
+void NsmMinGraphicsClockLimit::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(cpuOperatingConfigIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "MinSpeed";
+    nv::sensor_aggregation::DbusVariantType minSpeedVal{
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::minSpeed()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, minSpeedVal);
+#endif
+}
+
 NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     std::string& name, std::string& type,
-    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf)
+    std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+    std::string& inventoryObjPath) :
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
+
+    updateMetricOnSharedMemory();
 }
 
 requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
@@ -312,6 +336,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->maxSpeed(value);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -321,6 +346,20 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
+}
+
+void NsmMaxGraphicsClockLimit::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(cpuOperatingConfigIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    std::string propName = "MaxSpeed";
+    nv::sensor_aggregation::DbusVariantType maxSpeedVal{
+        cpuOperatingConfigIntf->CpuOperatingConfigIntf::maxSpeed()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, maxSpeedVal);
+#endif
 }
 
 } // namespace nsm
