@@ -26,7 +26,8 @@ TEST(nsmMemCapacityUtil, GoodGenReq)
     auto totalMemorySensor =
         std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath, totalMemorySensor);
+                                      inventoryObjPath, totalMemorySensor,
+                                      false);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -45,7 +46,8 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
     auto totalMemorySensor =
         std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath, totalMemorySensor);
+                                      inventoryObjPath, totalMemorySensor,
+                                      false);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
         0);
@@ -69,7 +71,8 @@ TEST(nsmMemCapacityUtil, BadHandleResp)
     auto totalMemorySensor =
         std::make_shared<NsmTotalMemory>(sensorName, sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
-                                      inventoryObjPath, totalMemorySensor);
+                                      inventoryObjPath, totalMemorySensor,
+                                      false);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),

@@ -23,12 +23,13 @@
 
 namespace nsm
 {
-requester::Coroutine setMigModeOnDevice(bool migMode,
+requester::Coroutine setMigModeOnDevice(const bool isLongRunning, bool migMode,
                                         AsyncOperationStatusType* status,
                                         std::shared_ptr<NsmDevice> device);
 
 requester::Coroutine
-    setMigModeEnabled(const AsyncSetOperationValueType& value,
+    setMigModeEnabled(const bool isLongRunning,
+                      const AsyncSetOperationValueType& value,
                       [[maybe_unused]] AsyncOperationStatusType* status,
                       std::shared_ptr<NsmDevice> device)
 {
@@ -39,13 +40,14 @@ requester::Coroutine
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    const auto rc = co_await setMigModeOnDevice(*migMode, status, device);
+    const auto rc = co_await setMigModeOnDevice(isLongRunning, *migMode, status,
+                                                device);
 
     co_return rc;
 }
 
 requester::Coroutine
-    setMigModeOnDevice(bool migMode,
+    setMigModeOnDevice(const bool isLongRunning, bool migMode,
                        [[maybe_unused]] AsyncOperationStatusType* status,
                        std::shared_ptr<NsmDevice> device)
 {
@@ -70,7 +72,7 @@ requester::Coroutine
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+                                               responseLen, isLongRunning);
     if (rc_)
     {
         lg2::error(

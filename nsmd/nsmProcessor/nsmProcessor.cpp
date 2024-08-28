@@ -144,8 +144,9 @@ NsmLocationCodeIntfProcessor::NsmLocationCodeIntfProcessor(
 
 NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath,
-                       [[maybe_unused]] std::shared_ptr<NsmDevice> device) :
-    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
+                       [[maybe_unused]] std::shared_ptr<NsmDevice> device,
+                       bool isLongRunning) :
+    NsmSensor(name, type, isLongRunning), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMigMode: create sensor:{NAME}", "NAME", name.c_str());
@@ -218,8 +219,8 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
 
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
                        std::shared_ptr<EccModeIntf> eccIntf,
-                       std::string& inventoryObjPath) :
-    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
+                       std::string& inventoryObjPath, bool isLongRunning) :
+    NsmSensor(name, type, isLongRunning), inventoryObjPath(inventoryObjPath)
 
 {
     eccModeIntf = eccIntf;
@@ -1151,8 +1152,8 @@ NsmCurrentUtilization::NsmCurrentUtilization(
     const std::string& name, const std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::shared_ptr<SMUtilizationIntf> smUtilizationIntf,
-    std::string& inventoryObjPath) :
-    NsmSensor(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    std::string& inventoryObjPath, bool isLongRunning) :
+    NsmSensor(name, type, isLongRunning), cpuOperatingConfigIntf(cpuConfigIntf),
     smUtilizationIntf(smUtilizationIntf), inventoryObjPath(inventoryObjPath),
     smUtilizationIntfName(smUtilizationIntf->interface),
     smUtilizationPropertyName("SMUtilization")
@@ -1983,8 +1984,9 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
 NsmProcessorThrottleDuration::NsmProcessorThrottleDuration(
     std::string& name, std::string& type,
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
-    std::string& inventoryObjPath) :
-    NsmSensor(name, type), processorPerformanceIntf(processorPerfIntf),
+    std::string& inventoryObjPath, bool isLongRunning) :
+    NsmSensor(name, type, isLongRunning),
+    processorPerformanceIntf(processorPerfIntf),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -2219,15 +2221,28 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
 
-        auto sensor = std::make_shared<NsmMigMode>(bus, name, type,
-                                                   inventoryObjPath, nsmDevice);
-        nsmDevice->addSensor(sensor, priority);
+        bool isLongRunning{false};
+
+        try
+        {
+            isLongRunning = co_await utils::coGetDbusProperty<bool>(
+                objPath.c_str(), "LongRunning", interface.c_str());
+        }
+        catch (...)
+        {}
+
+        auto sensor = std::make_shared<NsmMigMode>(
+            bus, name, type, inventoryObjPath, nsmDevice, isLongRunning);
+
+        nsmDevice->addSensor(sensor, priority, isLongRunning);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
             ->addAsyncSetOperation(
                 "com.nvidia.MigMode", "MIGModeEnabled",
-                AsyncSetOperationInfo{setMigModeEnabled, sensor, nsmDevice});
+                AsyncSetOperationInfo{
+                    std::bind_front(setMigModeEnabled, isLongRunning), sensor,
+                    nsmDevice});
     }
     if (type == "NSM_PCIe")
     {
@@ -2272,13 +2287,23 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
 
+        bool isLongRunning{false};
+
+        try
+        {
+            isLongRunning = co_await utils::coGetDbusProperty<bool>(
+                objPath.c_str(), "LongRunning", interface.c_str());
+        }
+        catch (...)
+        {}
+
         auto eccIntf = std::make_shared<EccModeIntf>(bus,
                                                      inventoryObjPath.c_str());
 
-        auto eccModeSensor = std::make_shared<NsmEccMode>(name, type, eccIntf,
-                                                          inventoryObjPath);
+        auto eccModeSensor = std::make_shared<NsmEccMode>(
+            name, type, eccIntf, inventoryObjPath, isLongRunning);
 
-        nsmDevice->addSensor(eccModeSensor, priority);
+        nsmDevice->addSensor(eccModeSensor, priority, isLongRunning);
 
         auto eccErrorCntSensor = std::make_shared<NsmEccErrorCounts>(
             name, type, eccIntf, inventoryObjPath);
@@ -2287,10 +2312,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
-            ->addAsyncSetOperation(eccIntf->interface, "ECCModeEnabled",
-                                   AsyncSetOperationInfo{setECCModeEnabled,
-                                                         eccModeSensor,
-                                                         nsmDevice});
+            ->addAsyncSetOperation(
+                eccIntf->interface, "ECCModeEnabled",
+                AsyncSetOperationInfo{
+                    std::bind_front(setECCModeEnabled, isLongRunning),
+                    eccModeSensor, nsmDevice});
     }
     else if (type == "NSM_EDPp")
     {
@@ -2317,9 +2343,23 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             name, type, cpuOperatingConfigIntf);
         auto maxGraphicsClockFreq = std::make_shared<NsmMaxGraphicsClockLimit>(
             name, type, cpuOperatingConfigIntf);
+
+        bool isCurrentUtilizationLongRunning{false};
+
+        try
+        {
+            isCurrentUtilizationLongRunning =
+                co_await utils::coGetDbusProperty<bool>(
+                    objPath.c_str(), "CurrentUtilizationLongRunning",
+                    interface.c_str());
+        }
+        catch (...)
+        {}
+
         auto currentUtilization = std::make_shared<NsmCurrentUtilization>(
             name + "_CurrentUtilization", type, cpuOperatingConfigIntf,
-            smUtilizationIntf, inventoryObjPath);
+            smUtilizationIntf, inventoryObjPath,
+            isCurrentUtilizationLongRunning);
 
         auto defaultBoostClockSpeed =
             std::make_shared<NsmDefaultBoostClockSpeed>(name, type,
@@ -2331,7 +2371,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         nsmDevice->addSensor(clockFreqSensor, priority);
         nsmDevice->addSensor(clockLimitSensor, priority);
-        nsmDevice->addSensor(currentUtilization, priority);
+        nsmDevice->addSensor(currentUtilization, priority,
+                             isCurrentUtilizationLongRunning);
 
         nsmDevice->addStaticSensor(minGraphicsClockFreq);
         nsmDevice->addStaticSensor(maxGraphicsClockFreq);
@@ -2351,6 +2392,18 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto deviceId = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "DeviceId", interface.c_str());
 
+        bool isGetViolationDurationLongRunning{false};
+
+        try
+        {
+            isGetViolationDurationLongRunning =
+                co_await utils::coGetDbusProperty<bool>(
+                    objPath.c_str(), "GetViolationDurationLongRunning",
+                    interface.c_str());
+        }
+        catch (...)
+        {}
+
         auto processorPerfIntf = std::make_shared<ProcessorPerformanceIntf>(
             bus, inventoryObjPath.c_str());
 
@@ -2360,7 +2413,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto throttleDurationSensor =
             std::make_shared<NsmProcessorThrottleDuration>(
-                name, type, processorPerfIntf, inventoryObjPath);
+                name, type, processorPerfIntf, inventoryObjPath,
+                isGetViolationDurationLongRunning);
 
         auto gpuUtilSensor = std::make_shared<NsmAccumGpuUtilTime>(
             name, type, processorPerfIntf, inventoryObjPath);
@@ -2370,17 +2424,29 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addSensor(gpuUtilSensor, priority);
         nsmDevice->addSensor(pciRxTxSensor, priority);
         nsmDevice->addSensor(throttleReasonSensor, priority);
-        nsmDevice->addSensor(throttleDurationSensor, priority);
+        nsmDevice->addSensor(throttleDurationSensor, priority,
+                             isGetViolationDurationLongRunning);
     }
     else if (type == "NSM_MemCapacityUtil")
     {
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
+
+        bool isLongRunning{false};
+        try
+        {
+            isLongRunning = co_await utils::coGetDbusProperty<bool>(
+                objPath.c_str(), "LongRunning", interface.c_str());
+        }
+        catch (...)
+        {}
+
         auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name, type);
         nsmDevice->addSensor(totalMemorySensor, priority);
         auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-            bus, name, type, inventoryObjPath, totalMemorySensor);
-        nsmDevice->addSensor(sensor, priority);
+            bus, name, type, inventoryObjPath, totalMemorySensor,
+            isLongRunning);
+        nsmDevice->addSensor(sensor, priority, isLongRunning);
     }
     else if (type == "NSM_PowerCap")
     {

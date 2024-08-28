@@ -61,7 +61,7 @@ nsm_requester_rc_t nsm_open()
 
 static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 				    uint8_t **nsm_resp_msg,
-				    size_t *resp_msg_len)
+				    size_t *resp_msg_len, uint8_t *tag)
 {
 	struct pollfd pollSet[1];
 	pollSet[0].fd = mctp_fd;
@@ -116,15 +116,17 @@ static nsm_requester_rc_t mctp_recv(mctp_eid_t eid, int mctp_fd,
 			return NSM_REQUESTER_NOT_NSM_MSG;
 		}
 		*resp_msg_len = nsm_len;
+		*tag = mctp_prefix[0];
 		return NSM_REQUESTER_SUCCESS;
 	}
 }
 
 nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
-				uint8_t **nsm_resp_msg, size_t *resp_msg_len)
+				uint8_t **nsm_resp_msg, size_t *resp_msg_len,
+				uint8_t *tag)
 {
 	nsm_requester_rc_t rc =
-	    mctp_recv(eid, mctp_fd, nsm_resp_msg, resp_msg_len);
+	    mctp_recv(eid, mctp_fd, nsm_resp_msg, resp_msg_len, tag);
 	if (rc != NSM_REQUESTER_SUCCESS) {
 		return rc;
 	}
@@ -150,8 +152,9 @@ nsm_requester_rc_t nsm_recv_any(mctp_eid_t eid, int mctp_fd,
 nsm_requester_rc_t nsm_recv(mctp_eid_t eid, int mctp_fd, uint8_t instance_id,
 			    uint8_t **nsm_resp_msg, size_t *resp_msg_len)
 {
+	uint8_t tag;
 	nsm_requester_rc_t rc =
-	    nsm_recv_any(eid, mctp_fd, nsm_resp_msg, resp_msg_len);
+	    nsm_recv_any(eid, mctp_fd, nsm_resp_msg, resp_msg_len, &tag);
 	if (rc != NSM_REQUESTER_SUCCESS) {
 		return rc;
 	}

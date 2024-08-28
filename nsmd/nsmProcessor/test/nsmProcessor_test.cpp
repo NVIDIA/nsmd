@@ -44,7 +44,7 @@ std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
 TEST(nsmMigMode, GoodGenReq)
 {
     nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
-                              nullptr);
+                              nullptr, false);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -61,7 +61,7 @@ TEST(nsmMigMode, GoodGenReq)
 TEST(nsmMigMode, GoodHandleResp)
 {
     nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
-                              nullptr);
+                              nullptr, false);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -80,7 +80,7 @@ TEST(nsmMigMode, GoodHandleResp)
 TEST(nsmMigMode, BadHandleResp)
 {
     nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
-                              nullptr);
+                              nullptr, false);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_MIG_mode_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -102,7 +102,7 @@ TEST(nsmMigMode, BadHandleResp)
 TEST(nsmMigMode, GoodUpdateReading)
 {
     nsm::NsmMigMode migSensor(bus, sensorName, sensorType, inventoryObjPath,
-                              nullptr);
+                              nullptr, false);
     bitfield8_t flags;
     flags.byte = 1;
     migSensor.updateReading(flags);
@@ -988,8 +988,9 @@ TEST(nsmProcessorThrottleDuration, GoodGenReq)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleDuration sensor(
-        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
+    nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
+                                             processorPerformanceIntf,
+                                             inventoryObjPath, false);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -1007,8 +1008,9 @@ TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleDuration sensor(
-        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
+    nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
+                                             processorPerformanceIntf,
+                                             inventoryObjPath, false);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_violation_duration_resp),
@@ -1040,8 +1042,9 @@ TEST(nsmProcessorThrottleDuration, BadHandleResp)
 {
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
-    nsm::NsmProcessorThrottleDuration sensor(
-        sensorName, sensorType, processorPerformanceIntf, inventoryObjPath);
+    nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
+                                             processorPerformanceIntf,
+                                             inventoryObjPath, false);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_violation_duration_resp),

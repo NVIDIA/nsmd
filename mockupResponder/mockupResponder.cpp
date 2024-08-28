@@ -1680,6 +1680,7 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getMigModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen)
 {
+    lg2::info("getMigModeHandler: request length={LEN}", "LEN", requestLen);
     auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)

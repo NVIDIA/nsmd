@@ -285,6 +285,24 @@ void SensorManagerImpl::startPolling(uuid_t uuid)
                     std::chrono::milliseconds(SENSOR_POLLING_TIME)),
                 true);
         }
+
+        if (!nsmDevice->pollingTimerLongRunning)
+        {
+            nsmDevice->pollingTimerLongRunning =
+                std::make_unique<sdbusplus::Timer>(
+                    event.get(),
+                    std::bind_front(&SensorManagerImpl::doPollingLongRunning,
+                                    this, nsmDevice));
+        }
+
+        if (!(nsmDevice->pollingTimerLongRunning->isRunning()))
+        {
+            nsmDevice->pollingTimerLongRunning->start(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::milliseconds(
+                        SENSOR_POLLING_TIME_LONG_RUNNING)),
+                true);
+        }
     }
 }
 
@@ -306,6 +324,24 @@ void SensorManagerImpl::startPolling()
                     std::chrono::milliseconds(SENSOR_POLLING_TIME)),
                 true);
         }
+
+        if (!nsmDevice->pollingTimerLongRunning)
+        {
+            nsmDevice->pollingTimerLongRunning =
+                std::make_unique<sdbusplus::Timer>(
+                    event.get(),
+                    std::bind_front(&SensorManagerImpl::doPollingLongRunning,
+                                    this, nsmDevice));
+        }
+
+        if (!(nsmDevice->pollingTimerLongRunning->isRunning()))
+        {
+            nsmDevice->pollingTimerLongRunning->start(
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::milliseconds(
+                        SENSOR_POLLING_TIME_LONG_RUNNING)),
+                true);
+        }
     }
 }
 
@@ -315,6 +351,7 @@ void SensorManagerImpl::stopPolling(uuid_t uuid)
     if (nsmDevice)
     {
         nsmDevice->pollingTimer->stop();
+        nsmDevice->pollingTimerLongRunning->stop();
     }
 }
 
@@ -323,6 +360,7 @@ void SensorManagerImpl::stopPolling()
     for (auto& nsmDevice : nsmDevices)
     {
         nsmDevice->pollingTimer->stop();
+        nsmDevice->pollingTimerLongRunning->stop();
     }
 }
 
@@ -343,6 +381,59 @@ void SensorManagerImpl::doPolling(std::shared_ptr<NsmDevice> nsmDevice)
     {
         nsmDevice->doPollingTaskHandle = nullptr;
     }
+}
+
+void SensorManagerImpl::doPollingLongRunning(
+    std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (nsmDevice->doPollingTaskHandleLongRunning)
+    {
+        if (!(nsmDevice->doPollingTaskHandleLongRunning.done()))
+        {
+            return;
+        }
+        nsmDevice->doPollingTaskHandleLongRunning.destroy();
+    }
+
+    auto co = doPollingTaskLongRunning(nsmDevice);
+    nsmDevice->doPollingTaskHandleLongRunning = co.handle;
+    if (nsmDevice->doPollingTaskHandleLongRunning.done())
+    {
+        nsmDevice->doPollingTaskHandleLongRunning = nullptr;
+    }
+}
+
+requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
+    std::shared_ptr<NsmDevice> nsmDevice)
+{
+    uint64_t t0 = 0;
+    uint64_t t1 = 0;
+    uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
+    eid_t eid = getEid(nsmDevice);
+    do
+    {
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
+
+        auto& sensors = nsmDevice->longRunningSensors;
+
+        size_t sensorIndex{0};
+        while (sensorIndex < sensors.size())
+        {
+            auto sensor = sensors[sensorIndex];
+            co_await sensor->update(*this, eid);
+            if (nsmDevice->pollingTimerLongRunning &&
+                !nsmDevice->pollingTimerLongRunning->isRunning())
+            {
+                co_return NSM_SW_ERROR;
+            }
+
+            ++sensorIndex;
+        }
+
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+    } while ((t1 - t0) >= pollingTimeInUsec);
+
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine
@@ -455,7 +546,7 @@ requester::Coroutine
 
 requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen)
+    size_t& responseLen, bool isLongRunning)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -488,7 +579,7 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
 
     const nsm_msg* response = nullptr;
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, &response, &responseLen);
+        handler, eid, request, &response, &responseLen, isLongRunning);
     responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
     }); // the memory is allocated and free at sock_handler.cpp
     // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
@@ -549,7 +640,7 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
 
     const nsm_msg* response = nullptr;
     // check if there is request in progress.
-    if (handler.hasInProgressRequest(eid))
+    while (handler.hasInProgressRequest(eid))
     {
         lg2::info(
             "SendRecvNsmMsgSync: waiting response for in progress request. EID={EID}",
@@ -557,7 +648,9 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
         // waiting for response
         while (1)
         {
-            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)&response, &responseLen);
+            uint8_t tag;
+            rc = nsm_recv_any(eid, mctpFd, (uint8_t**)&response, &responseLen,
+                              &tag);
             if (rc == (uint8_t)NSM_REQUESTER_EID_MISMATCH)
             {
                 lg2::info(
@@ -566,7 +659,7 @@ uint8_t SensorManagerImpl::SendRecvNsmMsgSync(
                 continue;
             }
 
-            handler.invalidInProgressRequest(eid);
+            handler.invalidInProgressRequest(eid, tag);
             if (rc == NSM_REQUESTER_SUCCESS)
             {
                 lg2::info(

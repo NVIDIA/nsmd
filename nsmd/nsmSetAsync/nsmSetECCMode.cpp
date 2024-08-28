@@ -23,12 +23,13 @@
 
 namespace nsm
 {
-requester::Coroutine setECCModeOnDevice(bool migMode,
+requester::Coroutine setECCModeOnDevice(const bool isLongRunning, bool migMode,
                                         AsyncOperationStatusType* status,
                                         std::shared_ptr<NsmDevice> device);
 
 requester::Coroutine
-    setECCModeEnabled(const AsyncSetOperationValueType& value,
+    setECCModeEnabled(const bool isLongRunning,
+                      const AsyncSetOperationValueType& value,
                       [[maybe_unused]] AsyncOperationStatusType* status,
                       std::shared_ptr<NsmDevice> device)
 {
@@ -39,13 +40,14 @@ requester::Coroutine
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    const auto rc = co_await setECCModeOnDevice(*eccMode, status, device);
+    const auto rc = co_await setECCModeOnDevice(isLongRunning, *eccMode, status,
+                                                device);
 
     co_return rc;
 }
 
 requester::Coroutine
-    setECCModeOnDevice(bool eccMode,
+    setECCModeOnDevice(const bool isLongRunning, bool eccMode,
                        [[maybe_unused]] AsyncOperationStatusType* status,
                        std::shared_ptr<NsmDevice> device)
 {
@@ -71,7 +73,7 @@ requester::Coroutine
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+                                               responseLen, isLongRunning);
     if (rc_)
     {
         if (rc_ != NSM_ERR_UNSUPPORTED_COMMAND_CODE)

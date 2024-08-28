@@ -828,22 +828,24 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         {
             auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
+
+            bool isLongRunning{false};
+            try
+            {
+                isLongRunning = co_await utils::coGetDbusProperty<bool>(
+                    objPath.c_str(), "LongRunning", interface.c_str());
+            }
+            catch (...)
+            {}
+
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);
-            nsmDevice->addStaticSensor(totalMemorySensor);
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-                bus, name, type, inventoryObjPath, totalMemorySensor);
-            nsmDevice->deviceSensors.push_back(sensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensor);
-                nsmDevice->prioritySensors.push_back(totalMemorySensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensor);
-                nsmDevice->roundRobinSensors.push_back(totalMemorySensor);
-            }
+                bus, name, type, inventoryObjPath, totalMemorySensor,
+                isLongRunning);
+
+            nsmDevice->addSensor(sensor, priority, isLongRunning);
+            nsmDevice->addSensor(totalMemorySensor, priority);
         }
     }
 

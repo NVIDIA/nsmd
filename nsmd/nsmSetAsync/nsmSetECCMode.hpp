@@ -23,7 +23,8 @@
 
 namespace nsm
 {
-requester::Coroutine setECCModeEnabled(const AsyncSetOperationValueType& value,
+requester::Coroutine setECCModeEnabled(const bool isLongRunning,
+                                       const AsyncSetOperationValueType& value,
                                        AsyncOperationStatusType* status,
                                        std::shared_ptr<NsmDevice> device);
 } // namespace nsm

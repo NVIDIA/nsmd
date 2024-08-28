@@ -224,6 +224,7 @@ std::optional<Response>
     Handler::processRxMsg(const std::vector<uint8_t>& nsmMsg)
 {
     uint8_t eid = nsmMsg[1];
+    const uint8_t tag = nsmMsg[0];
     nsm_header_info hdrFields{};
     auto hdr =
         reinterpret_cast<const nsm_msg_hdr*>(nsmMsg.data() + MCTP_DEMUX_PREFIX);
@@ -258,7 +259,7 @@ std::optional<Response>
     {
         auto response = reinterpret_cast<const nsm_msg*>(hdr);
         size_t responseLen = nsmMsg.size() - MCTP_DEMUX_PREFIX;
-        handler.handleResponse(eid, hdrFields.instance_id,
+        handler.handleResponse(tag, eid, hdrFields.instance_id,
                                hdrFields.nvidia_msg_type, response->payload[0],
                                response, responseLen);
     }

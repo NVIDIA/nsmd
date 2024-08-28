@@ -634,10 +634,11 @@ requester::Coroutine
 
 requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
                                                    const nsm_msg** responseMsg,
-                                                   size_t* responseLen)
+                                                   size_t* responseLen,
+                                                   bool isLongRunning)
 {
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, responseMsg, responseLen);
+        handler, eid, request, responseMsg, responseLen, isLongRunning);
     if (rc)
     {
         lg2::error("DeviceManager::SendRecvNsmMsg failed. eid={EID} rc={RC}",

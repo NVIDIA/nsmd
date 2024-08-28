@@ -66,7 +66,9 @@ class NsmMemoryCapacityUtil : public NsmSensor
   public:
     NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
                           const std::string& type,
-                          std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory>totalMemory);
+                          std::string& inventoryObjPath,
+                          std::shared_ptr<NsmTotalMemory> totalMemory,
+                          bool isLongRunning);
     NsmMemoryCapacityUtil() = default;
 
     std::optional<std::vector<uint8_t>>

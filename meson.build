@@ -31,14 +31,26 @@ conf_data = configuration_data()
 conf_data.set('SENSOR_POLLING_TIME', get_option('sensor-polling-time'))
 conf_data.set('GPU_PWR_GD_GPIO', '"' + get_option('gpio-name') + '"')
 conf_data.set(
+    'SENSOR_POLLING_TIME_LONG_RUNNING',
+    get_option('sensor-polling-time-long-running')
+)
+conf_data.set(
     'INSTANCE_ID_EXPIRATION_INTERVAL',
     get_option('instance-id-expiration-interval'),
+)
+conf_data.set(
+    'INSTANCE_ID_EXPIRATION_INTERVAL_LONG_RUNNING',
+    get_option('instance-id-expiration-interval-long-running'),
 )
 conf_data.set(
     'NUMBER_OF_REQUEST_RETRIES',
     get_option('number-of-request-retries'),
 )
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
+conf_data.set(
+    'RESPONSE_TIME_OUT_LONG_RUNNING',
+    get_option('response-time-out-long-running')
+)
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
 endif
