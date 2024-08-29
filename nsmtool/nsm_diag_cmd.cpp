@@ -105,21 +105,84 @@ class QueryTokenParameters : public CommandInterface
         result["Token request size"] =
             static_cast<uint32_t>(token_request.token_request_size);
         result["Device UUID"] = bytesToHexString(token_request.device_uuid, 8);
-        result["Device type"] =
-            static_cast<uint32_t>(token_request.device_type);
+        switch (token_request.device_type)
+        {
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_EROT:
+                result["Device type"] = "ERoT";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_GPU:
+                result["Device type"] = "GPU";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NVSWITCH:
+                result["Device type"] = "NVSwitch";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7:
+                result["Device type"] = "CX7";
+                break;
+            default:
+                result["Device type"] =
+                    "Invalid value: " +
+                    std::to_string(token_request.device_type);
+                break;
+        }
         result["Device index"] =
             static_cast<uint32_t>(token_request.device_index);
-        result["Status"] = token_request.status;
-        result["Token opcode"] = token_request.token_opcode;
+        switch (token_request.status)
+        {
+            case NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_OK:
+                result["Status"] = "OK";
+                break;
+            case NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_TOKEN_ALREADY_APPLIED:
+                result["Status"] = "Token already applied";
+                break;
+            case NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_TOKEN_NOT_SUPPORTED:
+                result["Status"] = "Token not supported";
+                break;
+            case NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_NO_KEY_CONFIGURED:
+                result["Status"] = "No key configured";
+                break;
+            case NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_INTERFACE_NOT_ALLOWED:
+                result["Status"] = "Interface not allowed";
+                break;
+            default:
+                result["Status"] = "Invalid value: " +
+                                   std::to_string(token_request.status);
+                break;
+        }
+        switch (token_request.token_opcode)
+        {
+            case NSM_DEBUG_TOKEN_OPCODE_RMCS:
+                result["Token opcode"] = "RMCS";
+                break;
+            case NSM_DEBUG_TOKEN_OPCODE_RMDT:
+                result["Token opcode"] = "RMDT";
+                break;
+            case NSM_DEBUG_TOKEN_OPCODE_CRCS:
+                result["Token opcode"] = "CRCS";
+                break;
+            case NSM_DEBUG_TOKEN_OPCODE_CRDT:
+                result["Token opcode"] = "CRDT";
+                break;
+            case NSM_DEBUG_TOKEN_OPCODE_LINKX_FRC:
+                result["Token opcode"] = "LINKX_FRC";
+                break;
+            default:
+                result["Token opcode"] =
+                    "Invalid value: " +
+                    std::to_string(token_request.token_opcode);
+                break;
+        }
         result["Keypair UUID"] = bytesToHexString(token_request.keypair_uuid,
                                                   16);
         result["Base MAC"] = bytesToHexString(token_request.base_mac, 8);
         result["PSID"] = bytesToHexString(token_request.psid, 16);
-        result["FW version"] = nlohmann::json::array();
-        for (size_t i = 0; i < 5; ++i)
-        {
-            result["FW version"].push_back(token_request.fw_version[i]);
-        }
+        result["FW version"] = std::to_string(token_request.fw_version[0]) +
+                               "." +
+                               std::to_string(token_request.fw_version[1] << 8 |
+                                              token_request.fw_version[2]) +
+                               "." +
+                               std::to_string(token_request.fw_version[3] << 8 |
+                                              token_request.fw_version[4]);
         result["Source address"] =
             bytesToHexString(token_request.source_address, 16);
         result["Session ID"] = static_cast<uint32_t>(token_request.session_id);
@@ -290,13 +353,13 @@ class QueryTokenStatus : public CommandInterface
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         nsm_debug_token_status status;
-        nsm_debug_token_status_additional_info additional_info;
-        nsm_debug_token_type token_type;
-        uint32_t time_left;
+        nsm_debug_token_status_additional_info additionalInfo;
+        nsm_debug_token_type tokenType;
+        uint32_t timeLeft;
 
         auto rc = decode_nsm_query_token_status_resp(
             responsePtr, payloadLength, &cc, &reason_code, &status,
-            &additional_info, &token_type, &time_left);
+            &additionalInfo, &tokenType, &timeLeft);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -308,10 +371,69 @@ class QueryTokenStatus : public CommandInterface
         nlohmann::ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        result["Status"] = status;
-        result["Additional info"] = additional_info;
-        result["Token type"] = token_type;
-        result["Time left"] = time_left;
+        switch (status)
+        {
+            case NSM_DEBUG_TOKEN_STATUS_QUERY_FAILURE:
+                result["Status"] = "Query failure";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE:
+                result["Status"] = "Debug session active";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_NO_TOKEN_APPLIED:
+                result["Status"] = "No token applied";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_CHALLENGE_PROVIDED:
+                result["Status"] = "Challenge provided";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_INSTALLATION_TIMEOUT:
+                result["Status"] = "Installation timeout";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_TOKEN_TIMEOUT:
+                result["Status"] = "Token timeout";
+                break;
+            default:
+                result["Status"] = "Invalid value: " + std::to_string(status);
+                break;
+        }
+        switch (additionalInfo)
+        {
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NONE:
+                result["Additional info"] = "None";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NO_DEBUG_SESSION:
+                result["Additional info"] = "No debug session";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_QUERY_DISALLOWED:
+                result["Additional info"] = "Debug session query disallowed";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_ACTIVE:
+                result["Additional info"] = "Debug session active";
+                break;
+            default:
+                result["Additional info"] = "Invalid value: " +
+                                            std::to_string(additionalInfo);
+                break;
+        }
+        switch (tokenType)
+        {
+            case NSM_DEBUG_TOKEN_TYPE_FRC:
+                result["Token type"] = "FRC";
+                break;
+            case NSM_DEBUG_TOKEN_TYPE_CRCS:
+                result["Token type"] = "CRCS";
+                break;
+            case NSM_DEBUG_TOKEN_TYPE_CRDT:
+                result["Token type"] = "CRDT";
+                break;
+            case NSM_DEBUG_TOKEN_TYPE_DEBUG_FIRMWARE:
+                result["Token type"] = "Debug firmware";
+                break;
+            default:
+                result["Token type"] = "Invalid value: " +
+                                       std::to_string(tokenType);
+                break;
+        }
+        result["Time left"] = timeLeft;
 
         DisplayInJson(result);
     }
@@ -537,8 +659,8 @@ class ResetNetworkDevice : public CommandInterface
                                                    &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
             return;
         }
@@ -608,8 +730,8 @@ class GetNetworkDeviceDebugInfo : public CommandInterface
             segData.data(), &nextHandle);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reasonCode << "\n";
             return;
         }
@@ -675,8 +797,8 @@ class EraseTrace : public CommandInterface
                                           &reasonCode, &resStatus);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reasonCode << "\n";
             return;
         }
@@ -754,12 +876,12 @@ class GetNetworkDeviceLogInfo : public CommandInterface
         std::vector<uint8_t> logData(65535, 0);
 
         auto rc = decode_get_network_device_log_info_resp(
-            responsePtr, payloadLength, &cc, &reasonCode, &nextHandle,
-            &logInfo, logData.data(), &logInfoSize);
+            responsePtr, payloadLength, &cc, &reasonCode, &nextHandle, &logInfo,
+            logData.data(), &logInfoSize);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reasonCode << "\n";
             return;
         }
@@ -778,9 +900,12 @@ class GetNetworkDeviceLogInfo : public CommandInterface
 
         result["Time High"] = static_cast<uint32_t>(logInfo.time_high);
         result["Time low"] = static_cast<uint32_t>(logInfo.time_low);
-        result["Log Entry Prefix"] = static_cast<uint32_t>(logInfo.entry_prefix);
-        result["Log Entry Suffix"] = static_cast<uint32_t>(logInfo.entry_suffix);
-        result["Number of Dwords in log entry"] = static_cast<uint8_t>(logInfo.length);
+        result["Log Entry Prefix"] =
+            static_cast<uint32_t>(logInfo.entry_prefix);
+        result["Log Entry Suffix"] =
+            static_cast<uint32_t>(logInfo.entry_suffix);
+        result["Number of Dwords in log entry"] =
+            static_cast<uint8_t>(logInfo.length);
 
         if (logInfoSize != 0)
             result["Log Information"] = "Data received";

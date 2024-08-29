@@ -95,10 +95,10 @@ struct nsm_debug_token_request {
 	uint16_t token_request_size;
 	uint8_t reserved1[20];
 	uint8_t device_uuid[8];
+	uint16_t device_type;
+	uint8_t reserved2[2];
 	uint8_t token_opcode;
 	uint8_t status;
-	uint8_t reserved2[2];
-	uint16_t device_type;
 	uint16_t device_index : 12;
 	uint8_t reserved3 : 4;
 	uint8_t keypair_uuid[16];
