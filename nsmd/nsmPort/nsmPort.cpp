@@ -901,24 +901,14 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             auto portStatusSensor = std::make_shared<NsmPortStatus>(
                 bus, portName, logicalPortNum, type, portMetricsOem3Intf,
                 objPath);
-            if (!portStatusSensor)
+            nsmDevice->deviceSensors.emplace_back(portStatusSensor);
+            if (priority)
             {
-                lg2::error(
-                    "Failed to create NSM Port status sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                    objPath);
+                nsmDevice->prioritySensors.emplace_back(portStatusSensor);
             }
             else
             {
-                nsmDevice->deviceSensors.emplace_back(portStatusSensor);
-                if (priority)
-                {
-                    nsmDevice->prioritySensors.emplace_back(portStatusSensor);
-                }
-                else
-                {
-                    nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
-                }
+                nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
             }
 
             auto portCharacteristicsSensor =

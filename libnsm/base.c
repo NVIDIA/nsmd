@@ -250,10 +250,9 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance_id,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
-						   size_t msg_len, uint8_t *cc,
-						   uint16_t *reason_code,
-						   bitfield8_t *types)
+int decode_get_supported_nvidia_message_types_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE])
 {
 	if (types == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -273,7 +272,8 @@ int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
 	struct nsm_get_supported_nvidia_message_types_resp *resp =
 	    (struct nsm_get_supported_nvidia_message_types_resp *)msg->payload;
 
-	memcpy(&(types->byte), resp->supported_nvidia_message_types, 32);
+	memcpy(types, resp->supported_nvidia_message_types,
+	       SUPPORTED_MSG_TYPE_DATA_SIZE);
 
 	return NSM_SW_SUCCESS;
 }
@@ -346,10 +346,10 @@ int encode_get_supported_command_codes_resp(uint8_t instance_id, uint8_t cc,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_supported_command_codes_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc,
-					    uint16_t *reason_code,
-					    bitfield8_t *command_codes)
+int decode_get_supported_command_codes_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    bitfield8_t command_codes[SUPPORTED_COMMAND_CODE_DATA_SIZE])
 {
 	if (command_codes == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -368,7 +368,8 @@ int decode_get_supported_command_codes_resp(const struct nsm_msg *msg,
 	struct nsm_get_supported_command_codes_resp *resp =
 	    (struct nsm_get_supported_command_codes_resp *)msg->payload;
 
-	memcpy(&(command_codes->byte), resp->supported_command_codes, 32);
+	memcpy(command_codes, resp->supported_command_codes,
+	       SUPPORTED_COMMAND_CODE_DATA_SIZE);
 
 	return NSM_SW_SUCCESS;
 }

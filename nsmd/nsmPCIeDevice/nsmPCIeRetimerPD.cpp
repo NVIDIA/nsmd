@@ -263,14 +263,6 @@ static requester::Coroutine
         std::make_shared<NsmPCIeDeviceQueryScalarTelemetry>(
             bus, name, associations, type, deviceType, deviceIndex,
             inventoryObjPath);
-    if (!retimerScalarTelemetry)
-    {
-        lg2::error(
-            "Failed to create pcie device scalar telemetry: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-
-        co_return NSM_ERROR;
-    }
     if (priority)
     {
         nsmDevice->prioritySensors.emplace_back(retimerScalarTelemetry);

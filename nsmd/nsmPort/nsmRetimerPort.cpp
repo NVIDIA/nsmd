@@ -344,14 +344,6 @@ static requester::Coroutine
 
         auto pciePortIntfSensor = std::make_shared<NsmPort>(
             bus, portName, type, associations, objPath);
-        if (!pciePortIntfSensor)
-        {
-            lg2::error(
-                "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
-            co_return NSM_ERROR;
-        }
         nsmDevice->addStaticSensor(pciePortIntfSensor);
 
         auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());

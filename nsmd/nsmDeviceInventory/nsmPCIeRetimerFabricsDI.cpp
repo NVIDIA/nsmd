@@ -66,14 +66,6 @@ static requester::Coroutine
 
     auto retimerFabricsDi = std::make_shared<NsmPCIeRetimerFabricDI>(
         bus, name, associations, type, fabricType);
-    if (!retimerFabricsDi)
-    {
-        lg2::error(
-            "Failed to create pcie retimer fabric device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}, Name={NAME}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath, "NAME", name);
-
-        co_return NSM_ERROR;
-    }
     nsmDevice->deviceSensors.emplace_back(retimerFabricsDi);
 
     co_return NSM_SUCCESS;

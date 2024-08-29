@@ -114,6 +114,13 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
         {
             auto peekedLength = recv(socketFd(), nullptr, 0,
                                      MSG_PEEK | MSG_TRUNC);
+            if (-1 == peekedLength)
+            {
+                returnCode = -errno;
+                std::cerr << "Failed to recv message length : RC = "
+                          << returnCode << "\n";
+                return returnCode;
+            }
             responseMsg.resize(peekedLength);
             auto recvDataLength =
                 recv(socketFd(), reinterpret_cast<void*>(responseMsg.data()),

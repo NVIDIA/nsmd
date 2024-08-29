@@ -91,7 +91,7 @@ requester::Coroutine
     uint16_t reason_code = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_ECC_mode_resp(responseMsg.get(), responseLen, &cc,
-                                  &reason_code, &data_size);
+                                  &data_size, &reason_code);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {

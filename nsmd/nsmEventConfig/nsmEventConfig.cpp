@@ -60,7 +60,8 @@ void NsmEventConfig::convertIdsToMask(std::vector<uint64_t>& eventIds,
 requester::Coroutine NsmEventConfig::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    rc = co_await setCurrentEventSources(manager, eid, messageType, srcEventMask);
+    rc = co_await setCurrentEventSources(manager, eid, messageType,
+                                         srcEventMask);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -69,6 +70,7 @@ requester::Coroutine NsmEventConfig::update(SensorManager& manager, eid_t eid)
                        "EID", eid, "RC", rc);
         }
     }
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -97,7 +99,8 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         co_return rc;
@@ -141,7 +144,8 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         co_return rc;

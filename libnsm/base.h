@@ -64,7 +64,6 @@ extern "C" {
 
 #define UNKNOWN_INSTANCE_ID 255
 
-
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,
@@ -618,14 +617,13 @@ int encode_get_supported_nvidia_message_types_resp(uint8_t instance, uint8_t cc,
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
  *  @param[out] reason_code  - pointer to reason code
- *  @param[out] types  - pointer to array bitfield8_t[8] for receiving supported
- *                       types
+ *  @param[out] types  - pointer to array bitfield8_t[32] for receiving
+ * supported types
  *  @return nsm_completion_codes
  */
-int decode_get_supported_nvidia_message_types_resp(const struct nsm_msg *msg,
-						   size_t msg_len, uint8_t *cc,
-						   uint16_t *reason_code,
-						   bitfield8_t *types);
+int decode_get_supported_nvidia_message_types_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE]);
 
 /** @brief Create a Get Supported Command codes request message
  *
@@ -657,14 +655,14 @@ int encode_get_supported_command_codes_resp(uint8_t instance_id, uint8_t cc,
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc     - pointer to response message completion code
  *  @param[out] reason_code     - pointer to reason code
- *  @param[out] command_codes  - pointer to array bitfield8_t[8] containing
+ *  @param[out] command_codes  - pointer to array bitfield8_t[32] containing
  * supported command codes
  *  @return nsm_completion_codes
  */
-int decode_get_supported_command_codes_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc,
-					    uint16_t *reason_code,
-					    bitfield8_t *command_codes);
+int decode_get_supported_command_codes_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    bitfield8_t command_codes[SUPPORTED_COMMAND_CODE_DATA_SIZE]);
 
 /** @brief Create a Query device identification request message
  *

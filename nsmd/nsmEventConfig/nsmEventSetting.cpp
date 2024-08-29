@@ -41,7 +41,8 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
     auto localEid = manager.getLocalEid();
-    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting, localEid);
+    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting,
+                                       localEid);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -51,6 +52,7 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
         }
     }
     nsmDevice->setEventMode(eventGenerationSetting);
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -75,7 +77,8 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
         co_return rc;
