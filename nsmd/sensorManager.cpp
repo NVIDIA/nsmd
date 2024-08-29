@@ -536,7 +536,7 @@ requester::Coroutine
             }
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-        } while ((t1 - t0) >= pollingTimeInUsec);
+        } while ((t1 - t0) < pollingTimeInUsec);
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
     } while ((t1 - t0) >= pollingTimeInUsec);
