@@ -178,10 +178,12 @@ struct nsm_get_network_device_log_info_req {
 // we might have to update, and if things are as per our understanding then no
 // change required. JIRA: https://jirasw.nvidia.com/browse/DGXOPENBMC-13373
 struct nsm_device_log_info_breakdown {
-	uint32_t lost_events : 4;
-	uint32_t unused : 3;
-	uint32_t synced_time : 1;
-	uint32_t reserved : 24;
+	uint8_t lost_events : 4;
+	uint8_t unused : 3;
+	uint8_t synced_time : 1;
+
+	uint8_t reserved1;
+	uint16_t reserved2;
 
 	uint32_t time_low;
 	uint32_t time_high;
@@ -193,7 +195,9 @@ struct nsm_device_log_info_breakdown {
 } __attribute__((packed));
 
 struct nsm_device_log_info {
-	uint32_t lost_events_and_synced_time;
+	uint8_t lost_events_and_synced_time;
+	uint8_t reserved1;
+	uint16_t reserved2;
 	uint32_t time_low;
 	uint32_t time_high;
 	uint32_t entry_prefix_and_length;

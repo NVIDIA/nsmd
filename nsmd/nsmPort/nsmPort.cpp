@@ -1,7 +1,7 @@
 #include "nsmPort.hpp"
 
-#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
+#include "dBusAsyncUtils.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -106,7 +106,7 @@ NsmPortStatus::NsmPortStatus(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum),
+    NsmObject(portName, type), portName(portName), portNumber(portNum),
     objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortStatus: {NAME} with port number {NUM}", "NAME",
@@ -123,44 +123,49 @@ NsmPortStatus::NsmPortStatus(
     updateMetricOnSharedMemory();
 }
 
-std::optional<std::vector<uint8_t>>
-    NsmPortStatus::genRequestMsg(eid_t eid, uint8_t instanceId)
+requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_query_port_status_req));
-    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_query_port_status_req(instanceId, portNumber, requestPtr);
+    std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                    sizeof(nsm_query_port_status_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(requestMsg.data());
+    auto rc = encode_query_port_status_req(0, portNumber, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-        return std::nullopt;
+        co_return NSM_SW_ERROR;
     }
 
-    return request;
-}
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
+                                         responseLen, false);
+    if (rc)
+    {
+        co_return rc;
+    }
 
-uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                         size_t responseLen)
-{
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint8_t portState = NSM_PORTSTATE_DOWN;
     uint8_t portStatus = NSM_PORTSTATUS_DISABLED;
 
-    auto rc = decode_query_port_status_resp(responseMsg, responseLen, &cc,
-                                            &reasonCode, &dataSize, &portState,
-                                            &portStatus);
+    rc = decode_query_port_status_resp(responseMsg.get(), responseLen, &cc,
+                                       &reasonCode, &dataSize, &portState,
+                                       &portStatus);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         switch (portState)
         {
             case NSM_PORTSTATE_DOWN:
+                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
+                break;
             case NSM_PORTSTATE_DOWN_LOCK:
                 portStateIntf->linkStatus(PortLinkStatus::LinkDown);
-                portMetricsOem3Intf->runtimeError(true);
+                co_await checkPortCharactersticRCAndPopulateRuntimeErr(manager,
+                                                                       eid);
                 break;
             case NSM_PORTSTATE_SLEEP:
                 portStateIntf->linkStatus(PortLinkStatus::LinkDown);
@@ -202,9 +207,54 @@ uint8_t NsmPortStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
             "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
             "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
             "RC", rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    return NSM_SW_SUCCESS;
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    NsmPortStatus::checkPortCharactersticRCAndPopulateRuntimeErr(
+        SensorManager& manager, eid_t eid)
+{
+    std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                    sizeof(nsm_query_port_characteristics_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(requestMsg.data());
+    auto rc = encode_query_port_characteristics_req(0, portNumber, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return NSM_SW_ERROR;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
+                                         responseLen, false);
+    if (rc)
+    {
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    struct nsm_port_characteristics_data data;
+
+    rc = decode_query_port_characteristics_resp(
+        responseMsg.get(), responseLen, &cc, &reasonCode, &dataSize, &data);
+
+    if (cc != NSM_SUCCESS && reasonCode != ERR_NULL)
+    {
+        portMetricsOem3Intf->runtimeError(true);
+    }
+    else
+    {
+        portMetricsOem3Intf->runtimeError(false);
+    }
+    co_return NSM_SW_SUCCESS;
 }
 
 void NsmPortStatus::updateMetricOnSharedMemory()

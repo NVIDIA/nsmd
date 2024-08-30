@@ -537,9 +537,11 @@ int encode_get_network_device_log_info_resp(
 	struct nsm_device_log_info *log_info =
 	    (struct nsm_device_log_info *)(&log_info_breakdown);
 	resp->log_info.lost_events_and_synced_time =
-	    htole32(log_info->lost_events_and_synced_time);
-	resp->log_info.time_high = htole32(log_info->time_high);
+	    log_info->lost_events_and_synced_time;
+	resp->log_info.reserved1 = log_info->reserved1;
+	resp->log_info.reserved2 = log_info->reserved2;
 	resp->log_info.time_low = htole32(log_info->time_low);
+	resp->log_info.time_high = htole32(log_info->time_high);
 	resp->log_info.entry_prefix_and_length =
 	    htole32(log_info->entry_prefix_and_length);
 	resp->log_info.entry_suffix = htole64(log_info->entry_suffix);
@@ -588,9 +590,11 @@ int decode_get_network_device_log_info_resp(
 
 	struct nsm_device_log_info info = {0};
 	info.lost_events_and_synced_time =
-	    le32toh(resp->log_info.lost_events_and_synced_time);
-	info.time_high = le32toh(resp->log_info.time_high);
+	    resp->log_info.lost_events_and_synced_time;
+	info.reserved1 = 0;
+	info.reserved2 = 0;
 	info.time_low = le32toh(resp->log_info.time_low);
+	info.time_high = le32toh(resp->log_info.time_high);
 	info.entry_prefix_and_length =
 	    le32toh(resp->log_info.entry_prefix_and_length);
 	info.entry_suffix = le64toh(resp->log_info.entry_suffix);

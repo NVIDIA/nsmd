@@ -4445,7 +4445,8 @@ std::optional<std::vector<uint8_t>>
     log_info.lost_events = 02;
     log_info.unused = 00;
     log_info.synced_time = 00;
-    log_info.reserved = 00;
+    log_info.reserved1 = 00;
+    log_info.reserved2 = 00;
     log_info.time_high = 100;
     log_info.time_low = 200;
     log_info.entry_prefix = 33;

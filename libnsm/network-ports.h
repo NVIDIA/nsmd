@@ -224,7 +224,7 @@ struct nsm_query_ports_available_resp {
  *  Structure representing NSM set port disable future request.
  */
 struct nsm_set_port_disable_future_req {
-	struct nsm_common_resp hdr;
+	struct nsm_common_req hdr;
 	bitfield8_t port_mask[PORT_MASK_DATA_SIZE];
 } __attribute__((packed));
 
