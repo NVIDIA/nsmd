@@ -91,11 +91,15 @@ class NsmMinGraphicsClockLimit : public NsmObject
   public:
     NsmMinGraphicsClockLimit(
         std::string& name, std::string& type,
-        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+        std::string& inventoryObjPath);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 class NsmMaxGraphicsClockLimit : public NsmObject
@@ -103,11 +107,15 @@ class NsmMaxGraphicsClockLimit : public NsmObject
   public:
     NsmMaxGraphicsClockLimit(
         std::string& name, std::string& type,
-        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
+        std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
+        std::string& inventoryObjPath);
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
+    std::string inventoryObjPath;
 };
 
 } // namespace nsm

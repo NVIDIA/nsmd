@@ -444,9 +444,9 @@ static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
         associations, type, inventoryObjPath, physicalContext, clockMode);
     nsmDevice->addSensor(nsmChassisControlSensor, priority);
     auto minGraphicsClockFreq = std::make_shared<NsmMinGraphicsClockLimit>(
-        name, type, cpuOperatingConfigIntf);
+        name, type, cpuOperatingConfigIntf, inventoryObjPath);
     auto maxGraphicsClockFreq = std::make_shared<NsmMaxGraphicsClockLimit>(
-        name, type, cpuOperatingConfigIntf);
+        name, type, cpuOperatingConfigIntf, inventoryObjPath);
 
     nsmDevice->addStaticSensor(minGraphicsClockFreq);
     nsmDevice->addStaticSensor(maxGraphicsClockFreq);
