@@ -588,6 +588,15 @@ std::optional<std::vector<uint8_t>>
                 case NSM_FW_GET_EROT_STATE_INFORMATION:
                     return getRotInformation(request, requestLen);
                     break;
+                case NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER:
+                    return queryFirmwareSecurityVersion(request, requestLen);
+                    break;
+                case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
+                    return updateMinSecurityVersion(request, requestLen);
+                    break;
+                case NSM_FW_IRREVERSABLE_CONFIGURATION:
+                    return irreversibleConfig(request, requestLen);
+                    break;
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -747,12 +756,12 @@ std::optional<std::vector<uint8_t>>
                       125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
                  {5, {3, 4, 5, 6, 7, 64, 65}},
-                 {6, {1}},
+                 {6, {1, 2, 3, 4, 5, 6}},
              }},
             {NSM_DEV_ID_EROT,
              {
                  {0, {0, 1, 2, 9}},
-                 {6, {1}},
+                 {6, {1, 2, 3, 4, 5, 6}},
              }},
         };
 

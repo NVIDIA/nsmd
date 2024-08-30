@@ -137,6 +137,164 @@ struct nsm_firmware_get_erot_state_info_resp {
 	uint8_t payload[1];
 } __attribute__((packed));
 
+/* Security Version Number Request and Response Structure */
+/**
+ * @struct Structure representing nsm firmware security version number request
+ * 
+ */
+struct nsm_firmware_security_version_number_req {
+    uint16_t component_classification;
+    uint16_t component_identifier;
+    uint8_t component_classification_index;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm firmware security version number request
+ * used in nsm callbacks
+ */
+struct nsm_firmware_security_version_number_req_command {
+    struct nsm_common_req hdr;
+    struct nsm_firmware_security_version_number_req fq_req;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm firmware security version number response
+ * 
+ */
+struct nsm_firmware_security_version_number_resp {
+    uint16_t active_component_security_version;
+    uint16_t pending_component_security_version;
+    uint16_t minimum_security_version;
+    uint16_t pending_minimum_security_version;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm firmware security version number response
+ * used in nsm callbacks
+ */
+struct nsm_firmware_security_version_number_resp_command {
+    struct nsm_common_resp hdr;
+    struct nsm_firmware_security_version_number_resp sec_ver_resp;
+} __attribute__((packed));
+
+/**
+ * @brief enum for sec update request types
+ * 
+ */
+enum sec_update_request_types {
+    REQUEST_TYPE_MOST_RESTRICTIVE_VALUE = 0,
+    REQUEST_TYPE_SPECIFIED_VALUE = 1
+};
+
+/**
+ * @struct Structure representing nsm update firmware security version number
+ * request parameter
+ */
+struct nsm_firmware_update_min_sec_ver_req {
+    uint8_t request_type;
+    uint16_t component_classification;
+    uint16_t component_identifier;
+    uint8_t component_classification_index;
+    uint64_t nonce;
+    uint16_t req_min_security_version;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm update firmware security version number
+ * request command
+ */
+struct nsm_firmware_update_min_sec_ver_req_command {
+    struct nsm_common_req hdr;
+    struct nsm_firmware_update_min_sec_ver_req ver_update_req;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm update firmware security version number
+ * response parameter
+ */
+struct nsm_firmware_update_min_sec_ver_resp {
+    uint32_t update_methods; 
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm update firmware security version number
+ * response command
+ */
+struct nsm_firmware_update_min_sec_ver_resp_command {
+    struct nsm_common_resp hdr;
+    struct nsm_firmware_update_min_sec_ver_resp sec_ver_resp;
+} __attribute__((packed));
+
+/**
+ * @brief enum for irreversible request types
+ * 
+ */
+enum irreversible_cfg_request_types {
+    QUERY_IRREVERSIBLE_CFG,
+    DISABLE_IRREVERSIBLE_CFG,
+    ENABLE_IRREVERSIBLE_CFG,
+};
+
+/**
+ * @struct Structure representing irreversible configuration request parameter
+ */
+struct nsm_firmware_irreversible_config_req {
+    uint8_t request_type;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration request parameter
+ * command.
+ */
+struct nsm_firmware_irreversible_config_req_command {
+    struct nsm_common_req hdr;
+    struct nsm_firmware_irreversible_config_req irreversible_cfg_req;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration response for Query
+ * irreversible configuration state
+ */
+struct nsm_firmware_irreversible_config_request_0_resp {
+	uint8_t irreversible_config_state;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration response for Enable
+ * irreversible configuration changes
+ */
+struct nsm_firmware_irreversible_config_request_2_resp {
+	uint64_t nonce;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration response for Query
+ * irreversible configuration state command
+ */
+struct nsm_firmware_irreversible_config_request_0_resp_command {
+	struct nsm_common_resp hdr;
+	struct nsm_firmware_irreversible_config_request_0_resp
+	    irreversible_cfg_query;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration response for Disable
+ * irreversible configuration changes command
+ */
+struct nsm_firmware_irreversible_config_request_1_resp_command {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing irreversible configuration response for Enable
+ * irreversible configuration changes command
+ */
+struct nsm_firmware_irreversible_config_request_2_resp_command {
+	struct nsm_common_resp hdr;
+	struct nsm_firmware_irreversible_config_request_2_resp
+	    irreversible_cfg_enable_response;
+} __attribute__((packed));
+
 /**
  * @brief Decode nsm query request erot state parameters message.
  *
@@ -201,6 +359,225 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 int decode_nsm_query_get_erot_state_parameters_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_firmware_erot_state_info_resp *fw_resp);
+
+/**
+ * @brief Decode nsm query firmware security version number req
+ * 
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] fw_req - firmware security version request
+ * @return int 
+ */
+int decode_nsm_query_firmware_security_version_number_req(const struct nsm_msg *msg,
+    size_t msg_len,
+    struct nsm_firmware_security_version_number_req* fw_req);
+
+/**
+ * @brief Encode nsm query firmware security version number req
+ * 
+ * @param[in] instance_id - instance id
+ * @param[in] fw_req - firmware security version request
+ * @param[out] msg - nsm message
+ * @return int 
+ */
+int encode_nsm_query_firmware_security_version_number_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_security_version_number_req *fw_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Encode nsm query firmware security version number Response
+ * 
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[in] sec_info - firmware security version response
+ * @param[in] msg - nsm message
+ * @return int 
+ */
+int encode_nsm_query_firmware_security_version_number_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_security_version_number_resp *sec_info, struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm query firmware security version number Response
+ * 
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] sec_info - firmware security version response
+ * @return int 
+ */
+int decode_nsm_query_firmware_security_version_number_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_firmware_security_version_number_resp* sec_resp);
+
+/**
+ * @brief Encode nsm firmware update security version number req
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] fw_req - firmware security version request
+ * @param[out] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_update_sec_ver_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_update_min_sec_ver_req *fw_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware update security version number req
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] fw_req - firmware security version request
+ * @return int
+ */
+int decode_nsm_firmware_update_sec_ver_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_firmware_update_min_sec_ver_req *fw_req);
+
+/**
+ * @brief Encode nsm firmware update security version number response
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[in] sec_resp - firmware security version response
+ * @param[in] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_update_sec_ver_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_update_min_sec_ver_resp *sec_resp, struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware update security version number response
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] sec_resp - firmware security version response
+ * @return int
+ */
+int decode_nsm_firmware_update_sec_ver_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_update_min_sec_ver_resp *sec_resp);
+
+/**
+ * @brief Encode nsm firmware Irreversible config request
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] fw_req - Irreversible config request
+ * @param[out] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_irreversible_config_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_irreversible_config_req *fw_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware Irreversible config request
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] fw_req - Irreversible config request
+ * @return int
+ */
+int decode_nsm_firmware_irreversible_config_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_firmware_irreversible_config_req *fw_req);
+
+/**
+ * @brief Encode nsm firmware Irreversible config response for request 0
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[in] cfg_resp - Irreversible config response for request 0
+ * @param[in] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_irreversible_config_request_0_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_irreversible_config_request_0_resp *cfg_resp,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware Irreversible config response for request 0
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] cfg_resp - Irreversible config response for request 0
+ * @return int
+ */
+int decode_nsm_firmware_irreversible_config_request_0_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_irreversible_config_request_0_resp *cfg_resp);
+
+/**
+ * @brief Encode nsm firmware Irreversible config response for request 1
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[in] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_irreversible_config_request_1_resp(uint8_t instance_id,
+							   uint8_t cc,
+							   uint16_t reason_code,
+							   struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware Irreversible config response for request 1
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @return int
+ */
+int decode_nsm_firmware_irreversible_config_request_1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code);
+
+/**
+ * @brief Encode nsm firmware Irreversible config response for request 2
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[in] cfg_resp - Irreversible config response for request 2
+ * @param[in] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_irreversible_config_request_2_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_firmware_irreversible_config_request_2_resp *cfg_resp,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware Irreversible config response for request 2
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] cfg_resp - Irreversible config response for request 2
+ * @return int
+ */
+int decode_nsm_firmware_irreversible_config_request_2_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_irreversible_config_request_2_resp *cfg_resp);
 
 #ifdef __cplusplus
 }
