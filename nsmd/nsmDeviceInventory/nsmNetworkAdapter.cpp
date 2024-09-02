@@ -98,7 +98,7 @@ static requester::Coroutine
 
     createNsmErrorInjectionSensors(manager, nsmDevice,
                                    path(inventoryObjPath) / name);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -1,7 +1,7 @@
 #include "nsmEndpoint.hpp"
 
-#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
+#include "dBusAsyncUtils.hpp"
 #include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -50,7 +50,7 @@ static requester::Coroutine createNsmEndpoints(SensorManager& manager,
         objPath.c_str(), "UUID", interface.c_str());
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                    associations);
+                                      associations);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
@@ -61,6 +61,7 @@ static requester::Coroutine createNsmEndpoints(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_FabricsEndpoint PDI matches no NsmDevice : UUID={UUID}, Fabric={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", fabricsObjPath, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -73,10 +74,12 @@ static requester::Coroutine createNsmEndpoints(SensorManager& manager,
         lg2::error(
             "Failed to create NSM Fabrics Endpoint : UUID={UUID}, Type={TYPE}, Fabrics_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", fabricsObjPath);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     nsmDevice->deviceSensors.push_back(fabricsEndpointSensor);
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

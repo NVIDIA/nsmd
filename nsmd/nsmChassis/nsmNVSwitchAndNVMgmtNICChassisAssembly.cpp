@@ -137,6 +137,7 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -147,6 +148,7 @@ requester::Coroutine
 {
     co_await createNsmChassisAssembly(manager, interface, objPath,
                                       "NSM_NVSwitch_ChassisAssembly");
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -157,6 +159,7 @@ requester::Coroutine
 {
     co_await createNsmChassisAssembly(manager, interface, objPath,
                                       "NSM_NVLinkMgmtNic_ChassisAssembly");
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

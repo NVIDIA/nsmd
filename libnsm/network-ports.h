@@ -500,7 +500,8 @@ int encode_set_port_disable_future_req(uint8_t instance,
  *  @return nsm_completion_codes
  */
 int decode_set_port_disable_future_req(const struct nsm_msg *msg,
-				       size_t msg_len, bitfield8_t *mask);
+				       size_t msg_len,
+				       bitfield8_t mask[PORT_MASK_DATA_SIZE]);
 
 /** @brief Encode a set port disable future response message
  *
@@ -569,7 +570,7 @@ int encode_get_port_disable_future_resp(uint8_t instance, uint8_t cc,
 int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
 					size_t msg_len, uint8_t *cc,
 					uint16_t *reason_code,
-					bitfield8_t *mask);
+					bitfield8_t mask[PORT_MASK_DATA_SIZE]);
 
 /** @brief Create a Get power mode request message
  *

@@ -63,7 +63,7 @@ requester::Coroutine
     associationsObject->pdi().associations(
         utils::getAssociations(associations));
     device->addStaticSensor(associationsObject);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -151,6 +151,7 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("ping failed. eid={EID} rc={RC}", "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -170,9 +171,10 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
         lg2::error(
             "ping decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
             "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -189,6 +191,7 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     {
         lg2::error("getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -210,6 +213,7 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
         lg2::error(
             "get supported msg type decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
             "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -217,6 +221,7 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     supportedTypes.resize(SUPPORTED_MSG_TYPE_DATA_SIZE);
     std::memcpy(supportedTypes.data(), types,
                 SUPPORTED_MSG_TYPE_DATA_SIZE * sizeof(bitfield8_t));
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -234,6 +239,7 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     {
         lg2::error("getSupportedCommandCodes failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -255,6 +261,7 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
         lg2::error(
             "get supported command code decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
             "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -262,6 +269,7 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     supportedCommands.resize(SUPPORTED_COMMAND_CODE_DATA_SIZE);
     std::memcpy(supportedCommands.data(), supportedCommandCodes,
                 SUPPORTED_COMMAND_CODE_DATA_SIZE * sizeof(bitfield8_t));
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -281,7 +289,7 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
                 "PID", propertyId, "EID", eid, "RC", rc);
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -369,6 +377,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         lg2::error(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -392,6 +401,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
         lg2::error(
             "decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "EID", eid, "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -420,6 +430,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
                 lg2::error(
                     "decode_get_inventory_information_resp invalid property data. eid={EID} porpertyID={PID}",
                     "EID", eid, "PID", propertyIdentifier);
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR_LENGTH;
             }
             memcpy(nvu8ArrVal.data(), data.data(), dataSize);
@@ -457,7 +468,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
                       "VALUE", (*propertyStringPtr).c_str());
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -601,6 +612,7 @@ requester::Coroutine
         lg2::error(
             "encode_nsm_query_device_identification_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -622,13 +634,14 @@ requester::Coroutine
         lg2::error(
             "decode_query_device_identification_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
             "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     // update the instanceId if mapping available for the device
     updateInstanceIdViaRemapping(deviceIdentification, deviceInstance, eid,
                                  uuid);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -674,6 +687,7 @@ requester::Coroutine
     {
         lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc, "EID",
                    eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -724,7 +738,7 @@ requester::Coroutine
     nsmDevice->fruDeviceIntf->register_property("UUID", nsmDevice->uuid);
 
     nsmDevice->fruDeviceIntf->initialize();
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

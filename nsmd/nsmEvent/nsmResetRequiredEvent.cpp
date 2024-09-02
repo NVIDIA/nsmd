@@ -18,6 +18,7 @@
 #include "nsmResetRequiredEvent.hpp"
 
 #include "platform-environmental.h"
+
 #include "dBusAsyncUtils.hpp"
 #include "sensorManager.hpp"
 
@@ -30,9 +31,7 @@ namespace nsm
 
 NsmResetRequiredEvent::NsmResetRequiredEvent(
     const std::string& name, const std::string& type,
-    const NsmResetRequiredEventInfo info) :
-    NsmEvent(name, type),
-    info(info)
+    const NsmResetRequiredEventInfo info) : NsmEvent(name, type), info(info)
 {
     if (!info.messageArgs.empty())
     {
@@ -79,9 +78,10 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
     return NSM_SW_SUCCESS;
 }
 
-static requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
-                                        const std::string& interface,
-                                        const std::string& objPath)
+static requester::Coroutine
+    createNsmResetRequiredEvent(SensorManager& manager,
+                                const std::string& interface,
+                                const std::string& objPath)
 {
     NsmResetRequiredEventInfo info{};
 
@@ -102,7 +102,7 @@ static requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
 
     info.loggingNamespace = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "LoggingNamespace", interface.c_str());
-    info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace); 
+    info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace);
 
     info.resolution = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Resolution", interface.c_str());
@@ -127,6 +127,7 @@ static requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
         lg2::error(
             "The UUID of Reset Required Event PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", info.uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -139,6 +140,7 @@ static requester::Coroutine createNsmResetRequiredEvent(SensorManager& manager,
     nsmDevice->deviceEvents.push_back(event);
     nsmDevice->eventDispatcher.addEvent(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                                         NSM_RESET_REQUIRED_EVENT, event);
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

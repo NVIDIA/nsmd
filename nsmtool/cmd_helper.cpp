@@ -129,7 +129,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                 reinterpret_cast<const nsm_msg_hdr*>(&responseMsg[2]);
             if (recvDataLength == peekedLength &&
                 resphdr->instance_id == reqhdr->instance_id &&
-                resphdr->request != NSM_REQUEST)
+                resphdr->request == 0)
             {
                 Logger(verbose, "Total length:", recvDataLength);
                 break;

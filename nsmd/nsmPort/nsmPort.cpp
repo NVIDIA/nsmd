@@ -97,7 +97,7 @@ static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
             }
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -858,6 +858,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_NVlink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 

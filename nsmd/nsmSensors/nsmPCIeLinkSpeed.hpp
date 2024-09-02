@@ -28,13 +28,15 @@
 
 namespace nsm
 {
-using namespace sdbusplus::xyz::openbmc_project;
-using namespace sdbusplus::server;
+using sdbusplus::server::object_t;
 using namespace nsm_shmem_utils;
 
-using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
-using PCIeSlotIntf = object_t<Inventory::Item::server::PCIeSlot>;
-using PCIeEccIntf = object_t<PCIe::server::PCIeECC>;
+using PCIeDeviceIntf = object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::PCIeDevice>;
+using PCIeSlotIntf = object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Item::server::PCIeSlot>;
+using PCIeEccIntf =
+    object_t<sdbusplus::xyz::openbmc_project::PCIe::server::PCIeECC>;
 
 class NsmPCIeLinkSpeedBase : public NsmSensor
 {
@@ -123,7 +125,8 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeEccIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    pdi().pcIeType((PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
+    pdi().pcIeType(
+        (PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
     pdi().lanesInUse(linkWidth(data.negotiated_link_width));
     pdi().maxLanes(linkWidth(data.max_link_width));
     updateMetricOnSharedMemory();

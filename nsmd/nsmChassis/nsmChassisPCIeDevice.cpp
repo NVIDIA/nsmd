@@ -17,8 +17,11 @@
 
 #include "nsmChassisPCIeDevice.hpp"
 
+#include "nsmGpuPriorityMapping.h"
+
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
+#include "nsmAERError.hpp"
 #include "nsmClockOutputEnableState.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
@@ -28,8 +31,6 @@
 #include "nsmPCIeLTSSMState.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "utils.hpp"
-#include "nsmAERError.hpp"
-#include "nsmGpuPriorityMapping.h"
 namespace nsm
 {
 
@@ -50,6 +51,8 @@ requester::Coroutine NsmChassisPCIeDevice<IntfType>::update(
             }
         }
     }
+
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -153,7 +156,6 @@ requester::Coroutine
         auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
             name, "PCIeAerErrorStatus", aerErrorIntf, deviceIndex);
         device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
-
     }
     else if (type == "NSM_LTSSMState")
     {
@@ -198,6 +200,7 @@ requester::Coroutine
         device->addSensor(nvLinkRefClock, priority);
     }
 
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

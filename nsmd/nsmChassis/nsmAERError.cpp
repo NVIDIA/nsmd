@@ -20,9 +20,10 @@
 #include "base.h"
 #include "libnsm/pci-links.h"
 
-#include <phosphor-logging/lg2.hpp>
 #include "asyncOperationManager.hpp"
 #include "sensorManager.hpp"
+
+#include <phosphor-logging/lg2.hpp>
 
 namespace nsm
 {
@@ -69,7 +70,6 @@ uint8_t
     auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-
     if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         auto hexFormat = [](const uint32_t value) -> std::string {
@@ -111,6 +111,7 @@ requester::Coroutine
             "clearAERError encode_clear_data_source_v1_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -124,6 +125,7 @@ requester::Coroutine
             "clearAERError SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -143,9 +145,10 @@ requester::Coroutine
             "clearAERError decode_clear_data_source_v1_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -157,7 +160,7 @@ requester::Coroutine NsmAERErrorStatusIntf::doclearAERErrorOnDevice(
     auto rc_ = co_await clearAERError(&status);
 
     statusInterface->status(status);
-
+    // coverity[missing_return]
     co_return rc_;
 };
 

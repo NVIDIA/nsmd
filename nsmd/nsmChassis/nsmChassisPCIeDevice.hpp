@@ -18,8 +18,9 @@
 #pragma once
 
 #include "globals.hpp"
-#include "nsmInterface.hpp"
 #include "nsmAssetIntf.hpp"
+#include "nsmInterface.hpp"
+
 #include <com/nvidia/NVLink/NVLinkRefClock/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
@@ -57,7 +58,8 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
                                        chassisInventoryBasePath / chassisName /
                                            "PCIeDevices")
     {}
-    NsmChassisPCIeDevice(const std::string& name, dbus::Interfaces inventoryPaths) :
+    NsmChassisPCIeDevice(const std::string& name,
+                         dbus::Interfaces inventoryPaths) :
         NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
                                        inventoryPaths)
     {}

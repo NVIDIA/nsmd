@@ -147,6 +147,7 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
         lg2::error(
             "Failed to create NSM GPM PerInstance Metrics. Unsupported GPM PerInstance Metic {METRIC}. Config={INTF}",
             "METRIC", metric, "INTF", interface);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -225,6 +226,7 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
         lg2::error(
             "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -333,6 +335,7 @@ static requester::Coroutine
         lg2::error(
             "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 

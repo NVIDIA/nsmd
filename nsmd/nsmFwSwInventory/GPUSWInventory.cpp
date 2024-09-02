@@ -72,6 +72,7 @@ requester::Coroutine
         lg2::error(
             "encode_get_driverVersion_req failed for GPU eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -102,9 +103,10 @@ requester::Coroutine
         lg2::error(
             "handleResponseMsg: decode_get_driver_info_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -131,6 +133,7 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_GPUSWInventory PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -140,7 +143,7 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

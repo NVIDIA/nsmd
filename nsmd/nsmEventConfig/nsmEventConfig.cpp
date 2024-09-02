@@ -94,6 +94,7 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
         lg2::error(
             "encode_nsm_set_current_event_sources_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -115,7 +116,7 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
             "decode_nsm_set_current_event_sources_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -139,6 +140,7 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
         lg2::error(
             "encode_nsm_configure_event_acknowledgement_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -162,7 +164,7 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
             "decode_nsm_configure_event_acknowledgement_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -191,6 +193,7 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
         lg2::error(
             "found NSM_EventConfig [{NAME}] but not applied since no NsmDevice UUID={UUID}",
             "NAME", name, "UUID", uuid);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -203,7 +206,7 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

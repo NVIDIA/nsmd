@@ -448,11 +448,13 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ceCountVal{pCieEccIntf->ceCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
-    
+
     propName = "UnsupportedRequestCount";
-    nv::sensor_aggregation::DbusVariantType unsupportedRequestCount{pCieEccIntf->ceCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, unsupportedRequestCount);
+    nv::sensor_aggregation::DbusVariantType unsupportedRequestCount{
+        pCieEccIntf->ceCount()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 unsupportedRequestCount);
 
     // pcie port metrics
     ifaceName = std::string(pCiePortIntf->interface);
@@ -469,12 +471,13 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
     propName = "ceCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
-    
+
     ifaceName = std::string(pCiePortIntf->interface);
     propName = "UnsupportedRequestCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, unsupportedRequestCount);
-    
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 unsupportedRequestCount);
+
 #endif
 }
 
@@ -1047,6 +1050,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBaseClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1059,6 +1063,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBaseClockSpeed SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1083,6 +1088,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1112,6 +1118,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBoostClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1124,6 +1131,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBoostClockSpeed: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1149,6 +1157,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultBoostClockSpeed: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1469,6 +1478,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         lg2::error(
             "NsmTotalMemorySize: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1481,6 +1491,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         lg2::error(
             "NsmTotalMemorySize: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1505,6 +1516,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         lg2::error(
             "NsmTotalMemorySize: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1819,6 +1831,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1831,6 +1844,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "NsmMaxPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1856,6 +1870,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1906,6 +1921,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1918,6 +1934,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "NsmMinPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1943,6 +1960,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1977,6 +1995,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         lg2::error(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -1989,6 +2008,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         lg2::error(
             "NsmDefaultPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -2014,6 +2034,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         lg2::error(
             "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;

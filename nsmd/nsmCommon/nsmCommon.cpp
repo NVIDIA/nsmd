@@ -222,6 +222,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -234,6 +235,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -259,6 +261,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -306,6 +309,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -318,6 +322,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -343,6 +348,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;

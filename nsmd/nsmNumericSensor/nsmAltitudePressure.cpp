@@ -124,6 +124,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
         lg2::error(
             "The UUID of Altitude Pressure Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -143,7 +144,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     {
         nsmDevice->roundRobinSensors.emplace_back(sensor);
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

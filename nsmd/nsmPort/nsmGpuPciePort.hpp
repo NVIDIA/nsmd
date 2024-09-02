@@ -1,5 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "asyncOperationManager.hpp"
 #include "nsmRetimerPort.hpp"
-#include "nsmGpuPriorityMapping.h"
 
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>
@@ -9,7 +26,6 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
-#include "asyncOperationManager.hpp"
 
 #define MAX_SCALAR_SOURCE_MASK_SIZE 4
 
@@ -90,12 +106,13 @@ class NsmClearPCIeIntf : public ClearPCIeIntf
     {}
 
     sdbusplus::message::object_path clearCounter(std::string Counter) override;
-    requester::Coroutine
-        clearPCIeErrorCounter(AsyncOperationStatusType* status,
-                              const uint8_t deviceIndex, const uint8_t groupId,
-                              const uint8_t dsId);
+    requester::Coroutine clearPCIeErrorCounter(AsyncOperationStatusType* status,
+                                               const uint8_t deviceIndex,
+                                               const uint8_t groupId,
+                                               const uint8_t dsId);
     requester::Coroutine doClearPCIeCountersOnDevice(
-        std::shared_ptr<AsyncStatusIntf> statusInterface, const std::string& Counter);
+        std::shared_ptr<AsyncStatusIntf> statusInterface,
+        const std::string& Counter);
 
     uint8_t deviceIndex;
     std::shared_ptr<NsmDevice> device;

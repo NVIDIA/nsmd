@@ -27,8 +27,8 @@ namespace nsm
 {
 
 NsmSetReconfigSettings::NsmSetReconfigSettings(
-    const std::string& name, SensorManager& manager,
-    std::string objPath, reconfiguration_permissions_v1_index settingIndex) :
+    const std::string& name, SensorManager& manager, std::string objPath,
+    reconfiguration_permissions_v1_index settingIndex) :
     NsmInterfaceProvider<ReconfigSettingsIntf>(
         name, "NSM_InbandReconfigSettings", dbus::Interfaces{objPath}),
     manager(manager), settingIndex(settingIndex)
@@ -44,7 +44,7 @@ requester::Coroutine NsmSetReconfigSettings::allowOneShotConfig(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
+    // coverity[missing_return]
     co_return co_await setAllowPermission(RP_ONESHOOT_HOT_RESET, *allowValue,
                                           *status, device);
 }
@@ -58,7 +58,7 @@ requester::Coroutine NsmSetReconfigSettings::allowPersistentConfig(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
+    // coverity[missing_return]
     co_return co_await setAllowPermission(RP_PERSISTENT, *allowValue, *status,
                                           device);
 }
@@ -72,7 +72,7 @@ requester::Coroutine NsmSetReconfigSettings::allowFLRPersistentConfig(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
+    // coverity[missing_return]
     co_return co_await setAllowPermission(RP_ONESHOT_FLR, *allowValue, *status,
                                           device);
 }
@@ -95,6 +95,7 @@ requester::Coroutine NsmSetReconfigSettings::setAllowPermission(
             "encode_set_reconfiguration_permissions_v1_req({SI}) failed. eid={EID} rc={RC}",
             "SI", (int)settingIndex, "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -109,6 +110,7 @@ requester::Coroutine NsmSetReconfigSettings::setAllowPermission(
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -130,7 +132,7 @@ requester::Coroutine NsmSetReconfigSettings::setAllowPermission(
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
     }
-
+    // coverity[missing_return]
     co_return cc ? cc : rc;
 }
 

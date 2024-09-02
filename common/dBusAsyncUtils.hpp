@@ -104,7 +104,7 @@ struct coGetDbusProperty
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
         service(service), objectPath(objectPath), interface(interface),
-        property(property)
+        property(property), ret{}
     {}
 };
 
@@ -236,7 +236,7 @@ struct coGetDbusProperty
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
         service(service), objectPath(objectPath), interface(interface),
-        property(property)
+        property(property), ret{}
     {}
 };
 

@@ -86,6 +86,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         finishDebugInfoCmd(OperationStatus::InternalFailure);
+        // coverity[missing_return]
         co_return sendRc;
     }
 
@@ -105,6 +106,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
             "eid={EID} rc={RC} cc={CC} len={LEN}",
             "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen);
         finishDebugInfoCmd(OperationStatus::InternalFailure);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -114,6 +116,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
         lg2::error("NsmDebugInfoObject: memfd_create: eid={EID} error={ERROR}",
                    "EID", eid, "ERROR", strerror(errno));
         finishDebugInfoCmd(OperationStatus::WriteFailure);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
     const uint8_t* requestPtr = segData.data();
@@ -126,6 +129,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
                        "EID", eid, "ERROR", strerror(errno));
             close(fileDesc);
             finishDebugInfoCmd(OperationStatus::WriteFailure);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         requestPtr += written;
@@ -136,7 +140,7 @@ requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
     fd(unixFd, true);
     nextRecordHandle(static_cast<uint64_t>(nextHandle));
     finishDebugInfoCmd(OperationStatus::Success);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

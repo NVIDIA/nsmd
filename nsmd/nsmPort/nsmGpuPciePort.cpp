@@ -1,4 +1,23 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "nsmGpuPciePort.hpp"
+
+#include "nsmGpuPriorityMapping.h"
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
@@ -75,6 +94,7 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
         lg2::error(
             "encode_query_available_clearable_scalar_data_sources_v1_req failed for group {A}. eid={EID} rc={RC}",
             "A", groupId, "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -87,6 +107,7 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
         lg2::error(
             "NsmClearPCIeCounters SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -110,6 +131,7 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
         lg2::error(
             "decode_query_available_clearable_scalar_data_sources_v1_respp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -207,6 +229,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
             "clearPCIeErrorCounter encode_clear_data_source_v1_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -220,6 +243,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
             "clearPCIeErrorCounter SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -239,9 +263,10 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
             "clearPCIeErrorCounter decode_clear_data_source_v1_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -258,7 +283,7 @@ requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
                                               dsId);
 
     statusInterface->status(status);
-
+    // coverity[missing_return]
     co_return rc_;
 };
 
@@ -313,6 +338,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_GPU_PCIe_0 PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
         if (type == "NSM_GPU_PCIe_0")
@@ -351,7 +377,8 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 std::make_shared<LaneErrorIntf>(bus, inventoryObjPath.c_str());
             auto perLanErrorSensor = std::make_shared<NsmPCIeECCGroup8>(
                 name, type, laneErrorIntf, deviceIndex, inventoryObjPath);
-            nsmDevice->addSensor(perLanErrorSensor, PER_LANE_ERROR_COUNT_PRIORITY);
+            nsmDevice->addSensor(perLanErrorSensor,
+                                 PER_LANE_ERROR_COUNT_PRIORITY);
         }
         else if (type == "NSM_PortInfo")
         {
@@ -392,6 +419,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
     co_return NSM_SUCCESS;

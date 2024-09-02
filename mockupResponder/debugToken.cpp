@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ std::optional<std::vector<uint8_t>>
     memset(&token_request, 0, sizeof(nsm_debug_token_request));
     token_request.token_request_version = 1;
     token_request.token_request_size = sizeof(nsm_debug_token_request);
-    memcpy(&token_request.device_uuid[8], uuid, 8);
+    memcpy(token_request.device_uuid, uuid, 8);
     token_request.device_type = NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_NVSWITCH;
     token_request.device_index = 0;
     token_request.status = NSM_DEBUG_TOKEN_CHALLENGE_QUERY_STATUS_OK;

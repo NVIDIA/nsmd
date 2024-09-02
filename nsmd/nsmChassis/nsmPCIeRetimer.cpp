@@ -30,8 +30,7 @@ namespace nsm
 NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
-    const std::string& type) :
-    NsmObject(name, type)
+    const std::string& type) : NsmObject(name, type)
 {
     auto pcieRetimerChaasisBasePath = std::string(chassisInventoryBasePath) +
                                       "/" + name;
@@ -91,13 +90,14 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NsmPCIeRetimerChassis PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     auto retimer_chassis =
         std::make_shared<NsmPCIeRetimerChassis>(bus, name, associations, type);
     nsmDevice->deviceSensors.emplace_back(retimer_chassis);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

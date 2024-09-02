@@ -45,6 +45,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
             "getMinGraphicsClockLimit: encode_get_inventory_information_req failed. "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
@@ -56,7 +57,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
         lg2::error("SendRecvNsmMsg failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-
+        // coverity[missing_return]
         co_return rc;
     }
     uint8_t cc = NSM_ERROR;
@@ -72,6 +73,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
     {
         memcpy(&value, &data[0], sizeof(value));
         minClockLimit = le32toh(value);
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
     else
@@ -99,6 +101,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
             "getMaxGraphicsClockLimit: encode_get_inventory_information_req failed. "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
@@ -110,7 +113,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
         lg2::error("SendRecvNsmMsg failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
-
+        // coverity[missing_return]
         co_return rc;
     }
     uint8_t cc = NSM_ERROR;
@@ -126,6 +129,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
     {
         memcpy(&value, &data[0], sizeof(value));
         maxClockLimit = le32toh(value);
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
     else
@@ -156,6 +160,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
             "error while doing getMinGraphicsClockLimit eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -167,6 +172,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
             "error while doing getMinGraphicsClockLimit eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -175,6 +181,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
     {
         lg2::error("invalid argument for speed limit");
         *status = AsyncOperationStatusType::InvalidArgument;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -203,6 +210,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
             "setClockLimitOnDevice encode_set_clock_limit_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -218,6 +226,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
             "EID", eid, "RC", rc);
 
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -237,6 +246,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
             "setClockLimitOnDevice decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 }
@@ -256,7 +266,7 @@ requester::Coroutine
 
     const auto rc = co_await setClockLimitOnDevice(
         clockId, std::get<0>(*config), std::get<1>(*config), status, device);
-
+    // coverity[missing_return]
     co_return rc;
 }
 

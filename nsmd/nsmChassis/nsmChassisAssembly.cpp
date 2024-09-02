@@ -114,6 +114,7 @@ requester::Coroutine
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

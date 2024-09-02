@@ -69,6 +69,7 @@ static requester::Coroutine
             lg2::error(
                 "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
         if (type == "NSM_FpgaProcessor")

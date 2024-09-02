@@ -59,6 +59,7 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "getPowerCapFromDevice encode_get_device_power_limit_req failed.eid = {EID} rc ={RC}",
                 "EID", eid, "RC", rc);
+            // coverity[missing_return]
             co_return rc;
         }
         std::shared_ptr<const nsm_msg> responseMsg;
@@ -70,6 +71,7 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
+            // coverity[missing_return]
             co_return rc_;
         }
         uint8_t cc = NSM_ERROR;
@@ -96,9 +98,10 @@ class NsmPowerCapIntf : public PowerCapIntf
             lg2::error(
                 "getPowerCapFromDevice: decode_get_power_limit_resp with reasonCode = {REASONCODE},cc = {CC}and rc = {RC} ",
                 "REASONCODE", reason_code, "CC", cc, "RC", rc);
+            // coverity[missing_return]
             co_return rc;
         }
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -121,6 +124,7 @@ class NsmPowerCapIntf : public PowerCapIntf
                 "setPowerCapOnDevice encode_set_device_power_limit_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -134,6 +138,7 @@ class NsmPowerCapIntf : public PowerCapIntf
                 "setPowerCapOnDevice SendRecvNsmMsg failed for whilesetting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -180,9 +185,10 @@ class NsmPowerCapIntf : public PowerCapIntf
                        "RC = {A} ",
                        "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -191,27 +197,29 @@ class NsmPowerCapIntf : public PowerCapIntf
                     AsyncOperationStatusType* status,
                     [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-    const std::tuple<bool, uint32_t>* reqPowerLimit =
-        std::get_if<std::tuple<bool, uint32_t>>(&value);
+        const std::tuple<bool, uint32_t>* reqPowerLimit =
+            std::get_if<std::tuple<bool, uint32_t>>(&value);
 
-    if (!reqPowerLimit)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    uint32_t powerLimit = std::get<1>(*reqPowerLimit);
-    bool persistency = std::get<0>(*reqPowerLimit);
-
-    if (powerLimit > PowerCapIntf::maxPowerCapValue() ||
-        powerLimit < PowerCapIntf::minPowerCapValue())
-    {
-        *status = AsyncOperationStatusType::InvalidArgument;
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        if (!reqPowerLimit)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
         }
-  
+
+        uint32_t powerLimit = std::get<1>(*reqPowerLimit);
+        bool persistency = std::get<0>(*reqPowerLimit);
+
+        if (powerLimit > PowerCapIntf::maxPowerCapValue() ||
+            powerLimit < PowerCapIntf::minPowerCapValue())
+        {
+            *status = AsyncOperationStatusType::InvalidArgument;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
         const auto rc = co_await setPowerCapOnDevice(powerLimit, status,
                                                      persistency);
-
+        // coverity[missing_return]
         co_return rc;
     }
 

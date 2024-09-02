@@ -69,6 +69,7 @@ requester::Coroutine
             "encode_set_error_injection_mode_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -86,6 +87,7 @@ requester::Coroutine
                 "EID", eid, "RC", rc);
         }
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -107,7 +109,7 @@ requester::Coroutine
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
     }
-
+    // coverity[missing_return]
     co_return cc ? cc : rc;
 }
 
@@ -170,6 +172,7 @@ requester::Coroutine
             "encode_set_current_error_injection_types_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -187,6 +190,7 @@ requester::Coroutine
                 "EID", eid, "RC", rc);
         }
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -208,7 +212,7 @@ requester::Coroutine
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
     }
-
+    // coverity[missing_return]
     co_return cc ? cc : rc;
 }
 } // namespace nsm

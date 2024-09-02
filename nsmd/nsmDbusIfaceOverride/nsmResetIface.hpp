@@ -57,6 +57,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
                 "assertFundamentalReset encode_assert_pcie_fundamental_reset_req failed. "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
+            // coverity[missing_return]
             co_return rc;
         }
         std::shared_ptr<const nsm_msg> responseMsg = NULL;
@@ -68,7 +69,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
             lg2::error("SendRecvNsmMsg failed for gpuFundamentalReset"
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
-
+            // coverity[missing_return]
             co_return rc_;
         }
 
@@ -83,6 +84,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
             lg2::info(
                 "assertFundamentalReset for EID: {EID} completed for action {ACTION}",
                 "EID", eid, "ACTION", action);
+            // coverity[missing_return]
             co_return NSM_SW_SUCCESS;
         }
         else
@@ -118,7 +120,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
         }
 
         statusInterface->status(status);
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -169,6 +171,7 @@ class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
                 "resetOnDevice encode_reset_network_device_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -182,6 +185,7 @@ class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
                 "resetOnDevice SendRecvNsmMsgSync failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -200,9 +204,10 @@ class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
                 "resetOnDevice decode_reset_network_device_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -212,6 +217,7 @@ class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
         AsyncOperationStatusType status{AsyncOperationStatusType::Success};
         const auto rc_ = co_await resetOnDevice(&status);
         statusInterface->status(status);
+        // coverity[missing_return]
         co_return rc_;
     }
 

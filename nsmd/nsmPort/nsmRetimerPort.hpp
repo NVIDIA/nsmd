@@ -15,9 +15,9 @@
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortWidth/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
+#include <xyz/openbmc_project/Metrics/LanError/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem1/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
-#include <xyz/openbmc_project/Metrics/LanError/server.hpp>
 
 namespace nsm
 {
@@ -124,8 +124,7 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
   public:
     NsmPCIeECCGroup8(const std::string& name, const std::string& type,
                      std::shared_ptr<LaneErrorIntf> laneErrorIntf,
-                     uint8_t deviceIndex,
-                     const std::string& inventoryObjPath);
+                     uint8_t deviceIndex, const std::string& inventoryObjPath);
     NsmPCIeECCGroup8() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -136,6 +135,5 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
     const std::string inventoryObjPath;
     void updateMetricOnSharedMemory();
 };
-
 
 } // namespace nsm

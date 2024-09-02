@@ -56,6 +56,7 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         lg2::error(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -94,9 +95,10 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         lg2::error(
             "responseHandler: query_scalar_group_telemetry_v1_group0 unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
             "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -224,6 +226,7 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NSM_PCIeRetimer_Switch PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -234,7 +237,7 @@ static requester::Coroutine
         lg2::error(
             "Failed to create pcie retimer switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
     nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
@@ -250,7 +253,7 @@ static requester::Coroutine
         lg2::error(
             "Failed to create pcie retimer switch reference clock: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
