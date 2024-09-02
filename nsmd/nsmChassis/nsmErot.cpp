@@ -197,7 +197,7 @@ static int extractNumber(const std::string& str)
 requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
                           const std::string& objPath)
 {
-    auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_ERoT_Slot";
+    auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
 
     auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
