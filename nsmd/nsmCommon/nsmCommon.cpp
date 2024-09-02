@@ -264,6 +264,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -351,6 +352,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 

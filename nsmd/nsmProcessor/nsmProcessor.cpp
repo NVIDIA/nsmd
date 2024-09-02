@@ -118,6 +118,7 @@ requester::Coroutine NsmUuidIntf::update(SensorManager& manager, eid_t eid)
             updateMetricOnSharedMemory();
         }
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -1091,6 +1092,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -1160,6 +1162,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -1519,6 +1522,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -1873,6 +1877,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -1963,6 +1968,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -2037,6 +2043,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -2708,6 +2715,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             workloadPowerProfilePageCollection, profileMapper, firstPageIndex);
         nsmDevice->addSensor(firstPage, priority);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

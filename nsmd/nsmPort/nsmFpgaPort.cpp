@@ -201,6 +201,7 @@ static requester::Coroutine
         // coverity[missing_return]
         co_return NSM_ERROR;
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

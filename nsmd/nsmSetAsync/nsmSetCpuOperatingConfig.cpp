@@ -82,6 +82,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
             "getMinGraphicsClockLimit: decode_get_inventory_information_resp with reasonCode = {REASONCODE},cc = {CC}and rc={RC}",
             "REASONCODE", reason_code, "CC", cc, "RC", rc);
     }
+    // coverity[missing_return]
     co_return NSM_SW_ERROR_COMMAND_FAIL;
 }
 
@@ -138,6 +139,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
             "getMaxGraphicsClockLimit: decode_get_inventory_information_resp with reasonCode = {REASONCODE},cc = {CC}and rc={RC}",
             "REASONCODE", reason_code, "CC", cc, "RC", rc);
     }
+    // coverity[missing_return]
     co_return NSM_SW_ERROR_COMMAND_FAIL;
 }
 
@@ -238,6 +240,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
     else

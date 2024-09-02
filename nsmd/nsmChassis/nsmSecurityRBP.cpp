@@ -36,8 +36,8 @@ static std::unordered_map<uint16_t, std::string> minSecVersionErrors = {
 SecurityConfiguration::SecurityConfiguration(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    SecurityConfigIntf(bus, objPath.c_str()),
-    uuid(uuidIn), progressIntf(progressIntfIn)
+    SecurityConfigIntf(bus, objPath.c_str()), uuid(uuidIn),
+    progressIntf(progressIntfIn)
 {}
 
 void SecurityConfiguration::updateState(
@@ -109,6 +109,7 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
             "securityCfgAsyncHandler: SendRecvNsmMsg error : eid={EID} rc={RC}",
             "EID", eid, "RC", sendRc);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     if (requestType == ENABLE_IRREVERSIBLE_CFG)
@@ -123,6 +124,7 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
                        " failed for : eid={EID} rc={RC}",
                        "EID", eid, "RC", sendRc);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         updateNonce(cfg_2_resp);
@@ -138,10 +140,12 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
                        " failed for : eid={EID} rc={RC}",
                        "EID", eid, "RC", sendRc);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         finishOperation(Progress::OperationStatus::Completed);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -179,8 +183,7 @@ void SecurityConfiguration::finishOperation(Progress::OperationStatus status)
 NsmSecurityCfgObject::NsmSecurityCfgObject(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uuid_t& uuid, std::shared_ptr<ProgressIntf> progressIntfIn) :
-    NsmSensor(name, type),
-    objectPath(getPath(name))
+    NsmSensor(name, type), objectPath(getPath(name))
 {
     lg2::info("NsmSecurityCfgObject: create object: {PATH}", "PATH",
               objectPath.c_str());
@@ -232,9 +235,9 @@ MinSecurityVersion::MinSecurityVersion(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    MinSecVersionIntf(bus, objPath.c_str()),
-    uuid(uuidIn), classification(classificationIn), identifier(identifierIn),
-    index(indexIn), progressIntf(progressIntfIn)
+    MinSecVersionIntf(bus, objPath.c_str()), uuid(uuidIn),
+    classification(classificationIn), identifier(identifierIn), index(indexIn),
+    progressIntf(progressIntfIn)
 {
     securityVersionObject =
         std::make_unique<SecurityVersionIntf>(bus, objPath.c_str());
@@ -372,6 +375,7 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
                    "EID", eid, "RC", sendRc);
         errorCode(getErrorCode(sendRc));
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
 
@@ -386,12 +390,14 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
                    "EID", eid, "RC", sendRc, "CC", cc);
         errorCode(getErrorCode(cc));
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
     const auto& updateMethodsVal =
         getActivationMethods(sec_resp.update_methods);
     updateMethod(updateMethodsVal);
     finishOperation(Progress::OperationStatus::Completed);
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -431,9 +437,8 @@ NsmMinSecVersionObject::NsmMinSecVersionObject(
     const std::string& type, const uuid_t& uuid, uint16_t classificationIn,
     uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    NsmSensor(chassisName, type),
-    objectPath(getPath(chassisName)), classification(classificationIn),
-    identifier(identifierIn), index(indexIn)
+    NsmSensor(chassisName, type), objectPath(getPath(chassisName)),
+    classification(classificationIn), identifier(identifierIn), index(indexIn)
 {
     lg2::info("NsmMinSecVersionObject: create object: {PATH}", "PATH",
               objectPath.c_str());

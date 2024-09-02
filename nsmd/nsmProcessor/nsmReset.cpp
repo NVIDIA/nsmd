@@ -90,6 +90,7 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

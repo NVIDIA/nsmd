@@ -44,6 +44,7 @@ requester::Coroutine NsmSetErrorInjection::errorInjectionModeEnabled(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
+    // coverity[missing_return]
     co_return co_await setModeEnabled(*enabledValue, *status, device);
 }
 requester::Coroutine
@@ -138,6 +139,7 @@ requester::Coroutine NsmSetErrorInjectionEnabled::enabled(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
+    // coverity[missing_return]
     co_return co_await setEnabled(*enabledValue, *status, device);
 }
 

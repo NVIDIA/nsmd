@@ -150,6 +150,7 @@ requester::Coroutine NsmThresholdFactory::processThresholdsPair(
                                         std::move(thresholdValue));
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -82,6 +82,7 @@ requester::Coroutine
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 

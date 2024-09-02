@@ -133,6 +133,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     {
         lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -142,6 +143,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                                          responseLen, false);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -207,8 +209,11 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
             "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
             "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
             "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+
+    // coverity[missing_return]
 
     co_return NSM_SW_SUCCESS;
 }
@@ -226,6 +231,7 @@ requester::Coroutine
         lg2::error(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -235,6 +241,7 @@ requester::Coroutine
                                          responseLen, false);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -254,6 +261,7 @@ requester::Coroutine
     {
         portMetricsOem3Intf->runtimeError(false);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -963,6 +971,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

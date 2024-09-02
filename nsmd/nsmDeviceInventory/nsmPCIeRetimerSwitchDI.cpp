@@ -66,6 +66,7 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -265,6 +266,7 @@ static requester::Coroutine
     {
         nsmDevice->roundRobinSensors.emplace_back(retimerSwitchRefClock);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

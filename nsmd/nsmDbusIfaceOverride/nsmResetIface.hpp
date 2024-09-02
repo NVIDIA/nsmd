@@ -94,6 +94,7 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
                 "ACTION", action, "REASONCODE", reason_code, "CC", cc, "RC",
                 rc);
         }
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

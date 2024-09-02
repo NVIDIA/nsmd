@@ -139,6 +139,7 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
         }
         queuedMctpInfos.pop();
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -160,6 +161,7 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
     rc = co_await SendRecvNsmMsg(eid, request, &respMsg, &respLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -200,6 +202,7 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
     rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -248,6 +251,7 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -342,6 +346,7 @@ requester::Coroutine
         co_await sensor->update(sensorManager, eid);
         ++sensorIndex;
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -361,6 +366,7 @@ requester::Coroutine
         co_await sensor->update(sensorManager, eid);
         ++sensorIndex;
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -386,6 +392,7 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -621,6 +628,7 @@ requester::Coroutine
     rc = co_await SendRecvNsmMsg(eid, request, &responseMsg, &responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -657,6 +665,7 @@ requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
         lg2::error("DeviceManager::SendRecvNsmMsg failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
     }
+    // coverity[missing_return]
     co_return rc;
 }
 

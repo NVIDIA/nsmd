@@ -70,6 +70,7 @@ requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
             }
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -112,6 +113,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 

@@ -152,6 +152,7 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
     {
         finishOperation(Progress::OperationStatus::Failed);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -410,6 +411,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                   eid, "RC", reasonCode);
         finishOperation(Progress::OperationStatus::Failed);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

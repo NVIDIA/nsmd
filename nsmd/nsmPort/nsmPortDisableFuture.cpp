@@ -51,6 +51,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 

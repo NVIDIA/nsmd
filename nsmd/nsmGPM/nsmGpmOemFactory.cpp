@@ -169,6 +169,7 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
     {
         nsmDevice->roundRobinSensors.emplace_back(gpmPerInstanceMetric);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -282,6 +283,7 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
         co_await createNsmPerInstanceGPMMetric(gpmIntf, nsmDevice,
                                                inventoryObjPath, intf, objPath);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -411,6 +413,7 @@ static requester::Coroutine
             nsmDevice->roundRobinSensors.emplace_back(gpmPerPortMetric);
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

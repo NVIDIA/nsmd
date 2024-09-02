@@ -22,6 +22,7 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
                                               responseLen, isLongRunning);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 

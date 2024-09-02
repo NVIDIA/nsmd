@@ -426,6 +426,7 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             if (nsmDevice->pollingTimerLongRunning &&
                 !nsmDevice->pollingTimerLongRunning->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -456,6 +457,7 @@ requester::Coroutine
                device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
                 "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
                 nsmDevice->getInstanceNumber());*/
+            // coverity[missing_return]
             co_return NSM_ERR_NOT_READY;
         }
 
@@ -482,6 +484,7 @@ requester::Coroutine
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -534,6 +537,7 @@ requester::Coroutine
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -578,6 +582,7 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     if (!nsmDevice->isDeviceActive ||
         !nsmDevice->isCommandSupported(messageType, commandCode))
     {
+        // coverity[missing_return]
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
@@ -593,12 +598,14 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
                    rc);
     }
+    // coverity[missing_return]
     co_return rc;
 }
 
 requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 {
     // placeholder
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

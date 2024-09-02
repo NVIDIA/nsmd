@@ -534,6 +534,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -603,6 +604,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -862,6 +864,7 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         // coverity[missing_return]
         co_return NSM_ERROR;
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

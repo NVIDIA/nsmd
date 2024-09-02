@@ -80,6 +80,7 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
+        // coverity[missing_return]
         co_return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
@@ -104,6 +105,7 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -126,6 +128,7 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
 {
     if (eventIdMasks.size() != EVENT_SOURCES_LENGTH)
     {
+        // coverity[missing_return]
         co_return NSM_ERR_INVALID_DATA_LENGTH;
     }
 
@@ -150,6 +153,7 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
