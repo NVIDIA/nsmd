@@ -23,7 +23,7 @@ sources = [
     'nsmSensor.cpp',
     'nsmNumericSensor/nsmNumericSensorComposite.cpp',
     'eventType3Handler.cpp',
-    'nsmEvent.cpp'
+    'nsmEvent.cpp',
 ]
 
 nsmd_headers = [

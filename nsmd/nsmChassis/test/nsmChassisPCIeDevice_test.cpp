@@ -334,7 +334,6 @@ struct NsmPCIeDeviceTest : public NsmChassisPCIeDeviceTest
     }
 };
 
-
 TEST_F(NsmPCIeDeviceTest, goodTestRequest)
 {
     auto request = sensor->genRequestMsg(eid, instanceId);

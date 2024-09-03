@@ -31,8 +31,8 @@ namespace nsm
 NsmWorkLoadProfileStatus::NsmWorkLoadProfileStatus(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<OemProfileInfoIntf> profileStatusInfo) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), profileStatusInfo(profileStatusInfo)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath),
+    profileStatusInfo(profileStatusInfo)
 
 {}
 
@@ -101,8 +101,7 @@ void NsmWorkLoadProfileStatus::updateReading(
 NsmWorkloadPowerProfileCollection::NsmWorkloadPowerProfileCollection(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<NsmDevice> device) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath), device(device)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 bool NsmWorkloadPowerProfileCollection::hasProfileId(uint16_t profileId)
@@ -151,8 +150,7 @@ void NsmWorkloadPowerProfileCollection::updateSupportedProfile(
 NsmWorkloadPowerProfilePageCollection::NsmWorkloadPowerProfilePageCollection(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<NsmDevice> device) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath), device(device)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 std::shared_ptr<NsmWorkloadPowerProfilePage>
@@ -197,8 +195,7 @@ NsmWorkloadPowerProfilePage::NsmWorkloadPowerProfilePage(
     std::shared_ptr<NsmWorkloadPowerProfileCollection> profileCollection,
     std::shared_ptr<NsmWorkloadPowerProfilePageCollection> pageCollection,
     std::shared_ptr<NsmWorkLoadProfileEnum> profileMapper, uint16_t pageId) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), device(device),
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath), device(device),
     profileCollection(profileCollection), pageCollection(pageCollection),
     profileMapper(profileMapper), pageId(pageId)
 {}

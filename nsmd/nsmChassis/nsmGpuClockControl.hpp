@@ -18,18 +18,19 @@
 #pragma once
 #include "platform-environmental.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmObject.hpp"
 #include "utils.hpp"
 
 #include <stdint.h>
 
+#include <com/nvidia/ClockMode/server.hpp>
+#include <com/nvidia/Common/ClearClockLimAsync/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <com/nvidia/ClockMode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
-#include <com/nvidia/Common/ClearClockLimAsync/server.hpp>
-#include "asyncOperationManager.hpp"
+
 #include <cstdint>
 #include <iostream>
 #include <limits>
@@ -40,7 +41,8 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
-using ProcessorModeIntf = sdbusplus::server::object_t<sdbusplus::server::com::nvidia::ClockMode>;
+using ProcessorModeIntf =
+    sdbusplus::server::object_t<sdbusplus::server::com::nvidia::ClockMode>;
 using Mode = sdbusplus::server::com::nvidia::ClockMode::Mode;
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using CpuOperatingConfigIntf =
@@ -57,8 +59,7 @@ class NsmClearClockLimAsyncIntf : public clearClockLimAsyncIntf
     sdbusplus::message::object_path clearClockLimit() override;
     requester::Coroutine doClearClockLimitOnDevice(
         std::shared_ptr<AsyncStatusIntf> statusInterface);
-    requester::Coroutine
-        clearReqClockLimit(AsyncOperationStatusType* status);
+    requester::Coroutine clearReqClockLimit(AsyncOperationStatusType* status);
 
   private:
     std::shared_ptr<NsmDevice> device;
@@ -70,10 +71,9 @@ class NsmChassisClockControl : public NsmSensor
     NsmChassisClockControl(
         sdbusplus::bus::bus& bus, const std::string& name,
         std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf,
-        std::shared_ptr<NsmClearClockLimAsyncIntf>nsmClearClockLimAsyncIntf,
+        std::shared_ptr<NsmClearClockLimAsyncIntf> nsmClearClockLimAsyncIntf,
         const std::vector<utils::Association>& associations, std::string& type,
-        const std::string& inventoryObjPath,
-        const std::string& physicalContext,
+        const std::string& inventoryObjPath, const std::string& physicalContext,
         const std::string& clockMode);
 
     std::optional<std::vector<uint8_t>>
@@ -83,14 +83,14 @@ class NsmChassisClockControl : public NsmSensor
     void updateMetricOnSharedMemory() override;
 
     requester::Coroutine
-    setMinClockLimits(const AsyncSetOperationValueType& value,
-                            [[maybe_unused]] AsyncOperationStatusType* status,
-                            std::shared_ptr<NsmDevice> device);
+        setMinClockLimits(const AsyncSetOperationValueType& value,
+                          [[maybe_unused]] AsyncOperationStatusType* status,
+                          std::shared_ptr<NsmDevice> device);
 
     requester::Coroutine
-    setMaxClockLimits(const AsyncSetOperationValueType& value,
-                            [[maybe_unused]] AsyncOperationStatusType* status,
-                            std::shared_ptr<NsmDevice> device);
+        setMaxClockLimits(const AsyncSetOperationValueType& value,
+                          [[maybe_unused]] AsyncOperationStatusType* status,
+                          std::shared_ptr<NsmDevice> device);
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
@@ -98,9 +98,8 @@ class NsmChassisClockControl : public NsmSensor
     std::shared_ptr<ProcessorModeIntf> processorModeIntf = nullptr;
     std::shared_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf;
-    std::shared_ptr<NsmClearClockLimAsyncIntf>nsmClearClockLimAsyncIntf;
+    std::shared_ptr<NsmClearClockLimAsyncIntf> nsmClearClockLimAsyncIntf;
     std::string inventoryObjPath;
 };
-
 
 } // namespace nsm

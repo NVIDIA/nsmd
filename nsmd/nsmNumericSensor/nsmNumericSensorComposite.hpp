@@ -27,10 +27,10 @@
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <xyz/openbmc_project/Sensor/Value/server.hpp>
-#include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Sensor/Type/server.hpp>
+#include <xyz/openbmc_project/Sensor/Value/server.hpp>
+#include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
 #include <iostream>
 #include <limits>
@@ -55,8 +55,7 @@ class NsmNumericSensorComposite : public NsmObject
         sdbusplus::bus::bus& bus, const std::string& name,
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& path,
-        const std::string& physicalContext,
-        const std::string& implementation
+        const std::string& physicalContext, const std::string& implementation
 #ifdef NVIDIA_SHMEM
         ,
         std::unique_ptr<NsmNumericSensorShmem> shmemSensor

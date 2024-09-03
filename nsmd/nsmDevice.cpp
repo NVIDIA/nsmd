@@ -156,8 +156,8 @@ void NsmDevice::setOnline()
 {
     isDeviceActive = true;
     lg2::info(
-                "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
-                "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
+        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
+        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     isDeviceReady = false;
     NsmServiceReadyIntf::getInstance().setStateStarting();
 
@@ -174,8 +174,8 @@ void NsmDevice::setOffline()
 {
     isDeviceActive = false;
     lg2::info(
-                "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
-                "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
+        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
+        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     SensorManager& sensorManager = SensorManager::getInstance();
     sensorManager.stopPolling(uuid);
 

@@ -1036,12 +1036,11 @@ TEST(queryScalarGroupTelemetryV1Group8, testGoodEncodeResponse)
 TEST(queryScalarGroupTelemetryV1Group8, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> data_byte;
-	for(int idx = 0; idx< TOTAL_PCIE_LANE_COUNT ;idx++)
-	{
-		data_byte.push_back(idx*0);
-		data_byte.push_back(idx*1);
-		data_byte.push_back(idx*2);
-		data_byte.push_back(idx*3);
+	for (int idx = 0; idx < TOTAL_PCIE_LANE_COUNT; idx++) {
+		data_byte.push_back(idx * 0);
+		data_byte.push_back(idx * 1);
+		data_byte.push_back(idx * 2);
+		data_byte.push_back(idx * 3);
 	}
 
 	std::vector<uint8_t> responseMsg{
@@ -1054,7 +1053,7 @@ TEST(queryScalarGroupTelemetryV1Group8, testGoodDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    TOTAL_PCIE_LANE_COUNT*4,
+	    TOTAL_PCIE_LANE_COUNT * 4,
 	    0 // data size
 	};
 	auto data =
@@ -1075,19 +1074,18 @@ TEST(queryScalarGroupTelemetryV1Group8, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 
-	EXPECT_EQ(data_size, TOTAL_PCIE_LANE_COUNT*4);
+	EXPECT_EQ(data_size, TOTAL_PCIE_LANE_COUNT * 4);
 	EXPECT_EQ(le32toh(data_test->error_counts[0]), data->error_counts[0]);
 }
 
 TEST(queryScalarGroupTelemetryV1Group8, testBadDecodeResponse)
 {
 	std::vector<uint8_t> data_byte;
-	for(int idx = 0; idx< TOTAL_PCIE_LANE_COUNT ;idx++)
-	{
-		data_byte.push_back(idx*0);
-		data_byte.push_back(idx*1);
-		data_byte.push_back(idx*2);
-		data_byte.push_back(idx*3);
+	for (int idx = 0; idx < TOTAL_PCIE_LANE_COUNT; idx++) {
+		data_byte.push_back(idx * 0);
+		data_byte.push_back(idx * 1);
+		data_byte.push_back(idx * 2);
+		data_byte.push_back(idx * 3);
 	}
 
 	std::vector<uint8_t> responseMsg{
@@ -1100,13 +1098,13 @@ TEST(queryScalarGroupTelemetryV1Group8, testBadDecodeResponse)
 	    0,					 // completion code
 	    0,
 	    0,
-	    TOTAL_PCIE_LANE_COUNT*4 -1 ,
+	    TOTAL_PCIE_LANE_COUNT * 4 - 1,
 	    0 // data size
 	};
 	auto data =
 	    reinterpret_cast<nsm_query_scalar_group_telemetry_group_8 *>(
 		data_byte.data());
-	
+
 	responseMsg.insert(responseMsg.end(), data_byte.begin(),
 			   data_byte.end());
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -1135,7 +1133,6 @@ TEST(queryScalarGroupTelemetryV1Group8, testBadDecodeResponse)
 	rc = decode_query_scalar_group_telemetry_v1_group8_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
-	
 }
 
 TEST(queryScalarGroupTelemetryV1Group9, testGoodEncodeResponse)
@@ -1275,22 +1272,24 @@ TEST(queryScalarGroupTelemetryV1Group9, testBadDecodeResponse)
 
 TEST(pcieFundamentalReset, testGoodEncodeRequest)
 {
-	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
-					sizeof(nsm_assert_pcie_fundamental_reset_req));
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_assert_pcie_fundamental_reset_req));
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	uint8_t device_index = 1;
 	uint8_t action = 0;
-	auto rc = encode_assert_pcie_fundamental_reset_req(0, device_index, action, request);
+	auto rc = encode_assert_pcie_fundamental_reset_req(0, device_index,
+							   action, request);
 	struct nsm_assert_pcie_fundamental_reset_req *req =
-	    reinterpret_cast<struct nsm_assert_pcie_fundamental_reset_req *>(request->payload);
+	    reinterpret_cast<struct nsm_assert_pcie_fundamental_reset_req *>(
+		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_PCI_LINK,
-		  request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, req->hdr.command);
 	EXPECT_EQ(2, req->hdr.data_size);
@@ -1302,24 +1301,25 @@ TEST(pcieFundamentalReset, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x80,	       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
-	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET,		     // command
-	    2,				     // data size
-	    1,				     // device_index
-		0                    // action
+	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, // command
+	    2,				       // data size
+	    1,				       // device_index
+	    0				       // action
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	size_t msg_len = requestMsg.size();
 	uint8_t device_index;
 	uint8_t action;
-	auto rc = decode_assert_pcie_fundamental_reset_req(request, msg_len, &device_index, &action);
+	auto rc = decode_assert_pcie_fundamental_reset_req(
+	    request, msg_len, &device_index, &action);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(1, device_index);
-	EXPECT_EQ(0,action);
+	EXPECT_EQ(0, action);
 }
 
 TEST(pcieFundamentalReset, testGoodEncodeResponse)
@@ -1329,8 +1329,8 @@ TEST(pcieFundamentalReset, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	uint16_t reason_code = ERR_NULL;
 
-	auto rc =
-	    encode_assert_pcie_fundamental_reset_resp(0, NSM_SUCCESS, reason_code, response);
+	auto rc = encode_assert_pcie_fundamental_reset_resp(
+	    0, NSM_SUCCESS, reason_code, response);
 
 	struct nsm_common_resp *resp =
 	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
@@ -1339,8 +1339,7 @@ TEST(pcieFundamentalReset, testGoodEncodeResponse)
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_PCI_LINK,
-		  response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, resp->command);
 	EXPECT_EQ(0, le16toh(resp->data_size));
@@ -1350,17 +1349,17 @@ TEST(pcieFundamentalReset, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
-	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET,		     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
+	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, // command
+	    0,				       // completion code
+	    0,				       // reserved
+	    0,				       // reserved
 	    0,
-		0				     // data size
-		};
+	    0 // data size
+	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
@@ -1369,8 +1368,8 @@ TEST(pcieFundamentalReset, testGoodDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	auto rc = decode_assert_pcie_fundamental_reset_resp(response, msg_len, &cc, &data_size,
-					   &reason_code);
+	auto rc = decode_assert_pcie_fundamental_reset_resp(
+	    response, msg_len, &cc, &data_size, &reason_code);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
@@ -1381,17 +1380,17 @@ TEST(pcieFundamentalReset, testBadDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
-	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET,		     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
-	    0,                   // data size
-		0				     // data size
-	    };
+	    NSM_ASSERT_PCIE_FUNDAMENTAL_RESET, // command
+	    0,				       // completion code
+	    0,				       // reserved
+	    0,				       // reserved
+	    0,				       // data size
+	    0				       // data size
+	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
@@ -1400,21 +1399,21 @@ TEST(pcieFundamentalReset, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	auto rc = decode_assert_pcie_fundamental_reset_resp( NULL, msg_len, &cc, &data_size,
-					   &reason_code);
+	auto rc = decode_assert_pcie_fundamental_reset_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_assert_pcie_fundamental_reset_resp(response, msg_len, NULL, &data_size,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_assert_pcie_fundamental_reset_resp(
+	    response, msg_len, NULL, &data_size, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_assert_pcie_fundamental_reset_resp(response, msg_len, &cc, NULL,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_assert_pcie_fundamental_reset_resp(response, msg_len, &cc,
+						       NULL, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_assert_pcie_fundamental_reset_resp(response, msg_len - 1, &cc, &data_size,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	rc = decode_assert_pcie_fundamental_reset_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(clearScalarDataSource, testGoodEncodeRequest)
@@ -1426,16 +1425,17 @@ TEST(clearScalarDataSource, testGoodEncodeRequest)
 	uint8_t device_index = 1;
 	uint8_t groupId = 8;
 	uint8_t dsId = 2;
-	auto rc = encode_clear_data_source_v1_req(0, device_index, groupId, dsId, request);
+	auto rc = encode_clear_data_source_v1_req(0, device_index, groupId,
+						  dsId, request);
 	struct nsm_clear_data_source_v1_req *req =
-	    reinterpret_cast<struct nsm_clear_data_source_v1_req *>(request->payload);
+	    reinterpret_cast<struct nsm_clear_data_source_v1_req *>(
+		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(0, request->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_PCI_LINK,
-		  request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, request->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_CLEAR_DATA_SOURCE_V1, req->hdr.command);
 	EXPECT_EQ(3, req->hdr.data_size);
@@ -1479,8 +1479,8 @@ TEST(clearScalarDataSource, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	uint16_t reason_code = ERR_NULL;
 
-	auto rc =
-	    encode_clear_data_source_v1_resp(0, NSM_SUCCESS, reason_code, response);
+	auto rc = encode_clear_data_source_v1_resp(0, NSM_SUCCESS, reason_code,
+						   response);
 
 	struct nsm_common_resp *resp =
 	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
@@ -1489,8 +1489,7 @@ TEST(clearScalarDataSource, testGoodEncodeResponse)
 
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_PCI_LINK,
-		  response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_CLEAR_DATA_SOURCE_V1, resp->command);
 	EXPECT_EQ(0, le16toh(resp->data_size));
@@ -1500,17 +1499,17 @@ TEST(clearScalarDataSource, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
-	    NSM_CLEAR_DATA_SOURCE_V1,		     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
+	    0xDE,		      // PCI VID: NVIDIA 0x10DE
+	    0x00,		      // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		      // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK,	      // NVIDIA_MSG_TYPE
+	    NSM_CLEAR_DATA_SOURCE_V1, // command
+	    0,			      // completion code
+	    0,			      // reserved
+	    0,			      // reserved
 	    0,
-		0				     // data size
-		};
+	    0 // data size
+	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
@@ -1519,8 +1518,8 @@ TEST(clearScalarDataSource, testGoodDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	auto rc = decode_clear_data_source_v1_resp(response, msg_len, &cc, &data_size,
-					   &reason_code);
+	auto rc = decode_clear_data_source_v1_resp(response, msg_len, &cc,
+						   &data_size, &reason_code);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
@@ -1531,17 +1530,17 @@ TEST(clearScalarDataSource, testBadDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
 	    0x10,
-	    0xDE,			     // PCI VID: NVIDIA 0x10DE
-	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,			     // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_PCI_LINK, // NVIDIA_MSG_TYPE
-	    NSM_CLEAR_DATA_SOURCE_V1,		     // command
-	    0,				     // completion code
-	    0,				     // reserved
-	    0,				     // reserved
-	    0,                   // data size
-		0				     // data size
-	    };
+	    0xDE,		      // PCI VID: NVIDIA 0x10DE
+	    0x00,		      // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		      // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PCI_LINK,	      // NVIDIA_MSG_TYPE
+	    NSM_CLEAR_DATA_SOURCE_V1, // command
+	    0,			      // completion code
+	    0,			      // reserved
+	    0,			      // reserved
+	    0,			      // data size
+	    0			      // data size
+	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
@@ -1550,21 +1549,21 @@ TEST(clearScalarDataSource, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	auto rc = decode_clear_data_source_v1_resp( NULL, msg_len, &cc, &data_size,
-					   &reason_code);
+	auto rc = decode_clear_data_source_v1_resp(NULL, msg_len, &cc,
+						   &data_size, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_clear_data_source_v1_resp(response, msg_len, NULL, &data_size,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_clear_data_source_v1_resp(response, msg_len, NULL,
+					      &data_size, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_clear_data_source_v1_resp(response, msg_len, &cc, NULL,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+					      &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_clear_data_source_v1_resp(response, msg_len - 1, &cc, &data_size,
-					   &reason_code);
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	rc = decode_clear_data_source_v1_resp(response, msg_len - 1, &cc,
+					      &data_size, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(QueryAvailableAndClearableScalarDataSource, testGoodEncodeRequest)

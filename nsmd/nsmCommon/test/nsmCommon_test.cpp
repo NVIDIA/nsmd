@@ -23,8 +23,8 @@ std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
 
 TEST(nsmMemCapacityUtil, GoodGenReq)
 {
-    auto totalMemorySensor =
-        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
+    auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
+                                                              sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
                                       inventoryObjPath, totalMemorySensor,
                                       false);
@@ -43,8 +43,8 @@ TEST(nsmMemCapacityUtil, GoodGenReq)
 
 TEST(nsmMemCapacityUtil, GoodHandleResp)
 {
-    auto totalMemorySensor =
-        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
+    auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
+                                                              sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
                                       inventoryObjPath, totalMemorySensor,
                                       false);
@@ -68,8 +68,8 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
 
 TEST(nsmMemCapacityUtil, BadHandleResp)
 {
-    auto totalMemorySensor =
-        std::make_shared<NsmTotalMemory>(sensorName, sensorType);
+    auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
+                                                              sensorType);
     nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
                                       inventoryObjPath, totalMemorySensor,
                                       false);

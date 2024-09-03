@@ -17,11 +17,11 @@
 
 #pragma once
 #include "globals.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
-#include "nsmAssetIntf.hpp"
 namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;

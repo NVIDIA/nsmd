@@ -814,8 +814,8 @@ TEST(getNetworkDeviceLogInfo, testGoodDecodeRequest)
 	size_t msg_len = requestMsg.size();
 
 	uint32_t handle;
-	auto rc = decode_get_network_device_log_info_req(request, msg_len,
-							&handle);
+	auto rc =
+	    decode_get_network_device_log_info_req(request, msg_len, &handle);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(03, handle);

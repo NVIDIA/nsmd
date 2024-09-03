@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -327,8 +327,7 @@ class QueryTokenStatus : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit QueryTokenStatus(const char* type, const char* name,
-                              CLI::App* app) :
-        CommandInterface(type, name, app)
+                              CLI::App* app) : CommandInterface(type, name, app)
     {
         auto ccOptionGroup = app->add_option_group(
             "Required", "Query token status for the specified token type");

@@ -21,9 +21,9 @@
 
 #include <stdint.h>
 
+#include <com/nvidia/PowerSupply/PowerSupplyInfo/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
-#include <com/nvidia/PowerSupply/PowerSupplyInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PowerSupply/server.hpp>
 
 #include <cstdint>
@@ -41,13 +41,14 @@ using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using PowerSupplyInfoIntf =
     object_t<sdbusplus::com::nvidia::PowerSupply::server::PowerSupplyInfo>;
 using PowerSupplyIntf = object_t<Inventory::Item::server::PowerSupply>;
-class NsmPowerPowerSupply :
-    public NsmObject
+class NsmPowerPowerSupply : public NsmObject
 {
   public:
-    NsmPowerPowerSupply(sdbusplus::bus::bus &bus, std::string &name,
-		    const std::vector<utils::Association> &associations,
-		    std::string &type, std::string &path, std::string &powerSupplyType);
+    NsmPowerPowerSupply(sdbusplus::bus::bus& bus, std::string& name,
+                        const std::vector<utils::Association>& associations,
+                        std::string& type, std::string& path,
+                        std::string& powerSupplyType);
+
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
         nullptr;

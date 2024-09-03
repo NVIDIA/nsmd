@@ -1470,15 +1470,16 @@ TEST(queryPortsAvailable, testBadDecodeResponseWithPayload)
 
 TEST(getPortDisableFuture, testGoodEncodeRequest)
 {
-	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
-					 sizeof(nsm_get_port_disable_future_req));
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_req));
 
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
 
 	auto rc = encode_get_port_disable_future_req(0, request);
 
 	nsm_get_port_disable_future_req *req =
-	    reinterpret_cast<nsm_get_port_disable_future_req *>(request->payload);
+	    reinterpret_cast<nsm_get_port_disable_future_req *>(
+		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(1, request->hdr.request);
@@ -1490,8 +1491,8 @@ TEST(getPortDisableFuture, testGoodEncodeRequest)
 
 TEST(getPortDisableFuture, testBadEncodeRequest)
 {
-	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
-					 sizeof(nsm_get_port_disable_future_req));
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_req));
 
 	auto rc = encode_get_port_disable_future_req(0, nullptr);
 
@@ -1502,12 +1503,12 @@ TEST(getPortDisableFuture, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> request_msg{
 	    0x10,
-	    0xDE,		   // PCI VID: NVIDIA 0x10DE
-	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
-	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
-	    NSM_GET_PORT_DISABLE_FUTURE,	   // command
-	    0			   // data size
+	    0xDE,			 // PCI VID: NVIDIA 0x10DE
+	    0x80,			 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			 // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	 // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_DISABLE_FUTURE, // command
+	    0				 // data size
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
@@ -1523,17 +1524,17 @@ TEST(getPortDisableFuture, testBadDecodeRequest)
 {
 	std::vector<uint8_t> request_msg{
 	    0x10,
-	    0xDE,		   // PCI VID: NVIDIA 0x10DE
-	    0x80,		   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89,		   // OCP_TYPE=1, OCP_VER=1, OCP=1
-	    NSM_TYPE_NETWORK_PORT, // NVIDIA_MSG_TYPE
-	    NSM_GET_PORT_DISABLE_FUTURE,	   // command
-	    1			   // data size [it should not be 1]
+	    0xDE,			 // PCI VID: NVIDIA 0x10DE
+	    0x80,			 // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			 // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	 // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_DISABLE_FUTURE, // command
+	    1				 // data size [it should not be 1]
 	};
 
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
-	size_t msg_len =
-	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_req);
+	size_t msg_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(nsm_get_port_disable_future_req);
 
 	auto rc = decode_get_port_disable_future_req(nullptr, 0);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
@@ -1548,18 +1549,18 @@ TEST(getPortDisableFuture, testBadDecodeRequest)
 TEST(getPortDisableFuture, testGoodEncodeResponseCCSuccess)
 {
 	uint16_t reason_code = ERR_NULL;
-    bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
-        0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
+	    0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	std::vector<uint8_t> response_msg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_disable_future_resp), 0);
 	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
 
 	// test for cc = 0x0 [NSM_SUCCESS]
-	auto rc = encode_get_port_disable_future_resp(0, NSM_SUCCESS, reason_code,
-						    mask, response);
+	auto rc = encode_get_port_disable_future_resp(
+	    0, NSM_SUCCESS, reason_code, mask, response);
 
 	struct nsm_get_port_disable_future_resp *resp =
 	    reinterpret_cast<struct nsm_get_port_disable_future_resp *>(
@@ -1576,10 +1577,10 @@ TEST(getPortDisableFuture, testGoodEncodeResponseCCSuccess)
 
 TEST(getPortDisableFuture, testGoodEncodeResponseCCError)
 {
-    bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
-        0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
+	    0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	uint16_t reason_code = ERR_NULL;
 
 	std::vector<uint8_t> response_msg(
@@ -1588,7 +1589,7 @@ TEST(getPortDisableFuture, testGoodEncodeResponseCCError)
 
 	// test for cc = 0x1 [NSM_ERROR]
 	auto rc = encode_get_port_disable_future_resp(0, NSM_ERROR, reason_code,
-						    mask, response);
+						      mask, response);
 
 	struct nsm_common_non_success_resp *resp =
 	    reinterpret_cast<struct nsm_common_non_success_resp *>(
@@ -1606,13 +1607,13 @@ TEST(getPortDisableFuture, testGoodEncodeResponseCCError)
 TEST(getPortDisableFuture, testBadEncodeResponse)
 {
 	bitfield8_t mask[PORT_MASK_DATA_SIZE] = {
-        0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	    0xFF, 0xFF, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 	uint16_t reason_code = ERR_NULL;
 
-	auto rc = encode_get_port_disable_future_resp(0, NSM_SUCCESS, reason_code,
-						    mask, nullptr);
+	auto rc = encode_get_port_disable_future_resp(
+	    0, NSM_SUCCESS, reason_code, mask, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 

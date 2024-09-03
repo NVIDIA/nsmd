@@ -367,7 +367,7 @@ int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len,
 	    (struct nsm_erase_trace_req *)msg->payload;
 
 	if (request->hdr.data_size != sizeof(struct nsm_erase_trace_req) -
-					 sizeof(struct nsm_common_req)) {
+					  sizeof(struct nsm_common_req)) {
 		return NSM_SW_ERROR_DATA;
 	}
 

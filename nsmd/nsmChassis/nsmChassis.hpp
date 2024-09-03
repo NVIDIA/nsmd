@@ -18,8 +18,9 @@
 #pragma once
 
 #include "globals.hpp"
-#include "nsmInterface.hpp"
 #include "nsmAssetIntf.hpp"
+#include "nsmInterface.hpp"
+
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
@@ -64,11 +65,11 @@ class NsmChassis : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_Chassis",
                                        chassisInventoryBasePath)
     {}
-    NsmChassis(const std::string& name,
-                         const std::shared_ptr<IntfType>& pdi) :
+    NsmChassis(const std::string& name, const std::shared_ptr<IntfType>& pdi) :
         NsmInterfaceProvider<IntfType>(name, "NSM_Chassis", {pdi})
     {}
-    virtual requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    virtual requester::Coroutine update(SensorManager& manager,
+                                        eid_t eid) override;
 };
 
 } // namespace nsm

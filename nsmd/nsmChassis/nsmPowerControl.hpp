@@ -66,9 +66,10 @@ class NsmPowerControl :
     public ClearPowerCapIntf
 {
   public:
-    NsmPowerControl(sdbusplus::bus::bus &bus, const std::string &name,
-		    const std::vector<utils::Association> &associations,
-		    std::string &type, const std::string &path, const std::string& physicalContext);
+    NsmPowerControl(sdbusplus::bus::bus& bus, const std::string& name,
+                    const std::vector<utils::Association>& associations,
+                    std::string& type, const std::string& path,
+                    const std::string& physicalContext);
     virtual uint32_t minPowerCapValue() const override;
     virtual uint32_t maxPowerCapValue() const override;
     virtual uint32_t defaultPowerCap() const override;
@@ -77,7 +78,7 @@ class NsmPowerControl :
         setPowerCap(const AsyncSetOperationValueType& value,
                     AsyncOperationStatusType* status,
                     [[maybe_unused]] std::shared_ptr<NsmDevice> device);
-    void updatePowerCapValue(const std::string &childName, uint32_t value);
+    void updatePowerCapValue(const std::string& childName, uint32_t value);
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =

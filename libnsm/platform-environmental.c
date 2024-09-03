@@ -169,7 +169,7 @@ int encode_get_platform_env_command_no_payload_req(
 		return rc;
 	}
 
-	struct nsm_common_req *request = (struct nsm_common_req*)msg->payload;
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 
 	request->command = command;
 	request->data_size = 0;
@@ -190,7 +190,6 @@ int decode_get_platform_env_command_no_payload_req(
 	}
 	return NSM_SW_SUCCESS;
 }
-
 
 uint32_t
 decode_inventory_information_as_uint32(const uint8_t *inventory_information,
@@ -3849,8 +3848,7 @@ int decode_aggregate_gpm_metric_bandwidth_data(const uint8_t *data,
 	return NSM_SW_SUCCESS;
 }
 
-int encode_get_violation_duration_req(uint8_t instance_id,
-						   struct nsm_msg *msg)
+int encode_get_violation_duration_req(uint8_t instance_id, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -3874,16 +3872,15 @@ int encode_get_violation_duration_req(uint8_t instance_id,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_violation_duration_req(const struct nsm_msg *msg,
-						   size_t msg_len)
+int decode_get_violation_duration_req(const struct nsm_msg *msg, size_t msg_len)
 {
 	return decode_common_req(msg, msg_len);
 }
 
 int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_violation_duration *data,
-					    struct nsm_msg *msg)
+				       uint16_t reason_code,
+				       struct nsm_violation_duration *data,
+				       struct nsm_msg *msg)
 {
 	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -3909,12 +3906,11 @@ int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
 
 	resp->hdr.command = NSM_GET_VIOLATION_DURATION;
 	resp->hdr.completion_code = cc;
-	resp->hdr.data_size =
-	    htole16(sizeof(struct nsm_violation_duration));
+	resp->hdr.data_size = htole16(sizeof(struct nsm_violation_duration));
 
-	resp->data.supported_counter.byte = htole64(data->supported_counter.byte);
-	resp->data.hw_violation_duration =
-	    htole64(data->hw_violation_duration);
+	resp->data.supported_counter.byte =
+	    htole64(data->supported_counter.byte);
+	resp->data.hw_violation_duration = htole64(data->hw_violation_duration);
 	resp->data.global_sw_violation_duration =
 	    htole64(data->global_sw_violation_duration);
 	resp->data.power_violation_duration =
@@ -3929,9 +3925,11 @@ int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_violation_duration_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
-    uint16_t *reason_code, struct nsm_violation_duration *data)
+int decode_get_violation_duration_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *data_size,
+				       uint16_t *reason_code,
+				       struct nsm_violation_duration *data)
 {
 	if (data_size == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -3943,7 +3941,7 @@ int decode_get_violation_duration_resp(
 	}
 
 	if (msg_len != sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_violation_duration_resp)) {
+			   sizeof(struct nsm_get_violation_duration_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -3955,9 +3953,9 @@ int decode_get_violation_duration_resp(
 	if (*data_size != sizeof(struct nsm_violation_duration)) {
 		return NSM_SW_ERROR_DATA;
 	}
-	data->supported_counter.byte = le64toh(resp->data.supported_counter.byte);
-	data->hw_violation_duration =
-	    le64toh(resp->data.hw_violation_duration);
+	data->supported_counter.byte =
+	    le64toh(resp->data.supported_counter.byte);
+	data->hw_violation_duration = le64toh(resp->data.hw_violation_duration);
 	data->global_sw_violation_duration =
 	    le64toh(resp->data.global_sw_violation_duration);
 	data->power_violation_duration =
@@ -3972,24 +3970,29 @@ int decode_get_violation_duration_resp(
 	return NSM_SW_SUCCESS;
 }
 
-static void htolePowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
+static void
+htolePowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
 {
-	data->feature_flag=htole32(data->feature_flag);
-	data->currentTmpSetting=htole32(data->currentTmpSetting);
-	data->currentTmpFloorSetting=htole32(data->currentTmpFloorSetting);
-	data->maxTmpFloorSettingInPercent=htole16(data->maxTmpFloorSettingInPercent);
-	data->minTmpFloorSettingInPercent=htole16(data->minTmpFloorSettingInPercent);
+	data->feature_flag = htole32(data->feature_flag);
+	data->currentTmpSetting = htole32(data->currentTmpSetting);
+	data->currentTmpFloorSetting = htole32(data->currentTmpFloorSetting);
+	data->maxTmpFloorSettingInPercent =
+	    htole16(data->maxTmpFloorSettingInPercent);
+	data->minTmpFloorSettingInPercent =
+	    htole16(data->minTmpFloorSettingInPercent);
 }
 
-static void letohPowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
+static void
+letohPowerSmoothingFeat(struct nsm_pwr_smoothing_featureinfo_data *data)
 {
-	data->feature_flag=le32toh(data->feature_flag);
-	data->currentTmpSetting=le32toh(data->currentTmpSetting);
-	data->currentTmpFloorSetting=le32toh(data->currentTmpFloorSetting);
-	data->maxTmpFloorSettingInPercent=le16toh(data->maxTmpFloorSettingInPercent);
-	data->minTmpFloorSettingInPercent=le16toh(data->minTmpFloorSettingInPercent);
+	data->feature_flag = le32toh(data->feature_flag);
+	data->currentTmpSetting = le32toh(data->currentTmpSetting);
+	data->currentTmpFloorSetting = le32toh(data->currentTmpFloorSetting);
+	data->maxTmpFloorSettingInPercent =
+	    le16toh(data->maxTmpFloorSettingInPercent);
+	data->minTmpFloorSettingInPercent =
+	    le16toh(data->minTmpFloorSettingInPercent);
 }
-
 
 int encode_get_powersmoothing_featinfo_req(uint8_t instance_id,
 					   struct nsm_msg *msg)
@@ -3998,7 +4001,6 @@ int encode_get_powersmoothing_featinfo_req(uint8_t instance_id,
 	    instance_id, msg, NSM_PWR_SMOOTHING_GET_FEATURE_INFO);
 }
 
-
 int decode_get_powersmoothing_featinfo_req(const struct nsm_msg *msg,
 					   size_t msg_len)
 {
@@ -4006,10 +4008,9 @@ int decode_get_powersmoothing_featinfo_req(const struct nsm_msg *msg,
 	    msg, msg_len, NSM_PWR_SMOOTHING_GET_FEATURE_INFO);
 }
 
-int encode_get_powersmoothing_featinfo_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_pwr_smoothing_featureinfo_data *data,
-					    struct nsm_msg *msg)
+int encode_get_powersmoothing_featinfo_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_pwr_smoothing_featureinfo_data *data, struct nsm_msg *msg)
 {
 	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4034,19 +4035,20 @@ int encode_get_powersmoothing_featinfo_resp(uint8_t instance_id, uint8_t cc,
 	    (struct nsm_get_power_smoothing_feat_resp *)msg->payload;
 	response->hdr.command = NSM_PWR_SMOOTHING_GET_FEATURE_INFO;
 	response->hdr.completion_code = cc;
-	response->hdr.data_size = htole16(sizeof(struct nsm_pwr_smoothing_featureinfo_data));
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_pwr_smoothing_featureinfo_data));
 
 	htolePowerSmoothingFeat(data);
 	memcpy(&(response->data), data,
 	       sizeof(struct nsm_pwr_smoothing_featureinfo_data));
-	
+
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_powersmoothing_featinfo_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code,
-					    uint16_t *data_size,
-					    struct nsm_pwr_smoothing_featureinfo_data *data)
+int decode_get_powersmoothing_featinfo_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_pwr_smoothing_featureinfo_data *data)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4063,19 +4065,19 @@ int decode_get_powersmoothing_featinfo_resp(const struct nsm_msg *msg,
 	}
 
 	struct nsm_get_power_smoothing_feat_resp *resp =
-		(struct nsm_get_power_smoothing_feat_resp *)msg->payload;
-    *data_size = le16toh(resp->hdr.data_size);
-	
+	    (struct nsm_get_power_smoothing_feat_resp *)msg->payload;
+	*data_size = le16toh(resp->hdr.data_size);
+
 	if (resp->hdr.command != NSM_PWR_SMOOTHING_GET_FEATURE_INFO) {
 		return NSM_ERR_INVALID_DATA;
 	}
 
 	size_t nsm_featureinfo_data_length =
-		sizeof(struct nsm_pwr_smoothing_featureinfo_data);
+	    sizeof(struct nsm_pwr_smoothing_featureinfo_data);
 	if (*data_size < nsm_featureinfo_data_length) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
-	
+
 	memcpy(data, &(resp->data), nsm_featureinfo_data_length);
 	*cc = resp->hdr.completion_code;
 
@@ -4084,24 +4086,24 @@ int decode_get_powersmoothing_featinfo_resp(const struct nsm_msg *msg,
 }
 
 int encode_get_hardware_lifetime_cricuitry_req(uint8_t instance_id,
-					   struct nsm_msg *msg)
+					       struct nsm_msg *msg)
 {
 	return encode_get_platform_env_command_no_payload_req(
-	    instance_id, msg, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
+	    instance_id, msg,
+	    NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
 }
-
 
 int decode_get_hardware_lifetime_cricuitry_req(const struct nsm_msg *msg,
-					   size_t msg_len)
+					       size_t msg_len)
 {
 	return decode_get_platform_env_command_no_payload_req(
-	    msg, msg_len, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
+	    msg, msg_len,
+	    NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE);
 }
 
-int encode_get_hardware_lifetime_cricuitry_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_hardwarecircuitry_data *data,
-					    struct nsm_msg *msg)
+int encode_get_hardware_lifetime_cricuitry_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_hardwarecircuitry_data *data, struct nsm_msg *msg)
 {
 	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4119,24 +4121,28 @@ int encode_get_hardware_lifetime_cricuitry_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE, msg);
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE,
+		    msg);
 	}
 
 	struct nsm_hardwareciruitry_resp *response =
 	    (struct nsm_hardwareciruitry_resp *)msg->payload;
-	response->hdr.command = NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE;
+	response->hdr.command =
+	    NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE;
 	response->hdr.completion_code = cc;
 	uint16_t data_size = htole16(sizeof(struct nsm_hardwarecircuitry_data));
 	response->hdr.data_size = htole16(data_size);
-	memcpy(&(response->data), data, sizeof(struct nsm_hardwarecircuitry_data));
-	response->data.reading =htole32(response->data.reading);
+	memcpy(&(response->data), data,
+	       sizeof(struct nsm_hardwarecircuitry_data));
+	response->data.reading = htole32(response->data.reading);
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_hardware_lifetime_cricuitry_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code,
-					    uint16_t *data_size,
-					    struct nsm_hardwarecircuitry_data *data)
+int decode_get_hardware_lifetime_cricuitry_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_hardwarecircuitry_data *data)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4153,26 +4159,26 @@ int decode_get_hardware_lifetime_cricuitry_resp(const struct nsm_msg *msg,
 	}
 
 	struct nsm_hardwareciruitry_resp *resp =
-		(struct nsm_hardwareciruitry_resp *)msg->payload;
+	    (struct nsm_hardwareciruitry_resp *)msg->payload;
 	*data_size = le16toh(resp->hdr.data_size);
 
-	if (resp->hdr.command != NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE) {
+	if (resp->hdr.command !=
+	    NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE) {
 		return NSM_ERR_INVALID_DATA;
 	}
 
 	size_t nsm_hardwarecircuitry_data_length =
-		sizeof(struct nsm_hardwarecircuitry_data);
+	    sizeof(struct nsm_hardwarecircuitry_data);
 	if (*data_size < nsm_hardwarecircuitry_data_length) {
 		return NSM_ERR_INVALID_DATA_LENGTH;
 	}
 
 	memcpy(data, &(resp->data), nsm_hardwarecircuitry_data_length);
-	data->reading=le32toh(data->reading);
+	data->reading = le32toh(data->reading);
 	*cc = resp->hdr.completion_code;
-	
+
 	return NSM_SUCCESS;
 }
-
 
 int encode_get_current_profile_info_req(uint8_t instance_id,
 					struct nsm_msg *msg)
@@ -4303,8 +4309,8 @@ static void htoleAdminOverrideData(struct nsm_admin_override_data *adminData)
 {
 	adminData->admin_override_percent_tmp_floor =
 	    htole16(adminData->admin_override_percent_tmp_floor);
-	adminData->admin_override_ramup_rate_in_miliwatts_per_second =
-	    htole32(adminData->admin_override_ramup_rate_in_miliwatts_per_second);
+	adminData->admin_override_ramup_rate_in_miliwatts_per_second = htole32(
+	    adminData->admin_override_ramup_rate_in_miliwatts_per_second);
 	adminData->admin_override_rampdown_rate_in_miliwatts_per_second =
 	    htole32(adminData
 			->admin_override_rampdown_rate_in_miliwatts_per_second);
@@ -4317,8 +4323,8 @@ static void letohAdminOverrideData(struct nsm_admin_override_data *adminData)
 {
 	adminData->admin_override_percent_tmp_floor =
 	    le16toh(adminData->admin_override_percent_tmp_floor);
-	adminData->admin_override_ramup_rate_in_miliwatts_per_second =
-	    le32toh(adminData->admin_override_ramup_rate_in_miliwatts_per_second);
+	adminData->admin_override_ramup_rate_in_miliwatts_per_second = le32toh(
+	    adminData->admin_override_ramup_rate_in_miliwatts_per_second);
 	adminData->admin_override_rampdown_rate_in_miliwatts_per_second =
 	    le32toh(adminData
 			->admin_override_rampdown_rate_in_miliwatts_per_second);
@@ -4404,8 +4410,9 @@ int decode_query_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
-int encode_set_active_preset_profile_req(uint8_t instance_id,uint8_t profile_id,
-					   struct nsm_msg *msg)
+int encode_set_active_preset_profile_req(uint8_t instance_id,
+					 uint8_t profile_id,
+					 struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4430,9 +4437,8 @@ int encode_set_active_preset_profile_req(uint8_t instance_id,uint8_t profile_id,
 	return NSM_SW_SUCCESS;
 }
 
-
 int decode_set_active_preset_profile_req(const struct nsm_msg *msg,
-					   size_t msg_len, uint8_t *profile_id)
+					 size_t msg_len, uint8_t *profile_id)
 {
 	if (msg == NULL || profile_id == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4456,8 +4462,8 @@ int decode_set_active_preset_profile_req(const struct nsm_msg *msg,
 }
 
 int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+					  uint16_t reason_code,
+					  struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4475,7 +4481,8 @@ int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE, msg);
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE, msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4483,12 +4490,13 @@ int encode_set_active_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
 int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4504,20 +4512,19 @@ int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
-int encode_setup_admin_override_req(uint8_t instance_id,uint8_t parameter_id, uint32_t param_value,
-					   struct nsm_msg *msg)
+int encode_setup_admin_override_req(uint8_t instance_id, uint8_t parameter_id,
+				    uint32_t param_value, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4543,11 +4550,11 @@ int encode_setup_admin_override_req(uint8_t instance_id,uint8_t parameter_id, ui
 	return NSM_SW_SUCCESS;
 }
 
-
-int decode_setup_admin_override_req(const struct nsm_msg *msg,
-					   size_t msg_len, uint8_t *parameter_id, uint32_t *param_value)
+int decode_setup_admin_override_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *parameter_id,
+				    uint32_t *param_value)
 {
-	if (msg == NULL || parameter_id == NULL || param_value==NULL) {
+	if (msg == NULL || parameter_id == NULL || param_value == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -4559,7 +4566,8 @@ int decode_setup_admin_override_req(const struct nsm_msg *msg,
 	struct nsm_setup_admin_override_req *request =
 	    (struct nsm_setup_admin_override_req *)msg->payload;
 
-	if (request->hdr.data_size < sizeof(request->parameter_id)+sizeof(request->param_value)) {
+	if (request->hdr.data_size <
+	    sizeof(request->parameter_id) + sizeof(request->param_value)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
@@ -4570,8 +4578,7 @@ int decode_setup_admin_override_req(const struct nsm_msg *msg,
 }
 
 int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+				     uint16_t reason_code, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4589,7 +4596,8 @@ int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE, msg);
+		    cc, reason_code, NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE,
+		    msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4597,12 +4605,12 @@ int encode_setup_admin_override_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
-int decode_setup_admin_override_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+int decode_setup_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4613,22 +4621,18 @@ int decode_setup_admin_override_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-
-
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
@@ -4639,14 +4643,14 @@ int encode_apply_admin_override_req(uint8_t instance_id, struct nsm_msg *msg)
 	    instance_id, msg, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE);
 }
 
-
 int decode_apply_admin_override_req(const struct nsm_msg *msg, size_t msg_len)
 {
 	return decode_get_platform_env_command_no_payload_req(
 	    msg, msg_len, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE);
 }
 
-int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code, struct nsm_msg *msg)
+int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4664,7 +4668,8 @@ int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc, uint16_t r
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE, msg);
+		    cc, reason_code, NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE,
+		    msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4672,12 +4677,12 @@ int encode_apply_admin_override_resp(uint8_t instance_id, uint8_t cc, uint16_t r
 	response->command = NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
-int decode_apply_admin_override_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t* reason_code)
+int decode_apply_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4693,21 +4698,20 @@ int decode_apply_admin_override_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
-
-int encode_toggle_immediate_rampdown_req(
-    uint8_t instance_id, uint8_t ramp_down_toggle, struct nsm_msg *msg)
+int encode_toggle_immediate_rampdown_req(uint8_t instance_id,
+					 uint8_t ramp_down_toggle,
+					 struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4732,9 +4736,9 @@ int encode_toggle_immediate_rampdown_req(
 	return NSM_SW_SUCCESS;
 }
 
-
 int decode_toggle_immediate_rampdown_req(const struct nsm_msg *msg,
-					   size_t msg_len, uint8_t *ramp_down_toggle)
+					 size_t msg_len,
+					 uint8_t *ramp_down_toggle)
 {
 	if (msg == NULL || ramp_down_toggle == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4758,8 +4762,8 @@ int decode_toggle_immediate_rampdown_req(const struct nsm_msg *msg,
 }
 
 int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+					  uint16_t reason_code,
+					  struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4777,7 +4781,8 @@ int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN, msg);
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN, msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4785,12 +4790,13 @@ int encode_toggle_immediate_rampdown_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_PWR_SMOOTHING_TOGGLE_IMMEDIATE_RAMP_DOWN;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
 int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4806,21 +4812,19 @@ int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
-
-int encode_toggle_feature_state_req(uint8_t instance_id,uint8_t feature_state,
-					   struct nsm_msg *msg)
+int encode_toggle_feature_state_req(uint8_t instance_id, uint8_t feature_state,
+				    struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4845,9 +4849,8 @@ int encode_toggle_feature_state_req(uint8_t instance_id,uint8_t feature_state,
 	return NSM_SW_SUCCESS;
 }
 
-
-int decode_toggle_feature_state_req(const struct nsm_msg *msg,
-					   size_t msg_len, uint8_t *feature_state)
+int decode_toggle_feature_state_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *feature_state)
 {
 	if (msg == NULL || feature_state == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4871,8 +4874,7 @@ int decode_toggle_feature_state_req(const struct nsm_msg *msg,
 }
 
 int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+				     uint16_t reason_code, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -4889,8 +4891,9 @@ int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
 	}
 
 	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE, msg);
+		return encode_reason_code(cc, reason_code,
+					  NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE,
+					  msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -4898,12 +4901,12 @@ int encode_toggle_feature_state_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
-int decode_toggle_feature_state_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+int decode_toggle_feature_state_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -4919,37 +4922,44 @@ int decode_toggle_feature_state_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
 static void letohgetPresetProfiledata(struct nsm_preset_profile_data *data)
 {
-	data->tmp_floor_setting_in_percent = le16toh(data->tmp_floor_setting_in_percent);
-	data->ramp_up_rate_in_miliwattspersec = le32toh(data->ramp_up_rate_in_miliwattspersec);
-	data->ramp_down_rate_in_miliwattspersec = le32toh(data->ramp_down_rate_in_miliwattspersec);
-	data->ramp_hysterisis_rate_in_miliwattspersec = le32toh(data->ramp_hysterisis_rate_in_miliwattspersec);
+	data->tmp_floor_setting_in_percent =
+	    le16toh(data->tmp_floor_setting_in_percent);
+	data->ramp_up_rate_in_miliwattspersec =
+	    le32toh(data->ramp_up_rate_in_miliwattspersec);
+	data->ramp_down_rate_in_miliwattspersec =
+	    le32toh(data->ramp_down_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_miliwattspersec =
+	    le32toh(data->ramp_hysterisis_rate_in_miliwattspersec);
 }
 
 static void htolegetPresetProfiledata(struct nsm_preset_profile_data *data)
 {
-	data->tmp_floor_setting_in_percent = htole16(data->tmp_floor_setting_in_percent);
-	data->ramp_up_rate_in_miliwattspersec = htole32(data->ramp_up_rate_in_miliwattspersec);
-	data->ramp_down_rate_in_miliwattspersec = htole32(data->ramp_down_rate_in_miliwattspersec);
-	data->ramp_hysterisis_rate_in_miliwattspersec = htole32(data->ramp_hysterisis_rate_in_miliwattspersec);
+	data->tmp_floor_setting_in_percent =
+	    htole16(data->tmp_floor_setting_in_percent);
+	data->ramp_up_rate_in_miliwattspersec =
+	    htole32(data->ramp_up_rate_in_miliwattspersec);
+	data->ramp_down_rate_in_miliwattspersec =
+	    htole32(data->ramp_down_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_miliwattspersec =
+	    htole32(data->ramp_hysterisis_rate_in_miliwattspersec);
 }
 
 int encode_get_preset_profile_req(uint8_t instance_id, struct nsm_msg *msg)
 {
-   return encode_get_platform_env_command_no_payload_req(
+	return encode_get_platform_env_command_no_payload_req(
 	    instance_id, msg, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION);
 }
 
@@ -4959,14 +4969,13 @@ int decode_get_preset_profile_req(const struct nsm_msg *msg, size_t msg_len)
 	    msg, msg_len, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION);
 }
 
-int encode_get_preset_profile_resp(uint8_t instance_id, uint8_t cc,
-				   uint16_t reason_code,
-				   struct nsm_get_all_preset_profile_meta_data *meta_data,
-				   struct nsm_preset_profile_data *profile_data,
-				   uint8_t max_number_of_profiles,
-				   struct nsm_msg *msg)
+int encode_get_preset_profile_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_all_preset_profile_meta_data *meta_data,
+    struct nsm_preset_profile_data *profile_data,
+    uint8_t max_number_of_profiles, struct nsm_msg *msg)
 {
-	if (msg == NULL || profile_data == NULL || meta_data == NULL ) {
+	if (msg == NULL || profile_data == NULL || meta_data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -4982,37 +4991,41 @@ int encode_get_preset_profile_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION,
-		    msg);
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION, msg);
 	}
 
 	struct nsm_get_all_preset_profile_resp *response =
 	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
-    
-	
-	uint16_t meta_data_size=sizeof(struct nsm_get_all_preset_profile_meta_data);
-	uint16_t profile_data_size=sizeof(struct nsm_preset_profile_data);
-	// data size is sum of metadata + number of profiles * size of one profile
-	uint16_t data_size=meta_data_size+max_number_of_profiles*profile_data_size;
 
-	response->hdr.command = NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION;
+	uint16_t meta_data_size =
+	    sizeof(struct nsm_get_all_preset_profile_meta_data);
+	uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
+	// data size is sum of metadata + number of profiles * size of one
+	// profile
+	uint16_t data_size =
+	    meta_data_size + max_number_of_profiles * profile_data_size;
+
+	response->hdr.command =
+	    NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION;
 	response->hdr.completion_code = cc;
 	response->hdr.data_size = htole16(data_size);
 
-	response->data.max_profiles_supported=max_number_of_profiles;
-	for(int i=0;i<max_number_of_profiles;i++)
-	{
-		htolegetPresetProfiledata(profile_data+i);	
+	response->data.max_profiles_supported = max_number_of_profiles;
+	for (int i = 0; i < max_number_of_profiles; i++) {
+		htolegetPresetProfiledata(profile_data + i);
 	}
-	memcpy(&(response->data.profiles), profile_data, profile_data_size*max_number_of_profiles);
+	memcpy(&(response->data.profiles), profile_data,
+	       profile_data_size * max_number_of_profiles);
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_preset_profile_metadata_resp(const struct nsm_msg *msg, size_t msg_len,
-				   uint8_t *cc, uint16_t *reason_code,
-				   struct nsm_get_all_preset_profile_meta_data *data, uint8_t *number_of_profiles)
+int decode_get_preset_profile_metadata_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_get_all_preset_profile_meta_data *data,
+    uint8_t *number_of_profiles)
 {
-	if (data == NULL ) {
+	if (data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -5022,32 +5035,33 @@ int decode_get_preset_profile_metadata_resp(const struct nsm_msg *msg, size_t ms
 	}
 
 	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		       sizeof(struct nsm_get_all_preset_profile_resp))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_get_all_preset_profile_resp *resp =
 	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
-	size_t meta_data_len = sizeof(struct nsm_get_all_preset_profile_meta_data);
+	size_t meta_data_len =
+	    sizeof(struct nsm_get_all_preset_profile_meta_data);
 
 	uint16_t preset_profile_size = sizeof(struct nsm_preset_profile_data);
-	uint16_t expected_data_size = preset_profile_size*(data->max_profiles_supported);
-	
-	if(le16toh(resp->hdr.data_size) < expected_data_size){
+	uint16_t expected_data_size =
+	    preset_profile_size * (data->max_profiles_supported);
+
+	if (le16toh(resp->hdr.data_size) < expected_data_size) {
 		return NSM_SW_ERROR_DATA;
 	}
 
 	memcpy(data, &(resp->data), meta_data_len);
-    *number_of_profiles=data->max_profiles_supported;
+	*number_of_profiles = data->max_profiles_supported;
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_preset_profile_data_from_resp(const struct nsm_msg *msg, size_t msg_len,
-				   uint8_t *cc, uint16_t *reason_code,
-				   uint8_t max_profiles_supported,
-				   uint8_t profile_id,
-				   struct nsm_preset_profile_data *profile_data)
+int decode_get_preset_profile_data_from_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t max_profiles_supported, uint8_t profile_id,
+    struct nsm_preset_profile_data *profile_data)
 {
 	if (profile_data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5059,7 +5073,7 @@ int decode_get_preset_profile_data_from_resp(const struct nsm_msg *msg, size_t m
 	}
 
 	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		       sizeof(struct nsm_get_all_preset_profile_resp))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5067,21 +5081,27 @@ int decode_get_preset_profile_data_from_resp(const struct nsm_msg *msg, size_t m
 	    (struct nsm_get_all_preset_profile_resp *)msg->payload;
 
 	uint16_t preset_profile_size = sizeof(struct nsm_preset_profile_data);
-	uint16_t expected_data_size = preset_profile_size*(max_profiles_supported);
-	
-	if(le16toh(resp->hdr.data_size) < expected_data_size){
+	uint16_t expected_data_size =
+	    preset_profile_size * (max_profiles_supported);
+
+	if (le16toh(resp->hdr.data_size) < expected_data_size) {
 		return NSM_SW_ERROR_DATA;
 	}
-	uint8_t profile_data_size=sizeof(struct nsm_preset_profile_data);
-	
-	memcpy(profile_data, &(resp->data.profiles)+profile_id*profile_data_size, profile_data_size);
+	uint8_t profile_data_size = sizeof(struct nsm_preset_profile_data);
+
+	memcpy(profile_data,
+	       &(resp->data.profiles) + profile_id * profile_data_size,
+	       profile_data_size);
 
 	// conversion le to he
 	letohgetPresetProfiledata(profile_data);
 
 	return NSM_SW_SUCCESS;
 }
-int encode_update_preset_profile_param_req(uint8_t instance_id, uint8_t profile_id,uint8_t parameter_id, uint32_t param_value,
+int encode_update_preset_profile_param_req(uint8_t instance_id,
+					   uint8_t profile_id,
+					   uint8_t parameter_id,
+					   uint32_t param_value,
 					   struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -5101,7 +5121,8 @@ int encode_update_preset_profile_param_req(uint8_t instance_id, uint8_t profile_
 	struct nsm_update_preset_profile_req *request =
 	    (struct nsm_update_preset_profile_req *)msg->payload;
 
-	request->hdr.command = NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
+	request->hdr.command =
+	    NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
 	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
 	request->profile_id = profile_id;
 	request->parameter_id = parameter_id;
@@ -5110,9 +5131,11 @@ int encode_update_preset_profile_param_req(uint8_t instance_id, uint8_t profile_
 }
 
 int decode_update_preset_profile_param_req(const struct nsm_msg *msg,
-					   size_t msg_len,  uint8_t *profile_id, uint8_t *parameter_id, uint32_t *param_value)
+					   size_t msg_len, uint8_t *profile_id,
+					   uint8_t *parameter_id,
+					   uint32_t *param_value)
 {
-	if (msg == NULL || parameter_id == NULL || param_value==NULL) {
+	if (msg == NULL || parameter_id == NULL || param_value == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -5124,10 +5147,11 @@ int decode_update_preset_profile_param_req(const struct nsm_msg *msg,
 	struct nsm_update_preset_profile_req *request =
 	    (struct nsm_update_preset_profile_req *)msg->payload;
 
-	if (request->hdr.data_size < sizeof(request->parameter_id)+sizeof(request->param_value)) {
+	if (request->hdr.data_size <
+	    sizeof(request->parameter_id) + sizeof(request->param_value)) {
 		return NSM_SW_ERROR_DATA;
 	}
-    *profile_id= request->profile_id;
+	*profile_id = request->profile_id;
 	*parameter_id = request->parameter_id;
 	*param_value = le32toh(request->param_value);
 
@@ -5154,7 +5178,8 @@ int encode_update_preset_profile_param_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS, msg);
+		    cc, reason_code,
+		    NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS, msg);
 	}
 	struct nsm_common_resp *response =
 	    (struct nsm_common_resp *)msg->payload;
@@ -5162,12 +5187,13 @@ int encode_update_preset_profile_param_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
 int decode_update_preset_profile_param_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -5178,51 +5204,51 @@ int decode_update_preset_profile_param_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
 double NvUFXP4_12ToDouble(uint16_t reading)
 {
-	double value= reading / (double)(1 << 12);
+	double value = reading / (double)(1 << 12);
 	return value;
 }
 
 uint16_t doubleToNvUFXP4_12(double reading)
 {
-	uint16_t value= reading * (1 << 12);
+	uint16_t value = reading * (1 << 12);
 	return value;
 }
 
 double NvUFXP8_24ToDouble(uint32_t reading)
 {
-	double value= reading / (double)(1 << 24);
+	double value = reading / (double)(1 << 24);
 	return value;
 }
 
 uint32_t doubleToNvUFXP8_24(double reading)
 {
-	uint32_t value= reading * (1 << 24);
+	uint32_t value = reading * (1 << 24);
 	return value;
 }
 
 // ** Enable Workload Power Profiles **
-int encode_enable_workload_power_profile_req(
-    uint8_t instance_id, bitfield32_t profile_mask[], int mask_length,struct nsm_msg *msg)
+int encode_enable_workload_power_profile_req(uint8_t instance_id,
+					     bitfield32_t profile_mask[],
+					     int mask_length,
+					     struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5242,24 +5268,23 @@ int encode_enable_workload_power_profile_req(
 	    (struct nsm_enable_workload_power_profile_req *)msg->payload;
 
 	request->hdr.command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
-	request->hdr.data_size = mask_length*sizeof(bitfield32_t);
-	for(int i=0;i<mask_length;i++){
+	request->hdr.data_size = mask_length * sizeof(bitfield32_t);
+	for (int i = 0; i < mask_length; i++) {
 		request->profile_mask[i].byte = htole32(profile_mask[i].byte);
 	}
-	
+
 	return NSM_SW_SUCCESS;
 }
 
-
 int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
-					   size_t msg_len, int *mask_length, bitfield32_t *profile_mask)
+					     size_t msg_len, int *mask_length,
+					     bitfield32_t *profile_mask)
 {
 	if (msg == NULL || profile_mask == NULL || mask_length == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(bitfield32_t)*8) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) + sizeof(bitfield32_t) * 8) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5269,18 +5294,17 @@ int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
 	if (request->hdr.data_size < sizeof(request->profile_mask)) {
 		return NSM_SW_ERROR_DATA;
 	}
-    *mask_length = sizeof(request->profile_mask)/sizeof(bitfield32_t);
-	memcpy(profile_mask, request->profile_mask,
-	       sizeof(bitfield32_t[8]));
-	for(int i=0;i<*mask_length;i++){
+	*mask_length = sizeof(request->profile_mask) / sizeof(bitfield32_t);
+	memcpy(profile_mask, request->profile_mask, sizeof(bitfield32_t[8]));
+	for (int i = 0; i < *mask_length; i++) {
 		profile_mask[i].byte = le32toh(profile_mask[i].byte);
 	}
 	return NSM_SW_SUCCESS;
 }
 
 int encode_enable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+					      uint16_t reason_code,
+					      struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5306,12 +5330,13 @@ int encode_enable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
 int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -5327,22 +5352,22 @@ int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
-
 // ** Enable Workload Power Profiles **
-int encode_disable_workload_power_profile_req(
-    uint8_t instance_id, bitfield32_t profile_mask[], int mask_length,struct nsm_msg *msg)
+int encode_disable_workload_power_profile_req(uint8_t instance_id,
+					      bitfield32_t profile_mask[],
+					      int mask_length,
+					      struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5362,24 +5387,23 @@ int encode_disable_workload_power_profile_req(
 	    (struct nsm_disable_workload_power_profile_req *)msg->payload;
 
 	request->hdr.command = NSM_DISABLE_WORKLOAD_POWER_PROFILE;
-	request->hdr.data_size = mask_length*sizeof(bitfield32_t);
-	for(int i=0;i<mask_length;i++){
+	request->hdr.data_size = mask_length * sizeof(bitfield32_t);
+	for (int i = 0; i < mask_length; i++) {
 		request->profile_mask[i].byte = htole32(profile_mask[i].byte);
 	}
-	
+
 	return NSM_SW_SUCCESS;
 }
 
-
 int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
-					   size_t msg_len, int *mask_length, bitfield32_t *profile_mask)
+					      size_t msg_len, int *mask_length,
+					      bitfield32_t *profile_mask)
 {
 	if (msg == NULL || profile_mask == NULL || mask_length == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(bitfield32_t)*8) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) + sizeof(bitfield32_t) * 8) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5389,18 +5413,17 @@ int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
 	if (request->hdr.data_size < sizeof(request->profile_mask)) {
 		return NSM_SW_ERROR_DATA;
 	}
-    *mask_length = sizeof(request->profile_mask)/sizeof(bitfield32_t);
-	memcpy(profile_mask, request->profile_mask,
-	       sizeof(bitfield32_t[8]));
-	for(int i=0;i<*mask_length;i++){
+	*mask_length = sizeof(request->profile_mask) / sizeof(bitfield32_t);
+	memcpy(profile_mask, request->profile_mask, sizeof(bitfield32_t[8]));
+	for (int i = 0; i < *mask_length; i++) {
 		profile_mask[i].byte = le32toh(profile_mask[i].byte);
 	}
 	return NSM_SW_SUCCESS;
 }
 
 int encode_disable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
-					    uint16_t reason_code,
-					    struct nsm_msg *msg)
+					       uint16_t reason_code,
+					       struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5426,12 +5449,13 @@ int encode_disable_workload_power_profile_resp(uint8_t instance_id, uint8_t cc,
 	response->command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
 	response->completion_code = cc;
 	response->data_size = 0;
-    
+
 	return NSM_SW_SUCCESS;
 }
 
 int decode_disable_workload_power_profile_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc, uint16_t *reason_code)
+					       size_t msg_len, uint8_t *cc,
+					       uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -5447,30 +5471,26 @@ int decode_disable_workload_power_profile_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_common_resp *resp =
-	    (struct nsm_common_resp *)msg->payload;
+	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	uint16_t data_size = le16toh(resp->data_size);
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-	
+
 	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
-
-
 int encode_get_workload_power_profile_status_req(uint8_t instance_id,
-					struct nsm_msg *msg)
+						 struct nsm_msg *msg)
 {
 	return encode_get_platform_env_command_no_payload_req(
-	    instance_id, msg,
-	    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO);
+	    instance_id, msg, NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO);
 }
 
 int decode_get_workload_power_profile_status_req(const struct nsm_msg *msg,
-					size_t msg_len)
+						 size_t msg_len)
 {
 	return decode_get_platform_env_command_no_payload_req(
 	    msg, msg_len, NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO);
@@ -5479,23 +5499,26 @@ int decode_get_workload_power_profile_status_req(const struct nsm_msg *msg,
 static void
 htole32PresetProfileResp(struct workload_power_profile_status *profileInfo)
 {
-	for(int i=0;i<8;i++)
-	{
-		profileInfo->supported_profile_mask.fields[i].byte = htole32(profileInfo->supported_profile_mask.fields[i].byte);
-	    profileInfo->requested_profile_maks.fields[i].byte = htole32(profileInfo->requested_profile_maks.fields[i].byte);
-	    profileInfo->enforced_profile_mask.fields[i].byte = htole32(profileInfo->enforced_profile_mask.fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		profileInfo->supported_profile_mask.fields[i].byte =
+		    htole32(profileInfo->supported_profile_mask.fields[i].byte);
+		profileInfo->requested_profile_maks.fields[i].byte =
+		    htole32(profileInfo->requested_profile_maks.fields[i].byte);
+		profileInfo->enforced_profile_mask.fields[i].byte =
+		    htole32(profileInfo->enforced_profile_mask.fields[i].byte);
 	}
-	
 }
 
 static void
 le32tohPresetProfileResp(struct workload_power_profile_status *profileInfo)
 {
-	for(int i=0;i<8;i++)
-	{
-		profileInfo->supported_profile_mask.fields[i].byte = le32toh(profileInfo->supported_profile_mask.fields[i].byte);
-	    profileInfo->requested_profile_maks.fields[i].byte = le32toh(profileInfo->requested_profile_maks.fields[i].byte);
-	    profileInfo->enforced_profile_mask.fields[i].byte = le32toh(profileInfo->enforced_profile_mask.fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		profileInfo->supported_profile_mask.fields[i].byte =
+		    le32toh(profileInfo->supported_profile_mask.fields[i].byte);
+		profileInfo->requested_profile_maks.fields[i].byte =
+		    le32toh(profileInfo->requested_profile_maks.fields[i].byte);
+		profileInfo->enforced_profile_mask.fields[i].byte =
+		    le32toh(profileInfo->enforced_profile_mask.fields[i].byte);
 	}
 }
 
@@ -5519,15 +5542,15 @@ int encode_get_workload_power_profile_status_resp(
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code,
-		    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO, msg);
+		    cc, reason_code, NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO,
+		    msg);
 	}
 
 	struct nsm_get_workload_power_profile_status_info_resp *response =
-	    (struct nsm_get_workload_power_profile_status_info_resp *)msg->payload;
+	    (struct nsm_get_workload_power_profile_status_info_resp *)
+		msg->payload;
 
-	response->hdr.command =
-	    NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO;
+	response->hdr.command = NSM_GET_WORKLOAD_POWER_PROFILE_STATUS_INFO;
 	response->hdr.completion_code = cc;
 	response->hdr.data_size =
 	    htole16(sizeof(struct workload_power_profile_status));
@@ -5554,45 +5577,50 @@ int decode_get_workload_power_profile_status_resp(
 		return rc;
 	}
 
-	if (msg_len != (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_workload_power_profile_status_info_resp))) {
+	if (msg_len !=
+	    (sizeof(struct nsm_msg_hdr) +
+	     sizeof(struct nsm_get_workload_power_profile_status_info_resp))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 	struct nsm_get_workload_power_profile_status_info_resp *resp_payload =
-	    (struct nsm_get_workload_power_profile_status_info_resp *)msg->payload;
+	    (struct nsm_get_workload_power_profile_status_info_resp *)
+		msg->payload;
 
 	*data_size = le16toh(resp_payload->hdr.data_size);
 	size_t response_data_len = sizeof(struct workload_power_profile_status);
 	memcpy(data, &(resp_payload->data), response_data_len);
 
-	// conversion le32toh 
+	// conversion le32toh
 	le32tohPresetProfileResp(data);
 
 	return NSM_SW_SUCCESS;
 }
 
-static void letohgetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
+static void
+letohgetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
 {
 	data->profile_id = le16toh(data->profile_id);
 	data->priority = le16toh(data->priority);
-	for(int i=0;i<8;i++)
-	{
-		data->conflict_mask.fields[i].byte = le32toh(data->conflict_mask.fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		data->conflict_mask.fields[i].byte =
+		    le32toh(data->conflict_mask.fields[i].byte);
 	}
 }
 
-static void htolegetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
+static void
+htolegetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
 {
 	data->profile_id = htole16(data->profile_id);
 	data->priority = htole16(data->priority);
-	for(int i=0;i<8;i++)
-	{
-		data->conflict_mask.fields[i].byte = htole32(data->conflict_mask.fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		data->conflict_mask.fields[i].byte =
+		    htole32(data->conflict_mask.fields[i].byte);
 	}
 }
 
-
-int encode_get_workload_power_profile_info_req(uint8_t instance_id, uint16_t identifier,struct nsm_msg *msg)
+int encode_get_workload_power_profile_info_req(uint8_t instance_id,
+					       uint16_t identifier,
+					       struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5615,17 +5643,19 @@ int encode_get_workload_power_profile_info_req(uint8_t instance_id, uint16_t ide
 	request->hdr.data_size = sizeof(identifier);
 	request->identifier = identifier;
 	return NSM_SW_SUCCESS;
-  
 }
 
-int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg, size_t msg_len, uint16_t *identifier)
+int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg,
+					       size_t msg_len,
+					       uint16_t *identifier)
 {
 	if (msg == NULL || identifier == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_workload_power_profile_info_req)) {
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_workload_power_profile_info_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5641,14 +5671,13 @@ int decode_get_workload_power_profile_info_req(const struct nsm_msg *msg, size_t
 	return NSM_SW_SUCCESS;
 }
 
-int encode_get_workload_power_profile_info_resp(uint8_t instance_id, uint8_t cc,
-				   uint16_t reason_code,
-				   struct nsm_all_workload_power_profile_meta_data *meta_data,
-				   struct nsm_workload_power_profile_data *profile_data,
-				   uint8_t number_of_profiles,
-				   struct nsm_msg *msg)
+int encode_get_workload_power_profile_info_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_all_workload_power_profile_meta_data *meta_data,
+    struct nsm_workload_power_profile_data *profile_data,
+    uint8_t number_of_profiles, struct nsm_msg *msg)
 {
-	if (msg == NULL || profile_data == NULL || meta_data == NULL ) {
+	if (msg == NULL || profile_data == NULL || meta_data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -5664,37 +5693,43 @@ int encode_get_workload_power_profile_info_resp(uint8_t instance_id, uint8_t cc,
 
 	if (cc != NSM_SUCCESS) {
 		return encode_reason_code(
-		    cc, reason_code, NSM_GET_WORKLOAD_POWER_PROFILE_INFO,
-		    msg);
+		    cc, reason_code, NSM_GET_WORKLOAD_POWER_PROFILE_INFO, msg);
 	}
 
-	struct nsm_workload_power_profile_get_all_preset_profile_resp *response =
-	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
-    
-	
-	uint16_t meta_data_size=sizeof(struct nsm_all_workload_power_profile_meta_data);
-	uint16_t profile_data_size=sizeof(struct nsm_workload_power_profile_data);
-	// data size is sum of metadata + number of profiles * size of one profile
-	uint16_t data_size=meta_data_size+number_of_profiles*profile_data_size;
+	struct nsm_workload_power_profile_get_all_preset_profile_resp
+	    *response =
+		(struct nsm_workload_power_profile_get_all_preset_profile_resp
+		     *)msg->payload;
+
+	uint16_t meta_data_size =
+	    sizeof(struct nsm_all_workload_power_profile_meta_data);
+	uint16_t profile_data_size =
+	    sizeof(struct nsm_workload_power_profile_data);
+	// data size is sum of metadata + number of profiles * size of one
+	// profile
+	uint16_t data_size =
+	    meta_data_size + number_of_profiles * profile_data_size;
 
 	response->hdr.command = NSM_GET_WORKLOAD_POWER_PROFILE_INFO;
 	response->hdr.completion_code = cc;
 	response->hdr.data_size = htole16(data_size);
-    response->data.next_identifier=htole16(meta_data->next_identifier);
-	response->data.number_of_profiles=number_of_profiles;
-	for(int i=0;i<number_of_profiles;i++)
-	{
-		htolegetWorkloadPresetProfiledata(profile_data+i);	
+	response->data.next_identifier = htole16(meta_data->next_identifier);
+	response->data.number_of_profiles = number_of_profiles;
+	for (int i = 0; i < number_of_profiles; i++) {
+		htolegetWorkloadPresetProfiledata(profile_data + i);
 	}
-	memcpy(&(response->data.profiles), profile_data, profile_data_size*number_of_profiles);
+	memcpy(&(response->data.profiles), profile_data,
+	       profile_data_size * number_of_profiles);
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_workload_power_profile_info_metadata_resp(const struct nsm_msg *msg, size_t msg_len,
-				   uint8_t *cc, uint16_t *reason_code,
-				   struct nsm_all_workload_power_profile_meta_data *data, uint8_t *number_of_profiles)
+int decode_get_workload_power_profile_info_metadata_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_all_workload_power_profile_meta_data *data,
+    uint8_t *number_of_profiles)
 {
-	if (data == NULL ) {
+	if (data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -5704,33 +5739,36 @@ int decode_get_workload_power_profile_info_metadata_resp(const struct nsm_msg *m
 	}
 
 	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		       sizeof(struct nsm_get_all_preset_profile_resp))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_workload_power_profile_get_all_preset_profile_resp *resp =
-	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
-	size_t meta_data_len = sizeof(struct nsm_all_workload_power_profile_meta_data);
+	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)
+		msg->payload;
+	size_t meta_data_len =
+	    sizeof(struct nsm_all_workload_power_profile_meta_data);
 
-	uint16_t preset_profile_size = sizeof(struct nsm_workload_power_profile_data);
-	uint16_t expected_data_size = preset_profile_size*(data->number_of_profiles);
-	
-	if(le16toh(resp->hdr.data_size) < expected_data_size){
+	uint16_t preset_profile_size =
+	    sizeof(struct nsm_workload_power_profile_data);
+	uint16_t expected_data_size =
+	    preset_profile_size * (data->number_of_profiles);
+
+	if (le16toh(resp->hdr.data_size) < expected_data_size) {
 		return NSM_SW_ERROR_DATA;
 	}
 
 	memcpy(data, &(resp->data), meta_data_len);
-    *number_of_profiles=data->number_of_profiles;
-	data->next_identifier=le16toh(data->next_identifier);
+	*number_of_profiles = data->number_of_profiles;
+	data->next_identifier = le16toh(data->next_identifier);
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_workload_power_profile_info_data_resp(const struct nsm_msg *msg, size_t msg_len,
-				   uint8_t *cc, uint16_t *reason_code,
-				   uint8_t max_profiles_supported,
-				   uint8_t offset,
-				   struct nsm_workload_power_profile_data *profile_data)
+int decode_get_workload_power_profile_info_data_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t max_profiles_supported, uint8_t offset,
+    struct nsm_workload_power_profile_data *profile_data)
 {
 	if (profile_data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5742,22 +5780,28 @@ int decode_get_workload_power_profile_info_data_resp(const struct nsm_msg *msg, 
 	}
 
 	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_all_preset_profile_resp))) {
+		       sizeof(struct nsm_get_all_preset_profile_resp))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_workload_power_profile_get_all_preset_profile_resp *resp =
-	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)msg->payload;
+	    (struct nsm_workload_power_profile_get_all_preset_profile_resp *)
+		msg->payload;
 
-	uint16_t preset_profile_size = sizeof(struct nsm_workload_power_profile_data);
-	uint16_t expected_data_size = preset_profile_size*(max_profiles_supported);
-	
-	if(le16toh(resp->hdr.data_size) < expected_data_size){
+	uint16_t preset_profile_size =
+	    sizeof(struct nsm_workload_power_profile_data);
+	uint16_t expected_data_size =
+	    preset_profile_size * (max_profiles_supported);
+
+	if (le16toh(resp->hdr.data_size) < expected_data_size) {
 		return NSM_SW_ERROR_DATA;
 	}
-	uint8_t profile_data_size=sizeof(struct nsm_workload_power_profile_data);
-	
-	memcpy(profile_data, &(resp->data.profiles)+offset*profile_data_size, profile_data_size);
+	uint8_t profile_data_size =
+	    sizeof(struct nsm_workload_power_profile_data);
+
+	memcpy(profile_data,
+	       &(resp->data.profiles) + offset * profile_data_size,
+	       profile_data_size);
 
 	// conversion le to he
 	letohgetWorkloadPresetProfiledata(profile_data);

@@ -33,8 +33,8 @@ class OemProfileInfoIntf : public ProfileInfoIntf
   public:
     OemProfileInfoIntf(sdbusplus::bus::bus& bus, const std::string& path,
                        std::shared_ptr<NsmDevice> device) :
-        ProfileInfoIntf(bus, path.c_str()),
-        device(device), inventoryObjPath(path)
+        ProfileInfoIntf(bus, path.c_str()), device(device),
+        inventoryObjPath(path)
     {}
 
     void enablePresetProfile(std::vector<uint8_t> profileMask) override

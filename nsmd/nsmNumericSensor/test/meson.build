@@ -29,7 +29,7 @@ dep_src_files = [
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
-    '../../../requester/request_timeout_tracker.cpp'
+    '../../../requester/request_timeout_tracker.cpp',
 ]
 
 dep_src_headers = [
@@ -55,24 +55,29 @@ tests_files = [
 ]
 
 tests_deps = [
-  test_src,
-  CLI11_dep,
-  nlohmann_json,
-  sdbusplus,
-  sdeventplus,
-  phosphor_logging,
-  gtest,
-  gmock
+    test_src,
+    CLI11_dep,
+    nlohmann_json,
+    sdbusplus,
+    sdeventplus,
+    phosphor_logging,
+    gtest,
+    gmock,
 ]
 
 if get_option('shmem').enabled()
-  tests_deps += nvidia_shmem
+    tests_deps += nvidia_shmem
 endif
 
-test('nsmNumericSensors_test', executable('nsmNumericSensors_test', tests_files,
-                   implicit_include_directories: false,
-                   link_args: dynamic_linker,
-                   build_rpath: '',
-                   dependencies: tests_deps),
-                   workdir: meson.current_source_dir()
+test(
+    'nsmNumericSensors_test',
+    executable(
+        'nsmNumericSensors_test',
+        tests_files,
+        implicit_include_directories: false,
+        link_args: dynamic_linker,
+        build_rpath: '',
+        dependencies: tests_deps,
+    ),
+    workdir: meson.current_source_dir(),
 )

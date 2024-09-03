@@ -18,7 +18,7 @@ dep_src_files = [
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
-    '../../../requester/request_timeout_tracker.cpp'
+    '../../../requester/request_timeout_tracker.cpp',
 ]
 
 dep_src_headers = [
@@ -65,7 +65,7 @@ foreach t : tests
             link_args: dynamic_linker,
             build_rpath: '',
             dependencies: tests_deps,
-            cpp_args : '-DMOCK_DBUS_ASYNC_UTILS',
+            cpp_args: '-DMOCK_DBUS_ASYNC_UTILS',
         ),
         workdir: meson.current_source_dir(),
     )
