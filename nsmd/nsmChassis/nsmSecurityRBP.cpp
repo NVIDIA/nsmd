@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,8 @@ static std::unordered_map<uint16_t, std::string> minSecVersionErrors = {
 SecurityConfiguration::SecurityConfiguration(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    SecurityConfigIntf(bus, objPath.c_str()), uuid(uuidIn),
-    progressIntf(progressIntfIn)
+    SecurityConfigIntf(bus, objPath.c_str()),
+    uuid(uuidIn), progressIntf(progressIntfIn)
 {}
 
 void SecurityConfiguration::updateState(
@@ -183,7 +183,8 @@ void SecurityConfiguration::finishOperation(Progress::OperationStatus status)
 NsmSecurityCfgObject::NsmSecurityCfgObject(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uuid_t& uuid, std::shared_ptr<ProgressIntf> progressIntfIn) :
-    NsmSensor(name, type), objectPath(getPath(name))
+    NsmSensor(name, type),
+    objectPath(getPath(name))
 {
     lg2::info("NsmSecurityCfgObject: create object: {PATH}", "PATH",
               objectPath.c_str());
@@ -235,9 +236,9 @@ MinSecurityVersion::MinSecurityVersion(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    MinSecVersionIntf(bus, objPath.c_str()), uuid(uuidIn),
-    classification(classificationIn), identifier(identifierIn), index(indexIn),
-    progressIntf(progressIntfIn)
+    MinSecVersionIntf(bus, objPath.c_str()),
+    uuid(uuidIn), classification(classificationIn), identifier(identifierIn),
+    index(indexIn), progressIntf(progressIntfIn)
 {
     securityVersionObject =
         std::make_unique<SecurityVersionIntf>(bus, objPath.c_str());
@@ -264,56 +265,9 @@ void MinSecurityVersion::updateProperties(
         htole16(sec_info.pending_minimum_security_version));
 }
 
-std::vector<MinSecVersionCommon::SecurityCommon::UpdateMethods>
-    MinSecurityVersion::getActivationMethods(uint32_t updateMethodResp)
-{
-    using namespace sdbusplus::common::xyz::openbmc_project::software;
-    std::vector<SecurityCommon::UpdateMethods> updateMethodsVal;
-    bitfield32_t updateMethodBits = {updateMethodResp};
-    if (updateMethodBits.bits.bit0)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::Automatic);
-    }
-    if (updateMethodBits.bits.bit1)
-    {
-        updateMethodsVal.push_back(
-            SecurityCommon::UpdateMethods::SelfContained);
-    }
-    if (updateMethodBits.bits.bit2)
-    {
-        updateMethodsVal.push_back(
-            SecurityCommon::UpdateMethods::MediumSpecificReset);
-    }
-    if (updateMethodBits.bits.bit3)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::SystemReboot);
-    }
-    if (updateMethodBits.bits.bit4)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::DCPowerCycle);
-    }
-    if (updateMethodBits.bits.bit5)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::ACPowerCycle);
-    }
-    if (updateMethodBits.bits.bit16)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::WarmReset);
-    }
-    if (updateMethodBits.bits.bit17)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::HotReset);
-    }
-    if (updateMethodBits.bits.bit18)
-    {
-        updateMethodsVal.push_back(SecurityCommon::UpdateMethods::FLR);
-    }
-    return updateMethodsVal;
-}
-
-void MinSecurityVersion::updateMinSecVersion(RequestTypes requestType,
-                                             uint64_t nonce,
-                                             uint16_t reqMinSecVersion)
+void MinSecurityVersion::updateMinSecVersion(
+    SecurityCommon::RequestTypes requestType, uint64_t nonce,
+    uint16_t reqMinSecVersion)
 {
     if (startOperation() != NSM_SW_SUCCESS)
     {
@@ -328,7 +282,7 @@ void MinSecurityVersion::updateMinSecVersion(RequestTypes requestType,
     sec_req.component_classification_index = index;
     sec_req.component_identifier = htole16(identifier);
     sec_req.nonce = nonce;
-    if (requestType == RequestTypes::MostRestrictiveValue)
+    if (requestType == SecurityCommon::RequestTypes::MostRestrictiveValue)
     {
         sec_req.request_type = REQUEST_TYPE_MOST_RESTRICTIVE_VALUE;
     }
@@ -393,9 +347,8 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
-    const auto& updateMethodsVal =
-        getActivationMethods(sec_resp.update_methods);
-    updateMethod(updateMethodsVal);
+    bitfield32_t updateMethodBitfield{sec_resp.update_methods};
+    updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
@@ -437,8 +390,9 @@ NsmMinSecVersionObject::NsmMinSecVersionObject(
     const std::string& type, const uuid_t& uuid, uint16_t classificationIn,
     uint16_t identifierIn, uint8_t indexIn,
     std::shared_ptr<ProgressIntf> progressIntfIn) :
-    NsmSensor(chassisName, type), objectPath(getPath(chassisName)),
-    classification(classificationIn), identifier(identifierIn), index(indexIn)
+    NsmSensor(chassisName, type),
+    objectPath(getPath(chassisName)), classification(classificationIn),
+    identifier(identifierIn), index(indexIn)
 {
     lg2::info("NsmMinSecVersionObject: create object: {PATH}", "PATH",
               objectPath.c_str());

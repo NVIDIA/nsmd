@@ -20,7 +20,7 @@ sources += [
     'nsmChassis/nsmSecurityRBP.cpp',
 ]
 
-nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride']
+nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride', 'nsmFirmwareUtils']
 
 if get_option('tests').enabled()
     subdir('test')

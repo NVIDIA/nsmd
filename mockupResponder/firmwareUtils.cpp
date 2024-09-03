@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,21 @@ class FirmwareStateMachine
     {
         3, 4, 1, 0
     };
+
+    uint16_t activeComponentKeyIndex = 0;
+    uint16_t pendingComponentKeyIndex = 0;
+    std::vector<uint8_t> apActiveComponentKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
+                                                  0xFF, 0xFF, 0xFF, 0xFF};
+    std::vector<uint8_t> apPendingComponentKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
+                                                   0xFF, 0xFF, 0xFF, 0xFF};
+    std::vector<uint8_t> apEfuseKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
+                                        0xFF, 0xFF, 0xFF, 0xFF};
+    std::vector<uint8_t> apPendingEfuseKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
+                                               0xFF, 0xFF, 0xFF, 0xFF};
+    std::vector<uint8_t> ecActiveComponentKeyPerm{0x00};
+    std::vector<uint8_t> ecPendingComponentKeyPerm{0x00};
+    std::vector<uint8_t> ecEfuseKeyPerm{0x00};
+    std::vector<uint8_t> ecPendingEfuseKeyPerm{0x00};
 };
 
 static std::unique_ptr<FirmwareStateMachine> fwStateMachine = nullptr;
@@ -269,6 +284,271 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::irreversibleConfig(const nsm_msg* requestMsg,
+                                        size_t requestLen)
+{
+    struct nsm_firmware_irreversible_config_req cfg_req;
+    auto rc = decode_nsm_firmware_irreversible_config_req(requestMsg,
+                                                          requestLen, &cfg_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_nsm_firmware_irreversible_config_req failed: rc={RC}", "RC",
+            rc);
+        return std::nullopt;
+    }
+
+    // Sample Update Irreversible Config Response
+    uint16_t msg_size = sizeof(struct nsm_msg_hdr) + 250;
+    std::vector<uint8_t> response(msg_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    switch (cfg_req.request_type)
+    {
+        case QUERY_IRREVERSIBLE_CFG:
+        {
+            struct nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
+            {};
+            cfg_0_resp.irreversible_config_state = fwStateMachine->configState;
+            rc = encode_nsm_firmware_irreversible_config_request_0_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                &cfg_0_resp, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            if (rc)
+            {
+                lg2::error(
+                    "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
+                    "RC", rc);
+                return std::nullopt;
+            }
+            return response;
+            break;
+        }
+        case DISABLE_IRREVERSIBLE_CFG:
+        {
+            fwStateMachine->configState = 0;
+            rc = encode_nsm_firmware_irreversible_config_request_1_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                responseMsg);
+            break;
+        }
+        case ENABLE_IRREVERSIBLE_CFG:
+        {
+            fwStateMachine->configState = 1;
+            struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
+            {};
+            cfg_2_resp.nonce = fwStateMachine->fixedNonce;
+            rc = encode_nsm_firmware_irreversible_config_request_2_resp(
+                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+                &cfg_2_resp, responseMsg);
+            break;
+        }
+        default:
+            lg2::error("Unknown request type {REQ_TYPE}", "REQ_TYPE",
+                       cfg_req.request_type);
+            break;
+    }
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::codeAuthKeyPermQueryHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
+    uint16_t componentClassification;
+    uint16_t componentIdentifier;
+    uint8_t componentClassificationIndex;
+    auto rc = decode_nsm_code_auth_key_perm_query_req(
+        requestMsg, requestLen, &componentClassification, &componentIdentifier,
+        &componentClassificationIndex);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_code_auth_key_perm_query_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    if (componentClassification != 0x000A)
+    {
+        lg2::error("Invalid component classification value");
+        return std::nullopt;
+    }
+    if (componentClassificationIndex != 0)
+    {
+        lg2::error("Invalid component classification index value");
+        return std::nullopt;
+    }
+    if (componentIdentifier != 0x0010 && componentIdentifier != 0xFF00)
+    {
+        lg2::error("Invalid component identifier value");
+        return std::nullopt;
+    }
+    bool isAp = componentIdentifier == 0x0010;
+    uint8_t bitmapLength =
+        isAp ? fwStateMachine->apActiveComponentKeyPerm.size()
+             : fwStateMachine->ecActiveComponentKeyPerm.size();
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_query_resp) +
+            bitmapLength * 4u,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reasonCode = ERR_NULL;
+    if (isAp)
+    {
+        rc = encode_nsm_code_auth_key_perm_query_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
+            fwStateMachine->activeComponentKeyIndex,
+            fwStateMachine->pendingComponentKeyIndex, bitmapLength,
+            fwStateMachine->apActiveComponentKeyPerm.data(),
+            fwStateMachine->apPendingComponentKeyPerm.data(),
+            fwStateMachine->apEfuseKeyPerm.data(),
+            fwStateMachine->apPendingEfuseKeyPerm.data(), responseMsg);
+    }
+    else
+    {
+        rc = encode_nsm_code_auth_key_perm_query_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
+            fwStateMachine->activeComponentKeyIndex,
+            fwStateMachine->pendingComponentKeyIndex, bitmapLength,
+            fwStateMachine->ecActiveComponentKeyPerm.data(),
+            fwStateMachine->ecPendingComponentKeyPerm.data(),
+            fwStateMachine->ecEfuseKeyPerm.data(),
+            fwStateMachine->ecPendingEfuseKeyPerm.data(), responseMsg);
+    }
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_code_auth_key_perm_query_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::codeAuthKeyPermUpdateHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
+    nsm_code_auth_key_perm_request_type requestType;
+    uint16_t componentClassification;
+    uint16_t componentIdentifier;
+    uint8_t componentClassificationIndex;
+    uint64_t nonce;
+    uint8_t bitmapLength;
+    auto rc = decode_nsm_code_auth_key_perm_update_req(
+        requestMsg, requestLen, &requestType, &componentClassification,
+        &componentIdentifier, &componentClassificationIndex, &nonce,
+        &bitmapLength, nullptr);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_code_auth_key_perm_update_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    if (componentClassification != 0x000A)
+    {
+        lg2::error("Invalid component classification value");
+        return std::nullopt;
+    }
+    if (componentClassificationIndex != 0)
+    {
+        lg2::error("Invalid component classification index value");
+        return std::nullopt;
+    }
+    if (componentIdentifier != 0x0010 && componentIdentifier != 0xFF00)
+    {
+        lg2::error("Invalid component identifier value");
+        return std::nullopt;
+    }
+    bool isAp = componentIdentifier == 0x0010;
+    std::vector<uint8_t> bitmap(bitmapLength);
+    rc = decode_nsm_code_auth_key_perm_update_req(
+        requestMsg, requestLen, &requestType, &componentClassification,
+        &componentIdentifier, &componentClassificationIndex, &nonce,
+        &bitmapLength, bitmap.data());
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_code_auth_key_perm_update_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    uint32_t updateMethod = 0;
+
+    if (fwStateMachine->configState == 0)
+    {
+        cc = 0x87; // irreversible config disabled
+    }
+    else if (nonce != fwStateMachine->fixedNonce)
+    {
+        cc = 0x88; // nonce mismatch
+    }
+    else if (isAp)
+    {
+        if (bitmapLength > fwStateMachine->apPendingEfuseKeyPerm.size())
+        {
+            cc = NSM_ERR_INVALID_DATA_LENGTH;
+        }
+        else
+        {
+            updateMethod = NSM_EFUSE_UPDATE_METHOD_DC_POWER_CYCLE;
+            for (auto i = 0; i < bitmapLength; ++i)
+            {
+                fwStateMachine->apPendingEfuseKeyPerm[i] = bitmap[i];
+            }
+        }
+    }
+    else
+    {
+        if (bitmapLength > fwStateMachine->ecEfuseKeyPerm.size())
+        {
+            cc = NSM_ERR_INVALID_DATA_LENGTH;
+        }
+        else
+        {
+            updateMethod = NSM_EFUSE_UPDATE_METHOD_AUTO;
+            for (auto i = 0; i < bitmapLength; ++i)
+            {
+                fwStateMachine->ecEfuseKeyPerm[i] |= bitmap[i];
+            }
+        }
+    }
+
+    rc = encode_nsm_code_auth_key_perm_update_resp(
+        requestMsg->hdr.instance_id, cc, reasonCode, updateMethod, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_code_auth_key_perm_update_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::queryFirmwareSecurityVersion(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
@@ -436,82 +716,6 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_nsm_firmware_update_sec_ver_resp failed: rc={RC}",
                    "RC", rc);
-        return std::nullopt;
-    }
-    return response;
-}
-
-std::optional<std::vector<uint8_t>>
-    MockupResponder::irreversibleConfig(const nsm_msg* requestMsg,
-                                        size_t requestLen)
-{
-    struct nsm_firmware_irreversible_config_req cfg_req;
-    auto rc = decode_nsm_firmware_irreversible_config_req(requestMsg,
-                                                          requestLen, &cfg_req);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "decode_nsm_firmware_irreversible_config_req failed: rc={RC}", "RC",
-            rc);
-        return std::nullopt;
-    }
-
-    // Sample Update Irreversible Config Response
-    uint16_t msg_size = sizeof(struct nsm_msg_hdr) + 250;
-    std::vector<uint8_t> response(msg_size, 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    switch (cfg_req.request_type)
-    {
-        case QUERY_IRREVERSIBLE_CFG:
-        {
-            struct nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
-            {};
-            cfg_0_resp.irreversible_config_state = fwStateMachine->configState;
-            rc = encode_nsm_firmware_irreversible_config_request_0_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-                &cfg_0_resp, responseMsg);
-            assert(rc == NSM_SW_SUCCESS);
-            if (rc)
-            {
-                lg2::error(
-                    "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
-                    "RC", rc);
-                return std::nullopt;
-            }
-            return response;
-            break;
-        }
-        case DISABLE_IRREVERSIBLE_CFG:
-        {
-            fwStateMachine->configState = 0;
-            rc = encode_nsm_firmware_irreversible_config_request_1_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-                responseMsg);
-            break;
-        }
-        case ENABLE_IRREVERSIBLE_CFG:
-        {
-            fwStateMachine->configState = 1;
-            struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
-            {};
-            cfg_2_resp.nonce = fwStateMachine->fixedNonce;
-            rc = encode_nsm_firmware_irreversible_config_request_2_resp(
-                requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-                &cfg_2_resp, responseMsg);
-            break;
-        }
-        default:
-            lg2::error("Unknown request type {REQ_TYPE}", "REQ_TYPE",
-                       cfg_req.request_type);
-            break;
-    }
-    assert(rc == NSM_SW_SUCCESS);
-    if (rc)
-    {
-        lg2::error(
-            "nsm_firmware_irreversible_config_request_resp failed: rc={RC}",
-            "RC", rc);
         return std::nullopt;
     }
     return response;

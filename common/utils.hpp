@@ -31,6 +31,7 @@
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
+#include <xyz/openbmc_project/Software/SecurityCommon/common.hpp>
 
 #include <exception>
 #include <filesystem>
@@ -465,4 +466,50 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
  * @param bf Pointer to the bitfield256_t structure.
  **/
 std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf);
+
+/**
+ * @brief Converts a bitmap into two vectors containing the indices of bits set
+ * to 0 and 1.
+ *
+ * @param[in] bitmap - A vector of bytes representing the bitmap.
+ * @return A pair of vectors, where the first vector contains the indices of
+ * bits that are 0, and the second vector contains the indices of bits that
+ * are 1.
+ *
+ * @note The indices are 0-based, meaning the first bit in the bitmap is index
+ * 0.
+ */
+std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
+    bitmapToIndices(const std::vector<uint8_t>& bitmap);
+
+/**
+ * @brief Converts a list of indices into a bitmap.
+ *
+ * @param[in] indices - A vector of 1-based indices where bits should be set
+ * to 1.
+ * @return A vector of bytes representing the bitmap.
+ *
+ * @note Indices that are not provided in the list will be set to 0 in the
+ * bitmap.
+ */
+std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices);
+
+/**
+ * @brief Converts a bitfield representing update methods into a list of update
+ * method enums.
+ *
+ * @param[in] updateMethodBitfield - A bitfield where each bit represents a
+ * different update method.
+ * @return A vector of SecurityCommon::UpdateMethods enums corresponding to the
+ * set bits in the bitfield.
+ *
+ * @note The function checks specific bits in the bitfield and adds the
+ * corresponding update method enum to the returned vector. Only the bits that
+ * are set in the bitfield will have their corresponding enums included in the
+ * list.
+ */
+std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
+                UpdateMethods>
+    updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield);
+
 } // namespace utils

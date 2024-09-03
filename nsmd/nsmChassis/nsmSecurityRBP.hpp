@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,8 @@
 namespace nsm
 {
 
-using namespace sdbusplus::server::xyz::openbmc_project::software;
+using namespace sdbusplus::common::xyz::openbmc_project::common;
+using namespace sdbusplus::common::xyz::openbmc_project::software;
 using namespace sdbusplus::server;
 using SecurityVersionIntf = object_t<
     sdbusplus::server::xyz::openbmc_project::software::SecurityVersion>;
@@ -43,9 +44,6 @@ using SecurityConfigIntf =
     object_t<sdbusplus::server::xyz::openbmc_project::software::SecurityConfig>;
 using MinSecVersionIntf = object_t<
     sdbusplus::server::xyz::openbmc_project::software::MinSecVersionConfig>;
-using namespace sdbusplus::common::xyz::openbmc_project::common;
-namespace MinSecVersionCommon =
-    sdbusplus::common::xyz::openbmc_project::software;
 using ProgressIntf = object_t<Common::server::Progress>;
 
 class SecurityConfiguration : public SecurityConfigIntf
@@ -111,9 +109,8 @@ class MinSecurityVersion : public MinSecVersionIntf
     virtual ~MinSecurityVersion() = default;
     void updateProperties(
         const struct ::nsm_firmware_security_version_number_resp& sec_info);
-    std::vector<MinSecVersionCommon::SecurityCommon::UpdateMethods>
-        getActivationMethods(uint32_t updateMethodResp);
-    void updateMinSecVersion(RequestTypes requestType, uint64_t nonce,
+    void updateMinSecVersion(SecurityCommon::RequestTypes requestType,
+                             uint64_t nonce,
                              uint16_t reqMinSecVersion) override;
 
   private:

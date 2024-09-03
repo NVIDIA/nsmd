@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
- * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -776,6 +776,321 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	EXPECT_EQ(reason_code, NSM_SW_ERROR_DATA);
 	EXPECT_NE(nullptr, erot_info.slot_info);
 	free(erot_info.slot_info);
+}
+
+TEST(codeAuthKeyPermQuery, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_query_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint16_t component_classification = 0x0001;
+	uint16_t component_identifier = 0x0002;
+	uint8_t component_classification_index = 0x03;
+	auto rc = encode_nsm_code_auth_key_perm_query_req(
+	    0, component_classification, component_identifier,
+	    component_classification_index, request);
+
+	nsm_code_auth_key_perm_query_req *req =
+	    (nsm_code_auth_key_perm_query_req *)request->payload;
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_FW_QUERY_CODE_AUTH_KEY_PERM, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_code_auth_key_perm_query_req) -
+		      sizeof(nsm_common_req),
+		  req->hdr.data_size);
+	EXPECT_EQ(req->component_classification, component_classification);
+	EXPECT_EQ(req->component_identifier, component_identifier);
+	EXPECT_EQ(req->component_classification_index,
+		  component_classification_index);
+}
+
+TEST(codeAuthKeyPermQuery, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE,		     // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_CODE_AUTH_KEY_PERM, // command
+	    NSM_SUCCESS,		     // completion code
+	    0,
+	    0,	  // reserved
+	    13,	  // data size
+	    0,	  // data size
+	    0x12, // active_component_key_index
+	    0x34, // active_component_key_index
+	    0x56, // pending_component_key_index
+	    0x78, // pending_component_key_index
+	    2,	  // permission_bitmap_length
+	    0x01, // active_component_key_perm_bitmap
+	    0x02, // active_component_key_perm_bitmap
+	    0x03, // pending_component_key_perm_bitmap
+	    0x04, // pending_component_key_perm_bitmap
+	    0x05, // efuse_key_perm_bitmap
+	    0x06, // efuse_key_perm_bitmap
+	    0x07, // pending_efuse_key_perm_bitmap
+	    0x08, // pending_efuse_key_perm_bitmap
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t active_component_key_index;
+	uint16_t pending_component_key_index;
+	uint8_t permission_bitmap_length;
+	auto rc = decode_nsm_code_auth_key_perm_query_resp(
+	    response, msg_len, &cc, &reason_code, &active_component_key_index,
+	    &pending_component_key_index, &permission_bitmap_length, NULL, NULL,
+	    NULL, NULL);
+	EXPECT_EQ(NSM_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(0, reason_code);
+	EXPECT_EQ(0x3412, active_component_key_index);
+	EXPECT_EQ(0x7856, pending_component_key_index);
+	EXPECT_EQ(2, permission_bitmap_length);
+
+	std::unique_ptr<uint8_t[]> active_component_key_perm_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+	std::unique_ptr<uint8_t[]> pending_component_key_perm_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+	std::unique_ptr<uint8_t[]> efuse_key_perm_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+	std::unique_ptr<uint8_t[]> pending_efuse_key_perm_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+
+	rc = decode_nsm_code_auth_key_perm_query_resp(
+	    response, msg_len, &cc, &reason_code, &active_component_key_index,
+	    &pending_component_key_index, &permission_bitmap_length,
+	    active_component_key_perm_bitmap.get(),
+	    pending_component_key_perm_bitmap.get(),
+	    efuse_key_perm_bitmap.get(), pending_efuse_key_perm_bitmap.get());
+	EXPECT_EQ(NSM_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(0, reason_code);
+	EXPECT_EQ(0x3412, active_component_key_index);
+	EXPECT_EQ(0x7856, pending_component_key_index);
+	EXPECT_EQ(2, permission_bitmap_length);
+	EXPECT_EQ(0x01, active_component_key_perm_bitmap.get()[0]);
+	EXPECT_EQ(0x02, active_component_key_perm_bitmap.get()[1]);
+	EXPECT_EQ(0x03, pending_component_key_perm_bitmap.get()[0]);
+	EXPECT_EQ(0x04, pending_component_key_perm_bitmap.get()[1]);
+	EXPECT_EQ(0x05, efuse_key_perm_bitmap.get()[0]);
+	EXPECT_EQ(0x06, efuse_key_perm_bitmap.get()[1]);
+	EXPECT_EQ(0x07, pending_efuse_key_perm_bitmap.get()[0]);
+	EXPECT_EQ(0x08, pending_efuse_key_perm_bitmap.get()[1]);
+}
+
+TEST(codeAuthKeyPermQuery, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x00,			     // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE,		     // NVIDIA_MSG_TYPE
+	    NSM_FW_QUERY_CODE_AUTH_KEY_PERM, // command
+	    NSM_SUCCESS,		     // completion code
+	    0,
+	    0,	  // reserved
+	    13,	  // data size
+	    0,	  // data size
+	    0x12, // active_component_key_index
+	    0x34, // active_component_key_index
+	    0x56, // pending_component_key_index
+	    0x78, // pending_component_key_index
+	    8,	  // permission_bitmap_length (incorrect)
+	    0x01, // active_component_key_perm_bitmap
+	    0x02, // active_component_key_perm_bitmap
+	    0x03, // pending_component_key_perm_bitmap
+	    0x04, // pending_component_key_perm_bitmap
+	    0x05, // efuse_key_perm_bitmap
+	    0x06, // efuse_key_perm_bitmap
+	    0x07, // pending_efuse_key_perm_bitmap
+	    0x08, // pending_efuse_key_perm_bitmap
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t active_component_key_index;
+	uint16_t pending_component_key_index;
+	uint8_t permission_bitmap_length;
+	auto rc = decode_nsm_code_auth_key_perm_query_resp(
+	    response, msg_len, &cc, &reason_code, &active_component_key_index,
+	    &pending_component_key_index, &permission_bitmap_length, NULL, NULL,
+	    NULL, NULL);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(codeAuthKeyPermUpdate, testGoodEncodeRequest)
+{
+	size_t dataLength = 16;
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_req) +
+	    dataLength);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_code_auth_key_perm_request_type request_type =
+	    NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE;
+	uint16_t component_classification = 0x0001;
+	uint16_t component_identifier = 0x0002;
+	uint8_t component_classification_index = 0x03;
+	uint64_t nonce = 0x0123456789abcdef;
+	uint8_t permission_bitmap_length = dataLength;
+	std::unique_ptr<uint8_t[]> permission_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+	for (size_t i = 0; i < permission_bitmap_length; ++i) {
+		permission_bitmap.get()[i] = i;
+	}
+	auto rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, request_type, component_classification, component_identifier,
+	    component_classification_index, nonce, permission_bitmap_length,
+	    permission_bitmap.get(), request);
+
+	nsm_code_auth_key_perm_update_req *req =
+	    (nsm_code_auth_key_perm_update_req *)request->payload;
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_code_auth_key_perm_update_req) -
+		      sizeof(nsm_common_req) + permission_bitmap_length,
+		  req->hdr.data_size);
+	EXPECT_EQ(req->request_type, request_type);
+	EXPECT_EQ(req->component_classification, component_classification);
+	EXPECT_EQ(req->component_identifier, component_identifier);
+	EXPECT_EQ(req->component_classification_index,
+		  component_classification_index);
+	EXPECT_EQ(req->nonce, nonce);
+	EXPECT_EQ(req->permission_bitmap_length, permission_bitmap_length);
+	uint8_t *bitmap_ptr =
+	    request->payload + sizeof(struct nsm_code_auth_key_perm_update_req);
+	EXPECT_EQ(0, memcmp(permission_bitmap.get(), bitmap_ptr,
+			    permission_bitmap_length));
+}
+
+TEST(codeAuthKeyPermUpdate, testBadEncodeRequest)
+{
+	size_t dataLength = 16;
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_req) +
+	    dataLength);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_code_auth_key_perm_request_type request_type =
+	    NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE;
+	uint16_t component_classification = 0x0001;
+	uint16_t component_identifier = 0x0002;
+	uint8_t component_classification_index = 0x03;
+	uint64_t nonce = 0x0123456789abcdef;
+	uint8_t permission_bitmap_length = dataLength;
+	std::unique_ptr<uint8_t[]> permission_bitmap(
+	    new uint8_t[permission_bitmap_length]);
+	for (size_t i = 0; i < permission_bitmap_length; ++i) {
+		permission_bitmap.get()[i] = i;
+	}
+
+	// incorrect length
+	auto rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, request_type, component_classification, component_identifier,
+	    component_classification_index, nonce, 0, permission_bitmap.get(),
+	    request);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+
+	// NULL bitmap buffer
+	rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, request_type, component_classification, component_identifier,
+	    component_classification_index, nonce, permission_bitmap_length,
+	    nullptr, request);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// incorrect request type
+	rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, static_cast<nsm_code_auth_key_perm_request_type>(0xFF),
+	    component_classification, component_identifier,
+	    component_classification_index, nonce, permission_bitmap_length,
+	    permission_bitmap.get(), request);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+}
+
+TEST(codeAuthKeyPermUpdate, testGoodDecodeResponse)
+{
+	uint32_t method = NSM_EFUSE_UPDATE_METHOD_SYSTEM_REBOOT |
+			  NSM_EFUSE_UPDATE_METHOD_FUNCTION_LEVEL_RESET;
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, // command
+	    NSM_SUCCESS,		      // completion code
+	    0,
+	    0,						 // reserved
+	    4,						 // data size
+	    0,						 // data size
+	    static_cast<uint8_t>(method & 0xFF),	 // update_method
+	    static_cast<uint8_t>((method >> 8) & 0xFF),	 // update_method
+	    static_cast<uint8_t>((method >> 16) & 0xFF), // update_method
+	    static_cast<uint8_t>((method >> 24) & 0xFF), // update_method
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint32_t update_method = 0;
+	auto rc = decode_nsm_code_auth_key_perm_update_resp(
+	    response, msg_len, &cc, &reason_code, &update_method);
+	EXPECT_EQ(NSM_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(0, reason_code);
+	EXPECT_EQ(NSM_EFUSE_UPDATE_METHOD_SYSTEM_REBOOT |
+		      NSM_EFUSE_UPDATE_METHOD_FUNCTION_LEVEL_RESET,
+		  update_method);
+}
+
+TEST(codeAuthKeyPermUpdate, testBadDecodeResponse)
+{
+	uint32_t method = NSM_EFUSE_UPDATE_METHOD_SYSTEM_REBOOT |
+			  NSM_EFUSE_UPDATE_METHOD_FUNCTION_LEVEL_RESET;
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, // command
+	    NSM_SUCCESS,		      // completion code
+	    0,
+	    0,						// reserved
+	    2,						// data size
+	    0,						// data size
+	    static_cast<uint8_t>(method & 0xFF),	// update_method
+	    static_cast<uint8_t>((method >> 8) & 0xFF), // update_method
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint32_t update_method = 0;
+	auto rc = decode_nsm_code_auth_key_perm_update_resp(
+	    response, msg_len, &cc, &reason_code, &update_method);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
 }
 
 TEST(QueryFirmwareSecurityVersion, testEncodeRequest)

@@ -10,10 +10,10 @@ sources = [
     '../libnsm/device-capability-discovery.c',
     '../libnsm/device-configuration.c',
     '../libnsm/diagnostics.c',
+    '../libnsm/firmware-utils.c',
     '../libnsm/platform-environmental.c',
     '../libnsm/pci-links.c',
     '../libnsm/network-ports.c',
-    '../libnsm/firmware-utils.c',
 ]
 
 nsmMockupResponder_headers = ['.', '..', '../libnsm', '../common']
