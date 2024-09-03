@@ -256,6 +256,7 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NSM_PCIeRetimer_PCIeDevices PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -263,14 +264,6 @@ static requester::Coroutine
         std::make_shared<NsmPCIeDeviceQueryScalarTelemetry>(
             bus, name, associations, type, deviceType, deviceIndex,
             inventoryObjPath);
-    if (!retimerScalarTelemetry)
-    {
-        lg2::error(
-            "Failed to create pcie device scalar telemetry: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-
-        co_return NSM_ERROR;
-    }
     if (priority)
     {
         nsmDevice->prioritySensors.emplace_back(retimerScalarTelemetry);
@@ -287,7 +280,7 @@ static requester::Coroutine
         lg2::error(
             "Failed to create pcie device reference clock: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -299,7 +292,7 @@ static requester::Coroutine
     {
         nsmDevice->roundRobinSensors.emplace_back(retimerRefClock);
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

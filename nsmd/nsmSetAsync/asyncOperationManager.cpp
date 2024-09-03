@@ -230,6 +230,7 @@ requester::Coroutine AsyncSetOperationDispatcher::setImpl(
 
     resultIntf->status(status);
 
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 };
 } // namespace nsm

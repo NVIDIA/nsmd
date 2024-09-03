@@ -41,6 +41,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
         lg2::error(
             "encode_get_port_disable_future_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -50,6 +51,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -72,9 +74,10 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
         lg2::error(
             "responseHandler: decode_get_port_disable_future_resp unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
             "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -98,6 +101,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
             "setDevicePortDisableFuture encode_set_MIG_mode_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -112,6 +116,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -132,9 +137,10 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         lg2::error("throwing write failure exception");
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -152,8 +158,10 @@ requester::Coroutine NsmDevicePortDisableFuture::setPortDisableFuture(
     if (asyncPatchInProgress)
     {
         // do not allow patch if already in process
-        lg2::error("throwing unavailable exception since patch is already in progress");
+        lg2::error(
+            "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -197,7 +205,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setPortDisableFuture(
 
     const auto rc = co_await setDevicePortDisableFuture(mask, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 

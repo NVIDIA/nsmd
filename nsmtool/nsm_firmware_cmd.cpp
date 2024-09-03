@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ class GetRotInformation : public CommandInterface
     {
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
-        struct nsm_firmware_erot_state_info_resp erot_info = {};
+        nsm_firmware_erot_state_info_resp erot_info = {};
 
         auto rc = decode_nsm_query_get_erot_state_parameters_resp(
             responsePtr, payloadLength, &cc, &reason_code, &erot_info);
@@ -85,6 +85,7 @@ class GetRotInformation : public CommandInterface
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n";
+            free(erot_info.slot_info);
             return;
         }
 

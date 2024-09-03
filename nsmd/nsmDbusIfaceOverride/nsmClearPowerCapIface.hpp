@@ -85,6 +85,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
         {
             lg2::error("SendRecvNsmMsg failed.eid={EID} rc={RC}", "EID", eid,
                        "RC", rc_);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         uint8_t cc = NSM_ERROR;
@@ -111,7 +112,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
                 "getPowerCapFromDevice: decode_get_power_limit_resp with reasonCode = {REASONCODE},cc = {CC}and rc ={RC}",
                 "REASONCODE", reason_code, "CC", cc, "RC", rc);
         }
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -132,6 +133,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
                 "clearPowerCapOnDevice encode_set_device_power_limit_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -145,6 +147,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
                 "clearPowerCapOnDevice SendRecvNsmMsg failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -160,14 +163,17 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
             co_await getPowerCapFromDevice();
             lg2::info("clearPowerCapOnDevice for EID: {EID} completed", "EID",
                       eid);
-            for (auto it = powerCapIntf->parents.begin(); it != powerCapIntf->parents.end();) {
+            for (auto it = powerCapIntf->parents.begin();
+                 it != powerCapIntf->parents.end();)
+            {
                 auto sensorIt = manager.objectPathToSensorMap.find(*it);
-		    if (sensorIt != manager.objectPathToSensorMap.end()) {
+                if (sensorIt != manager.objectPathToSensorMap.end())
+                {
                     auto sensor = sensorIt->second;
-			    if (sensor) {
+                    if (sensor)
+                    {
                         powerCapIntf->sensorCache.emplace_back(
-					std::dynamic_pointer_cast<
-					    NsmPowerControl>(sensor));
+                            std::dynamic_pointer_cast<NsmPowerControl>(sensor));
                         it = powerCapIntf->parents.erase(it);
                         continue;
                     }
@@ -176,8 +182,10 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
             }
 
             // update each cached sensor
-	    for (const auto &sensor : powerCapIntf->sensorCache) {
-		    sensor->updatePowerCapValue(powerCapIntf->name, powerCapIntf->PowerCapIntf::powerCap());
+            for (const auto& sensor : powerCapIntf->sensorCache)
+            {
+                sensor->updatePowerCapValue(
+                    powerCapIntf->name, powerCapIntf->PowerCapIntf::powerCap());
             }
         }
         else
@@ -186,9 +194,10 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
                 "clearPowerCapOnDevice decode_set_power_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
-
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 
@@ -200,7 +209,7 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
         const auto rc_ = co_await clearPowerCapOnDevice(&status);
 
         statusInterface->status(status);
-
+        // coverity[missing_return]
         co_return rc_;
     }
 

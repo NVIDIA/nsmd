@@ -77,6 +77,7 @@ requester::Coroutine NsmPowerControl::setPowerCap(
     if (*powerLimit > maxPowerCapValue() || *powerLimit < minPowerCapValue())
     {
         *status = AsyncOperationStatusType::InvalidArgument;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -97,7 +98,7 @@ requester::Coroutine NsmPowerControl::setPowerCap(
             *status = deviceStatus;
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -177,7 +178,7 @@ requester::Coroutine
     }
 
     statusInterface->status(status);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -229,6 +230,7 @@ static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
         lg2::error(
             "The UUID of CreateFPGATotalGPUPower PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -250,6 +252,7 @@ static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
                                                   fpgaControlTotalGpuPower),
                                   {},
                                   nsmDevice});
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -316,7 +316,7 @@ TEST(GetRotInformation, testGoodDecodeResponse)
 	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
 	    1,
 	    2, // number of slots: 2
-		NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
 	    1,
 	    0, // slot 0 tag
 	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
@@ -419,6 +419,7 @@ TEST(GetRotInformation, testGoodDecodeResponse)
 
 	EXPECT_EQ(2, erot_info.fq_resp_hdr.firmware_slot_count);
 	EXPECT_EQ(1, erot_info.fq_resp_hdr.active_slot);
+	EXPECT_NE(nullptr, erot_info.slot_info);
 	EXPECT_EQ(1, erot_info.slot_info[0].build_type);
 	EXPECT_EQ(2, erot_info.slot_info[1].build_type);
 
@@ -453,7 +454,7 @@ TEST(GetRotInformation, testGoodDecodeResponseRealErot213v)
 	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
 	    1,
 	    2, // number of slots: 2
-		NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
 	    1,
 	    0, // slot 0 tag
 	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
@@ -556,6 +557,7 @@ TEST(GetRotInformation, testGoodDecodeResponseRealErot213v)
 
 	EXPECT_EQ(2, erot_info.fq_resp_hdr.firmware_slot_count);
 	EXPECT_EQ(0, erot_info.fq_resp_hdr.active_slot);
+	EXPECT_NE(nullptr, erot_info.slot_info);
 	EXPECT_EQ(1, erot_info.slot_info[0].build_type);
 	EXPECT_EQ(2, erot_info.slot_info[1].build_type);
 
@@ -762,7 +764,9 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	EXPECT_EQ(reason_code, NSM_SW_ERROR_LENGTH);
 	/* Though, some tags should be decoded properly */
 	EXPECT_EQ(0x0102030405060708, erot_info.fq_resp_hdr.boot_status_code);
+	EXPECT_NE(nullptr, erot_info.slot_info);
 	free(erot_info.slot_info);
+	erot_info.slot_info = nullptr;
 
 	cc = NSM_SUCCESS;
 	reason_code = ERR_NULL;
@@ -770,6 +774,7 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	    response, msg_len, &cc, &reason_code, &erot_info);
 	/* The last tag has an unsupported id */
 	EXPECT_EQ(reason_code, NSM_SW_ERROR_DATA);
+	EXPECT_NE(nullptr, erot_info.slot_info);
 	free(erot_info.slot_info);
 }
 

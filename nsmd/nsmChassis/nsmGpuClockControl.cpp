@@ -51,7 +51,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
     auto rc_ = co_await clearReqClockLimit(&status);
 
     statusInterface->status(status);
-
+    // coverity[missing_return]
     co_return rc_;
 }
 requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
@@ -72,6 +72,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
             "clearReqClockLimit  encode_set_clock_limit_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -85,6 +86,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
             "clearReqClockLimit SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -104,9 +106,10 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
             "clearReqClockLimit decode_set_clock_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -270,6 +273,7 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
             "NsmChassisClockControl::setMinClockLimits encode_set_clock_limit_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -284,6 +288,7 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -305,9 +310,10 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
             "NsmChassisClockControl::setMinClockLimits decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -351,6 +357,7 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
             "NsmChassisClockControl::setMaxClockLimits encode_set_clock_limit_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -365,6 +372,7 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -386,9 +394,10 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
             "NsmChassisClockControl::setMaxClockLimits decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -428,6 +437,7 @@ static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
         lg2::error(
             "The UUID of CreateControlGpuClock PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -474,6 +484,7 @@ static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
             "RequestedSpeedLimitMax",
             AsyncSetOperationInfo{setMaxClockLimHandler,
                                   nsmChassisControlSensor, nsmDevice});
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

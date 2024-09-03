@@ -73,6 +73,7 @@ requester::Coroutine NsmThresholdFactory::make()
                                    NsmThresholdValueHardShutdownHigh>(
         thresholdInterfaces, ThresholdsPairInfo{.lowerThreshold{"LowerFatal"},
                                                 .upperThreshold{"UpperFatal"}});
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -149,6 +150,7 @@ requester::Coroutine NsmThresholdFactory::processThresholdsPair(
                                         std::move(thresholdValue));
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -176,7 +178,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
 
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type=Static",
                   "UUID", uuid, "NAME", thresholdInfo.name);
-
+        // coverity[missing_return]
         co_return NSM_SUCCESS;
     }
 
@@ -189,7 +191,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
             "Unsupported Threshold Type {TYPE} : UUID={UUID}, Name={NAME}",
             "UUID", uuid, "NAME", thresholdInfo.name, "TYPE",
             thresholdInfo.type);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -219,6 +221,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
     {
         nsmDevice->addStaticSensor(sensor);
         nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
+        // coverity[missing_return]
         co_return NSM_SUCCESS;
     }
 
@@ -231,7 +234,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
     NumericSensorFactory::makeAggregatorAndAddSensor(
         std::make_unique<NsmThresholdAggregatorBuilder>().get(), thresholdInfo,
         sensor, uuid, nsmDevice.get());
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

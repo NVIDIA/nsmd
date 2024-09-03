@@ -1,7 +1,7 @@
 #include "nsmRetimerPort.hpp"
 
-#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
+#include "dBusAsyncUtils.hpp"
 #include "nsmProcessor/nsmProcessor.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -293,7 +293,6 @@ void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
 #endif
 }
 
-
 static requester::Coroutine
     createNsmPCIeRetimerPorts(SensorManager& manager,
                               const std::string& interface,
@@ -333,6 +332,7 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NSM_PCIeRetimer_PCIeLink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -344,14 +344,6 @@ static requester::Coroutine
 
         auto pciePortIntfSensor = std::make_shared<NsmPort>(
             bus, portName, type, associations, objPath);
-        if (!pciePortIntfSensor)
-        {
-            lg2::error(
-                "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
-            co_return NSM_ERROR;
-        }
         nsmDevice->addStaticSensor(pciePortIntfSensor);
 
         auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
@@ -380,6 +372,7 @@ static requester::Coroutine
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                 "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
                 objPath);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
 
@@ -388,6 +381,7 @@ static requester::Coroutine
         nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

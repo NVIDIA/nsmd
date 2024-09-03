@@ -17,6 +17,8 @@
 
 #include "mockDBusHandler.hpp"
 
+#include <stdexcept>
+
 namespace utils
 {
 IDBusHandler& DBusHandler()
@@ -27,11 +29,15 @@ IDBusHandler& DBusHandler()
 PropertyValue DBusTest::get(const PropertyValuesCollection& properties,
                             const std::string& name)
 {
-    return std::find_if(
-               properties.begin(), properties.end(),
-               [&name](const std::pair<std::string, PropertyValue>& pair) {
+    auto it = std::find_if(
+        properties.begin(), properties.end(),
+        [&name](const std::pair<std::string, PropertyValue>& pair) {
         return pair.first == name;
-    })->second;
+    });
+    if (it == properties.end())
+        throw std::out_of_range("Property " + name +
+                                " not found in collection");
+    return it->second;
 }
 
 } // namespace utils

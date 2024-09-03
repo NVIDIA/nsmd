@@ -31,7 +31,7 @@ NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
     const NsmInterfaceProvider<OperationalStatusIntf>& provider,
     uint8_t gpuInstanceId) :
     NsmSensor(provider), NsmInterfaceContainer(provider),
-    gpuInstanceId(gpuInstanceId)
+    gpuInstanceId(gpuInstanceId), gpusPresence{}, gpusPower{}, state{}
 {
     updateMetricOnSharedMemory();
 }
@@ -79,6 +79,7 @@ requester::Coroutine
     }
     updateMetricOnSharedMemory();
 
+    // coverity[missing_return]
     co_return rc;
 }
 

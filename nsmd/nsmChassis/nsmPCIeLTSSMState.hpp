@@ -23,10 +23,9 @@
 
 namespace nsm
 {
-using namespace sdbusplus::xyz::openbmc_project;
-using namespace sdbusplus::server;
 
-using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
+using LTSSMStateIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::PCIe::server::LTSSMState>;
 
 class NsmPCIeLTSSMState :
     public NsmSensor,

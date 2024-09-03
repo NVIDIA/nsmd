@@ -20,8 +20,8 @@ namespace nsm
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
     std::string& correctionType, std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), dimmIntf(dimmIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->ecc(DimmIntf::convertEccFromString(correctionType));
     updateMetricOnSharedMemory();
@@ -45,8 +45,8 @@ NsmMemoryDeviceType::NsmMemoryDeviceType(std::string& name, std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
                                          std::string& memoryType,
                                          std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), dimmIntf(dimmIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->memoryType(DimmIntf::convertDeviceTypeFromString(memoryType));
     updateMetricOnSharedMemory();
@@ -70,8 +70,7 @@ NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
                                              std::string& name,
                                              std::string& type,
                                              std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath)
 {
     locationIntf =
         std::make_unique<LocationIntfMemory>(bus, inventoryObjPath.c_str());
@@ -92,8 +91,7 @@ NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
 NsmMemoryAssociation::NsmMemoryAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) :
-    NsmObject(name, type)
+    const std::vector<utils::Association>& associations) : NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -112,8 +110,7 @@ NsmRowRemapState::NsmRowRemapState(
     std::string& name, std::string& type,
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemapIntf: create sensor:{NAME}", "NAME", name.c_str());
@@ -197,8 +194,7 @@ NsmRowRemappingCounts::NsmRowRemappingCounts(
     std::string& name, std::string& type,
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemappingCount: create sensor:{NAME}", "NAME",
@@ -293,7 +289,8 @@ NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
     updateMetricOnSharedMemory();
 }
 
-void NsmRemappingAvailabilityBankCount::updateReading(const nsm_row_remap_availability& data)
+void NsmRemappingAvailabilityBankCount::updateReading(
+    const nsm_row_remap_availability& data)
 {
     rowRemapIntf->highRemappingAvailablityBankCount(data.high_remapping);
     rowRemapIntf->maxRemappingAvailablityBankCount(data.max_remapping);
@@ -303,7 +300,8 @@ void NsmRemappingAvailabilityBankCount::updateReading(const nsm_row_remap_availa
 }
 
 std::optional<std::vector<uint8_t>>
-    NsmRemappingAvailabilityBankCount::genRequestMsg(eid_t eid, uint8_t instanceId)
+    NsmRemappingAvailabilityBankCount::genRequestMsg(eid_t eid,
+                                                     uint8_t instanceId)
 {
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -319,18 +317,15 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-uint8_t
-    NsmRemappingAvailabilityBankCount::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                             size_t responseLen)
+uint8_t NsmRemappingAvailabilityBankCount::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
 {
-
     uint8_t cc = NSM_ERROR;
     struct nsm_row_remap_availability data;
     uint16_t data_size;
     uint16_t reason_code = ERR_NULL;
     auto rc = decode_get_row_remap_availability_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
-        &data);
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -365,25 +360,30 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType highRemappingAvailablityBankCount{
         rowRemapIntf->highRemappingAvailablityBankCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, highRemappingAvailablityBankCount);
+        inventoryObjPath, ifaceName, propName, smbusData,
+        highRemappingAvailablityBankCount);
 
     propName = "LowRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType lowRemappingAvailablityBankCount{
         rowRemapIntf->lowRemappingAvailablityBankCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, lowRemappingAvailablityBankCount);
+        inventoryObjPath, ifaceName, propName, smbusData,
+        lowRemappingAvailablityBankCount);
 
     propName = "PartialRemappingAvailablityBankCount";
-    nv::sensor_aggregation::DbusVariantType partialRemappingAvailablityBankCount{
-        rowRemapIntf->partialRemappingAvailablityBankCount()};
+    nv::sensor_aggregation::DbusVariantType
+        partialRemappingAvailablityBankCount{
+            rowRemapIntf->partialRemappingAvailablityBankCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, partialRemappingAvailablityBankCount);
+        inventoryObjPath, ifaceName, propName, smbusData,
+        partialRemappingAvailablityBankCount);
 
     propName = "NoRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType noRemappingAvailablityBankCount{
         rowRemapIntf->noRemappingAvailablityBankCount()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        inventoryObjPath, ifaceName, propName, smbusData, noRemappingAvailablityBankCount);
+        inventoryObjPath, ifaceName, propName, smbusData,
+        noRemappingAvailablityBankCount);
 
 #endif
 }
@@ -391,8 +391,7 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
 NsmEccErrorCountsDram::NsmEccErrorCountsDram(
     std::string& name, std::string& type,
     std::shared_ptr<EccModeIntfDram> eccIntf, std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    eccIntf(eccIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), eccIntf(eccIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
@@ -492,6 +491,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -504,6 +504,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -530,8 +531,10 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMinMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -558,6 +561,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -570,6 +574,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -596,8 +601,10 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         lg2::error(
             "NsmMaxMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
             "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -605,8 +612,8 @@ NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
                                          const std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
                                          std::string inventoryObjPath) :
-    NsmSensor(name, type),
-    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), dimmIntf(dimmIntf),
+    inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMemCurrClockFreq: create sensor:{NAME}", "NAME",
@@ -681,8 +688,7 @@ uint8_t
 
 NsmMemCapacity::NsmMemCapacity(const std::string& name, const std::string& type,
                                std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmMemoryCapacity(name, type),
-    dimmIntf(dimmIntf)
+    NsmMemoryCapacity(name, type), dimmIntf(dimmIntf)
 
 {
     lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME", name.c_str());
@@ -725,6 +731,7 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
 
@@ -854,8 +861,10 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

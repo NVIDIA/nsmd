@@ -49,7 +49,6 @@ class NsmDevice
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
-
     {}
 
     NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
@@ -58,12 +57,11 @@ class NsmDevice
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
         instanceNumber(instanceNumber)
-
     {}
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
 
-    eid_t eid;
+    eid_t eid = 0;
     uuid_t uuid;
     uuid_t deviceUuid;
     bool isDeviceActive;
@@ -130,8 +128,8 @@ class NsmDevice
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     uint8_t eventMode;
-    uint8_t deviceType;
-    uint8_t instanceNumber;
+    uint8_t deviceType = 0;
+    uint8_t instanceNumber = 0;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

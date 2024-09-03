@@ -27,9 +27,10 @@ NsmObjectFactory& NsmObjectFactory::instance()
     return instance;
 }
 
-requester::Coroutine NsmObjectFactory::createObjects(SensorManager& manager,
-                                     const std::string& interface,
-                                     const std::string& objPath)
+requester::Coroutine
+    NsmObjectFactory::createObjects(SensorManager& manager,
+                                    const std::string& interface,
+                                    const std::string& objPath)
 {
     auto it = creationFunctions.find(interface);
     if (it != creationFunctions.end())
@@ -45,6 +46,7 @@ requester::Coroutine NsmObjectFactory::createObjects(SensorManager& manager,
                 "ERROR", e, "INTF", interface, "PATH", objPath);
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

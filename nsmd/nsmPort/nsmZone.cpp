@@ -1,9 +1,10 @@
 #include "nsmZone.hpp"
 
 #include "common/types.hpp"
+#include "dBusAsyncUtils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
-#include "dBusAsyncUtils.hpp"
+
 #include <optional>
 #include <vector>
 
@@ -23,8 +24,9 @@ NsmZone::NsmZone(sdbusplus::bus::bus& bus, const std::string& name,
     zoneIntf->routingEnabled(bool(true));
 }
 
-static requester::Coroutine createNsmZones(SensorManager& manager, const std::string& interface,
-                           const std::string& objPath)
+static requester::Coroutine createNsmZones(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto name = co_await utils::coGetDbusProperty<std::string>(
@@ -45,6 +47,7 @@ static requester::Coroutine createNsmZones(SensorManager& manager, const std::st
         lg2::error(
             "The UUID of NSM_FabricsZone PDI matches no NsmDevice : UUID={UUID}, Fabric={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", fabricsObjPath, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -57,10 +60,12 @@ static requester::Coroutine createNsmZones(SensorManager& manager, const std::st
         lg2::error(
             "Failed to create NSM Fabrics Zone : UUID={UUID}, Type={TYPE}, Fabrics_Path={OBJPATH}",
             "UUID", uuid, "TYPE", type, "OBJPATH", fabricsObjPath);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     nsmDevice->deviceSensors.push_back(fabricsZoneSensor);
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -213,7 +213,7 @@ requester::Coroutine NsmSetWriteProtected::writeProtected(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
+    // coverity[missing_return]
     co_return co_await setWriteProtected(*writeProtected, *status, device);
 }
 requester::Coroutine
@@ -236,6 +236,7 @@ requester::Coroutine
             "encode_enable_disable_wp_req({DI}) failed. eid={EID} rc={RC}",
             "DI", dataIndex, "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -253,6 +254,7 @@ requester::Coroutine
                 "EID", eid, "RC", rc);
         }
         status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -274,7 +276,7 @@ requester::Coroutine
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;
     }
-
+    // coverity[missing_return]
     co_return cc ? cc : rc;
 }
 

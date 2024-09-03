@@ -651,7 +651,8 @@ int encode_set_port_disable_future_req(uint8_t instance,
 }
 
 int decode_set_port_disable_future_req(const struct nsm_msg *msg,
-				       size_t msg_len, bitfield8_t *mask)
+				       size_t msg_len,
+				       bitfield8_t mask[PORT_MASK_DATA_SIZE])
 {
 	if (msg == NULL || mask == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -669,7 +670,7 @@ int decode_set_port_disable_future_req(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	memcpy(&(mask->byte), request->port_mask, PORT_MASK_DATA_SIZE);
+	memcpy(mask, request->port_mask, PORT_MASK_DATA_SIZE);
 
 	return NSM_SW_SUCCESS;
 }
@@ -693,8 +694,8 @@ int encode_set_port_disable_future_resp(uint8_t instance, uint8_t cc,
 	}
 
 	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(
-		    cc, reason_code, NSM_SET_PORT_DISABLE_FUTURE, msg);
+		return encode_reason_code(cc, reason_code,
+					  NSM_SET_PORT_DISABLE_FUTURE, msg);
 	}
 
 	nsm_set_port_disable_future_resp *response =
@@ -716,9 +717,8 @@ int decode_set_port_disable_future_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) +
-		sizeof(nsm_set_port_disable_future_resp)) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_set_port_disable_future_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -750,7 +750,8 @@ int encode_get_port_disable_future_req(uint8_t instance_id, struct nsm_msg *msg)
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_port_disable_future_req(const struct nsm_msg *msg, size_t msg_len)
+int decode_get_port_disable_future_req(const struct nsm_msg *msg,
+				       size_t msg_len)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -791,8 +792,8 @@ int encode_get_port_disable_future_resp(uint8_t instance, uint8_t cc,
 	}
 
 	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(
-		    cc, reason_code, NSM_GET_PORT_DISABLE_FUTURE, msg);
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_PORT_DISABLE_FUTURE, msg);
 	}
 
 	struct nsm_get_port_disable_future_resp *response =
@@ -810,7 +811,7 @@ int encode_get_port_disable_future_resp(uint8_t instance, uint8_t cc,
 int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
 					size_t msg_len, uint8_t *cc,
 					uint16_t *reason_code,
-					bitfield8_t *mask)
+					bitfield8_t mask[PORT_MASK_DATA_SIZE])
 {
 	if (mask == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -821,16 +822,15 @@ int decode_get_port_disable_future_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-	if (msg_len <
-	    sizeof(struct nsm_msg_hdr) +
-		sizeof(struct nsm_get_port_disable_future_resp)) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_port_disable_future_resp)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_get_port_disable_future_resp *resp =
 	    (struct nsm_get_port_disable_future_resp *)msg->payload;
 
-	memcpy(&(mask->byte), resp->port_mask, PORT_MASK_DATA_SIZE);
+	memcpy(mask, resp->port_mask, PORT_MASK_DATA_SIZE);
 
 	return NSM_SW_SUCCESS;
 }

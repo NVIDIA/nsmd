@@ -124,7 +124,7 @@ static requester::Coroutine
 
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                    associations);
+                                      associations);
 
     auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "PhysicalContext", interface.c_str());
@@ -147,7 +147,7 @@ static requester::Coroutine
             "Association Property of TotalPower Sensor PDI has no chassis association. "
             "Name={NAME}, Type={TYPE}",
             "NAME", name, "TYPE", type);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 #endif
@@ -159,6 +159,7 @@ static requester::Coroutine
         lg2::error(
             "The UUID of CreateFPGATotalGPUPower PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -180,7 +181,7 @@ static requester::Coroutine
     nsmDevice->deviceSensors.emplace_back(fpgaTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGATotalGPUPowerSensorPath] =
         fpgaTotalGpuPower;
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

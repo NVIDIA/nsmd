@@ -12,6 +12,7 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
         lg2::error(
             "NsmSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
             "NAME", getName(), "EID", eid);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -21,11 +22,12 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
                                               responseLen, isLongRunning);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
     rc = handleResponseMsg(responseMsg.get(), responseLen);
-
+    // coverity[missing_return]
     co_return rc;
 }
 } // namespace nsm

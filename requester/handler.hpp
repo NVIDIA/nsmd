@@ -432,21 +432,20 @@ class Handler
     }
 
   private:
-    int fd; //!< file descriptor of MCTP communications socket
     sdeventplus::Event& event; //!< reference to NSM daemon's main event loop
     nsm::InstanceIdDb& instanceIdDb; //!< reference to instanceIdDb object
     mctp_socket::Manager& sockManager;
 
-    bool verbose;                 //!< verbose tracing flag
+    bool verbose;                        //!< verbose tracing flag
     std::chrono::seconds
         instanceIdExpiryIntervalRegular; //!< Instance ID expiration interval
     std::chrono::seconds
         instanceIdExpiryIntervalLongRunning; //!< Instance ID expiration
                                              //!< interval for Long Running
                                              //!< commands
-    uint8_t numRetries;           //!< number of request retries
+    uint8_t numRetries;                      //!< number of request retries
     std::chrono::milliseconds
-        responseTimeOutRegular;   //!< time to wait between each retry
+        responseTimeOutRegular;     //!< time to wait between each retry
     std::chrono::milliseconds
         responseTimeOutLongRunning; //!< time to wait between each retry for
                                     //!< Long Running commands
@@ -615,6 +614,5 @@ struct SendRecvNsmMsg
         resumeHandle();
     }
 };
-
 
 } // namespace requester

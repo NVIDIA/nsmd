@@ -107,6 +107,7 @@ class SensorManagerTest
                 size_t& responseLen,
                 [[maybe_unused]] bool isLongRunning) -> requester::Coroutine {
             allocMessage(response, responseMsg, responseLen);
+            // coverity[missing_return]
             co_return code;
         };
     }

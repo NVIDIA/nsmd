@@ -101,7 +101,7 @@ requester::Coroutine
                                                instanceNumber));
         device->addStaticSensor(version);
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

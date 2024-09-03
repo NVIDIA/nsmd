@@ -72,7 +72,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
 
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
-                                    associations);
+                                      associations);
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -82,6 +82,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
         lg2::error(
             "The UUID of CreatePowerSubSystem PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -92,6 +93,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
     auto fpgaPowerSubSystem = std::make_shared<NsmPowerPowerSupply>(
         bus, name, associations, type, nsmPowerSubSystemPath, powerSupplyType);
     nsmDevice->deviceSensors.emplace_back(fpgaPowerSubSystem);
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

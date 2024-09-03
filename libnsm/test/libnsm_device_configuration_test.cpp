@@ -255,7 +255,7 @@ TEST(getFpgaDiagnosticsSettingsWPSettings, testGoodEncodeResponse)
 
 	uint16_t reason_code = ERR_NULL;
 
-	struct nsm_fpga_diagnostics_settings_wp data;
+	struct nsm_fpga_diagnostics_settings_wp data = {};
 	data.gpu1_4 = 1;
 	struct nsm_fpga_diagnostics_settings_wp data_test = data;
 
@@ -375,7 +375,7 @@ TEST(getFpgaDiagnosticsSettingsWPJumper, testGoodEncodeResponse)
 
 	uint16_t reason_code = ERR_NULL;
 
-	struct nsm_fpga_diagnostics_settings_wp_jumper data;
+	struct nsm_fpga_diagnostics_settings_wp_jumper data = {};
 	data.presence = 1;
 	struct nsm_fpga_diagnostics_settings_wp_jumper data_test = data;
 
@@ -1123,7 +1123,7 @@ TEST(getReconfigurationPermissionsV1, testGoodEncodeResponse)
 
 	uint16_t reason_code = ERR_NULL;
 
-	nsm_reconfiguration_permissions_v1 data;
+	nsm_reconfiguration_permissions_v1 data = {};
 	data.persistent = 1;
 
 	auto rc = encode_get_reconfiguration_permissions_v1_resp(

@@ -323,7 +323,8 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
                                        const std::string& interfaceSubStr,
                                        std::vector<Association>& associations)
 {
-    auto mapperResponse = co_await utils::coGetServiceMap(objPath, dbus::Interfaces{});
+    auto mapperResponse = co_await utils::coGetServiceMap(objPath,
+                                                          dbus::Interfaces{});
 
     for (const auto& [service, interfaces] : mapperResponse)
     {
@@ -350,7 +351,7 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
             }
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 // Function to convert bitfield256_t to bitmap

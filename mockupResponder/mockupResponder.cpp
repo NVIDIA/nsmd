@@ -2101,7 +2101,7 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_query_admin_override_req failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    struct nsm_admin_override_data adminProfileData;
+    nsm_admin_override_data adminProfileData = {};
     adminProfileData.admin_override_percent_tmp_floor = 0;
     adminProfileData.admin_override_ramup_rate_in_miliwatts_per_second = 180;
     adminProfileData.admin_override_rampdown_rate_in_miliwatts_per_second = 150;

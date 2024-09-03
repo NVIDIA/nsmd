@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -128,6 +128,7 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
                                       "Unsupported Command"));
         }
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_SUCCESS;
@@ -140,6 +141,7 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return decodeRc;
     }
     if (reasonCode == 0)
@@ -150,6 +152,7 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
     {
         finishOperation(Progress::OperationStatus::Failed);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -174,6 +177,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
                                       "Unsupported Command"));
         }
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_SUCCESS;
@@ -187,6 +191,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return decodeRc;
     }
     int fd = memfd_create("token-request", 0);
@@ -195,6 +200,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
         lg2::error("DebugToken: memfd_create: eid={EID} error={ERROR}", "EID",
                    eid, "ERROR", strerror(errno));
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
     const uint8_t* requestPtr =
@@ -209,6 +215,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
                        "ERROR", strerror(errno));
             close(fd);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         requestPtr += written;
@@ -218,7 +225,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
     sdbusplus::message::unix_fd unixFd(fd);
     requestFd(unixFd, true);
     finishOperation(Progress::OperationStatus::Completed);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -243,6 +250,7 @@ requester::Coroutine
                                       "Unsupported Command"));
         }
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_SUCCESS;
@@ -260,6 +268,7 @@ requester::Coroutine
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return decodeRc;
     }
     DebugToken::TokenTypes dbusTokenType;
@@ -282,6 +291,7 @@ requester::Coroutine
                        "eid={EID} type={TYPE}",
                        "TYPE", tokenType);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
     DebugToken::TokenStatus dbusStatus;
@@ -310,6 +320,7 @@ requester::Coroutine
                        "eid={EID} status={STAT}",
                        "STAT", status);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
     DebugToken::AdditionalInfo dbusAdditionalInfo;
@@ -333,6 +344,7 @@ requester::Coroutine
                        "eid={EID} info={INFO}",
                        "INFO", additionalInfo);
             finishOperation(Progress::OperationStatus::Aborted);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
 
@@ -340,7 +352,7 @@ requester::Coroutine
                                 timeLeft),
                 true);
     finishOperation(Progress::OperationStatus::Completed);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -365,6 +377,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                                       "Unsupported Command"));
         }
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_SUCCESS;
@@ -377,6 +390,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return decodeRc;
     }
     if (cc != NSM_SUCCESS)
@@ -384,6 +398,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
         lg2::info("DebugToken: token not accepted: eid={EID} cc={CC}", "EID",
                   eid, "CC", cc);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
     if (reasonCode == 0)
@@ -396,6 +411,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                   eid, "RC", reasonCode);
         finishOperation(Progress::OperationStatus::Failed);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -547,6 +563,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
         lg2::error("DebugToken: encode_nsm_query_device_ids_req: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
@@ -564,6 +581,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
                                       "Unsupported Command"));
         }
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_ERROR;
@@ -577,6 +595,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
         finishOperation(Progress::OperationStatus::Aborted);
+        // coverity[missing_return]
         co_return decodeRc;
     }
     std::ostringstream oss;
@@ -587,6 +606,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
         oss << std::setw(2) << static_cast<int>(deviceId[i]);
     }
     tokenDeviceID(oss.str());
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

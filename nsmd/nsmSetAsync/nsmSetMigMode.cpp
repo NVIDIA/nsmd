@@ -42,7 +42,7 @@ requester::Coroutine
 
     const auto rc = co_await setMigModeOnDevice(isLongRunning, *migMode, status,
                                                 device);
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -66,6 +66,7 @@ requester::Coroutine
             "setMigModeOnDevice encode_set_MIG_mode_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -80,6 +81,7 @@ requester::Coroutine
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -100,9 +102,10 @@ requester::Coroutine
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         lg2::error("throwing write failure exception");
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 } // namespace nsm

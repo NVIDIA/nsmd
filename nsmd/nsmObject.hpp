@@ -47,6 +47,7 @@ class NsmObject
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
                                         [[maybe_unused]] eid_t eid)
     {
+        // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
 

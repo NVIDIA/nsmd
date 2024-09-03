@@ -97,7 +97,7 @@ static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
             }
         }
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -133,6 +133,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     {
         lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -142,6 +143,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                                          responseLen, false);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -207,8 +209,11 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
             "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
             "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
             "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+
+    // coverity[missing_return]
 
     co_return NSM_SW_SUCCESS;
 }
@@ -226,6 +231,7 @@ requester::Coroutine
         lg2::error(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -235,6 +241,7 @@ requester::Coroutine
                                          responseLen, false);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -254,6 +261,7 @@ requester::Coroutine
     {
         portMetricsOem3Intf->runtimeError(false);
     }
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -858,6 +866,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         lg2::error(
             "The UUID of NSM_NVlink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -901,24 +910,14 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             auto portStatusSensor = std::make_shared<NsmPortStatus>(
                 bus, portName, logicalPortNum, type, portMetricsOem3Intf,
                 objPath);
-            if (!portStatusSensor)
+            nsmDevice->deviceSensors.emplace_back(portStatusSensor);
+            if (priority)
             {
-                lg2::error(
-                    "Failed to create NSM Port status sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                    objPath);
+                nsmDevice->prioritySensors.emplace_back(portStatusSensor);
             }
             else
             {
-                nsmDevice->deviceSensors.emplace_back(portStatusSensor);
-                if (priority)
-                {
-                    nsmDevice->prioritySensors.emplace_back(portStatusSensor);
-                }
-                else
-                {
-                    nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
-                }
+                nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
             }
 
             auto portCharacteristicsSensor =
@@ -972,6 +971,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

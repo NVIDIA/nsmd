@@ -70,6 +70,7 @@ requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
             }
         }
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -102,6 +103,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     {
         lg2::error("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -111,6 +113,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -144,9 +147,10 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
         lg2::error(
             "responseHandler: decode_get_power_mode_resp unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
             "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -170,6 +174,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
             "setL1PowerDevice encode_set_power_mode_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -184,6 +189,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -203,9 +209,10 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         lg2::error("throwing write failure exception");
         *status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -226,6 +233,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWModeControl(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -242,7 +250,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWModeControl(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -263,6 +271,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1FWThrottlingMode(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -279,7 +288,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1FWThrottlingMode(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -300,6 +309,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PredictionMode(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -316,7 +326,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PredictionMode(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -337,6 +347,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWThreshold(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -347,7 +358,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWThreshold(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -368,6 +379,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWActiveTime(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -377,7 +389,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWActiveTime(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -398,6 +410,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWInactiveTime(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -408,7 +421,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWInactiveTime(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -429,6 +442,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime(
         lg2::error(
             "throwing unavailable exception since patch is already in progress");
         *status = AsyncOperationStatusType::Unavailable;
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
@@ -439,7 +453,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime(
 
     const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
     asyncPatchInProgress = false;
-
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -669,7 +683,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         nvSwitchAsset->pdi().manufacturer(manufacturer);
         device->addStaticSensor(nvSwitchAsset);
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

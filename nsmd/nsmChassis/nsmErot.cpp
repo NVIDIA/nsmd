@@ -16,13 +16,14 @@
  */
 
 #include "nsmErot.hpp"
-#include "nsmSecurityRBP.hpp"
 
-#include "sensorManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmSecurityRBP.hpp"
+#include "sensorManager.hpp"
+
+#include <charconv>
 #include <fstream>
 #include <iostream>
-#include <charconv>
 
 namespace nsm
 {
@@ -181,21 +182,25 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
 static int extractNumber(const std::string& str)
 {
     auto it = str.rbegin();
-    while (it != str.rend() && std::isdigit(*it)) {
+    while (it != str.rend() && std::isdigit(*it))
+    {
         ++it;
     }
     auto num_start = it.base();
     std::string number_str(num_start, str.end());
     int number = 0;
-    auto [ptr, ec] = std::from_chars(number_str.data(), number_str.data() + number_str.size(), number);
-    if (ec != std::errc()) {
+    auto [ptr, ec] = std::from_chars(
+        number_str.data(), number_str.data() + number_str.size(), number);
+    if (ec != std::errc())
+    {
         return -1;
     }
     return number;
 }
 
-requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::string& interface,
-                          const std::string& objPath)
+requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
+                                          const std::string& interface,
+                                          const std::string& objPath)
 {
     auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
 
@@ -208,6 +213,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::str
 
         if (name.find("RoT_") == std::string::npos)
         {
+            // coverity[missing_return]
             co_return NSM_SUCCESS;
         }
         std::shared_ptr<NsmBuildTypeObject> firmwareTypeAp = nullptr;
@@ -300,12 +306,12 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager, const std::str
             bus, name, type, uuid, rotProgressIntf);
         device->addSensor(securityCfg, false);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> erotInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_Chassis"
-};
+    "xyz.openbmc_project.Configuration.NSM_Chassis"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmErotCreateSensors, erotInterfaces)
 

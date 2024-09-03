@@ -114,6 +114,13 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
         {
             auto peekedLength = recv(socketFd(), nullptr, 0,
                                      MSG_PEEK | MSG_TRUNC);
+            if (-1 == peekedLength)
+            {
+                returnCode = -errno;
+                std::cerr << "Failed to recv message length : RC = "
+                          << returnCode << "\n";
+                return returnCode;
+            }
             responseMsg.resize(peekedLength);
             auto recvDataLength =
                 recv(socketFd(), reinterpret_cast<void*>(responseMsg.data()),
@@ -122,7 +129,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
                 reinterpret_cast<const nsm_msg_hdr*>(&responseMsg[2]);
             if (recvDataLength == peekedLength &&
                 resphdr->instance_id == reqhdr->instance_id &&
-                resphdr->request != NSM_REQUEST)
+                resphdr->request == 0)
             {
                 Logger(verbose, "Total length:", recvDataLength);
                 break;

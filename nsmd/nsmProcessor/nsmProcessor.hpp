@@ -110,7 +110,6 @@ class NsmUuidIntf : public NsmObject
     std::string inventoryObjPath;
 };
 
-
 using LocationIntfProcessor = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Location>;
 using LocationTypes = sdbusplus::xyz::openbmc_project::Inventory::Decorator::

@@ -172,5 +172,11 @@ int main(int argc, char** argv)
                    e.what());
         exit(EXIT_FAILURE);
     }
+    catch (const std::error_condition& e)
+    {
+        lg2::error("Exception: {HANDLER_EXCEPTION}", "HANDLER_EXCEPTION",
+                   e.message());
+        exit(EXIT_FAILURE);
+    }
     exit(EXIT_SUCCESS);
 }

@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -389,7 +389,8 @@ std::optional<std::vector<uint8_t>>
             if (sec_req.req_min_security_version >=
                     fwStateMachine->sec_respEc.minimum_security_version &&
                 sec_req.req_min_security_version <=
-                    fwStateMachine->sec_respEc.active_component_security_version)
+                    fwStateMachine->sec_respEc
+                        .active_component_security_version)
             {
                 fwStateMachine->sec_respEc.minimum_security_version =
                     sec_req.req_min_security_version;
@@ -406,10 +407,10 @@ std::optional<std::vector<uint8_t>>
         }
         else
         {
-            if (sec_req.req_min_security_version >=
-                    fwStateMachine->sec_respAp.minimum_security_version &&
+            if (sec_req.req_min_security_version > 0 &&
                 sec_req.req_min_security_version <=
-                    fwStateMachine->sec_respAp.active_component_security_version)
+                    fwStateMachine->sec_respAp
+                        .active_component_security_version)
             {
                 fwStateMachine->sec_respAp.pending_minimum_security_version =
                     sec_req.req_min_security_version;

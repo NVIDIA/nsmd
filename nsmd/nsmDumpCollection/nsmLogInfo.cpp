@@ -86,6 +86,7 @@ requester::Coroutine
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         finishLogInfoCmd(CmdOperationStatus::InternalFailure);
+        // coverity[missing_return]
         co_return sendRc;
     }
 
@@ -105,6 +106,7 @@ requester::Coroutine
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen);
         finishLogInfoCmd(CmdOperationStatus::InternalFailure);
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -114,6 +116,7 @@ requester::Coroutine
         lg2::error("NsmLogInfoObject: memfd_create: eid={EID} error={ERROR}",
                    "EID", eid, "ERROR", strerror(errno));
         finishLogInfoCmd(CmdOperationStatus::WriteFailure);
+        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
     const uint8_t* requestPtr = logData.data();
@@ -126,6 +129,7 @@ requester::Coroutine
                        "EID", eid, "ERROR", strerror(errno));
             close(fileDesc);
             finishLogInfoCmd(CmdOperationStatus::WriteFailure);
+            // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         requestPtr += written;
@@ -160,7 +164,7 @@ requester::Coroutine
             throw Common::Error::InternalFailure();
     }
     finishLogInfoCmd(CmdOperationStatus::Success);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

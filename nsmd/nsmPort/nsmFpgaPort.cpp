@@ -88,6 +88,7 @@ static requester::Coroutine
             lg2::error(
                 "The UUID of NSM_FpgaPort PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
         if (type == "NSM_FpgaPort")
@@ -168,6 +169,7 @@ static requester::Coroutine
                     "Failed to create NSM PCIe ECC Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
                     "UUID", uuid, "NAME", name, "TYPE", type, "OBJPATH",
                     objPath);
+                // coverity[missing_return]
                 co_return NSM_ERROR;
             }
             if (priority)
@@ -196,8 +198,10 @@ static requester::Coroutine
         lg2::error(
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

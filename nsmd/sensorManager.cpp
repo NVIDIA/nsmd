@@ -174,11 +174,13 @@ requester::Coroutine SensorManagerImpl::interfaceAddedTask()
         auto [objPath, interface] = queuedAddedInterfaces.front();
         queuedAddedInterfaces.pop();
 
-        co_await NsmObjectFactory::instance().createObjects(*this, interface, objPath);
+        co_await NsmObjectFactory::instance().createObjects(*this, interface,
+                                                            objPath);
     }
     newSensorEvent = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(std::mem_fn(&SensorManagerImpl::_startPolling), this,
                          std::placeholders::_1));
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -424,6 +426,7 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             if (nsmDevice->pollingTimerLongRunning &&
                 !nsmDevice->pollingTimerLongRunning->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -432,7 +435,7 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
     } while ((t1 - t0) >= pollingTimeInUsec);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -454,6 +457,7 @@ requester::Coroutine
                device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
                 "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
                 nsmDevice->getInstanceNumber());*/
+            // coverity[missing_return]
             co_return NSM_ERR_NOT_READY;
         }
 
@@ -480,6 +484,7 @@ requester::Coroutine
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -532,6 +537,7 @@ requester::Coroutine
             if (nsmDevice->pollingTimer &&
                 !nsmDevice->pollingTimer->isRunning())
             {
+                // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
@@ -540,7 +546,7 @@ requester::Coroutine
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
     } while ((t1 - t0) >= pollingTimeInUsec);
-
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -559,6 +565,7 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         lg2::error(
             "SensorManager::SendRecvNsmMsg  : No UUID found for EID {EID}",
             "EID", eid);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -568,12 +575,14 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         lg2::error(
             "SensorManager::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
             "EID", eid, "UUID", *uuid);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     if (!nsmDevice->isDeviceActive ||
         !nsmDevice->isCommandSupported(messageType, commandCode))
     {
+        // coverity[missing_return]
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
     }
 
@@ -589,12 +598,14 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
                    rc);
     }
+    // coverity[missing_return]
     co_return rc;
 }
 
 requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 {
     // placeholder
+    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 

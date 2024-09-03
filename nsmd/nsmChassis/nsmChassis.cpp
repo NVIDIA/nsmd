@@ -47,6 +47,8 @@ requester::Coroutine
             }
         }
     }
+
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -248,6 +250,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         chassisPrettyName->pdi().prettyName(prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
+
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

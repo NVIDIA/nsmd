@@ -41,7 +41,8 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
     auto localEid = manager.getLocalEid();
-    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting, localEid);
+    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting,
+                                       localEid);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -51,6 +52,7 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
         }
     }
     nsmDevice->setEventMode(eventGenerationSetting);
+    // coverity[missing_return]
     co_return rc;
 }
 
@@ -70,14 +72,17 @@ requester::Coroutine
         lg2::error(
             "encode_nsm_set_event_subscription_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg, responseLen);
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
     if (rc)
     {
+        // coverity[missing_return]
         co_return rc;
     }
 
@@ -90,7 +95,7 @@ requester::Coroutine
             "decode_nsm_set_event_subscription_resp failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
     }
-
+    // coverity[missing_return]
     co_return cc;
 }
 
@@ -115,6 +120,7 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
         lg2::error(
             "found NSM_EventSetting [{NAME}] but not applied since no NsmDevice UUID={UUID}",
             "NAME", name, "UUID", uuid);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -123,6 +129,7 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
         lg2::error(
             "NSM_EventSetting: Found an invalid setting={SETTING} for eventGenerationSetting",
             "SETTING", eventGenerationSetting);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -132,7 +139,7 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

@@ -19,6 +19,7 @@
 
 #include "pci-links.h"
 #include "platform-environmental.h"
+
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
@@ -31,8 +32,8 @@ namespace nsm
 {
 NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
                    const std::string& type, std::string& inventoryObjPath,
-                   std::shared_ptr<NsmDevice> device, const uint8_t deviceIndex) :
-    NsmObject(name, type)
+                   std::shared_ptr<NsmDevice> device,
+                   const uint8_t deviceIndex) : NsmObject(name, type)
 {
     lg2::info("NsmReset: create sensor:{NAME}", "NAME", name.c_str());
     resetIntf = std::make_shared<NsmResetIntf>(bus, inventoryObjPath.c_str());
@@ -43,8 +44,8 @@ NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
 }
 
 static requester::Coroutine createNsmResetSensor(SensorManager& manager,
-                                 const std::string& interface,
-                                 const std::string& objPath)
+                                                 const std::string& interface,
+                                                 const std::string& objPath)
 {
     try
     {
@@ -58,9 +59,8 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
         auto type = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Type", interface.c_str());
 
-        auto inventoryObjPath =
-            co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", interface.c_str());
+        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "InventoryObjPath", interface.c_str());
 
         auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
@@ -77,6 +77,7 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
             lg2::error(
                 "The UUID of NSM_Processor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", name, "TYPE", type);
+            // coverity[missing_return]
             co_return NSM_ERROR;
         }
         auto resetSensor = std::make_shared<NsmReset>(
@@ -89,6 +90,7 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
             "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
             "PATH", objPath, "INTF", interface, "ERROR", e);
     }
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

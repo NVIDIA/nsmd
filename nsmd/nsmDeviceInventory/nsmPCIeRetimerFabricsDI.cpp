@@ -61,21 +61,14 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NSM_PCIeRetimer_Fabrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     auto retimerFabricsDi = std::make_shared<NsmPCIeRetimerFabricDI>(
         bus, name, associations, type, fabricType);
-    if (!retimerFabricsDi)
-    {
-        lg2::error(
-            "Failed to create pcie retimer fabric device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}, Name={NAME}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath, "NAME", name);
-
-        co_return NSM_ERROR;
-    }
     nsmDevice->deviceSensors.emplace_back(retimerFabricsDi);
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

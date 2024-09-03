@@ -117,7 +117,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
             "Association Property of Numeric Sensor PDI has no chassis association. "
             "Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
             "NAME", info.name, "TYPE", info.type, "OBJPATH", objPath);
-
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -129,6 +129,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
         lg2::error(
             "The UUID of Numeric Sensor PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", info.name, "TYPE", info.type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -146,8 +147,10 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
-    co_await NsmThresholdFactory{manager, interface, objPath, sensor, info, uuid}.make();
-
+    co_await NsmThresholdFactory{manager, interface, objPath,
+                                 sensor,  info,      uuid}
+        .make();
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

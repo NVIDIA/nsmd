@@ -18,6 +18,7 @@
 #include "nsmXIDEvent.hpp"
 
 #include "platform-environmental.h"
+
 #include "dBusAsyncUtils.hpp"
 #include "sensorManager.hpp"
 
@@ -30,8 +31,7 @@ namespace nsm
 
 NsmXIDEvent::NsmXIDEvent(const std::string& name, const std::string& type,
                          const NsmXIDEventInfo info) :
-    NsmEvent(name, type),
-    info(info)
+    NsmEvent(name, type), info(info)
 {}
 
 int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
@@ -119,8 +119,8 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
 }
 
 static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
-                              const std::string& interface,
-                              const std::string& objPath)
+                                              const std::string& interface,
+                                              const std::string& objPath)
 {
     NsmXIDEventInfo info{};
 
@@ -166,6 +166,7 @@ static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
         lg2::error(
             "The UUID of XID Event PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", info.uuid, "NAME", name, "TYPE", type);
+        // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
@@ -177,6 +178,7 @@ static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
     nsmDevice->deviceEvents.push_back(event);
     nsmDevice->eventDispatcher.addEvent(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                                         NSM_XID_EVENT, event);
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 

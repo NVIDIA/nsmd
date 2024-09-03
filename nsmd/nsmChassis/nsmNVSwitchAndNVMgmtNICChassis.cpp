@@ -51,6 +51,8 @@ requester::Coroutine
             nsmDeviceAssociationIntf->initialize();
         }
     }
+
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -170,7 +172,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
         chassisPrettyName->pdi().prettyName(prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
-
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -180,6 +182,7 @@ requester::Coroutine createNsmNVSwitchChassis(SensorManager& manager,
 {
     co_await createNsmChassis(manager, interface, objPath,
                               "NSM_NVSwitch_Chassis");
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
@@ -189,6 +192,7 @@ requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
 {
     co_await createNsmChassis(manager, interface, objPath,
                               "NSM_NVLinkMgmtNic_Chassis");
+    // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
