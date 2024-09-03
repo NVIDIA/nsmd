@@ -232,6 +232,9 @@ class MockupResponder
         getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        setEDPpScalingFactorHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getFpgaDiagnosticsSettingsHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
     std::optional<std::vector<uint8_t>>

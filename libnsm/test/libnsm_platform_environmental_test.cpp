@@ -2670,9 +2670,9 @@ TEST(getEDPpScalingFactor, testGoodEncodeResponse)
 
 	uint16_t reason_code = ERR_NULL;
 	struct nsm_EDPp_scaling_factors scaling_factors;
-	scaling_factors.default_scaling_factor = 70;
-	scaling_factors.maximum_scaling_factor = 90;
-	scaling_factors.minimum_scaling_factor = 60;
+	scaling_factors.persistent_scaling_factor = 70;
+	scaling_factors.oneshot_scaling_factor = 90;
+	scaling_factors.enforced_scaling_factor = 60;
 
 	struct nsm_EDPp_scaling_factors scaling_factors_test = scaling_factors;
 
@@ -2694,8 +2694,8 @@ TEST(getEDPpScalingFactor, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR, resp->hdr.command);
 	EXPECT_EQ(sizeof(struct nsm_EDPp_scaling_factors),
 		  le16toh(resp->hdr.data_size));
-	EXPECT_EQ(scaling_factors.default_scaling_factor,
-		  resp->scaling_factors.default_scaling_factor);
+	EXPECT_EQ(scaling_factors.persistent_scaling_factor,
+		  resp->scaling_factors.persistent_scaling_factor);
 }
 
 TEST(getEDPpScalingFactor, testGoodDecodeResponse)
@@ -2730,8 +2730,8 @@ TEST(getEDPpScalingFactor, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(3, data_size);
-	EXPECT_EQ(scaling_factors.default_scaling_factor, 1);
-	EXPECT_EQ(scaling_factors.minimum_scaling_factor, 3);
+	EXPECT_EQ(scaling_factors.persistent_scaling_factor, 1);
+	EXPECT_EQ(scaling_factors.enforced_scaling_factor, 3);
 }
 
 TEST(getEDPpScalingFactor, testBadDecodeResponse)

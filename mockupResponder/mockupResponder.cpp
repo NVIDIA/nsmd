@@ -411,6 +411,8 @@ std::optional<std::vector<uint8_t>>
                     return getEccErrorCountsHandler(request, requestLen);
                 case NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
                     return getEDPpScalingFactorHandler(request, requestLen);
+                case NSM_SET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
+                    return setEDPpScalingFactorHandler(request, requestLen);
                 case NSM_GET_CLOCK_LIMIT:
                     return getClockLimitHandler(request, requestLen);
                 case NSM_SET_CLOCK_LIMIT:
@@ -750,7 +752,7 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 5, 6, 9, 10}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   6,   7,   8,   9,   11,  12,  14,  15,
+                 {3, {0,   2,   3,   6,   7,   8,   9,   10, 11,  12,  14,  15,
                       16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  118,
                       113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
                       125, 126, 127, 163, 164, 165, 166, 172, 173}},
@@ -841,6 +843,12 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
             break;
         case RATED_DEVICE_POWER_LIMIT:
             populateFrom(property, 80000);
+            break;
+        case MINIMUM_EDPP_SCALING_FACTOR:
+            property.push_back(19);
+            break;
+        case MAXIMUM_EDPP_SCALING_FACTOR:
+            property.push_back(86);
             break;
         case MINIMUM_GRAPHICS_CLOCK_LIMIT:
             populateFrom(property, 100);
@@ -3544,9 +3552,9 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     struct nsm_EDPp_scaling_factors scaling_factors;
-    scaling_factors.default_scaling_factor = 70;
-    scaling_factors.maximum_scaling_factor = 90;
-    scaling_factors.minimum_scaling_factor = 60;
+    scaling_factors.persistent_scaling_factor = 70;
+    scaling_factors.oneshot_scaling_factor = 90;
+    scaling_factors.enforced_scaling_factor = 60;
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
@@ -3562,6 +3570,41 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error(
             "encode_get_programmable_EDPp_scaling_factor_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setEDPpScalingFactorHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    uint8_t action;
+    uint8_t persistence;
+    uint32_t scaling_factor;
+    auto rc = decode_set_programmable_EDPp_scaling_factor_req(
+        requestMsg, requestLen, &action, &persistence, &scaling_factor);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_set_programmable_EDPp_scaling_factor_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_programmable_EDPp_scaling_factor_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "encode_set_programmable_EDPp_scaling_factor_resp failed: rc={RC}",
             "RC", rc);
         return std::nullopt;
     }
