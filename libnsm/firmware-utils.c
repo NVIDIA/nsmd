@@ -1260,16 +1260,23 @@ int encode_nsm_code_auth_key_perm_update_req(
     uint8_t permission_bitmap_length, uint8_t *permission_bitmap,
     struct nsm_msg *msg)
 {
-	if (msg == NULL || permission_bitmap == NULL) {
+	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
-	}
-	if (permission_bitmap_length == 0) {
-		return NSM_SW_ERROR_DATA;
 	}
 	if (request_type !=
 		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
 	    request_type !=
 		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (request_type ==
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
+	    permission_bitmap_length != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+	if (request_type ==
+		NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE &&
+	    (permission_bitmap_length == 0 || permission_bitmap == NULL)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
@@ -1295,9 +1302,12 @@ int encode_nsm_code_auth_key_perm_update_req(
 	req->component_classification_index = component_classification_index;
 	req->nonce = nonce;
 	req->permission_bitmap_length = permission_bitmap_length;
-	uint8_t *bitmap_ptr =
-	    msg->payload + sizeof(struct nsm_code_auth_key_perm_update_req);
-	memcpy(bitmap_ptr, permission_bitmap, permission_bitmap_length);
+	if (permission_bitmap_length != 0) {
+		uint8_t *bitmap_ptr =
+		    msg->payload +
+		    sizeof(struct nsm_code_auth_key_perm_update_req);
+		memcpy(bitmap_ptr, permission_bitmap, permission_bitmap_length);
+	}
 
 	return NSM_SUCCESS;
 }

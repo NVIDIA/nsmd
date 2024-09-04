@@ -990,8 +990,6 @@ TEST(codeAuthKeyPermUpdate, testBadEncodeRequest)
 	    dataLength);
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
-	nsm_code_auth_key_perm_request_type request_type =
-	    NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE;
 	uint16_t component_classification = 0x0001;
 	uint16_t component_identifier = 0x0002;
 	uint8_t component_classification_index = 0x03;
@@ -1002,20 +1000,38 @@ TEST(codeAuthKeyPermUpdate, testBadEncodeRequest)
 	for (size_t i = 0; i < permission_bitmap_length; ++i) {
 		permission_bitmap.get()[i] = i;
 	}
+	int rc;
 
-	// incorrect length
-	auto rc = encode_nsm_code_auth_key_perm_update_req(
-	    0, request_type, component_classification, component_identifier,
+	// most restrictive value requested but bitmap is specified
+	rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE,
+	    component_classification, component_identifier,
+	    component_classification_index, nonce, permission_bitmap_length,
+	    permission_bitmap.get(), request);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+
+	// specified value requested but bitmap is of zero length
+	rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE,
+	    component_classification, component_identifier,
 	    component_classification_index, nonce, 0, permission_bitmap.get(),
 	    request);
 	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 
-	// NULL bitmap buffer
+	// specified value requested but bitmap is nullptr
 	rc = encode_nsm_code_auth_key_perm_update_req(
-	    0, request_type, component_classification, component_identifier,
+	    0, NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE,
+	    component_classification, component_identifier,
 	    component_classification_index, nonce, permission_bitmap_length,
 	    nullptr, request);
-	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+
+	// specified value requested but bitmap is not specified
+	rc = encode_nsm_code_auth_key_perm_update_req(
+	    0, NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE,
+	    component_classification, component_identifier,
+	    component_classification_index, nonce, 0, nullptr, request);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 
 	// incorrect request type
 	rc = encode_nsm_code_auth_key_perm_update_req(

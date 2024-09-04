@@ -49,13 +49,13 @@ class GetRotInformation : public CommandInterface
             "Required",
             "Get information about a particular firmware set installed on an endpoint");
         ccOptionGroup
-            ->add_option("--classification", classification,
+            ->add_option("-c,--classification", classification,
                          "Component classification")
             ->required();
         ccOptionGroup
-            ->add_option("--identifier", identifier, "Component identifier")
+            ->add_option("-i,--identifier", identifier, "Component identifier")
             ->required();
-        ccOptionGroup->add_option("--index", index, "Component index")
+        ccOptionGroup->add_option("-d,--index", index, "Component index")
             ->required();
     }
 
@@ -201,13 +201,13 @@ class QueryCodeAuthKeyPerm : public CommandInterface
         auto optionGroup = app->add_option_group(
             "Required", "Query firmware code authentication key permissions");
         optionGroup
-            ->add_option("--classification", classification,
+            ->add_option("-c,--classification", classification,
                          "Component classification")
             ->required();
         optionGroup
-            ->add_option("--identifier", identifier, "Component identifier")
+            ->add_option("-i,--identifier", identifier, "Component identifier")
             ->required();
-        optionGroup->add_option("--index", index, "Component index")
+        optionGroup->add_option("-d,--index", index, "Component index")
             ->required();
     }
 
@@ -322,7 +322,7 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
             "Required", "Update firmware code authentication key permissions");
         optionGroup
             ->add_option(
-                "--requestType", requestType,
+                "-r,--requestType", requestType,
                 "Request type - "
                 "0 - most restrictive permitted value, 1 - specified value")
             ->required();
@@ -338,30 +338,61 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
             ->required();
         optionGroup
             ->add_option(
-                "--nonce", nonce,
+                "-n,--nonce", nonce,
                 "Nonce obtained from Enable Irreversible Configuration command")
             ->required();
-        optionGroup
-            ->add_option("-p,--perm", permissionBitmapHexstring,
-                         "Hexadecimal string containing permission bitmap data")
-            ->required();
+        optionGroup->add_option(
+            "-k,--keys", revokedKeysString,
+            "Comma-separated list of indexes of keys to be revoked. "
+            "Cannot be used when request type is set to 0. "
+            "Required when request type is set to 1.");
+        optionGroup->add_option(
+            "-b,--bitmap", bitmapSize,
+            "Size of the permission bitmap to be sent. "
+            "If set to 0 or omitted, the size is calculated automatically "
+            "based on the provided indexes.");
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
+        std::vector<uint8_t> indices;
+        if (requestType == 0 && !revokedKeysString.empty())
+        {
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+        if (requestType == 1)
+        {
+            if (revokedKeysString.empty())
+            {
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            std::istringstream iss{revokedKeysString};
+            std::string indexStr;
+            while (getline(iss, indexStr, ','))
+            {
+                try
+                {
+                    indices.emplace_back(static_cast<uint8_t>(stoul(indexStr)));
+                }
+                catch (const std::exception&)
+                {
+                    return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+                }
+            }
+        }
+        std::vector<uint8_t> bitmap;
+        try
+        {
+            bitmap = utils::indicesToBitmap(indices, bitmapSize);
+        }
+        catch (const std::exception&)
+        {
+            return std::make_pair(NSM_SW_ERROR_LENGTH, std::vector<uint8_t>());
+        }
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_req) +
-            permissionBitmapHexstring.size() / 2);
+            bitmap.size());
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-
-        std::vector<uint8_t> bitmap;
-        for (size_t i = 0; i < permissionBitmapHexstring.length(); i += 2)
-        {
-            std::string byteString = permissionBitmapHexstring.substr(i, 2);
-            uint8_t byte = (uint8_t)strtoul(byteString.c_str(), NULL, 16);
-            bitmap.push_back(byte);
-        }
-
         auto rc = encode_nsm_code_auth_key_perm_update_req(
             0, requestType, classification, identifier, index, nonce,
             bitmap.size(), bitmap.data(), request);
@@ -437,7 +468,8 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
     uint16_t identifier;
     uint8_t index;
     uint64_t nonce;
-    std::string permissionBitmapHexstring;
+    uint32_t bitmapSize;
+    std::string revokedKeysString;
 };
 
 class QueryFirmwareSecurityVersion : public CommandInterface
@@ -459,13 +491,13 @@ class QueryFirmwareSecurityVersion : public CommandInterface
         auto ccOptionGroup = app->add_option_group(
             "Required", "Parameters for Query Minimum Security Version");
         ccOptionGroup
-            ->add_option("--classification", classification,
+            ->add_option("-c,--classification", classification,
                          "Component classification")
             ->required();
         ccOptionGroup
-            ->add_option("--identifier", identifier, "Component identifier")
+            ->add_option("-i,--identifier", identifier, "Component identifier")
             ->required();
-        ccOptionGroup->add_option("--index", index, "Component index")
+        ccOptionGroup->add_option("-d,--index", index, "Component index")
             ->required();
     }
 
@@ -541,17 +573,17 @@ class UpdateMinSecurityVersion : public CommandInterface
             "Required", "Parameters for Update Minimum Security Version");
         ccOptionGroup
             ->add_option(
-                "--requestType", requestType,
+                "-r,--requestType", requestType,
                 "Request Type. 0 - most restrictive permitted value, 1 - specified value")
             ->required();
-        ccOptionGroup->add_option("--classification", classification,
+        ccOptionGroup->add_option("-c,--classification", classification,
                                   "Component classification");
-        ccOptionGroup->add_option("--identifier", identifier,
+        ccOptionGroup->add_option("-i,--identifier", identifier,
                                   "Component identifier");
-        ccOptionGroup->add_option("--index", index, "Component index");
+        ccOptionGroup->add_option("-d,--index", index, "Component index");
         ccOptionGroup
             ->add_option(
-                "--nonce", nonce,
+                "-n,--nonce", nonce,
                 "Nonce obtained from Enable Irreversible Configuration command")
             ->required();
         ccOptionGroup->add_option("--reqMinSecVersion", reqMinSecVersion,
@@ -665,7 +697,7 @@ class IrreversibleConfig : public CommandInterface
         auto ccOptionGroup = app->add_option_group(
             "Required", "Parameters for Irreversible Config Method");
         ccOptionGroup
-            ->add_option("--requestType", requestType,
+            ->add_option("-r,--requestType", requestType,
                          "Request Type. 0 - Query, 1 - Disable, 2 - Enable")
             ->required();
     }

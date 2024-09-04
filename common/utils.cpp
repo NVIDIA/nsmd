@@ -406,10 +406,33 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
     return std::make_pair(zeroIndices, oneIndices);
 }
 
-std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices)
+std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
+                                     const size_t size)
 {
+    constexpr const size_t maxBitmapSize = 8; // maximum size used by ERoT
+    if (size > maxBitmapSize)
+    {
+        throw std::invalid_argument(
+            "Requested bitmap size larger than maximum allowed value");
+    }
+    if (indices.empty())
+    {
+        return std::vector<uint8_t>(size, 0);
+    }
     uint8_t maxIndex = *std::max_element(indices.begin(), indices.end());
-    std::vector<uint8_t> bitmap(maxIndex / 8 + 1, 0);
+    std::vector<uint8_t> bitmap;
+    if (size == 0)
+    {
+        bitmap.resize(maxIndex / 8 + 1, 0);
+    }
+    else if (maxIndex > size * 8 - 1)
+    {
+        throw std::invalid_argument("Index out of bounds for specified size");
+    }
+    else
+    {
+        bitmap.resize(size, 0);
+    }
     for (auto& index : indices)
     {
         size_t bitmapIndex = index / 8;

@@ -146,19 +146,35 @@ void NsmKeyMgmt::revokeKeys(SecurityCommon::RequestTypes requestType,
         throw Common::Error::Unavailable();
     }
     nsm_code_auth_key_perm_request_type type;
+    std::vector<uint8_t> bitmap;
     if (requestType == SecurityCommon::RequestTypes::MostRestrictiveValue)
     {
         type = NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE;
+        if (indices.size() != 0)
+        {
+            throw Common::Error::InvalidArgument();
+        }
     }
     else if (requestType == SecurityCommon::RequestTypes::SpecifiedValue)
     {
         type = NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE;
+        if (indices.size() == 0)
+        {
+            throw Common::Error::InvalidArgument();
+        }
+        try
+        {
+            bitmap = utils::indicesToBitmap(indices, bitmapLength);
+        }
+        catch (std::exception&)
+        {
+            throw Common::Error::InvalidArgument();
+        }
     }
     else
     {
         throw Common::Error::InvalidArgument();
     }
-    auto bitmap = utils::indicesToBitmap(indices);
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_req) +
         bitmap.size());
@@ -241,6 +257,8 @@ uint8_t NsmKeyMgmt::handleResponseMsg(const nsm_msg* responseMsg,
                    "RC", rc, "CC", cc, "RSC", reasonCode);
         return rc;
     }
+
+    bitmapLength = permissionBitmapLength;
 
     auto activeIndices = utils::bitmapToIndices(efuseKeyPermBitmap);
     auto pendingIndices = utils::bitmapToIndices(pendingEfuseKeyPermBitmap);
