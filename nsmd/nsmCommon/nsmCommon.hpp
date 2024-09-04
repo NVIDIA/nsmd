@@ -19,11 +19,13 @@
 #include "base.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
-#include "nsmSensor.hpp"
-#include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
-#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
-#include <telemetry_mrd_producer.hpp>
+
 #include "nsmCommon/sharedMemCommon.hpp"
+#include "nsmSensor.hpp"
+
+#include <telemetry_mrd_producer.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 namespace nsm
 {
 

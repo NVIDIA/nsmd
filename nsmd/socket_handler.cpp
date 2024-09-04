@@ -68,8 +68,9 @@ SocketInfo Handler::initSocket(int type, int protocol,
         pollSet[0].events = POLLIN;
         int numFds = 1;
         int timeout = 1;
-        // The sendRecvNsmMsgSync() API also poll the same fd and recv data from the fd just before the callback invoked.
-        // So add poll checking again to avoid the recv() API blocking forever.
+        // The sendRecvNsmMsgSync() API also poll the same fd and recv data from
+        // the fd just before the callback invoked. So add poll checking again
+        // to avoid the recv() API blocking forever.
         int ret = poll(pollSet, numFds, timeout);
         if (ret <= 0)
         {

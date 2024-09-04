@@ -78,9 +78,7 @@ enum nsm_debug_information_type {
 	INFO_TYPE_DEVICE_DUMP = 3
 };
 
-enum nsm_erase_information_type {
-	INFO_TYPE_DEVICE_DEBUG_INFO = 0
-};
+enum nsm_erase_information_type { INFO_TYPE_DEVICE_DEBUG_INFO = 0 };
 
 enum nsm_erase_trace_status {
 	ERASE_TRACE_NO_DATA_ERASED = 0,
@@ -455,13 +453,11 @@ int encode_get_network_device_log_info_resp(
  *  @param[out] next_handle - next record handle
  *  @return nsm_completion_codes
  */
-int decode_get_network_device_log_info_resp(const struct nsm_msg *msg,
-					    size_t msg_len, uint8_t *cc,
-					    uint16_t *reason_code,
-					    uint32_t *next_handle,
-					    struct nsm_device_log_info_breakdown *log_info,
-					    uint8_t *log_data,
-					    uint16_t *log_data_size);
+int decode_get_network_device_log_info_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint32_t *next_handle,
+    struct nsm_device_log_info_breakdown *log_info, uint8_t *log_data,
+    uint16_t *log_data_size);
 
 #ifdef __cplusplus
 }

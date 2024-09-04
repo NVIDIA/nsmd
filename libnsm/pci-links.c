@@ -731,4 +731,3 @@ int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
 }
-

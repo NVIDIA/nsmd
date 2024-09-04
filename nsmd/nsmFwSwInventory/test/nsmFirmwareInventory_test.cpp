@@ -31,8 +31,9 @@ using namespace ::testing;
 
 namespace nsm
 {
-requester::Coroutine nsmFirmwareInventoryCreateSensors(SensorManager&, const std::string&,
-                                       const std::string&);
+requester::Coroutine nsmFirmwareInventoryCreateSensors(SensorManager&,
+                                                       const std::string&,
+                                                       const std::string&);
 }
 
 struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
@@ -158,8 +159,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(7, fpga.deviceSensors.size());
     auto sensors = 0;
-    auto retimerAsset = dynamic_pointer_cast<NsmFirmwareInventory<NsmAssetIntf>>(
-        fpga.deviceSensors[sensors++]);
+    auto retimerAsset =
+        dynamic_pointer_cast<NsmFirmwareInventory<NsmAssetIntf>>(
+            fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAsset);
     EXPECT_EQ(get<std::string>(retimer, "Manufacturer"),
               retimerAsset->pdi().manufacturer());

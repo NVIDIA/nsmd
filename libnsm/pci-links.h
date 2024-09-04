@@ -586,7 +586,7 @@ struct nsm_assert_pcie_fundamental_reset_req {
 	uint8_t action;
 } __attribute__((packed));
 
-enum action {NOT_RESET, RESET};
+enum action { NOT_RESET, RESET };
 /** @brief Encode a Assert PCIe Fundamental Reset Request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -595,8 +595,10 @@ enum action {NOT_RESET, RESET};
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_assert_pcie_fundamental_reset_req(uint8_t instance, uint8_t device_index, uint8_t action,
-			    struct nsm_msg *msg);
+int encode_assert_pcie_fundamental_reset_req(uint8_t instance,
+					     uint8_t device_index,
+					     uint8_t action,
+					     struct nsm_msg *msg);
 
 /** @brief Decode a Assert PCIe Fundamental Reset request message
  *
@@ -606,8 +608,10 @@ int encode_assert_pcie_fundamental_reset_req(uint8_t instance, uint8_t device_in
  *  @param[in] action - Action to be performed 0/1 (not reset/ reset)
  *  @return nsm_completion_codes
  */
-int decode_assert_pcie_fundamental_reset_req(const struct nsm_msg *msg, size_t msg_len,
-			    uint8_t *device_index, uint8_t *action);
+int decode_assert_pcie_fundamental_reset_req(const struct nsm_msg *msg,
+					     size_t msg_len,
+					     uint8_t *device_index,
+					     uint8_t *action);
 
 /** @brief Encode a Assert PCIe Fundamental Reset response message
  *
@@ -618,7 +622,8 @@ int decode_assert_pcie_fundamental_reset_req(const struct nsm_msg *msg, size_t m
  *  @return nsm_completion_codes
  */
 int encode_assert_pcie_fundamental_reset_resp(uint8_t instance_id, uint8_t cc,
-			     uint16_t reason_code, struct nsm_msg *msg);
+					      uint16_t reason_code,
+					      struct nsm_msg *msg);
 
 /** @brief Decode a Assert PCIe Fundamental Reset response message
  *  @param[in] msg    - response message
@@ -626,9 +631,10 @@ int encode_assert_pcie_fundamental_reset_resp(uint8_t instance_id, uint8_t cc,
  *  @param[out] cc - pointer to response message completion code
  *  @return nsm_completion_codes
  */
-int decode_assert_pcie_fundamental_reset_resp(const struct nsm_msg *msg, size_t msg_len,
-			     uint8_t *cc, uint16_t *data_size,
-			     uint16_t *reason_code);
+int decode_assert_pcie_fundamental_reset_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *data_size,
+					      uint16_t *reason_code);
 
 /** @struct nsm_query_available_clearable_scalar_data_sources_v1_req
  *
@@ -736,8 +742,9 @@ struct nsm_clear_data_source_v1_req {
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_clear_data_source_v1_req(uint8_t instance_id, uint8_t device_index, uint8_t groupId, uint8_t dsId,
-			    struct nsm_msg *msg);
+int encode_clear_data_source_v1_req(uint8_t instance_id, uint8_t device_index,
+				    uint8_t groupId, uint8_t dsId,
+				    struct nsm_msg *msg);
 
 /** @brief Decode a NSM Clear Data Source V1 Request message
  *
@@ -749,7 +756,8 @@ int encode_clear_data_source_v1_req(uint8_t instance_id, uint8_t device_index, u
  *  @return nsm_completion_codes
  */
 int decode_clear_data_source_v1_req(const struct nsm_msg *msg, size_t msg_len,
-			    uint8_t *device_index, uint8_t *groupId, uint8_t *dsId);
+				    uint8_t *device_index, uint8_t *groupId,
+				    uint8_t *dsId);
 
 /** @brief Encode a NSM Clear Data Source V1 response message
  *
@@ -760,7 +768,7 @@ int decode_clear_data_source_v1_req(const struct nsm_msg *msg, size_t msg_len,
  *  @return nsm_completion_codes
  */
 int encode_clear_data_source_v1_resp(uint8_t instance_id, uint8_t cc,
-			     uint16_t reason_code, struct nsm_msg *msg);
+				     uint16_t reason_code, struct nsm_msg *msg);
 
 /** @brief Decode a NSM Clear Data Source V1 Response message
  *  @param[in] msg    - response message
@@ -771,8 +779,8 @@ int encode_clear_data_source_v1_resp(uint8_t instance_id, uint8_t cc,
  *  @return nsm_completion_codes
  */
 int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
-			     uint8_t *cc, uint16_t *data_size,
-			     uint16_t *reason_code);
+				     uint8_t *cc, uint16_t *data_size,
+				     uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

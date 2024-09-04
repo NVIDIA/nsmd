@@ -74,8 +74,9 @@ class NumericSensorFactory
 
     CreationFunction getCreationFunction();
 
-    requester::Coroutine make(SensorManager& manager, const std::string& interface,
-              const std::string& objPath);
+    requester::Coroutine make(SensorManager& manager,
+                              const std::string& interface,
+                              const std::string& objPath);
 
     static void
         makeAggregatorAndAddSensor(NumericSensorAggregatorBuilder* builder,

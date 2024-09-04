@@ -17,12 +17,14 @@
 
 #pragma once
 
-#include "nsmInterface.hpp"
-#include <optional>
-#include "nsmDevice.hpp"
-#include "nsmSensor.hpp"
 #include "asyncOperationManager.hpp"
+#include "nsmDevice.hpp"
+#include "nsmInterface.hpp"
+#include "nsmSensor.hpp"
+
 #include <com/nvidia/PCIe/AERErrorStatus/server.hpp>
+
+#include <optional>
 
 namespace nsm
 {

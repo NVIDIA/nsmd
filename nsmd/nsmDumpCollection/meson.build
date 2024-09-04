@@ -4,4 +4,4 @@ sources += [
     'nsmDumpCollection/nsmLogInfo.cpp',
 ]
 
-nsmd_headers += [ '.', '..' ]
+nsmd_headers += ['.', '..']

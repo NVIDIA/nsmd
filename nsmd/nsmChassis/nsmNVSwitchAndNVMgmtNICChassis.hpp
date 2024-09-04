@@ -18,8 +18,9 @@
 #pragma once
 
 #include "globals.hpp"
-#include "nsmInterface.hpp"
 #include "nsmAssetIntf.hpp"
+#include "nsmInterface.hpp"
+
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>

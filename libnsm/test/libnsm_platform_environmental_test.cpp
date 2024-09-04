@@ -2968,7 +2968,8 @@ TEST(setClockLimit, testGoodEncodeRequest)
 	uint8_t flags = 11;
 	uint32_t limit_max = 40;
 	uint32_t limit_min = 29;
-	auto rc = encode_set_clock_limit_req(0, clock_id, flags, limit_min, limit_max, request);
+	auto rc = encode_set_clock_limit_req(0, clock_id, flags, limit_min,
+					     limit_max, request);
 	struct nsm_set_clock_limit_req *req =
 	    reinterpret_cast<struct nsm_set_clock_limit_req *>(
 		request->payload);
@@ -2983,7 +2984,7 @@ TEST(setClockLimit, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_SET_CLOCK_LIMIT, req->hdr.command);
 	EXPECT_EQ(10, req->hdr.data_size);
 	EXPECT_EQ(limit_max, le32toh(req->limit_max));
-    EXPECT_EQ(limit_min, le32toh(req->limit_min));
+	EXPECT_EQ(limit_min, le32toh(req->limit_min));
 }
 
 TEST(setClockLimit, testGoodDecodeRequest)
@@ -4545,7 +4546,8 @@ TEST(getRowRemapAvailability, testGoodDecodeResponse)
 	    160,
 	    0,
 	    170,
-	    0,};
+	    0,
+	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
@@ -5580,7 +5582,7 @@ TEST(getViolationDuration, testGoodDecodeRequest)
 	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
 	    0x89,			     // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
-	    NSM_GET_VIOLATION_DURATION,   // command
+	    NSM_GET_VIOLATION_DURATION,	     // command
 	    0				     // data size
 	};
 
@@ -5639,23 +5641,20 @@ TEST(getViolationDuration, testGoodEncodeResponse)
 	EXPECT_EQ(resp->data.counter4, htole64(data.counter4));
 }
 
-
 TEST(getViolationDuration, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> data_byte{
-	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0B,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00,
+	    0x00, 0x00, 0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+	    0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0B, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00,
+	    0x00, 0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03,
+	    0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
-	struct nsm_violation_duration* data =
-	      reinterpret_cast<struct nsm_violation_duration *>(data_byte.data());
+	struct nsm_violation_duration *data =
+	    reinterpret_cast<struct nsm_violation_duration *>(data_byte.data());
 
 	std::vector<uint8_t> responseMsg{
 	    0x10,
@@ -5688,33 +5687,28 @@ TEST(getViolationDuration, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(72, data_size);
-    EXPECT_EQ(le64toh(data->supported_counter.byte),
-	 	  data_resp.supported_counter.byte);
+	EXPECT_EQ(le64toh(data->supported_counter.byte),
+		  data_resp.supported_counter.byte);
 	EXPECT_EQ(le64toh(data->thermal_violation_duration),
-	 	  data_resp.thermal_violation_duration);
+		  data_resp.thermal_violation_duration);
 	EXPECT_EQ(le64toh(data->power_violation_duration),
 		  data_resp.power_violation_duration);
 	EXPECT_EQ(le64toh(data->hw_violation_duration),
 		  data_resp.hw_violation_duration);
-	EXPECT_EQ(le64toh(data->counter4),
-		  data_resp.counter4);
-	EXPECT_EQ(le64toh(data->counter7),
-		  data_resp.counter7); 
+	EXPECT_EQ(le64toh(data->counter4), data_resp.counter4);
+	EXPECT_EQ(le64toh(data->counter7), data_resp.counter7);
 }
-
 
 TEST(getViolationDuration, testBadDecodeResponse)
 {
 	std::vector<uint8_t> data_byte{
-	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00,
-	    0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0B,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00,
+	    0x00, 0x00, 0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+	    0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0B, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x01, 0x0A, 0x00, 0x01, 0x0B, 0x00, 0x00,
+	    0x00, 0x02, 0x03, 0x0B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03,
+	    0x0B, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 
 	std::vector<uint8_t> responseMsg{
@@ -5742,23 +5736,23 @@ TEST(getViolationDuration, testBadDecodeResponse)
 	uint16_t data_size = 0;
 	struct nsm_violation_duration data_resp;
 
-	auto rc = decode_get_violation_duration_resp(NULL, msg_len, &cc, &data_size,
-					      &reason_code, &data_resp);
+	auto rc = decode_get_violation_duration_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_get_violation_duration_resp(response, msg_len, NULL, &data_size,
-					 &reason_code, &data_resp);
+	rc = decode_get_violation_duration_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_violation_duration_resp(response, msg_len, &cc, NULL,
-					 &reason_code, &data_resp);
+						&reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_get_violation_duration_resp(response, msg_len - 1, &cc, &data_size,
-					 &reason_code, &data_resp);
+	rc = decode_get_violation_duration_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	rc = decode_get_violation_duration_resp(response, msg_len, &cc, &data_size,
-					 &reason_code, &data_resp);
+	rc = decode_get_violation_duration_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }

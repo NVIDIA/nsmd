@@ -32,7 +32,7 @@ conf_data.set('SENSOR_POLLING_TIME', get_option('sensor-polling-time'))
 conf_data.set('GPU_PWR_GD_GPIO', '"' + get_option('gpio-name') + '"')
 conf_data.set(
     'SENSOR_POLLING_TIME_LONG_RUNNING',
-    get_option('sensor-polling-time-long-running')
+    get_option('sensor-polling-time-long-running'),
 )
 conf_data.set(
     'INSTANCE_ID_EXPIRATION_INTERVAL',
@@ -49,7 +49,7 @@ conf_data.set(
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
 conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
-    get_option('response-time-out-long-running')
+    get_option('response-time-out-long-running'),
 )
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
@@ -59,21 +59,21 @@ if get_option('stanbyToDC').enabled()
 endif
 
 if get_option('aer-error-status-priority')
-   conf_data.set('AER_ERR_SENSOR_PRIORITY', 1)
+    conf_data.set('AER_ERR_SENSOR_PRIORITY', 1)
 else
-   conf_data.set('AER_ERR_SENSOR_PRIORITY', 0)
+    conf_data.set('AER_ERR_SENSOR_PRIORITY', 0)
 endif
 
 if get_option('per-lan-error-count-priority')
-   conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 1)
+    conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 1)
 else
-   conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 0)
+    conf_data.set('PER_LANE_ERROR_COUNT_PRIORITY', 0)
 endif
 
 if get_option('error-injection-priority')
-   conf_data.set('ERROR_INJECTION_PRIORITY', 1)
+    conf_data.set('ERROR_INJECTION_PRIORITY', 1)
 else
-   conf_data.set('ERROR_INJECTION_PRIORITY', 0)
+    conf_data.set('ERROR_INJECTION_PRIORITY', 0)
 endif
 
 conf_data.set('LOCAL_EID', get_option('local-eid'))
@@ -91,7 +91,7 @@ deps = [
 ]
 
 if get_option('shmem').enabled()
-    nvidia_shmem = dependency('nvidia-tal', required : true)
+    nvidia_shmem = dependency('nvidia-tal', required: true)
     deps += nvidia_shmem
 endif
 

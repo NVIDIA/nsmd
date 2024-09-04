@@ -23,7 +23,7 @@ option(
     'gpio-name',
     type: 'string',
     value: 'GPU_BASE_PWR_GD',
-    description: 'GPIO name for NSM'
+    description: 'GPIO name for NSM',
 )
 option(
     'sensor-polling-time-long-running',

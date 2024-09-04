@@ -54,9 +54,10 @@ class NsmThresholdFactory
         const std::unordered_map<std::string, std::string>& thresholdInterfaces,
         const ThresholdsPairInfo& thresholdsPairInfo);
 
-    requester::Coroutine createNsmThreshold(const std::string& intfName,
-                            const std::string& thresholdType,
-                            std::unique_ptr<NsmThresholdValue> thresholdValue);
+    requester::Coroutine
+        createNsmThreshold(const std::string& intfName,
+                           const std::string& thresholdType,
+                           std::unique_ptr<NsmThresholdValue> thresholdValue);
 
   private:
     SensorManager& manager;

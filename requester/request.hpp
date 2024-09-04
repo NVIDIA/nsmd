@@ -67,8 +67,7 @@ class RequestRetryTimer
     explicit RequestRetryTimer(sdeventplus::Event& event, uint8_t numRetries,
                                std::chrono::milliseconds timeout) :
 
-        event(event),
-        numRetries(numRetries), timeout(timeout),
+        event(event), numRetries(numRetries), timeout(timeout),
         timer(event.get(), std::bind_front(&RequestRetryTimer::callback, this))
     {}
 
@@ -199,9 +198,9 @@ class Request final : public RequestRetryTimer
     }
 
   private:
-    int fd;    //!< file descriptor of MCTP communications socket
-    eid_t eid; //!< endpoint ID of the remote MCTP endpoint
-    uint8_t tag;                     //!< tag mctp message tag to be used
+    int fd;      //!< file descriptor of MCTP communications socket
+    eid_t eid;   //!< endpoint ID of the remote MCTP endpoint
+    uint8_t tag; //!< tag mctp message tag to be used
     std::vector<uint8_t> requestMsg; //!< NSM request message
     bool verbose;                    //!< verbose tracing flag
 

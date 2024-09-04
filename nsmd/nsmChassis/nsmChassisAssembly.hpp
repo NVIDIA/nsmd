@@ -18,8 +18,9 @@
 #pragma once
 
 #include "globals.hpp"
-#include "nsmInterface.hpp"
 #include "nsmAssetIntf.hpp"
+#include "nsmInterface.hpp"
+
 #include <xyz/openbmc_project/Inventory/Decorator/Area/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>

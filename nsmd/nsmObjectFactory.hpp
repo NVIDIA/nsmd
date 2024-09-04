@@ -17,9 +17,10 @@
 
 #pragma once
 
+#include "dBusAsyncUtils.hpp"
 #include "sensorManager.hpp"
 #include "types.hpp"
-#include "dBusAsyncUtils.hpp"
+
 #include <functional>
 #include <map>
 #include <string>
@@ -32,45 +33,46 @@ namespace nsm
 #define CONCAT_INNER(a, b) a##b
 #define UNIQUE_NAME(base) CONCAT(base, __FILE__##_##__COUNTER__)
 
-  using CreationFunction =
-      std::function<requester::Coroutine(SensorManager &manager, const std::string &interface,
-                                         const std::string &objPath)>;
+using CreationFunction = std::function<requester::Coroutine(
+    SensorManager& manager, const std::string& interface,
+    const std::string& objPath)>;
 
-#define REGISTER_NSM_CREATION_FUNCTION(func, interfaceNameOrInterfacesVector) \
-  static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)()  \
-  {                                                                           \
-    auto &factory = NsmObjectFactory::instance();                             \
-    factory.registerCreationFunction(func,                                    \
-                                     interfaceNameOrInterfacesVector);        \
-  }
+#define REGISTER_NSM_CREATION_FUNCTION(func, interfaceNameOrInterfacesVector)  \
+    static void __attribute__((constructor)) CONCAT(_register_, __COUNTER__)() \
+    {                                                                          \
+        auto& factory = NsmObjectFactory::instance();                          \
+        factory.registerCreationFunction(func,                                 \
+                                         interfaceNameOrInterfacesVector);     \
+    }
 
-  class NsmObjectFactory
-  {
+class NsmObjectFactory
+{
   public:
-    void operator=(const NsmObjectFactory &) = delete;
-    NsmObjectFactory(NsmObjectFactory &other) = delete;
+    void operator=(const NsmObjectFactory&) = delete;
+    NsmObjectFactory(NsmObjectFactory& other) = delete;
 
-    static NsmObjectFactory &instance();
+    static NsmObjectFactory& instance();
 
-    requester::Coroutine createObjects(SensorManager &manager, const std::string &interface,
-                                       const std::string &objPath);
+    requester::Coroutine createObjects(SensorManager& manager,
+                                       const std::string& interface,
+                                       const std::string& objPath);
 
-    void registerCreationFunction(const CreationFunction &func,
+    void registerCreationFunction(const CreationFunction& func,
                                   const std::string interfaceName);
 
-    void registerCreationFunction(const CreationFunction &func,
-                                  const std::vector<std::string> &interfaces);
+    void registerCreationFunction(const CreationFunction& func,
+                                  const std::vector<std::string>& interfaces);
 
     std::map<std::string, CreationFunction> creationFunctions;
 
-    bool isSupported(const std::string &interface)
+    bool isSupported(const std::string& interface)
     {
-      auto it = creationFunctions.find(interface);
-      return (it != creationFunctions.end());
+        auto it = creationFunctions.find(interface);
+        return (it != creationFunctions.end());
     }
 
   private:
     NsmObjectFactory() = default;
-  };
+};
 
 } // namespace nsm

@@ -36,8 +36,7 @@ class GPMMetricUpdator : public MetricUpdator
   public:
     GPMMetricUpdator(GPMMetricsIntf* intf, updateGPMMetricFunc updateFunc,
                      const std::string& objPath) :
-        intf(intf),
-        updateFunc(updateFunc), objPath(objPath){};
+        intf(intf), updateFunc(updateFunc), objPath(objPath) {};
 
     void updateMetric([[maybe_unused]] const std::string& name,
                       const double val) override
@@ -72,8 +71,7 @@ class NVLinkMetricUpdator : public MetricUpdator
     NVLinkMetricUpdator(NVLinkMetricsIntf* intf,
                         updateNVLinkMetricFunc updateFunc,
                         const std::string& objPath) :
-        intf(intf),
-        updateFunc(updateFunc), objPath(objPath){};
+        intf(intf), updateFunc(updateFunc), objPath(objPath) {};
 
     void updateMetric([[maybe_unused]] const std::string& name,
                       const double val) override
@@ -161,8 +159,7 @@ class GPMMetricInstanceUpdator : public MetricPerInstanceUpdator
                              const std::string& objPath,
                              const std::shared_ptr<GPMMetricsIntf>& gpmIntf,
                              updatePerInstanceGPMMetricFunc updateFunc) :
-        name(name),
-        objPath(objPath), gpmIntf(gpmIntf), updateFunc(updateFunc)
+        name(name), objPath(objPath), gpmIntf(gpmIntf), updateFunc(updateFunc)
     {}
     void updateMetric(const std::vector<double>& metrics) override
     {
@@ -295,10 +292,10 @@ NsmGPMAggregated::NsmGPMAggregated(
     uint8_t computeInstance, const std::vector<uint8_t>& metricsBitfield,
     std::shared_ptr<GPMMetricsIntf> gpmIntf,
     std::shared_ptr<NVLinkMetricsIntf> nvlinkMetricsIntf) :
-    NsmSensorAggregator(name, type),
-    retrievalSource(retrievalSource), gpuInstance(gpuInstance),
-    computeInstance(computeInstance), metricsBitfield(metricsBitfield),
-    objPath(objpath), gpmIntf(gpmIntf), nvlinkMetricsIntf(nvlinkMetricsIntf)
+    NsmSensorAggregator(name, type), retrievalSource(retrievalSource),
+    gpuInstance(gpuInstance), computeInstance(computeInstance),
+    metricsBitfield(metricsBitfield), objPath(objpath), gpmIntf(gpmIntf),
+    nvlinkMetricsIntf(nvlinkMetricsIntf)
 {
     metricsTable[0] = {
         "GraphicsEngineActivityPercent", decodePercentage,
@@ -475,10 +472,10 @@ NsmGPMPerInstance::NsmGPMPerInstance(
     uint8_t gpuInstance, uint8_t computeInstance, uint8_t metricId,
     const uint32_t instanceBitfield, GPMMetricsUnit unit,
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator) :
-    NsmSensorAggregator(name, type),
-    retrievalSource(retrievalSource), gpuInstance(gpuInstance),
-    computeInstance(computeInstance), metricId(metricId),
-    instanceBitfield(instanceBitfield), metricUpdator(metricUpdator)
+    NsmSensorAggregator(name, type), retrievalSource(retrievalSource),
+    gpuInstance(gpuInstance), computeInstance(computeInstance),
+    metricId(metricId), instanceBitfield(instanceBitfield),
+    metricUpdator(metricUpdator)
 {
     metrics.reserve(32);
     switch (unit)

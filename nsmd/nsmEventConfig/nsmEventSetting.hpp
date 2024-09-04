@@ -33,7 +33,8 @@ class NsmEventSetting : public NsmObject
 
   private:
     requester::Coroutine setEventSubscription(SensorManager& manager, eid_t eid,
-                                 uint8_t globalSettting, eid_t receiverEid);
+                                              uint8_t globalSettting,
+                                              eid_t receiverEid);
     uint8_t eventGenerationSetting;
     std::shared_ptr<NsmDevice> nsmDevice;
 };

@@ -282,7 +282,8 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
         }
         if (allProperties.contains("BindingType"))
         {
-            bindingType = std::get<std::string>(allProperties.at("BindingType"));
+            bindingType =
+                std::get<std::string>(allProperties.at("BindingType"));
         }
         lg2::error("refreshEndpoints: EID={EID}, UUID={UUID}", "EID", eid,
                    "UUID", uuid);

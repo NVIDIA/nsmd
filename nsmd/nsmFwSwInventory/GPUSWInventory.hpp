@@ -2,11 +2,12 @@
 #include "platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
-#include "nsmAssetIntf.hpp"
+
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>

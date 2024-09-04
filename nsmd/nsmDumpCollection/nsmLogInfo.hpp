@@ -42,8 +42,8 @@ class NsmLogInfoObject : public NsmObject, public LogInfoIntf
 {
   public:
     NsmLogInfoObject(sdbusplus::bus::bus& bus, const std::string& name,
-                       const std::string& inventoryPath,
-                       const std::string& type, const uuid_t& uuid);
+                     const std::string& inventoryPath, const std::string& type,
+                     const uuid_t& uuid);
 
     void getLogInfo(uint64_t recHandle) override;
 

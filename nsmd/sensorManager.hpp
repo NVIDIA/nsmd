@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "dBusAsyncUtils.hpp"
 #include "common/types.hpp"
+#include "dBusAsyncUtils.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObject.hpp"

@@ -18,9 +18,10 @@
 #pragma once
 #include "nsmDevice.hpp"
 
+#include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/State/ServiceReady/common.hpp>
 #include <xyz/openbmc_project/State/ServiceReady/server.hpp>
-#include <phosphor-logging/lg2.hpp>
+
 #include <map>
 #include <memory>
 #include <mutex>
@@ -76,10 +77,9 @@ class NsmServiceReadyIntf
     // Private constructor to prevent direct instantiation
     NsmServiceReadyIntf(sdbusplus::bus::bus& bus, const char* path,
                         nsm::NsmDeviceTable& nsmDevices) :
-      nsmDevices(nsmDevices)
+        nsmDevices(nsmDevices)
     {
-        serviceIntf = std::make_unique<ServiceReadyIntf>(
-            bus, path);
+        serviceIntf = std::make_unique<ServiceReadyIntf>(bus, path);
         serviceIntf->state(ServiceReadyIntf::States::Starting);
         serviceIntf->serviceType(ServiceReadyIntf::ServiceTypes::NSM);
     }

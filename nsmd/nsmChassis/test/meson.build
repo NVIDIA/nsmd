@@ -80,7 +80,7 @@ foreach t : tests
             link_args: dynamic_linker,
             build_rpath: '',
             dependencies: tests_deps,
-            cpp_args : '-DMOCK_DBUS_ASYNC_UTILS',
+            cpp_args: '-DMOCK_DBUS_ASYNC_UTILS',
         ),
         workdir: meson.current_source_dir(),
     )

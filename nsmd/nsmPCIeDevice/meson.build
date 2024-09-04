@@ -1,4 +1,3 @@
-
 sources += [
     'nsmPCIeDevice/nsmPCIeRetimerPD.cpp',
 ]

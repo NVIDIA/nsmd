@@ -1,7 +1,6 @@
-
 sources += [
-  'nsmEvent/nsmXIDEvent.cpp',
-  'nsmEvent/nsmResetRequiredEvent.cpp',
+    'nsmEvent/nsmXIDEvent.cpp',
+    'nsmEvent/nsmResetRequiredEvent.cpp',
 ]
 
 nsmd_headers += ['.', '..']

@@ -2,4 +2,4 @@ sources += [
     'nsmDebugToken/nsmDebugToken.cpp',
 ]
 
-nsmd_headers += [ '.', '..' ]
+nsmd_headers += ['.', '..']

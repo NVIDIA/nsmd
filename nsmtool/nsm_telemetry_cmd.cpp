@@ -405,8 +405,7 @@ class QueryPortStatus : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit QueryPortStatus(const char* type, const char* name,
-                             CLI::App* app) :
-        CommandInterface(type, name, app)
+                             CLI::App* app) : CommandInterface(type, name, app)
     {
         auto portStatusOptionGroup = app->add_option_group(
             "Required",
@@ -582,7 +581,6 @@ class SetPortDisableFuture : public CommandInterface
   private:
     std::vector<uint8_t> portMask;
 };
-
 
 class GetPortDisableFuture : public CommandInterface
 {
@@ -2611,16 +2609,20 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
   public:
     ~QueryAvailableAndClearableScalarGroup() = default;
     QueryAvailableAndClearableScalarGroup() = delete;
-    QueryAvailableAndClearableScalarGroup(const QueryAvailableAndClearableScalarGroup&) = delete;
-    QueryAvailableAndClearableScalarGroup(QueryAvailableAndClearableScalarGroup&&) = default;
+    QueryAvailableAndClearableScalarGroup(
+        const QueryAvailableAndClearableScalarGroup&) = delete;
+    QueryAvailableAndClearableScalarGroup(
+        QueryAvailableAndClearableScalarGroup&&) = default;
     QueryAvailableAndClearableScalarGroup&
         operator=(const QueryAvailableAndClearableScalarGroup&) = delete;
-    QueryAvailableAndClearableScalarGroup& operator=(QueryAvailableAndClearableScalarGroup&&) = default;
+    QueryAvailableAndClearableScalarGroup&
+        operator=(QueryAvailableAndClearableScalarGroup&&) = default;
 
     using CommandInterface::CommandInterface;
 
-    explicit QueryAvailableAndClearableScalarGroup(const char* type, const char* name,
-                                       CLI::App* app) :
+    explicit QueryAvailableAndClearableScalarGroup(const char* type,
+                                                   const char* name,
+                                                   CLI::App* app) :
         CommandInterface(type, name, app)
     {
         auto scalarTelemetryOptionGroup = app->add_option_group(
@@ -2659,8 +2661,11 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
 
-                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
-                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                auto rc =
+                    decode_query_available_clearable_scalar_data_sources_v1_resp(
+                        responsePtr, payloadLength, &cc, &data_size,
+                        &reason_code, &mask_length, (uint8_t*)available_source,
+                        (uint8_t*)clearable_source);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
@@ -2670,45 +2675,44 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
                             sizeof(
-                                nsm_query_available_clearable_scalar_data_sources_v1_resp
-                                ));
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp));
 
                     return;
                 }
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                if(available_source[0].bits.bit0)
+                if (available_source[0].bits.bit0)
                 {
                     availableSource.push_back("TotalNonFatalErrors");
                 }
-                if(available_source[0].bits.bit1)
+                if (available_source[0].bits.bit1)
                 {
                     availableSource.push_back("TotalFatalErrors");
                 }
-                if(available_source[0].bits.bit2)
+                if (available_source[0].bits.bit2)
                 {
                     availableSource.push_back("UnsupportedRequestCounts");
                 }
-                if(available_source[0].bits.bit3)
+                if (available_source[0].bits.bit3)
                 {
                     availableSource.push_back("CorrectableErrorCount");
                 }
                 result["AvailableSource"] = availableSource;
 
-                if(clearable_source[0].bits.bit0)
+                if (clearable_source[0].bits.bit0)
                 {
                     clearableSource.push_back("TotalNonFatalErrors");
                 }
-                if(clearable_source[0].bits.bit1)
+                if (clearable_source[0].bits.bit1)
                 {
                     clearableSource.push_back("TotalFatalErrors");
                 }
-                if(clearable_source[0].bits.bit2)
+                if (clearable_source[0].bits.bit2)
                 {
                     clearableSource.push_back("UnsupportedRequestCounts");
                 }
-                if(clearable_source[0].bits.bit3)
+                if (clearable_source[0].bits.bit3)
                 {
                     clearableSource.push_back("CorresctableErrorCount");
                 }
@@ -2718,16 +2722,19 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 break;
             }
 
-           case GROUP_ID_3:
-           {
+            case GROUP_ID_3:
+            {
                 bitfield8_t available_source[1];
                 bitfield8_t clearable_source[1];
                 uint8_t mask_length;
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
 
-                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
-                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                auto rc =
+                    decode_query_available_clearable_scalar_data_sources_v1_resp(
+                        responsePtr, payloadLength, &cc, &data_size,
+                        &reason_code, &mask_length, (uint8_t*)available_source,
+                        (uint8_t*)clearable_source);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
@@ -2737,21 +2744,20 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
                             sizeof(
-                                nsm_query_available_clearable_scalar_data_sources_v1_resp
-                                ));
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp));
 
                     return;
                 }
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                if(available_source[0].bits.bit0)
+                if (available_source[0].bits.bit0)
                 {
                     availableSource.push_back("L0ToRecoveryCount");
                 }
                 result["AvailableSource"] = availableSource;
 
-                if(clearable_source[0].bits.bit0)
+                if (clearable_source[0].bits.bit0)
                 {
                     clearableSource.push_back("L0ToRecoveryCount");
                 }
@@ -2761,7 +2767,7 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 break;
             }
 
-           case GROUP_ID_4:
+            case GROUP_ID_4:
             {
                 bitfield8_t available_source[1];
                 bitfield8_t clearable_source[1];
@@ -2769,8 +2775,11 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
 
-                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
-                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                auto rc =
+                    decode_query_available_clearable_scalar_data_sources_v1_resp(
+                        responsePtr, payloadLength, &cc, &data_size,
+                        &reason_code, &mask_length, (uint8_t*)available_source,
+                        (uint8_t*)clearable_source);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
@@ -2780,89 +2789,90 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
                             sizeof(
-                                nsm_query_available_clearable_scalar_data_sources_v1_resp
-                                ));
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp));
 
                     return;
                 }
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                
-                if(available_source[0].bits.bit0)
+
+                if (available_source[0].bits.bit0)
                 {
                     availableSource.push_back("RecieverErrorCount");
                 }
-                if(available_source[0].bits.bit1)
+                if (available_source[0].bits.bit1)
                 {
                     availableSource.push_back("NaksRecievedCount");
                 }
-                if(available_source[0].bits.bit2)
+                if (available_source[0].bits.bit2)
                 {
                     availableSource.push_back("NaksSentCount");
                 }
-                if(available_source[0].bits.bit3)
+                if (available_source[0].bits.bit3)
                 {
                     availableSource.push_back("BadTlpCount");
                 }
-                if(available_source[0].bits.bit4)
+                if (available_source[0].bits.bit4)
                 {
                     availableSource.push_back("ReplayRollOverCount");
                 }
-                if(available_source[0].bits.bit5)
+                if (available_source[0].bits.bit5)
                 {
                     availableSource.push_back("FcTimeoutErrorCount");
                 }
-                if(available_source[0].bits.bit6)
+                if (available_source[0].bits.bit6)
                 {
                     availableSource.push_back("ReplayCount");
                 }
                 result["AvailableSource"] = availableSource;
 
-               if(clearable_source[0].bits.bit0)
+                if (clearable_source[0].bits.bit0)
                 {
                     clearableSource.push_back("RecieverErrorCount");
                 }
-                if(clearable_source[0].bits.bit1)
+                if (clearable_source[0].bits.bit1)
                 {
                     clearableSource.push_back("NaksRecievedCount");
                 }
-                if(available_source[0].bits.bit2)
+                if (available_source[0].bits.bit2)
                 {
                     clearableSource.push_back("NaksSentCount");
                 }
-                if(clearable_source[0].bits.bit3)
+                if (clearable_source[0].bits.bit3)
                 {
                     clearableSource.push_back("BadTlpCount");
                 }
-                if(clearable_source[0].bits.bit4)
+                if (clearable_source[0].bits.bit4)
                 {
                     clearableSource.push_back("ReplayRollOverCount");
                 }
-                if(clearable_source[0].bits.bit5)
+                if (clearable_source[0].bits.bit5)
                 {
                     clearableSource.push_back("FcTimeoutErrorCount");
                 }
-                if(clearable_source[0].bits.bit6)
+                if (clearable_source[0].bits.bit6)
                 {
                     clearableSource.push_back("ReplayCount");
                 }
                 result["clearableSource"] = clearableSource;
-              
-                
+
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-           case GROUP_ID_8:
-           {
+            case GROUP_ID_8:
+            {
                 bitfield8_t available_source[1];
                 bitfield8_t clearable_source[1];
                 uint8_t mask_length;
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
 
-                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
-                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                auto rc =
+                    decode_query_available_clearable_scalar_data_sources_v1_resp(
+                        responsePtr, payloadLength, &cc, &data_size,
+                        &reason_code, &mask_length, (uint8_t*)available_source,
+                        (uint8_t*)clearable_source);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
@@ -2872,21 +2882,20 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
                             sizeof(
-                                nsm_query_available_clearable_scalar_data_sources_v1_resp
-                                ));
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp));
 
                     return;
                 }
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                if(available_source[0].bits.bit0)
+                if (available_source[0].bits.bit0)
                 {
                     availableSource.push_back("PerLaneErrorCounts");
                 }
                 result["AvailableSource"] = availableSource;
 
-                if(clearable_source[0].bits.bit0)
+                if (clearable_source[0].bits.bit0)
                 {
                     clearableSource.push_back("PerLaneErrorCounts");
                 }
@@ -2895,17 +2904,20 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
-            
+
             case GROUP_ID_9:
-           {
+            {
                 bitfield8_t available_source[1];
                 bitfield8_t clearable_source[1];
                 uint8_t mask_length;
                 uint16_t data_size;
                 uint16_t reason_code = ERR_NULL;
 
-                auto rc = decode_query_available_clearable_scalar_data_sources_v1_resp(
-                    responsePtr, payloadLength, &cc, &data_size, &reason_code, &mask_length, (uint8_t* )available_source, (uint8_t* )clearable_source);
+                auto rc =
+                    decode_query_available_clearable_scalar_data_sources_v1_resp(
+                        responsePtr, payloadLength, &cc, &data_size,
+                        &reason_code, &mask_length, (uint8_t*)available_source,
+                        (uint8_t*)clearable_source);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
@@ -2915,29 +2927,28 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
                             sizeof(
-                                nsm_query_available_clearable_scalar_data_sources_v1_resp
-                                ));
+                                nsm_query_available_clearable_scalar_data_sources_v1_resp));
 
                     return;
                 }
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                if(available_source[0].bits.bit0)
+                if (available_source[0].bits.bit0)
                 {
                     availableSource.push_back("AerUncorrectableErrorStatus");
                 }
-                if(available_source[0].bits.bit1)
+                if (available_source[0].bits.bit1)
                 {
                     availableSource.push_back("AerCorrectableErrorStatus");
                 }
                 result["AvailableSource"] = availableSource;
-                if(clearable_source[0].bits.bit0)
+                if (clearable_source[0].bits.bit0)
                 {
                     clearableSource.push_back("AerUncorrectableErrorStatus");
                 }
 
-                if(clearable_source[0].bits.bit1)
+                if (clearable_source[0].bits.bit1)
                 {
                     clearableSource.push_back("AerCorrectableErrorStatus");
                 }
@@ -2947,7 +2958,6 @@ class QueryAvailableAndClearableScalarGroup : public CommandInterface
                 break;
             }
 
-          
             default:
             {
                 std::cerr << "Invalid Group Id \n";
@@ -3185,8 +3195,7 @@ class GetCurrClockFreq : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit GetCurrClockFreq(const char* type, const char* name,
-                              CLI::App* app) :
-        CommandInterface(type, name, app)
+                              CLI::App* app) : CommandInterface(type, name, app)
     {
         auto currClockFreqOptionGroup = app->add_option_group(
             "Required",
@@ -3690,7 +3699,8 @@ class GetRowRemapAvailability : public CommandInterface
         result["Completion Code"] = cc;
         result["NoRemappingAvailability"] = (uint16_t)data.no_remapping;
         result["LowRemappingAvaialability"] = (uint16_t)data.low_remapping;
-        result["PartialRemappingAvailability"] = (uint16_t)data.partial_remapping;
+        result["PartialRemappingAvailability"] =
+            (uint16_t)data.partial_remapping;
         result["HighRemappingAvailability"] = (uint16_t)data.high_remapping;
         result["MaxRemappingAvailability"] = (uint16_t)data.max_remapping;
         nsmtool::helper::DisplayInJson(result);
@@ -4122,8 +4132,7 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     {
       public:
         QueryPerInstanceGPMMetricsAggregateResponseParser(
-            const MetricsInfo* info) :
-            info(info)
+            const MetricsInfo* info) : info(info)
         {}
 
       private:
@@ -4307,13 +4316,13 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<GetPortDisableFuture>(
         "telemetry", "GetPortDisableFuture", getPortDisableFuture));
 
-    auto getPowerMode = telemetry->add_subcommand(
-        "GetPowerMode", "Get L1 power mode");
+    auto getPowerMode = telemetry->add_subcommand("GetPowerMode",
+                                                  "Get L1 power mode");
     commands.push_back(std::make_unique<GetPowerMode>(
         "telemetry", "GetPowerMode", getPowerMode));
 
-    auto setPowerMode = telemetry->add_subcommand(
-        "SetPowerMode", "Set L1 power mode");
+    auto setPowerMode = telemetry->add_subcommand("SetPowerMode",
+                                                  "Set L1 power mode");
     commands.push_back(std::make_unique<SetPowerMode>(
         "telemetry", "SetPowerMode", setPowerMode));
 
@@ -4405,9 +4414,11 @@ void registerCommand(CLI::App& app)
         "telemetry", "QueryScalarGroupTelemetry", queryScalarGroupTelemetry));
 
     auto queryAvailableAndClearableScalarGroup = telemetry->add_subcommand(
-        "QueryAvailableAndClearableScalarGroup", "retrieve available and clearable Scalar Data source for the group");
+        "QueryAvailableAndClearableScalarGroup",
+        "retrieve available and clearable Scalar Data source for the group");
     commands.push_back(std::make_unique<QueryAvailableAndClearableScalarGroup>(
-        "telemetry", "QueryAvailableAndClearableScalarGroup", queryAvailableAndClearableScalarGroup));
+        "telemetry", "QueryAvailableAndClearableScalarGroup",
+        queryAvailableAndClearableScalarGroup));
 
     auto pcieFundamentalReset = telemetry->add_subcommand(
         "PcieFundamentalReset", "Assert PCIe Fundamental Reset action");
@@ -4418,7 +4429,7 @@ void registerCommand(CLI::App& app)
         "ClearScalarDataSource", "Clear Scalar Data Source");
     commands.push_back(std::make_unique<ClearScalarDataSource>(
         "telemetry", "ClearScalarDataSource", clearScalarDataSource));
-        
+
     auto getClockLimit = telemetry->add_subcommand(
         "GetClockLimit", "retrieve clock Limit for clockId");
     commands.push_back(std::make_unique<GetClockLimit>(
@@ -4458,7 +4469,7 @@ void registerCommand(CLI::App& app)
         "GetRowRemappingCounts", "get Row Remapping Error Counts");
     commands.push_back(std::make_unique<GetRowRemappingCounts>(
         "telemetry", "GetRowRemappingCounts", getRowRemappingCounts));
-    
+
     auto getRowRemapAvailability = telemetry->add_subcommand(
         "GetRowRemapAvailability", "get Row Remapping Availability ");
     commands.push_back(std::make_unique<GetRowRemapAvailability>(
@@ -4489,8 +4500,8 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<QueryPerInstanceGPMMetrics>(
         "telemetry", "QueryPerInstanceGPMMetrics", queryPerInstanceGPMMetrics));
 
-    auto getViolationDuration = telemetry->add_subcommand("GetViolationDuration",
-                                                      "get processor throttle duration");
+    auto getViolationDuration = telemetry->add_subcommand(
+        "GetViolationDuration", "get processor throttle duration");
     commands.push_back(std::make_unique<GetViolationDuration>(
         "telemetry", "GetViolationDuration", getViolationDuration));
 }
