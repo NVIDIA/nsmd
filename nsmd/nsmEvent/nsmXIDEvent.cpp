@@ -24,6 +24,7 @@
 
 #include <fmt/args.h>
 
+#include <boost/algorithm/string/replace.hpp>
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
@@ -58,6 +59,7 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
     }
 
     std::string messageText(text, messageTextSize);
+    boost::algorithm::replace_all(messageText, ",", ";");
 
     std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>
         timePoint{std::chrono::nanoseconds(payload.timestamp)};
