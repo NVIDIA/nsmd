@@ -6,6 +6,15 @@ namespace nsm
 {
 requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
 {
+    if (isLongRunning)
+    {
+        // TODO: Temporarily disabling long running commands.
+        // To be removed after backend starts support long running commands.
+
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    }
+
     auto requestMsg = genRequestMsg(eid, 0);
     if (!requestMsg.has_value())
     {
