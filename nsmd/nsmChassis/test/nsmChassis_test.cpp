@@ -80,6 +80,10 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
         {"DEVICE_UUID", fpgaUuid},
         {"INSTANCE_NUMBER", uint64_t(0)},
     };
+    const PropertyValuesCollection fpgaAsset = {
+        {"Type", "NSM_FPGA_Asset"},
+        {"Manufacturer", "NVIDIA"},
+    };
     const PropertyValuesCollection asset = {
         {"Type", "NSM_Asset"},
         {"Manufacturer", "NVIDIA"},
@@ -305,9 +309,17 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     values.push(get(fpgaProperties, "DeviceType"));
     values.push(get(fpgaProperties, "DEVICE_UUID"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
+
+    values = std::queue<PropertyValue>();
+    values.push(get(fpgaProperties, "Name"));
+    values.push(get(fpgaAsset, "Type"));
+    values.push(get(fpgaProperties, "UUID"));
+    values.push(get(fpgaAsset, "Manufacturer"));
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
+
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(3, fpga.roundRobinSensors.size());
-    EXPECT_EQ(3, fpga.deviceSensors.size());
+    EXPECT_EQ(4, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
     EXPECT_EQ(0, gpu.deviceSensors.size());
@@ -321,9 +333,14 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     auto pcieRefClock =
         dynamic_pointer_cast<NsmInterfaceProvider<PCIeRefClockIntf>>(
             fpga.deviceSensors[sensors++]);
+    auto chassisAsset = dynamic_pointer_cast<NsmChassis<NsmAssetIntf>>(
+        fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, chassisUuid);
     EXPECT_NE(nullptr, mctpUuid);
     EXPECT_NE(nullptr, pcieRefClock);
+    EXPECT_NE(nullptr, chassisAsset);
+    EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
+              chassisAsset->pdi().manufacturer());
 
     EXPECT_EQ(fpgaUuid, chassisUuid->pdi().uuid());
 }

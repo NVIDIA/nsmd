@@ -100,6 +100,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
             device->addStaticSensor(pCIeRefClock);
         }
     }
+    else if (type == "NSM_FPGA_Asset")
+    {
+        auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
+        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "Manufacturer", interface.c_str());
+        chassisAsset->pdi().manufacturer(manufacturer);
+        device->deviceSensors.emplace_back(chassisAsset);
+    }
     else if (type == "NSM_Asset")
     {
         auto chassisAsset = NsmChassis<NsmAssetIntf>(name);
