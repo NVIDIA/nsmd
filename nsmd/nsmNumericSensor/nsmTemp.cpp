@@ -41,17 +41,15 @@ NsmTemp::NsmTemp(sdbusplus::bus::bus& bus, const std::string& name,
     NsmNumericSensor(
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
+#ifdef NVIDIA_SHMEM
+            std::make_unique<NsmNumericSensorShmem>(
+                name, getSensorType(), chassis_association,
+                std::make_unique<SMBPBITempSMBusSensorBytesConverter>()),
+#endif
             std::make_unique<NsmNumericSensorDbusValue>(
                 bus, name, getSensorType(), SensorUnit::DegreesC, association,
                 physicalContext, implementation, maxAllowableValue,
-                readingBasis, description)
-#ifdef NVIDIA_SHMEM
-                ,
-            std::make_unique<NsmNumericSensorShmem>(
-                name, getSensorType(), chassis_association,
-                std::make_unique<SMBPBITempSMBusSensorBytesConverter>())
-#endif
-                ))
+                readingBasis, description)))
 {}
 
 std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,

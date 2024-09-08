@@ -97,13 +97,13 @@ void NsmNumericSensorComposite::updateCompositeReading(std::string childName,
         totalValue = std::nan("");
     }
 
-    valueIntf->value(totalValue);
 #ifdef NVIDIA_SHMEM
     if (shmemSensor)
     {
         shmemSensor->updateReading(totalValue);
     }
 #endif
+    valueIntf->value(totalValue);
 }
 
 static requester::Coroutine
