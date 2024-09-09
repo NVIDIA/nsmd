@@ -2175,8 +2175,8 @@ class GetEDPpScalingFactors : public CommandInterface
             scaling_factors.persistent_scaling_factor;
         result["Requested_OneShot_Scaling_Factor"] =
             scaling_factors.oneshot_scaling_factor;
-        result["Persistent_Scaling_Factor"] =
-            scaling_factors.persistent_scaling_factor;
+        result["Enforced_Scaling_Factor"] =
+            scaling_factors.enforced_scaling_factor;
         nsmtool::helper::DisplayInJson(result);
     }
 };

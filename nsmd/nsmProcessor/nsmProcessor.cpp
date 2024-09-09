@@ -1900,12 +1900,14 @@ NsmGpuHealth::NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
     healthIntf->health(GpuHealthType::OK);
 }
 
-NsmPowerCap::NsmPowerCap(std::string& name, std::string& type,
-                         std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
-                         const std::vector<std::string>& parents,
-                         std::string& inventoryObjPath) :
+NsmPowerCap::NsmPowerCap(
+    std::string& name, std::string& type,
+    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
+    const std::vector<std::string>& parents,
+    const std::shared_ptr<PowerPersistencyIntf> persistencyIntf,
+    std::string& inventoryObjPath) :
     NsmSensor(name, type), powerCapIntf(powerCapIntf), parents(parents),
-    inventoryObjPath(inventoryObjPath)
+    persistencyIntf(persistencyIntf), inventoryObjPath(inventoryObjPath)
 {}
 
 void NsmPowerCap::updateMetricOnSharedMemory()
@@ -2785,9 +2787,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto powerLimitIntf =
             std::make_shared<PowerLimitIface>(bus, inventoryObjPath.c_str());
 
+        auto persistencyIntf = std::make_shared<PowerPersistencyIntf>(
+            bus, inventoryObjPath.c_str());
+
         // create sensors for power cap properties
         auto powerCap = std::make_shared<NsmPowerCap>(
-            name, type, powerCapIntf, candidateForList, inventoryObjPath);
+            name, type, powerCapIntf, candidateForList, persistencyIntf,
+            inventoryObjPath);
         nsmDevice->addSensor(powerCap, priority);
         nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
         manager.powerCapList.emplace_back(powerCap);

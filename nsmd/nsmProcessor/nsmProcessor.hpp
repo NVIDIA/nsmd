@@ -59,6 +59,7 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
+#include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>
 
 #include <cstdint>
 
@@ -569,12 +570,15 @@ using DimmMemoryMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Dimm::server::MemoryMetrics>;
 
+using PowerPersistencyIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::power::Persistency>;
 class NsmPowerCap : public NsmSensor
 {
   public:
     NsmPowerCap(std::string& name, std::string& type,
                 std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
                 const std::vector<std::string>& parents,
+                const std::shared_ptr<PowerPersistencyIntf>persistencyIntf,
                 std::string& inventoryObjPath);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -591,6 +595,7 @@ class NsmPowerCap : public NsmSensor
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
     void updateReading(uint32_t value);
     std::vector<std::string> parents;
+    std::shared_ptr<PowerPersistencyIntf>persistencyIntf;
     std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
     std::string inventoryObjPath;
 };
