@@ -350,11 +350,12 @@ uint8_t
         portInfoIntf->currentSpeed(speedGbps);
         portInfoIntf->maxSpeed(speedGbps);
 
-        // not yet clear from spec raised as concern
         portMetricsOem3Intf->txNoProtocolBytes(data.nv_port_data_rate_kbps);
         portMetricsOem3Intf->rxNoProtocolBytes(data.nv_port_data_rate_kbps);
-        portMetricsOem3Intf->txWidth(data.status_lane_info);
-        portMetricsOem3Intf->rxWidth(data.status_lane_info);
+
+        uint16_t width = static_cast<uint16_t>(data.status_lane_info & 0x0F);
+        portMetricsOem3Intf->txWidth(width);
+        portMetricsOem3Intf->rxWidth(width);
 
         updateMetricOnSharedMemory();
     }
