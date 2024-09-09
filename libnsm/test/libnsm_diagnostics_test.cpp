@@ -586,11 +586,9 @@ TEST(eraseTrace, testGoodEncodeRequest)
 					sizeof(nsm_erase_trace_req));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
-	uint8_t type = 0;
-	uint8_t data_size =
-	    sizeof(struct nsm_erase_trace_req) - sizeof(struct nsm_common_req);
+	uint8_t data_size = 0;
 
-	auto rc = encode_erase_trace_req(0, type, request);
+	auto rc = encode_erase_trace_req(0, request);
 
 	struct nsm_erase_trace_req *req =
 	    reinterpret_cast<struct nsm_erase_trace_req *>(request->payload);
@@ -601,7 +599,6 @@ TEST(eraseTrace, testGoodEncodeRequest)
 	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, request->hdr.nvidia_msg_type);
 	EXPECT_EQ(NSM_ERASE_TRACE, req->hdr.command);
 	EXPECT_EQ(data_size, req->hdr.data_size);
-	EXPECT_EQ(type, req->info_type);
 }
 
 TEST(eraseTrace, testBadEncodeRequest)
@@ -609,7 +606,7 @@ TEST(eraseTrace, testBadEncodeRequest)
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_erase_trace_req));
 
-	auto rc = encode_erase_trace_req(0, 0, nullptr);
+	auto rc = encode_erase_trace_req(0, nullptr);
 
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
@@ -623,18 +620,14 @@ TEST(eraseTrace, testGoodDecodeRequest)
 	    0x89,		 // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
 	    NSM_ERASE_TRACE,	 // command
-	    0x02,		 // data size
-	    0x01,		 // debug_info_type
-	    0x00};		 // reserved
+	    0x00};		 // data size
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	size_t msg_len = requestMsg.size();
 
-	uint8_t type;
-	auto rc = decode_erase_trace_req(request, msg_len, &type);
+	auto rc = decode_erase_trace_req(request, msg_len);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(01, type);
 }
 
 TEST(eraseTrace, testBadDecodeRequest)
@@ -646,24 +639,18 @@ TEST(eraseTrace, testBadDecodeRequest)
 	    0x89,		 // OCP_TYPE=8, OCP_VER=9
 	    NSM_TYPE_DIAGNOSTIC, // NVIDIA_MSG_TYPE
 	    NSM_ERASE_TRACE,	 // command
-	    0x04,		 // data size [shouldn't be 4]
-	    0x01,		 // debug_info_type
-	    0x00};		 // reserved
+	    0x04};		 // data size [shouldn't be 4]
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	size_t msg_len = requestMsg.size();
 
-	uint8_t type;
-	auto rc = decode_erase_trace_req(nullptr, msg_len, &type);
+	auto rc = decode_erase_trace_req(nullptr, msg_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_erase_trace_req(request, msg_len, nullptr);
-	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
-
-	rc = decode_erase_trace_req(request, msg_len - 2, &type);
+	rc = decode_erase_trace_req(request, msg_len - 2);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	rc = decode_erase_trace_req(request, msg_len, &type);
+	rc = decode_erase_trace_req(request, msg_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 

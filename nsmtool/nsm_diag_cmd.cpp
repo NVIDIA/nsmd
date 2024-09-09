@@ -764,25 +764,12 @@ class EraseTrace : public CommandInterface
 
     using CommandInterface::CommandInterface;
 
-    explicit EraseTrace(const char* type, const char* name, CLI::App* app) :
-        CommandInterface(type, name, app)
-    {
-        auto eraseTraceOptionGroup =
-            app->add_option_group("Required", "Erase trace options.");
-
-        infoType = 0;
-        eraseTraceOptionGroup->add_option(
-            "-t, --infoType", infoType,
-            "Debug information type [0-Device debug info]");
-        eraseTraceOptionGroup->require_option(1);
-    }
-
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
                                         sizeof(nsm_erase_trace_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        auto rc = encode_erase_trace_req(instanceId, infoType, request);
+        auto rc = encode_erase_trace_req(instanceId, request);
         return {rc, requestMsg};
     }
 
@@ -824,9 +811,6 @@ class EraseTrace : public CommandInterface
 
         nsmtool::helper::DisplayInJson(result);
     }
-
-  private:
-    uint8_t infoType;
 };
 
 class GetNetworkDeviceLogInfo : public CommandInterface

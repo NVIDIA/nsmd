@@ -322,8 +322,7 @@ int decode_get_network_device_debug_info_resp(const struct nsm_msg *msg,
 	return NSM_SW_SUCCESS;
 }
 
-int encode_erase_trace_req(uint8_t instance_id, uint8_t info_type,
-			   struct nsm_msg *msg)
+int encode_erase_trace_req(uint8_t instance_id, struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -343,18 +342,14 @@ int encode_erase_trace_req(uint8_t instance_id, uint8_t info_type,
 	    (struct nsm_erase_trace_req *)msg->payload;
 
 	request->hdr.command = NSM_ERASE_TRACE;
-	request->hdr.data_size =
-	    sizeof(struct nsm_erase_trace_req) - sizeof(struct nsm_common_req);
-	request->info_type = info_type;
-	request->reserved = 0x00;
+	request->hdr.data_size = 0x00;
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len,
-			   uint8_t *info_type)
+int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len)
 {
-	if (msg == NULL || info_type == NULL) {
+	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -366,12 +361,9 @@ int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len,
 	struct nsm_erase_trace_req *request =
 	    (struct nsm_erase_trace_req *)msg->payload;
 
-	if (request->hdr.data_size != sizeof(struct nsm_erase_trace_req) -
-					  sizeof(struct nsm_common_req)) {
+	if (request->hdr.data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-
-	*info_type = request->info_type;
 
 	return NSM_SW_SUCCESS;
 }

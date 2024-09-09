@@ -43,8 +43,7 @@ class NsmEraseTraceObject : public NsmObject, public EraseIntf
                         const std::string& inventoryPath,
                         const std::string& type, const uuid_t& uuid);
 
-    std::tuple<uint64_t, EraseStatus>
-        erase(EraseInfoType debugInfoType) override;
+    std::tuple<uint64_t, EraseStatus> erase() override;
 
   private:
     std::string objPath;
