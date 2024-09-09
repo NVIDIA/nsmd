@@ -30,6 +30,8 @@ enum device_configuration_command {
 	NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1 = 0x05,
 	NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1 = 0x06,
 	NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1 = 0x07,
+	NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1 = 0x08,
+	NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1 = 0x09,
 	NSM_SET_RECONFIGURATION_PERMISSIONS_V1 = 0x40,
 	NSM_GET_RECONFIGURATION_PERMISSIONS_V1 = 0x41,
 	NSM_ENABLE_DISABLE_GPU_IST_MODE = 0x62,
@@ -352,6 +354,31 @@ struct nsm_set_reconfiguration_permissions_v1_req {
 	uint8_t setting_index;
 	uint8_t configuration;
 	uint8_t permission;
+} __attribute__((packed));
+
+enum compute_mode {
+	NO_MODE = 0,
+	PRODUCTION_MODE = 1,
+	DEVTOOLS_MODE = 2,
+};
+
+/** @struct nsm_get_confidential_compute_mode_v1_resp
+ *
+ *  Structure representing Get Confidential Compute Mode v1 response.
+ */
+struct nsm_get_confidential_compute_mode_v1_resp {
+	struct nsm_common_resp hdr;
+	uint8_t current_mode;
+	uint8_t pending_mode;
+} __attribute__((packed));
+
+/** @struct nsm_set_confidential_compute_mode_v1_req
+ *
+ *  Structure representing Set Confidential Compute Mode v1 request.
+ */
+struct nsm_set_confidential_compute_mode_v1_req {
+	struct nsm_common_req hdr;
+	uint8_t mode;
 } __attribute__((packed));
 
 /** @brief Encode a Set Error Injection Mode v1 request message
@@ -928,6 +955,100 @@ int encode_set_reconfiguration_permissions_v1_resp(uint8_t instance_id,
 int decode_set_reconfiguration_permissions_v1_resp(const struct nsm_msg *msg,
 						   size_t msg_len, uint8_t *cc,
 						   uint16_t *reason_code);
+
+/** @brief Encode a Get Confidential Compute Mode v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_confidential_compute_mode_v1_req(uint8_t instance_id,
+						struct nsm_msg *msg);
+
+/** @brief Decode a Get Confidential Compute Mode v1 request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_confidential_compute_mode_v1_req(const struct nsm_msg *msg,
+						size_t msg_len);
+
+/** @brief Encode a Get Confidential Compute Mode v1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] current_mode - Current Confidential Compute modes
+ *  @param[in] pending_mode - Pending Confidential Compute modes
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_get_confidential_compute_mode_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t current_mode,
+    uint8_t pending_mode, struct nsm_msg *msg);
+
+/** @brief Decode a Get Confidential Compute Mode v1 response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] current_mode - current confidential compute mode
+ *  @param[in] pending_mode - pending confidential compute mode
+ * @return nsm_completion_codes
+ */
+int decode_get_confidential_compute_mode_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint8_t *current_mode, uint8_t *pending_mode);
+
+/** @brief Encode a Set Confidential Compute Mode v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mode - 0 : Confidential Compute DevTools Mode, 1 : Confidential
+ * Compute Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_confidential_compute_mode_v1_req(uint8_t instance_id,
+						uint8_t mode,
+						struct nsm_msg *msg);
+
+/** @brief Decode a Set Confidential Compute Mode v1 request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] mode - 0 : Confidential Compute DevTools Mode, 1 : Confidential
+ *  @return nsm_completion_codes
+ */
+int decode_set_confidential_compute_mode_v1_req(const struct nsm_msg *msg,
+						size_t msg_len, uint8_t *mode);
+
+/** @brief Encode a Set Confidential Compute Mode v1 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_set_confidential_compute_mode_v1_resp(uint8_t instance_id,
+						 uint8_t cc,
+						 uint16_t reason_code,
+						 struct nsm_msg *msg);
+
+/** @brief Decode a Set Confidential Compute Mode v1 response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ * @return nsm_completion_codes
+ */
+int decode_set_confidential_compute_mode_v1_resp(const struct nsm_msg *msg,
+						 size_t msg_len, uint8_t *cc,
+						 uint16_t *data_size,
+						 uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

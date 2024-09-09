@@ -1433,3 +1433,228 @@ TEST(setReconfigurationPermissionsV1, testBadDecodeResponse)
 	    response, msg_len - 1, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(getConfidentialComputeMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_confidential_compute_mode_v1_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t current_mode = 2;
+	uint8_t pending_mode = 1;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_confidential_compute_mode_v1_resp(
+	    0, NSM_SUCCESS, reason_code, current_mode, pending_mode, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_confidential_compute_mode_v1_resp *resp =
+	    reinterpret_cast<
+		struct nsm_get_confidential_compute_mode_v1_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1, resp->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_get_confidential_compute_mode_v1_resp) -
+		      sizeof(struct nsm_common_resp),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(resp->current_mode, 2);
+	EXPECT_EQ(resp->pending_mode, 1);
+}
+
+TEST(getConfidentialComputeMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1, // command
+	    0,					  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    2,
+	    0, // data size
+	    1, // current_mode
+	    0  // pending mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t current_mode;
+	uint8_t pending_mode;
+
+	auto rc = decode_get_confidential_compute_mode_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &current_mode,
+	    &pending_mode);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(2, data_size);
+	EXPECT_EQ(1, current_mode);
+	EXPECT_EQ(0, pending_mode);
+}
+
+TEST(getConfidentialComputeMode, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1, // command
+	    0,					  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    3,
+	    0, // wrong data size
+	    2, // current data
+	    1  // pending data
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t current_mode;
+	uint8_t pending_mode;
+
+	auto rc = decode_get_confidential_compute_mode_v1_resp(
+	    NULL, msg_len, &cc, &data_size, &reason_code, &current_mode,
+	    &pending_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_confidential_compute_mode_v1_resp(
+	    response, msg_len, NULL, &data_size, &reason_code, &current_mode,
+	    &pending_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_confidential_compute_mode_v1_resp(
+	    response, msg_len, &cc, NULL, &reason_code, &current_mode,
+	    &pending_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_confidential_compute_mode_v1_resp(
+	    response, msg_len - 1, &cc, &data_size, &reason_code, &current_mode,
+	    &pending_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_confidential_compute_mode_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code, &current_mode,
+	    &pending_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(setConfidentialComputeMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_set_confidential_compute_mode_v1_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint8_t mode = 1;
+	auto rc = encode_set_confidential_compute_mode_v1_req(0, mode, request);
+	struct nsm_set_confidential_compute_mode_v1_req *req =
+	    reinterpret_cast<struct nsm_set_confidential_compute_mode_v1_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(mode, req->mode);
+}
+
+TEST(setConfidentialComputeMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, // command
+	    1,					  // data size
+	    1					  // mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t mode;
+	auto rc = decode_set_confidential_compute_mode_v1_req(request, msg_len,
+							      &mode);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(mode, 1);
+}
+
+TEST(setConfidentialComputeMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_set_confidential_compute_mode_v1_resp(
+	    0, NSM_SUCCESS, reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setConfidentialComputeMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, // command
+	    0,					  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_confidential_compute_mode_v1_resp(
+	    response, msg_len, &cc, &data_size, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}

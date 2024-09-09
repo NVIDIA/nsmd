@@ -901,6 +901,121 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
     bool permission;
 };
 
+class GetConfidentialComputeModeV1 : public CommandInterface
+{
+  public:
+    ~GetConfidentialComputeModeV1() = default;
+    GetConfidentialComputeModeV1() = delete;
+    GetConfidentialComputeModeV1(const GetConfidentialComputeModeV1&) = delete;
+    GetConfidentialComputeModeV1(GetConfidentialComputeModeV1&&) = default;
+    GetConfidentialComputeModeV1&
+        operator=(const GetConfidentialComputeModeV1&) = delete;
+    GetConfidentialComputeModeV1&
+        operator=(GetConfidentialComputeModeV1&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_confidential_compute_mode_v1_req(instanceId,
+                                                              request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t data_size;
+        uint8_t current_mode;
+        uint8_t pending_mode;
+        auto rc = decode_get_confidential_compute_mode_v1_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code,
+            &current_mode, &pending_mode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_confidential_compute_mode_v1_resp));
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Current Mode"] = current_mode;
+        result["Pending Mode"] = pending_mode;
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
+class SetConfidentialComputeModeV1 : public CommandInterface
+{
+  public:
+    ~SetConfidentialComputeModeV1() = default;
+    SetConfidentialComputeModeV1() = delete;
+    SetConfidentialComputeModeV1(const SetConfidentialComputeModeV1&) = delete;
+    SetConfidentialComputeModeV1(SetConfidentialComputeModeV1&&) = default;
+    SetConfidentialComputeModeV1&
+        operator=(const SetConfidentialComputeModeV1&) = delete;
+    SetConfidentialComputeModeV1&
+        operator=(SetConfidentialComputeModeV1&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetConfidentialComputeModeV1(const char* type, const char* name,
+                                          CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto setConfidentialComputeModeV1 =
+            app->add_option_group("Required", "Set Confidential Compute Mode");
+        setConfidentialComputeModeV1->add_option("-r, --mode", mode, "mode");
+        setConfidentialComputeModeV1->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_set_confidential_compute_mode_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_confidential_compute_mode_v1_req(instanceId, mode,
+                                                              request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t data_size;
+        auto rc = decode_set_confidential_compute_mode_v1_resp(
+            responsePtr, payloadLength, &cc, &data_size, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc; // check in nsm spec before merging
+                                        // code and do required change
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t mode;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -963,6 +1078,18 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<SetReconfigurationPermissionsV1>(
         "config", "SetReconfigurationPermissionsV1",
         setReconfigurationPermissionsV1));
+
+    auto getConfidentialComputeModeV1 = config->add_subcommand(
+        "GetConfidentialComputeModeV1", "Get Confidential Compute Mode Data");
+    commands.push_back(std::make_unique<GetConfidentialComputeModeV1>(
+        "config", "GetConfidentialComputeModeV1",
+        getConfidentialComputeModeV1));
+
+    auto setConfidentialComputeModeV1 = config->add_subcommand(
+        "SetConfidentialComputeModeV1", "Set Confidential Compute Mode Data");
+    commands.push_back(std::make_unique<SetConfidentialComputeModeV1>(
+        "config", "SetConfidentialComputeModeV1",
+        setConfidentialComputeModeV1));
 }
 
 } // namespace config

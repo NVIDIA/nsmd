@@ -2571,6 +2571,314 @@ uint8_t NsmProcessorThrottleDuration::handleResponseMsg(
     return cc;
 }
 
+NsmConfidentialCompute::NsmConfidentialCompute(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<ConfidentialComputeIntf> confidentialComputeIntf,
+    std::string& inventoryObjPath) :
+    NsmSensor(name, type),
+    confidentialComputeIntf(confidentialComputeIntf),
+    inventoryObjPath(inventoryObjPath)
+{
+    updateMetricOnSharedMemory();
+}
+
+void NsmConfidentialCompute::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(confidentialComputeIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType ccModeEnabled{
+        confidentialComputeIntf->ccModeEnabled()};
+    std::string propName = "CCModeEnabled";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, ccModeEnabled);
+
+    propName = "PendingCCModeState";
+    nv::sensor_aggregation::DbusVariantType pendingCCModeState{
+        confidentialComputeIntf->pendingCCModeState()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, pendingCCModeState);
+
+    nv::sensor_aggregation::DbusVariantType ccDevModeEnabled{
+        confidentialComputeIntf->ccDevModeEnabled()};
+    propName = "CCDevModeEnabled";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, ccDevModeEnabled);
+
+    propName = "PendingCCDevModeState";
+    nv::sensor_aggregation::DbusVariantType pendingCCDevModeState{
+        confidentialComputeIntf->pendingCCDevModeState()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
+                                                 propName, smbusData,
+                                                 pendingCCDevModeState);
+
+#endif
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmConfidentialCompute::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_confidential_compute_mode_v1_req(instanceId,
+                                                          requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_confidential_compute_mode_v1_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t
+    NsmConfidentialCompute::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                              size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint8_t current_mode;
+    uint8_t pending_mode;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_confidential_compute_mode_v1_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &current_mode,
+        &pending_mode);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(current_mode, pending_mode);
+        clearErrorBitMap("decode_get_confidential_compute_mode_v1_resp");
+    }
+    else
+    {
+        logHandleResponseMsg("decode_get_confidential_compute_mode_v1_resp",
+                             reason_code, cc, rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
+void NsmConfidentialCompute::updateReading(uint8_t current_mode,
+                                           uint8_t pending_mode)
+{
+    switch (current_mode)
+    {
+        case NO_MODE:
+            confidentialComputeIntf->ccModeEnabled(false);
+            confidentialComputeIntf->ccDevModeEnabled(false);
+            break;
+        case PRODUCTION_MODE:
+            confidentialComputeIntf->ccModeEnabled(true);
+            confidentialComputeIntf->ccDevModeEnabled(false);
+            break;
+        case DEVTOOLS_MODE:
+            confidentialComputeIntf->ccModeEnabled(false);
+            confidentialComputeIntf->ccDevModeEnabled(true);
+            break;
+    }
+
+    switch (pending_mode)
+    {
+        case NO_MODE:
+            confidentialComputeIntf->pendingCCModeState(false);
+            confidentialComputeIntf->pendingCCDevModeState(false);
+            break;
+        case PRODUCTION_MODE:
+            confidentialComputeIntf->pendingCCModeState(true);
+            confidentialComputeIntf->pendingCCDevModeState(false);
+            break;
+        case DEVTOOLS_MODE:
+            confidentialComputeIntf->pendingCCModeState(false);
+            confidentialComputeIntf->pendingCCDevModeState(true);
+            break;
+    }
+
+    updateMetricOnSharedMemory();
+}
+
+requester::Coroutine NsmConfidentialCompute::patchCCMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const bool* reqSetting = std::get_if<bool>(&value);
+    if (reqSetting == NULL)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    lg2::info("set Confidential Compute Mode On Device for EID: {EID}", "EID",
+              eid);
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_confidential_compute_mode_v1_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    uint8_t mode;
+    if (*reqSetting == true)
+    {
+        mode = PRODUCTION_MODE;
+    }
+    else
+    {
+        if (confidentialComputeIntf->pendingCCDevModeState())
+        {
+            mode = DEVTOOLS_MODE;
+        }
+        else
+        {
+            mode = NO_MODE;
+        }
+    }
+
+    auto rc = encode_set_confidential_compute_mode_v1_req(0, mode, requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCMode encode_set_confidential_compute_mode_v1_req failed. eid = {EID} rc = { RC } ",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCMode SendRecvNsmMsgSync failed"
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc_);
+
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t data_size = 0;
+    rc = decode_set_confidential_compute_mode_v1_resp(
+        responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info(
+            "NsmConfidentialCompute :: patchCCMode for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCMode decode_set_confidential_compute_mode_v1_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const bool* reqSetting = std::get_if<bool>(&value);
+    if (reqSetting == NULL)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    lg2::info("set Confidential Compute Devtools Mode On Device for EID: {EID}",
+              "EID", eid);
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_confidential_compute_mode_v1_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    uint8_t mode;
+    if (*reqSetting == true)
+    {
+        mode = DEVTOOLS_MODE;
+    }
+    else
+    {
+        if (confidentialComputeIntf->pendingCCModeState())
+        {
+            mode = PRODUCTION_MODE;
+        }
+        else
+        {
+            mode = NO_MODE;
+        }
+    }
+
+    auto rc = encode_set_confidential_compute_mode_v1_req(0, mode, requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCDevMode encode_set_confidential_compute_mode_v1_req failed. eid = {EID} rc = { RC } ",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCDevMode SendRecvNsmMsgSync failed"
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc_);
+
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    uint16_t data_size = 0;
+    rc = decode_set_confidential_compute_mode_v1_resp(
+        responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info(
+            "NsmConfidentialCompute :: patchCCDevMode for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "NsmConfidentialCompute :: patchCCDevMode decode_set_confidential_compute_mode_v1_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath)
@@ -2632,6 +2940,37 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->deviceSensors.push_back(healthSensor);
 
         createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
+        auto confidentialComputeIntf =
+            std::make_shared<ConfidentialComputeIntf>(bus,
+                                                      inventoryObjPath.c_str());
+        auto confidentialComputeSensor =
+            std::make_shared<NsmConfidentialCompute>(
+                name, type, confidentialComputeIntf, inventoryObjPath);
+        nsmDevice->addSensor(confidentialComputeSensor,
+                             CONFIDENTIAL_COMPUTE_MODE_PRIORITY);
+        nsm::AsyncSetOperationHandler setconfidentialComputeHandler =
+            std::bind(&NsmConfidentialCompute::patchCCMode,
+                      confidentialComputeSensor, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.CCMode", "CCModeEnabled",
+                AsyncSetOperationInfo{setconfidentialComputeHandler,
+                                      confidentialComputeSensor, nsmDevice});
+
+        nsm::AsyncSetOperationHandler setconfidentialComputeDevtoolHandler =
+            std::bind(&NsmConfidentialCompute::patchCCDevMode,
+                      confidentialComputeSensor, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.CCMode", "CCDevModeEnabled",
+                AsyncSetOperationInfo{setconfidentialComputeDevtoolHandler,
+                                      confidentialComputeSensor, nsmDevice});
     }
     else if (type == "NSM_PortDisableFuture")
     {

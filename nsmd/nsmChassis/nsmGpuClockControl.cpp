@@ -244,29 +244,23 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
     SensorManager& manager = SensorManager::getInstance();
     auto eid = manager.getEid(device);
     lg2::info("set RequestedSpeedLimitMin On Device for EID: {EID}", "EID",
               eid);
-
     uint32_t allowableMin = cpuOperatingConfigIntf->minSpeed();
     uint32_t allowableMax = cpuOperatingConfigIntf->maxSpeed();
     uint32_t maxReqSpeed = cpuOperatingConfigIntf->requestedSpeedLimitMax();
-
     if (allowableMin > *minReqSpeed || allowableMax < *minReqSpeed)
     {
         *status = AsyncOperationStatusType::WriteFailure;
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-
     auto rc = encode_set_clock_limit_req(
         0, GRAPHICS_CLOCK, static_cast<uint8_t>(clockLimitFlag::PERSISTENCE),
         *minReqSpeed, maxReqSpeed, requestMsg);
-
     if (rc)
     {
         lg2::error(
@@ -276,7 +270,6 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
@@ -291,12 +284,11 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
-                                     &reason_code, &data_size);
+                                     &data_size, &reason_code);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
@@ -327,12 +319,10 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
     SensorManager& manager = SensorManager::getInstance();
     auto eid = manager.getEid(device);
     lg2::info("set RequestedSpeedLimitMax On Device for EID: {EID}", "EID",
               eid);
-
     uint32_t allowableMin = cpuOperatingConfigIntf->minSpeed();
     uint32_t allowableMax = cpuOperatingConfigIntf->maxSpeed();
     uint32_t minReqSpeed = cpuOperatingConfigIntf->requestedSpeedLimitMin();
@@ -342,14 +332,11 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
         *status = AsyncOperationStatusType::WriteFailure;
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-
     auto rc = encode_set_clock_limit_req(
         0, GRAPHICS_CLOCK, static_cast<uint8_t>(clockLimitFlag::PERSISTENCE),
         minReqSpeed, *maxReqSpeed, requestMsg);
-
     if (rc)
     {
         lg2::error(
@@ -374,13 +361,11 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
-                                     &reason_code, &data_size);
-
+                                     &data_size, &reason_code);
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         lg2::info(
