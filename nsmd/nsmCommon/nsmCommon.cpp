@@ -97,8 +97,8 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory> totalMemory,
     bool isLongRunning) :
-    NsmSensor(name, type, isLongRunning), totalMemory(totalMemory),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type, isLongRunning),
+    totalMemory(totalMemory), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
@@ -198,8 +198,8 @@ NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type),
+    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -286,8 +286,8 @@ NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type),
+    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());

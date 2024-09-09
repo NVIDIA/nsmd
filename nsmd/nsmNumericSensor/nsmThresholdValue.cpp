@@ -23,7 +23,8 @@ namespace nsm
 NsmThresholdValueWarningLow::NsmThresholdValueWarningLow(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdWarningIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueWarningLow::updateReading(double value,
@@ -35,7 +36,8 @@ void NsmThresholdValueWarningLow::updateReading(double value,
 NsmThresholdValueWarningHigh::NsmThresholdValueWarningHigh(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdWarningIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueWarningHigh::updateReading(double value,
@@ -47,7 +49,8 @@ void NsmThresholdValueWarningHigh::updateReading(double value,
 NsmThresholdValueCriticalLow::NsmThresholdValueCriticalLow(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdCriticalIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueCriticalLow::updateReading(double value,
@@ -59,7 +62,8 @@ void NsmThresholdValueCriticalLow::updateReading(double value,
 NsmThresholdValueCriticalHigh::NsmThresholdValueCriticalHigh(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdCriticalIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueCriticalHigh::updateReading(double value,
@@ -71,7 +75,8 @@ void NsmThresholdValueCriticalHigh::updateReading(double value,
 NsmThresholdValueHardShutdownLow::NsmThresholdValueHardShutdownLow(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdHardShutdownIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueHardShutdownLow::updateReading(double value,
@@ -83,7 +88,8 @@ void NsmThresholdValueHardShutdownLow::updateReading(double value,
 NsmThresholdValueHardShutdownHigh::NsmThresholdValueHardShutdownHigh(
     const std::string& name, const std::string& type,
     std::shared_ptr<ThresholdHardShutdownIntf> intf) :
-    NsmThresholdValue(name, type), intf(intf)
+    NsmThresholdValue(name, type),
+    intf(intf)
 {}
 
 void NsmThresholdValueHardShutdownHigh::updateReading(double value,

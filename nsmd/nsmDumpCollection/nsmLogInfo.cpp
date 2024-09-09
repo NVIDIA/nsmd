@@ -42,8 +42,8 @@ NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus::bus& bus,
                                    const std::string& inventoryPath,
                                    const std::string& type,
                                    const uuid_t& uuid) :
-    NsmObject(name, type), LogInfoIntf(bus, (inventoryPath + name).c_str()),
-    uuid(uuid)
+    NsmObject(name, type),
+    LogInfoIntf(bus, (inventoryPath + name).c_str()), uuid(uuid)
 {
     lg2::debug("NsmLogInfoObject: {NAME}", "NAME", name.c_str());
 

@@ -22,10 +22,10 @@
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
 
+#include <com/nvidia/Common/ResetEdppAsync/server.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
-#include <com/nvidia/Common/ResetEdppAsync/server.hpp>
 
 #include <cstdint>
 
@@ -40,8 +40,8 @@ class NsmResetEdppAsyncIntf : public ResetEdppAsyncIntf
   public:
     NsmResetEdppAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
                           std::shared_ptr<NsmDevice> device) :
-        ResetEdppAsyncIntf(bus, path), device(device)
-    {};
+        ResetEdppAsyncIntf(bus, path),
+        device(device){};
 
     requester::Coroutine clearSetPoint(AsyncOperationStatusType* status)
     {

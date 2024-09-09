@@ -26,8 +26,8 @@ namespace nsm
 
 NsmPCIeSlot::NsmPCIeSlot(const NsmInterfaceProvider<PCIeSlotIntf>& provider,
                          uint8_t deviceIndex) :
-    NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceIndex(deviceIndex)
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeSlot::genRequestMsg(eid_t eid, uint8_t instanceId)

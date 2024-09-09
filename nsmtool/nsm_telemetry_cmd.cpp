@@ -405,7 +405,8 @@ class QueryPortStatus : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit QueryPortStatus(const char* type, const char* name,
-                             CLI::App* app) : CommandInterface(type, name, app)
+                             CLI::App* app) :
+        CommandInterface(type, name, app)
     {
         auto portStatusOptionGroup = app->add_option_group(
             "Required",
@@ -2533,8 +2534,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: " << "rc=" << rc
-                        << ", cc=" << (int)cc
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -2569,8 +2570,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: " << "rc=" << rc
-                        << ", cc=" << (int)cc
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(struct nsm_msg_hdr) +
@@ -3080,8 +3081,8 @@ class ClearScalarDataSource : public CommandInterface
             responsePtr, payloadLength, &cc, &data_size, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -3195,7 +3196,8 @@ class GetCurrClockFreq : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit GetCurrClockFreq(const char* type, const char* name,
-                              CLI::App* app) : CommandInterface(type, name, app)
+                              CLI::App* app) :
+        CommandInterface(type, name, app)
     {
         auto currClockFreqOptionGroup = app->add_option_group(
             "Required",
@@ -3685,8 +3687,8 @@ class GetRowRemapAvailability : public CommandInterface
             responsePtr, payloadLength, &cc, &data_size, &reason_code, &data);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +
@@ -4132,7 +4134,8 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     {
       public:
         QueryPerInstanceGPMMetricsAggregateResponseParser(
-            const MetricsInfo* info) : info(info)
+            const MetricsInfo* info) :
+            info(info)
         {}
 
       private:
@@ -4250,8 +4253,8 @@ class GetViolationDuration : public CommandInterface
             &violationDuration);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(struct nsm_msg_hdr) +

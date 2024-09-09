@@ -24,7 +24,8 @@ namespace nsm
 
 NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(const NsmObject& provider,
                                            uint8_t deviceIndex) :
-    NsmSensor(provider), deviceIndex(deviceIndex)
+    NsmSensor(provider),
+    deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,

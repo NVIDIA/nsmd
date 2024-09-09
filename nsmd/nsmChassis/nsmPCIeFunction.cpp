@@ -27,8 +27,9 @@ namespace nsm
 NsmPCIeFunction::NsmPCIeFunction(
     const NsmInterfaceProvider<PCIeDeviceIntf>& provider, uint8_t deviceIndex,
     uint8_t functionId) :
-    NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceIndex(deviceIndex), functionId(functionId)
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), deviceIndex(deviceIndex),
+    functionId(functionId)
 {}
 
 std::optional<Request> NsmPCIeFunction::genRequestMsg(eid_t eid,

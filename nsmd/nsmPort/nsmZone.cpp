@@ -13,7 +13,8 @@ namespace nsm
 
 NsmZone::NsmZone(sdbusplus::bus::bus& bus, const std::string& name,
                  const std::string& type, const std::string& fabricObjPath,
-                 const std::string& zoneType) : NsmObject(name, type)
+                 const std::string& zoneType) :
+    NsmObject(name, type)
 {
     lg2::info("NsmFabricZone: create sensor:{NAME}", "NAME", name.c_str());
     auto inventoryObjPath = fabricObjPath + "/zones/0";

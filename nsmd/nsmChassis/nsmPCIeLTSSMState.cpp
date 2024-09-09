@@ -26,8 +26,8 @@ namespace nsm
 
 NsmPCIeLTSSMState::NsmPCIeLTSSMState(
     const NsmInterfaceProvider<LTSSMStateIntf>& provider, uint8_t deviceIndex) :
-    NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceIndex(deviceIndex)
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), deviceIndex(deviceIndex)
 {}
 
 std::optional<Request> NsmPCIeLTSSMState::genRequestMsg(eid_t eid,

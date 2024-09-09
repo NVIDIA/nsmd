@@ -556,8 +556,8 @@ TEST(NsmPCIeGroup5, BadHandleResp)
 TEST(nsmEDPpScalingFactor, GoodGenReq)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
-    auto resetEdppAsyncIntf =
-        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
     const uint8_t eid{12};
@@ -575,8 +575,8 @@ TEST(nsmEDPpScalingFactor, GoodGenReq)
 TEST(nsmEDPpScalingFactor, GoodHandleResp)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
-    auto resetEdppAsyncIntf =
-        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 
@@ -604,8 +604,8 @@ TEST(nsmEDPpScalingFactor, GoodHandleResp)
 TEST(nsmEDPpScalingFactor, GoodUpdateReading)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
-    auto resetEdppAsyncIntf =
-        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 
@@ -616,14 +616,15 @@ TEST(nsmEDPpScalingFactor, GoodUpdateReading)
     sensor.persistence = true;
     sensor.updateReading(scaling_factors);
     EXPECT_EQ(sensor.eDPpIntf->setPoint(),
-              std::make_tuple(scaling_factors.enforced_scaling_factor, sensor.persistence));
+              std::make_tuple(scaling_factors.enforced_scaling_factor,
+                              sensor.persistence));
 }
 
 TEST(nsmEDPpScalingFactor, BadHandleResp)
 {
     auto eDPpIntf = std::make_shared<EDPpLocal>(bus, inventoryObjPath);
-    auto resetEdppAsyncIntf =
-        std::make_shared<NsmResetEdppAsyncIntf>(bus, inventoryObjPath.c_str(), nullptr);
+    auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
+        bus, inventoryObjPath.c_str(), nullptr);
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 

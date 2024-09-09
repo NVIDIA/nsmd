@@ -12,7 +12,8 @@ NsmFpgaProcessor::NsmFpgaProcessor(
     std::string& inventoryObjPath,
     const std::vector<utils::Association>& associations,
     const std::string& fpgaType, const std::string& locationType,
-    std::string& health) : NsmObject(name, type)
+    std::string& health) :
+    NsmObject(name, type)
 {
     acceleratorIntf =
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());

@@ -42,7 +42,8 @@ class NsmPowerCapIntf : public PowerCapIntf
     NsmPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
                     std::string& name, const std::vector<std::string>& parents,
                     std::shared_ptr<NsmDevice> device) :
-        PowerCapIntf(bus, path), name(name), parents(parents), device(device)
+        PowerCapIntf(bus, path),
+        name(name), parents(parents), device(device)
     {}
 
     requester::Coroutine getPowerCapFromDevice()

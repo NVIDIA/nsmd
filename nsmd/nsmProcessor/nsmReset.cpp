@@ -33,7 +33,8 @@ namespace nsm
 NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
                    const std::string& type, std::string& inventoryObjPath,
                    std::shared_ptr<NsmDevice> device,
-                   const uint8_t deviceIndex) : NsmObject(name, type)
+                   const uint8_t deviceIndex) :
+    NsmObject(name, type)
 {
     lg2::info("NsmReset: create sensor:{NAME}", "NAME", name.c_str());
     resetIntf = std::make_shared<NsmResetIntf>(bus, inventoryObjPath.c_str());

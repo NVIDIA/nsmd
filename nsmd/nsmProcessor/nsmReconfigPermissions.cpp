@@ -27,7 +27,8 @@ namespace nsm
 NsmReconfigPermissions::NsmReconfigPermissions(
     const NsmInterfaceProvider<ReconfigSettingsIntf>& provider,
     ReconfigSettingsIntf::FeatureType feature) :
-    NsmSensor(provider), NsmInterfaceContainer(provider), feature(feature)
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), feature(feature)
 {
     // Validates feature value during object creation
     index = getIndex(feature);

@@ -32,7 +32,8 @@ NsmGpuPciePort::NsmGpuPciePort(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& health, const std::string& chasisState,
     const std::vector<utils::Association>& associations,
-    const std::string& inventoryObjPath) : NsmObject(name, type)
+    const std::string& inventoryObjPath) :
+    NsmObject(name, type)
 {
     lg2::info("NsmGpuPciePort: create sensor:{NAME}", "NAME", name.c_str());
     associationDefIntf =
@@ -61,7 +62,8 @@ NsmGpuPciePortInfo::NsmGpuPciePortInfo(
     const std::string& name, const std::string& type,
     const std::string& portType, const std::string& portProtocol,
     std::shared_ptr<PortInfoIntf> portInfoIntf) :
-    NsmObject(name, type), portInfoIntf(portInfoIntf)
+    NsmObject(name, type),
+    portInfoIntf(portInfoIntf)
 {
     lg2::info("NsmGpuPciePortInfo: create sensor:{NAME}", "NAME", name.c_str());
     portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
@@ -72,8 +74,8 @@ NsmGpuPciePortInfo::NsmGpuPciePortInfo(
 NsmClearPCIeCounters::NsmClearPCIeCounters(
     const std::string& name, const std::string& type, const uint8_t groupId,
     uint8_t deviceIndex, std::shared_ptr<ClearPCIeIntf> clearPCIeIntf) :
-    NsmObject(name, type), groupId(groupId), deviceIndex(deviceIndex),
-    clearPCIeIntf(clearPCIeIntf)
+    NsmObject(name, type),
+    groupId(groupId), deviceIndex(deviceIndex), clearPCIeIntf(clearPCIeIntf)
 {
     lg2::info("NsmClearPCIeCounters:: create sensor {NAME} of group {GROUP_ID}",
               "NAME", name, "GROUP_ID", groupId);

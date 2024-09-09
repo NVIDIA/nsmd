@@ -24,7 +24,8 @@ namespace nsm
 
 NsmInventoryPropertyBase::NsmInventoryPropertyBase(
     const NsmObject& pdi, nsm_inventory_property_identifiers property) :
-    NsmSensor(pdi), property(property)
+    NsmSensor(pdi),
+    property(property)
 {}
 
 std::optional<Request>
