@@ -45,30 +45,17 @@ NsmEraseTraceObject::NsmEraseTraceObject(sdbusplus::bus::bus& bus,
     objPath = inventoryPath + name;
 }
 
-std::tuple<uint64_t, EraseStatus>
-    NsmEraseTraceObject::erase(EraseInfoType eraseInfoType)
+std::tuple<uint64_t, EraseStatus> NsmEraseTraceObject::erase()
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
     std::tuple<uint64_t, EraseStatus> result(NSM_ERROR, EraseStatus::Unknown);
 
-    nsm_erase_information_type infoType;
-    switch (eraseInfoType)
-    {
-        case EraseInfoType::DeviceDebugInfo:
-            infoType = INFO_TYPE_DEVICE_DEBUG_INFO;
-            break;
-        default:
-            lg2::error("NsmEraseTraceObject: unsupported info type: {TP}", "TP",
-                       eraseInfoType);
-            return result;
-    }
-
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
-    auto rc = encode_erase_trace_req(0, infoType, requestMsg);
+    auto rc = encode_erase_trace_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("NsmEraseTraceObject: encode_erase_trace_req: rc={RC}", "RC",
@@ -115,8 +102,9 @@ std::tuple<uint64_t, EraseStatus>
             std::get<1>(result) = EraseStatus::DataEraseInProgress;
             break;
         default:
-            lg2::error("NsmEraseTraceObject: unsupported info type: {TP}", "TP",
-                       eraseInfoType);
+            lg2::error(
+                "NsmEraseTraceObject: unsupported response status type: {TP}",
+                "TP", resStatus);
             std::get<1>(result) = EraseStatus::Unknown;
             return result;
     }

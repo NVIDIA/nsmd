@@ -4444,8 +4444,7 @@ std::optional<std::vector<uint8_t>>
         lg2::info("eraseTraceHandler: request length={LEN}", "LEN", requestLen);
     }
 
-    uint8_t info_type = 0;
-    auto rc = decode_erase_trace_req(requestMsg, requestLen, &info_type);
+    auto rc = decode_erase_trace_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_erase_trace_req failed: rc={RC}", "RC", rc);

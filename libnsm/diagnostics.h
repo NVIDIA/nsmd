@@ -143,8 +143,6 @@ struct nsm_get_network_device_debug_info_resp {
  */
 struct nsm_erase_trace_req {
 	struct nsm_common_req hdr;
-	uint8_t info_type;
-	uint8_t reserved;
 } __attribute__((packed));
 
 /** @struct nsm_erase_trace_resp
@@ -361,22 +359,18 @@ int decode_get_network_device_debug_info_resp(const struct nsm_msg *msg,
 /** @brief Encode a Erase Trace request message
  *
  *  @param[in] instance_id - NSM instance ID
- *  @param[in] info_type - information type to erase
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_erase_trace_req(uint8_t instance_id, uint8_t info_type,
-			   struct nsm_msg *msg);
+int encode_erase_trace_req(uint8_t instance_id, struct nsm_msg *msg);
 
 /** @brief Decode a Erase Trace request message
  *
  *  @param[in] msg - request message
  *  @param[in] msg_len - Length of request message
- *  @param[out] info_type - information type to erase
  *  @return nsm_completion_codes
  */
-int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len,
-			   uint8_t *info_type);
+int decode_erase_trace_req(const struct nsm_msg *msg, size_t msg_len);
 
 /** @brief Encode a Erase Trace response message
  *
