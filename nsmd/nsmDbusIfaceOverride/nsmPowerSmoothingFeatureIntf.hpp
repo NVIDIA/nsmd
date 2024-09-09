@@ -32,8 +32,8 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
     OemPowerSmoothingFeatIntf(sdbusplus::bus::bus& bus,
                               const std::string& inventoryObjPath,
                               std::shared_ptr<NsmDevice> device) :
-        PowerSmoothingIntf(bus, (inventoryObjPath).c_str()), device(device),
-        inventoryObjPath(inventoryObjPath)
+        PowerSmoothingIntf(bus, (inventoryObjPath).c_str()),
+        device(device), inventoryObjPath(inventoryObjPath)
 
     {}
     std::string getInventoryObjPath()

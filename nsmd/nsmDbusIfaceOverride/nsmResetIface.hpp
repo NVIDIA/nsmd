@@ -38,7 +38,8 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
   public:
     NsmResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
                       std::shared_ptr<NsmDevice> device, uint8_t deviceIndex) :
-        ResetAsyncIntf(bus, path), device(device), deviceIndex(deviceIndex)
+        ResetAsyncIntf(bus, path),
+        device(device), deviceIndex(deviceIndex)
     {}
 
     requester::Coroutine assertFundamentalReset(uint8_t action)
@@ -152,7 +153,8 @@ class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
   public:
     NsmSwitchResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
                             std::shared_ptr<NsmDevice> device) :
-        ResetAsyncIntf(bus, path), device(device)
+        ResetAsyncIntf(bus, path),
+        device(device)
     {}
 
     requester::Coroutine resetOnDevice(AsyncOperationStatusType* status)

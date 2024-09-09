@@ -150,7 +150,8 @@ class NsmNumericSensor : public NsmSensor
     NsmNumericSensor(
         const std::string& name, const std::string& type, uint8_t sensorId,
         std::shared_ptr<NsmNumericSensorValueAggregate> sensorValue) :
-        NsmSensor(name, type), sensorId(sensorId), sensorValue(sensorValue) {};
+        NsmSensor(name, type),
+        sensorId(sensorId), sensorValue(sensorValue){};
 
     std::shared_ptr<NsmNumericSensorValueAggregate> getSensorValueObject()
     {

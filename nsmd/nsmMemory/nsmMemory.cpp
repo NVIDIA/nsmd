@@ -20,8 +20,8 @@ namespace nsm
 NsmMemoryErrorCorrection::NsmMemoryErrorCorrection(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf,
     std::string& correctionType, std::string& inventoryObjPath) :
-    NsmObject(name, type), dimmIntf(dimmIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->ecc(DimmIntf::convertEccFromString(correctionType));
     updateMetricOnSharedMemory();
@@ -45,8 +45,8 @@ NsmMemoryDeviceType::NsmMemoryDeviceType(std::string& name, std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
                                          std::string& memoryType,
                                          std::string& inventoryObjPath) :
-    NsmObject(name, type), dimmIntf(dimmIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 {
     dimmIntf->memoryType(DimmIntf::convertDeviceTypeFromString(memoryType));
     updateMetricOnSharedMemory();
@@ -70,7 +70,8 @@ NsmLocationIntfMemory::NsmLocationIntfMemory(sdbusplus::bus::bus& bus,
                                              std::string& name,
                                              std::string& type,
                                              std::string& inventoryObjPath) :
-    NsmObject(name, type), inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type),
+    inventoryObjPath(inventoryObjPath)
 {
     locationIntf =
         std::make_unique<LocationIntfMemory>(bus, inventoryObjPath.c_str());
@@ -91,7 +92,8 @@ NsmMemoryHealth::NsmMemoryHealth(sdbusplus::bus::bus& bus, std::string& name,
 NsmMemoryAssociation::NsmMemoryAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath,
-    const std::vector<utils::Association>& associations) : NsmObject(name, type)
+    const std::vector<utils::Association>& associations) :
+    NsmObject(name, type)
 {
     associationDef = std::make_unique<AssociationDefinitionsIntf>(
         bus, inventoryObjPath.c_str());
@@ -110,7 +112,8 @@ NsmRowRemapState::NsmRowRemapState(
     std::string& name, std::string& type,
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type),
+    inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemapIntf: create sensor:{NAME}", "NAME", name.c_str());
@@ -194,7 +197,8 @@ NsmRowRemappingCounts::NsmRowRemappingCounts(
     std::string& name, std::string& type,
     std::shared_ptr<MemoryRowRemappingIntf> memoryRowRemappingIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type),
+    inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRowRemappingCount: create sensor:{NAME}", "NAME",
@@ -280,8 +284,8 @@ NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
     const std::string& name, const std::string& type,
     std::shared_ptr<MemoryRowRemappingIntf> rowRemapIntf,
     const std::string& inventoryObjPath) :
-    NsmSensor(name, type), rowRemapIntf(rowRemapIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type),
+    rowRemapIntf(rowRemapIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmRemappingAvailabilityBankCount: create sensor:{NAME}", "NAME",
@@ -391,7 +395,8 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
 NsmEccErrorCountsDram::NsmEccErrorCountsDram(
     std::string& name, std::string& type,
     std::shared_ptr<EccModeIntfDram> eccIntf, std::string& inventoryObjPath) :
-    NsmSensor(name, type), eccIntf(eccIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type),
+    eccIntf(eccIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmEccErrorCounts: create sensor:{NAME}", "NAME", name.c_str());
@@ -470,7 +475,8 @@ uint8_t
 
 NsmMinMemoryClockLimit::NsmMinMemoryClockLimit(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmObject(name, type), dimmIntf(dimmIntf)
+    NsmObject(name, type),
+    dimmIntf(dimmIntf)
 {
     lg2::info("NsmMinMemoryClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -540,7 +546,8 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
 
 NsmMaxMemoryClockLimit::NsmMaxMemoryClockLimit(
     std::string& name, std::string& type, std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmObject(name, type), dimmIntf(dimmIntf)
+    NsmObject(name, type),
+    dimmIntf(dimmIntf)
 {
     lg2::info("NsmMaxMemoryClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -612,8 +619,8 @@ NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
                                          const std::string& type,
                                          std::shared_ptr<DimmIntf> dimmIntf,
                                          std::string inventoryObjPath) :
-    NsmSensor(name, type), dimmIntf(dimmIntf),
-    inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type),
+    dimmIntf(dimmIntf), inventoryObjPath(inventoryObjPath)
 
 {
     lg2::info("NsmMemCurrClockFreq: create sensor:{NAME}", "NAME",
@@ -688,7 +695,8 @@ uint8_t
 
 NsmMemCapacity::NsmMemCapacity(const std::string& name, const std::string& type,
                                std::shared_ptr<DimmIntf> dimmIntf) :
-    NsmMemoryCapacity(name, type), dimmIntf(dimmIntf)
+    NsmMemoryCapacity(name, type),
+    dimmIntf(dimmIntf)
 
 {
     lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME", name.c_str());

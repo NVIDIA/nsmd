@@ -52,7 +52,8 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& deviceType,
     const uint8_t deviceIndex, std::string& inventoryObjPath) :
-    NsmSensor(name, type), deviceIndex(deviceIndex)
+    NsmSensor(name, type),
+    deviceIndex(deviceIndex)
 {
     auto objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceQueryScalarTelemetry: {NAME}", "NAME",

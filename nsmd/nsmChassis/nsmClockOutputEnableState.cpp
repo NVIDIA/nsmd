@@ -25,7 +25,8 @@ namespace nsm
 NsmClockOutputEnableStateBase::NsmClockOutputEnableStateBase(
     const NsmObject& provider, clock_output_enable_state_index bufferIndex,
     NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
-    NsmSensor(provider), bufferIndex(bufferIndex), deviceType(deviceType),
+    NsmSensor(provider),
+    bufferIndex(bufferIndex), deviceType(deviceType),
     instanceNumber(instanceNumber), retimer(retimer)
 {
     utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);

@@ -30,8 +30,9 @@ namespace nsm
 NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
     const NsmInterfaceProvider<OperationalStatusIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmSensor(provider), NsmInterfaceContainer(provider),
-    gpuInstanceId(gpuInstanceId), gpusPresence{}, gpusPower{}, state{}
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), gpuInstanceId(gpuInstanceId),
+    gpusPresence{}, gpusPower{}, state{}
 {
     updateMetricOnSharedMemory();
 }

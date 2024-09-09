@@ -58,8 +58,9 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
         std::shared_ptr<NsmDevice> device,
         std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
         std::shared_ptr<ClearPowerCapIntf> clearPowerCapIntf) :
-        ClearPowerCapAsyncIntf(bus, path), device(device),
-        powerCapIntf(powerCapIntf), clearPowerCapIntf(clearPowerCapIntf)
+        ClearPowerCapAsyncIntf(bus, path),
+        device(device), powerCapIntf(powerCapIntf),
+        clearPowerCapIntf(clearPowerCapIntf)
     {}
 
     requester::Coroutine getPowerCapFromDevice()

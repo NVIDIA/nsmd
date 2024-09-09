@@ -103,8 +103,8 @@ class Handler
             std::chrono::milliseconds(RESPONSE_TIME_OUT),
         std::chrono::milliseconds responseTimeOutLongRunning =
             std::chrono::milliseconds(RESPONSE_TIME_OUT_LONG_RUNNING)) :
-        event(event), instanceIdDb(instanceIdDb), sockManager(sockManager),
-        verbose(verbose),
+        event(event),
+        instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
         instanceIdExpiryIntervalRegular(instanceIdExpiryInterval),
         instanceIdExpiryIntervalLongRunning(
             instanceIdExpiryIntervalLongRunning),
@@ -591,9 +591,9 @@ struct SendRecvNsmMsg
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
                    size_t* responseLen, bool isLongRunning) :
-        handler(handler), isLongRunning(isLongRunning), eid(eid),
-        request(request), responseMsg(responseMsg), responseLen(responseLen),
-        rc(NSM_ERROR)
+        handler(handler),
+        isLongRunning(isLongRunning), eid(eid), request(request),
+        responseMsg(responseMsg), responseLen(responseLen), rc(NSM_ERROR)
     {}
 
     /** @brief The function will be registered by ReqisterHandler for handling

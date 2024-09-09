@@ -29,8 +29,9 @@ namespace nsm
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
     NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
-    NsmSensor(provider), NsmInterfaceContainer(provider),
-    deviceType(deviceType), instanceNumber(instanceNumber), retimer(retimer)
+    NsmSensor(provider),
+    NsmInterfaceContainer(provider), deviceType(deviceType),
+    instanceNumber(instanceNumber), retimer(retimer)
 {
     utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
 }

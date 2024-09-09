@@ -45,6 +45,7 @@
 #include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
+#include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
@@ -59,7 +60,6 @@
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/ProcessorPerformance/server.hpp>
-#include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>
 
 #include <cstdint>
 
@@ -316,10 +316,10 @@ class EDPpLocal : public EDPpIntf
 class NsmEDPpScalingFactor : public NsmSensor
 {
   public:
-    NsmEDPpScalingFactor(std::string& name, std::string& type,
-                         std::string& inventoryObjPath,
-                         std::shared_ptr<EDPpLocal> eDPpIntf,
-                         std::shared_ptr<NsmResetEdppAsyncIntf> resetEdppAsyncIntf);
+    NsmEDPpScalingFactor(
+        std::string& name, std::string& type, std::string& inventoryObjPath,
+        std::shared_ptr<EDPpLocal> eDPpIntf,
+        std::shared_ptr<NsmResetEdppAsyncIntf> resetEdppAsyncIntf);
     NsmEDPpScalingFactor() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -329,15 +329,15 @@ class NsmEDPpScalingFactor : public NsmSensor
     void updateMetricOnSharedMemory() override;
 
     requester::Coroutine
-    patchSetPoint(const AsyncSetOperationValueType& value,
-                            [[maybe_unused]] AsyncOperationStatusType* status,
-                            std::shared_ptr<NsmDevice> device);
+        patchSetPoint(const AsyncSetOperationValueType& value,
+                      [[maybe_unused]] AsyncOperationStatusType* status,
+                      std::shared_ptr<NsmDevice> device);
 
   private:
     void updateReading(struct nsm_EDPp_scaling_factors scaling_factor);
     bool persistence;
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
-    std::shared_ptr<NsmResetEdppAsyncIntf>resetEdppAsyncIntf;
+    std::shared_ptr<NsmResetEdppAsyncIntf> resetEdppAsyncIntf;
     std::string inventoryObjPath;
 };
 
@@ -360,7 +360,7 @@ class NsmMinEDPpLimit : public NsmObject
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
-   std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
+    std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
 };
 
 using CpuOperatingConfigIntf =
@@ -578,7 +578,7 @@ class NsmPowerCap : public NsmSensor
     NsmPowerCap(std::string& name, std::string& type,
                 std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
                 const std::vector<std::string>& parents,
-                const std::shared_ptr<PowerPersistencyIntf>persistencyIntf,
+                const std::shared_ptr<PowerPersistencyIntf> persistencyIntf,
                 std::string& inventoryObjPath);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -595,7 +595,7 @@ class NsmPowerCap : public NsmSensor
     std::shared_ptr<NsmPowerCapIntf> powerCapIntf = nullptr;
     void updateReading(uint32_t value);
     std::vector<std::string> parents;
-    std::shared_ptr<PowerPersistencyIntf>persistencyIntf;
+    std::shared_ptr<PowerPersistencyIntf> persistencyIntf;
     std::vector<std::shared_ptr<NsmPowerControl>> sensorCache;
     std::string inventoryObjPath;
 };

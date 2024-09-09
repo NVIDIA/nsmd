@@ -32,7 +32,8 @@ namespace nsm
 
 NsmXIDEvent::NsmXIDEvent(const std::string& name, const std::string& type,
                          const NsmXIDEventInfo info) :
-    NsmEvent(name, type), info(info)
+    NsmEvent(name, type),
+    info(info)
 {}
 
 int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,

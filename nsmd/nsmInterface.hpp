@@ -109,7 +109,8 @@ class NsmInterfaceProvider : public NsmObject, public NsmInterfaces<IntfType>
     {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          const Interfaces<IntfType>& interfaces) :
-        NsmObject(name, type), NsmInterfaces<IntfType>(interfaces)
+        NsmObject(name, type),
+        NsmInterfaces<IntfType>(interfaces)
     {}
     NsmInterfaceProvider(const std::string& name, const std::string& type,
                          const path& path, std::shared_ptr<IntfType> pdi) :

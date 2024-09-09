@@ -33,8 +33,8 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
                                  const std::string& type,
                                  uint8_t eventGenerationSetting,
                                  std::shared_ptr<NsmDevice> nsmDevice) :
-    NsmObject(name, type), eventGenerationSetting(eventGenerationSetting),
-    nsmDevice(nsmDevice)
+    NsmObject(name, type),
+    eventGenerationSetting(eventGenerationSetting), nsmDevice(nsmDevice)
 {}
 
 requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)

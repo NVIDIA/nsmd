@@ -103,8 +103,8 @@ struct coGetDbusProperty
     coGetDbusProperty(const std::string& objectPath,
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
-        service(service), objectPath(objectPath), interface(interface),
-        property(property), ret{}
+        service(service),
+        objectPath(objectPath), interface(interface), property(property), ret{}
     {}
 };
 
@@ -174,7 +174,8 @@ struct coGetServiceMap
      */
     coGetServiceMap(const std::string& objectPath,
                     const dbus::Interfaces& ifaceList) :
-        objectPath(objectPath), ifaceList(ifaceList)
+        objectPath(objectPath),
+        ifaceList(ifaceList)
     {}
 };
 
@@ -235,8 +236,8 @@ struct coGetDbusProperty
     coGetDbusProperty(const std::string& objectPath,
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
-        service(service), objectPath(objectPath), interface(interface),
-        property(property), ret{}
+        service(service),
+        objectPath(objectPath), interface(interface), property(property), ret{}
     {}
 };
 
@@ -267,7 +268,8 @@ struct coGetServiceMap
 
     coGetServiceMap(const std::string& objectPath,
                     const dbus::Interfaces& ifaceList) :
-        objectPath(objectPath), ifaceList(ifaceList)
+        objectPath(objectPath),
+        ifaceList(ifaceList)
     {}
 };
 

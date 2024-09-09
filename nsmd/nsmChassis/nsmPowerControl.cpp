@@ -34,8 +34,8 @@ NsmPowerControl::NsmPowerControl(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations, std::string& type,
     const std::string& path, const std::string& physicalContext) :
-    NsmObject(name, type), PowerCapIntf(bus, path.c_str()),
-    ClearPowerCapIntf(bus, path.c_str())
+    NsmObject(name, type),
+    PowerCapIntf(bus, path.c_str()), ClearPowerCapIntf(bus, path.c_str())
 {
     decoratorAreaIntf = std::make_unique<DecoratorAreaIntf>(bus, path.c_str());
     decoratorAreaIntf->physicalContext(

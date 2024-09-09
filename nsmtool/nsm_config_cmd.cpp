@@ -91,8 +91,8 @@ class SetErrorInjectionModeV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
@@ -145,8 +145,8 @@ class GetErrorInjectionModeV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &data);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) +
@@ -205,8 +205,8 @@ class GetSupportedErrorInjectionTypesV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &data);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) +
@@ -280,8 +280,8 @@ class SetCurrentErrorInjectionTypesV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
@@ -339,8 +339,8 @@ class GetCurrentErrorInjectionTypesV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &data);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) +
@@ -420,8 +420,8 @@ class EnableDisableGpuIstMode : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
@@ -508,8 +508,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: " << "rc=" << rc
-                        << ", cc=" << (int)cc
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
@@ -560,8 +560,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
                     std::cerr
-                        << "Response message error: " << "rc=" << rc
-                        << ", cc=" << (int)cc
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
                         << ", reasonCode=" << (int)reason_code << "\n"
                         << payloadLength << "...."
                         << (sizeof(nsm_msg_hdr) +
@@ -585,8 +585,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                     responsePtr, payloadLength, &cc, &reason_code, &data);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n"
                               << payloadLength << "...."
                               << (sizeof(nsm_msg_hdr) +
@@ -610,8 +610,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                     responsePtr, payloadLength, &cc, &reason_code, &data);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n"
                               << payloadLength << "...."
                               << (sizeof(nsm_msg_hdr) +
@@ -635,8 +635,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                     responsePtr, payloadLength, &cc, &reason_code, &data);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n"
                               << payloadLength << "...."
                               << (sizeof(nsm_msg_hdr) +
@@ -660,8 +660,8 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                     responsePtr, payloadLength, &cc, &reason_code, &data);
                 if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
                 {
-                    std::cerr << "Response message error: " << "rc=" << rc
-                              << ", cc=" << (int)cc
+                    std::cerr << "Response message error: "
+                              << "rc=" << rc << ", cc=" << (int)cc
                               << ", reasonCode=" << (int)reason_code << "\n"
                               << payloadLength << "...."
                               << (sizeof(nsm_msg_hdr) +
@@ -778,8 +778,8 @@ class GetReconfigurationPermissionsV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &data);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) +
@@ -880,8 +880,8 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            std::cerr << "Response message error: " << "rc=" << rc
-                      << ", cc=" << (int)cc
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
                       << ", reasonCode=" << (int)reason_code << "\n"
                       << payloadLength << "...."
                       << (sizeof(nsm_msg_hdr) +

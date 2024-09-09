@@ -30,7 +30,8 @@ namespace nsm
 NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
-    const std::string& type) : NsmObject(name, type)
+    const std::string& type) :
+    NsmObject(name, type)
 {
     auto pcieRetimerChaasisBasePath = std::string(chassisInventoryBasePath) +
                                       "/" + name;

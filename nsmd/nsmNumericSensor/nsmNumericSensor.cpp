@@ -260,7 +260,8 @@ void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
 NsmNumericSensorCompositeChildValue::NsmNumericSensorCompositeChildValue(
     const std::string& name, const std::string& sensorType,
     const std::vector<std::string>& parents) :
-    name(name), sensorType(sensorType), parents(parents)
+    name(name),
+    sensorType(sensorType), parents(parents)
 {}
 
 void NsmNumericSensorCompositeChildValue::updateReading(double value,

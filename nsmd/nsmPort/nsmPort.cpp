@@ -106,8 +106,8 @@ NsmPortStatus::NsmPortStatus(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmObject(portName, type), portName(portName), portNumber(portNum),
-    objPath(inventoryObjPath)
+    NsmObject(portName, type),
+    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortStatus: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -298,8 +298,8 @@ NsmPortCharacteristics::NsmPortCharacteristics(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum),
-    objPath(inventoryObjPath)
+    NsmSensor(portName, type),
+    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -418,8 +418,8 @@ NsmPortMetrics::NsmPortMetrics(
     const std::string& type,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath) :
-    NsmSensor(portName, type), portName(portName), portNumber(portNum),
-    objPath(inventoryObjPath)
+    NsmSensor(portName, type),
+    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortMetrics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);

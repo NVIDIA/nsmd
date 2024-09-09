@@ -26,7 +26,8 @@ namespace nsm
 
 NsmErrorInjection::NsmErrorInjection(
     const NsmInterfaceProvider<ErrorInjectionIntf>& provider) :
-    NsmSensor(provider), NsmInterfaceContainer<ErrorInjectionIntf>(provider)
+    NsmSensor(provider),
+    NsmInterfaceContainer<ErrorInjectionIntf>(provider)
 {}
 
 std::optional<Request> NsmErrorInjection::genRequestMsg(eid_t eid,

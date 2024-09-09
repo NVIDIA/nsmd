@@ -827,7 +827,10 @@ enum power_limit_id { DEVICE = 0, MODULE = 1 };
  */
 enum power_limit_action { NEW_LIMIT = 0, DEFAULT_LIMIT = 1 };
 
-enum edpp_scaling_factor_action {NEW_SCALING_FACTOR = 0, RESET_TO_DEFAULT = 1};
+enum edpp_scaling_factor_action {
+	NEW_SCALING_FACTOR = 0,
+	RESET_TO_DEFAULT = 1
+};
 
 /**
  @brief Lifetime of power limit

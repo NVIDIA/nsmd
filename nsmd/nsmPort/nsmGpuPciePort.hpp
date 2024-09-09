@@ -102,7 +102,8 @@ class NsmClearPCIeIntf : public ClearPCIeIntf
     NsmClearPCIeIntf(sdbusplus::bus::bus& bus, const char* path,
                      const uint8_t deviceIndex,
                      std::shared_ptr<NsmDevice> device) :
-        ClearPCIeIntf(bus, path), deviceIndex(deviceIndex), device(device)
+        ClearPCIeIntf(bus, path),
+        deviceIndex(deviceIndex), device(device)
     {}
 
     sdbusplus::message::object_path clearCounter(std::string Counter) override;

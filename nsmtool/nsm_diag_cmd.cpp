@@ -327,7 +327,8 @@ class QueryTokenStatus : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit QueryTokenStatus(const char* type, const char* name,
-                              CLI::App* app) : CommandInterface(type, name, app)
+                              CLI::App* app) :
+        CommandInterface(type, name, app)
     {
         auto ccOptionGroup = app->add_option_group(
             "Required", "Query token status for the specified token type");

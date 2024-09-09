@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -752,10 +752,10 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 5, 6, 9, 10}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   6,   7,   8,   9,   10, 11,  12,  14,  15,
-                      16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  118,
-                      113, 114, 115, 116, 117, 119, 120, 121, 122, 123, 124,
-                      125, 126, 127, 163, 164, 165, 166, 172, 173}},
+                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
+                      15,  16,  17,  69,  70,  71,  73,  74,  77,  78,  79,
+                      118, 113, 114, 115, 116, 117, 119, 120, 121, 122, 123,
+                      124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
                  {5, {3, 4, 5, 6, 7, 64, 65}},
                  {6, {1, 2, 3, 4, 5, 6}},

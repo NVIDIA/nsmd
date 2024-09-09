@@ -32,8 +32,8 @@ NsmPCIeAERErrorStatus::NsmPCIeAERErrorStatus(
     const std::string& name, const std::string& type,
     std::shared_ptr<NsmAERErrorStatusIntf> aerErrorStatusIntf,
     uint8_t deviceIndex) :
-    NsmSensor(name, type), aerErrorStatusIntf(aerErrorStatusIntf),
-    deviceIndex(deviceIndex)
+    NsmSensor(name, type),
+    aerErrorStatusIntf(aerErrorStatusIntf), deviceIndex(deviceIndex)
 {
     lg2::info("NsmPCIeAERErrorStatus: create sensor:{NAME}", "NAME",
               name.c_str());

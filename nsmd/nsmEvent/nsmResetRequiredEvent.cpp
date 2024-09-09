@@ -31,7 +31,9 @@ namespace nsm
 
 NsmResetRequiredEvent::NsmResetRequiredEvent(
     const std::string& name, const std::string& type,
-    const NsmResetRequiredEventInfo info) : NsmEvent(name, type), info(info)
+    const NsmResetRequiredEventInfo info) :
+    NsmEvent(name, type),
+    info(info)
 {
     if (!info.messageArgs.empty())
     {

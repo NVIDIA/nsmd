@@ -33,8 +33,8 @@ NsmEventConfig::NsmEventConfig(const std::string& name, const std::string& type,
                                uint8_t messageType,
                                std::vector<uint64_t>& srcEventIds,
                                std::vector<uint64_t>& ackEventIds) :
-    NsmObject(name, type), messageType(messageType), srcEventMask(8),
-    ackEventMask(8)
+    NsmObject(name, type),
+    messageType(messageType), srcEventMask(8), ackEventMask(8)
 {
     // convert id list to bitfield
     convertIdsToMask(srcEventIds, srcEventMask);

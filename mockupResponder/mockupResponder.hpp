@@ -1,6 +1,6 @@
 /*
- * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -242,10 +242,10 @@ class MockupResponder
                                            size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
-                                           size_t requestLen);
+                                         size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getNetworkDeviceLogInfoHandler(const nsm_msg* requestMsg,
-                                           size_t requestLen);
+                                       size_t requestLen);
     std::optional<std::vector<uint8_t>>
         eraseTraceHandler(const nsm_msg* requestMsg, size_t requestLen);
 
@@ -383,8 +383,7 @@ class MockupResponder
                  nsm_reconfiguration_permissions_v1>
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
-        std::map<uint8_t, std::map<error_injection_type, bool>>
-            errorInjection;
+        std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
     } state;
 };
 
