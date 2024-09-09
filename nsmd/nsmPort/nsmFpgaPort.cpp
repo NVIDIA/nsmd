@@ -125,7 +125,8 @@ static requester::Coroutine
                 name, type, portType, portProtocol, portInfoIntf);
             nsmDevice->deviceSensors.emplace_back(portInfoSensor);
             auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-                name, type, portInfoIntf, portWidthIntf, deviceIndex);
+                name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
+                deviceIndex);
 
             if (priority)
             {
@@ -157,11 +158,11 @@ static requester::Coroutine
                 std::make_shared<PCIeEccIntf>(bus, inventoryObjPath.c_str());
 
             auto pcieECCIntfSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
-                name, type, pcieECCIntf, deviceIndex);
+                name, type, inventoryObjPath, pcieECCIntf, deviceIndex);
             auto pcieECCIntfSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
-                name, type, pcieECCIntf, deviceIndex);
+                name, type, inventoryObjPath, pcieECCIntf, deviceIndex);
             auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
-                name, type, pcieECCIntf, deviceIndex);
+                name, type, inventoryObjPath, pcieECCIntf, deviceIndex);
 
             if (!pcieECCIntfSensorGroup2 || !pcieECCIntfSensorGroup3 ||
                 !pcieECCIntfSensorGroup4)

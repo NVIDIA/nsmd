@@ -59,6 +59,7 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
 {
   public:
     NsmPCIeECCGroup1(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
                      std::shared_ptr<PortInfoIntf> portInfoIntf,
                      std::shared_ptr<PortWidthIntf> portWidthIntf,
                      uint8_t deviceIndex);
@@ -66,8 +67,10 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
+    std::string objPath;
     double convertEncodedSpeedToGbps(const uint32_t& speed);
     size_t convertEncodedWidthToActualWidth(const uint32_t& width);
     std::shared_ptr<PortInfoIntf> portInfoIntf = nullptr;
@@ -78,14 +81,17 @@ class NsmPCIeECCGroup2 : public NsmPcieGroup
 {
   public:
     NsmPCIeECCGroup2(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
     NsmPCIeECCGroup2() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
+    std::string objPath;
     std::shared_ptr<PCIeEccIntf> pcieEccIntf = nullptr;
 };
 
@@ -93,14 +99,17 @@ class NsmPCIeECCGroup3 : public NsmPcieGroup
 {
   public:
     NsmPCIeECCGroup3(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
     NsmPCIeECCGroup3() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
+    std::string objPath;
     std::shared_ptr<PCIeEccIntf> pcieEccIntf = nullptr;
 };
 
@@ -108,14 +117,17 @@ class NsmPCIeECCGroup4 : public NsmPcieGroup
 {
   public:
     NsmPCIeECCGroup4(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
     NsmPCIeECCGroup4() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
+    std::string objPath;
     std::shared_ptr<PCIeEccIntf> pcieEccIntf = nullptr;
 };
 

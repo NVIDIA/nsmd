@@ -37,14 +37,22 @@ NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
 
 NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
                                    const std::string& type,
+                                   const std::string& inventoryPath,
                                    std::shared_ptr<PortInfoIntf> portInfoIntf,
                                    std::shared_ptr<PortWidthIntf> portWidthIntf,
                                    uint8_t deviceIndex) :
     NsmPcieGroup(name, type, deviceIndex, 1),
-    portInfoIntf(portInfoIntf), portWidthIntf(portWidthIntf)
-
+    objPath(inventoryPath), portInfoIntf(portInfoIntf),
+    portWidthIntf(portWidthIntf)
 {
     lg2::info("NsmPCIeECCGroup1: {NAME}", "NAME", name.c_str());
+
+    portInfoIntf->maxSpeed(0);
+    portInfoIntf->currentSpeed(0);
+    portWidthIntf->width(0);
+    portWidthIntf->activeWidth(0);
+
+    updateMetricOnSharedMemory();
 }
 
 double NsmPCIeECCGroup1::convertEncodedSpeedToGbps(const uint32_t& speed)
@@ -109,6 +117,7 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
             convertEncodedWidthToActualWidth(data.max_link_width));
         portWidthIntf->activeWidth(
             convertEncodedWidthToActualWidth(data.negotiated_link_width));
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -121,15 +130,43 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
+void NsmPCIeECCGroup1::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePortInfoName = std::string(portInfoIntf->interface);
+    auto ifacePortWidthName = std::string(portWidthIntf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantCS{
+        portInfoIntf->currentSpeed()};
+    std::string propName = "CurrentSpeed";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
+
+    nv::sensor_aggregation::DbusVariantType variantAW{
+        portWidthIntf->activeWidth()};
+    propName = "ActiveWidth";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortWidthName, propName, rawSmbpbiData, variantAW);
+#endif
+}
+
 NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& type,
+                                   const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
     NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2),
-    pcieEccIntf(pcieEccIntf)
-
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup2: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->nonfeCount(0);
+    pcieEccIntf->feCount(0);
+    pcieEccIntf->ceCount(0);
+    pcieEccIntf->unsupportedRequestCount(0);
+
+    updateMetricOnSharedMemory();
 }
 
 uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -149,6 +186,7 @@ uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->feCount(data.fatal_errors);
         pcieEccIntf->ceCount(data.correctable_errors);
         pcieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -161,15 +199,48 @@ uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
+void NsmPCIeECCGroup2::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePCIeEccName = std::string(pcieEccIntf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantNFC{
+        pcieEccIntf->nonfeCount()};
+    std::string propName = "nonfeCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNFC);
+
+    nv::sensor_aggregation::DbusVariantType variantFC{pcieEccIntf->feCount()};
+    propName = "feCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantFC);
+
+    nv::sensor_aggregation::DbusVariantType variantCC{pcieEccIntf->ceCount()};
+    propName = "ceCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantCC);
+
+    nv::sensor_aggregation::DbusVariantType variantURC{
+        pcieEccIntf->unsupportedRequestCount()};
+    propName = "UnsupportedRequestCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantURC);
+#endif
+}
+
 NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
                                    const std::string& type,
+                                   const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
     NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3),
-    pcieEccIntf(pcieEccIntf)
-
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup3: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->l0ToRecoveryCount(0);
+    updateMetricOnSharedMemory();
 }
 
 uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -186,6 +257,7 @@ uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         pcieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -198,15 +270,36 @@ uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
+void NsmPCIeECCGroup3::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePCIeEccName = std::string(pcieEccIntf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantL0TRC{
+        pcieEccIntf->l0ToRecoveryCount()};
+    std::string propName = "L0ToRecoveryCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantL0TRC);
+#endif
+}
+
 NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
                                    const std::string& type,
+                                   const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
     NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4),
-    pcieEccIntf(pcieEccIntf)
-
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup4: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->replayCount(0);
+    pcieEccIntf->replayRolloverCount(0);
+    pcieEccIntf->nakSentCount(0);
+    pcieEccIntf->nakReceivedCount(0);
+
+    updateMetricOnSharedMemory();
 }
 
 uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -226,6 +319,7 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
         pcieEccIntf->nakSentCount(data.NAK_sent_cnt);
         pcieEccIntf->nakReceivedCount(data.NAK_recv_cnt);
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -236,6 +330,38 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
+}
+
+void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePCIeEccName = std::string(pcieEccIntf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantRC{
+        pcieEccIntf->replayCount()};
+    std::string propName = "ReplayCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantRC);
+
+    nv::sensor_aggregation::DbusVariantType variantRRC{
+        pcieEccIntf->replayRolloverCount()};
+    propName = "ReplayRolloverCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantRRC);
+
+    nv::sensor_aggregation::DbusVariantType variantNSC{
+        pcieEccIntf->nakSentCount()};
+    propName = "NAKSentCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNSC);
+
+    nv::sensor_aggregation::DbusVariantType variantNRC{
+        pcieEccIntf->nakReceivedCount()};
+    propName = "NAKReceivedCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNRC);
+#endif
 }
 
 NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
@@ -361,13 +487,13 @@ static requester::Coroutine
         portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
 
         auto pcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-            portName, type, portInfoIntf, portWidthIntf, deviceIndex);
+            portName, type, objPath, portInfoIntf, portWidthIntf, deviceIndex);
         auto pcieECCIntfSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
-            portName, type, pcieECCIntf, deviceIndex);
+            portName, type, objPath, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
-            portName, type, pcieECCIntf, deviceIndex);
+            portName, type, objPath, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
-            portName, type, pcieECCIntf, deviceIndex);
+            portName, type, objPath, pcieECCIntf, deviceIndex);
 
         if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup2 ||
             !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4)
