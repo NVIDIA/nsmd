@@ -54,6 +54,7 @@ class NsmLogInfoObject : public NsmObject, public LogInfoIntf
         getLogInfoAsyncHandler(std::shared_ptr<Request> request);
 
     std::string objPath;
+    std::string fdName;
     uuid_t uuid;
     bool cmdInProgress{false};
 };
