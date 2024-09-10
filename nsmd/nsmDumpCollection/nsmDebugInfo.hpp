@@ -55,6 +55,7 @@ class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
         getDebugInfoAsyncHandler(std::shared_ptr<Request> request);
 
     std::string objPath;
+    std::string fdName;
     uuid_t uuid;
     bool cmdInProgress{false};
 };

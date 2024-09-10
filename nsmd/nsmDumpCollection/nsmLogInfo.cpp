@@ -48,6 +48,7 @@ NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus::bus& bus,
     lg2::debug("NsmLogInfoObject: {NAME}", "NAME", name.c_str());
 
     objPath = inventoryPath + name;
+    fdName = name + "_log_info";
     sdbusplus::message::unix_fd unixFd(0);
     fd(unixFd, true);
 }
@@ -110,7 +111,7 @@ requester::Coroutine
         co_return rc;
     }
 
-    int fileDesc = memfd_create("log_info", 0);
+    int fileDesc = memfd_create(fdName.c_str(), 0);
     if (fileDesc == -1)
     {
         lg2::error("NsmLogInfoObject: memfd_create: eid={EID} error={ERROR}",
