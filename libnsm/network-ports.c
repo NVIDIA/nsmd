@@ -1211,3 +1211,153 @@ int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
 	}
 	return result;
 }
+
+int encode_get_switch_isolation_mode_req(uint8_t instance, struct nsm_msg *msg)
+{
+	return encode_common_req(instance, NSM_TYPE_NETWORK_PORT,
+				 NSM_GET_SWITCH_ISOLATION_MODE, msg);
+}
+
+int decode_get_switch_isolation_mode_req(const struct nsm_msg *msg,
+					 size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
+					  uint16_t reason_code,
+					  uint8_t isolation_mode,
+					  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_SWITCH_ISOLATION_MODE, msg);
+	}
+
+	struct nsm_get_switch_isolation_mode_resp *response =
+	    (struct nsm_get_switch_isolation_mode_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_SWITCH_ISOLATION_MODE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_get_switch_isolation_mode_resp) -
+		    sizeof(struct nsm_common_resp));
+
+	response->isolation_mode = isolation_mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_switch_isolation_mode_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code,
+					  uint8_t *isolation_mode)
+{
+	if (isolation_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != (sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_switch_isolation_mode_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_switch_isolation_mode_resp *resp =
+	    (struct nsm_get_switch_isolation_mode_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(resp->hdr.data_size);
+	if (data_size != sizeof(struct nsm_get_switch_isolation_mode_resp) -
+			     sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*isolation_mode = resp->isolation_mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_switch_isolation_mode_req(uint8_t instance,
+					 uint8_t isolation_mode,
+					 struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance, NSM_TYPE_NETWORK_PORT,
+				   NSM_SET_SWITCH_ISOLATION_MODE, msg);
+
+	if (rc == NSM_SW_SUCCESS) {
+		struct nsm_set_switch_isolation_mode_req *req =
+		    (struct nsm_set_switch_isolation_mode_req *)msg->payload;
+		req->hdr.data_size =
+		    sizeof(struct nsm_set_switch_isolation_mode_req) -
+		    sizeof(struct nsm_common_req);
+		req->isolation_mode = isolation_mode;
+	}
+	return rc;
+}
+
+int decode_set_switch_isolation_mode_req(const struct nsm_msg *msg,
+					 size_t msg_len,
+					 uint8_t *isolation_mode)
+{
+	if (msg == NULL || isolation_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_switch_isolation_mode_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_switch_isolation_mode_req *req =
+	    (struct nsm_set_switch_isolation_mode_req *)msg->payload;
+
+	if (req->hdr.data_size !=
+	    sizeof(struct nsm_set_switch_isolation_mode_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*isolation_mode = req->isolation_mode;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg)
+{
+	return encode_common_resp(instance, cc, reason_code,
+				  NSM_TYPE_NETWORK_PORT,
+				  NSM_SET_SWITCH_ISOLATION_MODE, msg);
+}
+
+int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code)
+{
+	uint16_t data_size;
+	return decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+}

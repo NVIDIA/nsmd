@@ -17,6 +17,8 @@
 
 #include "nsmSwitch.hpp"
 
+#include "network-ports.h"
+
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
@@ -456,6 +458,152 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime(
     co_return rc;
 }
 
+NsmSwitchIsolationMode::NsmSwitchIsolationMode(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<SwitchIsolationIntf> switchIsolationIntf) :
+    NsmSensor(name, type),
+    switchIsolationIntf(switchIsolationIntf)
+{}
+
+std::optional<std::vector<uint8_t>>
+    NsmSwitchIsolationMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_switch_isolation_mode_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_switch_isolation_mode_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t
+    NsmSwitchIsolationMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                              size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint8_t isolationMode;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_switch_isolation_mode_resp(
+        responseMsg, responseLen, &cc, &reason_code, &isolationMode);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        if (isolationMode == SWITCH_COMMUNICATION_MODE_ENABLED)
+        {
+            switchIsolationIntf->isolationMode(
+                SwitchCommunicationMode::SwitchCommunicationEnabled);
+        }
+        else if (isolationMode == SWITCH_COMMUNICATION_MODE_DISABLED)
+        {
+            switchIsolationIntf->isolationMode(
+                SwitchCommunicationMode::SwitchCommunicationDisabled);
+        }
+        else
+        {
+            switchIsolationIntf->isolationMode(
+                SwitchCommunicationMode::SwitchCommunicationUnknown);
+        }
+        clearErrorBitMap("decode_get_switch_isolation_mode_resp");
+    }
+    else
+    {
+        logHandleResponseMsg("decode_get_switch_isolation_mode_resp",
+                             reason_code, cc, rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    return cc;
+}
+
+requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const std::string* reqIsolationMode = std::get_if<std::string>(&value);
+    if (reqIsolationMode == NULL)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    lg2::info("set Switch Isolation Mode On Device for EID: {EID}", "EID", eid);
+
+    uint8_t isolationMode;
+    if (*reqIsolationMode == "SwitchCommunicationEnabled")
+    {
+        isolationMode = SWITCH_COMMUNICATION_MODE_ENABLED;
+    }
+    else if (*reqIsolationMode == "SwitchCommunicationDisabled")
+    {
+        isolationMode = SWITCH_COMMUNICATION_MODE_DISABLED;
+    }
+    else
+    {
+        lg2::error(
+            "NsmSwitchIsolationMode::setSwitchIsolationMode invalid isolation mode {MODE}",
+            "MODE", *reqIsolationMode);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_DATA;
+    }
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_switch_isolation_mode_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    auto rc = encode_set_switch_isolation_mode_req(0, isolationMode,
+                                                   requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmSwitchIsolationMode::setSwitchIsolationMode encode_set_switch_isolation_mode_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "NsmSwitchIsolationMode::setSwitchIsolationMode SendRecvNsmMsgSync failed for"
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_switch_isolation_mode_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info(
+            "NsmSwitchIsolationMode::setSwitchIsolationMode for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "NsmSwitchIsolationMode::setSwitchIsolationMode decode_set_switch_isolation_mode_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
@@ -527,6 +675,24 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
 
         createNsmErrorInjectionSensors(manager, device,
                                        path(inventoryObjPath) / name);
+
+        std::string dbusObjPath = inventoryObjPath + name;
+        auto isolationModeIntf =
+            std::make_shared<SwitchIsolationIntf>(bus, dbusObjPath.c_str());
+        auto isolationModeSensor = std::make_shared<NsmSwitchIsolationMode>(
+            name, type, isolationModeIntf);
+        device->addSensor(isolationModeSensor, false);
+
+        nsm::AsyncSetOperationHandler setIsolationModeHandler =
+            std::bind(&NsmSwitchIsolationMode::setSwitchIsolationMode,
+                      isolationModeSensor, std::placeholders::_1,
+                      std::placeholders::_2, std::placeholders::_3);
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(dbusObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.SwitchIsolation", "IsolationMode",
+                AsyncSetOperationInfo{setIsolationModeHandler,
+                                      isolationModeSensor, device});
     }
     else if (type == "NSM_PortDisableFuture")
     {

@@ -325,6 +325,28 @@ struct nsm_get_power_mode_resp {
 	struct nsm_power_mode_data data;
 } __attribute__((packed));
 
+/** @struct nsm_get_switch_isolation_mode_resp
+ *
+ *  Structure representing NSM Get Switch Isolation Mode response.
+ */
+struct nsm_get_switch_isolation_mode_resp {
+	struct nsm_common_resp hdr;
+	uint8_t isolation_mode;
+} __attribute__((packed));
+
+enum nsm_switch_isolation_mode {
+	SWITCH_COMMUNICATION_MODE_ENABLED = 0,
+	SWITCH_COMMUNICATION_MODE_DISABLED = 1
+};
+/** @struct nsm_set_switch_isolation_mode_req
+ *
+ *  Structure representing NSM Set Switch Isolation Mode response.
+ */
+struct nsm_set_switch_isolation_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t isolation_mode;
+} __attribute__((packed));
+
 /** @struct nsm_set_power_mode_req
  *
  *  Structure representing NSM set power mode request.
@@ -801,6 +823,93 @@ int encode_nsm_health_event(uint8_t instance_id, bool ackr,
 int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
 			    uint16_t *event_state,
 			    struct nsm_health_event_payload *payload);
+/** @brief Encode Get Switch Isolation request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_switch_isolation_mode_req(uint8_t instance, struct nsm_msg *msg);
+
+/** @brief Decode a Get Switch Isolation Mode request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_switch_isolation_mode_req(const struct nsm_msg *msg,
+					 size_t msg_len);
+
+/** @brief Encode Get Switch Isolation Mode response message
+ *
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[in] isolation_mode - isolation mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
+					  uint16_t reason_code,
+					  uint8_t isolation_mode,
+					  struct nsm_msg *msg);
+
+/** @brief Decode Get Switch Isolation Mode response message
+ *
+ *  @param[in] resp    - response message
+ *  @param[in] respLen - Length of response message
+ *  @param[out] cc     - Completion Code
+ *  @param[out] reason_code  - Reason Code
+ *  @param[out] isolation_mode - Isolation Mode
+ *  @return nsm_completion_codes
+ */
+int decode_get_switch_isolation_mode_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code,
+					  uint8_t *isolation_mode);
+
+/** @brief Encode Set Switch Isolation request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] isolation_mode - Isolation Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_switch_isolation_mode_req(uint8_t instance,
+					 uint8_t isolation_mode,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Set Switch Isolation Mode request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] isolation_mode - Isolation Mode
+ *  @return nsm_completion_codes
+ */
+int decode_set_switch_isolation_mode_req(const struct nsm_msg *msg,
+					 size_t msg_len,
+					 uint8_t *isolation_mode);
+/** @brief Encode Set Switch Isolation Mode response message
+ *
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - Reason Code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg);
+
+/** @brief Decode Set Switch Isolation Mode response message
+ *
+ *  @param[in] resp    - response message
+ *  @param[in] respLen - Length of response message
+ *  @param[out] cc     - Completion Code
+ *  @param[out] reason_code  - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

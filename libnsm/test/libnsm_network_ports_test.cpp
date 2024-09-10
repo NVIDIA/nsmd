@@ -2478,3 +2478,295 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
 	EXPECT_EQ(0, payload.reserved);
 	EXPECT_EQ(0, payload.portNumber);
 }
+
+TEST(getSwitchIsolationMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_get_switch_isolation_mode_req(0, request);
+
+	nsm_common_req *req =
+	    reinterpret_cast<nsm_common_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_SWITCH_ISOLATION_MODE, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getSwitchIsolationMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_GET_SWITCH_ISOLATION_MODE, // command
+	    0,				   // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+
+	auto rc = decode_get_switch_isolation_mode_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getSwitchIsolationMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) +
+		sizeof(struct nsm_get_switch_isolation_mode_resp),
+	    0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t isolation_mode = 1;
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_switch_isolation_mode_resp(
+	    0, NSM_SUCCESS, reason_code, isolation_mode, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_switch_isolation_mode_resp *resp =
+	    reinterpret_cast<struct nsm_get_switch_isolation_mode_resp *>(
+		response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_SWITCH_ISOLATION_MODE, resp->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_get_switch_isolation_mode_resp) -
+		      sizeof(struct nsm_common_resp),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(isolation_mode, resp->isolation_mode);
+}
+
+TEST(getSwitchIsolationMode, testBadEncodeResponse)
+{
+	uint8_t isolation_mode = 1;
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_switch_isolation_mode_resp(
+	    0, NSM_SUCCESS, reason_code, isolation_mode, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getSwitchIsolationMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_GET_SWITCH_ISOLATION_MODE, // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    1,
+	    0, // data size
+	    1  // isolation_mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t isolation_mode;
+
+	auto rc = decode_get_switch_isolation_mode_resp(
+	    response, msg_len, &cc, &reason_code, &isolation_mode);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(isolation_mode, 1);
+}
+
+TEST(getSwitchIsolationMode, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_GET_SWITCH_ISOLATION_MODE, // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    2,
+	    0, // data size
+	    1  // isolation_mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t isolation_mode;
+
+	auto rc = decode_get_switch_isolation_mode_resp(
+	    NULL, msg_len, &cc, &reason_code, &isolation_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_switch_isolation_mode_resp(
+	    response, msg_len, NULL, &reason_code, &isolation_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_switch_isolation_mode_resp(response, msg_len, &cc, NULL,
+						   &isolation_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_switch_isolation_mode_resp(
+	    response, msg_len - 1, &cc, &reason_code, &isolation_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_switch_isolation_mode_resp(
+	    response, msg_len, &cc, &reason_code, &isolation_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(setSwitchIsolationMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_switch_isolation_mode_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	uint8_t isolationMode = 1;
+	auto rc =
+	    encode_set_switch_isolation_mode_req(0, isolationMode, request);
+
+	nsm_set_switch_isolation_mode_req *req =
+	    reinterpret_cast<nsm_set_switch_isolation_mode_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_SWITCH_ISOLATION_MODE, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(isolationMode, req->isolation_mode);
+}
+
+TEST(setSwitchIsolationMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_SET_SWITCH_ISOLATION_MODE, // command
+	    1,				   // data size
+	    1				   // isolation_mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+	uint8_t isolationMode;
+	auto rc = decode_set_switch_isolation_mode_req(request, msg_len,
+						       &isolationMode);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(isolationMode, 1);
+}
+
+TEST(setSwitchIsolationMode, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_SET_SWITCH_ISOLATION_MODE, // command
+	    1,				   // data size
+	    1				   // isolation_mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+	uint8_t isolationMode;
+	auto rc =
+	    decode_set_switch_isolation_mode_req(NULL, msg_len, &isolationMode);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+	rc = decode_set_switch_isolation_mode_req(request, msg_len + 2,
+						  &isolationMode);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_set_switch_isolation_mode_req(request, msg_len + 2, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setSwitchIsolationMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_set_switch_isolation_mode_resp(0, NSM_SUCCESS,
+							reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_SWITCH_ISOLATION_MODE, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setSwitchIsolationMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	   // NVIDIA_MSG_TYPE
+	    NSM_SET_SWITCH_ISOLATION_MODE, // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_set_switch_isolation_mode_resp(response, msg_len, &cc,
+							&reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+}

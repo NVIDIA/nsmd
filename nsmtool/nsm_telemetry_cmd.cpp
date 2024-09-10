@@ -813,6 +813,116 @@ class SetPowerMode : public CommandInterface
     uint16_t l1HWPredictionInactiveTime;
 };
 
+class GetSwitchIsolationMode : public CommandInterface
+{
+  public:
+    ~GetSwitchIsolationMode() = default;
+    GetSwitchIsolationMode() = delete;
+    GetSwitchIsolationMode(const GetSwitchIsolationMode&) = delete;
+    GetSwitchIsolationMode(GetSwitchIsolationMode&&) = default;
+    GetSwitchIsolationMode& operator=(const GetSwitchIsolationMode&) = delete;
+    GetSwitchIsolationMode& operator=(GetSwitchIsolationMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_switch_isolation_mode_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t isolationMode;
+
+        auto rc = decode_get_switch_isolation_mode_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &isolationMode);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["Completion Code"] = cc;
+            result["Isolation Mode"] = isolationMode;
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_switch_isolation_mode_resp "
+                << "rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        return;
+    }
+};
+
+class SetSwitchIsolationMode : public CommandInterface
+{
+  public:
+    ~SetSwitchIsolationMode() = default;
+    SetSwitchIsolationMode() = delete;
+    SetSwitchIsolationMode(const SetSwitchIsolationMode&) = delete;
+    SetSwitchIsolationMode(SetSwitchIsolationMode&&) = default;
+    SetSwitchIsolationMode& operator=(const SetSwitchIsolationMode&) = delete;
+    SetSwitchIsolationMode& operator=(SetSwitchIsolationMode&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetSwitchIsolationMode(const char* type, const char* name,
+                                    CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto requestedMode = app->add_option_group(
+            "Required",
+            "Requested Switch Isolation Mode 0(Enabled)/1(Disabled)");
+
+        requestedMode->add_option("-i, --isolation_mode", isolation_mode,
+                                  "Isolation Mode of Switch");
+
+        requestedMode->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_set_MIG_mode_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_switch_isolation_mode_req(instanceId,
+                                                       isolation_mode, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_set_switch_isolation_mode_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_common_resp));
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+    uint8_t isolation_mode;
+};
+
 class GetInventoryInformation : public CommandInterface
 {
   public:
@@ -4336,6 +4446,16 @@ void registerCommand(CLI::App& app)
                                                   "Set L1 power mode");
     commands.push_back(std::make_unique<SetPowerMode>(
         "telemetry", "SetPowerMode", setPowerMode));
+
+    auto getSwitchIsolationMode = telemetry->add_subcommand(
+        "GetSwitchIsolationMode", "Get Switch Isolation Mode");
+    commands.push_back(std::make_unique<GetSwitchIsolationMode>(
+        "telemetry", "GetSwitchIsolationMode", getSwitchIsolationMode));
+
+    auto setSwitchIsolationMode = telemetry->add_subcommand(
+        "SetSwitchIsolationMode", "Set Switch Isolation Mode");
+    commands.push_back(std::make_unique<SetSwitchIsolationMode>(
+        "telemetry", "SetSwitchIsolationMode", setSwitchIsolationMode));
 
     auto getInventoryInformation = telemetry->add_subcommand(
         "GetInventoryInformation", "get inventory information");

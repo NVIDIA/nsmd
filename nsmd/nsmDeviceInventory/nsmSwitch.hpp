@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config.h"
+
 #include "libnsm/diagnostics.h"
 #include "libnsm/network-ports.h"
 
@@ -10,6 +12,7 @@
 #include "utils.hpp"
 
 #include <com/nvidia/PowerMode/server.hpp>
+#include <com/nvidia/SwitchIsolation/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -32,6 +35,8 @@ using NvSwitchIntf = object_t<Inventory::Item::server::NvSwitch>;
 using ResetDeviceIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::control::Reset>;
 using L1PowerModeIntf = object_t<sdbusplus::com::nvidia::server::PowerMode>;
+using SwitchIsolationIntf =
+    object_t<sdbusplus::server::com::nvidia::SwitchIsolation>;
 
 template <typename IntfType>
 class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
@@ -124,6 +129,30 @@ class NsmSwitchDIPowerMode : public NsmInterfaceProvider<L1PowerModeIntf>
   private:
     std::string objPath;
     bool asyncPatchInProgress{false};
+};
+
+using SwitchCommunicationMode =
+    sdbusplus::common::com::nvidia::SwitchIsolation::CommunicationMode;
+class NsmSwitchIsolationMode : public NsmSensor
+{
+  public:
+    NsmSwitchIsolationMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<SwitchIsolationIntf> switchIsolationIntf);
+    NsmSwitchIsolationMode() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine setSwitchIsolationMode(
+        const AsyncSetOperationValueType& value,
+        [[maybe_unused]] AsyncOperationStatusType* status,
+        std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<SwitchIsolationIntf> switchIsolationIntf;
 };
 
 } // namespace nsm
