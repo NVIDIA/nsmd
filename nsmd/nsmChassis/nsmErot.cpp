@@ -246,6 +246,15 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 }
             }
         }
+        if (rotProgressIntf == nullptr)
+        {
+            // IRoT does not have security and key management properties,
+            // progress interface is not created while parsing slot properties
+            auto progressPath = std::string(chassisInventoryBasePath) + "/" +
+                                name;
+            rotProgressIntf =
+                std::make_shared<ProgressIntf>(bus, progressPath.c_str());
+        }
         auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
             bus, name, type, uuid, rotProgressIntf);
         device->addSensor(securityCfg, false);
