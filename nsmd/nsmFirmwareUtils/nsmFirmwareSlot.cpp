@@ -41,6 +41,7 @@ NsmFirmwareSlot::NsmFirmwareSlot(
         utils::getAssociations(associations));
     slotId(slotNum);
     type(fwType);
+    extendedVersion("NA");
 }
 
 void NsmFirmwareSlot::updateActiveSlotAssociation()
