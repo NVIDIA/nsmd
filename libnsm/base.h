@@ -788,6 +788,20 @@ int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
  */
 int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 		       uint16_t *data_size, uint16_t *reason_code);
+
+/** @brief Encode an NSM raw command request message
+ *  @param[in] messageType - NVIDIA message type
+ *  @param[in] commandCode - Command identifier for the NSM passthrough command
+ *  @param[in] commandData - Data payload for the command
+ *  @param[in] dataSize - Size of the command data
+ *  @param[out] requestMsg - Message buffer where the encoded message will be
+ * written
+ *  @return int - Completion status for encoding the request
+ */
+int encode_raw_cmd_req(uint8_t messageType, uint8_t commandCode,
+		       const uint8_t *commandData, size_t dataSize,
+		       struct nsm_msg *requestMsg);
+
 #ifdef __cplusplus
 }
 #endif

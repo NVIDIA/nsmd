@@ -682,3 +682,38 @@ int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_raw_cmd_req(uint8_t messageType, uint8_t commandCode,
+		       const uint8_t *commandData, size_t dataSize,
+		       struct nsm_msg *requestMsg)
+{
+	if (!requestMsg) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// Zero out the entire message structure (header + payload)
+	memset(requestMsg, 0,
+	       sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req) +
+		   dataSize);
+
+	// Reuse encode_common_req for setting up the header and command
+	// structure
+	uint8_t rc = encode_common_req(DEFAULT_INSTANCE_ID, messageType,
+				       commandCode, requestMsg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	// Copy the command data into the payload after the common request
+	if (commandData && dataSize > 0) {
+		memcpy(requestMsg->payload + sizeof(struct nsm_common_req),
+		       commandData, dataSize);
+	}
+
+	// Set the data_size to the size of the command data
+	struct nsm_common_req *request =
+	    (struct nsm_common_req *)requestMsg->payload;
+	request->data_size = dataSize;
+
+	return NSM_SW_SUCCESS;
+}
