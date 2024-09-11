@@ -34,6 +34,14 @@ option(
     value: 1499,
 )
 option(
+    'rr-refresh-limit',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'Refresh limit in millseconds for round robin sensors. Round robin sensors are refreshed every `n` millseconds',
+    value: 5000,
+)
+option(
     'mockup-responder',
     type: 'feature',
     description: 'Mockup Responder',

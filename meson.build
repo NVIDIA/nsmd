@@ -51,6 +51,10 @@ conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
     get_option('response-time-out-long-running'),
 )
+conf_data.set(
+    'DEFAULT_RR_REFRESH_LIMIT_IN_MS',
+    get_option('rr-refresh-limit'),
+)
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
 endif
