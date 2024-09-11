@@ -21,6 +21,12 @@
 
 #include <tal.hpp>
 
+static constexpr const uint64_t INIT_TIMESTAMP =
+    std::numeric_limits<uint64_t>().min();
+
+static constexpr const uint64_t DEFAULT_RR_REFRESH_LIMIT_IN_USEC =
+    DEFAULT_RR_REFRESH_LIMIT_IN_MS * 1000;
+
 namespace nsm
 {
 
@@ -31,8 +37,7 @@ class NsmObject
     NsmObject() = delete;
     NsmObject(const std::string& name, const std::string& type,
               bool isLongRunning = false) :
-        isLongRunning(isLongRunning),
-        name(name), type(type)
+        isLongRunning(isLongRunning), name(name), type(type)
     {}
     NsmObject(const NsmObject& copy) : name(copy.name), type(copy.type) {}
     virtual ~NsmObject() = default;
@@ -43,6 +48,19 @@ class NsmObject
     const std::string& getType() const
     {
         return type;
+    }
+
+    void setLastUpdatedTimeStamp(const uint64_t currentTimestampInUsec)
+    {
+        lastUpdatedTimeStampInUsec = currentTimestampInUsec;
+    }
+
+    inline bool needsUpdate(const uint64_t& currentTimestampInUsec) const
+    {
+        const uint64_t deltaInUsec = currentTimestampInUsec -
+                                     lastUpdatedTimeStampInUsec;
+        return (isStatic // We don't want to throttle if it's a static sensor
+                || (deltaInUsec > refreshLimitInUsec));
     }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
@@ -66,5 +84,7 @@ class NsmObject
   private:
     const std::string name;
     const std::string type;
+    uint64_t lastUpdatedTimeStampInUsec = INIT_TIMESTAMP;
+    uint64_t refreshLimitInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
 };
 } // namespace nsm

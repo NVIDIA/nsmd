@@ -46,10 +46,9 @@ SensorManagerImpl::SensorManagerImpl(
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable,
     NsmDeviceTable& nsmDevices, eid_t localEid,
     mctp_socket::Manager& sockManager, bool verbose) :
-    SensorManager(nsmDevices, localEid),
-    bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
-    objServer(objServer), eidTable(eidTable), sockManager(sockManager),
-    verbose(verbose)
+    SensorManager(nsmDevices, localEid), bus(bus), event(event),
+    handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -494,6 +493,11 @@ requester::Coroutine
 
         // update roundRobin sensors for rest of polling time interval
         auto toBeUpdated = nsmDevice->roundRobinSensors.size();
+
+        // Make sure the first round-robin sensor is not compared
+        // to an uninitialised timestamp
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+
         do
         {
             if (!toBeUpdated)
@@ -510,8 +514,16 @@ requester::Coroutine
             }
 
             auto sensor = nsmDevice->roundRobinSensors.front();
+
             nsmDevice->roundRobinSensors.pop_front();
             toBeUpdated--;
+
+            if (!sensor->needsUpdate(t1))
+            {
+                // Skip the RR-sensor
+                nsmDevice->roundRobinSensors.push_back(sensor);
+                continue;
+            }
 
             // ServiceReady Logic:
             // The round-robin queue is circular hence encountering the first
@@ -543,6 +555,7 @@ requester::Coroutine
             }
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+            sensor->setLastUpdatedTimeStamp(t1);
         } while ((t1 - t0) < pollingTimeInUsec);
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
