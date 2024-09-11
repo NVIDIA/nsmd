@@ -2429,7 +2429,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto uuidSensor = std::make_shared<NsmUuidIntf>(
             bus, name, type, inventoryObjPath, deviceUuid);
-        nsmDevice->deviceSensors.push_back(uuidSensor);
+        nsmDevice->addStaticSensor(uuidSensor);
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
             bus, name, type, inventoryObjPath);
         nsmDevice->addStaticSensor(gpuRevisionSensor);
