@@ -94,7 +94,7 @@ void SendNSMCommand::getMatchingFruDeviceObjectPath(
                     callback(matchedObjectPath); // Pass the matched object path
                     return; // Exit early to avoid checking other devices
                 }
-                });
+            });
         }
 
         callback(""); // No match found

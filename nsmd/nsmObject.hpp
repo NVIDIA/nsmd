@@ -37,7 +37,8 @@ class NsmObject
     NsmObject() = delete;
     NsmObject(const std::string& name, const std::string& type,
               bool isLongRunning = false) :
-        isLongRunning(isLongRunning), name(name), type(type)
+        isLongRunning(isLongRunning),
+        name(name), type(type)
     {}
     NsmObject(const NsmObject& copy) : name(copy.name), type(copy.type) {}
     virtual ~NsmObject() = default;
