@@ -67,9 +67,8 @@ class NsmDevice
     uuid_t deviceUuid;
     bool isDeviceActive;
     bool isDeviceReady = false;
-    std::unique_ptr<sdbusplus::Timer> pollingTimer;
+    bool stopPolling = false;
     std::coroutine_handle<> doPollingTaskHandle;
-    std::unique_ptr<sdbusplus::Timer> pollingTimerLongRunning;
     std::coroutine_handle<> doPollingTaskHandleLongRunning;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmObject>> prioritySensors;

@@ -23,7 +23,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds',
-    value: 249,
+    value: 150,
 )
 option(
     'gpio-name',
@@ -38,6 +38,22 @@ option(
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds for NSM Long-running requests',
     value: 1499,
+)
+option(
+    'allowed-buffer-in-ms-for-polling',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'Max allowable deviation in milliseconds from the desired polling interval. If within buffer, skip sleeping. Helps in minimizing delay.',
+    value: 50,
+)
+option(
+    'inactive-sleep-time-in-ms',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'Time in milliseconds to sleep for if device is inactive, before starting polling again.',
+    value: 1000,
 )
 option(
     'rr-refresh-limit',

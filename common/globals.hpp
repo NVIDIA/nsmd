@@ -36,3 +36,8 @@ const path debugTokenObjectBasePath = "/xyz/openbmc_project/debug_token";
 const std::vector<uint8_t> supportedMessageTypes = {0, 1, 2, 3, 4, 5, 6};
 
 const std::string nullDate = "0000-00-00T00:00:00Z";
+
+constexpr const int64_t SD_EVENT_SOURCE_MAX_PRIORITY =
+    std::numeric_limits<int64_t>().min();
+
+constexpr const int64_t SD_EVENT_SOURCE_NORMAL_PRIORITY = 0;
