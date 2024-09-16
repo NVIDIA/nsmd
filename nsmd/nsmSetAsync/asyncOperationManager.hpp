@@ -109,7 +109,7 @@ class AsyncSetOperationDispatcher : public AsyncSetIntf
   private:
     requester::Coroutine setImpl(const std::string& interface,
                                  const std::string& property,
-                                 const AsyncSetOperationValueType& value,
+                                 const AsyncSetOperationValueType value,
                                  std::shared_ptr<AsyncStatusIntf> resultIntf);
 
     sdbusplus::message::object_path

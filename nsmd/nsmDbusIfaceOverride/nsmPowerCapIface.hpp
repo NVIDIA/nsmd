@@ -112,7 +112,10 @@ class NsmPowerCapIntf : public PowerCapIntf
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info("setPowerCapOnDevice for EID: {EID}", "EID", eid);
+        lg2::info(
+            "setPowerCapOnDevice for EID: {EID} with power limit(in watts): {PW}",
+            "EID", eid, "PW", power_limit);
+
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant

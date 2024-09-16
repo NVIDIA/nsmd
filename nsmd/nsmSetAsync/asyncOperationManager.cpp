@@ -185,7 +185,7 @@ int AsyncSetOperationDispatcher::addAsyncSetOperation(
 
 requester::Coroutine AsyncSetOperationDispatcher::setImpl(
     const std::string& interface, const std::string& property,
-    const AsyncSetOperationValueType& value,
+    const AsyncSetOperationValueType value,
     std::shared_ptr<AsyncStatusIntf> resultIntf)
 {
     auto findInterface = asyncOperations.find(interface);
