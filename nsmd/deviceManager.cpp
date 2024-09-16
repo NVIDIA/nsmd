@@ -758,7 +758,7 @@ requester::Coroutine
                                                          eid),
             [](void* ptr) {
         delete static_cast<nsm::nsmRawCommand::NsmRawCommandHandler*>(ptr);
-            });
+    });
 
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;

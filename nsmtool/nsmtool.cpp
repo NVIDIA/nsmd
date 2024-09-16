@@ -20,8 +20,8 @@
 #include "nsm_diag_cmd.hpp"
 #include "nsm_discovery_cmd.hpp"
 #include "nsm_firmware_cmd.hpp"
-#include "nsm_telemetry_cmd.hpp"
 #include "nsm_passthrough_cmd.hpp"
+#include "nsm_telemetry_cmd.hpp"
 
 #include <CLI/CLI.hpp>
 
