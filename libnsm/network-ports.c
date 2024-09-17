@@ -65,6 +65,7 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	    htole64(portData->port_rcv_switch_relay_errors);
 	portData->QP1_dropped = htole64(portData->QP1_dropped);
 	portData->xmit_wait = htole64(portData->xmit_wait);
+	portData->effective_ber = htole64(portData->effective_ber);
 }
 
 static void letohPortCounterData(struct nsm_port_counter_data *portData)
@@ -111,6 +112,7 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	    le64toh(portData->port_rcv_switch_relay_errors);
 	portData->QP1_dropped = le64toh(portData->QP1_dropped);
 	portData->xmit_wait = le64toh(portData->xmit_wait);
+	portData->effective_ber = le64toh(portData->effective_ber);
 }
 
 static void
@@ -237,21 +239,21 @@ int decode_get_port_telemetry_counter_resp(const struct nsm_msg *msg,
 		return rc;
 	}
 
-	if (msg_len != (sizeof(struct nsm_msg_hdr) +
-			sizeof(struct nsm_get_port_telemetry_counter_resp))) {
+	if (msg_len <
+	    (sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp) +
+	     PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_get_port_telemetry_counter_resp *resp =
 	    (struct nsm_get_port_telemetry_counter_resp *)msg->payload;
-	size_t counter_data_len = sizeof(struct nsm_port_counter_data);
 
 	*data_size = le16toh(resp->hdr.data_size);
-	if (*data_size < counter_data_len) {
+	if (*data_size < PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE) {
 		return NSM_SW_ERROR_DATA;
 	}
 
-	memcpy(data, &(resp->data), counter_data_len);
+	memcpy(data, &(resp->data), *data_size);
 
 	// conversion le64toh for each counter data
 	letohPortCounterData(data);

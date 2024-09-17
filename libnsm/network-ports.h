@@ -23,7 +23,8 @@ extern "C" {
 #endif
 
 #include "base.h"
-#define PORT_COUNTER_TELEMETRY_DATA_SIZE 204
+#define PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE 204
+#define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 212
 #define PORT_MASK_DATA_SIZE 32
 // defined in MBps
 #define MAXLINKBANDWIDTH 50000
@@ -100,7 +101,8 @@ struct nsm_supported_port_counter {
 	uint8_t QP1_dropped : 1;
 
 	uint8_t xmit_wait : 1;
-	uint8_t unused : 7;
+	uint8_t effective_ber : 1;
+	uint8_t unused : 6;
 } __attribute__((packed));
 
 struct nsm_port_counter_data {
@@ -130,6 +132,7 @@ struct nsm_port_counter_data {
 	uint64_t port_rcv_switch_relay_errors;
 	uint64_t QP1_dropped;
 	uint64_t xmit_wait;
+	uint64_t effective_ber;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {

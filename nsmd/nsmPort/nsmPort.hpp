@@ -98,6 +98,7 @@ class NsmPortMetrics : public NsmSensor
   public:
     NsmPortMetrics(sdbusplus::bus::bus& bus, std::string& portName,
                    uint8_t portNum, const std::string& type,
+                   const uint8_t deviceType,
                    const std::vector<utils::Association>& associations,
                    std::string& parentObjPath, std::string& inventoryObjPath);
     NsmPortMetrics() = default;
@@ -119,6 +120,7 @@ class NsmPortMetrics : public NsmSensor
     std::unique_ptr<PortIntf> portIntf = nullptr;
 
     uint8_t portNumber;
+    uint8_t typeOfDevice;
     std::string objPath;
 };
 
