@@ -15,12 +15,15 @@
  * limitations under the License.
  */
 
+#include "config.h"
+
 #include "cmd_helper.hpp"
 
 #include "requester/mctp.h"
 
 #include "xyz/openbmc_project/Common/error.hpp"
 
+#include <linux/mctp.h>
 #include <systemd/sd-bus.h>
 
 #include <sdbusplus/server.hpp>
@@ -154,6 +157,105 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
 
     Logger(verbose, "Shutdown Socket successful :  RC = ", returnCode);
     return NSM_SW_SUCCESS;
+}
+
+/*
+ * Initialize the socket, send nsm command & recieve response from socket with
+ * in-kernel MCTP
+ *
+ */
+int inKernelMctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
+                             std::vector<uint8_t>& responseMsg, bool verbose)
+{
+    int returnCode = 0;
+
+    int sockFd = socket(AF_MCTP, SOCK_DGRAM, 0);
+    if (-1 == sockFd)
+    {
+        returnCode = -errno;
+        std::cerr << "Failed to create the socket : RC = " << sockFd << "\n";
+        return returnCode;
+    }
+    Logger(verbose, "Success in creating the socket : RC = ", sockFd);
+
+    CustomFD socketFd(sockFd);
+
+    struct sockaddr_mctp addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.smctp_family = AF_MCTP;
+    addr.smctp_network = MCTP_NET_ANY;
+    addr.smctp_addr.s_addr = requestMsg[1];
+    addr.smctp_tag = MCTP_TAG_OWNER;
+    addr.smctp_type = requestMsg[2];
+
+    int result = sendto(socketFd(), &requestMsg[3], requestMsg.size() - 3, 0,
+                        (struct sockaddr*)&addr, sizeof(addr));
+    if (-1 == result)
+    {
+        returnCode = -errno;
+        std::cerr << "Failed to send message type as VDM to mctp : RC = "
+                  << returnCode << "\n";
+        return returnCode;
+    }
+    Logger(verbose, "Success in sending message type as VDM to mctp : RC = ",
+           returnCode);
+
+    // Read the response from socket
+    ssize_t peekedLength = recv(socketFd(), nullptr, 0, MSG_TRUNC | MSG_PEEK);
+    if (0 == peekedLength)
+    {
+        std::cerr << "Socket is closed : peekedLength = " << peekedLength
+                  << "\n";
+        return returnCode;
+    }
+    else if (peekedLength <= -1)
+    {
+        returnCode = -errno;
+        std::cerr << "recv() system call failed : RC = " << returnCode << "\n";
+        return returnCode;
+    }
+    else
+    {
+        auto reqhdr = reinterpret_cast<const nsm_msg_hdr*>(&requestMsg[3]);
+        do
+        {
+            auto peekedLength = recv(socketFd(), nullptr, 0,
+                                     MSG_PEEK | MSG_TRUNC);
+            if (-1 == peekedLength)
+            {
+                returnCode = -errno;
+                std::cerr << "Failed to recv message length : RC = "
+                          << returnCode << "\n";
+                return returnCode;
+            }
+            responseMsg.resize(peekedLength);
+
+            struct sockaddr_mctp addr;
+            socklen_t addrlen;
+            addrlen = sizeof(addr);
+            memset(&addr, 0, sizeof(addr));
+
+            ssize_t recvDataLength = recvfrom(
+                socketFd(), reinterpret_cast<void*>(responseMsg.data()),
+                peekedLength, 0, (struct sockaddr*)&addr, &addrlen);
+
+            auto resphdr =
+                reinterpret_cast<const nsm_msg_hdr*>(responseMsg.data());
+            if (recvDataLength == peekedLength &&
+                resphdr->instance_id == reqhdr->instance_id &&
+                resphdr->request == 0)
+            {
+                return NSM_SW_SUCCESS;
+            }
+            else if (recvDataLength != peekedLength)
+            {
+                std::cerr << "Failure to read response length packet: length = "
+                          << recvDataLength << "\n";
+                return returnCode;
+            }
+        } while (1);
+    }
 }
 
 // parser for bitField variable
@@ -311,6 +413,13 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
 
     if (mctp_eid != NSM_ENTITY_ID)
     {
+#ifdef MCTP_IN_KERNEL
+        std::vector<uint8_t> reqMsg{MCTP_MSG_TAG_REQ, mctp_eid,
+                                    MCTP_MSG_TYPE_PCI_VDM};
+        reqMsg.insert(reqMsg.end(), requestMsg.begin(), requestMsg.end());
+
+        inKernelMctpSockSendRecv(reqMsg, responseMsg, mctpVerbose);
+#else
         auto [type, protocol, sockAddress] = getMctpSockInfo(mctp_eid);
         if (sockAddress.empty())
         {
@@ -375,6 +484,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         memcpy(responseMsg.data(), responseMessage, responseMsg.size());
 
         free(responseMessage);
+#endif
         if (verbose)
         {
             std::cout << "nsmtool: ";
@@ -387,14 +497,19 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         requestMsg.insert(requestMsg.begin(), mctp_eid);
         requestMsg.insert(requestMsg.begin(), MCTP_MSG_TYPE_PCI_VDM);
 
+#ifdef MCTP_IN_KERNEL
+        inKernelMctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+#else
         mctpSockSendRecv(requestMsg, responseMsg, mctpVerbose);
+        responseMsg.erase(responseMsg.begin(),
+                          responseMsg.begin() + 2 /* skip the mctp header */);
+#endif
+
         if (verbose)
         {
             std::cout << "nsmtool: ";
             printBuffer(Rx, responseMsg);
         }
-        responseMsg.erase(responseMsg.begin(),
-                          responseMsg.begin() + 2 /* skip the mctp header */);
     }
     return NSM_SW_SUCCESS;
 }

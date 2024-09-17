@@ -150,3 +150,10 @@ option(
     value: false,
     description: 'Confidential Compute Devtool Mode Sensor Priority',
 )
+
+option(
+    'enable-in-kernel-mctp',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Use the in-kernel MCTP stack instead of the demux daemon',
+)

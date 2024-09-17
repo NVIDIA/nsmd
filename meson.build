@@ -119,6 +119,11 @@ if get_option('confidential-compute-devtool-mode')
 endif
 
 conf_data.set('LOCAL_EID', get_option('local-eid'))
+
+if get_option('enable-in-kernel-mctp').enabled()
+    conf_data.set('MCTP_IN_KERNEL', 0)
+endif
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []
