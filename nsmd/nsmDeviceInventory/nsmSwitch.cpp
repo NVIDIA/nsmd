@@ -46,11 +46,11 @@ NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus::bus& bus,
     lg2::info("NsmSwitchDIReset: create sensor:{NAME}", "NAME", name.c_str());
 
     objPath = inventoryObjPath + name;
-    resetIntf = std::make_shared<NsmResetIntf>(bus, objPath.c_str());
+    resetIntf = std::make_shared<NsmResetDeviceIntf>(bus, objPath.c_str());
     resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
-                             processor::Reset::ResetTypes::ForceRestart);
-    resetAsyncIntf =
-        std::make_shared<NsmSwitchResetAsyncIntf>(bus, objPath.c_str(), device);
+                             Reset::ResetTypes::ForceRestart);
+    resetAsyncIntf = std::make_shared<NsmNetworkDeviceResetAsyncIntf>(
+        bus, objPath.c_str(), device);
 }
 
 template <typename IntfType>

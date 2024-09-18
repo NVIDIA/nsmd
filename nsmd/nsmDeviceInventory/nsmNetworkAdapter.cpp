@@ -98,8 +98,29 @@ static requester::Coroutine
 
     createNsmErrorInjectionSensors(manager, nsmDevice,
                                    path(inventoryObjPath) / name);
+
+    auto ntwAdpResetSensor = std::make_shared<NsmNetworkAdapterDIReset>(
+        bus, name, type, inventoryObjPath, nsmDevice);
+    nsmDevice->deviceSensors.push_back(ntwAdpResetSensor);
+
     // coverity[missing_return]
     co_return NSM_SUCCESS;
+}
+
+NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
+    NsmObject(name, type)
+{
+    lg2::info("NsmNetworkAdapterDIReset: create sensor:{NAME}", "NAME",
+              name.c_str());
+
+    objPath = inventoryObjPath + name;
+    resetIntf = std::make_shared<NsmResetDeviceIntf>(bus, objPath.c_str());
+    resetIntf->resetType(sdbusplus::common::xyz::openbmc_project::control::
+                             Reset::ResetTypes::ForceRestart);
+    resetAsyncIntf = std::make_shared<NsmNetworkDeviceResetAsyncIntf>(
+        bus, objPath.c_str(), device);
 }
 
 REGISTER_NSM_CREATION_FUNCTION(

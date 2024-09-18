@@ -14,7 +14,7 @@
 #include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
-#include <xyz/openbmc_project/Control/Processor/Reset/server.hpp>
+#include <xyz/openbmc_project/Control/Reset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/NvSwitch/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Switch/server.hpp>
@@ -29,8 +29,8 @@ using UuidIntf = object_t<Common::server::UUID>;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using SwitchIntf = object_t<Inventory::Item::server::Switch>;
 using NvSwitchIntf = object_t<Inventory::Item::server::NvSwitch>;
-using ResetIntf = sdbusplus::server::object_t<
-    sdbusplus::server::xyz::openbmc_project::control::processor::Reset>;
+using ResetDeviceIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::Reset>;
 using L1PowerModeIntf = object_t<sdbusplus::com::nvidia::server::PowerMode>;
 
 template <typename IntfType>
@@ -57,8 +57,8 @@ class NsmSwitchDIReset : public NsmObject
                      std::shared_ptr<NsmDevice> device);
 
   private:
-    std::shared_ptr<ResetIntf> resetIntf = nullptr;
-    std::shared_ptr<NsmSwitchResetAsyncIntf> resetAsyncIntf = nullptr;
+    std::shared_ptr<ResetDeviceIntf> resetIntf = nullptr;
+    std::shared_ptr<NsmNetworkDeviceResetAsyncIntf> resetAsyncIntf = nullptr;
     std::string objPath;
 };
 
