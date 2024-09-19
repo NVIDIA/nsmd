@@ -902,6 +902,7 @@ class GetInventoryInformation : public CommandInterface
             case BUILD_DATE:
             case FIRMWARE_VERSION:
             case INFO_ROM_VERSION:
+            case FPGA_FIRMWARE_VERSION:
                 propRecordResult["Data"] = std::string((char*)data.data(),
                                                        dataSize);
                 break;
