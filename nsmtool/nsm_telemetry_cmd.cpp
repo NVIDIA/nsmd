@@ -305,6 +305,13 @@ class GetPortTelemetryCounter : public CommandInterface
             countersResult["Tx Wait"] =
                 static_cast<uint64_t>(portData->xmit_wait);
         }
+
+        if (portData->supported_counter.effective_ber)
+        {
+            result[key].push_back(25);
+            countersResult["Effective BER"] =
+                static_cast<uint64_t>(portData->effective_ber);
+        }
         result["Port Counter Information"] = countersResult;
 
         nsmtool::helper::DisplayInJson(result);

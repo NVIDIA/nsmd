@@ -18,14 +18,15 @@ TEST(NsmPortMetrics, GoodTest)
     std::string pName("dummy_port");
     uint8_t portNum = 1;
     std::string type = "DummyType";
+    uint8_t deviceType = 1;
     std::string parentObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device";
     std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device/Ports";
     std::vector<utils::Association> associations;
 
-    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, associations,
-                                parentObjPath, inventoryObjPath);
+    nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
+                                associations, parentObjPath, inventoryObjPath);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
@@ -51,6 +52,7 @@ TEST(NsmPortMetrics, GoodTest)
         0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     }; /*for counter values, 8 bytes each*/
     auto portTelData =
         reinterpret_cast<nsm_port_counter_data*>(portData.data());

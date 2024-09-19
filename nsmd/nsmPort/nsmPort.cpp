@@ -416,14 +416,16 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
 
 NsmPortMetrics::NsmPortMetrics(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
-    const std::string& type,
+    const std::string& type, const uint8_t deviceType,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath) :
     NsmSensor(portName, type),
-    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
+    portName(portName), portNumber(portNum), typeOfDevice(deviceType),
+    objPath(inventoryObjPath)
 {
-    lg2::debug("NsmPortMetrics: {NAME} with port number {NUM}", "NAME",
-               portName.c_str(), "NUM", portNum);
+    lg2::debug(
+        "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
+        "NAME", portName.c_str(), "NUM", portNum, "DT", typeOfDevice);
 
     iBPortIntf = std::make_unique<IBPortIntf>(bus, inventoryObjPath.c_str());
     portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
@@ -633,7 +635,9 @@ double NsmPortMetrics::getBitErrorRate(uint64_t value)
     }
     else
     {
-        lg2::debug("NsmPortMetrics: getBitErrorRate failed");
+        lg2::debug(
+            "NsmPortMetrics: getBitErrorRate failed for {NAME} with port number {NUM} for device type {DT}",
+            "NAME", portName.c_str(), "NUM", portNumber, "DT", typeOfDevice);
         return 0.0;
     }
 }
@@ -767,7 +771,9 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         else
         {
             lg2::error(
-                "NsmPortMetrics: updating counter value failed: iBPortIntf is NULL");
+                "NsmPortMetrics: updating counter value failed: iBPortIntf is NULL for {NAME} with port number {NUM} for device type {DT}",
+                "NAME", portName.c_str(), "NUM", portNumber, "DT",
+                typeOfDevice);
         }
 
         if (portMetricsOem2Intf)
@@ -785,13 +791,16 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         else
         {
             lg2::error(
-                "NsmPortMetrics: updating counter value failed: portMetricsOem2Intf is NULL");
+                "NsmPortMetrics: updating counter value failed: portMetricsOem2Intf is NULL for {NAME} with port number {NUM} for device type {DT}",
+                "NAME", portName.c_str(), "NUM", portNumber, "DT",
+                typeOfDevice);
         }
     }
     else
     {
         lg2::error(
-            "NsmPortMetrics: updating counter value failed: portCounterInfo is NULL");
+            "NsmPortMetrics: updating counter value failed: portCounterInfo is NULL for {NAME} with port number {NUM} for device type {DT}",
+            "NAME", portName.c_str(), "NUM", portNumber, "DT", typeOfDevice);
     }
 }
 
@@ -806,8 +815,8 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "encode_get_port_telemetry_counter_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "encode_get_port_telemetry_counter_req failed for portNumber={NUM}, deviceType={DT}, eid={EID}, rc={RC}",
+            "NUM", portNumber, "DT", typeOfDevice, "EID", eid, "RC", rc);
         return std::nullopt;
     }
 
@@ -820,7 +829,7 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
-    struct nsm_port_counter_data data;
+    struct nsm_port_counter_data data = {};
 
     auto rc = decode_get_port_telemetry_counter_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
@@ -833,9 +842,9 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     else
     {
         lg2::error(
-            "responseHandler: get_port_telemetry_counter unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
-            "RC", rc);
+            "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+            "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber, "RSNCOD",
+            reasonCode, "CC", cc, "RC", rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -950,8 +959,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         }
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
-            bus, portName, logicalPortNum, type, associations, parentObjPath,
-            objPath);
+            bus, portName, logicalPortNum, type, deviceType, associations,
+            parentObjPath, objPath);
         if (!portMetricsSensor)
         {
             lg2::error(
