@@ -34,8 +34,10 @@ extern "C" {
 enum nsm_port_telemetry_commands {
 	NSM_GET_PORT_TELEMETRY_COUNTER = 0x01,
 	NSM_GET_PORT_HEALTH_THRESHOLDS = 0x02,
+#ifdef ENABLE_SYSTEM_GUID
 	NSM_SET_SYSTEM_GUID = 0x03,
 	NSM_GET_SYSTEM_GUID = 0x04,
+#endif
 	NSM_SET_LINK_DISABLE_STICKY = 0x05,
 	NSM_GET_LINK_DISABLE_STICKY = 0x06,
 	NSM_SET_PORT_HEALTH_THRESHOLDS = 0x07,
@@ -151,6 +153,56 @@ struct nsm_power_mode_data {
 	uint16_t l1_hw_inactive_time;
 	uint16_t l1_prediction_inactive_time;
 } __attribute__((packed));
+
+#ifdef ENABLE_SYSTEM_GUID
+/** @struct nsm_set_system_guid_req
+ *
+ *  Structure representing NSM set system guid request.
+ */
+struct nsm_set_system_guid_req {
+	struct nsm_common_req hdr;
+	uint8_t SysGUID_0;
+	uint8_t SysGUID_1;
+	uint8_t SysGUID_2;
+	uint8_t SysGUID_3;
+	uint8_t SysGUID_4;
+	uint8_t SysGUID_5;
+	uint8_t SysGUID_6;
+	uint8_t SysGUID_7;
+} __attribute__((packed));
+
+/** @struct nsm_set_system_guid_resp
+ *
+ *  Structure representing NSM set system guid response.
+ */
+struct nsm_set_system_guid_resp {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/** @struct nsm_get_system_guid_req
+ *
+ *  Structure representing NSM get system guid request.
+ */
+struct nsm_get_system_guid_req {
+	struct nsm_common_req hdr;
+} __attribute__((packed));
+
+/** @struct nsm_get_system_guid_resp
+ *
+ *  Structure representing NSM get system guid response.
+ */
+struct nsm_get_system_guid_resp {
+	struct nsm_common_resp hdr;
+	uint8_t SysGUID_0;
+	uint8_t SysGUID_1;
+	uint8_t SysGUID_2;
+	uint8_t SysGUID_3;
+	uint8_t SysGUID_4;
+	uint8_t SysGUID_5;
+	uint8_t SysGUID_6;
+	uint8_t SysGUID_7;
+} __attribute__((packed));
+#endif
 
 /** @struct nsm_common_port_req
  *
@@ -288,6 +340,46 @@ struct nsm_set_power_mode_req {
  *  Structure representing NSM set power mode response.
  */
 typedef struct nsm_common_resp nsm_set_power_mode_resp;
+
+#ifdef ENABLE_SYSTEM_GUID
+/** @brief Encode a Set System GUID request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @param[out] sysGuid - System Guid (8 bytes)
+ *  @param[out] sysGuid_len - System Guid buffer length
+ *  @return nsm_completion_codes
+ */
+int encode_set_system_guid_req(uint8_t instance_id, struct nsm_msg *msg,
+			       uint8_t *sys_guid, size_t sys_guid_len);
+
+/** @brief Decode a Set System GUID response message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_set_system_guid_resp(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get System GUID request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get System GUID response message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] sysGuid - System Guid will be written to this (8 bytes)
+ *  @param[out] sysGuid_len - System Guid buffer length
+ *  @return nsm_completion_codes
+ */
+int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *sys_guid, size_t sys_guid_len);
+#endif
 
 /** @brief Encode a Get port telemetry counter request message
  *

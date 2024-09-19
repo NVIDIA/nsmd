@@ -21,6 +21,9 @@
 
 #include "device-configuration.h"
 #include "pci-links.h"
+#ifdef ENABLE_SYSTEM_GUID
+#include "network-ports.h"
+#endif
 #include "platform-environmental.h"
 
 #include "asyncOperationManager.hpp"
@@ -85,6 +88,7 @@ NsmProcessorAssociation::NsmProcessorAssociation(
     }
     associationDef->associations(associations_list);
 }
+
 NsmUuidIntf::NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                          std::string& type, std::string& inventoryObjPath,
                          uuid_t uuid) :
@@ -120,9 +124,168 @@ requester::Coroutine NsmUuidIntf::update(SensorManager& manager, eid_t eid)
             updateMetricOnSharedMemory();
         }
     }
+
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
+
+#ifdef ENABLE_SYSTEM_GUID
+NsmSysGuidIntf::NsmSysGuidIntf(sdbusplus::bus::bus& bus, std::string& name,
+                               std::string& type,
+                               std::string& inventoryObjPath) :
+    NsmObject(name, type),
+    inventoryObjPath(inventoryObjPath)
+{
+    sysguidIntf = std::make_unique<SysGuidIntf>(bus, inventoryObjPath.c_str());
+    sysguidIntf->sysGUID();
+}
+
+uint8_t NsmSysGuidIntf::sysGUID[8] = {0x00, 0x00, 0x00, 0x00,
+                                      0x00, 0x00, 0x00, 0x00};
+bool NsmSysGuidIntf::sysGuidGenerated = false;
+
+requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
+{
+    // We only need to generate sysGUID once
+    // (unique per tray)
+    if (!sysGuidGenerated)
+    {
+        lg2::info("First instance, generating SysGUID");
+        sysGuidGenerated = true;
+        srand(time(NULL));
+        for (auto i = 0; i < 8; i++)
+        {
+            sysGUID[i] = rand();
+        }
+    }
+
+    Request readSysGuid(sizeof(nsm_msg_hdr) +
+                        sizeof(struct nsm_get_system_guid_req));
+    auto readSysGuidMsg = reinterpret_cast<struct nsm_msg*>(readSysGuid.data());
+
+    auto rc = encode_get_system_guid_req(0, readSysGuidMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> readSysGuidResponseMsg;
+    size_t readSysGuidResponseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(
+        eid, readSysGuid, readSysGuidResponseMsg, readSysGuidResponseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}", "RC",
+            rc, "EID", eid);
+        co_return rc;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    uint8_t data[8] = {0};
+    uint16_t dataLen = 8;
+
+    rc = decode_get_system_guid_resp(readSysGuidResponseMsg.get(),
+                                     readSysGuidResponseLen, data, dataLen);
+
+    if (rc == NSM_SW_SUCCESS)
+    {
+        bool setSysGuidNeeded = false;
+        for (auto i = 0; i < 8; i++)
+        {
+            if (data[i] != sysGUID[i])
+            {
+                setSysGuidNeeded = true;
+                break;
+            }
+        }
+
+        if (setSysGuidNeeded)
+        {
+            Request setSysGuid(sizeof(nsm_msg_hdr) +
+                               sizeof(struct nsm_set_system_guid_req));
+            auto setSysGuidMsg =
+                reinterpret_cast<struct nsm_msg*>(setSysGuid.data());
+
+            rc = encode_set_system_guid_req(0, setSysGuidMsg, sysGUID, 8);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "NsmGetSysGuid encode_set_system_guid_req failed. eid={EID} rc={RC}",
+                    "EID", eid, "RC", rc);
+                co_return rc;
+            }
+
+            std::shared_ptr<const nsm_msg> setSysGuidResponseMsg;
+            size_t setSysGuidResponseLen = 0;
+            rc = co_await manager.SendRecvNsmMsg(
+                eid, setSysGuid, setSysGuidResponseMsg, setSysGuidResponseLen);
+            if (rc)
+            {
+                lg2::error(
+                    "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+                    "RC", rc, "EID", eid);
+                co_return rc;
+            }
+
+            Request reReadSysGuid(sizeof(nsm_msg_hdr) +
+                                  sizeof(struct nsm_get_system_guid_req));
+            auto reReadSysGuidMsg =
+                reinterpret_cast<struct nsm_msg*>(reReadSysGuid.data());
+
+            rc = encode_get_system_guid_req(0, reReadSysGuidMsg);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error(
+                    "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
+                    "EID", eid, "RC", rc);
+                co_return rc;
+            }
+
+            std::shared_ptr<const nsm_msg> reReadSysGuidResponseMsg;
+            size_t reReadSysGuidResponseLen = 0;
+            rc = co_await manager.SendRecvNsmMsg(eid, reReadSysGuid,
+                                                 reReadSysGuidResponseMsg,
+                                                 reReadSysGuidResponseLen);
+            if (rc)
+            {
+                lg2::error(
+                    "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+                    "RC", rc, "EID", eid);
+                co_return rc;
+            }
+
+            reason_code = ERR_NULL;
+            dataLen = 8;
+
+            rc = decode_get_system_guid_resp(reReadSysGuidResponseMsg.get(),
+                                             readSysGuidResponseLen, data,
+                                             dataLen);
+        }
+
+        // convert it to a string
+        std::ostringstream oss;
+        for (auto& guidtoken : data)
+        {
+            oss << std::hex << std::setw(2) << std::setfill('0')
+                << static_cast<int>(guidtoken);
+        }
+        sysguidIntf->sysGUID(oss.str());
+    }
+    else
+    {
+        lg2::error(
+            "NsmGetSysGuid decode_get_system_guid_resp failed. reasonCode={RESONCODE} and rc={RC}",
+            "RESONCODE", reason_code, "RC", rc);
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return rc;
+}
+#endif
 
 NsmLocationIntfProcessor::NsmLocationIntfProcessor(
     sdbusplus::bus::bus& bus, std::string& name, std::string& type,
@@ -2430,6 +2593,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto uuidSensor = std::make_shared<NsmUuidIntf>(
             bus, name, type, inventoryObjPath, deviceUuid);
         nsmDevice->addStaticSensor(uuidSensor);
+
+#ifdef ENABLE_SYSTEM_GUID
+        auto sysGuidSensor = std::make_shared<NsmSysGuidIntf>(bus, name, type,
+                                                              inventoryObjPath);
+        nsmDevice->addStaticSensor(sysGuidSensor);
+#endif
+
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
             bus, name, type, inventoryObjPath);
         nsmDevice->addStaticSensor(gpuRevisionSensor);

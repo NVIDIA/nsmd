@@ -12,6 +12,12 @@ option(
     value: 'enabled',
 )
 option(
+    'system-guid',
+    type: 'feature',
+    description: 'Enable System GUID feature',
+    value: 'disabled',
+)
+option(
     'sensor-polling-time',
     type: 'integer',
     min: 1,

@@ -133,6 +133,123 @@ letohPortCharacteristicsData(struct nsm_port_characteristics_data *data)
 	data->status_lane_info = le32toh(data->status_lane_info);
 }
 
+#ifdef ENABLE_SYSTEM_GUID
+int encode_set_system_guid_req(uint8_t instance_id, struct nsm_msg *msg,
+			       uint8_t *sys_guid, size_t sys_guid_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_system_guid_req *request =
+	    (struct nsm_set_system_guid_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_SYSTEM_GUID;
+	request->hdr.data_size = 0x08;
+
+	if (sys_guid_len != 8) {
+		return NSM_SW_ERROR_DATA;
+	}
+	request->SysGUID_0 = sys_guid[0];
+	request->SysGUID_1 = sys_guid[1];
+	request->SysGUID_2 = sys_guid[2];
+	request->SysGUID_3 = sys_guid[3];
+	request->SysGUID_4 = sys_guid[4];
+	request->SysGUID_5 = sys_guid[5];
+	request->SysGUID_6 = sys_guid[6];
+	request->SysGUID_7 = sys_guid[7];
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_system_guid_resp(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_system_guid_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_system_guid_resp *response =
+	    (struct nsm_set_system_guid_resp *)msg->payload;
+
+	if (response->hdr.data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_system_guid_req *request =
+	    (struct nsm_get_system_guid_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_SYSTEM_GUID;
+	request->hdr.data_size = 0x00;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *sys_guid, size_t sys_guid_len)
+{
+	if (msg == NULL || sys_guid == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_system_guid_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_system_guid_resp *response =
+	    (struct nsm_get_system_guid_resp *)msg->payload;
+
+	if (response->hdr.data_size < 8 || sys_guid_len != 8) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	sys_guid[0] = response->SysGUID_0;
+	sys_guid[1] = response->SysGUID_1;
+	sys_guid[2] = response->SysGUID_2;
+	sys_guid[3] = response->SysGUID_3;
+	sys_guid[4] = response->SysGUID_4;
+	sys_guid[5] = response->SysGUID_5;
+	sys_guid[6] = response->SysGUID_6;
+	sys_guid[7] = response->SysGUID_7;
+
+	return NSM_SW_SUCCESS;
+}
+#endif
+
 int encode_get_port_telemetry_counter_req(uint8_t instance_id,
 					  uint8_t port_number,
 					  struct nsm_msg *msg)
