@@ -907,8 +907,13 @@ class GetInventoryInformation : public CommandInterface
                                                        dataSize);
                 break;
             case DEVICE_GUID:
-                propRecordResult["Data"] = utils::convertUUIDToString(data);
+            {
+                std::vector<uint8_t> nvu8ArrVal(UUID_INT_SIZE, 0);
+                memcpy(nvu8ArrVal.data(), data.data(), dataSize);
+                propRecordResult["Data"] =
+                    utils::convertUUIDToString(nvu8ArrVal);
                 break;
+            }
             case MINIMUM_MEMORY_CLOCK_LIMIT:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;
