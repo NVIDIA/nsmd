@@ -127,35 +127,33 @@ requester::Coroutine
     {
         auto deviceType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "DeviceType", interface.c_str());
-        auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceIndex", interface.c_str());
         auto functionIds =
             co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
                 objPath.c_str(), "Functions", interface.c_str());
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
         auto pcieDeviceObject =
             NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
         pcieDeviceObject.pdi().deviceType(deviceType);
         device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-                              pcieDeviceObject, deviceIndex),
-                          priority);
+                              pcieDeviceObject, 0),
+                          PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
 
         for (auto& id : functionIds)
         {
             auto function = std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
-                                                              deviceIndex, id);
+                                                              0, id);
             device->addStaticSensor(function);
         }
-
-        const std::string inventoyObjPath = chassisInventoryBasePath /
-                                            chassisName / "PCIeDevices" / name;
-        auto aerErrorIntf = std::make_shared<NsmAERErrorStatusIntf>(
-            utils::DBusHandler::getBus(), inventoyObjPath.c_str(), deviceIndex,
-            device);
-        auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
-            name, "PCIeAerErrorStatus", aerErrorIntf, deviceIndex);
-        device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
+        if (device->getDeviceType() == NSM_DEV_ID_GPU)
+        {
+            const std::string inventoyObjPath =
+                chassisInventoryBasePath / chassisName / "PCIeDevices" / name;
+            auto aerErrorIntf = std::make_shared<NsmAERErrorStatusIntf>(
+                utils::DBusHandler::getBus(), inventoyObjPath.c_str(), 0,
+                device);
+            auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
+                name, "PCIeAerErrorStatus", aerErrorIntf, 0);
+            device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
+        }
     }
     else if (type == "NSM_LTSSMState")
     {
@@ -178,26 +176,27 @@ requester::Coroutine
     {
         auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", interface.c_str());
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        auto deviceType = (NsmDeviceIdentification)device->getDeviceType();
         auto pcieRefClockObject =
             NsmChassisPCIeDevice<PCIeRefClockIntf>(chassisName, name);
-        auto nvLinkRefClockObject =
-            NsmChassisPCIeDevice<NVLinkRefClockIntf>(chassisName, name);
 
         auto pcieRefClock =
             std::make_shared<NsmClockOutputEnableState<PCIeRefClockIntf>>(
                 pcieRefClockObject, PCIE_CLKBUF_INDEX, deviceType,
                 instanceNumber);
-        auto nvLinkRefClock =
-            std::make_shared<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
-                nvLinkRefClockObject, NVHS_CLKBUF_INDEX, deviceType,
-                instanceNumber);
-        device->addSensor(pcieRefClock, priority);
-        device->addSensor(nvLinkRefClock, priority);
+        device->addSensor(pcieRefClock, CLOCK_OUTPUT_ENABLE_STATE_PRIORITY);
+
+        if (deviceType == NSM_DEV_ID_GPU)
+        {
+            auto nvLinkRefClockObject =
+                NsmChassisPCIeDevice<NVLinkRefClockIntf>(chassisName, name);
+            auto nvLinkRefClock =
+                std::make_shared<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
+                    nvLinkRefClockObject, NVHS_CLKBUF_INDEX, deviceType,
+                    instanceNumber);
+            device->addSensor(nvLinkRefClock,
+                              CLOCK_OUTPUT_ENABLE_STATE_PRIORITY);
+        }
     }
 
     // coverity[missing_return]

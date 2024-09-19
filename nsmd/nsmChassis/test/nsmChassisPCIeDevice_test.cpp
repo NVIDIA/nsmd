@@ -102,8 +102,6 @@ struct NsmChassisPCIeDeviceTest :
     const PropertyValuesCollection pcieDevice = {
         {"Type", "NSM_PCIeDevice"},
         {"DeviceType", "GPU"},
-        {"DeviceIndex", uint64_t(1)},
-        {"Priority", false},
         {"Functions", std::vector<uint64_t>{0}},
     };
     const PropertyValuesCollection ltssmState = {
@@ -117,7 +115,6 @@ struct NsmChassisPCIeDeviceTest :
         {"Type", "NSM_ClockOutputEnableState"},
         {"DeviceType", uint64_t(NSM_DEV_ID_GPU)},
         {"InstanceNumber", uint64_t(instanceId)},
-        {"Priority", false},
     };
     const MapperServiceMap gpuServiceMap = {
         {
@@ -220,9 +217,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     values.push(get(pcieDevice, "Type"));
     values.push(get(basic, "UUID"));
     values.push(get(pcieDevice, "DeviceType"));
-    values.push(get(pcieDevice, "DeviceIndex"));
     values.push(get(pcieDevice, "Functions"));
-    values.push(get(pcieDevice, "Priority"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
 
@@ -244,7 +239,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     values.push(get(basic, "UUID"));
     values.push(get(clockOutputEnableState, "DeviceType"));
     values.push(get(clockOutputEnableState, "InstanceNumber"));
-    values.push(get(clockOutputEnableState, "Priority"));
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 
@@ -294,8 +288,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(MARKETING_NAME, model->property);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
               model->pdi().manufacturer());
-    EXPECT_EQ(get<uint64_t>(pcieDevice, "DeviceIndex"),
-              pcieDeviceObject->deviceIndex);
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
               pcieDeviceObject->pdi().deviceType());
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),

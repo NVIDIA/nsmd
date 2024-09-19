@@ -35,17 +35,16 @@ namespace nsm
 {
 
 using namespace sdbusplus::xyz::openbmc_project;
-using namespace sdbusplus::com::nvidia;
-using namespace sdbusplus::server;
+using sdbusplus::server::object_t;
 using UuidIntf = object_t<Common::server::UUID>;
-using NVLinkRefClockIntf = object_t<NVLink::server::NVLinkRefClock>;
+using NVLinkRefClockIntf =
+    object_t<sdbusplus::com::nvidia::NVLink::server::NVLinkRefClock>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
 using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
-using OperationalStatusIntf =
-    object_t<State::Decorator::server::OperationalStatus>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
-using LTSSMStateIntf = object_t<PCIe::server::LTSSMState>;
+using LTSSMStateIntf =
+    object_t<sdbusplus::xyz::openbmc_project::PCIe::server::LTSSMState>;
 
 template <typename IntfType>
 class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
