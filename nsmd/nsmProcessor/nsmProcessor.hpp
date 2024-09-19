@@ -46,6 +46,9 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>
+#ifdef ENABLE_SYSTEM_GUID
+#include <com/nvidia/SysGUID/SysGUID/server.hpp>
+#endif
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
@@ -110,6 +113,43 @@ class NsmUuidIntf : public NsmObject
   private:
     std::unique_ptr<UuidIntf> uuidIntf = nullptr;
     std::string inventoryObjPath;
+};
+
+#ifdef ENABLE_SYSTEM_GUID
+using SysGuidIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::SysGUID::server::SysGUID>;
+class NsmSysGuidIntf : public NsmObject
+{
+  public:
+    NsmSysGuidIntf(sdbusplus::bus::bus& bus, std::string& name,
+                   std::string& type, std::string& inventoryObjPath);
+
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::unique_ptr<SysGuidIntf> sysguidIntf = nullptr;
+    std::string inventoryObjPath;
+
+    // SysGUID is used externally to identify which GPU's
+    // are in the same tray.
+    // So sysGUID is static (each GPU in a chassis will
+    // share the same ID)
+    static uint8_t sysGUID[];
+    static bool sysGuidGenerated;
+};
+#endif
+
+using AssetIntfProcessor = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
+
+template <typename IntfType>
+class NsmAssetIntfProcessor : public NsmInterfaceProvider<IntfType>
+{
+  public:
+    NsmAssetIntfProcessor(const std::string& name, const std::string& type,
+                          const std::shared_ptr<AssetIntfProcessor> assetIntf) :
+        NsmInterfaceProvider<IntfType>(name, type, assetIntf)
+    {}
 };
 
 using LocationIntfProcessor = sdbusplus::server::object_t<

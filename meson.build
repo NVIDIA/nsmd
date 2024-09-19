@@ -20,6 +20,10 @@ if get_option('tests').enabled()
     gmock = dependency('gmock', disabler: true, required: false)
 endif
 
+if get_option('system-guid').enabled()
+    add_project_arguments('-DENABLE_SYSTEM_GUID', language: ['cpp', 'c'])
+endif
+
 cpp = meson.get_compiler('cpp')
 if cpp.has_header('CLI/CLI.hpp')
     CLI11_dep = declare_dependency()

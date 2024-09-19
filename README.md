@@ -34,3 +34,4 @@ daemon to expose the emulated MCTP Endpoint to D-Bus.
 
 The mockup NSM responder listens to demux unix socket for the request from
 nsmd/nsmtool and returns the respond through modified MCTP demux daemon.
+
