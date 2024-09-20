@@ -192,8 +192,6 @@
                 "PCIeDevice": {
                     "Type": "NSM_PCIeDevice",
                     "DeviceType": "SingleFunction",
-                    "DeviceIndex": 0,
-                    "Priority": false,
                     "Functions": [
                         0
                     ]
@@ -206,10 +204,7 @@
                 },
                 "ClockOutputEnableState": {
                     "Type": "NSM_ClockOutputEnableState",
-                    "InstanceNumber": "$INSTANCE_NUMBER",
-                    "DeviceType": "$DEVICE_TYPE",
-                    "IsRetimer": false,
-                    "Priority": false
+                    "InstanceNumber": "$INSTANCE_NUMBER"
                 }
             },
             {

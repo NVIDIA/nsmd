@@ -143,6 +143,50 @@
                 "UUID": "$UUID",
                 "Count": 9,
                 "Priority": true
+            },
+            {
+                "ChassisName": "HGX_NVLinkManagementNIC_0",
+                "Name": "NVLinkManagementNIC_0",
+                "Type": "NSM_ChassisPCIeDevice",
+                "UUID": "$UUID",
+                "DEVICE_UUID": "$DEVICE_UUID",
+                "Asset": {
+                    "Type": "NSM_Asset",
+                    "Name": "HGX_NVLinkManagementNIC_0",
+                    "Manufacturer": "NVIDIA"
+                },
+                "Associations": [
+                    {
+                        "Forward": "chassis",
+                        "Backward": "pciedevice",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_0"
+                    },
+                    {
+                        "Forward": "connected_port",
+                        "Backward": "connected_pciedevice",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_0/NetworkAdapters/NVLinkManagementNIC_0/Ports/NVLinkManagement_0"
+                    },
+                    {
+                        "Forward": "connected_port",
+                        "Backward": "connected_pciedevice",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_0/NetworkAdapters/NVLinkManagementNIC_0/Ports/NVLinkManagement_1"
+                    }
+                ],
+                "Health": {
+                    "Type": "NSM_Health",
+                    "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+                },
+                "PCIeDevice": {
+                    "Type": "NSM_PCIeDevice",
+                    "DeviceType": "SingleFunction",
+                    "Functions": [
+                        0
+                    ]
+                },
+                "ClockOutputEnableState": {
+                    "Type": "NSM_ClockOutputEnableState",
+                    "InstanceNumber": "$INSTANCE_NUMBER"
+                }
             }
         ],
         "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
