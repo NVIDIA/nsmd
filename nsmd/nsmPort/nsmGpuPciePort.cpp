@@ -402,7 +402,8 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 name, type, portType, portProtocol, portInfoIntf);
             nsmDevice->deviceSensors.emplace_back(portInfoSensor);
             auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-                name, type, portInfoIntf, portWidthIntf, deviceIndex);
+                name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
+                deviceIndex);
 
             if (priority)
             {

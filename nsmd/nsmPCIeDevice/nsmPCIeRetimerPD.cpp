@@ -55,7 +55,7 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     NsmSensor(name, type),
     deviceIndex(deviceIndex)
 {
-    auto objPath = inventoryObjPath + name;
+    objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceQueryScalarTelemetry: {NAME}", "NAME",
                name.c_str());
 
@@ -74,6 +74,7 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     }
     associationDefIntf->associations(associations_list);
     pcieDeviceIntf->deviceType(deviceType);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -122,6 +123,7 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
             convertToLaneCount(data.negotiated_link_width));
         pcieDeviceIntf->PCIeDeviceIntf::maxLanes(
             convertToLaneCount(data.max_link_width));
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -133,18 +135,52 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
+void NsmPCIeDeviceQueryScalarTelemetry::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(pcieDeviceIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType valueVariantPT{
+        pcieDeviceIntf->convertPCIeTypesToString(pcieDeviceIntf->pcIeType())};
+    std::string propName = "PCIeType";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 smbusData, valueVariantPT);
+
+    nv::sensor_aggregation::DbusVariantType valueVariantMPT{
+        pcieDeviceIntf->convertPCIeTypesToString(
+            pcieDeviceIntf->maxPCIeType())};
+    propName = "MaxPCIeType";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 smbusData, valueVariantMPT);
+
+    nv::sensor_aggregation::DbusVariantType valueVariantLIU{
+        pcieDeviceIntf->lanesInUse()};
+    propName = "LanesInUse";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 smbusData, valueVariantLIU);
+
+    nv::sensor_aggregation::DbusVariantType valueVariantMLIN{
+        pcieDeviceIntf->maxLanes()};
+    propName = "MaxLanes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 smbusData, valueVariantMLIN);
+#endif
+}
+
 NsmPCIeDeviceGetClockOutput::NsmPCIeDeviceGetClockOutput(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uint64_t& deviceInstance, std::string& inventoryObjPath) :
     NsmSensor(name, type)
 {
-    auto objPath = inventoryObjPath + name;
+    objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceGetClockOutput: {NAME}", "NAME", name.c_str());
 
     // initialize members
     pcieRefClockIntf = std::make_unique<PCIeRefClockIntf>(bus, objPath.c_str());
     clkBufIndex = PCIE_CLKBUF_INDEX;
     deviceInstanceNumber = static_cast<uint8_t>(deviceInstance);
+    updateMetricOnSharedMemory();
 }
 
 std::optional<std::vector<uint8_t>>
@@ -182,6 +218,7 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
         // update values
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
+        updateMetricOnSharedMemory();
     }
     else
     {
@@ -191,6 +228,20 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
+}
+
+void NsmPCIeDeviceGetClockOutput::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(pcieRefClockIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    nv::sensor_aggregation::DbusVariantType valueVariantPRCE{
+        pcieRefClockIntf->pcIeReferenceClockEnabled()};
+    std::string propName = "PCIeReferenceClockEnabled";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 smbusData, valueVariantPRCE);
+#endif
 }
 
 bool NsmPCIeDeviceGetClockOutput::getRetimerClockState(uint32_t clockBuffer)

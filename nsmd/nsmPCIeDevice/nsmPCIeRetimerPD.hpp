@@ -2,13 +2,17 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "common/types.hpp"
 #include "globals.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
+#include <tal.hpp>
+#include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
@@ -59,8 +63,10 @@ class NsmPCIeDeviceQueryScalarTelemetry : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
+    std::string objPath;
     std::unique_ptr<AssociationDefinitionsInft> associationDefIntf = nullptr;
     std::unique_ptr<PCIeDeviceIntf> pcieDeviceIntf = nullptr;
     uint8_t deviceIndex;
@@ -80,10 +86,12 @@ class NsmPCIeDeviceGetClockOutput : public NsmSensor
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     bool getRetimerClockState(uint32_t clockBuffer);
 
+    std::string objPath;
     std::unique_ptr<PCIeRefClockIntf> pcieRefClockIntf = nullptr;
     uint8_t clkBufIndex;
     uint8_t deviceInstanceNumber;
