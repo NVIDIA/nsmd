@@ -88,13 +88,14 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
             data.ltssm_state == 0xFF ? LTSSMStateIntf::State::IllegalState
                                      : LTSSMStateIntf::State(data.ltssm_state);
         pdi().ltssmState(state);
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group6_resp");
     }
     else
     {
         pdi().ltssmState(LTSSMStateIntf::State::NA);
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group6_resp failed. rc={RC}, cc={CC}",
-            "RC", rc, "CC", cc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group6_resp", reasonCode,
+            cc, rc);
     }
 
     return cc ? cc : rc;

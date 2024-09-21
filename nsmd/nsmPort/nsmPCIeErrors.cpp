@@ -192,6 +192,19 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
             break;
     }
 
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        logHandleResponseMsg(
+            std::format("decode_query_scalar_group_telemetry_v1_group{}_resp",
+                        groupId),
+            reasonCode, cc, rc);
+    }
+    else
+    {
+        clearErrorBitMap(std::format(
+            "decode_query_scalar_group_telemetry_v1_group{}_resp", groupId));
+    }
+
     return cc ? cc : rc;
 }
 } // namespace nsm

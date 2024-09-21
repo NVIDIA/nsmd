@@ -134,6 +134,10 @@ NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
 void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
                           bool priority, bool isLongRunning)
 {
+    std::string deviceInstanceName =
+        utils::getDeviceInstanceName(getDeviceType(), getInstanceNumber());
+    sensor->setDeviceIdentifier(deviceInstanceName);
+
     deviceSensors.emplace_back(sensor);
     if (isLongRunning)
     {

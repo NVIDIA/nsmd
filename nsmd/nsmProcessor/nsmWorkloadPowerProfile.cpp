@@ -68,12 +68,12 @@ uint8_t NsmWorkLoadProfileStatus::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_current_profile_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_profile_info_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_profile_info_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -277,12 +277,14 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
                 pageCollection->addPage(nextPageId, page);
             }
         }
+        clearErrorBitMap(
+            "decode_get_workload_power_profile_info_metadata_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_workload_power_profile_info_metadata_resp unsuccessfull.reasonCode = {RSNCOD}, cc = {CC},rc = {RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_get_workload_power_profile_info_metadata_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

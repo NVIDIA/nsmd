@@ -78,15 +78,14 @@ uint8_t NsmPeakPower::handleResponseMsg(const struct nsm_msg* responseMsg,
         // unit of power is milliwatt in NSM Command Response and selected unit
         // on DBus is Watts. Hence it is converted to Watts.
         sensorValue->updateReading(reading / 1000.0);
+        clearErrorBitMap("decode_get_max_observed_power_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_get_max_observed_power_resp failed. "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_max_observed_power_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

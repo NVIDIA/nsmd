@@ -62,12 +62,12 @@ uint8_t NsmErrorInjection::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         pdi().errorInjectionModeEnabled(data.mode);
         pdi().persistentDataModified(data.flags.bits.bit0);
+        clearErrorBitMap("decode_get_error_injection_mode_v1_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_error_injection_mode_v1_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_error_injection_mode_v1_resp",
+                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;
@@ -123,12 +123,12 @@ uint8_t NsmErrorInjectionSupported::handleResponseMsg(
             auto type = pdi->type();
             pdi->supported(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
         }
+        clearErrorBitMap("decode_get_error_injection_types_v1_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_error_injection_types_v1_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_error_injection_types_v1_resp",
+                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;
@@ -169,12 +169,12 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
             auto type = pdi->type();
             pdi->enabled(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
         }
+        clearErrorBitMap("decode_get_error_injection_types_v1_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_error_injection_types_v1_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_error_injection_types_v1_resp",
+                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

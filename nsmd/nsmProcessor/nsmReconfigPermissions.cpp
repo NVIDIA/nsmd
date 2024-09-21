@@ -125,13 +125,13 @@ uint8_t
         pdi().allowPersistentConfig(data.persistent);
         pdi().allowFLRPersistentConfig(data.flr_persistent);
         pdi().type(feature);
+        clearErrorBitMap("decode_get_reconfiguration_permissions_v1_resp");
     }
     else
     {
         pdi().type(ReconfigSettingsIntf::FeatureType::Unknown);
-        lg2::error(
-            "handleResponseMsg: decode_get_reconfiguration_permissions_v1_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_reconfiguration_permissions_v1_resp",
+                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

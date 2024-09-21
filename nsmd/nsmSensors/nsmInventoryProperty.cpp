@@ -59,9 +59,13 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
     if (rc)
     {
-        lg2::error(
-            "responseHandler: decode_get_inventory_information_resp failed. property={NUM} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NUM", int(property), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_get_inventory_information_resp failed. property={NUM} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+                "NUM", int(property), "REASONCODE", reasonCode, "CC", cc, "RC",
+                rc);
+        }
         return rc;
     }
 
@@ -69,12 +73,16 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
     {
         data.resize(dataSize);
         handleResponse(data);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_get_inventory_information_resp is not success CC. property={NUM} rc={RC}",
-            "NUM", int(property), "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_get_inventory_information_resp is not success CC. property={NUM} rc={RC}",
+                "NUM", int(property), "RC", rc);
+        }
         return rc;
     }
 

@@ -62,12 +62,15 @@ uint8_t NsmClockOutputEnableStateBase::handleResponseMsg(
     auto rc = decode_get_clock_output_enable_state_resp(
         responseMsg, responseLen, &cc, &reasonCode, &size, &data);
 
-    if (rc != NSM_SUCCESS || cc != NSM_SUCCESS)
+    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+    {
+        clearErrorBitMap("decode_get_clock_output_enable_state_resp");
+    }
+    else
     {
         memset(&data, 0, sizeof(data));
-        lg2::error(
-            "responseHandler: decode_get_clock_output_enable_state_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_clock_output_enable_state_resp",
+                             reasonCode, cc, rc);
     }
     handleResponse(data);
 

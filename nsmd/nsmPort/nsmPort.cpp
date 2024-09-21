@@ -358,13 +358,17 @@ uint8_t
         portMetricsOem3Intf->rxWidth(width);
 
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_query_port_characteristics_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
-            "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
+                cc, "RC", rc);
+        }
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -838,13 +842,17 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         updateCounterValues(&data);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("get_port_telemetry_counter");
     }
     else
     {
-        lg2::error(
-            "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber, "RSNCOD",
-            reasonCode, "CC", cc, "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber,
+                "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        }
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

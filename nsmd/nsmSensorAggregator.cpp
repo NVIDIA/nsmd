@@ -41,11 +41,13 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
     auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumed_len,
                                     &cc, &telemetry_count);
 
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::error("responseHandler: decode_aggregate_resp failed. "
-                   "Type={TYPE} sensor={NAME} rc={RC} cc={CC}.",
-                   "TYPE", getType(), "NAME", getName(), "RC", rc, "CC", cc);
+        clearErrorBitMap("decode_aggregate_resp");
+    }
+    else
+    {
+        logHandleResponseMsg("decode_aggregate_resp", ERR_NULL, cc, rc);
         return rc;
     }
 

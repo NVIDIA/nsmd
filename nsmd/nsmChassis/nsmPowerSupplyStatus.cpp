@@ -75,6 +75,7 @@ uint8_t
                                        ? PowerStateIntf::PowerState::On
                                        : PowerStateIntf::PowerState::Off);
         }
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
@@ -82,9 +83,8 @@ uint8_t
         {
             pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
         }
-        lg2::error(
-            "responseHandler: decode_get_power_supply_status_resp is not success CC. rc={RC}",
-            "RC", rc);
+        logHandleResponseMsg("decode_get_power_supply_status_resp", reasonCode,
+                             cc, rc);
         return rc;
     }
 

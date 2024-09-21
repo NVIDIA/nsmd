@@ -222,13 +222,12 @@ uint8_t
         cpuOperatingConfigIntf->requestedSpeedLimitMax(
             clockLimit.requested_limit_max);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_get_clock_limit_resp");
     }
     else
     {
-        lg2::error(
-            "NsmChassisClockControl: handleResponseMsg decode_get_clock_limit_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_clock_limit_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

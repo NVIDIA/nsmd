@@ -18,7 +18,9 @@
 #pragma once
 #include "requester/handler.hpp"
 #include "types.hpp"
+#include "utils.hpp"
 
+#include <phosphor-logging/lg2.hpp>
 #include <tal.hpp>
 
 static constexpr const uint64_t INIT_TIMESTAMP =
@@ -50,6 +52,15 @@ class NsmObject
     {
         return type;
     }
+    const std::string& getDeviceIdentifier() const
+    {
+        return deviceIdentifier;
+    }
+
+    void setDeviceIdentifier(const std::string deviceType)
+    {
+        deviceIdentifier = deviceType;
+    }
 
     void setLastUpdatedTimeStamp(const uint64_t currentTimestampInUsec)
     {
@@ -61,6 +72,62 @@ class NsmObject
         const uint64_t deltaInUsec = currentTimestampInUsec -
                                      lastUpdatedTimeStampInUsec;
         return (deltaInUsec > refreshLimitInUsec);
+    }
+
+    void logHandleResponseMsg(const std::string funcName,
+                              const uint16_t& reason_code, const int& cc,
+                              const int& rc)
+    {
+        if (!shouldLogError(cc, rc))
+        {
+            return;
+        }
+        lg2::error(
+            "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
+            "with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+            "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
+            getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    }
+
+    bool shouldLogError(const int& cc, const int& rc)
+    {
+        if (cc == NSM_SUCCESS)
+        {
+            rc_map.isAnyBitSet = true;
+            return !utils::isbitfield256_tBitSet(rc_map.bitMap, rc);
+        }
+        cc_map.isAnyBitSet = true;
+        return !utils::isbitfield256_tBitSet(cc_map.bitMap, cc);
+    }
+
+    void clearErrorBitMap(std::string funcName)
+    {
+        if (cc_map.isAnyBitSet)
+        {
+            lg2::error(
+                "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
+                "request SUCCESSFUL | CC Code(s) Cleared : [{CCCLEAREDBITS}]",
+                "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
+                getName(), "CCCLEAREDBITS",
+                utils::bitfield256_tGetSetBits(cc_map.bitMap));
+        }
+        if (rc_map.isAnyBitSet)
+        {
+            lg2::error(
+                "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
+                "request SUCCESSFUL | RC Code(s) Cleared : [{RCCLEAREDBITS}]",
+                "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
+                getName(), "RCCLEAREDBITS",
+                utils::bitfield256_tGetSetBits(rc_map.bitMap));
+        }
+        // Clear the bitmaps
+        for (int i = 0; i < 8; i++)
+        {
+            cc_map.bitMap.fields[i].byte = 0;
+            rc_map.bitMap.fields[i].byte = 0;
+        }
+        cc_map.isAnyBitSet = false;
+        rc_map.isAnyBitSet = false;
     }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
@@ -86,5 +153,9 @@ class NsmObject
     const std::string type;
     uint64_t lastUpdatedTimeStampInUsec = INIT_TIMESTAMP;
     uint64_t refreshLimitInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
+    utils::bitfield256_err_code cc_map;
+    utils::bitfield256_err_code rc_map;
+    std::string deviceIdentifier;
+    // deviceIdentifier = deviceName_deviceInstanceNumber
 };
 } // namespace nsm

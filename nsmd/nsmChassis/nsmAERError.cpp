@@ -82,12 +82,13 @@ uint8_t
             hexFormat(data.aer_uncorrectable_error_status));
         aerErrorStatusIntf->aerCorrectableErrorStatus(
             hexFormat(data.aer_correctable_error_status));
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group9_resp");
     }
     else
     {
-        lg2::error(
-            "NsmPCIeAERErrorStatus: decode_query_scalar_group_telemetry_v1_group9_resp failed. rc={RC}, cc={CC}",
-            "RC", rc, "CC", cc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group9_resp", reasonCode,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

@@ -371,13 +371,12 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(flags);
+        clearErrorBitMap("decode_get_temperature_reading_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_temperature_reading_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_temperature_reading_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -445,13 +444,11 @@ uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(flags);
+        clearErrorBitMap("decode_get_ECC_mode_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_ECC_mode_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_ECC_mode_resp", reason_code, cc, rc);
 
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -536,13 +533,12 @@ uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(errorCounts);
+        clearErrorBitMap("decode_get_ECC_error_counts_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_ECC_error_counts_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_ECC_error_counts_resp", reason_code,
+                             cc, rc);
 
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -680,13 +676,13 @@ uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group2_resp");
     }
     else
     {
-        lg2::error(
-            "NsmPciGroup2 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group2_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group2_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -748,13 +744,13 @@ uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group3_resp");
     }
     else
     {
-        lg2::error(
-            "NsmPciGroup3 :: handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group3_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group3_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -853,13 +849,13 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group4_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group4_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group4_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -921,13 +917,13 @@ uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group5_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_query_scalar_group_telemetry_v1_group5_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group5_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -1007,13 +1003,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(scaling_factors);
+        clearErrorBitMap("decode_get_programmable_EDPp_scaling_factor_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_programmable_EDPp_scaling_factor_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_programmable_EDPp_scaling_factor_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -1321,13 +1316,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(clockLimit);
+        clearErrorBitMap("decode_get_clock_limit_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_clock_limit_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_clock_limit_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -1393,7 +1387,7 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint8_t cc = NSM_ERROR;
     uint32_t clockFreq = 1;
     uint16_t data_size;
-    uint16_t reason_code;
+    uint16_t reason_code = ERR_NULL;
 
     auto rc = decode_get_curr_clock_freq_resp(
         responseMsg, responseLen, &cc, &data_size, &reason_code, &clockFreq);
@@ -1401,13 +1395,12 @@ uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(clockFreq);
+        clearErrorBitMap("decode_get_curr_clock_freq_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_curr_clock_freq_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_curr_clock_freq_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -1624,13 +1617,12 @@ uint8_t
         cpuOperatingConfigIntf->utilization(gpu_utilization);
         smUtilizationIntf->smUtilization(gpu_utilization);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_get_current_utilization_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_utilization_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_utilization_resp", reason_code,
+                             cc, rc);
 
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -1744,13 +1736,12 @@ uint8_t NsmProcessorThrottleReason::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_get_current_clock_event_reason_code_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_clock_event_reason_code_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_clock_event_reason_code_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -1837,13 +1828,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(context_util_time, SM_util_time);
+        clearErrorBitMap("decode_get_accum_GPU_util_time_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_accum_GPU_util_time_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_accum_GPU_util_time_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -1979,13 +1969,12 @@ uint8_t NsmTotalNvLinks::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         totalNvLinkInterface->totalNumberNVLinks(totalNvLinks);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_query_ports_available_resp");
     }
     else
     {
-        lg2::error(
-            "NsmTotalNvLinks::handleResponseMsg  decode_query_ports_available_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_query_ports_available_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -2056,13 +2045,12 @@ uint8_t
         std::string revision(data.begin(), data.end());
         revisionIntf->version(revision);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_inventory_information_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -2176,12 +2164,12 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(enforced_limit_in_miliwatts / 1000);
+        clearErrorBitMap("decode_get_power_limit_resp");
     }
     else
     {
-        lg2::error(
-            "decode_get_power_limit_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_power_limit_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -2543,13 +2531,12 @@ uint8_t NsmProcessorThrottleDuration::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_get_violation_duration_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_violation_duration_resp  "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_violation_duration_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;

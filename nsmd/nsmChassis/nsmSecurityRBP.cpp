@@ -223,10 +223,15 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &stateInfo);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(":decode_nsm_firmware_irreversible_config_request_0_resp"
-                   " rc={RC} cc={CC} reasonCode={RSC}",
-                   "RC", rc, "CC", cc, "RSC", reasonCode);
+        logHandleResponseMsg(
+            "decode_nsm_firmware_irreversible_config_request_0_resp",
+            reasonCode, cc, rc);
         return rc;
+    }
+    else
+    {
+        clearErrorBitMap(
+            "decode_nsm_firmware_irreversible_config_request_0_resp");
     }
     securityCfgObject->updateState(stateInfo);
     return cc;
@@ -434,11 +439,15 @@ uint8_t NsmMinSecVersionObject::handleResponseMsg(const nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &sec_info);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            ":decode_nsm_query_firmware_security_version_number_resp rc={RC}"
-            " cc={CC} reasonCode={RSC}",
-            "RC", rc, "CC", cc, "RSC", reasonCode);
+        logHandleResponseMsg(
+            "decode_nsm_query_firmware_security_version_number_resp",
+            reasonCode, cc, rc);
         return rc;
+    }
+    else
+    {
+        clearErrorBitMap(
+            "decode_nsm_query_firmware_security_version_number_resp");
     }
     minSecVersion->updateProperties(sec_info);
     return cc;

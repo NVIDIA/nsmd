@@ -71,12 +71,12 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
                                                     instanceNumber, retimer);
         // Updates WriteProtected in FirmwareInventory
         pdi().writeProtected(value);
+        clearErrorBitMap("decode_get_fpga_diagnostics_settings_wp_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_fpga_diagnostics_settings_wp_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_fpga_diagnostics_settings_wp_resp",
+                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

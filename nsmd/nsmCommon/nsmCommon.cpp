@@ -55,13 +55,14 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
         uint32_t* maximumMemoryCapacityMiB =
             reinterpret_cast<uint32_t*>(data.data());
         updateReading(maximumMemoryCapacityMiB);
+        clearErrorBitMap(
+            "decode_get_inventory_information_resp for Maximum Memory Capacity");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_inventory_information_resp for Maximum Memory Capacity"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_get_inventory_information_resp for Maximum Memory Capacity",
+            reason_code, cc, rc);
         updateReading(NULL);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -181,13 +182,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_get_memory_capacity_util_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_memory_capacity_util_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_memory_capacity_util_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

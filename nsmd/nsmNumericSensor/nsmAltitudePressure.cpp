@@ -57,15 +57,14 @@ uint8_t
         // unit of pressure is hPa in NSM Command Response and selected unit
         // in SensorValue PDI is Pa. Hence it is converted to Watts.
         sensorValue->updateReading(reading * 100.0);
+        clearErrorBitMap("decode_get_altitude_pressure_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_get_altitude_pressure_resp failed. "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_altitude_pressure_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

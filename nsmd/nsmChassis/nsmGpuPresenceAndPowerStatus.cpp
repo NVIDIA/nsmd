@@ -156,11 +156,25 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
             break;
     }
 
-    if (cc != NSM_SUCCESS)
+    std::string decodeMethodName = "";
+    switch (state)
     {
-        lg2::error(
-            "NsmGpuPresenceAndPowerStatus::handleResponseMsg  is not success CC. rc={RC}, cc={CC}, reasonCode={REASON_CODE}",
-            "RC", rc, "CC", cc, "REASON_CODE", reasonCode);
+        case State::GetPresence:
+            decodeMethodName = "decode_get_gpu_presence_resp";
+            break;
+        case State::GetPowerStatus:
+            decodeMethodName = "decode_get_gpu_power_status_resp";
+            break;
+        default:
+            break;
+    }
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        clearErrorBitMap(decodeMethodName);
+    }
+    else
+    {
+        logHandleResponseMsg(decodeMethodName, reasonCode, cc, rc);
     }
     return rc;
 }

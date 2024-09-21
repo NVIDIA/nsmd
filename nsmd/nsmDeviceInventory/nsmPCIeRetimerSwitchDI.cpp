@@ -155,12 +155,12 @@ uint8_t NsmPCIeRetimerSwitchGetClockState::handleResponseMsg(
         // update values
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
+        clearErrorBitMap("get_clock_output_enable_state");
     }
     else
     {
-        lg2::error(
-            "responseHandler: get_clock_output_enable_state unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("get_clock_output_enable_state", reasonCode, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

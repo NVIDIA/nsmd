@@ -85,6 +85,22 @@ struct Association
 using Associations =
     std::vector<std::tuple<std::string, std::string, std::string>>;
 
+struct bitfield256_err_code
+{
+    bitfield256_t bitMap;
+    bool isAnyBitSet; // Flag indicating if any bits are set
+
+    bitfield256_err_code()
+    {
+        // Initialize cc_map and rc_map with all bits set to zero
+        for (int i = 0; i < 8; i++)
+        {
+            bitMap.fields[i].byte = 0;
+        }
+        isAnyBitSet = false;
+    }
+};
+
 /** @struct CustomFD
  *
  *  RAII wrapper for file descriptor.
@@ -446,6 +462,21 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
  */
 void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
                                    uint8_t instanceNumber, bool retimer);
+/**
+ * @brief Get Device Name associated to Device Type
+ *
+ * @param deviceType NSM device type number
+ */
+std::string getDeviceNameFromDeviceType(const uint8_t deviceType);
+
+/**
+ * @brief Get Device Instance Name = deviceName_deviceInstanceNumber
+ *
+ * @param deviceType NSM device type number
+ * @param instanceNumber NSM device instance number
+ */
+std::string getDeviceInstanceName(const uint8_t deviceType,
+                                  const uint8_t instanceNumber);
 
 /** @brief Get associations of a configuration PDI by coroutine
  *
@@ -495,6 +526,27 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
  */
 std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
                                      const size_t size = 0);
+
+/**
+ * @brief Check bitfield256_t bitmap for given bit and set the bit.
+ *
+ * @param[in] bitMap - bitfield256_t bitmap where bits should be set.
+ * @param[in] errCode - Bit to be set.
+ *
+ * @return true if bit already set, false if bit set to 1.
+ *
+ * @note Sets the provided bit to 1.
+ */
+bool isbitfield256_tBitSet(bitfield256_t& bitMap, const int& errCode);
+
+/**
+ * @brief Get list of set bits.
+ *
+ * @param[in] bitMap - bitfield256_t bitmap where bits are set.
+ *
+ * @return Comma separated string of set bit positions.
+ */
+std::string bitfield256_tGetSetBits(const bitfield256_t& bitMap);
 
 /**
  * @brief Converts a bitfield representing update methods into a list of update

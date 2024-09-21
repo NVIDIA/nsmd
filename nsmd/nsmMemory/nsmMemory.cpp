@@ -180,13 +180,12 @@ uint8_t NsmRowRemapState::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(flags);
+        clearErrorBitMap("decode_get_row_remap_state_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_row_remap_state_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remap_state_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -268,13 +267,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(correctable_error, uncorrectable_error);
+        clearErrorBitMap("decode_get_row_remapping_counts_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_row_remapping_counts_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remapping_counts_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -335,13 +333,12 @@ uint8_t NsmRemappingAvailabilityBankCount::handleResponseMsg(
     {
         updateReading(data);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_get_row_remap_availability_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_row_remap_availability_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remap_availability_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -460,13 +457,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(errorCounts);
+        clearErrorBitMap("decode_get_ECC_error_counts_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_ECC_error_counts_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_ECC_error_counts_resp", reason_code,
+                             cc, rc);
 
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -681,13 +677,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(clockFreq);
+        clearErrorBitMap("decode_get_curr_clock_freq_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_curr_clock_freq_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_curr_clock_freq_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;

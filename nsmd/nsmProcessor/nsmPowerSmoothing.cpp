@@ -60,12 +60,12 @@ uint8_t NsmPowerSmoothing::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_powersmoothing_featinfo_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_powersmoothing_featinfo_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_powersmoothing_featinfo_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -144,12 +144,12 @@ uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_hardware_lifetime_cricuitry_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_hardware_lifetime_cricuitry_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_hardware_lifetime_cricuitry_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -215,12 +215,12 @@ uint8_t NsmCurrentPowerSmoothingProfile::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_current_profile_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_profile_info_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_profile_info_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -312,12 +312,12 @@ uint8_t NsmPowerSmoothingAdminOverride::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_query_admin_override_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_query_admin_override_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_query_admin_override_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -455,12 +455,12 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
             updateSupportedProfile(getSupportedProfileById(profileId),
                                    &profileData);
         }
+        clearErrorBitMap("decode_get_preset_profile_metadata_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_preset_profile_metadata_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_preset_profile_metadata_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
