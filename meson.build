@@ -16,8 +16,26 @@ phosphor_dbus_interfaces = dependency('phosphor-dbus-interfaces')
 phosphor_logging = dependency('phosphor-logging')
 
 if get_option('tests').enabled()
-    gtest = dependency('gtest', main: true, disabler: true, required: false)
+    gtest = dependency(
+        'gtest',
+        main: true,
+        disabler: true,
+        required: false,
+        version: '>=1.14.0',
+    )
     gmock = dependency('gmock', disabler: true, required: false)
+    if not gtest.found() or not gmock.found()
+        googletest = import('cmake').subproject('googletest', required: true)
+        gtest = declare_dependency(
+            dependencies: [
+                googletest.get_variable('gtest_dep'),
+                googletest.get_variable('gtest_main_dep'),
+            ],
+        )
+        gmock = googletest.get_variable('gmock_dep')
+    endif
+    gtest = gtest.as_system('system')
+    gmock = gmock.as_system('system')
 endif
 
 if get_option('system-guid').enabled()

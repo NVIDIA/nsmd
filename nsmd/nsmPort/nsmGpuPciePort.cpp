@@ -17,7 +17,7 @@
 
 #include "nsmGpuPciePort.hpp"
 
-#include "nsmGpuPriorityMapping.h"
+#include "nsmPriorityMapping.h"
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"

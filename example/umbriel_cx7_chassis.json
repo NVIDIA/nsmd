@@ -187,6 +187,24 @@
                     "Type": "NSM_ClockOutputEnableState",
                     "InstanceNumber": "$INSTANCE_NUMBER"
                 }
+            },
+            {
+                "Name": "PCIe_0",
+                "Type": "NSM_PCIePort",
+                "InventoryObjPath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER/Ports/PCIe_0",
+                "UUID": "$UUID",
+                "Health": "xyz.openbmc_project.State.Decorator.Health.HealthType.OK",
+                "PortType": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort",
+                "PortProtocol": "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe",
+                "LinkState": "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStates.Enabled",
+                "LinkStatus": "xyz.openbmc_project.Inventory.Decorator.PortState.LinkStatusType.LinkUp",
+                "Associations": [
+                    {
+                        "Forward": "parent_device",
+                        "Backward": "all_states",
+                        "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER"
+                    }
+                ]
             }
         ],
         "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",

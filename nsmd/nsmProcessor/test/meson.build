@@ -42,6 +42,7 @@ dep_src_headers = [
     '../../',
     '../../nsmSensors',
     '../../nsmCommon',
+    '../../nsmPort',
     '../../nsmDbusIfaceOverride',
     '../../nsmSetAsync',
     '../../nsmRawCommand',
