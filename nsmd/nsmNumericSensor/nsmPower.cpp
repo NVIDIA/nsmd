@@ -46,17 +46,15 @@ NsmPower::NsmPower(sdbusplus::bus::bus& bus, const std::string& name,
     NsmNumericSensor(
         name, type, sensorId,
         std::make_shared<NsmNumericSensorValueAggregate>(
+#ifdef NVIDIA_SHMEM
+            std::make_unique<NsmNumericSensorShmem>(
+                name, getSensorType(), chassis_association,
+                std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>()),
+#endif
             std::make_unique<NsmNumericSensorDbusValueTimestamp>(
                 bus, name, getSensorType(), SensorUnit::Watts, association,
                 physicalContext, implementation, maxAllowableValue,
-                readingBasis, description)
-#ifdef NVIDIA_SHMEM
-                ,
-            std::make_unique<NsmNumericSensorShmem>(
-                name, getSensorType(), chassis_association,
-                std::make_unique<SMBPBIPowerSMBusSensorBytesConverter>())
-#endif
-                )),
+                readingBasis, description))),
     averagingInterval(averagingInterval)
 {}
 
