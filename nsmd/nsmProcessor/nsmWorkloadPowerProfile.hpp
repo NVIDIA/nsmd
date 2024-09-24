@@ -113,7 +113,7 @@ class NsmWorkloadPowerProfileCollection : public NsmObject
 {
   private:
     std::string inventoryObjPath;
-    std::map<uint8_t, std::shared_ptr<OemWorkLoadPowerProfileIntf>>
+    std::map<uint16_t, std::shared_ptr<OemWorkLoadPowerProfileIntf>>
         supportedPowerProfiles;
     std::shared_ptr<NsmDevice> device;
 
@@ -125,7 +125,7 @@ class NsmWorkloadPowerProfileCollection : public NsmObject
     std::shared_ptr<OemWorkLoadPowerProfileIntf>
         getSupportedProfileById(uint16_t profileId);
     bool hasProfileId(uint16_t profileId);
-    void addSupportedProfile(uint8_t profileId,
+    void addSupportedProfile(uint16_t profileId,
                              std::shared_ptr<OemWorkLoadPowerProfileIntf> obj);
     void
         updateSupportedProfile(std::shared_ptr<OemWorkLoadPowerProfileIntf> obj,

@@ -5736,7 +5736,7 @@ int decode_get_workload_power_profile_info_metadata_resp(
 	}
 
 	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-		       sizeof(struct nsm_get_all_preset_profile_resp))) {
+		       sizeof(struct nsm_all_workload_power_profile_resp_meta_data))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5749,7 +5749,7 @@ int decode_get_workload_power_profile_info_metadata_resp(
 	uint16_t preset_profile_size =
 	    sizeof(struct nsm_workload_power_profile_data);
 	uint16_t expected_data_size =
-	    preset_profile_size * (data->number_of_profiles);
+	    preset_profile_size * (resp->data.number_of_profiles);
 
 	if (le16toh(resp->hdr.data_size) < expected_data_size) {
 		return NSM_SW_ERROR_DATA;

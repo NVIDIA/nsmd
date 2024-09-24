@@ -79,6 +79,15 @@ class OemWorkLoadPowerProfileIntf :
         AssociationDefinitionsIntf::associations(associations_list);
         WorkLoadPowerProfileIntf::profileName(profileName);
     }
+
+    std::string getProfileName()
+    {
+        return profileName;
+    }
+    uint16_t getProfileId()
+    {
+        return profileId;
+    }
 };
 
 } // namespace nsm
