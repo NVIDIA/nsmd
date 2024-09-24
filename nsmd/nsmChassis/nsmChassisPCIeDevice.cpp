@@ -17,7 +17,7 @@
 
 #include "nsmChassisPCIeDevice.hpp"
 
-#include "nsmGpuPriorityMapping.h"
+#include "nsmPriorityMapping.h"
 
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"

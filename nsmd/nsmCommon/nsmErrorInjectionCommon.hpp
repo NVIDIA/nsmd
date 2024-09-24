@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "nsmGpuPriorityMapping.h"
+#include "nsmPriorityMapping.h"
 
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection.hpp"

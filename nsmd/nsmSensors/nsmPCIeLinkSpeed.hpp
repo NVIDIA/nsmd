@@ -20,6 +20,7 @@
 #include "libnsm/pci-links.h"
 
 #include "nsmInterface.hpp"
+#include "nsmPortInfo.hpp"
 #include "sharedMemCommon.hpp"
 
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
@@ -129,6 +130,68 @@ inline void NsmPCIeLinkSpeed<PCIeEccIntf>::handleResponse(
         (PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
     pdi().lanesInUse(linkWidth(data.negotiated_link_width));
     pdi().maxLanes(linkWidth(data.max_link_width));
+    updateMetricOnSharedMemory();
+}
+
+template <>
+inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> data;
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortInfoIntf::interface,
+                                "CurrentSpeedGbps", data, pdi().currentSpeed());
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortInfoIntf::interface,
+                                "MaxSpeedGbps", data, pdi().maxSpeed());
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortWidth::interface,
+                                "ActiveWidth", data, pdi().activeWidth());
+    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortWidth::interface, "Width",
+                                data, pdi().width());
+#endif
+}
+template <>
+inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
+    const nsm_query_scalar_group_telemetry_group_1& data)
+{
+    auto convertToTransferRate = [](uint32_t generation) {
+        switch (generation)
+        {
+            case 1:
+            {
+                return 2.5;
+            }
+            case 2:
+            {
+                return 5.0;
+            }
+            case 3:
+            {
+                return 8.0;
+            }
+            case 4:
+            {
+                return 16.0;
+            }
+            case 5:
+            {
+                return 32.0;
+            }
+            case 6:
+            {
+                return 64.0;
+            }
+            default:
+            {
+                lg2::error(
+                    "NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse: unknown generation {GENERATION}",
+                    "GENERATION", generation);
+                return 0.0;
+            }
+        }
+    };
+    pdi().currentSpeed(convertToTransferRate(data.negotiated_link_speed));
+    pdi().maxSpeed(convertToTransferRate(data.max_link_speed));
+    pdi().activeWidth(linkWidth(data.negotiated_link_width));
+    pdi().width(linkWidth(data.max_link_width));
     updateMetricOnSharedMemory();
 }
 

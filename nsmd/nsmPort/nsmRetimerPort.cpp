@@ -35,6 +35,7 @@ NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
     associationDefIntf->associations(associations_list);
 }
 
+// TODO refactor usage to NsmPCIeLinkSpeed<PortInfoIntf>
 NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
@@ -151,6 +152,7 @@ void NsmPCIeECCGroup1::updateMetricOnSharedMemory()
 #endif
 }
 
+// TODO refactor usage to NsmPCIeErrors(2)
 NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
@@ -229,6 +231,7 @@ void NsmPCIeECCGroup2::updateMetricOnSharedMemory()
 #endif
 }
 
+// TODO refactor usage to NsmPCIeErrors(3)
 NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
@@ -284,6 +287,7 @@ void NsmPCIeECCGroup3::updateMetricOnSharedMemory()
 #endif
 }
 
+// TODO refactor usage to NsmPCIeErrors(4)
 NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
@@ -364,6 +368,7 @@ void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
 #endif
 }
 
+// TODO refactor usage to NsmPCIeErrors(8)
 NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
                                    const std::string& type,
                                    std::shared_ptr<LaneErrorIntf> laneErrorIntf,

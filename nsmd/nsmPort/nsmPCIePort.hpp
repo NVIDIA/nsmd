@@ -15,24 +15,21 @@
  * limitations under the License.
  */
 
-#pragma once
+#include "globals.hpp"
+#include "nsmInterface.hpp"
 
-#ifndef AER_ERR_SENSOR_PRIORITY
-#define AER_ERR_SENSOR_PRIORITY false
-#endif
+namespace nsm
+{
 
-#ifndef PER_LANE_ERROR_COUNT_PRIORITY
-#define PER_LANE_ERROR_COUNT_PRIORITY false
-#endif
+template <typename IntfType>
+class NsmPCIePort : public NsmInterfaceProvider<IntfType>
+{
+  public:
+    NsmPCIePort() = delete;
+    NsmPCIePort(const std::string& inventoryObjPath) :
+        NsmInterfaceProvider<IntfType>("NSM_PCIe_0", "NSM_PCIePort",
+                                       dbus::Interfaces{inventoryObjPath})
+    {}
+};
 
-#ifndef ERROR_INJECTION_PRIORITY
-#define ERROR_INJECTION_PRIORITY false
-#endif
-
-#ifndef PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY
-#define PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY false
-#endif
-
-#ifndef CLOCK_OUTPUT_ENABLE_STATE_PRIORITY
-#define CLOCK_OUTPUT_ENABLE_STATE_PRIORITY false
-#endif
+} // namespace nsm
