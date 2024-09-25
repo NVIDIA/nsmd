@@ -53,7 +53,7 @@ uint8_t
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    nsm_query_scalar_group_telemetry_group_1 data = {};
+    nsm_query_scalar_group_telemetry_group_1 data{};
     uint16_t size = 0;
 
     auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
@@ -72,6 +72,7 @@ uint8_t
             "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     }
+    updateMetricOnSharedMemory();
 
     return cc ? cc : rc;
 }

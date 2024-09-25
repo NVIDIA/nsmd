@@ -79,6 +79,14 @@ class NsmPCIeLinkSpeed :
         NsmPCIeLinkSpeedBase(provider, deviceIndex),
         NsmInterfaceContainer<IntfType>(provider)
     {
+        nsm_query_scalar_group_telemetry_group_1 data{
+            .negotiated_link_speed = 1, // Gen1
+            .negotiated_link_width = 0,
+            .target_link_speed = 0,
+            .max_link_speed = 1, // Gen1
+            .max_link_width = 0,
+        };
+        handleResponse(data);
         updateMetricOnSharedMemory();
     }
 };
@@ -130,7 +138,6 @@ inline void NsmPCIeLinkSpeed<PCIeEccIntf>::handleResponse(
         (PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
     pdi().lanesInUse(linkWidth(data.negotiated_link_width));
     pdi().maxLanes(linkWidth(data.max_link_width));
-    updateMetricOnSharedMemory();
 }
 
 template <>
@@ -192,7 +199,6 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
     pdi().maxSpeed(convertToTransferRate(data.max_link_speed));
     pdi().activeWidth(linkWidth(data.negotiated_link_width));
     pdi().width(linkWidth(data.max_link_width));
-    updateMetricOnSharedMemory();
 }
 
 } // namespace nsm
