@@ -1096,7 +1096,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
     else
     {
         lg2::error(
-            "NsmEDPpScalingFactor::patchSetPoint decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "NsmEDPpScalingFactor::patchSetPoint decode_set_programmable_EDPp_scaling_factor_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;

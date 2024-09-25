@@ -2257,7 +2257,7 @@ class SetEDPpScalingFactors : public CommandInterface
   private:
     uint8_t action;
     uint8_t persistence;
-    uint32_t scaling_factor;
+    uint8_t scaling_factor;
 };
 
 class QueryScalarGroupTelemetry : public CommandInterface

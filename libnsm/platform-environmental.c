@@ -2001,7 +2001,7 @@ int decode_get_programmable_EDPp_scaling_factor_resp(
 int encode_set_programmable_EDPp_scaling_factor_req(uint8_t instance_id,
 						    uint8_t action,
 						    uint8_t persistence,
-						    uint32_t scaling_factor,
+						    uint8_t scaling_factor,
 						    struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -2022,10 +2022,12 @@ int encode_set_programmable_EDPp_scaling_factor_req(uint8_t instance_id,
 	    (struct nsm_set_programmable_EDPp_scaling_factor_req *)msg->payload;
 
 	request->hdr.command = NSM_SET_PROGRAMMABLE_EDPP_SCALING_FACTOR;
-	request->hdr.data_size = 2 * sizeof(uint8_t) + sizeof(uint32_t);
+	request->hdr.data_size =
+	    sizeof(struct nsm_set_programmable_EDPp_scaling_factor_req) -
+	    sizeof(struct nsm_common_req);
 	request->action = action;
 	request->persistence = persistence;
-	request->scaling_factor = htole32(scaling_factor);
+	request->scaling_factor = scaling_factor;
 	return NSM_SW_SUCCESS;
 }
 
@@ -2033,7 +2035,7 @@ int decode_set_programmable_EDPp_scaling_factor_req(const struct nsm_msg *msg,
 						    size_t msg_len,
 						    uint8_t *action,
 						    uint8_t *persistence,
-						    uint32_t *scaling_factor)
+						    uint8_t *scaling_factor)
 {
 	if (msg == NULL || action == NULL || persistence == NULL ||
 	    scaling_factor == NULL) {
@@ -2049,13 +2051,15 @@ int decode_set_programmable_EDPp_scaling_factor_req(const struct nsm_msg *msg,
 	struct nsm_set_programmable_EDPp_scaling_factor_req *request =
 	    (struct nsm_set_programmable_EDPp_scaling_factor_req *)msg->payload;
 
-	if (request->hdr.data_size != 2 * sizeof(uint8_t) + sizeof(uint32_t)) {
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_set_programmable_EDPp_scaling_factor_req) -
+		sizeof(struct nsm_common_req)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
 	*action = request->action;
 	*persistence = request->persistence;
-	*scaling_factor = le32toh(request->scaling_factor);
+	*scaling_factor = request->scaling_factor;
 
 	return NSM_SW_SUCCESS;
 }
