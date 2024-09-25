@@ -43,6 +43,23 @@ NsmPCIeErrors::NsmPCIeErrors(const NsmInterfaceProvider<PCIeEccIntf>& provider,
     NsmInterfaceContainer<PCIeEccIntf>(provider), deviceIndex(deviceIndex),
     groupId(groupId)
 {
+#define initHandleResponse(X)                                                  \
+    {                                                                          \
+        nsm_query_scalar_group_telemetry_group_##X data{};                     \
+        handleResponse(data);                                                  \
+    }
+    switch (groupId)
+    {
+        case GROUP_ID_2:
+            initHandleResponse(2);
+            break;
+        case GROUP_ID_3:
+            initHandleResponse(3);
+            break;
+        case GROUP_ID_4:
+            initHandleResponse(3);
+            break;
+    }
     updateMetricOnSharedMemory();
 }
 
@@ -139,41 +156,40 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
     int rc = NSM_SW_ERROR_COMMAND_FAIL;
 
 #define decode_query_scalar_group_telemetry_v1_group(X)                        \
-    rc = decode_query_scalar_group_telemetry_v1_group##X##_resp(               \
-        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);         \
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)                             \
     {                                                                          \
-        handleResponse(data);                                                  \
-        updateMetricOnSharedMemory();                                          \
+        nsm_query_scalar_group_telemetry_group_##X data{};                     \
+        rc = decode_query_scalar_group_telemetry_v1_group##X##_resp(           \
+            responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);     \
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)                         \
+        {                                                                      \
+            handleResponse(data);                                              \
+            updateMetricOnSharedMemory();                                      \
+        }                                                                      \
+        else                                                                   \
+        {                                                                      \
+            memset(&data, 0, sizeof(data));                                    \
+            handleResponse(data);                                              \
+            updateMetricOnSharedMemory();                                      \
+            lg2::error(                                                        \
+                "NsmPCIeErrors::handleResponseMsg: "                           \
+                "decode_query_scalar_group_telemetry_v1_group{GROUPID}_resp"   \
+                "failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",    \
+                "GROUPID", groupId, "REASONCODE", reasonCode, "CC", cc, "RC",  \
+                rc);                                                           \
+        }                                                                      \
     }
 
     switch (groupId)
     {
         case GROUP_ID_2:
-        {
-            nsm_query_scalar_group_telemetry_group_2 data;
             decode_query_scalar_group_telemetry_v1_group(2);
-        }
-        break;
+            break;
         case GROUP_ID_3:
-        {
-            nsm_query_scalar_group_telemetry_group_3 data;
             decode_query_scalar_group_telemetry_v1_group(3);
-        }
-        break;
+            break;
         case GROUP_ID_4:
-        {
-            nsm_query_scalar_group_telemetry_group_4 data;
             decode_query_scalar_group_telemetry_v1_group(4);
-        }
-        break;
-    }
-
-    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "NsmPCIeErrors::handleResponseMsg: decode_query_scalar_group_telemetry_v1_group{GROUPID}_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "GROUPID", groupId, "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+            break;
     }
 
     return cc ? cc : rc;
