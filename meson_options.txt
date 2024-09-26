@@ -212,3 +212,9 @@ option(
     value: 5,
     description: 'Maximum number of EROTs supported by the system',
 )
+option(
+  'accelerator-dbus',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Expose Accelerator D-Bus Interface for Processor'
+)
