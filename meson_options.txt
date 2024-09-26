@@ -163,3 +163,10 @@ option(
     value: 'disabled',
     description: 'Use the in-kernel MCTP stack instead of the demux daemon',
 )
+
+option(
+  'accelerator-dbus',
+  type: 'feature',
+  value: 'enabled',
+  description: 'Expose Accelerator D-Bus Interface for Processor'
+)
