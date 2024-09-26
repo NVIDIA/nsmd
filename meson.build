@@ -77,6 +77,14 @@ conf_data.set(
     'DEFAULT_RR_REFRESH_LIMIT_IN_MS',
     get_option('rr-refresh-limit'),
 )
+conf_data.set(
+    'ALLOWED_BUFFER_IN_MS',
+    get_option('allowed-buffer-in-ms-for-polling'),
+)
+conf_data.set(
+    'INACTIVE_SLEEP_TIME_IN_MS',
+    get_option('inactive-sleep-time-in-ms'),
+)
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
 endif

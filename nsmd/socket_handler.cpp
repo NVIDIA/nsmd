@@ -19,6 +19,7 @@
 
 #include "libnsm/base.h"
 
+#include "common/globals.hpp"
 #include "socket_manager.hpp"
 
 #include <sys/socket.h>
@@ -215,6 +216,7 @@ SocketInfo Handler::initSocket(int type, int protocol,
     }
 
     auto io = std::make_unique<IO>(event, sockFd, EPOLLIN, std::move(callback));
+    io->set_priority(SD_EVENT_SOURCE_MAX_PRIORITY);
     socketInfoMap[pathName] = std::tuple(std::move(fd), sendBufferSize,
                                          std::move(io));
 

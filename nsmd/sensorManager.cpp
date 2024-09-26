@@ -23,13 +23,11 @@
 #include "libnsm/platform-environmental.h"
 #include "libnsm/requester/mctp.h"
 
+#include "common/sleep.hpp"
 #include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
-
-#include <chrono>
-#include <iostream>
 
 namespace nsm
 {
@@ -274,38 +272,9 @@ void SensorManagerImpl::startPolling(uuid_t uuid)
     auto nsmDevice = getNsmDevice(uuid);
     if (nsmDevice)
     {
-        if (!nsmDevice->pollingTimer)
-        {
-            nsmDevice->pollingTimer = std::make_unique<sdbusplus::Timer>(
-                event.get(), std::bind_front(&SensorManagerImpl::doPolling,
-                                             this, nsmDevice));
-        }
-
-        if (!(nsmDevice->pollingTimer->isRunning()))
-        {
-            nsmDevice->pollingTimer->start(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::milliseconds(SENSOR_POLLING_TIME)),
-                true);
-        }
-
-        if (!nsmDevice->pollingTimerLongRunning)
-        {
-            nsmDevice->pollingTimerLongRunning =
-                std::make_unique<sdbusplus::Timer>(
-                    event.get(),
-                    std::bind_front(&SensorManagerImpl::doPollingLongRunning,
-                                    this, nsmDevice));
-        }
-
-        if (!(nsmDevice->pollingTimerLongRunning->isRunning()))
-        {
-            nsmDevice->pollingTimerLongRunning->start(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::milliseconds(
-                        SENSOR_POLLING_TIME_LONG_RUNNING)),
-                true);
-        }
+        nsmDevice->stopPolling = false;
+        doPolling(nsmDevice);
+        doPollingLongRunning(nsmDevice);
     }
 }
 
@@ -313,38 +282,9 @@ void SensorManagerImpl::startPolling()
 {
     for (auto& nsmDevice : nsmDevices)
     {
-        if (!nsmDevice->pollingTimer)
-        {
-            nsmDevice->pollingTimer = std::make_unique<sdbusplus::Timer>(
-                event.get(), std::bind_front(&SensorManagerImpl::doPolling,
-                                             this, nsmDevice));
-        }
-
-        if (!(nsmDevice->pollingTimer->isRunning()))
-        {
-            nsmDevice->pollingTimer->start(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::milliseconds(SENSOR_POLLING_TIME)),
-                true);
-        }
-
-        if (!nsmDevice->pollingTimerLongRunning)
-        {
-            nsmDevice->pollingTimerLongRunning =
-                std::make_unique<sdbusplus::Timer>(
-                    event.get(),
-                    std::bind_front(&SensorManagerImpl::doPollingLongRunning,
-                                    this, nsmDevice));
-        }
-
-        if (!(nsmDevice->pollingTimerLongRunning->isRunning()))
-        {
-            nsmDevice->pollingTimerLongRunning->start(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::milliseconds(
-                        SENSOR_POLLING_TIME_LONG_RUNNING)),
-                true);
-        }
+        nsmDevice->stopPolling = false;
+        doPolling(nsmDevice);
+        doPollingLongRunning(nsmDevice);
     }
 }
 
@@ -353,8 +293,7 @@ void SensorManagerImpl::stopPolling(uuid_t uuid)
     auto nsmDevice = getNsmDevice(uuid);
     if (nsmDevice)
     {
-        nsmDevice->pollingTimer->stop();
-        nsmDevice->pollingTimerLongRunning->stop();
+        nsmDevice->stopPolling = true;
     }
 }
 
@@ -362,8 +301,7 @@ void SensorManagerImpl::stopPolling()
 {
     for (auto& nsmDevice : nsmDevices)
     {
-        nsmDevice->pollingTimer->stop();
-        nsmDevice->pollingTimerLongRunning->stop();
+        nsmDevice->stopPolling = true;
     }
 }
 
@@ -409,23 +347,18 @@ void SensorManagerImpl::doPollingLongRunning(
 requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
     std::shared_ptr<NsmDevice> nsmDevice)
 {
-    uint64_t t0 = 0;
-    uint64_t t1 = 0;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
     eid_t eid = getEid(nsmDevice);
     do
     {
-        sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
-
         auto& sensors = nsmDevice->longRunningSensors;
-
         size_t sensorIndex{0};
+
         while (sensorIndex < sensors.size())
         {
             auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
-            if (nsmDevice->pollingTimerLongRunning &&
-                !nsmDevice->pollingTimerLongRunning->isRunning())
+            if (nsmDevice->stopPolling)
             {
                 // coverity[missing_return]
                 co_return NSM_SW_ERROR;
@@ -434,8 +367,12 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             ++sensorIndex;
         }
 
-        sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-    } while ((t1 - t0) >= pollingTimeInUsec);
+        co_await common::Sleep(
+            event, pollingTimeInUsec,
+            common::NonPriority); // The timer for long running commands can
+                                  // have a normal priority
+    } while (true);
+
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -445,21 +382,29 @@ requester::Coroutine
 {
     uint64_t t0 = 0;
     uint64_t t1 = 0;
-    uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
+    /**
+     * @brief The maximum allowable deviation in microseconds from the desired
+     * polling interval. If the difference between the polling time and the
+     * elapsed time is less than this buffer, the system will skip the sleep
+     * operation and proceed with the next polling cycle, ensuring minimal
+     * delay.
+     */
+    uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
+    uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
 
     do
     {
+        uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
+        common::TimerEventPriority timerEventPriority = common::Priority;
+
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
         if (!nsmDevice->isDeviceActive)
         {
-            /*lg2::error(
-                "SensorManager::doPollingTask : skip polling due to inactive
-               device, deviceType:{DEVTYPE} InstanceNumber:{INSTNUM}",
-                "DEVTYPE", nsmDevice->getDeviceType(), "INSTNUM",
-                nsmDevice->getInstanceNumber());*/
-            // coverity[missing_return]
-            co_return NSM_ERR_NOT_READY;
+            // Sleep. Wait for the device to get active.
+            co_await common::Sleep(event, inActiveSleepTimeInUsec,
+                                   common::Priority);
+            continue;
         }
 
         eid_t eid = getEid(nsmDevice);
@@ -473,17 +418,18 @@ requester::Coroutine
 #endif
         // update all priority sensors
         auto& sensors = nsmDevice->prioritySensors;
+        const size_t prioritySensorCount = sensors.size();
 
         // Insertion into container NsmDevice::prioritySensors, triggered by
         // Configuration PDI added event, may invalidate container's
         // iterators and hence using index based element access.
         size_t sensorIndex{0};
-        while (sensorIndex < sensors.size())
+
+        while (sensorIndex < prioritySensorCount)
         {
             auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
-            if (nsmDevice->pollingTimer &&
-                !nsmDevice->pollingTimer->isRunning())
+            if (nsmDevice->stopPolling)
             {
                 // coverity[missing_return]
                 co_return NSM_SW_ERROR;
@@ -548,8 +494,7 @@ requester::Coroutine
                 nsmDevice->roundRobinSensors.push_back(sensor);
             }
 
-            if (nsmDevice->pollingTimer &&
-                !nsmDevice->pollingTimer->isRunning())
+            if (nsmDevice->stopPolling)
             {
                 // coverity[missing_return]
                 co_return NSM_SW_ERROR;
@@ -557,10 +502,39 @@ requester::Coroutine
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
             sensor->setLastUpdatedTimeStamp(t1);
+
         } while ((t1 - t0) < pollingTimeInUsec);
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-    } while ((t1 - t0) >= pollingTimeInUsec);
+
+        if (prioritySensorCount == 0)
+        {
+            // We can have a even bigger sleep for devices with no priority
+            // sensors.
+            pollingTimeInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
+            // The timer event for devices with no priority sensors can be
+            // of low priority.
+            timerEventPriority = common::NonPriority;
+        }
+
+        uint64_t diff = t1 - t0;
+        if (diff > pollingTimeInUsec)
+        {
+            // We have already crossed the polling interval. Don't sleep
+            continue;
+        }
+
+        uint64_t sleepDeltaInUsec = pollingTimeInUsec - diff;
+        if (sleepDeltaInUsec < allowedBufferInUsec)
+        {
+            // If the delta is within the allowed buffer, we can skip sleeping
+            // and continue polling.
+            continue;
+        }
+        co_await common::Sleep(event, sleepDeltaInUsec, timerEventPriority);
+
+    } while (true);
+
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
