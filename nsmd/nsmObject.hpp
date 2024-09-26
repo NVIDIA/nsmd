@@ -98,10 +98,10 @@ class NsmObject
         if (cc == NSM_SUCCESS)
         {
             rc_map.isAnyBitSet = true;
-            return !utils::isbitfield256_tBitSet(rc_map.bitMap, rc);
+            return !rc_map.isBitSet(rc);
         }
         cc_map.isAnyBitSet = true;
-        return !utils::isbitfield256_tBitSet(cc_map.bitMap, cc);
+        return !cc_map.isBitSet(cc);
     }
 
     void clearErrorBitMap(std::string funcName)
@@ -112,8 +112,7 @@ class NsmObject
                 "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
                 "request SUCCESSFUL | CC Code(s) Cleared : [{CCCLEAREDBITS}]",
                 "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
-                getName(), "CCCLEAREDBITS",
-                utils::bitfield256_tGetSetBits(cc_map.bitMap));
+                getName(), "CCCLEAREDBITS", cc_map.getSetBits());
         }
         if (rc_map.isAnyBitSet)
         {
@@ -121,8 +120,7 @@ class NsmObject
                 "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
                 "request SUCCESSFUL | RC Code(s) Cleared : [{RCCLEAREDBITS}]",
                 "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
-                getName(), "RCCLEAREDBITS",
-                utils::bitfield256_tGetSetBits(rc_map.bitMap));
+                getName(), "RCCLEAREDBITS", rc_map.getSetBits());
         }
         // Clear the bitmaps
         for (int i = 0; i < 8; i++)

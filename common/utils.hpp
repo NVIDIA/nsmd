@@ -99,6 +99,9 @@ struct bitfield256_err_code
         }
         isAnyBitSet = false;
     }
+
+    bool isBitSet(const int& errCode);
+    std::string getSetBits() const;
 };
 
 /** @struct CustomFD
@@ -526,27 +529,6 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
  */
 std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
                                      const size_t size = 0);
-
-/**
- * @brief Check bitfield256_t bitmap for given bit and set the bit.
- *
- * @param[in] bitMap - bitfield256_t bitmap where bits should be set.
- * @param[in] errCode - Bit to be set.
- *
- * @return true if bit already set, false if bit set to 1.
- *
- * @note Sets the provided bit to 1.
- */
-bool isbitfield256_tBitSet(bitfield256_t& bitMap, const int& errCode);
-
-/**
- * @brief Get list of set bits.
- *
- * @param[in] bitMap - bitfield256_t bitmap where bits are set.
- *
- * @return Comma separated string of set bit positions.
- */
-std::string bitfield256_tGetSetBits(const bitfield256_t& bitMap);
 
 /**
  * @brief Converts a bitfield representing update methods into a list of update

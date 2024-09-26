@@ -100,50 +100,49 @@ TEST(getDeviceInstanceName, UnknownTypeWithValidInstance)
     EXPECT_EQ(utils::getDeviceInstanceName(5, 0), "NSM_DEV_ID_UNKNOWN_0");
 }
 
-TEST(isbitfield256_tBitSet, TestSuccessErrorCodes)
+TEST(isBitSet, TestSuccessErrorCodes)
 {
     utils::bitfield256_err_code errorCodes;
 
-    EXPECT_TRUE(utils::isbitfield256_tBitSet(errorCodes.bitMap, NSM_SUCCESS));
-    EXPECT_TRUE(
-        utils::isbitfield256_tBitSet(errorCodes.bitMap, NSM_SW_SUCCESS));
+    EXPECT_TRUE(errorCodes.isBitSet(NSM_SUCCESS));
+    EXPECT_TRUE(errorCodes.isBitSet(NSM_SW_SUCCESS));
 }
 
-TEST(isbitfield256_tBitSet, TestSettingBits)
+TEST(isBitSet, TestSettingBits)
 {
     utils::bitfield256_err_code errorCodes;
 
-    EXPECT_FALSE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 2));
+    EXPECT_FALSE(errorCodes.isBitSet(2));
     EXPECT_EQ(errorCodes.bitMap.fields[0].byte,
               0b00000000000000000000000000000100);
 
-    EXPECT_TRUE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 2));
+    EXPECT_TRUE(errorCodes.isBitSet(2));
 
-    EXPECT_FALSE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 33));
+    EXPECT_FALSE(errorCodes.isBitSet(33));
     EXPECT_EQ(errorCodes.bitMap.fields[1].byte,
               0b00000000000000000000000000000010);
 }
 
-TEST(bitfield256_tGetSetBits, TestNoSetBits)
+TEST(getSetBits, TestNoSetBits)
 {
-    bitfield256_t emptyBitField = {};
+    utils::bitfield256_err_code emptyBitField;
 
-    EXPECT_EQ(utils::bitfield256_tGetSetBits(emptyBitField), "No err code");
+    EXPECT_EQ(emptyBitField.getSetBits(), "No err code");
 }
 
-TEST(bitfield256_tGetSetBits, TestSetBits)
+TEST(getSetBits, TestSetBits)
 {
-    bitfield256_t bitMap = {};
-    bitMap.fields[0].byte = 0b00000000000000000000000000000001;
+    utils::bitfield256_err_code bitMap;
+    bitMap.bitMap.fields[0].byte = 0b00000000000000000000000000000001;
 
-    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "0");
+    EXPECT_EQ(bitMap.getSetBits(), "0");
 
-    bitMap.fields[0].byte = 0b00000000000000000000000000001101;
+    bitMap.bitMap.fields[0].byte = 0b00000000000000000000000000001101;
 
-    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "0, 2, 3");
+    EXPECT_EQ(bitMap.getSetBits(), "0, 2, 3");
 
-    bitMap.fields[0].byte = 0b00000000000000000000000011110000;
-    bitMap.fields[2].byte = 0b00000000000000000000000000000001;
+    bitMap.bitMap.fields[0].byte = 0b00000000000000000000000011110000;
+    bitMap.bitMap.fields[2].byte = 0b00000000000000000000000000000001;
 
-    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "4, 5, 6, 7, 64");
+    EXPECT_EQ(bitMap.getSetBits(), "4, 5, 6, 7, 64");
 }

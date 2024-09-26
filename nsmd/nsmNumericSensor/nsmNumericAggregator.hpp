@@ -65,8 +65,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
                        " of type {TYPE} | Bits Invalid Code Cleared for"
                        " Tag(s) : [{TAGCLEAREDBITS}]",
                        "FUNCNAME", funcName, "NAME", getName(), "TYPE",
-                       getType(), "TAGCLEAREDBITS",
-                       utils::bitfield256_tGetSetBits(tag_map.bitMap));
+                       getType(), "TAGCLEAREDBITS", tag_map.getSetBits());
         }
         // Clear the bitMaps
         for (int i = 0; i < 8; i++)
@@ -104,7 +103,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
                 return true;
             }
         }
-        return !utils::isbitfield256_tBitSet(tag_map.bitMap, tag);
+        return !tag_map.isBitSet(tag);
     }
 };
 } // namespace nsm

@@ -471,7 +471,7 @@ std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
     return bitmap;
 }
 
-bool isbitfield256_tBitSet(bitfield256_t& bitMap, const int& errCode)
+bool utils::bitfield256_err_code::isBitSet(const int& errCode)
 {
     if (errCode == NSM_SUCCESS || errCode == NSM_SW_SUCCESS)
     {
@@ -491,7 +491,7 @@ bool isbitfield256_tBitSet(bitfield256_t& bitMap, const int& errCode)
     return true;
 }
 
-std::string bitfield256_tGetSetBits(const bitfield256_t& bitMap)
+std::string utils::bitfield256_err_code::getSetBits() const
 {
     std::ostringstream oss;
 
@@ -519,7 +519,6 @@ std::string bitfield256_tGetSetBits(const bitfield256_t& bitMap)
 
     return result.empty() ? "No err code" : result;
 }
-
 std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
                 UpdateMethods>
     updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield)
