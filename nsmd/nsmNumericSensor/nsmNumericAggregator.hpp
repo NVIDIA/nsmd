@@ -19,6 +19,7 @@
 
 #include "base.h"
 
+#include "common/utils.hpp"
 #include "nsmSensorAggregator.hpp"
 
 #include <array>
@@ -46,6 +47,35 @@ class NsmNumericAggregator : public NsmSensorAggregator
         return sensors[tag].get();
     };
 
+    void logFalseValid(const uint8_t tag)
+    {
+        if (shouldLogDebug(tag))
+        {
+            lg2::debug(
+                "NsmNumericAggregator: False Valid bit in Tag {TAG} for Aggregator {NAME} of type {TYPE}.",
+                "TAG", tag, "NAME", getName(), "TYPE", getType());
+        }
+    }
+
+    void clearTagBitMap(std::string funcName)
+    {
+        if (tag_map.isAnyBitSet)
+        {
+            lg2::error("handleResponseMsg: {FUNCNAME} Aggregator {NAME}"
+                       " of type {TYPE} | Bits Invalid Code Cleared for"
+                       " Tag(s) : [{TAGCLEAREDBITS}]",
+                       "FUNCNAME", funcName, "NAME", getName(), "TYPE",
+                       getType(), "TAGCLEAREDBITS",
+                       utils::bitfield256_tGetSetBits(tag_map.bitMap));
+        }
+        // Clear the bitMaps
+        for (int i = 0; i < 8; i++)
+        {
+            tag_map.bitMap.fields[i].byte = 0;
+        }
+        tag_map.isAnyBitSet = false;
+    }
+
     bool priority;
 
   protected:
@@ -57,5 +87,24 @@ class NsmNumericAggregator : public NsmSensorAggregator
     std::array<std::shared_ptr<NsmNumericSensorValueAggregate>,
                NSM_AGGREGATE_MAX_SAMPLE_TAG_VALUE>
         sensors{};
+    utils::bitfield256_err_code tag_map;
+
+    bool shouldLogDebug(const uint8_t tag)
+    {
+        tag_map.isAnyBitSet = true;
+        if (tag == 0)
+        {
+            if (tag_map.bitMap.fields[0].byte & 1)
+            {
+                return false;
+            }
+            else
+            {
+                tag_map.bitMap.fields[0].byte |= 1;
+                return true;
+            }
+        }
+        return !utils::isbitfield256_tBitSet(tag_map.bitMap, tag);
+    }
 };
 } // namespace nsm
