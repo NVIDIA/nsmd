@@ -347,10 +347,20 @@ void SensorManagerImpl::doPollingLongRunning(
 requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
     std::shared_ptr<NsmDevice> nsmDevice)
 {
+    uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
-    eid_t eid = getEid(nsmDevice);
+
     do
     {
+        if (!nsmDevice->isDeviceActive)
+        {
+            // Sleep. Wait for the device to get active.
+            co_await common::Sleep(event, inActiveSleepTimeInUsec,
+                                   common::Priority);
+            continue;
+        }
+
+        eid_t eid = getEid(nsmDevice);
         auto& sensors = nsmDevice->longRunningSensors;
         size_t sensorIndex{0};
 
