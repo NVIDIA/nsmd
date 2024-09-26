@@ -60,8 +60,7 @@ class NsmObject
     {
         const uint64_t deltaInUsec = currentTimestampInUsec -
                                      lastUpdatedTimeStampInUsec;
-        return (isStatic // We don't want to throttle if it's a static sensor
-                || (deltaInUsec > refreshLimitInUsec));
+        return (deltaInUsec > refreshLimitInUsec);
     }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
