@@ -202,13 +202,17 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                 break;
         }
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_query_port_status_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
-            "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
+                cc, "RC", rc);
+        }
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

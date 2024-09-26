@@ -127,12 +127,14 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(clearableSource);
+        clearErrorBitMap(
+            "decode_query_available_clearable_scalar_data_sources_v1_respp");
     }
     else
     {
-        lg2::error(
-            "decode_query_available_clearable_scalar_data_sources_v1_respp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_available_clearable_scalar_data_sources_v1_respp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

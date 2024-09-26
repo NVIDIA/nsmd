@@ -255,12 +255,14 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         value = le32toh(value);
         cpuOperatingConfigIntf->minSpeed(value);
         updateMetricOnSharedMemory();
+        clearErrorBitMap(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -343,12 +345,14 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         value = le32toh(value);
         cpuOperatingConfigIntf->maxSpeed(value);
         updateMetricOnSharedMemory();
+        clearErrorBitMap(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

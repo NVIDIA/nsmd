@@ -91,6 +91,10 @@ class NsmObject
 
     bool shouldLogError(const int& cc, const int& rc)
     {
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            return false;
+        }
         if (cc == NSM_SUCCESS)
         {
             rc_map.isAnyBitSet = true;

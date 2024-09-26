@@ -589,11 +589,19 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
     uint8_t deviceId[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE] = {0};
     auto decodeRc = decode_nsm_query_device_ids_resp(
         responseMsg.get(), responseLen, &cc, &reasonCode, deviceId);
-    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    if (decodeRc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        lg2::error("DebugToken: decode_nsm_query_device_ids_resp: "
-                   "eid={EID} rc={RC} cc={CC} len={LEN}",
-                   "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
+        clearErrorBitMap("decode_nsm_query_device_ids_resp");
+    }
+    else
+    {
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error("DebugToken: decode_nsm_query_device_ids_resp: "
+                       "eid={EID} rc={RC} cc={CC} len={LEN}",
+                       "EID", eid, "RC", decodeRc, "CC", cc, "LEN",
+                       responseLen);
+        }
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return decodeRc;

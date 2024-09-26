@@ -527,12 +527,14 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[0] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
+        clearErrorBitMap(
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMinMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -598,12 +600,14 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[1] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
+        clearErrorBitMap(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

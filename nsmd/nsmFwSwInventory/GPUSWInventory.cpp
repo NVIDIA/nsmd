@@ -98,12 +98,11 @@ requester::Coroutine
     {
         std::string version(driverVersion);
         updateValue(driverState, version);
+        clearErrorBitMap("decode_get_driver_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_driver_info_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_driver_info_resp", reasonCode, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

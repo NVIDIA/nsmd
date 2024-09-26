@@ -91,12 +91,13 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
 
         switchIntf->deviceId(hexaDeviceId.str());
         switchIntf->vendorId(hexaVendorId.str());
+        clearErrorBitMap(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: query_scalar_group_telemetry_v1_group0 unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("query_scalar_group_telemetry_v1_group0",
+                             reasonCode, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

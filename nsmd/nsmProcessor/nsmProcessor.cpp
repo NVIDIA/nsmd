@@ -274,12 +274,12 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                 << static_cast<int>(guidtoken);
         }
         sysguidIntf->sysGUID(oss.str());
+        clearErrorBitMap("NsmGetSysGuid decode_get_system_guid_resp");
     }
     else
     {
-        lg2::error(
-            "NsmGetSysGuid decode_get_system_guid_resp failed. reasonCode={RESONCODE} and rc={RC}",
-            "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("NsmGetSysGuid decode_get_system_guid_resp",
+                             reason_code, cc, rc);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -1151,12 +1151,14 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
     {
         memcpy(&value, &data[0], sizeof(value));
         eDPpIntf->allowableMax(value);
+        clearErrorBitMap(
+            "NsmMaxEDPpLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMaxEDPpLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMaxEDPpLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1213,12 +1215,14 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
     {
         memcpy(&value, &data[0], sizeof(value));
         eDPpIntf->allowableMin(value);
+        clearErrorBitMap(
+            "NsmMinEDPpLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMinEDPpLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMinEDPpLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     co_return cc;
@@ -1463,12 +1467,14 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::baseSpeed(value);
+        clearErrorBitMap(
+            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -1534,12 +1540,12 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         value = le32toh(value);
         cpuOperatingConfigIntf
             ->CpuOperatingConfigIntf::defaultBoostClockSpeedMHz(value);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmDefaultBoostClockSpeed: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -1895,12 +1901,12 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         persistentMemoryInterface->volatileSizeInKiB(value * 1024);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmTotalMemorySize: decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -2254,12 +2260,12 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         value = le32toh(value);
         // miliwatts to Watts
         updateValue(value / 1000);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -2346,12 +2352,12 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         value = le32toh(value);
         // miliwatts to Watts
         updateValue(value / 1000);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -2422,12 +2428,12 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         value = le32toh(value);
         // miliwatts to Watts
         updateValue(value / 1000);
+        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg("decode_get_inventory_information_resp",
+                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
