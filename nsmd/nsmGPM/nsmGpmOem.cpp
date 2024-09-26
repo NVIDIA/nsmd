@@ -428,7 +428,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_query_aggregate_gpm_metrics_req failed. "
+        lg2::debug("encode_query_aggregate_gpm_metrics_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -511,7 +511,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_query_aggregate_gpm_metrics_req failed. "
+        lg2::debug("encode_query_aggregate_gpm_metrics_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;

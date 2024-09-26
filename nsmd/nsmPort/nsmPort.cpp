@@ -131,7 +131,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     auto rc = encode_query_port_status_req(0, portNumber, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
+        lg2::debug("encode_query_port_status_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
@@ -327,7 +327,7 @@ std::optional<std::vector<uint8_t>>
                                                     requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -822,7 +822,7 @@ std::optional<std::vector<uint8_t>>
                                                     requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_port_telemetry_counter_req failed for portNumber={NUM}, deviceType={DT}, eid={EID}, rc={RC}",
             "NUM", portNumber, "DT", typeOfDevice, "EID", eid, "RC", rc);
         return std::nullopt;

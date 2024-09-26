@@ -73,7 +73,7 @@ std::optional<Request> NsmPCIeErrors::genRequestMsg(eid_t eid,
         instanceId, deviceIndex, groupId, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req({GROUPID}) failed. eid={EID} rc={RC}",
             "GROUPID", groupId, "EID", eid, "RC", rc);
         return std::nullopt;

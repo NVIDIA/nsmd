@@ -60,7 +60,7 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
 
     if (!valid)
     {
-        lg2::error(
+        lg2::debug(
             "NsmNumericAggregator: False Valid bit in Tag {TAG} for Aggregator {NAME} of type {TYPE}.",
             "TAG", tag, "NAME", getName(), "TYPE", getType());
     }

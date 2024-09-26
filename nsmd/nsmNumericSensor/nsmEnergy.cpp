@@ -62,7 +62,7 @@ std::optional<std::vector<uint8_t>> NsmEnergy::genRequestMsg(eid_t eid,
                                                   requestPtr);
     if (rc)
     {
-        lg2::error("encode_get_current_energy_count_req failed. "
+        lg2::debug("encode_get_current_energy_count_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

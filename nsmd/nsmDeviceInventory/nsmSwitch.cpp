@@ -101,7 +101,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     auto rc = encode_get_power_mode_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
+        lg2::debug("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
         // coverity[missing_return]
         co_return rc;

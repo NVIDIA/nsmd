@@ -196,7 +196,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_clock_limit_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmChassisClockControl: encode_get_clock_limit_req failed. "
+        lg2::debug("NsmChassisClockControl: encode_get_clock_limit_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

@@ -69,7 +69,7 @@ requester::Coroutine
     auto rc = encode_get_driver_info_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_driverVersion_req failed for GPU eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]

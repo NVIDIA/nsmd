@@ -42,7 +42,7 @@ std::optional<Request>
                                                        requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_clock_output_enable_state_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

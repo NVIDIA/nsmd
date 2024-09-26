@@ -40,7 +40,7 @@ std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,
         instanceId, GET_POWER_SUPPLY_STATUS, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_fpga_diagnostics_settings_req(GET_POWER_SUPPLY_STATUS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

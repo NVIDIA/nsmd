@@ -166,7 +166,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
     auto rc = encode_get_system_guid_req(0, readSysGuidMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         co_return rc;
@@ -178,7 +178,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
         eid, readSysGuid, readSysGuidResponseMsg, readSysGuidResponseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}", "RC",
             rc, "EID", eid);
         co_return rc;
@@ -213,7 +213,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
             rc = encode_set_system_guid_req(0, setSysGuidMsg, sysGUID, 8);
             if (rc != NSM_SW_SUCCESS)
             {
-                lg2::error(
+                lg2::debug(
                     "NsmGetSysGuid encode_set_system_guid_req failed. eid={EID} rc={RC}",
                     "EID", eid, "RC", rc);
                 co_return rc;
@@ -225,7 +225,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                 eid, setSysGuid, setSysGuidResponseMsg, setSysGuidResponseLen);
             if (rc)
             {
-                lg2::error(
+                lg2::debug(
                     "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
                     "RC", rc, "EID", eid);
                 co_return rc;
@@ -239,7 +239,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
             rc = encode_get_system_guid_req(0, reReadSysGuidMsg);
             if (rc != NSM_SW_SUCCESS)
             {
-                lg2::error(
+                lg2::debug(
                     "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
                     "EID", eid, "RC", rc);
                 co_return rc;
@@ -252,7 +252,7 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                                                  reReadSysGuidResponseLen);
             if (rc)
             {
-                lg2::error(
+                lg2::debug(
                     "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
                     "RC", rc, "EID", eid);
                 co_return rc;
@@ -348,7 +348,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_MIG_mode_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_MIG_mode_req failed. "
+        lg2::debug("encode_get_MIG_mode_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -422,7 +422,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_ECC_mode_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_ECC_mode_req failed. "
+        lg2::debug("encode_get_ECC_mode_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -512,7 +512,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_ECC_error_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_ECC_error_counts_req failed. "
+        lg2::debug("encode_get_ECC_error_counts_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -571,7 +571,7 @@ std::optional<std::vector<uint8_t>>
                                                          groupId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmPciGroup :: encode_query_scalar_group_telemetry_v1_req failed for"
             "group = {GROUPID} eid={EID} rc={RC}",
             "GROUPID", groupId, "EID", eid, "RC", rc);
@@ -980,7 +980,7 @@ std::optional<std::vector<uint8_t>>
                                                               requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_programmable_EDPp_scaling_factor_req failed. "
+        lg2::debug("encode_get_programmable_EDPp_scaling_factor_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1054,7 +1054,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
 
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmEDPpScalingFactor::patchSetPoint  failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -1119,7 +1119,7 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         co_return rc;
@@ -1183,7 +1183,7 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         co_return rc;
@@ -1298,7 +1298,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_clock_limit_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_clock_limit_req failed. "
+        lg2::debug("encode_get_clock_limit_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1376,7 +1376,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_curr_clock_freq_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_curr_clock_freq_req failed. "
+        lg2::debug("encode_get_curr_clock_freq_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1432,7 +1432,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmDefaultBaseClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -1504,7 +1504,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmDefaultBoostClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -1578,7 +1578,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_current_utilization_req failed. "
+        lg2::debug("encode_get_current_utilization_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1721,7 +1721,7 @@ std::optional<std::vector<uint8_t>>
                                                              requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_current_clock_event_reason_code_req failed. "
+        lg2::debug("encode_get_current_clock_event_reason_code_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1810,7 +1810,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_accum_GPU_util_time_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_accum_GPU_util_time_req failed. "
+        lg2::debug("encode_get_accum_GPU_util_time_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1866,7 +1866,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmTotalMemorySize: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -1951,7 +1951,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_query_ports_available_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_query_ports_available_req failed. "
+        lg2::debug("encode_query_ports_available_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -2025,7 +2025,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, DEVICE_PART_NUMBER, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_inventory_information_req failed. "
+        lg2::debug("encode_get_inventory_information_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -2144,7 +2144,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_device_power_limit_req(instanceId, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_device_power_limit_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -2224,7 +2224,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -2316,7 +2316,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -2392,7 +2392,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -2516,7 +2516,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_violation_duration_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_violation_duration_req failed. "
+        lg2::debug("encode_get_violation_duration_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

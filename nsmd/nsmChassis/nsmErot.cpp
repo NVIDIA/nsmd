@@ -47,7 +47,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, &nsmRequest, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_nsm_query_get_erot_state_parameters_req(GET_NSM_BUILD_TYPE) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

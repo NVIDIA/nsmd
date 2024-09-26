@@ -115,7 +115,7 @@ std::optional<Request>
                 instanceId, GET_GPU_POWER_STATUS, requestPtr);
             break;
         default:
-            lg2::error(
+            lg2::debug(
                 "NsmGpuPresenceAndPowerStatus::genRequestMsg unsupported state. eid={EID} rc={RC}, state={STATE}",
                 "EID", eid, "RC", rc, "STATE", int(state));
             break;
@@ -123,7 +123,7 @@ std::optional<Request>
 
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmGpuPresenceAndPowerStatus::genRequestMsg failed. eid={EID} rc={RC}, state={STATE}",
             "EID", eid, "RC", rc, "STATE", int(state));
         return std::nullopt;

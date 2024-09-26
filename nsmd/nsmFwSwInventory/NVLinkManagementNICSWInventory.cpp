@@ -88,7 +88,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_driver_info_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_driverVersion_req failed. eid={EID} rc={RC}",
+        lg2::debug("encode_get_driverVersion_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
     }

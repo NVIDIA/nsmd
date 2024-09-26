@@ -52,7 +52,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_voltage_req(instanceId, sensorId, requestPtr);
     if (rc)
     {
-        lg2::error("encode_get_voltage_req failed. "
+        lg2::debug("encode_get_voltage_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

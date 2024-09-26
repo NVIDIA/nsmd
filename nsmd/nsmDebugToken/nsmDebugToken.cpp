@@ -560,7 +560,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
     auto rc = encode_nsm_query_device_ids_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: encode_nsm_query_device_ids_req: "
+        lg2::debug("DebugToken: encode_nsm_query_device_ids_req: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -572,7 +572,7 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
                                                   responseLen);
     if (sendRc)
     {
-        lg2::error("DebugToken: queryDeviceId SendRecvNsmMsg: "
+        lg2::debug("DebugToken: queryDeviceId SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)

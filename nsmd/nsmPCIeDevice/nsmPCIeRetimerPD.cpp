@@ -88,7 +88,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, deviceIndex, GROUP_ID_1, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -193,7 +193,7 @@ std::optional<std::vector<uint8_t>>
                                                        requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_clock_output_enable_state_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

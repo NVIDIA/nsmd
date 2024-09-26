@@ -31,7 +31,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_altitude_pressure_req(instanceId, requestPtr);
     if (rc)
     {
-        lg2::error("encode_get_altitude_pressure_req failed. "
+        lg2::debug("encode_get_altitude_pressure_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

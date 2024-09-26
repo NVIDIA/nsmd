@@ -45,7 +45,7 @@ std::optional<std::vector<uint8_t>>
                                                            requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_workload_power_profile_status_req failed. "
+        lg2::debug("encode_get_workload_power_profile_status_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -84,7 +84,7 @@ void NsmWorkLoadProfileStatus::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("workload_power_profile_status data is null");
+        lg2::debug("workload_power_profile_status data is null");
         return;
     }
 
@@ -121,7 +121,7 @@ std::shared_ptr<OemWorkLoadPowerProfileIntf>
     {
         return it->second;
     }
-    lg2::error("getSupportedProfileById: ProfileId not found: {ID}", "ID",
+    lg2::debug("getSupportedProfileById: ProfileId not found: {ID}", "ID",
                profileId);
     throw std::out_of_range("profileId not found in map");
 }
@@ -213,7 +213,7 @@ std::optional<std::vector<uint8_t>>
                                                          requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_workload_power_profile_info_req for page {PAGE} failed. "
             "eid={EID} rc={RC}",
             "PAGE", pageId, "EID", eid, "RC", rc);

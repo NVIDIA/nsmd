@@ -49,7 +49,7 @@ std::optional<Request> NsmPCIeAERErrorStatus::genRequestMsg(eid_t eid,
         instanceId, deviceIndex, GROUP_ID_9, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmPCIeAERErrorStatus: encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

@@ -62,7 +62,7 @@ std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,
                                                  requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_temperature_reading_req failed. "
+        lg2::debug("encode_get_temperature_reading_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

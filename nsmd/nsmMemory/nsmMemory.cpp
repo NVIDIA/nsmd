@@ -158,7 +158,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remap_state_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remap_state_req failed. "
+        lg2::debug("encode_get_row_remap_state_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -242,7 +242,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remapping_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remapping_counts_req failed. "
+        lg2::debug("encode_get_row_remapping_counts_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -310,7 +310,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remap_availability_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remap_availability_req failed. "
+        lg2::debug("encode_get_row_remap_availability_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -435,7 +435,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_ECC_error_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_ECC_error_counts_req failed. "
+        lg2::debug("encode_get_ECC_error_counts_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -490,7 +490,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -503,7 +503,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -563,7 +563,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -657,7 +657,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_curr_clock_freq_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_curr_clock_freq_req failed. "
+        lg2::debug("encode_get_curr_clock_freq_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;

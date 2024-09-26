@@ -47,7 +47,7 @@ std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,
                                                        requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_fpga_diagnostics_settings_req(GET_WP_SETTINGS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;

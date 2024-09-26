@@ -204,7 +204,7 @@ std::optional<std::vector<uint8_t>>
                                                           requestMsg);
     if (rc)
     {
-        lg2::error("encode_nsm_firmware_irreversible_config_req failed."
+        lg2::debug("encode_nsm_firmware_irreversible_config_req failed."
                    " eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -420,7 +420,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, &sec_req, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_nsm_query_firmware_security_version_number_req failed."
             " eid={EID} rc={RC}",
             "EID", eid, "RC", rc);

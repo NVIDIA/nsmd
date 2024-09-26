@@ -38,7 +38,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
     auto rc = encode_get_port_disable_future_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_port_disable_future_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]

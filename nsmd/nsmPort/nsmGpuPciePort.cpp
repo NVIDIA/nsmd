@@ -93,7 +93,7 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
         0, deviceIndex, groupId, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_available_clearable_scalar_data_sources_v1_req failed for group {A}. eid={EID} rc={RC}",
             "A", groupId, "EID", eid, "RC", rc);
         // coverity[missing_return]

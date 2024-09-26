@@ -210,7 +210,7 @@ std::optional<std::vector<uint8_t>>
         componentClassificationIndex, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "KeyMgmt - genRequestMsg - "
             "encode_nsm_code_auth_key_perm_query_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
