@@ -70,3 +70,80 @@ TEST(makeDBusNameValid, Functional)
         EXPECT_STREQ(utils::makeDBusNameValid(e[0]).c_str(), e[1].c_str());
     }
 }
+
+TEST(getDeviceNameFromDeviceType, ValidDeviceTypes)
+{
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(0), "GPU");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(1), "SWITCH");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(2), "BRIDGE");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(3), "BASEBOARD");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(4), "EROT");
+}
+
+TEST(getDeviceNameFromDeviceType, UnknownDeviceType)
+{
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(5), "NSM_DEV_ID_UNKNOWN");
+    EXPECT_EQ(utils::getDeviceNameFromDeviceType(255), "NSM_DEV_ID_UNKNOWN");
+}
+
+TEST(getDeviceInstanceName, ValidInstances)
+{
+    EXPECT_EQ(utils::getDeviceInstanceName(0, 0), "GPU_0");
+    EXPECT_EQ(utils::getDeviceInstanceName(1, 1), "SWITCH_1");
+    EXPECT_EQ(utils::getDeviceInstanceName(2, 2), "BRIDGE_2");
+    EXPECT_EQ(utils::getDeviceInstanceName(3, 3), "BASEBOARD_3");
+    EXPECT_EQ(utils::getDeviceInstanceName(4, 4), "EROT_4");
+}
+
+TEST(getDeviceInstanceName, UnknownTypeWithValidInstance)
+{
+    EXPECT_EQ(utils::getDeviceInstanceName(5, 0), "NSM_DEV_ID_UNKNOWN_0");
+}
+
+TEST(isbitfield256_tBitSet, TestSuccessErrorCodes)
+{
+    utils::bitfield256_err_code errorCodes;
+
+    EXPECT_TRUE(utils::isbitfield256_tBitSet(errorCodes.bitMap, NSM_SUCCESS));
+    EXPECT_TRUE(
+        utils::isbitfield256_tBitSet(errorCodes.bitMap, NSM_SW_SUCCESS));
+}
+
+TEST(isbitfield256_tBitSet, TestSettingBits)
+{
+    utils::bitfield256_err_code errorCodes;
+
+    EXPECT_FALSE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 2));
+    EXPECT_EQ(errorCodes.bitMap.fields[0].byte,
+              0b00000000000000000000000000000100);
+
+    EXPECT_TRUE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 2));
+
+    EXPECT_FALSE(utils::isbitfield256_tBitSet(errorCodes.bitMap, 33));
+    EXPECT_EQ(errorCodes.bitMap.fields[1].byte,
+              0b00000000000000000000000000000010);
+}
+
+TEST(bitfield256_tGetSetBits, TestNoSetBits)
+{
+    bitfield256_t emptyBitField = {};
+
+    EXPECT_EQ(utils::bitfield256_tGetSetBits(emptyBitField), "No err code");
+}
+
+TEST(bitfield256_tGetSetBits, TestSetBits)
+{
+    bitfield256_t bitMap = {};
+    bitMap.fields[0].byte = 0b00000000000000000000000000000001;
+
+    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "0");
+
+    bitMap.fields[0].byte = 0b00000000000000000000000000001101;
+
+    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "0, 2, 3");
+
+    bitMap.fields[0].byte = 0b00000000000000000000000011110000;
+    bitMap.fields[2].byte = 0b00000000000000000000000000000001;
+
+    EXPECT_EQ(utils::bitfield256_tGetSetBits(bitMap), "4, 5, 6, 7, 64");
+}
