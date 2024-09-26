@@ -25,8 +25,8 @@ namespace nsm
 {
 enum class clockLimitFlag
 {
-    PERSISTENCE = 0,
-    CLEAR = 1
+    PERSISTENCE = 1,
+    CLEAR = 3
 };
 
 requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,

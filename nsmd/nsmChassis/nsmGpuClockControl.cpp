@@ -34,8 +34,8 @@ namespace nsm
 
 enum class clockLimitFlag
 {
-    PERSISTENCE = 0,
-    CLEAR = 1
+    PERSISTENCE = 1,
+    CLEAR = 3
 };
 
 NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
@@ -261,7 +261,6 @@ requester::Coroutine NsmChassisClockControl::setMinClockLimits(
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    maxReqSpeed = std::max(maxReqSpeed, *minReqSpeed);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -345,7 +344,6 @@ requester::Coroutine NsmChassisClockControl::setMaxClockLimits(
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    minReqSpeed = std::min(minReqSpeed, *maxReqSpeed);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
