@@ -676,13 +676,14 @@ uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group2_resp");
+        clearErrorBitMap(
+            "NsmPciGroup2 decode_query_scalar_group_telemetry_v1_group2_resp");
     }
     else
     {
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group2_resp", reason_code,
-            cc, rc);
+            "NsmPciGroup2 decode_query_scalar_group_telemetry_v1_group2_resp",
+            reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -744,13 +745,14 @@ uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group3_resp");
+        clearErrorBitMap(
+            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp");
     }
     else
     {
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group3_resp", reason_code,
-            cc, rc);
+            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp",
+            reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -849,13 +851,14 @@ uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group4_resp");
+        clearErrorBitMap(
+            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp");
     }
     else
     {
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group4_resp", reason_code,
-            cc, rc);
+            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp",
+            reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

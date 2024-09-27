@@ -75,7 +75,7 @@ uint8_t
                                        ? PowerStateIntf::PowerState::On
                                        : PowerStateIntf::PowerState::Off);
         }
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group1_resp");
+        clearErrorBitMap("decode_get_power_supply_status_resp");
     }
     else
     {

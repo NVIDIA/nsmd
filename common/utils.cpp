@@ -515,6 +515,7 @@ std::string utils::bitfield256_err_code::getSetBits() const
     {
         result.pop_back();
         result.pop_back();
+        // removed trailing , and whitespace
     }
 
     return result.empty() ? "No err code" : result;

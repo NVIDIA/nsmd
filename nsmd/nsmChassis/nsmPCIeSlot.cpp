@@ -61,8 +61,8 @@ uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (rc)
     {
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group1_resp", reasonCode,
-            cc, rc);
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
         return rc;
     }
 
@@ -73,15 +73,16 @@ uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
                               : PCIeSlotIntf::SlotTypes(value - 1);
         };
         pdi().slotType(slotType(data.negotiated_link_speed));
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group1_resp");
+        clearErrorBitMap(
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
         pdi().slotType(PCIeSlotIntf::SlotTypes::Unknown);
 
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group1_resp", reasonCode,
-            cc, rc);
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
         return rc;
     }
 

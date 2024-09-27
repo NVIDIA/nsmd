@@ -62,15 +62,16 @@ uint8_t
     if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         handleResponse(data);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group1_resp");
+        clearErrorBitMap(
+            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
         memset(&data, 0, sizeof(data));
         handleResponse(data);
         logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group1_resp", reasonCode,
-            cc, rc);
+            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
     }
     updateMetricOnSharedMemory();
 
