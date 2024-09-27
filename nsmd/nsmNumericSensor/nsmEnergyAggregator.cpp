@@ -80,7 +80,7 @@ int NsmEnergyAggregator::handleSamples(
         }
         else
         {
-            lg2::error("decode_aggregate_energy_count_data failed. rc={RC}.",
+            lg2::debug("decode_aggregate_energy_count_data failed. rc={RC}.",
                        "RC", rc);
             returnValue = rc;
             updateSensorNotWorking(sample.tag, sample.valid);

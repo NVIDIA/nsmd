@@ -232,7 +232,7 @@ requester::Coroutine
     auto rc = encode_query_port_characteristics_req(0, portNumber, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -778,7 +778,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "NsmPortMetrics: updating counter value failed: iBPortIntf is NULL for {NAME} with port number {NUM} for device type {DT}",
                 "NAME", portName.c_str(), "NUM", portNumber, "DT",
                 typeOfDevice);
@@ -798,7 +798,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "NsmPortMetrics: updating counter value failed: portMetricsOem2Intf is NULL for {NAME} with port number {NUM} for device type {DT}",
                 "NAME", portName.c_str(), "NUM", portNumber, "DT",
                 typeOfDevice);

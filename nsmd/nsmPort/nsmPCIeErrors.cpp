@@ -170,7 +170,7 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
             memset(&data, 0, sizeof(data));                                    \
             handleResponse(data);                                              \
             updateMetricOnSharedMemory();                                      \
-            lg2::error(                                                        \
+            lg2::debug(                                                        \
                 "NsmPCIeErrors::handleResponseMsg: "                           \
                 "decode_query_scalar_group_telemetry_v1_group{GROUPID}_resp"   \
                 "failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",    \

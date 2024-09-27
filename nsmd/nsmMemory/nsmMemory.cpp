@@ -576,7 +576,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -705,7 +705,7 @@ void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
 {
     if (maximumMemoryCapacity == NULL)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMemCapacity::updateReading unable to fetch Maximum Memory Capacity");
         return;
     }

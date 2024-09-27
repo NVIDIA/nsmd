@@ -80,7 +80,7 @@ int NsmThresholdAggregator::handleSamples(
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "decode_aggregate_thermal_parameter_data failed. rc={RC}.",
                 "RC", rc);
             returnValue = rc;

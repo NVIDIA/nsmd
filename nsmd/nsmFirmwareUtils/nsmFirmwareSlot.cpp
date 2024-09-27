@@ -125,7 +125,7 @@ void NsmFirmwareSlot::update(
             signingType(SigningTypeIntf::SigningTypes::DOT);
             break;
         default:
-            lg2::error("Invalid signing type - type={TYPE}", "TYPE",
+            lg2::debug("Invalid signing type - type={TYPE}", "TYPE",
                        info.signing_type);
             break;
     }

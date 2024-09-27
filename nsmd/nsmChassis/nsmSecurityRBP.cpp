@@ -79,7 +79,7 @@ void SecurityConfiguration::updateIrreversibleConfig(bool state)
         securityCfgAsyncHandler(request, cfg_req.request_type).detach();
         return;
     }
-    lg2::error("encode_nsm_firmware_irreversible_config_req failed: rc={RC}",
+    lg2::debug("encode_nsm_firmware_irreversible_config_req failed: rc={RC}",
                "RC", rc);
     finishOperation(Progress::OperationStatus::Aborted);
     if (rc == NSM_ERR_INVALID_DATA)

@@ -61,7 +61,7 @@ uint8_t
                                                   &reasonCode, &status);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "responseHandler: decode_get_power_supply_status_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         return rc;

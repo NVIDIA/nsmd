@@ -1131,7 +1131,7 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         co_return rc;
@@ -1195,7 +1195,7 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         co_return rc;
@@ -1445,7 +1445,7 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmDefaultBaseClockSpeed SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -1517,7 +1517,7 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmDefaultBoostClockSpeed: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -1879,7 +1879,7 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmTotalMemorySize: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -2237,7 +2237,7 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -2329,7 +2329,7 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -2405,7 +2405,7 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmDefaultPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]

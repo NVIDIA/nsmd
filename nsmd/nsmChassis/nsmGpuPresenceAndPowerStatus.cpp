@@ -150,7 +150,7 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
                                                   &reasonCode, &gpusPower);
             break;
         default:
-            lg2::error(
+            lg2::debug(
                 "NsmGpuPresenceAndPowerStatus::handleResponseMsg unsupported state. rc={RC}, state={STATE}",
                 "RC", rc, "STATE", int(state));
             break;

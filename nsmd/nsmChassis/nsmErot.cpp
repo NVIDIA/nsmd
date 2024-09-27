@@ -76,7 +76,7 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
     }
     if (erotInfo.fq_resp_hdr.firmware_slot_count < fwSlotObjects.size())
     {
-        lg2::error(
+        lg2::debug(
             "GET_NSM_BUILD_TYPE sc={SlOT_COUNT}, but expected slots not less than {SLOTS}",
             "SC", erotInfo.fq_resp_hdr.firmware_slot_count, "SLOTS",
             fwSlotObjects.size());

@@ -82,7 +82,7 @@ int NsmVoltageAggregator::handleSamples(
         }
         else
         {
-            lg2::error("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
+            lg2::debug("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
                        rc);
             returnValue = rc;
             updateSensorNotWorking(sample.tag, sample.valid);

@@ -79,7 +79,7 @@ int NsmTempAggregator::handleSamples(
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "decode_aggregate_temperature_reading_data failed. rc={RC}.",
                 "RC", rc);
             returnValue = rc;
