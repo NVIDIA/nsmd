@@ -84,6 +84,8 @@ class NsmKeyMgmt :
     uint16_t componentIdentifier;
     uint8_t componentClassificationIndex;
 
+    uint8_t bitmapLength;
+
     bool opInProgress{false};
 };
 

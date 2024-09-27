@@ -487,12 +487,14 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
  *
  * @param[in] indices - A vector of 1-based indices where bits should be set
  * to 1.
+ * @param[in] size - (optional) size of the output bitmap.
  * @return A vector of bytes representing the bitmap.
  *
  * @note Indices that are not provided in the list will be set to 0 in the
  * bitmap.
  */
-std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices);
+std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
+                                     const size_t size = 0);
 
 /**
  * @brief Converts a bitfield representing update methods into a list of update

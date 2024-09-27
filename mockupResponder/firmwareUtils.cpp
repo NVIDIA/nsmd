@@ -17,6 +17,8 @@
 
 #include "firmware-utils.h"
 
+#include "utils.hpp"
+
 #include <mockupResponder.hpp>
 #include <phosphor-logging/lg2.hpp>
 
@@ -38,16 +40,19 @@ class FirmwareStateMachine
         3, 4, 1, 0
     };
 
-    uint16_t activeComponentKeyIndex = 0;
-    uint16_t pendingComponentKeyIndex = 0;
+    uint16_t apActiveComponentKeyIndex = 6;
+    uint16_t apPendingComponentKeyIndex = 6;
     std::vector<uint8_t> apActiveComponentKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
                                                   0xFF, 0xFF, 0xFF, 0xFF};
     std::vector<uint8_t> apPendingComponentKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
                                                    0xFF, 0xFF, 0xFF, 0xFF};
-    std::vector<uint8_t> apEfuseKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
-                                        0xFF, 0xFF, 0xFF, 0xFF};
-    std::vector<uint8_t> apPendingEfuseKeyPerm{0xFE, 0xFF, 0xFF, 0xFF,
-                                               0xFF, 0xFF, 0xFF, 0xFF};
+    std::vector<uint8_t> apEfuseKeyPerm{0x00, 0x00, 0x00, 0x00,
+                                        0x00, 0x00, 0x00, 0x00};
+    std::vector<uint8_t> apPendingEfuseKeyPerm{0x00, 0x00, 0x00, 0x00,
+                                               0x00, 0x00, 0x00, 0x00};
+
+    uint16_t ecActiveComponentKeyIndex = 2;
+    uint16_t ecPendingComponentKeyIndex = 2;
     std::vector<uint8_t> ecActiveComponentKeyPerm{0x00};
     std::vector<uint8_t> ecPendingComponentKeyPerm{0x00};
     std::vector<uint8_t> ecEfuseKeyPerm{0x00};
@@ -287,6 +292,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::irreversibleConfig(const nsm_msg* requestMsg,
                                         size_t requestLen)
 {
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
     struct nsm_firmware_irreversible_config_req cfg_req;
     auto rc = decode_nsm_firmware_irreversible_config_req(requestMsg,
                                                           requestLen, &cfg_req);
@@ -409,8 +418,8 @@ std::optional<std::vector<uint8_t>>
     {
         rc = encode_nsm_code_auth_key_perm_query_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
-            fwStateMachine->activeComponentKeyIndex,
-            fwStateMachine->pendingComponentKeyIndex, bitmapLength,
+            fwStateMachine->apActiveComponentKeyIndex,
+            fwStateMachine->apPendingComponentKeyIndex, bitmapLength,
             fwStateMachine->apActiveComponentKeyPerm.data(),
             fwStateMachine->apPendingComponentKeyPerm.data(),
             fwStateMachine->apEfuseKeyPerm.data(),
@@ -420,8 +429,8 @@ std::optional<std::vector<uint8_t>>
     {
         rc = encode_nsm_code_auth_key_perm_query_resp(
             requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
-            fwStateMachine->activeComponentKeyIndex,
-            fwStateMachine->pendingComponentKeyIndex, bitmapLength,
+            fwStateMachine->ecActiveComponentKeyIndex,
+            fwStateMachine->ecPendingComponentKeyIndex, bitmapLength,
             fwStateMachine->ecActiveComponentKeyPerm.data(),
             fwStateMachine->ecPendingComponentKeyPerm.data(),
             fwStateMachine->ecEfuseKeyPerm.data(),
@@ -451,6 +460,28 @@ std::optional<std::vector<uint8_t>>
     uint8_t componentClassificationIndex;
     uint64_t nonce;
     uint8_t bitmapLength;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reasonCode = ERR_NULL;
+    uint32_t updateMethod = 0;
+
+    auto encodeResp = [&](uint8_t cc) -> std::optional<std::vector<uint8_t>> {
+        int rc = encode_nsm_code_auth_key_perm_update_resp(
+            requestMsg->hdr.instance_id, cc, reasonCode, updateMethod,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "encode_nsm_code_auth_key_perm_update_resp failed: rc={RC}",
+                "RC", rc);
+            return std::nullopt;
+        }
+        return response;
+    };
+
     auto rc = decode_nsm_code_auth_key_perm_update_req(
         requestMsg, requestLen, &requestType, &componentClassification,
         &componentIdentifier, &componentClassificationIndex, &nonce,
@@ -462,20 +493,42 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+    if (requestType !=
+            NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
+        requestType != NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE)
+    {
+        lg2::error("Invalid request type");
+        return encodeResp(NSM_ERR_INVALID_DATA);
+    }
+    if (requestType ==
+            NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE &&
+        bitmapLength != 0)
+    {
+        lg2::error("Invalid request type and bitmap length");
+        return encodeResp(NSM_ERR_INVALID_DATA);
+    }
     if (componentClassification != 0x000A)
     {
         lg2::error("Invalid component classification value");
-        return std::nullopt;
+        return encodeResp(NSM_ERR_INVALID_DATA);
     }
     if (componentClassificationIndex != 0)
     {
         lg2::error("Invalid component classification index value");
-        return std::nullopt;
+        return encodeResp(NSM_ERR_INVALID_DATA);
     }
     if (componentIdentifier != 0x0010 && componentIdentifier != 0xFF00)
     {
         lg2::error("Invalid component identifier value");
-        return std::nullopt;
+        return encodeResp(NSM_ERR_INVALID_DATA);
+    }
+    if (fwStateMachine->configState == 0)
+    {
+        return encodeResp(0x87); // irreversible config disabled
+    }
+    else if (nonce != fwStateMachine->fixedNonce)
+    {
+        return encodeResp(0x88); // nonce mismatch
     }
     bool isAp = componentIdentifier == 0x0010;
     std::vector<uint8_t> bitmap(bitmapLength);
@@ -490,62 +543,67 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_code_auth_key_perm_update_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint8_t cc = NSM_SUCCESS;
-    uint16_t reasonCode = ERR_NULL;
-    uint32_t updateMethod = 0;
-
-    if (fwStateMachine->configState == 0)
+    if (isAp)
     {
-        cc = 0x87; // irreversible config disabled
-    }
-    else if (nonce != fwStateMachine->fixedNonce)
-    {
-        cc = 0x88; // nonce mismatch
-    }
-    else if (isAp)
-    {
-        if (bitmapLength > fwStateMachine->apPendingEfuseKeyPerm.size())
+        if (requestType ==
+            NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE)
         {
-            cc = NSM_ERR_INVALID_DATA_LENGTH;
-        }
-        else
-        {
-            updateMethod = NSM_EFUSE_UPDATE_METHOD_DC_POWER_CYCLE;
-            for (auto i = 0; i < bitmapLength; ++i)
+            std::vector<uint8_t> indices;
+            for (auto i = 0; i < fwStateMachine->apActiveComponentKeyIndex; ++i)
             {
-                fwStateMachine->apPendingEfuseKeyPerm[i] = bitmap[i];
+                indices.emplace_back(i);
+            }
+            try
+            {
+                bitmap = utils::indicesToBitmap(indices);
+            }
+            catch (const std::exception&)
+            {
+                return encodeResp(NSM_ERR_INVALID_DATA_LENGTH);
             }
         }
+        if (bitmapLength > fwStateMachine->apPendingEfuseKeyPerm.size())
+        {
+            return encodeResp(NSM_ERR_INVALID_DATA_LENGTH);
+        }
+        for (size_t i = 0; i < bitmap.size(); ++i)
+        {
+            fwStateMachine->apPendingEfuseKeyPerm[i] |= bitmap[i];
+        }
+        updateMethod = NSM_EFUSE_UPDATE_METHOD_DC_POWER_CYCLE;
     }
     else
     {
-        if (bitmapLength > fwStateMachine->ecEfuseKeyPerm.size())
+        if (requestType ==
+            NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE)
         {
-            cc = NSM_ERR_INVALID_DATA_LENGTH;
-        }
-        else
-        {
-            updateMethod = NSM_EFUSE_UPDATE_METHOD_AUTO;
-            for (auto i = 0; i < bitmapLength; ++i)
+            std::vector<uint8_t> indices;
+            for (auto i = 0; i < fwStateMachine->ecActiveComponentKeyIndex; ++i)
             {
-                fwStateMachine->ecEfuseKeyPerm[i] |= bitmap[i];
+                indices.emplace_back(i);
+            }
+            try
+            {
+                bitmap = utils::indicesToBitmap(indices);
+            }
+            catch (const std::exception&)
+            {
+                return encodeResp(NSM_ERR_INVALID_DATA_LENGTH);
             }
         }
+        if (bitmapLength > fwStateMachine->ecEfuseKeyPerm.size())
+        {
+            return encodeResp(NSM_ERR_INVALID_DATA_LENGTH);
+        }
+        for (size_t i = 0; i < bitmap.size(); ++i)
+        {
+            fwStateMachine->ecEfuseKeyPerm[i] |= bitmap[i];
+            fwStateMachine->ecPendingEfuseKeyPerm[i] |= bitmap[i];
+        }
+        updateMethod = NSM_EFUSE_UPDATE_METHOD_AUTO;
     }
 
-    rc = encode_nsm_code_auth_key_perm_update_resp(
-        requestMsg->hdr.instance_id, cc, reasonCode, updateMethod, responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error("encode_nsm_code_auth_key_perm_update_resp failed: rc={RC}",
-                   "RC", rc);
-        return std::nullopt;
-    }
-    return response;
+    return encodeResp(NSM_SUCCESS);
 }
 
 std::optional<std::vector<uint8_t>>
