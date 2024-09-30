@@ -31,10 +31,11 @@ using namespace sdbusplus::com::nvidia;
 using namespace sdbusplus::server;
 
 using EraseIntf = object_t<sdbusplus::com::nvidia::Dump::server::Erase>;
-
 using EraseInfoType =
     sdbusplus::common::com::nvidia::dump::Erase::EraseInfoType;
 using EraseStatus = sdbusplus::common::com::nvidia::dump::Erase::EraseStatus;
+using EraseOperationStatus =
+    sdbusplus::common::com::nvidia::dump::Erase::OperationStatus;
 
 class NsmEraseTraceObject : public NsmObject, public EraseIntf
 {
@@ -42,8 +43,8 @@ class NsmEraseTraceObject : public NsmObject, public EraseIntf
     NsmEraseTraceObject(sdbusplus::bus::bus& bus, const std::string& name,
                         const std::string& inventoryPath,
                         const std::string& type, const uuid_t& uuid);
-
-    std::tuple<uint64_t, EraseStatus> erase() override;
+    void erase() override;
+    requester::Coroutine eraseTraceOnDevice();
 
   private:
     std::string objPath;

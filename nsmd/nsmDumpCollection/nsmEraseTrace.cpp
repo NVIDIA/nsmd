@@ -43,15 +43,28 @@ NsmEraseTraceObject::NsmEraseTraceObject(sdbusplus::bus::bus& bus,
 {
     lg2::debug("NsmEraseTraceObject: {NAME}", "NAME", name.c_str());
     objPath = inventoryPath + name;
+    EraseIntf::eraseInfo(std::make_tuple(EraseOperationStatus::Unavailable,
+                                         EraseStatus::Unknown));
 }
 
-std::tuple<uint64_t, EraseStatus> NsmEraseTraceObject::erase()
+void NsmEraseTraceObject::erase()
+{
+    if (std::get<0>(eraseInfo()) == EraseOperationStatus::InProgress)
+    {
+        throw Common::Error::Unavailable();
+        return;
+    }
+    eraseInfo(std::make_tuple(EraseOperationStatus::InProgress,
+                              EraseStatus::Unknown));
+    eraseTraceOnDevice().detach();
+}
+requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
-    std::tuple<uint64_t, EraseStatus> result(NSM_ERROR, EraseStatus::Unknown);
-
+    std::tuple<EraseOperationStatus, EraseStatus> result(
+        EraseIntf::eraseInfo());
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
 
@@ -60,36 +73,41 @@ std::tuple<uint64_t, EraseStatus> NsmEraseTraceObject::erase()
     {
         lg2::error("NsmEraseTraceObject: encode_erase_trace_req: rc={RC}", "RC",
                    rc);
-        return result;
+        std::get<0>(result) = EraseOperationStatus::InternalFailure;
+        eraseInfo(result);
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                          responseLen);
-    if (rc_ != NSM_SW_SUCCESS)
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("NsmEraseTraceObject: getRequest SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc_);
-        return result;
+                   "EID", eid, "RC", rc);
+        std::get<0>(result) = EraseOperationStatus::InternalFailure;
+        eraseInfo(result);
+        co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint8_t resStatus = 0;
-
     rc = decode_erase_trace_resp(responseMsg.get(), responseLen, &cc,
                                  &reasonCode, &resStatus);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        std::cerr << "Response message error: "
-                  << "rc=" << rc << ", cc=" << (int)cc
-                  << ", reasonCode=" << (int)reasonCode << "\n";
-        return result;
+        lg2::error(
+            "NsmEraseTraceObject: decode_erase_trace_resp failed with rc = {RC}, cc = {CC} and reason_code = {REASON_CODE}",
+            "RC", rc, "CC", cc, "REASON_CODE", reasonCode);
+        std::get<0>(result) = EraseOperationStatus::InternalFailure;
+        eraseInfo(result);
+        co_return rc;
     }
 
-    std::get<0>(result) = NSM_SUCCESS;
+    std::get<0>(result) = EraseOperationStatus::Success;
     switch (resStatus)
     {
         case ERASE_TRACE_NO_DATA_ERASED:
@@ -106,9 +124,10 @@ std::tuple<uint64_t, EraseStatus> NsmEraseTraceObject::erase()
                 "NsmEraseTraceObject: unsupported response status type: {TP}",
                 "TP", resStatus);
             std::get<1>(result) = EraseStatus::Unknown;
-            return result;
+            break;
     }
-    return result;
+    eraseInfo(result);
+    co_return rc;
 }
 
 } // namespace nsm
