@@ -375,6 +375,8 @@ std::optional<std::vector<uint8_t>>
                     return queryPortCharacteristicsHandler(request, requestLen);
                 case NSM_QUERY_PORT_STATUS:
                     return queryPortStatusHandler(request, requestLen);
+                case NSM_GET_FABRIC_MANAGER_STATE:
+                    return getFabricManagerStateHandler(request, requestLen);
                 case NSM_QUERY_PORTS_AVAILABLE:
                     return queryPortsAvailableHandler(request, requestLen);
                 case NSM_SET_PORT_DISABLE_FUTURE:
@@ -748,7 +750,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
-                 {1, {1, 8, 9, 10, 11, 68, 69}},
+                 {1, {1, 8, 9, 10, 11, 14, 68, 69}},
                  {2, {4}},
                  {3, {12}},
                  {4,
@@ -1069,6 +1071,52 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_query_port_status_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getFabricManagerStateHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getFabricManagerStateHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_fabric_manager_state_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_fabric_manager_state_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    // mock data to send
+    std::vector<uint8_t> data{
+        0x03, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+
+    auto fmStateData =
+        reinterpret_cast<nsm_fabric_manager_state_data*>(data.data());
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_fabric_manager_state_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              fmStateData, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_fabric_manager_state_resp failed: rc={RC}", "RC",
+                   rc);
         return std::nullopt;
     }
     return response;

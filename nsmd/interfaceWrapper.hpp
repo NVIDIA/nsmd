@@ -44,11 +44,21 @@ class InterfaceWrapper : public NsmObject
     std::shared_ptr<T> interface;
 };
 
+/** @brief Get interface from object path. If interface is not present on the
+ * object path add it and return the instance, if interface exist then return
+ * the instance
+ *
+ *  @param[in] sensorObjectPath - object path & intf combination for lookup
+ *  @param[in] manager - snsor manager instance
+ *  @param[in] bus - bus instance
+ *  @param[in] path - dbus object path
+ *  @return Shared pointer to the interface
+ */
 template <typename T>
-std::shared_ptr<T>
-    retrieveInterfaceFromSensorMap(const std::string& sensorObjectPath,
-                                   SensorManager& manager,
-                                   sdbusplus::bus_t& bus, const char* path)
+std::shared_ptr<T> getInterfaceOnObjectPath(const std::string& sensorObjectPath,
+                                            SensorManager& manager,
+                                            sdbusplus::bus_t& bus,
+                                            const char* path)
 {
     std::shared_ptr<T> dBusIntf{};
 

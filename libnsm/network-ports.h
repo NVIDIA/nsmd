@@ -25,13 +25,14 @@ extern "C" {
 #include "base.h"
 #define PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE 204
 #define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 212
+#define FABRIC_MANAGER_STATE_DATA_SIZE 18
 #define PORT_MASK_DATA_SIZE 32
 // defined in MBps
 #define MAXLINKBANDWIDTH 50000
 
 /** @brief NSM Type1 network port telemetry commands
  */
-enum nsm_port_telemetry_commands {
+enum nsm_network_port_commands {
 	NSM_GET_PORT_TELEMETRY_COUNTER = 0x01,
 	NSM_GET_PORT_HEALTH_THRESHOLDS = 0x02,
 #ifdef ENABLE_SYSTEM_GUID
@@ -47,6 +48,7 @@ enum nsm_port_telemetry_commands {
 	NSM_GET_POWER_MODE = 0x0b,
 	NSM_SET_POWER_PROFILE = 0x0c,
 	NSM_GET_POWER_PROFILE = 0x0d,
+	NSM_GET_FABRIC_MANAGER_STATE = 0x0e,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
 	NSM_QUERY_PORT_STATUS = 0x43,
@@ -78,6 +80,26 @@ enum nsm_port_status {
  */
 enum nsm_network_ports_events {
 	NSM_THRESHOLD_EVENT = 0x00,
+};
+
+/** @brief FM State
+ */
+enum nsm_fabric_manager_state {
+	NSM_FM_STATE_RESERVED = 0x00,
+	NSM_FM_STATE_OFFLINE = 0x01,
+	NSM_FM_STATE_STANDBY = 0x02,
+	NSM_FM_STATE_CONFIGURED = 0x03,
+	NSM_FM_STATE_RESERVED_TIMEOUT = 0x04,
+	NSM_FM_STATE_ERROR = 0x05
+};
+
+/** @brief FM Report Status
+ */
+enum nsm_fm_report_status {
+	NSM_FM_REPORT_STATUS_RESERVED = 0x00,
+	NSM_FM_REPORT_STATUS_NOT_RECEIVED = 0x01,
+	NSM_FM_REPORT_STATUS_RECEIVED = 0x02,
+	NSM_FM_REPORT_STATUS_TIMEOUT = 0x03
 };
 
 struct nsm_supported_port_counter {
@@ -158,6 +180,13 @@ struct nsm_power_mode_data {
 	uint16_t l1_hw_active_time;
 	uint16_t l1_hw_inactive_time;
 	uint16_t l1_prediction_inactive_time;
+} __attribute__((packed));
+
+struct nsm_fabric_manager_state_data {
+	uint8_t fm_state;
+	uint8_t report_status;
+	uint64_t last_restart_timestamp;
+	uint64_t duration_since_last_restart_sec;
 } __attribute__((packed));
 
 #ifdef ENABLE_SYSTEM_GUID
@@ -383,6 +412,21 @@ struct nsm_health_event_payload {
 	uint8_t estimated_effective_ber_threshold : 1;
 	uint8_t reserved : 1;
 	uint8_t portNumber;
+} __attribute__((packed));
+
+/** @struct nsm_get_fabric_manager_state_req
+ *
+ *  Structure representing NSM get fabric manager state request.
+ */
+typedef struct nsm_common_req nsm_get_fabric_manager_state_req;
+
+/** @struct nsm_get_fabric_manager_state_resp
+ *
+ *  Structure representing NSM get fabric manager state response.
+ */
+struct nsm_get_fabric_manager_state_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_fabric_manager_state_data data;
 } __attribute__((packed));
 
 #ifdef ENABLE_SYSTEM_GUID
@@ -910,6 +954,52 @@ int encode_set_switch_isolation_mode_resp(uint8_t instance, uint8_t cc,
 int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
 					  size_t msg_len, uint8_t *cc,
 					  uint16_t *reason_code);
+
+/** @brief Encode a get fabric manager state request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_fabric_manager_state_req(uint8_t instance_id,
+					struct nsm_msg *msg);
+
+/** @brief Decode a get fabric manager state request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_fabric_manager_state_req(const struct nsm_msg *msg,
+					size_t msg_len);
+
+/** @brief Encode a get fabric manager state response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Response message completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[in] data - Fabric manager state data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_fabric_manager_state_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_fabric_manager_state_data *data, struct nsm_msg *msg);
+
+/** @brief Decode a get fabric manager state response message
+ *
+ *  @param[in] msg    - Response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - Pointer to response message completion code
+ *  @param[out] reason_code     - Pointer to reason code
+ *  @param[out] data_size - Data size in bytes
+ *  @param[out] data - Fabric manager state data
+ *  @return nsm_completion_codes
+ */
+int decode_get_fabric_manager_state_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_fabric_manager_state_data *data);
 
 #ifdef __cplusplus
 }

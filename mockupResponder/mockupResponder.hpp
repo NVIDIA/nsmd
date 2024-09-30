@@ -86,6 +86,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         queryPortStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getFabricManagerStateHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         queryPortsAvailableHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>

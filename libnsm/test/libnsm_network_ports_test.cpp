@@ -2770,3 +2770,318 @@ TEST(setSwitchIsolationMode, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 }
+
+TEST(getFabricManagerState, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_get_fabric_manager_state_req(0, request);
+
+	nsm_get_fabric_manager_state_req *req =
+	    reinterpret_cast<nsm_get_fabric_manager_state_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_FABRIC_MANAGER_STATE, req->command);
+	EXPECT_EQ(0, req->data_size);
+}
+
+TEST(getFabricManagerState, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_req));
+
+	auto rc = encode_get_fabric_manager_state_req(0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getFabricManagerState, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x80,			  // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	  // NVIDIA_MSG_TYPE
+	    NSM_GET_FABRIC_MANAGER_STATE, // command
+	    0				  // data size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+
+	auto rc = decode_get_fabric_manager_state_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(getFabricManagerState, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x80,			  // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,	  // NVIDIA_MSG_TYPE
+	    NSM_GET_FABRIC_MANAGER_STATE, // command
+	    1				  // data size [it should not be 1]
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	size_t msg_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(nsm_get_fabric_manager_state_req);
+
+	auto rc = decode_get_fabric_manager_state_req(nullptr, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_req(request, msg_len - 2);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_fabric_manager_state_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getFabricManagerState, testGoodEncodeResponseCCSuccess)
+{
+	std::vector<uint8_t> data{
+	    0x03, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+	auto fab_mgr_data =
+	    reinterpret_cast<nsm_fabric_manager_state_data *>(data.data());
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x0 [NSM_SUCCESS]
+	auto rc = encode_get_fabric_manager_state_resp(
+	    0, NSM_SUCCESS, reason_code, fab_mgr_data, response);
+
+	struct nsm_get_fabric_manager_state_resp *resp =
+	    reinterpret_cast<struct nsm_get_fabric_manager_state_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_FABRIC_MANAGER_STATE, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(htole16(data.size()), resp->hdr.data_size);
+}
+
+TEST(getFabricManagerState, testGoodEncodeResponseCCError)
+{
+	std::vector<uint8_t> data{
+	    0x03, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+	auto fab_mgr_data =
+	    reinterpret_cast<nsm_fabric_manager_state_data *>(data.data());
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	// test for cc = 0x1 [NSM_ERROR]
+	auto rc = encode_get_fabric_manager_state_resp(
+	    0, NSM_ERROR, reason_code, fab_mgr_data, response);
+
+	struct nsm_common_non_success_resp *resp =
+	    reinterpret_cast<struct nsm_common_non_success_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_FABRIC_MANAGER_STATE, resp->command);
+	EXPECT_EQ(NSM_ERROR, resp->completion_code);
+	EXPECT_EQ(htole16(reason_code), resp->reason_code);
+}
+
+TEST(getFabricManagerState, testBadEncodeResponse)
+{
+	uint8_t fm_data[FABRIC_MANAGER_STATE_DATA_SIZE];
+	auto fab_mgr_data =
+	    reinterpret_cast<nsm_fabric_manager_state_data *>(fm_data);
+	uint16_t reason_code = ERR_NULL;
+
+	std::vector<uint8_t> response_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+
+	auto rc = encode_get_fabric_manager_state_resp(
+	    0, NSM_SUCCESS, reason_code, fab_mgr_data, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_get_fabric_manager_state_resp(0, NSM_SUCCESS, reason_code,
+						  nullptr, response);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getFabricManagerState, testGoodDecodeResponseCCSuccess)
+{
+	// test when CC is NSM_SUCCESS and data payload is correct
+	std::vector<uint8_t> data_orig{
+	    0x03, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+	auto fm_data_orig =
+	    reinterpret_cast<nsm_fabric_manager_state_data *>(data_orig.data());
+
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x00,			  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	  // NVIDIA_MSG_TYPE
+	    NSM_GET_FABRIC_MANAGER_STATE, // command
+	    0x00,			  // completion code
+	    0x00,			  // reserved
+	    0x00,
+	    0x12, // data size
+	    0x00};
+	response_msg.insert(response_msg.end(), data_orig.begin(),
+			    data_orig.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_fabric_manager_state_data fab_mgr_data;
+
+	auto rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &fab_mgr_data);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(data_size, 0x0012);
+	EXPECT_EQ(fab_mgr_data.fm_state, fm_data_orig->fm_state);
+	EXPECT_EQ(fab_mgr_data.report_status, fm_data_orig->report_status);
+	EXPECT_EQ(fab_mgr_data.last_restart_timestamp,
+		  le64toh(fm_data_orig->last_restart_timestamp));
+	EXPECT_EQ(fab_mgr_data.duration_since_last_restart_sec,
+		  le64toh(fm_data_orig->duration_since_last_restart_sec));
+}
+
+TEST(getFabricManagerState, testGoodDecodeResponseCCError)
+{
+	// test when CC is NSM_ERROR and data payload is empty
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			  // PCI VID: NVIDIA 0x10DE
+	    0x00,			  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	  // NVIDIA_MSG_TYPE
+	    NSM_GET_FABRIC_MANAGER_STATE, // command
+	    0x01,			  // completion code
+	    0x00,			  // reason code
+	    0x00};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_fabric_manager_state_data fab_mgr_data;
+
+	auto rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &fab_mgr_data);
+
+	EXPECT_EQ(cc, NSM_ERROR);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, 0x0000);
+}
+
+TEST(getFabricManagerState, testBadDecodeResponseWithPayload)
+{
+	std::vector<uint8_t> response_msg{
+	    0x10,
+	    0xDE,			    // PCI VID: NVIDIA 0x10DE
+	    0x00,			    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			    // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_NETWORK_PORT,	    // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_TELEMETRY_COUNTER, // command
+	    0x01, // completion code [0x01 - NSM_ERROR]
+	    0x00, // reserved
+	    0x00,
+	    0x00, // data size [it should not 00]
+	    0x00,
+	    0x03,
+	    0x02,
+	    0x01,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x02,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	    0x00,
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
+	size_t msg_len = response_msg.size();
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	struct nsm_fabric_manager_state_data fab_mgr_data = {};
+
+	auto rc = decode_get_fabric_manager_state_resp(
+	    nullptr, msg_len, &cc, &reason_code, &data_size, &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_resp(response, msg_len, nullptr,
+						  &reason_code, &data_size,
+						  &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, nullptr, &data_size, &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_ERROR);
+
+	response_msg[6] = 0x00; // making CC - NSM_SUCCESS
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len - 10, &cc, &reason_code, &data_size,
+	    &fab_mgr_data); //-10 from total size which means we should get
+			    // error
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_fabric_manager_state_resp(
+	    response, msg_len, &cc, &reason_code, &data_size, &fab_mgr_data);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

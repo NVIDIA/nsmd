@@ -252,9 +252,8 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
         auto sensorObjectPath = memoryInventoryObjPath +
                                 "/xyz.openbmc_project.Inventory.Item.Dimm";
 
-        std::shared_ptr<DimmIntf> dimmIntf =
-            retrieveInterfaceFromSensorMap<DimmIntf>(
-                sensorObjectPath, manager, bus, memoryInventoryObjPath.c_str());
+        std::shared_ptr<DimmIntf> dimmIntf = getInterfaceOnObjectPath<DimmIntf>(
+            sensorObjectPath, manager, bus, memoryInventoryObjPath.c_str());
 
         auto dramUsage = gpmAggregateMetrics->getMetricInfo(
             static_cast<uint8_t>(GPMMetricId::DRAMUsage));

@@ -590,6 +590,61 @@ class SetPortDisableFuture : public CommandInterface
     std::vector<uint8_t> portMask;
 };
 
+class GetFabricManagerState : public CommandInterface
+{
+  public:
+    ~GetFabricManagerState() = default;
+    GetFabricManagerState() = delete;
+    GetFabricManagerState(const GetFabricManagerState&) = delete;
+    GetFabricManagerState(GetFabricManagerState&&) = default;
+    GetFabricManagerState& operator=(const GetFabricManagerState&) = delete;
+    GetFabricManagerState& operator=(GetFabricManagerState&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_fabric_manager_state_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_fabric_manager_state_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t dataLen = 0;
+        struct nsm_fabric_manager_state_data fmStateData;
+
+        auto rc = decode_get_fabric_manager_state_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &dataLen,
+            &fmStateData);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            ordered_json result;
+            result["FM State"] = fmStateData.fm_state;
+            result["Report Status"] = fmStateData.report_status;
+            result["Last Restart Timestamp (Epoch time in Sec)"] =
+                static_cast<uint64_t>(fmStateData.last_restart_timestamp);
+            result["Duration Since Last Restart (Sec)"] = static_cast<uint64_t>(
+                fmStateData.duration_since_last_restart_sec);
+            nsmtool::helper::DisplayInJson(result);
+        }
+        else
+        {
+            std::cerr
+                << "Response message error: decode_get_fabric_manager_state_resp fail"
+                << " rc=" << rc << ", cc=" << (int)cc
+                << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        return;
+    }
+};
+
 class GetPortDisableFuture : public CommandInterface
 {
   public:
@@ -4436,6 +4491,11 @@ void registerCommand(CLI::App& app)
         "SetPortDisableFuture", "query ports available");
     commands.push_back(std::make_unique<SetPortDisableFuture>(
         "telemetry", "SetPortDisableFuture", setPortDisableFuture));
+
+    auto getFabricManagerState = telemetry->add_subcommand(
+        "GetFabricManagerState", "Get Fabric Manager State");
+    commands.push_back(std::make_unique<GetFabricManagerState>(
+        "telemetry", "GetFabricManagerState", getFabricManagerState));
 
     auto getPortDisableFuture = telemetry->add_subcommand(
         "GetPortDisableFuture", "query ports available");

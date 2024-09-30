@@ -748,7 +748,7 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                                     "/xyz.openbmc_project.Inventory.Item.Dimm";
 
             std::shared_ptr<DimmIntf> dimmIntf =
-                retrieveInterfaceFromSensorMap<DimmIntf>(
+                getInterfaceOnObjectPath<DimmIntf>(
                     sensorObjectPath, manager, bus, inventoryObjPath.c_str());
 
             auto correctionType =
