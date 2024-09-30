@@ -319,6 +319,34 @@ void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
     }
 }
 
+std::string getDeviceNameFromDeviceType(const uint8_t deviceType)
+{
+    switch (deviceType)
+    {
+        case 0:
+            return "GPU";
+        case 1:
+            return "SWITCH";
+        case 2:
+            return "BRIDGE";
+        case 3:
+            return "BASEBOARD";
+        case 4:
+            return "EROT";
+        default:
+            return "NSM_DEV_ID_UNKNOWN";
+    }
+}
+
+std::string getDeviceInstanceName(const uint8_t deviceType,
+                                  const uint8_t instanceNumber)
+{
+    std::string deviceInstanceName = getDeviceNameFromDeviceType(deviceType);
+    deviceInstanceName += "_";
+    deviceInstanceName += std::to_string(static_cast<int>(instanceNumber));
+    return deviceInstanceName;
+}
+
 requester::Coroutine coGetAssociations(const std::string& objPath,
                                        const std::string& interfaceSubStr,
                                        std::vector<Association>& associations)
@@ -443,6 +471,55 @@ std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
     return bitmap;
 }
 
+bool utils::bitfield256_err_code::isBitSet(const int& errCode)
+{
+    if (errCode == NSM_SUCCESS || errCode == NSM_SW_SUCCESS)
+    {
+        return true; // No need to track these error codes
+    }
+
+    uint8_t fieldIndex = errCode / 32;
+    uint8_t bitIndex = errCode % 32;
+    uint32_t& byte = bitMap.fields[fieldIndex].byte;
+
+    if (!(byte & (1 << bitIndex)))
+    {
+        byte |= (1 << bitIndex);
+        return false;
+    }
+
+    return true;
+}
+
+std::string utils::bitfield256_err_code::getSetBits() const
+{
+    std::ostringstream oss;
+
+    for (size_t i = 0; i < 8; ++i)
+    {
+        uint32_t byte = bitMap.fields[i].byte;
+
+        while (byte > 0)
+        {
+            // Get the position of the least significant set bit
+            int position = __builtin_ctz(byte);
+            oss << (i * 32 + position) << ", ";
+
+            // Remove the least significant set bit
+            byte &= (byte - 1);
+        }
+    }
+
+    std::string result = oss.str();
+    if (!result.empty())
+    {
+        result.pop_back();
+        result.pop_back();
+        // removed trailing , and whitespace
+    }
+
+    return result.empty() ? "No err code" : result;
+}
 std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
                 UpdateMethods>
     updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield)
@@ -486,5 +563,4 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
 
     return updateMethods;
 }
-
 } // namespace utils

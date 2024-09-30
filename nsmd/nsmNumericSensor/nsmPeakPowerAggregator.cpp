@@ -44,7 +44,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_get_max_observed_power_req failed. "
+        lg2::debug("encode_get_max_observed_power_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;

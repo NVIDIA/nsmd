@@ -40,7 +40,7 @@ std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,
         instanceId, GET_POWER_SUPPLY_STATUS, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_fpga_diagnostics_settings_req(GET_POWER_SUPPLY_STATUS) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -61,7 +61,7 @@ uint8_t
                                                   &reasonCode, &status);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "responseHandler: decode_get_power_supply_status_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
             "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         return rc;
@@ -75,6 +75,7 @@ uint8_t
                                        ? PowerStateIntf::PowerState::On
                                        : PowerStateIntf::PowerState::Off);
         }
+        clearErrorBitMap("decode_get_power_supply_status_resp");
     }
     else
     {
@@ -82,9 +83,8 @@ uint8_t
         {
             pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
         }
-        lg2::error(
-            "responseHandler: decode_get_power_supply_status_resp is not success CC. rc={RC}",
-            "RC", rc);
+        logHandleResponseMsg("decode_get_power_supply_status_resp", reasonCode,
+                             cc, rc);
         return rc;
     }
 

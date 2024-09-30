@@ -37,7 +37,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_powersmoothing_featinfo_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_powersmoothing_featinfo_req failed. "
+        lg2::debug("encode_get_powersmoothing_featinfo_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -60,12 +60,12 @@ uint8_t NsmPowerSmoothing::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_powersmoothing_featinfo_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_powersmoothing_featinfo_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_powersmoothing_featinfo_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -76,7 +76,7 @@ void NsmPowerSmoothing::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("nsm_pwr_smoothing_featureinfo_data data is null");
+        lg2::debug("nsm_pwr_smoothing_featureinfo_data data is null");
         return;
     }
     // Update values on iface
@@ -121,7 +121,7 @@ std::optional<std::vector<uint8_t>>
                                                          requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_hardware_lifetime_cricuitry_req failed. "
+        lg2::debug("encode_get_hardware_lifetime_cricuitry_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -144,12 +144,12 @@ uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_hardware_lifetime_cricuitry_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_hardware_lifetime_cricuitry_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_hardware_lifetime_cricuitry_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -160,7 +160,7 @@ void NsmHwCircuitryTelemetry::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("nsm_hardwarecircuitry_data data is null");
+        lg2::debug("nsm_hardwarecircuitry_data data is null");
         return;
     }
     // Update values on iface
@@ -192,7 +192,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_current_profile_info_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_current_profile_info_req failed. "
+        lg2::debug("encode_get_current_profile_info_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -215,12 +215,12 @@ uint8_t NsmCurrentPowerSmoothingProfile::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_current_profile_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_profile_info_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_profile_info_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -242,7 +242,7 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("nsm_get_current_profile_data data is null");
+        lg2::debug("nsm_get_current_profile_data data is null");
         return;
     }
     // Update values on iface
@@ -289,7 +289,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_query_admin_override_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_query_admin_override_req failed. "
+        lg2::debug("encode_query_admin_override_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -312,12 +312,12 @@ uint8_t NsmPowerSmoothingAdminOverride::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_query_admin_override_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_query_admin_override_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_query_admin_override_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -328,7 +328,7 @@ void NsmPowerSmoothingAdminOverride::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("nsm_admin_override_data data is null");
+        lg2::debug("nsm_admin_override_data data is null");
         return;
     }
     // Update values on iface
@@ -371,7 +371,7 @@ std::shared_ptr<OemPowerProfileIntf>
     {
         return it->second;
     }
-    lg2::error("getSupportedProfileById: ProfileId not found: {ID}", "ID",
+    lg2::debug("getSupportedProfileById: ProfileId not found: {ID}", "ID",
                profileId);
     throw std::out_of_range("profileId not found in map");
 }
@@ -417,7 +417,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_preset_profile_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_preset_profile_req failed. "
+        lg2::debug("encode_get_preset_profile_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -455,12 +455,12 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
             updateSupportedProfile(getSupportedProfileById(profileId),
                                    &profileData);
         }
+        clearErrorBitMap("decode_get_preset_profile_metadata_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_preset_profile_metadata_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_preset_profile_metadata_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

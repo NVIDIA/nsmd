@@ -39,7 +39,7 @@ std::optional<Request> NsmPCIeSlot::genRequestMsg(eid_t eid, uint8_t instanceId)
         instanceId, deviceIndex, 1, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -60,9 +60,9 @@ uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
     if (rc)
     {
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
         return rc;
     }
 
@@ -73,14 +73,16 @@ uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
                               : PCIeSlotIntf::SlotTypes(value - 1);
         };
         pdi().slotType(slotType(data.negotiated_link_speed));
+        clearErrorBitMap(
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
         pdi().slotType(PCIeSlotIntf::SlotTypes::Unknown);
 
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp is not success CC. rc={RC}",
-            "RC", rc);
+        logHandleResponseMsg(
+            "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
         return rc;
     }
 

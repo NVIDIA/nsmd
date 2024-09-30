@@ -188,7 +188,7 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
             }
             default:
             {
-                lg2::error(
+                lg2::debug(
                     "NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse: unknown generation {GENERATION}",
                     "GENERATION", generation);
                 return 0.0;

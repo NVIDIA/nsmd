@@ -62,7 +62,7 @@ std::optional<std::vector<uint8_t>> NsmTemp::genRequestMsg(eid_t eid,
                                                  requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_temperature_reading_req failed. "
+        lg2::debug("encode_get_temperature_reading_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -84,15 +84,14 @@ uint8_t NsmTemp::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         sensorValue->updateReading(reading);
+        clearErrorBitMap("decode_get_temperature_reading_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_get_temperature_reading_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_temperature_reading_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

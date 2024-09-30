@@ -41,7 +41,7 @@ std::optional<Request> NsmWriteProtectedJumper::genRequestMsg(
         0, GET_WP_JUMPER_PRESENCE, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_fpga_diagnostics_settings_req(GET_WP_JUMPER_PRESENCE) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -63,12 +63,13 @@ uint8_t NsmWriteProtectedJumper::handleResponseMsg(
     {
         pdi().writeProtected(data.presence);
         pdi().writeProtectedControl(data.presence);
+        clearErrorBitMap("encode_get_fpga_diagnostics_settings_wp_jumper_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: encode_get_fpga_diagnostics_settings_wp_jumper_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "encode_get_fpga_diagnostics_settings_wp_jumper_resp", reasonCode,
+            cc, rc);
     }
 
     return cc ? cc : rc;

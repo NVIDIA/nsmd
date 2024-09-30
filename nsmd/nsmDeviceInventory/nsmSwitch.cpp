@@ -101,7 +101,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     auto rc = encode_get_power_mode_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
+        lg2::debug("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
         // coverity[missing_return]
         co_return rc;
@@ -141,12 +141,11 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
             static_cast<uint64_t>(data.l1_hw_inactive_time));
         this->pdi().hwPredictionInactiveTime(
             static_cast<uint64_t>(data.l1_prediction_inactive_time));
+        clearErrorBitMap("decode_get_power_mode_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_get_power_mode_resp unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_power_mode_resp", reasonCode, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

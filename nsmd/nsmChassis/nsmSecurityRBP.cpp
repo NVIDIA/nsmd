@@ -79,7 +79,7 @@ void SecurityConfiguration::updateIrreversibleConfig(bool state)
         securityCfgAsyncHandler(request, cfg_req.request_type).detach();
         return;
     }
-    lg2::error("encode_nsm_firmware_irreversible_config_req failed: rc={RC}",
+    lg2::debug("encode_nsm_firmware_irreversible_config_req failed: rc={RC}",
                "RC", rc);
     finishOperation(Progress::OperationStatus::Aborted);
     if (rc == NSM_ERR_INVALID_DATA)
@@ -204,7 +204,7 @@ std::optional<std::vector<uint8_t>>
                                                           requestMsg);
     if (rc)
     {
-        lg2::error("encode_nsm_firmware_irreversible_config_req failed."
+        lg2::debug("encode_nsm_firmware_irreversible_config_req failed."
                    " eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -223,10 +223,15 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &stateInfo);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(":decode_nsm_firmware_irreversible_config_request_0_resp"
-                   " rc={RC} cc={CC} reasonCode={RSC}",
-                   "RC", rc, "CC", cc, "RSC", reasonCode);
+        logHandleResponseMsg(
+            "decode_nsm_firmware_irreversible_config_request_0_resp",
+            reasonCode, cc, rc);
         return rc;
+    }
+    else
+    {
+        clearErrorBitMap(
+            "decode_nsm_firmware_irreversible_config_request_0_resp");
     }
     securityCfgObject->updateState(stateInfo);
     return cc;
@@ -415,7 +420,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, &sec_req, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_nsm_query_firmware_security_version_number_req failed."
             " eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
@@ -434,11 +439,15 @@ uint8_t NsmMinSecVersionObject::handleResponseMsg(const nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &sec_info);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            ":decode_nsm_query_firmware_security_version_number_resp rc={RC}"
-            " cc={CC} reasonCode={RSC}",
-            "RC", rc, "CC", cc, "RSC", reasonCode);
+        logHandleResponseMsg(
+            "decode_nsm_query_firmware_security_version_number_resp",
+            reasonCode, cc, rc);
         return rc;
+    }
+    else
+    {
+        clearErrorBitMap(
+            "decode_nsm_query_firmware_security_version_number_resp");
     }
     minSecVersion->updateProperties(sec_info);
     return cc;

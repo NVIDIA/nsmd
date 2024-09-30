@@ -88,7 +88,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, deviceIndex, GROUP_ID_1, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -124,12 +124,12 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
         pcieDeviceIntf->PCIeDeviceIntf::maxLanes(
             convertToLaneCount(data.max_link_width));
         updateMetricOnSharedMemory();
+        clearErrorBitMap("query_scalar_group_telemetry_v1_group1");
     }
     else
     {
-        lg2::error(
-            "responseHandler: query_scalar_group_telemetry_v1_group1 unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("query_scalar_group_telemetry_v1_group1",
+                             reasonCode, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -193,7 +193,7 @@ std::optional<std::vector<uint8_t>>
                                                        requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_clock_output_enable_state_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -219,12 +219,12 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
         updateMetricOnSharedMemory();
+        clearErrorBitMap("get_clock_output_enable_state");
     }
     else
     {
-        lg2::error(
-            "responseHandler: get_clock_output_enable_state unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("get_clock_output_enable_state", reasonCode, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

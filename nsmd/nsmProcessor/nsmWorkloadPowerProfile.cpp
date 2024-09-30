@@ -45,7 +45,7 @@ std::optional<std::vector<uint8_t>>
                                                            requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_workload_power_profile_status_req failed. "
+        lg2::debug("encode_get_workload_power_profile_status_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -68,12 +68,12 @@ uint8_t NsmWorkLoadProfileStatus::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
+        clearErrorBitMap("decode_get_current_profile_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_current_profile_info_resp unsuccessfull. reasonCode={RSNCOD}, cc={CC}, rc={RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_profile_info_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -84,7 +84,7 @@ void NsmWorkLoadProfileStatus::updateReading(
 {
     if (data == nullptr)
     {
-        lg2::error("workload_power_profile_status data is null");
+        lg2::debug("workload_power_profile_status data is null");
         return;
     }
 
@@ -121,7 +121,7 @@ std::shared_ptr<OemWorkLoadPowerProfileIntf>
     {
         return it->second;
     }
-    lg2::error("getSupportedProfileById: ProfileId not found: {ID}", "ID",
+    lg2::debug("getSupportedProfileById: ProfileId not found: {ID}", "ID",
                profileId);
     throw std::out_of_range("profileId not found in map");
 }
@@ -213,7 +213,7 @@ std::optional<std::vector<uint8_t>>
                                                          requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_workload_power_profile_info_req for page {PAGE} failed. "
             "eid={EID} rc={RC}",
             "PAGE", pageId, "EID", eid, "RC", rc);
@@ -277,12 +277,14 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
                 pageCollection->addPage(nextPageId, page);
             }
         }
+        clearErrorBitMap(
+            "decode_get_workload_power_profile_info_metadata_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_workload_power_profile_info_metadata_resp unsuccessfull.reasonCode = {RSNCOD}, cc = {CC},rc = {RC}",
-            "RSNCOD", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_get_workload_power_profile_info_metadata_resp", reason_code,
+            cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

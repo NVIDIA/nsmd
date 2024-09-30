@@ -42,7 +42,7 @@ std::optional<Request> NsmPCIeFunction::genRequestMsg(eid_t eid,
         instanceId, deviceIndex, GROUP_ID_0, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -65,10 +65,15 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto error = rc != NSM_SUCCESS || cc != NSM_SUCCESS;
     if (error)
     {
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group0_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_query_scalar_group_telemetry_v1_group0_resp", reasonCode,
+            cc, rc);
     }
+    else
+    {
+        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group0_resp");
+    }
+
     auto hexFormat = [error](const uint32_t value) -> std::string {
         if (error)
             return "";

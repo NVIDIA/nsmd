@@ -55,13 +55,14 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
         uint32_t* maximumMemoryCapacityMiB =
             reinterpret_cast<uint32_t*>(data.data());
         updateReading(maximumMemoryCapacityMiB);
+        clearErrorBitMap(
+            "decode_get_inventory_information_resp for Maximum Memory Capacity");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_inventory_information_resp for Maximum Memory Capacity"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "decode_get_inventory_information_resp for Maximum Memory Capacity",
+            reason_code, cc, rc);
         updateReading(NULL);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -157,7 +158,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_memory_capacity_util_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_memory_capacity_util_req failed. "
+        lg2::debug("encode_get_memory_capacity_util_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -181,13 +182,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
+        clearErrorBitMap("decode_get_memory_capacity_util_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_memory_capacity_util_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_memory_capacity_util_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -219,7 +219,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -232,7 +232,7 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -255,12 +255,14 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         value = le32toh(value);
         cpuOperatingConfigIntf->minSpeed(value);
         updateMetricOnSharedMemory();
+        clearErrorBitMap(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -307,7 +309,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -320,7 +322,7 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -343,12 +345,14 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         value = le32toh(value);
         cpuOperatingConfigIntf->maxSpeed(value);
         updateMetricOnSharedMemory();
+        clearErrorBitMap(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

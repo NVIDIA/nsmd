@@ -428,7 +428,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_query_aggregate_gpm_metrics_req failed. "
+        lg2::debug("encode_query_aggregate_gpm_metrics_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -460,7 +460,7 @@ int NsmGPMAggregated::handleSamples(const std::vector<TelemetrySample>& samples)
 
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error(
+            lg2::debug(
                 "Failed to decode GPM Aggregate Metric {NAME}. Object Path = {OBJPATH}, rc = {RC}.",
                 "NAME", metric.name, "OBJPATH", objPath, "RC", rc);
             returnValue = rc;
@@ -511,7 +511,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_query_aggregate_gpm_metrics_req failed. "
+        lg2::debug("encode_query_aggregate_gpm_metrics_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -535,7 +535,7 @@ int NsmGPMPerInstance::handleSamples(
 
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error(
+            lg2::debug(
                 "Failed to decode GPM Per-instance Metric for Instance ID {INSTANCE_ID}. Object Path = {OBJPATH}, rc = {RC}.",
                 "INSTANCE_ID", sample.tag, "OBJPATH", objPath, "RC", rc);
             returnValue = rc;

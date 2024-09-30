@@ -60,9 +60,11 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
 
     if (!valid)
     {
-        lg2::error(
-            "NsmNumericAggregator: False Valid bit in Tag {TAG} for Aggregator {NAME} of type {TYPE}.",
-            "TAG", tag, "NAME", getName(), "TYPE", getType());
+        logFalseValid(tag);
+    }
+    else
+    {
+        clearTagBitMap("NsmNumericAggregator");
     }
 
     sensors[tag]->updateReading(std::numeric_limits<double>::quiet_NaN());

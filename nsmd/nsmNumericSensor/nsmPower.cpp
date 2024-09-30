@@ -68,7 +68,7 @@ std::optional<std::vector<uint8_t>> NsmPower::genRequestMsg(eid_t eid,
                                                 averagingInterval, requestPtr);
     if (rc)
     {
-        lg2::error("encode_get_current_power_draw_req failed. "
+        lg2::debug("encode_get_current_power_draw_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -93,15 +93,14 @@ uint8_t NsmPower::handleResponseMsg(const struct nsm_msg* responseMsg,
         // unit of power is milliwatt in NSM Command Response and selected unit
         // in SensorValue PDI is Watts. Hence it is converted to Watts.
         sensorValue->updateReading(reading / 1000.0);
+        clearErrorBitMap("decode_get_current_power_draw_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_get_temperature_reading_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_current_power_draw_resp", reason_code,
+                             cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

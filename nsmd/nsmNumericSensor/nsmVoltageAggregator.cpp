@@ -42,7 +42,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_get_votage_req failed. "
+        lg2::debug("encode_get_votage_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -82,7 +82,7 @@ int NsmVoltageAggregator::handleSamples(
         }
         else
         {
-            lg2::error("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
+            lg2::debug("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
                        rc);
             returnValue = rc;
             updateSensorNotWorking(sample.tag, sample.valid);

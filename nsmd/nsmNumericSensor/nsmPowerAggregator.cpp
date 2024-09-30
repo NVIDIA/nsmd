@@ -43,7 +43,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_get_temperature_reading_req failed. "
+        lg2::debug("encode_get_temperature_reading_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -73,7 +73,7 @@ int NsmPowerAggregator::handleSamples(
 
             if (rc != NSM_SW_SUCCESS)
             {
-                lg2::error("decode_aggregate_timestamp_data failed. rc={RC}.",
+                lg2::debug("decode_aggregate_timestamp_data failed. rc={RC}.",
                            "RC", rc);
                 returnValue = rc;
             }
@@ -92,7 +92,7 @@ int NsmPowerAggregator::handleSamples(
             }
             else
             {
-                lg2::error(
+                lg2::debug(
                     "decode_aggregate_get_current_power_draw_reading failed. rc={RC}.",
                     "RC", rc);
                 returnValue = rc;

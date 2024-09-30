@@ -33,7 +33,7 @@ std::optional<std::vector<uint8_t>>
                                                 requestPtr);
     if (rc)
     {
-        lg2::error("encode_read_thermal_parameter_req failed. "
+        lg2::debug("encode_read_thermal_parameter_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -55,15 +55,14 @@ uint8_t NsmThreshold::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         sensorValue->updateReading(threshold);
+        clearErrorBitMap("decode_read_thermal_parameter_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_read_thermal_parameter_resp failed. "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_read_thermal_parameter_resp", reason_code,
+                             cc, rc);
 
         if (rc == NSM_SW_SUCCESS)
         {

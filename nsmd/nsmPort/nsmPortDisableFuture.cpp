@@ -38,7 +38,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
     auto rc = encode_get_port_disable_future_req(0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_port_disable_future_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -68,12 +68,12 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
         std::vector<uint8_t> maskArray;
         utils::convertBitMaskToVector(maskArray, mask, PORT_MASK_DATA_SIZE);
         this->pdi().portDisableFuture(maskArray);
+        clearErrorBitMap("decode_get_port_disable_future_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_get_port_disable_future_resp unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_port_disable_future_resp", reasonCode,
+                             cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

@@ -43,7 +43,7 @@ std::optional<std::vector<uint8_t>>
 
     if (rc)
     {
-        lg2::error("encode_get_current_energy_count_req failed. "
+        lg2::debug("encode_get_current_energy_count_req failed. "
                    "eid={EID}, rc={RC}.",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -80,7 +80,7 @@ int NsmEnergyAggregator::handleSamples(
         }
         else
         {
-            lg2::error("decode_aggregate_energy_count_data failed. rc={RC}.",
+            lg2::debug("decode_aggregate_energy_count_data failed. rc={RC}.",
                        "RC", rc);
             returnValue = rc;
             updateSensorNotWorking(sample.tag, sample.valid);

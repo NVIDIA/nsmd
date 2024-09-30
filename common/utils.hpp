@@ -85,6 +85,25 @@ struct Association
 using Associations =
     std::vector<std::tuple<std::string, std::string, std::string>>;
 
+struct bitfield256_err_code
+{
+    bitfield256_t bitMap;
+    bool isAnyBitSet; // Flag indicating if any bits are set
+
+    bitfield256_err_code()
+    {
+        // Initialize cc_map and rc_map with all bits set to zero
+        for (int i = 0; i < 8; i++)
+        {
+            bitMap.fields[i].byte = 0;
+        }
+        isAnyBitSet = false;
+    }
+
+    bool isBitSet(const int& errCode);
+    std::string getSetBits() const;
+};
+
 /** @struct CustomFD
  *
  *  RAII wrapper for file descriptor.
@@ -446,6 +465,21 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
  */
 void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
                                    uint8_t instanceNumber, bool retimer);
+/**
+ * @brief Get Device Name associated to Device Type
+ *
+ * @param deviceType NSM device type number
+ */
+std::string getDeviceNameFromDeviceType(const uint8_t deviceType);
+
+/**
+ * @brief Get Device Instance Name = deviceName_deviceInstanceNumber
+ *
+ * @param deviceType NSM device type number
+ * @param instanceNumber NSM device instance number
+ */
+std::string getDeviceInstanceName(const uint8_t deviceType,
+                                  const uint8_t instanceNumber);
 
 /** @brief Get associations of a configuration PDI by coroutine
  *

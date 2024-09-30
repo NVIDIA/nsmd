@@ -47,7 +47,7 @@ std::optional<std::vector<uint8_t>>
         instanceId, &nsmRequest, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_nsm_query_get_erot_state_parameters_req(GET_NSM_BUILD_TYPE) failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -63,16 +63,20 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
     struct ::nsm_firmware_erot_state_info_resp erotInfo;
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reasonCode, &erotInfo);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        lg2::error(
-            ":decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE) rc={RC} cc={CC} reasonCode={RSC}",
-            "RC", rc, "CC", cc, "RSC", reasonCode);
-        return rc;
+        clearErrorBitMap(
+            "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE)");
+    }
+    else
+    {
+        logHandleResponseMsg(
+            "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE)",
+            reasonCode, cc, rc);
     }
     if (erotInfo.fq_resp_hdr.firmware_slot_count < fwSlotObjects.size())
     {
-        lg2::error(
+        lg2::debug(
             "GET_NSM_BUILD_TYPE sc={SlOT_COUNT}, but expected slots not less than {SLOTS}",
             "SC", erotInfo.fq_resp_hdr.firmware_slot_count, "SLOTS",
             fwSlotObjects.size());

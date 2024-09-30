@@ -158,7 +158,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remap_state_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remap_state_req failed. "
+        lg2::debug("encode_get_row_remap_state_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -180,13 +180,12 @@ uint8_t NsmRowRemapState::handleResponseMsg(const struct nsm_msg* responseMsg,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(flags);
+        clearErrorBitMap("decode_get_row_remap_state_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_row_remap_state_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remap_state_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -243,7 +242,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remapping_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remapping_counts_req failed. "
+        lg2::debug("encode_get_row_remapping_counts_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -268,13 +267,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(correctable_error, uncorrectable_error);
+        clearErrorBitMap("decode_get_row_remapping_counts_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_row_remapping_counts_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remapping_counts_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -312,7 +310,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_row_remap_availability_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_row_remap_availability_req failed. "
+        lg2::debug("encode_get_row_remap_availability_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -335,13 +333,12 @@ uint8_t NsmRemappingAvailabilityBankCount::handleResponseMsg(
     {
         updateReading(data);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_get_row_remap_availability_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_row_remap_availability_resp"
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_row_remap_availability_resp",
+                             reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -438,7 +435,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_ECC_error_counts_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_ECC_error_counts_req failed. "
+        lg2::debug("encode_get_ECC_error_counts_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -460,13 +457,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(errorCounts);
+        clearErrorBitMap("decode_get_ECC_error_counts_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_ECC_error_counts_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_ECC_error_counts_resp", reason_code,
+                             cc, rc);
 
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -494,7 +490,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -507,7 +503,7 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMinMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -531,12 +527,14 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[0] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
+        clearErrorBitMap(
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMinMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -565,7 +563,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
                                                    requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -578,7 +576,7 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMaxMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         // coverity[missing_return]
@@ -602,12 +600,14 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[1] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
+        clearErrorBitMap(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp failed. cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "CC", cc, "RESONCODE", reason_code, "RC", rc);
+        logHandleResponseMsg(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp",
+            reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -657,7 +657,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_curr_clock_freq_req(instanceId, clock_id, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_curr_clock_freq_req failed. "
+        lg2::debug("encode_get_curr_clock_freq_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -681,13 +681,12 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(clockFreq);
+        clearErrorBitMap("decode_get_curr_clock_freq_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg:  decode_get_curr_clock_freq_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_curr_clock_freq_resp", reason_code, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return cc;
@@ -706,7 +705,7 @@ void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
 {
     if (maximumMemoryCapacity == NULL)
     {
-        lg2::error(
+        lg2::debug(
             "NsmMemCapacity::updateReading unable to fetch Maximum Memory Capacity");
         return;
     }

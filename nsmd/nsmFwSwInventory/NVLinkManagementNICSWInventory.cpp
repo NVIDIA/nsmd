@@ -88,7 +88,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_driver_info_req(instanceId, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_get_driverVersion_req failed. eid={EID} rc={RC}",
+        lg2::debug("encode_get_driverVersion_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
     }
@@ -111,12 +111,11 @@ uint8_t NsmSWInventoryDriverVersionAndStatus::handleResponseMsg(
     {
         std::string version(driverVersion);
         updateValue(driverState, version);
+        clearErrorBitMap("decode_get_driver_info_resp");
     }
     else
     {
-        lg2::error(
-            "handleResponseMsg: decode_get_driver_info_resp sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_driver_info_resp", reasonCode, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

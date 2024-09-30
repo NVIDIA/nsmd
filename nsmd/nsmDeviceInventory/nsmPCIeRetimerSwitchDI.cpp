@@ -54,7 +54,7 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         0, deviceIndex, GROUP_ID_0, requestMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -91,12 +91,13 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
 
         switchIntf->deviceId(hexaDeviceId.str());
         switchIntf->vendorId(hexaVendorId.str());
+        clearErrorBitMap(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: query_scalar_group_telemetry_v1_group0 unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("query_scalar_group_telemetry_v1_group0",
+                             reasonCode, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -130,7 +131,7 @@ std::optional<std::vector<uint8_t>>
                                                        requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_clock_output_enable_state_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -155,12 +156,12 @@ uint8_t NsmPCIeRetimerSwitchGetClockState::handleResponseMsg(
         // update values
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
+        clearErrorBitMap("get_clock_output_enable_state");
     }
     else
     {
-        lg2::error(
-            "responseHandler: get_clock_output_enable_state unsuccessfull. reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg("get_clock_output_enable_state", reasonCode, cc,
+                             rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

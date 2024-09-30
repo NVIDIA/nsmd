@@ -52,7 +52,7 @@ std::optional<std::vector<uint8_t>>
     auto rc = encode_get_voltage_req(instanceId, sensorId, requestPtr);
     if (rc)
     {
-        lg2::error("encode_get_voltage_req failed. "
+        lg2::debug("encode_get_voltage_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -76,15 +76,13 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
         // unit of voltage is microvolts in NSM Command Response and selected
         // unit in SensorValue PDI is Volts. Hence it is converted to Volts.
         sensorValue->updateReading(reading / 1'000'000.0);
+        clearErrorBitMap("decode_get_voltage_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
 
-        lg2::error(
-            "handleResponseMsg: decode_get_voltage_resp "
-            "sensor={NAME} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "NAME", getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        logHandleResponseMsg("decode_get_voltage_resp", reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

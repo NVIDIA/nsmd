@@ -131,7 +131,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     auto rc = encode_query_port_status_req(0, portNumber, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_query_port_status_req failed. eid={EID} rc={RC}",
+        lg2::debug("encode_query_port_status_req failed. eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
@@ -202,13 +202,17 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                 break;
         }
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_query_port_status_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
-            "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
+                cc, "RC", rc);
+        }
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -228,7 +232,7 @@ requester::Coroutine
     auto rc = encode_query_port_characteristics_req(0, portNumber, requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -323,7 +327,7 @@ std::optional<std::vector<uint8_t>>
                                                     requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -358,13 +362,17 @@ uint8_t
         portMetricsOem3Intf->rxWidth(width);
 
         updateMetricOnSharedMemory();
+        clearErrorBitMap("decode_query_port_characteristics_resp");
     }
     else
     {
-        lg2::error(
-            "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC", cc,
-            "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
+                cc, "RC", rc);
+        }
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;
@@ -770,7 +778,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "NsmPortMetrics: updating counter value failed: iBPortIntf is NULL for {NAME} with port number {NUM} for device type {DT}",
                 "NAME", portName.c_str(), "NUM", portNumber, "DT",
                 typeOfDevice);
@@ -790,7 +798,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
         }
         else
         {
-            lg2::error(
+            lg2::debug(
                 "NsmPortMetrics: updating counter value failed: portMetricsOem2Intf is NULL for {NAME} with port number {NUM} for device type {DT}",
                 "NAME", portName.c_str(), "NUM", portNumber, "DT",
                 typeOfDevice);
@@ -814,7 +822,7 @@ std::optional<std::vector<uint8_t>>
                                                     requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "encode_get_port_telemetry_counter_req failed for portNumber={NUM}, deviceType={DT}, eid={EID}, rc={RC}",
             "NUM", portNumber, "DT", typeOfDevice, "EID", eid, "RC", rc);
         return std::nullopt;
@@ -838,13 +846,17 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     {
         updateCounterValues(&data);
         updateMetricOnSharedMemory();
+        clearErrorBitMap("get_port_telemetry_counter");
     }
     else
     {
-        lg2::error(
-            "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-            "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber, "RSNCOD",
-            reasonCode, "CC", cc, "RC", rc);
+        if (shouldLogError(cc, rc))
+        {
+            lg2::error(
+                "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
+                "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber,
+                "RSNCOD", reasonCode, "CC", cc, "RC", rc);
+        }
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     return NSM_SW_SUCCESS;

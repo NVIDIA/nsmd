@@ -210,7 +210,7 @@ std::optional<std::vector<uint8_t>>
         componentClassificationIndex, requestMsg);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "KeyMgmt - genRequestMsg - "
             "encode_nsm_code_auth_key_perm_query_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
@@ -233,11 +233,13 @@ uint8_t NsmKeyMgmt::handleResponseMsg(const nsm_msg* responseMsg,
         NULL);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error("KeyMgmt - handleResponseMsg - "
-                   "decode_nsm_code_auth_key_perm_query_resp failed."
-                   "rc={RC} cc={CC} reasonCode={RSC}",
-                   "RC", rc, "CC", cc, "RSC", reasonCode);
+        logHandleResponseMsg("decode_nsm_code_auth_key_perm_query_resp",
+                             reasonCode, cc, rc);
         return rc;
+    }
+    else
+    {
+        clearErrorBitMap("decode_nsm_code_auth_key_perm_query_resp");
     }
     std::vector<uint8_t> activeComponentKeyPermBitmap(permissionBitmapLength);
     std::vector<uint8_t> pendingComponentKeyPermBitmap(permissionBitmapLength);

@@ -73,7 +73,7 @@ std::optional<Request> NsmPCIeErrors::genRequestMsg(eid_t eid,
         instanceId, deviceIndex, groupId, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req({GROUPID}) failed. eid={EID} rc={RC}",
             "GROUPID", groupId, "EID", eid, "RC", rc);
         return std::nullopt;
@@ -170,7 +170,7 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
             memset(&data, 0, sizeof(data));                                    \
             handleResponse(data);                                              \
             updateMetricOnSharedMemory();                                      \
-            lg2::error(                                                        \
+            lg2::debug(                                                        \
                 "NsmPCIeErrors::handleResponseMsg: "                           \
                 "decode_query_scalar_group_telemetry_v1_group{GROUPID}_resp"   \
                 "failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",    \
@@ -190,6 +190,19 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
         case GROUP_ID_4:
             decode_query_scalar_group_telemetry_v1_group(4);
             break;
+    }
+
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        logHandleResponseMsg(
+            std::format("decode_query_scalar_group_telemetry_v1_group{}_resp",
+                        groupId),
+            reasonCode, cc, rc);
+    }
+    else
+    {
+        clearErrorBitMap(std::format(
+            "decode_query_scalar_group_telemetry_v1_group{}_resp", groupId));
     }
 
     return cc ? cc : rc;

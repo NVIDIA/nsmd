@@ -38,7 +38,7 @@ std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
         instanceId, deviceIndex, GROUP_ID_1, requestPtr);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         return std::nullopt;
@@ -62,15 +62,16 @@ uint8_t
     if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         handleResponse(data);
+        clearErrorBitMap(
+            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
         memset(&data, 0, sizeof(data));
         handleResponse(data);
-
-        lg2::error(
-            "responseHandler: decode_query_scalar_group_telemetry_v1_group1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        logHandleResponseMsg(
+            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp",
+            reasonCode, cc, rc);
     }
     updateMetricOnSharedMemory();
 
