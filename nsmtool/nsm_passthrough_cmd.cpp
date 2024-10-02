@@ -13,6 +13,8 @@
 #include <chrono>
 #include <fstream>
 #include <iostream>
+#include <ostream>
+#include <string>
 #include <thread>
 
 namespace nsmtool
@@ -25,6 +27,99 @@ std::vector<std::unique_ptr<GetCommandStatus>> getCommandStatusObjects;
 std::vector<std::unique_ptr<WaitCommandStatusComplete>>
     waitCommandStatusCompleteObjects;
 std::vector<std::unique_ptr<GetNSMResponse>> getNSMResponseObjects;
+std::vector<std::unique_ptr<GetDebugInfoFromFD>> getDebugInfoFromFDObjects;
+std::vector<std::unique_ptr<GetLogInfoFromFD>> getLogInfoFromFDObjects;
+
+void readAndPrintFDData(sdbusplus::message::unix_fd& unixfd)
+{
+    std::vector<uint8_t> buffer;
+    int dupFd = dup(unixfd.fd);
+    if (dupFd < 0)
+    {
+        std::cout << "FD ERROR while duplicating." << std::endl;
+        return;
+    }
+    auto fCleanup = [dupFd](FILE* f) -> void {
+        fclose(f);
+        close(dupFd);
+    };
+    std::unique_ptr<FILE, decltype(fCleanup)> file(fdopen(dupFd, "rb"),
+                                                   fCleanup);
+    if (!file)
+    {
+        std::cout << "FD open ERROR." << std::endl;
+        close(dupFd);
+        return;
+    }
+    int rc = fseek(file.get(), 0, SEEK_END);
+    if (rc < 0)
+    {
+        std::cout << "FSEEK ERROR" << std::endl;
+        return;
+    }
+    auto filesize = ftell(file.get());
+    if (filesize <= 0)
+    {
+        std::cout << "No data to print." << std::endl;
+        return;
+    }
+    rewind(file.get());
+    size_t size = static_cast<size_t>(filesize);
+    buffer.resize(size);
+    auto len = fread(buffer.data(), 1, size, file.get());
+    if (len != size)
+    {
+        std::cout << "Length ERROR." << std::endl;
+        return;
+    }
+
+    // print data in format same as hexdump <file>
+    const size_t bytesPerLine = 16;
+    size_t totalBytes = buffer.size();
+
+    std::cout << "[Fd data] = " << std::endl;
+    for (size_t i = 0; i < totalBytes; i += bytesPerLine)
+    {
+        std::cout << std::setw(8) << std::setfill('0') << std::hex << i << "  ";
+
+        for (size_t j = 0; j < bytesPerLine; ++j)
+        {
+            if (i + j < totalBytes)
+            {
+                std::cout << std::setw(2) << std::setfill('0') << std::hex
+                          << static_cast<int>(buffer[i + j]) << " ";
+            }
+            else
+            {
+                // Fill with spaces if not enough bytes
+                std::cout << "   ";
+            }
+            if (j == 7)
+            {
+                // Add extra space after the first 8 bytes
+                std::cout << " ";
+            }
+        }
+
+        // Print the ASCII representation
+        std::cout << " |";
+        for (size_t j = 0; j < bytesPerLine; ++j)
+        {
+            if (i + j < totalBytes)
+            {
+                char ch = buffer[i + j];
+                std::cout << (std::isprint(ch) ? ch : '.');
+            }
+            else
+            {
+                // Fill with spaces for missing bytes
+                std::cout << ' ';
+            }
+        }
+        std::cout << "|" << std::endl;
+    }
+}
+
 SendNSMCommand::SendNSMCommand(CLI::App* app)
 {
     std::string targetType;
@@ -351,6 +446,166 @@ void GetNSMResponse::execute(const std::string& objectPath)
     {}
 }
 
+GetDebugInfoFromFD::GetDebugInfoFromFD(CLI::App* app)
+{
+    std::string objectPath;
+
+    auto subcmd =
+        app->add_subcommand("getDebugInfoFromFD",
+                            "Get Network Device Debug Info from FD as client");
+    subcmd->add_option("-o, --object_path", objectPath, "D-Bus Object Path")
+        ->required();
+
+    subcmd->callback([this, &objectPath]() { this->execute(objectPath); });
+}
+
+void GetDebugInfoFromFD::execute(const std::string& objectPath)
+{
+    try
+    {
+        auto bus = sdbusplus::bus::new_default();
+        dbus::PropertyMap allProperties;
+        sdbusplus::message::message method =
+            bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
+                                "org.freedesktop.DBus.Properties", "GetAll");
+        method.append("com.nvidia.Dump.DebugInfo", "");
+        auto reply = bus.call(method);
+        reply.read(allProperties);
+
+        if (allProperties.contains("Status"))
+        {
+            std::string status =
+                std::get<std::string>(allProperties.at("Status"));
+            std::cout << "[Status] = " << status << std::endl;
+        }
+        if (allProperties.contains("NextRecordHandle"))
+        {
+            uint64_t nxtRecHndl =
+                std::get<uint64_t>(allProperties.at("NextRecordHandle"));
+            std::cout << std::dec << "[Next record handle] = " << nxtRecHndl
+                      << std::endl;
+        }
+        if (allProperties.contains("RecordHandle"))
+        {
+            uint64_t recHndl =
+                std::get<uint64_t>(allProperties.at("RecordHandle"));
+            std::cout << std::dec << "[Record handle] = " << recHndl
+                      << std::endl;
+        }
+        if (allProperties.contains("Fd"))
+        {
+            sdbusplus::message::unix_fd unixfd =
+                std::get<sdbusplus::message::unix_fd>(allProperties.at("Fd"));
+
+            readAndPrintFDData(unixfd);
+        }
+        std::cout << std::endl;
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        std::cout << "Error while fetching data from DebugInfo PDI"
+                  << std::endl;
+    }
+}
+
+GetLogInfoFromFD::GetLogInfoFromFD(CLI::App* app)
+{
+    std::string objectPath;
+
+    auto subcmd = app->add_subcommand(
+        "getLogInfoFromFD", "Get Network Device Log Info from FD as client");
+    subcmd->add_option("-o, --object_path", objectPath, "D-Bus Object Path")
+        ->required();
+
+    subcmd->callback([this, &objectPath]() { this->execute(objectPath); });
+}
+
+void GetLogInfoFromFD::execute(const std::string& objectPath)
+{
+    try
+    {
+        auto bus = sdbusplus::bus::new_default();
+        dbus::PropertyMap allProperties;
+        sdbusplus::message::message method =
+            bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
+                                "org.freedesktop.DBus.Properties", "GetAll");
+        method.append("com.nvidia.Dump.LogInfo", "");
+        auto reply = bus.call(method);
+        reply.read(allProperties);
+
+        if (allProperties.contains("Status"))
+        {
+            std::string status =
+                std::get<std::string>(allProperties.at("Status"));
+            std::cout << "[Status] = " << status << std::endl;
+        }
+        if (allProperties.contains("NextRecordHandle"))
+        {
+            uint64_t nxtRecHndl =
+                std::get<uint64_t>(allProperties.at("NextRecordHandle"));
+            std::cout << std::dec << "[Next record handle] = " << nxtRecHndl
+                      << std::endl;
+        }
+        if (allProperties.contains("RecordHandle"))
+        {
+            uint64_t recHndl =
+                std::get<uint64_t>(allProperties.at("RecordHandle"));
+            std::cout << std::dec << "[Record handle] = " << recHndl
+                      << std::endl;
+        }
+        if (allProperties.contains("Fd"))
+        {
+            sdbusplus::message::unix_fd unixfd =
+                std::get<sdbusplus::message::unix_fd>(allProperties.at("Fd"));
+
+            readAndPrintFDData(unixfd);
+        }
+        if (allProperties.contains("EntryPrefix"))
+        {
+            uint64_t entryPre =
+                std::get<uint64_t>(allProperties.at("EntryPrefix"));
+            std::cout << std::dec << "[Entry Prefix] = " << entryPre
+                      << std::endl;
+        }
+        if (allProperties.contains("EntrySuffix"))
+        {
+            uint64_t entrySuf =
+                std::get<uint64_t>(allProperties.at("EntrySuffix"));
+            std::cout << std::dec << "[Entry Suffix] = " << entrySuf
+                      << std::endl;
+        }
+        if (allProperties.contains("Length"))
+        {
+            uint64_t len = std::get<uint64_t>(allProperties.at("Length"));
+            std::cout << std::dec << "[Length] = " << len << std::endl;
+        }
+        if (allProperties.contains("LostEvents"))
+        {
+            uint64_t lostEvnt =
+                std::get<uint64_t>(allProperties.at("LostEvents"));
+            std::cout << std::dec << "[Lost Events] = " << lostEvnt
+                      << std::endl;
+        }
+        if (allProperties.contains("TimeSynced"))
+        {
+            std::string timeSync =
+                std::get<std::string>(allProperties.at("TimeSynced"));
+            std::cout << "[Time Synced] = " << timeSync << std::endl;
+        }
+        if (allProperties.contains("TimeStamp"))
+        {
+            uint64_t timeStmp =
+                std::get<uint64_t>(allProperties.at("TimeStamp"));
+            std::cout << std::dec << "[Time Stamp] = " << timeStmp << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        std::cout << "Error while fetching data from LogInfo PDI" << std::endl;
+    }
+}
+
 void registerCommand(CLI::App& app)
 {
     auto* passthroughApp = app.add_subcommand(
@@ -362,6 +617,9 @@ void registerCommand(CLI::App& app)
     auto waitCommandStatusComplete =
         std::make_unique<WaitCommandStatusComplete>(passthroughApp);
     auto getNSMResponse = std::make_unique<GetNSMResponse>(passthroughApp);
+    auto getDebugInfoFromFD =
+        std::make_unique<GetDebugInfoFromFD>(passthroughApp);
+    auto getLogInfoFromFD = std::make_unique<GetLogInfoFromFD>(passthroughApp);
 
     // Push the unique_ptrs to the global vector to keep them alive
     sendNSMCommandObjects.push_back(std::move(sendNSMCommand));
@@ -369,6 +627,8 @@ void registerCommand(CLI::App& app)
     waitCommandStatusCompleteObjects.push_back(
         std::move(waitCommandStatusComplete));
     getNSMResponseObjects.push_back(std::move(getNSMResponse));
+    getDebugInfoFromFDObjects.push_back(std::move(getDebugInfoFromFD));
+    getLogInfoFromFDObjects.push_back(std::move(getLogInfoFromFD));
 }
 
 } // namespace passthrough
