@@ -17,6 +17,7 @@
 #pragma once
 #include "platform-environmental.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSmoothingAdminProfileIntf.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
@@ -114,6 +115,39 @@ class NsmPowerProfileCollection : public NsmSensor
     void updateSupportedProfile(std::shared_ptr<OemPowerProfileIntf> obj,
                                 nsm_preset_profile_data* data);
     std::string getProfilePathByProfileId(uint8_t profileId);
+};
+
+// Power Smoothing Control: Apply Admin Override and Activate a preset profile
+
+class NsmPowerSmoothingAction : public NsmObject, public ProfileActionAsyncIntf
+{
+  public:
+    NsmPowerSmoothingAction(sdbusplus::bus::bus& bus, const std::string& name,
+                            const std::string& type,
+                            std::string& inventoryObjPath,
+                            std::shared_ptr<NsmDevice> device);
+
+    // dbus method override for ProfileActionAsyncIntf
+    sdbusplus::message::object_path
+        activatePresetProfile(uint16_t profileID) override;
+    // method to support post operation
+    requester::Coroutine doActivatePresetProfile(
+        std::shared_ptr<AsyncStatusIntf> statusInterface, uint16_t& profileID);
+    requester::Coroutine
+        requestActivatePresetProfile(AsyncOperationStatusType* status,
+                                     uint16_t& profileID);
+
+    // dbus method override for ProfileActionAsyncIntf
+    sdbusplus::message::object_path applyAdminOverride() override;
+    // method to support post operation
+    requester::Coroutine
+        doApplyAdminOverride(std::shared_ptr<AsyncStatusIntf> statusInterface);
+    requester::Coroutine
+        requestApplyAdminOverride(AsyncOperationStatusType* status);
+
+  private:
+    std::shared_ptr<NsmDevice> device;
+    std::string inventoryObjPath;
 };
 
 //  Power Smoothing Control: Get Current Profile Information

@@ -466,4 +466,183 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
     return NSM_SW_SUCCESS;
 }
 
+NsmPowerSmoothingAction::NsmPowerSmoothingAction(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
+    NsmObject(name, type),
+    ProfileActionAsyncIntf(bus, inventoryObjPath.c_str()), device(device),
+    inventoryObjPath(inventoryObjPath)
+{}
+
+requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
+    AsyncOperationStatusType* status, uint16_t& profileID)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_active_preset_profile_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    // first argument instanceid=0 is irrelevant
+    auto rc = encode_set_active_preset_profile_req(0, profileID, requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "requestActivatePresetProfile  encode_set_active_preset_profile_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "requestActivatePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_active_preset_profile_resp(responseMsg.get(), responseLen,
+                                               &cc, &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("requestActivatePresetProfile for EID: {EID} completed",
+                  "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "requestActivatePresetProfile decode_set_active_preset_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmPowerSmoothingAction::doActivatePresetProfile(
+    std::shared_ptr<AsyncStatusIntf> statusInterface, uint16_t& profileID)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    auto rc_ = co_await requestActivatePresetProfile(&status, profileID);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+}
+
+sdbusplus::message::object_path
+    NsmPowerSmoothingAction::activatePresetProfile(uint16_t profileID)
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmPowerSmoothingAction::activatePresetProfile failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    doActivatePresetProfile(statusInterface, profileID).detach();
+
+    return objectPath;
+}
+
+requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
+    AsyncOperationStatusType* status)
+{
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    lg2::info("requestApplyAdminOverride for EID: {EID}", "EID", eid);
+
+    // first argument instanceid=0 is irrelevant
+    auto rc = encode_apply_admin_override_req(0, requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "requestActivatePresetProfile  encode_apply_admin_override_req failed. eid={EID}, rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                               responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "requestActivatePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_apply_admin_override_resp(responseMsg.get(), responseLen, &cc,
+                                          &reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        lg2::info("requestActivatePresetProfile for EID: {EID} completed",
+                  "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "requestActivatePresetProfile decode_set_active_preset_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmPowerSmoothingAction::doApplyAdminOverride(
+    std::shared_ptr<AsyncStatusIntf> statusInterface)
+{
+    AsyncOperationStatusType status{AsyncOperationStatusType::Success};
+
+    auto rc_ = co_await requestApplyAdminOverride(&status);
+
+    statusInterface->status(status);
+
+    co_return rc_;
+}
+
+sdbusplus::message::object_path NsmPowerSmoothingAction::applyAdminOverride()
+{
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        lg2::error(
+            "NsmPowerSmoothingAction::applyAdminOverride failed. No available result Object to allocate for the Post request.");
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    doApplyAdminOverride(statusInterface).detach();
+
+    return objectPath;
+}
+
 } // namespace nsm

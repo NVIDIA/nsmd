@@ -5244,9 +5244,10 @@ uint32_t doubleToNvUFXP8_24(double reading)
 	return value;
 }
 
-// ** Enable Workload Power Profiles **
-int encode_enable_workload_power_profile_req(
-    uint8_t instance_id, bitfield256_t profile_mask, struct nsm_msg *msg)
+//  Enable Workload Power Profiles
+int encode_enable_workload_power_profile_req(uint8_t instance_id,
+					     bitfield256_t profile_mask,
+					     struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5267,22 +5268,23 @@ int encode_enable_workload_power_profile_req(
 
 	request->hdr.command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
 	request->hdr.data_size = sizeof(bitfield256_t);
-	for(int i=0;i<8;i++){
-		request->profile_mask.fields[i].byte = htole32(profile_mask.fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		request->profile_mask.fields[i].byte =
+		    htole32(profile_mask.fields[i].byte);
 	}
 
 	return NSM_SW_SUCCESS;
 }
 
 int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
-					   size_t msg_len, bitfield256_t *profile_mask)
+					     size_t msg_len,
+					     bitfield256_t *profile_mask)
 {
-	if (msg == NULL || profile_mask == NULL ) {
+	if (msg == NULL || profile_mask == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(bitfield256_t)) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) + sizeof(bitfield256_t)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5294,8 +5296,9 @@ int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
 	}
 
 	memcpy(profile_mask, &(request->profile_mask), sizeof(bitfield256_t));
-	for(int i=0;i<8;i++){
-		profile_mask->fields[i].byte = le32toh(profile_mask->fields[i].byte);
+	for (int i = 0; i < 8; i++) {
+		profile_mask->fields[i].byte =
+		    le32toh(profile_mask->fields[i].byte);
 	}
 	return NSM_SW_SUCCESS;
 }
@@ -5361,9 +5364,10 @@ int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
 	return NSM_SUCCESS;
 }
 
-// ** Enable Workload Power Profiles **
-int encode_disable_workload_power_profile_req(
-    uint8_t instance_id, bitfield256_t profile_mask,struct nsm_msg *msg)
+//  Enable Workload Power Profiles
+int encode_disable_workload_power_profile_req(uint8_t instance_id,
+					      bitfield256_t profile_mask,
+					      struct nsm_msg *msg)
 {
 	if (msg == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -5383,23 +5387,24 @@ int encode_disable_workload_power_profile_req(
 	    (struct nsm_disable_workload_power_profile_req *)msg->payload;
 
 	request->hdr.command = NSM_DISABLE_WORKLOAD_POWER_PROFILE;
-	request->hdr.data_size =sizeof(bitfield256_t);
-	for(int i=0;i<8;i++){
-		request->profile_mask.fields[i].byte = htole32(profile_mask.fields[i].byte);
+	request->hdr.data_size = sizeof(bitfield256_t);
+	for (int i = 0; i < 8; i++) {
+		request->profile_mask.fields[i].byte =
+		    htole32(profile_mask.fields[i].byte);
 	}
 
 	return NSM_SW_SUCCESS;
 }
 
 int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
-					   size_t msg_len, bitfield256_t *profile_mask)
+					      size_t msg_len,
+					      bitfield256_t *profile_mask)
 {
 	if (msg == NULL || profile_mask == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(bitfield256_t)) {
+	if (msg_len < sizeof(struct nsm_msg_hdr) + sizeof(bitfield256_t)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
@@ -5409,11 +5414,11 @@ int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
 	if (request->hdr.data_size < sizeof(request->profile_mask)) {
 		return NSM_SW_ERROR_DATA;
 	}
-    
-	memcpy(profile_mask, &(request->profile_mask),
-	       sizeof(bitfield32_t[8]));
-	for(int i=0;i<8;i++){
-		profile_mask->fields[i].byte = le32toh(profile_mask->fields[i].byte);
+
+	memcpy(profile_mask, &(request->profile_mask), sizeof(bitfield32_t[8]));
+	for (int i = 0; i < 8; i++) {
+		profile_mask->fields[i].byte =
+		    le32toh(profile_mask->fields[i].byte);
 	}
 	return NSM_SW_SUCCESS;
 }
@@ -5735,8 +5740,9 @@ int decode_get_workload_power_profile_info_metadata_resp(
 		return rc;
 	}
 
-	if (msg_len < (sizeof(struct nsm_msg_hdr) +
-		       sizeof(struct nsm_all_workload_power_profile_resp_meta_data))) {
+	if (msg_len <
+	    (sizeof(struct nsm_msg_hdr) +
+	     sizeof(struct nsm_all_workload_power_profile_resp_meta_data))) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
