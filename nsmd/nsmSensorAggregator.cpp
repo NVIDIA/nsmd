@@ -87,10 +87,9 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::warning(
-            "responseHandler: decoding failed for one or more samples. "
-            "Type={TYPE}, sensor={NAME}, rc={RC}",
-            "TYPE", getType(), "NAME", getName(), "RC", rc);
+        lg2::debug("responseHandler: decoding failed for one or more samples. "
+                   "Type={TYPE}, sensor={NAME}, rc={RC}",
+                   "TYPE", getType(), "NAME", getName(), "RC", rc);
     }
 
     return rc;
