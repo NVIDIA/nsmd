@@ -90,7 +90,13 @@ class NsmPowerCapIntf : public PowerCapIntf
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            PowerCapIntf::powerCap(enforced_limit_in_miliwatts / 1000);
+            // check if device returned invalid power limit, report invalid
+            // value as is on dbus
+            uint32_t reading =
+                (enforced_limit_in_miliwatts == INVALID_POWER_LIMIT)
+                    ? INVALID_POWER_LIMIT
+                    : enforced_limit_in_miliwatts / 1000;
+            PowerCapIntf::powerCap(reading);
             lg2::info("getPowerCapFromDevice for EID: {EID} completed", "EID",
                       eid);
         }

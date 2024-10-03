@@ -2172,7 +2172,12 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateReading(enforced_limit_in_miliwatts / 1000);
+        // check if device returned invalid power limit, report invalid
+        // value as is on dbus
+        uint32_t reading = (enforced_limit_in_miliwatts == INVALID_POWER_LIMIT)
+                               ? INVALID_POWER_LIMIT
+                               : enforced_limit_in_miliwatts / 1000;
+        updateReading(reading);
         clearErrorBitMap("decode_get_power_limit_resp");
     }
     else
@@ -2262,7 +2267,11 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         // miliwatts to Watts
-        updateValue(value / 1000);
+        // check if device returned invalid power limit, report invalid
+        // value as is on dbus
+        uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
+                                                          : value / 1000;
+        updateValue(reading);
         clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
@@ -2354,7 +2363,11 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         // miliwatts to Watts
-        updateValue(value / 1000);
+        // check if device returned invalid power limit, report invalid
+        // value as is on dbus
+        uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
+                                                          : value / 1000;
+        updateValue(reading);
         clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
@@ -2430,7 +2443,11 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         // miliwatts to Watts
-        updateValue(value / 1000);
+        // check if device returned invalid power limit, report invalid
+        // value as is on dbus
+        uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
+                                                          : value / 1000;
+        updateValue(reading);
         clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
