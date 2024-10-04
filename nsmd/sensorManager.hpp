@@ -53,9 +53,9 @@ class SensorManager
     {}
     virtual ~SensorManager() = default;
 
-    /** @brief Send request NSM message to eid by blocking socket API directly.
-     *         The function will return when received the response message from
-     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
+    /** @brief Send request NSM message to eid by blocking socket API
+     * directly. The function will return when received the response message
+     * from NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
      *         request.
      *
      *  @param[in] eid endpoint ID
@@ -69,9 +69,9 @@ class SensorManager
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t& responseLen, bool isLongRunning = false) = 0;
 
-    /** @brief Send request NSM message to eid by blocking socket API directly.
-     *         The function will return when received the response message from
-     *         NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
+    /** @brief Send request NSM message to eid by blocking socket API
+     * directly. The function will return when received the response message
+     * from NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
      *         request.
      *
      *  @param[in] eid endpoint ID
@@ -146,18 +146,28 @@ class SensorManagerImpl : public SensorManager
         if (instance)
         {
             throw std::logic_error(
-                "Initialize called on an already initialized SensorManager");
+                "Initialize called on an already initialized "
+                "SensorManager");
         }
-        static SensorManagerImpl inst(bus, event, handler, instanceIdDb,
-                                      objServer, eidTable, nsmDevices, localEid,
-                                      sockManager, verbose);
-        instance.reset(&inst);
+        instance = std::make_unique<SensorManagerImpl>(
+            bus, event, handler, instanceIdDb, objServer, eidTable, nsmDevices,
+            localEid, sockManager, verbose);
     }
 
     sdbusplus::asio::object_server& getObjServer()
     {
         return objServer;
     }
+
+    SensorManagerImpl(
+        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
+        requester::Handler<requester::Request>& handler,
+        nsm::InstanceIdDb& instanceIdDb,
+        sdbusplus::asio::object_server& objServer,
+        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable,
+        NsmDeviceTable& nsmDevices, eid_t localEid,
+        mctp_socket::Manager& sockManager, bool verbose);
 
   private:
     // Regular methods as before
@@ -186,16 +196,6 @@ class SensorManagerImpl : public SensorManager
     void scanInventory();
     requester::Coroutine pollEvents(eid_t eid);
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
-    // Private constructor
-    SensorManagerImpl(
-        sdbusplus::bus::bus& bus, sdeventplus::Event& event,
-        requester::Handler<requester::Request>& handler,
-        nsm::InstanceIdDb& instanceIdDb,
-        sdbusplus::asio::object_server& objServer,
-        std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-            eidTable,
-        NsmDeviceTable& nsmDevices, eid_t localEid,
-        mctp_socket::Manager& sockManager, bool verbose);
     void checkAllDevicesReady();
 
     sdbusplus::bus::bus& bus;
