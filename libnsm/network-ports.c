@@ -219,10 +219,16 @@ int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg)
 }
 
 int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
 				uint8_t *sys_guid, size_t sys_guid_len)
 {
 	if (msg == NULL || sys_guid == NULL) {
 		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
