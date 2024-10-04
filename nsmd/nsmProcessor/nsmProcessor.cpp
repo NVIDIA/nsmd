@@ -184,14 +184,16 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
+    uint8_t cc = NSM_ERROR;
     uint16_t reason_code = ERR_NULL;
     uint8_t data[8] = {0};
     uint16_t dataLen = 8;
 
     rc = decode_get_system_guid_resp(readSysGuidResponseMsg.get(),
-                                     readSysGuidResponseLen, data, dataLen);
+                                     readSysGuidResponseLen, &cc, &reason_code,
+                                     data, dataLen);
 
-    if (rc == NSM_SW_SUCCESS)
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         bool setSysGuidNeeded = false;
         for (auto i = 0; i < 8; i++)
@@ -258,12 +260,13 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                 co_return rc;
             }
 
+            uint8_t cc = NSM_ERROR;
             reason_code = ERR_NULL;
             dataLen = 8;
 
             rc = decode_get_system_guid_resp(reReadSysGuidResponseMsg.get(),
-                                             readSysGuidResponseLen, data,
-                                             dataLen);
+                                             readSysGuidResponseLen, &cc,
+                                             &reason_code, data, dataLen);
         }
 
         // convert it to a string

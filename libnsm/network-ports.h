@@ -373,11 +373,14 @@ int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg);
  *
  *  @param[in] msg - request message
  *  @param[in] msg_len - Length of request message
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code
  *  @param[out] sysGuid - System Guid will be written to this (8 bytes)
  *  @param[out] sysGuid_len - System Guid buffer length
  *  @return nsm_completion_codes
  */
 int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
 				uint8_t *sys_guid, size_t sys_guid_len);
 #endif
 
