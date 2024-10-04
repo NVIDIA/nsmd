@@ -2453,10 +2453,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::enableWorkloadPowerProfile(const nsm_msg* requestMsg,
                                                 size_t requestLen)
 {
-    bitfield32_t profile_mask[8];
-    int mask_length;
-    auto rc = decode_enable_workload_power_profile_req(
-        requestMsg, requestLen, &mask_length, profile_mask);
+    bitfield256_t profile_mask;
+
+    auto rc = decode_enable_workload_power_profile_req(requestMsg, requestLen,
+                                                       &profile_mask);
 
     lg2::info("enableWorkloadPowerProfile: request length={LEN}", "LEN",
               requestLen);
@@ -2473,13 +2473,12 @@ std::optional<std::vector<uint8_t>>
                                   0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    lg2::error(
-        "enableWorkloadPowerProfile: instanceId={INSTANCEID}, mask_length={MASKLEN}",
-        "INSTANCEID", requestMsg->hdr.instance_id, "MASKLEN", mask_length);
-    for (int i = 0; i < mask_length; i++)
+    lg2::error("enableWorkloadPowerProfile: instanceId={INSTANCEID}",
+               "INSTANCEID", requestMsg->hdr.instance_id);
+    for (int i = 0; i < 8; i++)
     {
         lg2::error("ProfileMask = {MASK}", "MASK", lg2::hex,
-                   profile_mask[i].byte);
+                   profile_mask.fields[i].byte);
     }
 
     rc = encode_enable_workload_power_profile_resp(
@@ -2498,10 +2497,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::disableWorkloadPowerProfile(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
-    bitfield32_t profile_mask[8];
-    int mask_length;
-    auto rc = decode_disable_workload_power_profile_req(
-        requestMsg, requestLen, &mask_length, profile_mask);
+    bitfield256_t profile_mask;
+
+    auto rc = decode_disable_workload_power_profile_req(requestMsg, requestLen,
+                                                        &profile_mask);
 
     lg2::info("disableWorkloadPowerProfile: request length={LEN}", "LEN",
               requestLen);
@@ -2518,13 +2517,12 @@ std::optional<std::vector<uint8_t>>
                                   0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    lg2::error(
-        "disableWorkloadPowerProfile: instanceId={INSTANCEID}, mask_length={MASKLEN}",
-        "INSTANCEID", requestMsg->hdr.instance_id, "MASKLEN", mask_length);
-    for (int i = 0; i < mask_length; i++)
+    lg2::error("disableWorkloadPowerProfile: instanceId={INSTANCEID}",
+               "INSTANCEID", requestMsg->hdr.instance_id);
+    for (int i = 0; i < 8; i++)
     {
         lg2::error("ProfileMask = {MASK}", "MASK", lg2::hex,
-                   profile_mask[i].byte);
+                   profile_mask.fields[i].byte);
     }
 
     rc = encode_disable_workload_power_profile_resp(

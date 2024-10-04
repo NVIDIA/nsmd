@@ -548,4 +548,11 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
                 UpdateMethods>
     updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield);
 
+// Function to convert bitmap to a bitfield256_t
+/**
+ * Converts a bitmap structure to a bitfield256_t.
+ *
+ * @param bitmap Pointer to the bitmap structure.
+ **/
+bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap);
 } // namespace utils
