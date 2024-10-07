@@ -401,11 +401,11 @@ requester::Coroutine
      */
     uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
     uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
+    uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
 
     do
     {
-        uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
-        common::TimerEventPriority timerEventPriority = common::Priority;
+        auto timerEventPriority = common::Priority;
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
@@ -519,9 +519,6 @@ requester::Coroutine
 
         if (prioritySensorCount == 0)
         {
-            // We can have a even bigger sleep for devices with no priority
-            // sensors.
-            pollingTimeInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
             // The timer event for devices with no priority sensors can be
             // of low priority.
             timerEventPriority = common::NonPriority;
