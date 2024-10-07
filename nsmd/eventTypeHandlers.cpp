@@ -126,6 +126,7 @@ void EventType0Handler::rediscovery(uint8_t eid, const nsm_msg* event,
 EventType1Handler::EventType1Handler()
 {
     enableDelegation(NSM_THRESHOLD_EVENT);
+    enableDelegation(NSM_FABRIC_MANAGER_STATE_EVENT);
 }
 
 EventType3Handler::EventType3Handler()

@@ -227,6 +227,10 @@ class MockupResponder
 
     void sendResetRequiredEvent(uint8_t eid, bool ackr);
 
+    void sendFabricManagerStateEvent(uint8_t dest, bool ackr, uint8_t state,
+                                     uint8_t status, uint64_t last_restart_time,
+                                     uint64_t last_restart_duration);
+
     std::optional<std::vector<uint8_t>>
         queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);

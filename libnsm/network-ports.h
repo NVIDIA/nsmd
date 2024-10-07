@@ -80,6 +80,7 @@ enum nsm_port_status {
  */
 enum nsm_network_ports_events {
 	NSM_THRESHOLD_EVENT = 0x00,
+	NSM_FABRIC_MANAGER_STATE_EVENT = 0x01,
 };
 
 /** @brief FM State
@@ -428,6 +429,13 @@ struct nsm_get_fabric_manager_state_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_fabric_manager_state_data data;
 } __attribute__((packed));
+
+/** @struct nsm_get_fabric_manager_state_event_payload
+ *
+ *  Structure representing payload of NSM get fabric manager state event
+ */
+typedef struct nsm_fabric_manager_state_data
+    nsm_get_fabric_manager_state_event_payload;
 
 #ifdef ENABLE_SYSTEM_GUID
 /** @brief Encode a Set System GUID request message
@@ -1000,6 +1008,31 @@ int decode_get_fabric_manager_state_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size,
     struct nsm_fabric_manager_state_data *data);
+
+/** @brief Create a get fabric manager state event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] payload - fabric manager state event payload
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_fabric_manager_state_event(
+    uint8_t instance_id, bool ackr,
+    nsm_get_fabric_manager_state_event_payload payload, struct nsm_msg *msg);
+
+/** @brief Decode a get fabric manager state event message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] event_class - event class
+ *  @param[out] event_state - event state
+ *  @param[out] payload - fabric manager state event payload
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_fabric_manager_state_event(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
+    uint16_t *event_state, nsm_get_fabric_manager_state_event_payload *payload);
 
 #ifdef __cplusplus
 }
