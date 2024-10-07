@@ -54,7 +54,7 @@ class NsmResetEdppAsyncIntf : public ResetEdppAsyncIntf
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
         auto rc = encode_set_programmable_EDPp_scaling_factor_req(
-            0, RESET_TO_DEFAULT, ONE_SHOT, 0, requestMsg);
+            0, RESET_TO_DEFAULT, PERSISTENT, 0, requestMsg);
 
         if (rc)
         {
@@ -94,7 +94,7 @@ class NsmResetEdppAsyncIntf : public ResetEdppAsyncIntf
         else
         {
             lg2::error(
-                "NsmResetEdppAsyncIntf::clearSetPoint decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+                "NsmResetEdppAsyncIntf::clearSetPoint decode_set_programmable_EDPp_scaling_factor_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;

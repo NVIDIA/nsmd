@@ -3587,7 +3587,7 @@ std::optional<std::vector<uint8_t>>
 {
     uint8_t action;
     uint8_t persistence;
-    uint32_t scaling_factor;
+    uint8_t scaling_factor;
     auto rc = decode_set_programmable_EDPp_scaling_factor_req(
         requestMsg, requestLen, &action, &persistence, &scaling_factor);
     assert(rc == NSM_SW_SUCCESS);

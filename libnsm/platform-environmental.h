@@ -767,7 +767,7 @@ struct nsm_set_programmable_EDPp_scaling_factor_req {
 	struct nsm_common_req hdr;
 	uint8_t action;
 	uint8_t persistence;
-	uint32_t scaling_factor;
+	uint8_t scaling_factor;
 } __attribute__((packed));
 
 /** @struct nsm_set_clock_limit_req
@@ -1960,7 +1960,7 @@ int decode_get_programmable_EDPp_scaling_factor_resp(
 int encode_set_programmable_EDPp_scaling_factor_req(uint8_t instance_id,
 						    uint8_t action,
 						    uint8_t persistence,
-						    uint32_t scaling_factor,
+						    uint8_t scaling_factor,
 						    struct nsm_msg *msg);
 
 /** @brief Decode a Set Programmable EDPp Scaling Factor request message
@@ -1977,7 +1977,7 @@ int decode_set_programmable_EDPp_scaling_factor_req(const struct nsm_msg *msg,
 						    size_t msg_len,
 						    uint8_t *action,
 						    uint8_t *persistence,
-						    uint32_t *scaling_factor);
+						    uint8_t *scaling_factor);
 
 /** @brief Encode a Set Programmable EDPp Scaling Factor response message
  *
