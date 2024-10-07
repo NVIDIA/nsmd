@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 #pragma once
+#include "asyncOperationManager.hpp"
+
 #include <com/nvidia/PowerSmoothing/PowerProfile/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 
@@ -61,7 +63,7 @@ class OemPowerProfileIntf :
         return inventoryObjPath;
     }
 
-    void getProfileInfoFromDevice()
+    requester::Coroutine getProfileInfoFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -78,23 +80,20 @@ class OemPowerProfileIntf :
             lg2::error(
                 "getProfileInfo: encode_get_preset_profile_req failed for eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
-                "getProfileInfo SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
+                "getProfileInfo SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+
+            co_return rc_;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -135,12 +134,14 @@ class OemPowerProfileIntf :
             lg2::error(
                 "getProfileInfo decode_get_preset_profile_metadata_resp/decode_get_preset_profile_data_from_resp. eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+            co_return rc;
         }
+        co_return NSM_SW_SUCCESS;
     }
 
-    void updateProfileInfoOnDevice(uint8_t parameterId, double paramValue)
+    requester::Coroutine
+        updateProfileInfoOnDevice(uint8_t parameterId, double paramValue,
+                                  AsyncOperationStatusType* status)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -166,24 +167,22 @@ class OemPowerProfileIntf :
                 "updateProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, profileID: {PROFILEID}) for eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc, "ID", parameterId, "PROFILEID",
                 profileId);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
-                "updateProfileInfoOnDevice SendRecvNsmMsgSync failed(parameterId:{ID}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "updateProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
                 profileId);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -194,7 +193,7 @@ class OemPowerProfileIntf :
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // verify setting is applied on the device
-            getProfileInfoFromDevice();
+            co_await getProfileInfoFromDevice();
         }
         else
         {
@@ -202,33 +201,86 @@ class OemPowerProfileIntf :
                 "updateProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
                 parameterId, "PROFILEID", profileId);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
+        co_return NSM_SW_SUCCESS;
     }
 
-    double tmpFloorPercent(double floorPercent) override
+    requester::Coroutine
+        setTmpFloorPercent(const AsyncSetOperationValueType& value,
+                           AsyncOperationStatusType* status,
+                           [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        updateProfileInfoOnDevice(0, floorPercent);
-        return PowerProfileIntf::tmpFloorPercent();
+        const double* floorPercent = std::get_if<double>(&value);
+
+        if (!floorPercent)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await updateProfileInfoOnDevice(0, *floorPercent,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampUpRate(double ramupRate) override
+    requester::Coroutine
+        setRampUpRate(const AsyncSetOperationValueType& value,
+                      AsyncOperationStatusType* status,
+                      [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        updateProfileInfoOnDevice(1, ramupRate);
-        return PowerProfileIntf::rampUpRate();
+        const double* ramupRate = std::get_if<double>(&value);
+
+        if (!ramupRate)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await updateProfileInfoOnDevice(1, *ramupRate,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampDownRate(double rampDownRate) override
+    requester::Coroutine
+        setRampDownRate(const AsyncSetOperationValueType& value,
+                        AsyncOperationStatusType* status,
+                        [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        updateProfileInfoOnDevice(2, rampDownRate);
-        return PowerProfileIntf::rampDownRate();
+        const double* rampDownRate = std::get_if<double>(&value);
+
+        if (!rampDownRate)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await updateProfileInfoOnDevice(2, *rampDownRate,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampDownHysteresis(double rampDownHysterisis) override
+    requester::Coroutine setRampDownHysteresis(
+        const AsyncSetOperationValueType& value,
+        AsyncOperationStatusType* status,
+        [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        updateProfileInfoOnDevice(3, rampDownHysterisis);
-        return PowerProfileIntf::rampDownHysteresis();
+        const double* rampDownHysteresis = std::get_if<double>(&value);
+
+        if (!rampDownHysteresis)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc =
+            co_await updateProfileInfoOnDevice(3, *rampDownHysteresis, status);
+        // coverity[missing_return]
+        co_return rc;
     }
 };
 } // namespace nsm

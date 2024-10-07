@@ -25,8 +25,8 @@ namespace nsm
 NsmPowerSmoothing::NsmPowerSmoothing(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf) :
-    NsmSensor(name, type),
-    pwrSmoothingIntf(pwrSmoothingIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), pwrSmoothingIntf(pwrSmoothingIntf),
+    inventoryObjPath(inventoryObjPath)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -108,8 +108,8 @@ void NsmPowerSmoothing::updateReading(
 NsmHwCircuitryTelemetry::NsmHwCircuitryTelemetry(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf) :
-    NsmSensor(name, type),
-    pwrSmoothingIntf(pwrSmoothingIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), pwrSmoothingIntf(pwrSmoothingIntf),
+    inventoryObjPath(inventoryObjPath)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -277,8 +277,8 @@ NsmPowerSmoothingAdminOverride::NsmPowerSmoothingAdminOverride(
     std::string& name, std::string& type,
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf,
     std::string& inventoryObjPath) :
-    NsmSensor(name, type),
-    adminProfileIntf(adminProfileIntf), inventoryObjPath(inventoryObjPath)
+    NsmSensor(name, type), adminProfileIntf(adminProfileIntf),
+    inventoryObjPath(inventoryObjPath)
 {}
 
 std::optional<std::vector<uint8_t>>
@@ -352,8 +352,7 @@ std::string NsmPowerSmoothingAdminOverride::getInventoryObjPath()
 NsmPowerProfileCollection::NsmPowerProfileCollection(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<NsmDevice> device) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), device(device)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 bool NsmPowerProfileCollection::hasProfileId(uint8_t profileId)
@@ -450,6 +449,49 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
                 auto powerProfile = std::make_shared<OemPowerProfileIntf>(
                     utils::DBusHandler::getBus(), inventoryObjPath, profileId,
                     device);
+
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(powerProfile->getInventoryObjPath())
+                    ->addAsyncSetOperation(
+                        powerProfile->PowerProfileIntf::interface,
+                        "TMPFloorPercent",
+                        AsyncSetOperationInfo{
+                            std::bind_front(
+                                &OemPowerProfileIntf::setTmpFloorPercent,
+                                powerProfile),
+                            {},
+                            device});
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(powerProfile->getInventoryObjPath())
+                    ->addAsyncSetOperation(
+                        powerProfile->PowerProfileIntf::interface, "RampUpRate",
+                        AsyncSetOperationInfo{
+                            std::bind_front(&OemPowerProfileIntf::setRampUpRate,
+                                            powerProfile),
+                            {},
+                            device});
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(powerProfile->getInventoryObjPath())
+                    ->addAsyncSetOperation(
+                        powerProfile->PowerProfileIntf::interface,
+                        "RampDownRate",
+                        AsyncSetOperationInfo{
+                            std::bind_front(
+                                &OemPowerProfileIntf::setRampDownRate,
+                                powerProfile),
+                            {},
+                            device});
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(powerProfile->getInventoryObjPath())
+                    ->addAsyncSetOperation(
+                        powerProfile->PowerProfileIntf::interface,
+                        "RampDownHysteresis",
+                        AsyncSetOperationInfo{
+                            std::bind_front(
+                                &OemPowerProfileIntf::setRampDownHysteresis,
+                                powerProfile),
+                            {},
+                            device});
                 addSupportedProfile(profileId, powerProfile);
             }
             updateSupportedProfile(getSupportedProfileById(profileId),

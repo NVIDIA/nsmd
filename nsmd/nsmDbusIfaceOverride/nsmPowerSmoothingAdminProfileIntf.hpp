@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 #pragma once
+#include "asyncOperationManager.hpp"
+
 #include <com/nvidia/PowerSmoothing/AdminPowerProfile/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -57,7 +59,7 @@ class OemAdminProfileIntf :
         return inventoryObjPath;
     }
 
-    void getAdminProfileFromDevice()
+    requester::Coroutine getAdminProfileFromDevice()
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -74,23 +76,21 @@ class OemAdminProfileIntf :
             lg2::error(
                 "getAdminProfileFromDevice: encode_setup_admin_override_req failed. eid={EID}, rc={RC}",
                 "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            // coverity[missing_return]
+            co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
-                "getAdminProfileFromDevice SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
+                "getAdminProfileFromDevice SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+            // coverity[missing_return]
+            co_return rc_;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -122,12 +122,16 @@ class OemAdminProfileIntf :
             lg2::error(
                 "getAdminProfileFromDevice decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+            // coverity[missing_return]
+            co_return rc;
         }
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
     }
 
-    void overrideAdminProfileParam(uint8_t parameterId, double paramValue)
+    requester::Coroutine
+        overrideAdminProfileParam(uint8_t parameterId, double paramValue,
+                                  AsyncOperationStatusType* status)
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
@@ -144,25 +148,25 @@ class OemAdminProfileIntf :
         if (rc)
         {
             lg2::error(
-                "overrideAdminProfileParam: encode_setup_admin_override_req failed. eid={EID}, rc={RC}",
-                "EID", eid, "RC", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+                "overrideAdminProfileParam: encode_setup_admin_override_req failed. eid={EID}, rc={RC}, paramId={ID}, paramValue={VAL}",
+                "EID", eid, "RC", rc, "ID", parameterId, "VAL", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = manager.SendRecvNsmMsgSync(eid, request, responseMsg,
-                                              responseLen);
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
         if (rc_)
         {
             lg2::error(
-                "overrideAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
-            return;
+                "overrideAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}",
+                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         uint8_t cc = NSM_SUCCESS;
@@ -172,40 +176,95 @@ class OemAdminProfileIntf :
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            getAdminProfileFromDevice();
+            co_await getAdminProfileFromDevice();
         }
         else
         {
             lg2::error(
-                "overrideAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            throw sdbusplus::xyz::openbmc_project::Common::Device::Error::
-                WriteFailure();
+                "overrideAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}",
+                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                parameterId, "VAL", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
     }
 
-    double tmpFloorPercent(double floorPercent) override
+    requester::Coroutine
+        setTmpFloorPercent(const AsyncSetOperationValueType& value,
+                           AsyncOperationStatusType* status,
+                           [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        overrideAdminProfileParam(0, floorPercent);
-        return AdminPowerProfileIntf::tmpFloorPercent();
+        const double* floorPercent = std::get_if<double>(&value);
+
+        if (!floorPercent)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await overrideAdminProfileParam(0, *floorPercent,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampUpRate(double ramupRate) override
+    requester::Coroutine
+        setRampUpRate(const AsyncSetOperationValueType& value,
+                      AsyncOperationStatusType* status,
+                      [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        overrideAdminProfileParam(1, ramupRate);
-        return AdminPowerProfileIntf::rampUpRate();
+        const double* ramupRate = std::get_if<double>(&value);
+
+        if (!ramupRate)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await overrideAdminProfileParam(1, *ramupRate,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampDownRate(double rampDownRate) override
+    requester::Coroutine
+        setRampDownRate(const AsyncSetOperationValueType& value,
+                        AsyncOperationStatusType* status,
+                        [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        overrideAdminProfileParam(2, rampDownRate);
-        return AdminPowerProfileIntf::rampDownRate();
+        const double* rampDownRate = std::get_if<double>(&value);
+
+        if (!rampDownRate)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc = co_await overrideAdminProfileParam(2, *rampDownRate,
+                                                           status);
+        // coverity[missing_return]
+        co_return rc;
     }
 
-    double rampDownHysteresis(double rampDownHysterisis) override
+    requester::Coroutine setRampDownHysteresis(
+        const AsyncSetOperationValueType& value,
+        AsyncOperationStatusType* status,
+        [[maybe_unused]] std::shared_ptr<NsmDevice> device)
     {
-        overrideAdminProfileParam(3, rampDownHysterisis);
-        return AdminPowerProfileIntf::rampDownHysteresis();
+        const double* rampDownHysteresis = std::get_if<double>(&value);
+
+        if (!rampDownHysteresis)
+        {
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
+
+        const auto rc =
+            co_await overrideAdminProfileParam(3, *rampDownHysteresis, status);
+        // coverity[missing_return]
+        co_return rc;
     }
 };
 } // namespace nsm
