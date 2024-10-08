@@ -136,3 +136,17 @@ option(
     value: false,
     description: 'Error Injection Priority',
 )
+
+option(
+    'confidential-compute-mode',
+    type: 'boolean',
+    value: false,
+    description: 'Confidential Compute Mode Sensor Priority',
+)
+
+option(
+    'confidential-compute-devtool-mode',
+    type: 'boolean',
+    value: false,
+    description: 'Confidential Compute Devtool Mode Sensor Priority',
+)

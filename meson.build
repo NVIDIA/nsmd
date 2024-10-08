@@ -110,6 +110,14 @@ else
     conf_data.set('ERROR_INJECTION_PRIORITY', 0)
 endif
 
+if get_option('confidential-compute-mode')
+    conf_data.set('CONFIDENTIAL_COMPUTE_MODE_PRIORITY', 1)
+endif
+
+if get_option('confidential-compute-devtool-mode')
+    conf_data.set('CONFIDENTIAL_COMPUTE_DEVTOOL_MODE_PRIORITY', 1)
+endif
+
 conf_data.set('LOCAL_EID', get_option('local-eid'))
 configure_file(output: 'config.h', configuration: conf_data)
 

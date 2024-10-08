@@ -571,6 +571,12 @@ std::optional<std::vector<uint8_t>>
                 case NSM_SET_RECONFIGURATION_PERMISSIONS_V1:
                     return setReconfigurationPermissionsV1Handler(request,
                                                                   requestLen);
+                case NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1:
+                    return getConfidentialComputeModeHandler(request,
+                                                             requestLen);
+                case NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1:
+                    return setConfidentialComputeModeHandler(request,
+                                                             requestLen);
                 case NSM_ENABLE_DISABLE_GPU_IST_MODE:
                     return enableDisableGpuIstModeHandler(request, requestLen);
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
@@ -757,7 +763,7 @@ std::optional<std::vector<uint8_t>>
                       97,  118, 113, 114, 115, 116, 117, 119, 120, 121, 122,
                       123, 124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4, {}},
-                 {5, {3, 4, 5, 6, 7, 64, 65}},
+                 {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
                  {6, {1, 2, 3, 4, 5, 6}},
              }},
             {NSM_DEV_ID_EROT,
@@ -4882,6 +4888,76 @@ std::optional<std::vector<uint8_t>>
     }
     return response;
 }
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getConfidentialComputeModeHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    auto rc = decode_get_confidential_compute_mode_v1_req(requestMsg,
+                                                          requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode request for getConfidentialComputeModeHandler failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    uint8_t current_mode = 2;
+    uint8_t pending_mode = 2;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_confidential_compute_mode_v1_resp),
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_confidential_compute_mode_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, current_mode,
+        pending_mode, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "encode_get_confidential_compute_mode_v1_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setConfidentialComputeModeHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    uint8_t mode;
+    auto rc = decode_set_confidential_compute_mode_v1_req(requestMsg,
+                                                          requestLen, &mode);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode request for setConfidentialComputeModeHandler failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_confidential_compute_mode_v1_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error(
+            "encode_set_confidential_compute_mode_v1_resp failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::setErrorInjectionModeV1Handler(const nsm_msg* requestMsg,
                                                     size_t requestLen)

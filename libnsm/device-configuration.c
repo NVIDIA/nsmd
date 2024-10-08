@@ -839,3 +839,148 @@ int decode_set_reconfiguration_permissions_v1_resp(const struct nsm_msg *msg,
 	}
 	return rc;
 }
+
+int encode_get_confidential_compute_mode_v1_req(uint8_t instance_id,
+						struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1, msg);
+}
+
+int decode_get_confidential_compute_mode_v1_req(const struct nsm_msg *msg,
+						size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_confidential_compute_mode_v1_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code, uint8_t current_mode,
+    uint8_t pending_mode, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(
+		    cc, reason_code, NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1, msg);
+	}
+
+	struct nsm_get_confidential_compute_mode_v1_resp *resp =
+	    (struct nsm_get_confidential_compute_mode_v1_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_CONFIDENTIAL_COMPUTE_MODE_V1;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(struct nsm_get_confidential_compute_mode_v1_resp) -
+		    sizeof(struct nsm_common_resp));
+	resp->current_mode = current_mode;
+	resp->pending_mode = pending_mode;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_confidential_compute_mode_v1_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, uint8_t *current_mode, uint8_t *pending_mode)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL ||
+	    current_mode == NULL || pending_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len !=
+	    (sizeof(struct nsm_msg_hdr)) +
+		sizeof(struct nsm_get_confidential_compute_mode_v1_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_confidential_compute_mode_v1_resp *resp =
+	    (struct nsm_get_confidential_compute_mode_v1_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+
+	if ((*data_size) !=
+	    (sizeof(struct nsm_get_confidential_compute_mode_v1_resp) -
+	     sizeof(struct nsm_common_resp))) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*current_mode = resp->current_mode;
+	*pending_mode = resp->pending_mode;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_confidential_compute_mode_v1_req(uint8_t instance_id,
+						uint8_t mode,
+						struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		struct nsm_set_confidential_compute_mode_v1_req *req =
+		    (struct nsm_set_confidential_compute_mode_v1_req *)
+			msg->payload;
+		req->hdr.data_size =
+		    sizeof(struct nsm_set_confidential_compute_mode_v1_req) -
+		    sizeof(struct nsm_common_req);
+		req->mode = mode;
+	}
+	return rc;
+}
+
+int decode_set_confidential_compute_mode_v1_req(const struct nsm_msg *msg,
+						size_t msg_len, uint8_t *mode)
+{
+	if (msg == NULL || mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_set_confidential_compute_mode_v1_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_confidential_compute_mode_v1_req *request =
+	    (struct nsm_set_confidential_compute_mode_v1_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_set_confidential_compute_mode_v1_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*mode = request->mode;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_confidential_compute_mode_v1_resp(uint8_t instance_id,
+						 uint8_t cc,
+						 uint16_t reason_code,
+						 struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_CONFIDENTIAL_COMPUTE_MODE_V1, msg);
+}
+
+int decode_set_confidential_compute_mode_v1_resp(const struct nsm_msg *msg,
+						 size_t msg_len, uint8_t *cc,
+						 uint16_t *data_size,
+						 uint16_t *reason_code)
+{
+	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}

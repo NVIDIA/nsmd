@@ -49,6 +49,7 @@
 #ifdef ENABLE_SYSTEM_GUID
 #include <com/nvidia/SysGUID/SysGUID/server.hpp>
 #endif
+#include <com/nvidia/CCMode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
@@ -758,6 +759,37 @@ class NsmProcessorThrottleDuration : public NsmSensor
     void updateReading(const nsm_violation_duration& data);
     std::shared_ptr<ProcessorPerformanceIntf> processorPerformanceIntf =
         nullptr;
+    std::string inventoryObjPath;
+};
+
+using ConfidentialComputeIntf =
+    sdbusplus::server::object_t<sdbusplus::server::com::nvidia::CCMode>;
+class NsmConfidentialCompute : public NsmSensor
+{
+  public:
+    NsmConfidentialCompute(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<ConfidentialComputeIntf> confidentialComputeIntf,
+        std::string& inventoryObjPath);
+    NsmConfidentialCompute() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
+    requester::Coroutine
+        patchCCMode(const AsyncSetOperationValueType& value,
+                    [[maybe_unused]] AsyncOperationStatusType* status,
+                    std::shared_ptr<NsmDevice> device);
+    requester::Coroutine
+        patchCCDevMode(const AsyncSetOperationValueType& value,
+                       [[maybe_unused]] AsyncOperationStatusType* status,
+                       std::shared_ptr<NsmDevice> device);
+
+  private:
+    void updateReading(uint8_t current_mode, uint8_t pending_mode);
+    std::shared_ptr<ConfidentialComputeIntf> confidentialComputeIntf = nullptr;
     std::string inventoryObjPath;
 };
 

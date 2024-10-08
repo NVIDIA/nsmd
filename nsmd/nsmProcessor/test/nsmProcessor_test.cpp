@@ -1672,8 +1672,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     auto capabilitiesCount =
         size_t(ErrorInjectionCapabilityIntf::Type::Unknown);
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(6, gpu.roundRobinSensors.size());
-    EXPECT_EQ(10 + capabilitiesCount, gpu.deviceSensors.size());
+    EXPECT_EQ(7, gpu.roundRobinSensors.size());
+    EXPECT_EQ(11 + capabilitiesCount, gpu.deviceSensors.size());
 
     int si = 6;
 
