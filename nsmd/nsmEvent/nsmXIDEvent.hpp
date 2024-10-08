@@ -17,32 +17,21 @@
 
 #pragma once
 
-#include "nsmEvent.hpp"
+#include "nsmEventInfo.hpp"
 
 namespace nsm
 {
-
-struct NsmXIDEventInfo
-{
-    std::string uuid;
-    std::string originOfCondition;
-    std::string messageId;
-    Level severity;
-    std::string loggingNamespace;
-    std::string resolution;
-    std::vector<std::string> messageArgs;
-};
 
 class NsmXIDEvent : public NsmEvent
 {
   public:
     NsmXIDEvent(const std::string& name, const std::string& type,
-                const NsmXIDEventInfo info);
+                const NsmEventInfo info);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
 
   private:
-    const NsmXIDEventInfo info;
+    const NsmEventInfo info;
 };
 } // namespace nsm

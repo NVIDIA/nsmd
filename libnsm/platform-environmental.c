@@ -3643,23 +3643,17 @@ int encode_nsm_reset_required_event(uint8_t instance_id, bool ackr,
 int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
 				    uint8_t *event_class, uint16_t *event_state)
 {
-	if (msg == NULL || event_class == NULL || event_state == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
-		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_event *event = (struct nsm_event *)msg->payload;
-	if (event->data_size > 0) {
+	uint8_t data_size = 0;
+	int result = decode_nsm_event(msg, msg_len, NSM_RESET_REQUIRED_EVENT,
+				      NSM_GENERAL_EVENT_CLASS, event_state,
+				      &data_size, NULL);
+	if (data_size > 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-
-	*event_class = event->event_class;
-	*event_state = le16toh(event->event_state);
-
-	return NSM_SW_SUCCESS;
+	if (event_class != NULL) {
+		*event_class = NSM_GENERAL_EVENT_CLASS;
+	}
+	return result;
 }
 
 int decode_query_aggregate_gpm_metrics_req(

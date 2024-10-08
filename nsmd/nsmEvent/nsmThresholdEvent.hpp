@@ -15,17 +15,23 @@
  * limitations under the License.
  */
 
-#include "eventType3Handler.hpp"
+#pragma once
 
-#include "platform-environmental.h"
+#include "nsmEventInfo.hpp"
 
 namespace nsm
 {
 
-EventType3Handler::EventType3Handler()
+class NsmThresholdEvent : public NsmEvent
 {
-    enableDelegation(NSM_XID_EVENT);
-    enableDelegation(NSM_RESET_REQUIRED_EVENT);
-};
+  public:
+    NsmThresholdEvent(const std::string& name, const std::string& type,
+                      const NsmEventInfo info);
 
+    int handle(eid_t eid, NsmType type, NsmEventId eventId,
+               const nsm_msg* event, size_t eventLen) final;
+
+  private:
+    const NsmEventInfo info;
+};
 } // namespace nsm

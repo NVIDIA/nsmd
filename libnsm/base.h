@@ -748,6 +748,29 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 		     uint16_t event_state, uint8_t data_size, uint8_t *data,
 		     struct nsm_msg *msg);
 
+/**
+ * @brief Decode an event message.
+ *
+ * This function decodes an event message by extracting the event identifier,
+ * event class, event state, data size, and data payload from the provided
+ * response message. The provided event identifier and event class are compared
+ * with the decoded values during the process.
+ *
+ * @param[in]  msg         Pointer to the response message containing event
+ * data.
+ * @param[in]  msg_len     Length of the response message.
+ * @param[in]  event_id    Event identifier to compare with the decoded value.
+ * @param[in]  event_class Event class to compare with the decoded value.
+ * @param[out] event_state Pointer to store the decoded event state.
+ * @param[out] data_size   Pointer to store the size of the data payload.
+ * @param[out] data        Pointer to store the decoded data payload.
+ *
+ * @return nsm_completion_codes Completion status of the decoding process.
+ */
+int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
+		     uint8_t event_id, uint8_t event_class,
+		     uint16_t *event_state, uint8_t *data_size, uint8_t *data);
+
 /** @brief Encode a Common request message
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] nvidia_msg_type - NVIDIA message type

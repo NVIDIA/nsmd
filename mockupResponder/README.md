@@ -51,3 +51,27 @@ root@umbriel:~# nsmMockupResponder -e 30 -d "gpu" -i 1 -v
 <3> received NSM request length=11
 ...........
 ```
+
+## MockupResponder events examples
+
+### genThreasholdEvent
+
+#### Parameters
+
+- **dest**: The destination EID.
+- **ackr**: Acknowledgment request flag.
+- **port_rcv_errors_threshold**: Port receive errors threshold flag.
+- **port_xmit_discard_threshold**: Port transmit discard threshold flag.
+- **symbol_ber_threshold**: Symbol bit error rate threshold flag.
+- **port_rcv_remote_physical_errors_threshold**: Port receive remote physical errors threshold flag.
+- **port_rcv_switch_relay_errors_threshold**: Port receive switch relay errors threshold flag.
+- **effective_ber_threshold**: Effective bit error rate threshold flag.
+- **estimated_effective_ber_threshold**: Estimated effective bit error rate threshold flag.
+- **portNumber**: The port number associated with the event.
+
+#### Usage
+
+```bash
+busctl call xyz.openbmc_project.NSM.eid_22 /xyz/openbmc_project/NSM/22 xyz.openbmc_project.NSM.Device genThreasholdEvent ybbbbbbbby 22 1 0 0 1 0 0 0 0 0
+busctl call xyz.openbmc_project.NSM.eid_28 /xyz/openbmc_project/NSM/28 xyz.openbmc_project.NSM.Device genThreasholdEvent ybbbbbbbby 28 1 0 0 1 0 0 0 0 0
+```

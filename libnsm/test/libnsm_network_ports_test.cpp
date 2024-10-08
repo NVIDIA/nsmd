@@ -2324,3 +2324,157 @@ TEST(setPowerMode, testBadDecodeResponse)
 	rc = decode_set_power_mode_resp(response, msg_len, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+class PortsHealthEventDecode : public testing::Test
+{
+      protected:
+	const size_t eventMsgSize = sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+				    sizeof(nsm_health_event_payload);
+
+	PortsHealthEventDecode()
+	    : eventMsg(eventMsgSize, 0),
+	      expected{.port_rcv_errors_threshold = 0,
+		       .port_xmit_discard_threshold = 0,
+		       .symbol_ber_threshold = 1,
+		       .port_rcv_remote_physical_errors_threshold = 0,
+		       .port_rcv_switch_relay_errors_threshold = 0,
+		       .effective_ber_threshold = 0,
+		       .estimated_effective_ber_threshold = 0,
+		       .reserved = 0,
+		       .portNumber = 1}
+	{
+		auto rc = encode_nsm_health_event(
+		    0, true, &expected,
+		    reinterpret_cast<nsm_msg *>(eventMsg.data()));
+		EXPECT_EQ(NSM_SW_SUCCESS, rc);
+		event = reinterpret_cast<nsm_msg *>(eventMsg.data());
+	};
+
+	std::vector<uint8_t> eventMsg;
+	const nsm_msg *event;
+	const nsm_health_event_payload expected;
+};
+
+TEST_F(PortsHealthEventDecode, testBadEncodeEvent)
+{
+	auto rc = encode_nsm_health_event(0, false, &expected, nullptr);
+	EXPECT_EQ(NSM_ERR_INVALID_DATA, rc);
+}
+
+TEST_F(PortsHealthEventDecode, testGoodDecodeEvent)
+{
+	uint16_t eventState{};
+	nsm_health_event_payload payload{};
+
+	auto rc = decode_nsm_health_event(event, eventMsg.size(), &eventState,
+					  &payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, eventState);
+
+	EXPECT_EQ(expected.port_rcv_errors_threshold,
+		  payload.port_rcv_errors_threshold);
+	EXPECT_EQ(expected.port_xmit_discard_threshold,
+		  payload.port_xmit_discard_threshold);
+	EXPECT_EQ(expected.symbol_ber_threshold, payload.symbol_ber_threshold);
+	EXPECT_EQ(expected.port_rcv_remote_physical_errors_threshold,
+		  payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(expected.port_rcv_switch_relay_errors_threshold,
+		  payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(expected.effective_ber_threshold,
+		  payload.effective_ber_threshold);
+	EXPECT_EQ(expected.estimated_effective_ber_threshold,
+		  payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(expected.reserved, payload.reserved);
+	EXPECT_EQ(expected.portNumber, payload.portNumber);
+}
+
+TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
+{
+	uint16_t eventState = 1;
+	nsm_health_event_payload payload{};
+
+	auto rc = decode_nsm_health_event(event, eventMsgSize - 3, &eventState,
+					  &payload);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+	EXPECT_EQ(1, eventState);
+	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
+	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
+	EXPECT_EQ(0, payload.symbol_ber_threshold);
+	EXPECT_EQ(0, payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(0, payload.effective_ber_threshold);
+	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(0, payload.reserved);
+	EXPECT_EQ(0, payload.portNumber);
+
+	reinterpret_cast<nsm_event *>(const_cast<nsm_msg *>(event)->payload)
+	    ->data_size = 1;
+	rc = decode_nsm_health_event(event, eventMsgSize - 1, &eventState,
+				     &payload);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+	EXPECT_EQ(0, eventState);
+	EXPECT_EQ(expected.port_rcv_errors_threshold,
+		  payload.port_rcv_errors_threshold);
+	EXPECT_EQ(expected.port_xmit_discard_threshold,
+		  payload.port_xmit_discard_threshold);
+	EXPECT_EQ(expected.symbol_ber_threshold, payload.symbol_ber_threshold);
+	EXPECT_EQ(expected.port_rcv_remote_physical_errors_threshold,
+		  payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(expected.port_rcv_switch_relay_errors_threshold,
+		  payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(expected.effective_ber_threshold,
+		  payload.effective_ber_threshold);
+	EXPECT_EQ(expected.estimated_effective_ber_threshold,
+		  payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(expected.reserved, payload.reserved);
+	EXPECT_EQ(0, payload.portNumber);
+}
+
+TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)
+{
+	uint16_t eventState = 1;
+	nsm_health_event_payload payload{};
+
+	auto rc = decode_nsm_health_event(event, eventMsg.size(), &eventState,
+					  nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+	EXPECT_EQ(0, eventState);
+
+	rc = decode_nsm_health_event(event, eventMsg.size(), nullptr, &payload);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
+	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
+	EXPECT_EQ(0, payload.symbol_ber_threshold);
+	EXPECT_EQ(0, payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(0, payload.effective_ber_threshold);
+	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(0, payload.reserved);
+	EXPECT_EQ(0, payload.portNumber);
+}
+
+TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
+{
+	uint16_t eventState = 1;
+	uint8_t dataSize = 1;
+	nsm_health_event_payload payload{};
+
+	auto rc =
+	    decode_nsm_event(event, eventMsg.size(), NSM_THRESHOLD_EVENT,
+			     NSM_ASSERTION_DEASSERTION_EVENT_CLASS, &eventState,
+			     &dataSize, reinterpret_cast<uint8_t *>(&payload));
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
+	EXPECT_EQ(1, eventState);
+	EXPECT_EQ(1, dataSize);
+	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
+	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
+	EXPECT_EQ(0, payload.symbol_ber_threshold);
+	EXPECT_EQ(0, payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(0, payload.effective_ber_threshold);
+	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(0, payload.reserved);
+	EXPECT_EQ(0, payload.portNumber);
+}

@@ -70,6 +70,16 @@
                 "AcknowledgementEventIds": [
                     1
                 ]
+            },
+            {
+                "Name": "networkPortEventSetting",
+                "Type": "NSM_EventConfig",
+                "MessageType": 1,
+                "UUID": "$UUID",
+                "SubscribedEventIDs": [
+                    0
+                ],
+                "AcknowledgementEventIds": []
             }
         ],
         "Probe": "xyz.openbmc_project.FruDevice({'DEVICE_TYPE': 2, 'INSTANCE_NUMBER': 0})",

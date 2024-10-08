@@ -22,15 +22,15 @@
 namespace nsm
 {
 
-class EventType3Handler : public DelegatingEventHandler
+struct NsmEventInfo
 {
-  public:
-    EventType3Handler();
-
-    virtual uint8_t nsmType() override
-    {
-        return NSM_TYPE_PLATFORM_ENVIRONMENTAL;
-    }
+    std::string uuid;
+    std::string originOfCondition;
+    std::string messageId;
+    Level severity;
+    std::string loggingNamespace;
+    std::string resolution;
+    std::vector<std::string> messageArgs;
 };
 
-} // namespace nsm
+}; // namespace nsm

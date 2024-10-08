@@ -1186,3 +1186,28 @@ int decode_set_power_mode_resp(const struct nsm_msg *msg, size_t msgLen,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_nsm_health_event(uint8_t instance_id, bool ackr,
+			    const struct nsm_health_event_payload *payload,
+			    struct nsm_msg *msg)
+{
+	return encode_nsm_event(instance_id, NSM_TYPE_NETWORK_PORT, ackr,
+				NSM_EVENT_VERSION, NSM_THRESHOLD_EVENT,
+				NSM_GENERAL_EVENT_CLASS, 0, sizeof(*payload),
+				(uint8_t *)(payload), msg);
+}
+
+int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
+			    uint16_t *event_state,
+			    struct nsm_health_event_payload *payload)
+{
+	uint8_t data_size = 0;
+	int result = decode_nsm_event(msg, msg_len, NSM_THRESHOLD_EVENT,
+				      NSM_GENERAL_EVENT_CLASS, event_state,
+				      &data_size, (uint8_t *)payload);
+	if (result == NSM_SW_SUCCESS &&
+	    data_size != sizeof(struct nsm_health_event_payload)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return result;
+}
