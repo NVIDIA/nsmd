@@ -11,6 +11,8 @@
 #include <xyz/openbmc_project/Common/error.hpp>
 #include <xyz/openbmc_project/Control/Processor/Reset/server.hpp>
 #include <xyz/openbmc_project/Control/Processor/ResetAsync/server.hpp>
+#include <xyz/openbmc_project/Control/Reset/server.hpp>
+#include <xyz/openbmc_project/Control/ResetAsync/server.hpp>
 
 #include <cstdint>
 
@@ -21,6 +23,11 @@ using ResetIntf = sdbusplus::server::object_t<
 
 using ResetAsyncIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::control::processor::ResetAsync>;
+using ResetDeviceIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::Reset>;
+
+using ResetDeviceAsyncIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::control::ResetAsync>;
 
 class NsmResetIntf : public ResetIntf
 {
@@ -148,12 +155,23 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
     uint8_t deviceIndex;
 };
 
-class NsmSwitchResetAsyncIntf : public ResetAsyncIntf
+class NsmResetDeviceIntf : public ResetDeviceIntf
 {
   public:
-    NsmSwitchResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
-                            std::shared_ptr<NsmDevice> device) :
-        ResetAsyncIntf(bus, path),
+    using ResetDeviceIntf::ResetDeviceIntf;
+
+    void reset() override
+    {
+        return;
+    }
+};
+
+class NsmNetworkDeviceResetAsyncIntf : public ResetDeviceAsyncIntf
+{
+  public:
+    NsmNetworkDeviceResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
+                                   std::shared_ptr<NsmDevice> device) :
+        ResetDeviceAsyncIntf(bus, path),
         device(device)
     {}
 
