@@ -19,8 +19,7 @@
 
 #include "deviceManager.hpp"
 #include "eventManager.hpp"
-#include "eventType0Handler.hpp"
-#include "eventType3Handler.hpp"
+#include "eventTypeHandlers.hpp"
 #include "instance_id.hpp"
 #include "nsmDbusIfaceOverride/nsmLogDumpOnDemand.hpp"
 #include "nsmDevice.hpp"
@@ -147,13 +146,16 @@ int main(int argc, char** argv)
                                            objServer, eidTable, nsmDevices,
                                            localEid, sockManager, verbose);
 
-        auto eventType0Handler = std::make_unique<nsm::EventType0Handler>();
-        eventManager.registerHandler(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-                                     std::move(eventType0Handler));
-
-        auto eventType3Handler = std::make_unique<nsm::EventType3Handler>();
-        eventManager.registerHandler(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                                     std::move(eventType3Handler));
+        std::unique_ptr<nsm::EventHandler> eventHandlers[] = {
+            std::make_unique<nsm::EventType0Handler>(),
+            std::make_unique<nsm::EventType1Handler>(),
+            std::make_unique<nsm::EventType3Handler>(),
+        };
+        for (auto& handler : eventHandlers)
+        {
+            auto type = handler->nsmType();
+            eventManager.registerHandler(type, std::move(handler));
+        }
 
 #ifdef NVIDIA_SHMEM
         // Initialize TAL

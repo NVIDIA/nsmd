@@ -17,36 +17,22 @@
 
 #pragma once
 
-#include "nsmEvent.hpp"
+#include "nsmEventInfo.hpp"
 
 namespace nsm
 {
-
-int logEvent(const std::string& messageId, Level level,
-             const std::map<std::string, std::string>& data);
-
-struct NsmResetRequiredEventInfo
-{
-    std::string uuid;
-    std::string originOfCondition;
-    std::string messageId;
-    Level severity;
-    std::string loggingNamespace;
-    std::string resolution;
-    std::vector<std::string> messageArgs;
-};
 
 class NsmResetRequiredEvent : public NsmEvent
 {
   public:
     NsmResetRequiredEvent(const std::string& name, const std::string& type,
-                          const NsmResetRequiredEventInfo info);
+                          const NsmEventInfo info);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) final;
 
   private:
-    const NsmResetRequiredEventInfo info;
+    const NsmEventInfo info;
     std::map<std::string, std::string> eventData;
     std::string messageArgs{};
 };

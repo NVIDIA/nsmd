@@ -155,6 +155,30 @@
                 "UUID": "$UUID",
                 "Priority": false,
                 "Count": 74
+            },
+            {
+                "Name": "NetworkPortEventSetting",
+                "Type": "NSM_EventConfig",
+                "MessageType": 1,
+                "UUID": "$UUID",
+                "SubscribedEventIDs": [
+                    0
+                ],
+                "AcknowledgementEventIds": []
+            },
+            {
+                "Name": "ThresholdEventSetting",
+                "Type": "NSM_Event_Threshold",
+                "UUID": "$UUID",
+                "OriginOfCondition": "/redfish/v1/Fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER",
+                "MessageId": "ResourceEvent.1.0.ResourceErrorsDetected",
+                "Severity": "Critical",
+                "LoggingNamespace": "NVSwitch $INSTANCE_NUMBER Threshold",
+                "Resolution": "Regarding Port Error documentation and further actions please refer to (TBD)",
+                "MessageArgs": [
+                    "NVSwitch_$INSTANCE_NUMBER NVLink_$INSTANCE_NUMBER",
+                    "No Error"
+                ]
             }
         ],
         "Name": "HGX_NVSwitch_$INSTANCE_NUMBER",

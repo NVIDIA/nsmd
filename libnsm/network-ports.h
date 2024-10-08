@@ -74,6 +74,12 @@ enum nsm_port_status {
 	NSM_PORTSTATUS_ENABLED = 0x02
 };
 
+/** @brief NSM Type 1 network ports events
+ */
+enum nsm_network_ports_events {
+	NSM_THRESHOLD_EVENT = 0x00,
+};
+
 struct nsm_supported_port_counter {
 	uint8_t port_rcv_pkts : 1;
 	uint8_t port_rcv_data : 1;
@@ -340,6 +346,22 @@ struct nsm_set_power_mode_req {
  *  Structure representing NSM set power mode response.
  */
 typedef struct nsm_common_resp nsm_set_power_mode_resp;
+
+/** @struct nsm_health_event_payload
+ *
+ *  Structure representing NSM Ports health event payload.
+ */
+struct nsm_health_event_payload {
+	uint8_t port_rcv_errors_threshold : 1;
+	uint8_t port_xmit_discard_threshold : 1;
+	uint8_t symbol_ber_threshold : 1;
+	uint8_t port_rcv_remote_physical_errors_threshold : 1;
+	uint8_t port_rcv_switch_relay_errors_threshold : 1;
+	uint8_t effective_ber_threshold : 1;
+	uint8_t estimated_effective_ber_threshold : 1;
+	uint8_t reserved : 1;
+	uint8_t portNumber;
+} __attribute__((packed));
 
 #ifdef ENABLE_SYSTEM_GUID
 /** @brief Encode a Set System GUID request message
@@ -755,6 +777,31 @@ int encode_set_power_mode_resp(uint8_t instance, uint16_t reason_code,
  */
 int decode_set_power_mode_resp(const struct nsm_msg *msg, size_t msgLen,
 			       uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a ports health event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] payload - Pointer to health event payload
+ *  @param[out] msg - Pointer to encoded message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_health_event(uint8_t instance_id, bool ackr,
+			    const struct nsm_health_event_payload *payload,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a ports health event message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] event_state - Pointer to decoded event state
+ *  @param[out] payload - Pointer do decoded health event payload
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
+			    uint16_t *event_state,
+			    struct nsm_health_event_payload *payload);
+
 #ifdef __cplusplus
 }
 #endif

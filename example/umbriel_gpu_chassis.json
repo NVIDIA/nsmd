@@ -420,6 +420,30 @@
                 "UUID": "$UUID",
                 "Count": 9,
                 "Priority": true
+            },
+            {
+                "Name": "NetworkPortEventSetting",
+                "Type": "NSM_EventConfig",
+                "MessageType": 1,
+                "UUID": "$UUID",
+                "SubscribedEventIDs": [
+                    0
+                ],
+                "AcknowledgementEventIds": []
+            },
+            {
+                "Name": "ThresholdEventSetting",
+                "Type": "NSM_Event_Threshold",
+                "UUID": "$UUID",
+                "OriginOfCondition": "/redfish/v1/Chassis/HGX_GPU_SXM_$INSTANCE_NUMBER + 1",
+                "MessageId": "ResourceEvent.1.0.ResourceErrorsDetected",
+                "Severity": "Critical",
+                "LoggingNamespace": "GPU_SXM $INSTANCE_NUMBER + 1 Threshold",
+                "Resolution": "Regarding Port Error documentation and further actions please refer to (TBD)",
+                "MessageArgs": [
+                    "GPU_SXM_$INSTANCE_NUMBER + 1",
+                    "No Error"
+                ]
             }
         ],
         "Probe": "xyz.openbmc_project.NsmDevice({'DEVICE_TYPE': 0})",

@@ -19,9 +19,6 @@
 #include "test/mockSensorManager.hpp"
 using namespace ::testing;
 
-#define private public
-#define protected public
-
 #include "network-ports.h"
 
 #include "utils.hpp"

@@ -591,6 +591,36 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 	return NSM_SUCCESS;
 }
 
+int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
+		     uint8_t event_id, uint8_t event_class,
+		     uint16_t *event_state, uint8_t *data_size, uint8_t *data)
+{
+
+	if (msg == NULL || event_state == NULL || data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+
+	if (event_id != event->event_id || event_class != event->event_class) {
+		return NSM_SW_ERROR_DATA;
+	}
+	*event_state = le16toh(event->event_state);
+	*data_size = event->data_size;
+	if (*data_size > 0) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		memcpy(data, event->data, *data_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_common_req(uint8_t instance_id, uint8_t nvidia_msg_type,
 		      uint8_t command, struct nsm_msg *msg)
 {

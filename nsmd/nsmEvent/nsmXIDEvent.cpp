@@ -31,7 +31,7 @@ namespace nsm
 {
 
 NsmXIDEvent::NsmXIDEvent(const std::string& name, const std::string& type,
-                         const NsmXIDEventInfo info) :
+                         const NsmEventInfo info) :
     NsmEvent(name, type),
     info(info)
 {}
@@ -125,7 +125,7 @@ static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath)
 {
-    NsmXIDEventInfo info{};
+    NsmEventInfo info{};
 
     info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());

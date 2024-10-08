@@ -29,9 +29,9 @@
 namespace nsm
 {
 
-NsmResetRequiredEvent::NsmResetRequiredEvent(
-    const std::string& name, const std::string& type,
-    const NsmResetRequiredEventInfo info) :
+NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
+                                             const std::string& type,
+                                             const NsmEventInfo info) :
     NsmEvent(name, type),
     info(info)
 {
@@ -85,7 +85,7 @@ static requester::Coroutine
                                 const std::string& interface,
                                 const std::string& objPath)
 {
-    NsmResetRequiredEventInfo info{};
+    NsmEventInfo info{};
 
     info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());

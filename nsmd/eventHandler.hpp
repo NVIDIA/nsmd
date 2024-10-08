@@ -59,7 +59,7 @@ class EventHandler
         {
             // unsupported event id
             lg2::info(
-                "No event id{EVENTID} handler found for received NSM event from EID={EID}.",
+                "No event id={EVENTID} handler found for received NSM event from EID={EID}.",
                 "EVENTID", eventId, "EID", eid);
             unsupportedEvent(eid, event, eventLen);
             return;

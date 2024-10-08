@@ -22,7 +22,7 @@ sources = [
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
     'nsmNumericSensor/nsmNumericSensorComposite.cpp',
-    'eventType3Handler.cpp',
+    'eventTypeHandlers.cpp',
     'nsmEvent.cpp',
 ]
 

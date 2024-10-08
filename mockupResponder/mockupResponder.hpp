@@ -184,6 +184,36 @@ class MockupResponder
                       uint8_t eventId, uint8_t eventClass, uint16_t eventState,
                       uint8_t dataSize, uint8_t* data);
 
+    /**
+     * @brief Sends a threshold event to a specified destination.
+     *
+     * This function sends a threshold event to the given destination with
+     * various threshold parameters.
+     *
+     * @param dest The destination EID.
+     * @param ackr Acknowledgment request flag.
+     * @param port_rcv_errors_threshold Port receive errors threshold flag.
+     * @param port_xmit_discard_threshold Port transmit discard threshold flag.
+     * @param symbol_ber_threshold Symbol bit error rate threshold flag.
+     * @param port_rcv_remote_physical_errors_threshold Port receive remote
+     * physical errors threshold flag.
+     * @param port_rcv_switch_relay_errors_threshold Port receive switch relay
+     * errors threshold flag.
+     * @param effective_ber_threshold Effective bit error rate threshold flag.
+     * @param estimated_effective_ber_threshold Estimated effective bit error
+     * rate threshold flag.
+     * @param portNumber The port number associated with the event.
+     */
+    void sendThreasholdEvent(uint8_t dest, bool ackr,
+                             bool port_rcv_errors_threshold,
+                             bool port_xmit_discard_threshold,
+                             bool symbol_ber_threshold,
+                             bool port_rcv_remote_physical_errors_threshold,
+                             bool port_rcv_switch_relay_errors_threshold,
+                             bool effective_ber_threshold,
+                             bool estimated_effective_ber_threshold,
+                             uint8_t portNumber);
+
     void sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag, uint32_t reason,
                       uint32_t sequence_number, uint64_t timestamp,
                       std::string message_text);
@@ -204,8 +234,8 @@ class MockupResponder
         clearScalarDataSourceHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
 
-    int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg,
-                     bool verbose);
+    int mctpSockSend(uint8_t dest, std::vector<uint8_t>& requestMsg);
+
     std::optional<std::vector<uint8_t>>
         getCurrentEnergyCountHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);

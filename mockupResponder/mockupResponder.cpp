@@ -36,10 +36,10 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <cstdint>
+#include <ctime>
+#include <functional>
 
 using namespace utils;
-
-#include <ctime>
 
 namespace MockupResponder
 {
@@ -126,6 +126,21 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
     iface->register_method(
         "genResetRequiredEvent",
         [&](uint8_t eid, bool ackr) { sendResetRequiredEvent(eid, ackr); });
+
+    iface->register_method(
+        "genThreasholdEvent",
+        [&](uint8_t dest, bool ackr, bool port_rcv_errors_threshold,
+            bool port_xmit_discard_threshold, bool symbol_ber_threshold,
+            bool port_rcv_remote_physical_errors_threshold,
+            bool port_rcv_switch_relay_errors_threshold,
+            bool effective_ber_threshold,
+            bool estimated_effective_ber_threshold, uint8_t portNumber) {
+        sendThreasholdEvent(
+            dest, ackr, port_rcv_errors_threshold, port_xmit_discard_threshold,
+            symbol_ber_threshold, port_rcv_remote_physical_errors_threshold,
+            port_rcv_switch_relay_errors_threshold, effective_ber_threshold,
+            estimated_effective_ber_threshold, portNumber);
+    });
 
     iface->initialize();
 
@@ -1704,7 +1719,10 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getMigModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen)
 {
-    lg2::info("getMigModeHandler: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getMigModeHandler: request length={LEN}", "LEN", requestLen);
+    }
     auto rc = decode_common_req(requestMsg, requestLen);
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
@@ -1983,8 +2001,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getPowerSmoothingFeatureInfo(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
-    lg2::info("getPowerSmoothingFeatureInfo: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("getPowerSmoothingFeatureInfo: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_get_powersmoothing_featinfo_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
@@ -2024,7 +2045,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getHwCircuiteryUsage(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("getHwCircuiteryUsage: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getHwCircuiteryUsage: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_get_hardware_lifetime_cricuitry_req(requestMsg,
                                                          requestLen);
@@ -2064,7 +2089,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getCurrentProfileInfo(const nsm_msg* requestMsg,
                                            size_t requestLen)
 {
-    lg2::info("getCurrentProfileInfo: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getCurrentProfileInfo: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_get_current_profile_info_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
@@ -2108,7 +2137,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getQueryAdminOverride(const nsm_msg* requestMsg,
                                            size_t requestLen)
 {
-    lg2::info("getQueryAdminOverride: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getQueryAdminOverride: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_query_admin_override_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
@@ -2155,9 +2188,12 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_set_active_preset_profile_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info(
-        "setActivePresetProfile: profile_id={PROFILE_ID}, request length={LEN}",
-        "LEN", requestLen, "PROFILE_ID", profile_id);
+    if (verbose)
+    {
+        lg2::info(
+            "setActivePresetProfile: profile_id={PROFILE_ID}, request length={LEN}",
+            "LEN", requestLen, "PROFILE_ID", profile_id);
+    }
 
     uint16_t reason_code = ERR_NULL;
 
@@ -2193,7 +2229,11 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_setup_admin_override_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info("setupAdminOverride: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("setupAdminOverride: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     uint16_t reason_code = ERR_NULL;
 
@@ -2239,7 +2279,11 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_apply_admin_override_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info("applyAdminOverride: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("applyAdminOverride: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     uint16_t reason_code = ERR_NULL;
 
@@ -2274,8 +2318,11 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_toggle_immediate_rampdown_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info("toggleImmediateRampDown: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("toggleImmediateRampDown: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     uint16_t reason_code = ERR_NULL;
 
@@ -2341,7 +2388,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getPresetProfileInfo(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    lg2::info("getPresetProfileInfo: request length={LEN}", "LEN", requestLen);
+    if (verbose)
+    {
+        lg2::info("getPresetProfileInfo: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_get_preset_profile_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
@@ -2396,11 +2447,17 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::updatePresetProfileParams(const nsm_msg* requestMsg,
                                                size_t requestLen)
 {
-    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
+                  requestLen);
+    }
     size_t s = sizeof(struct nsm_msg_hdr) +
                sizeof(struct nsm_update_preset_profile_req);
-    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN", s);
+    if (verbose)
+    {
+        lg2::info("updatePresetProfileParams: request length={LEN}", "LEN", s);
+    }
     uint8_t profile_id;
     uint8_t parameter_id;
     uint32_t param_value;
@@ -2412,8 +2469,11 @@ std::optional<std::vector<uint8_t>>
         lg2::error("decode_update_preset_profile_param_req: rc={RC}", "RC", rc);
         return std::nullopt;
     }
-    lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("updatePresetProfileParams: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     uint16_t reason_code = ERR_NULL;
 
@@ -2458,8 +2518,11 @@ std::optional<std::vector<uint8_t>>
     auto rc = decode_enable_workload_power_profile_req(requestMsg, requestLen,
                                                        &profile_mask);
 
-    lg2::info("enableWorkloadPowerProfile: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("enableWorkloadPowerProfile: request length={LEN}", "LEN",
+                  requestLen);
+    }
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_enable_workload_power_profile_req: rc={RC}", "RC",
@@ -2502,8 +2565,11 @@ std::optional<std::vector<uint8_t>>
     auto rc = decode_disable_workload_power_profile_req(requestMsg, requestLen,
                                                         &profile_mask);
 
-    lg2::info("disableWorkloadPowerProfile: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("disableWorkloadPowerProfile: request length={LEN}", "LEN",
+                  requestLen);
+    }
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_disable_workload_power_profile_req: rc={RC}", "RC",
@@ -2541,8 +2607,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getWorkLoadProfileStatusInfo(const nsm_msg* requestMsg,
                                                   size_t requestLen)
 {
-    lg2::info("getWorkLoadProfileStatusInfo: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("getWorkLoadProfileStatusInfo: request length={LEN}", "LEN",
+                  requestLen);
+    }
 
     auto rc = decode_get_workload_power_profile_status_req(requestMsg,
                                                            requestLen);
@@ -2588,8 +2657,11 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getWorkloadPowerProfileInfo(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
-    lg2::info("getWorkloadPowerProfileInfo: request length={LEN}", "LEN",
-              requestLen);
+    if (verbose)
+    {
+        lg2::info("getWorkloadPowerProfileInfo: request length={LEN}", "LEN",
+                  requestLen);
+    }
     uint16_t identifier;
     uint16_t LAST_PAGE_ID = 3;
 
@@ -2602,8 +2674,11 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     const int supported_number_of_profile_per_page = 5;
-    lg2::info("getWorkloadPowerProfileInfo: identifier in req = {ID}", "ID",
-              identifier);
+    if (verbose)
+    {
+        lg2::info("getWorkloadPowerProfileInfo: identifier in req = {ID}", "ID",
+                  identifier);
+    }
 
     struct nsm_all_workload_power_profile_meta_data profile_meta_data;
     profile_meta_data.number_of_profiles = supported_number_of_profile_per_page;
@@ -2673,8 +2748,7 @@ void Logger(bool verbose, const char* msg, const T& data)
 }
 
 int MockupResponder::mctpSockSend(uint8_t dest_eid,
-                                  std::vector<uint8_t>& requestMsg,
-                                  bool verbose)
+                                  std::vector<uint8_t>& requestMsg)
 {
     if (sockFd < 0)
     {
@@ -2729,7 +2803,7 @@ void MockupResponder::sendRediscoveryEvent(uint8_t dest, bool ackr)
         lg2::error("sendRediscoveryEvent failed");
     }
 
-    rc = mctpSockSend(dest, eventMsg, true);
+    rc = mctpSockSend(dest, eventMsg);
     if (rc != NSM_SUCCESS)
     {
         lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
@@ -2765,7 +2839,7 @@ void MockupResponder::sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag,
         lg2::error("sendXIDEvent failed");
     }
 
-    rc = mctpSockSend(dest, eventMsg, true);
+    rc = mctpSockSend(dest, eventMsg);
     if (rc != NSM_SUCCESS)
     {
         lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
@@ -2788,7 +2862,7 @@ void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
         lg2::error("sendResetRequiredEvent failed");
     }
 
-    rc = mctpSockSend(dest, eventMsg, true);
+    rc = mctpSockSend(dest, eventMsg);
     if (rc != NSM_SUCCESS)
     {
         lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
@@ -2816,7 +2890,47 @@ void MockupResponder::sendNsmEvent(uint8_t dest, uint8_t nsmType, bool ackr,
         lg2::error("sendNsmEvent failed");
     }
 
-    rc = mctpSockSend(dest, eventMsg, true);
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendThreasholdEvent(
+    uint8_t dest, bool ackr, bool port_rcv_errors_threshold,
+    bool port_xmit_discard_threshold, bool symbol_ber_threshold,
+    bool port_rcv_remote_physical_errors_threshold,
+    bool port_rcv_switch_relay_errors_threshold, bool effective_ber_threshold,
+    bool estimated_effective_ber_threshold, uint8_t portNumber)
+{
+    const nsm_health_event_payload payload = {
+        .port_rcv_errors_threshold = port_rcv_errors_threshold,
+        .port_xmit_discard_threshold = port_xmit_discard_threshold,
+        .symbol_ber_threshold = symbol_ber_threshold,
+        .port_rcv_remote_physical_errors_threshold =
+            port_rcv_remote_physical_errors_threshold,
+        .port_rcv_switch_relay_errors_threshold =
+            port_rcv_switch_relay_errors_threshold,
+        .effective_ber_threshold = effective_ber_threshold,
+        .estimated_effective_ber_threshold = estimated_effective_ber_threshold,
+        .reserved = 0,
+        .portNumber = portNumber};
+
+    if (verbose)
+    {
+        lg2::info("sendThreasholdEvent dest eid={EID}", "EID", dest);
+    }
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  sizeof(nsm_health_event_payload));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+    auto rc = encode_nsm_health_event(mockInstanceId, ackr, &payload, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendThreasholdEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
     if (rc != NSM_SUCCESS)
     {
         lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);

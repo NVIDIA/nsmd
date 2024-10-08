@@ -62,7 +62,7 @@ class EventManager
         {
             // unsupported event type
             lg2::info(
-                "No event Type{NSMTYPE} handler found for received NSM event Type={NSMTYPE} ID={EVENTID} from EID={EID}.",
+                "No event handler found for received NSM event Type={NSMTYPE} ID={EVENTID} from EID={EID}.",
                 "NSMTYPE", nsmType, "EVENTID", eventId, "EID", eid);
             return std::nullopt;
         }
