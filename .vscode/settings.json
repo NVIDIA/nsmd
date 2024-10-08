@@ -1,0 +1,8 @@
+{
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "modificationsIfAvailable",
+    "C_Cpp.clang_format_path": "/usr/bin/clang-format-17",
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/**"
+    ]
+}
