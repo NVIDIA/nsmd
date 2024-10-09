@@ -2921,7 +2921,16 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 #ifdef ENABLE_SYSTEM_GUID
         auto sysGuidSensor = std::make_shared<NsmSysGuidIntf>(bus, name, type,
                                                               inventoryObjPath);
-        nsmDevice->addStaticSensor(sysGuidSensor);
+
+        // Note: Setting this to addSensor as opposed to addStaticSensor:
+        //       Ideally this would be a static sensor, but the GPU changes
+        //       state with the host. A static sensor does not update so
+        //       the System GUID gets wiped. Polling here resolves the issue
+        //       and ensures the GUID is always correctly loaded.
+        // TBD:  A more optimal solution would be to update static sensors
+        //       when nsmObjects go online/offline but that may have other
+        //       impacts so needs some further investigation.
+        nsmDevice->addSensor(sysGuidSensor, false, true);
 #endif
 
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(
