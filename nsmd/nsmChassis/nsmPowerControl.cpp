@@ -47,7 +47,8 @@ NsmPowerControl::NsmPowerControl(
     associationDefinitionsInft =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
     powerModeIntf = std::make_unique<PowerModeIntf>(bus, path.c_str());
-    powerModeIntf->powerMode(Mode::PowerMode::MaximumPerformance);
+    powerModeIntf->powerMode(Mode::PowerMode::OEM);
+    PowerCapIntf::powerCapEnable(true);
     // handle associations
     std::vector<std::tuple<std::string, std::string, std::string>>
         associations_list;
@@ -115,6 +116,7 @@ void NsmPowerControl::updatePowerCapValue(const std::string& childName,
     }
     // calling parent powercap to initialize the value on dbus
     PowerCapIntf::powerCap(totalValue);
+    PowerCapIntf::powerCapEnable(true);
 }
 
 // custom get for maxPowerValue
