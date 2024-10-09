@@ -385,6 +385,10 @@ std::optional<std::vector<uint8_t>>
                     return getPowerModeHandler(request, requestLen);
                 case NSM_SET_POWER_MODE:
                     return setPowerModeHandler(request, requestLen);
+                case NSM_GET_SWITCH_ISOLATION_MODE:
+                    return getSwitchIsolationMode(request, requestLen);
+                case NSM_SET_SWITCH_ISOLATION_MODE:
+                    return setSwitchIsolationMode(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -744,7 +748,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0, {0, 1, 2, 5, 6, 9, 10}},
-                 {1, {1, 10, 11, 68, 69}},
+                 {1, {1, 8, 9, 10, 11, 68, 69}},
                  {2, {4}},
                  {3, {12}},
                  {4,
@@ -1262,6 +1266,83 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_set_power_mode_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getSwitchIsolationMode(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getSwitchIsolationMode: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_switch_isolation_mode_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_switch_isolation_mode_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    uint8_t isolation_mode = 1;
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_switch_isolation_mode_resp), 0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_switch_isolation_mode_resp(requestMsg->hdr.instance_id,
+                                               NSM_SUCCESS, reason_code,
+                                               isolation_mode, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_switch_isolation_mode_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setSwitchIsolationMode(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setSwitchIsolationMode: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t isolationMode;
+    auto rc = decode_set_switch_isolation_mode_req(requestMsg, requestLen,
+                                                   &isolationMode);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_switch_isolation_mode_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_set_switch_isolation_mode_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_switch_isolation_mode_resp failed: rc={RC}",
+                   "RC", rc);
         return std::nullopt;
     }
     return response;
