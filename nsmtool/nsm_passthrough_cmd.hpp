@@ -4,6 +4,8 @@
  */
 
 #pragma once
+#include "utils.hpp"
+
 #include <CLI/CLI.hpp>
 #include <sdbusplus/bus.hpp>
 
@@ -67,6 +69,26 @@ class GetNSMResponse
 {
   public:
     GetNSMResponse(CLI::App* app);
+    void execute(const std::string& objectPath);
+
+  private:
+    std::string objectPath;
+};
+
+class GetDebugInfoFromFD
+{
+  public:
+    GetDebugInfoFromFD(CLI::App* app);
+    void execute(const std::string& objectPath);
+
+  private:
+    std::string objectPath;
+};
+
+class GetLogInfoFromFD
+{
+  public:
+    GetLogInfoFromFD(CLI::App* app);
     void execute(const std::string& objectPath);
 
   private:
