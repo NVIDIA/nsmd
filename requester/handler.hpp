@@ -383,59 +383,6 @@ class Handler
         return requestFound;
     }
 
-    bool hasInProgressRequest(eid_t eid)
-    {
-        bool hasRegularReq{false};
-        bool hasLongRunnigReq{false};
-
-        if (handlersRegular.contains(eid) && !handlersRegular[eid].empty())
-        {
-            auto& valid = std::get<3>(handlersRegular[eid].front());
-            auto& timerInstance = std::get<2>(handlersRegular[eid].front());
-            hasRegularReq = valid && timerInstance->isRunning();
-        }
-
-        if (handlersLongRunning.contains(eid) &&
-            !handlersLongRunning[eid].empty())
-        {
-            auto& valid = std::get<3>(handlersLongRunning[eid].front());
-            auto& timerInstance = std::get<2>(handlersLongRunning[eid].front());
-            hasLongRunnigReq = valid && timerInstance->isRunning();
-        }
-
-        return hasRegularReq || hasLongRunnigReq;
-    }
-
-    void invalidInProgressRequest(eid_t eid, [[maybe_unused]] uint8_t tag)
-    {
-        if (handlersRegular.contains(eid) && !handlersRegular[eid].empty())
-        {
-            // force timer timeout
-            auto& timerInstance = std::get<2>(handlersRegular[eid].front());
-            if (timerInstance->isRunning())
-            {
-                timerInstance->start(std::chrono::microseconds(1));
-
-                auto& valid = std::get<3>(handlersRegular[eid].front());
-                valid = false;
-            }
-        }
-
-        if (handlersLongRunning.contains(eid) &&
-            !handlersLongRunning[eid].empty())
-        {
-            // force timer timeout
-            auto& timerInstance = std::get<2>(handlersLongRunning[eid].front());
-            if (timerInstance->isRunning())
-            {
-                timerInstance->start(std::chrono::microseconds(1));
-
-                auto& valid = std::get<3>(handlersLongRunning[eid].front());
-                valid = false;
-            }
-        }
-    }
-
     void setSocketHandler(const mctp_socket::Handler* handler)
     {
         socketHandler = handler;
