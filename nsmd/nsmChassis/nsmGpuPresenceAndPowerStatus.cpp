@@ -74,9 +74,6 @@ requester::Coroutine
         {
             pdi->state(OperationalStatusIntf::StateType::Fault);
         }
-        lg2::error(
-            "responseHandler: decode_get_gpu_power_status_resp is not success CC. rc={RC}",
-            "RC", rc);
     }
     updateMetricOnSharedMemory();
 
@@ -138,16 +135,19 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
     uint8_t rc = NSM_SW_ERROR;
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
+    std::string decodeMethodName = "";
 
     switch (state)
     {
         case State::GetPresence:
             rc = decode_get_gpu_presence_resp(responseMsg, responseLen, &cc,
                                               &reasonCode, &gpusPresence);
+            decodeMethodName = "decode_get_gpu_presence_resp";
             break;
         case State::GetPowerStatus:
             rc = decode_get_gpu_power_status_resp(responseMsg, responseLen, &cc,
                                                   &reasonCode, &gpusPower);
+            decodeMethodName = "decode_get_gpu_power_status_resp";
             break;
         default:
             lg2::debug(
@@ -156,18 +156,6 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
             break;
     }
 
-    std::string decodeMethodName = "";
-    switch (state)
-    {
-        case State::GetPresence:
-            decodeMethodName = "decode_get_gpu_presence_resp";
-            break;
-        case State::GetPowerStatus:
-            decodeMethodName = "decode_get_gpu_power_status_resp";
-            break;
-        default:
-            break;
-    }
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         clearErrorBitMap(decodeMethodName);

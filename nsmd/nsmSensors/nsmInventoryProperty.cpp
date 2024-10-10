@@ -80,8 +80,8 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
         if (shouldLogError(cc, rc))
         {
             lg2::error(
-                "responseHandler: decode_get_inventory_information_resp is not success CC. property={NUM} rc={RC}",
-                "NUM", int(property), "RC", rc);
+                "responseHandler: decode_get_inventory_information_resp is not success CC. property={NUM} cc={CC} rc={RC}",
+                "NUM", int(property), "CC", cc, "RC", rc);
         }
         return rc;
     }
