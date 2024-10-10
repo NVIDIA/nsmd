@@ -50,6 +50,11 @@
                     "all_switches",
                     "fabrics",
                     "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_1"
+                ],
+                [
+                  "fabric_manager",
+                  "fabric",
+                  "/xyz/openbmc_project/inventory/system/managers/HGX_FabricManager_0"
                 ]
             ]
         },
@@ -124,13 +129,26 @@
                     "Type": "NSM_Asset",
                     "Manufacturer": "NVIDIA"
                 },
+                "PowerMode": {
+                    "Type": "NSM_PowerMode",
+                    "Priority": false
+                },
                 "Switch": {
-                    "Type": "NSM_Switch",
+                    "Name": "NVSwitch_$INSTANCE_NUMBER",
                     "SwitchType": "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
                     "SwitchSupportedProtocols": [
-                        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink",
-                        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.PCIe"
+                        "xyz.openbmc_project.Inventory.Item.Switch.SwitchType.NVLink"
+                    ],
+                    "Association": [
+                        "associated_switch_obj",
+                        "associated_switch_obj",
+                        "/xyz/openbmc_project/inventory/system/fabrics/HGX_NVLinkFabric_0/Switches/NVSwitch_$INSTANCE_NUMBER"
                     ]
+                },
+                "FabricManager": {
+                    "Name": "HGX_FabricManager_0",
+                    "Type": "NSM_FabricManager",
+                    "InventoryObjPath": "/xyz/openbmc_project/inventory/system/managers/"
                 }
             },
             {

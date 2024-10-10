@@ -1361,3 +1361,129 @@ int decode_set_switch_isolation_mode_resp(const struct nsm_msg *msg,
 	uint16_t data_size;
 	return decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
 }
+
+int encode_get_fabric_manager_state_req(uint8_t instance_id,
+					struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_fabric_manager_state_req *request =
+	    (nsm_get_fabric_manager_state_req *)msg->payload;
+
+	request->command = NSM_GET_FABRIC_MANAGER_STATE;
+	request->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_fabric_manager_state_req(const struct nsm_msg *msg,
+					size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_fabric_manager_state_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_fabric_manager_state_req *request =
+	    (nsm_get_fabric_manager_state_req *)msg->payload;
+
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_fabric_manager_state_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_fabric_manager_state_data *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_FABRIC_MANAGER_STATE, msg);
+	}
+
+	struct nsm_get_fabric_manager_state_resp *response =
+	    (struct nsm_get_fabric_manager_state_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_FABRIC_MANAGER_STATE;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_fabric_manager_state_data));
+
+	response->data.fm_state = data->fm_state;
+	response->data.report_status = data->report_status;
+	response->data.last_restart_timestamp =
+	    htole64(data->last_restart_timestamp);
+	response->data.duration_since_last_restart_sec =
+	    htole64(data->duration_since_last_restart_sec);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_fabric_manager_state_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_fabric_manager_state_data *data)
+{
+	if (data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_get_fabric_manager_state_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_fabric_manager_state_resp *resp =
+	    (struct nsm_get_fabric_manager_state_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	if (*data_size < sizeof(struct nsm_fabric_manager_state_data)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	data->fm_state = resp->data.fm_state;
+	data->report_status = resp->data.report_status;
+	data->last_restart_timestamp =
+	    le64toh(resp->data.last_restart_timestamp);
+	data->duration_since_last_restart_sec =
+	    le64toh(resp->data.duration_since_last_restart_sec);
+
+	return NSM_SW_SUCCESS;
+}

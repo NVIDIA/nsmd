@@ -22,6 +22,7 @@
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
+#include "interfaceWrapper.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmDebugInfo.hpp"
 #include "nsmDebugToken.hpp"
@@ -31,6 +32,7 @@
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmLogInfo.hpp"
+#include "nsmManagers/nsmFabricManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #include "sharedMemCommon.hpp"
@@ -848,6 +850,39 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         nvSwitchAsset->pdi().manufacturer(manufacturer);
         device->addStaticSensor(nvSwitchAsset);
     }
+    else if (type == "NSM_FabricManager")
+    {
+        auto nameFM = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "Name", interface.c_str());
+        auto inventoryObjPathFM =
+            co_await utils::coGetDbusProperty<std::string>(
+                objPath.c_str(), "InventoryObjPath", interface.c_str());
+
+        auto objPathFM = inventoryObjPathFM + nameFM;
+        auto sensorObjectPathFM = objPathFM + "/com.nvidia.State.FabricManager";
+        std::shared_ptr<FabricManagerIntf> fabricMgrIntf =
+            getInterfaceOnObjectPath<FabricManagerIntf>(
+                sensorObjectPathFM, manager, bus, objPathFM.c_str());
+
+        sensorObjectPathFM =
+            objPathFM +
+            "/xyz.openbmc_project.State.Decorator.OperationalStatus";
+        std::shared_ptr<OperaStatusIntf> opStateIntf =
+            getInterfaceOnObjectPath<OperaStatusIntf>(
+                sensorObjectPathFM, manager, bus, objPathFM.c_str());
+
+        sensorObjectPathFM =
+            objPathFM + "/xyz.openbmc_project.Inventory.Item.ManagementService";
+        std::shared_ptr<ManagementServiceIntf> mgmtSerIntf =
+            getInterfaceOnObjectPath<ManagementServiceIntf>(
+                sensorObjectPathFM, manager, bus, objPathFM.c_str());
+
+        auto fabricMgrState = std::make_shared<NsmFabricManagerState>(
+            nameFM, type, inventoryObjPathFM, fabricMgrIntf, opStateIntf,
+            mgmtSerIntf);
+
+        device->addSensor(fabricMgrState, false, false);
+    }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -856,7 +891,8 @@ std::vector<std::string> nvSwitchInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.PortDisableFuture",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.PowerMode",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset"};
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset",
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch.FabricManager"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmSwitchDI, nvSwitchInterfaces)
 } // namespace nsm

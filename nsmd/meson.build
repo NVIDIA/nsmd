@@ -53,6 +53,7 @@ subdir('nsmEvent')
 subdir('nsmGPM')
 subdir('nsmFirmwareUtils')
 subdir('nsmRawCommand')
+subdir('nsmManagers')
 
 executable(
     'nsmd',
