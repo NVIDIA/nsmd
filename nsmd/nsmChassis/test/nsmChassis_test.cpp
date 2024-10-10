@@ -666,7 +666,7 @@ TEST_F(NsmInventoryPropertyTest, badTestResponseSize)
         instanceId, NSM_SUCCESS, ERR_NULL, 0, nullptr, responseMsg);
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
 {
@@ -685,7 +685,7 @@ TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
 TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
 {

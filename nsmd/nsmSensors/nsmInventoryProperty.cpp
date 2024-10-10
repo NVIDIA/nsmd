@@ -57,19 +57,8 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
 
     auto rc = decode_get_inventory_information_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
-    if (rc)
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: decode_get_inventory_information_resp failed. property={NUM} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-                "NUM", int(property), "REASONCODE", reasonCode, "CC", cc, "RC",
-                rc);
-        }
-        return rc;
-    }
 
-    if (cc == NSM_SUCCESS)
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         data.resize(dataSize);
         handleResponse(data);
@@ -80,13 +69,13 @@ uint8_t NsmInventoryPropertyBase::handleResponseMsg(
         if (shouldLogError(cc, rc))
         {
             lg2::error(
-                "responseHandler: decode_get_inventory_information_resp is not success CC. property={NUM} cc={CC} rc={RC}",
-                "NUM", int(property), "CC", cc, "RC", rc);
+                "responseHandler: decode_get_inventory_information_resp failed. property={NUM} with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
+                "NUM", int(property), "REASONCODE", reasonCode, "CC", cc, "RC",
+                rc);
         }
-        return rc;
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
-
-    return cc;
+    return NSM_SW_SUCCESS;
 }
 
 } // namespace nsm
