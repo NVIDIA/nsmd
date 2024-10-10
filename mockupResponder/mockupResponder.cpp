@@ -142,6 +142,14 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             estimated_effective_ber_threshold, portNumber);
     });
 
+    iface->register_method("genFabricManagerStateEvent",
+                           [&](uint8_t eid, bool ackr, uint8_t state,
+                               uint8_t status, uint64_t last_restart_time,
+                               uint64_t last_restart_duration) {
+        sendFabricManagerStateEvent(eid, ackr, state, status, last_restart_time,
+                                    last_restart_duration);
+    });
+
     iface->initialize();
 
     mockEid = eid;
@@ -2995,6 +3003,41 @@ void MockupResponder::sendResetRequiredEvent(uint8_t dest, bool ackr)
     if (rc != NSM_SUCCESS)
     {
         lg2::error("sendResetRequiredEvent failed");
+    }
+
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+    }
+}
+
+void MockupResponder::sendFabricManagerStateEvent(
+    uint8_t dest, bool ackr, uint8_t state, uint8_t status,
+    uint64_t last_restart_time, uint64_t last_restart_duration)
+{
+    if (verbose)
+    {
+        lg2::info("sendFabricManagerStateEvent dest eid={EID}", "EID", dest);
+    }
+
+    uint8_t instanceId = 25;
+    std::vector<uint8_t> eventMsg(
+        sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+        sizeof(nsm_get_fabric_manager_state_event_payload));
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    const nsm_get_fabric_manager_state_event_payload payload{
+        .fm_state = state,
+        .report_status = status,
+        .last_restart_timestamp = last_restart_time,
+        .duration_since_last_restart_sec = last_restart_duration};
+
+    auto rc = encode_nsm_get_fabric_manager_state_event(instanceId, ackr,
+                                                        payload, msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendFabricManagerStateEvent failed");
     }
 
     rc = mctpSockSend(dest, eventMsg);

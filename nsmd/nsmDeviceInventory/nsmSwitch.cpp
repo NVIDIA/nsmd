@@ -30,6 +30,7 @@
 #include "nsmEraseTrace.hpp"
 #include "nsmErrorInjection.hpp"
 #include "nsmErrorInjectionCommon.hpp"
+#include "nsmEvent/nsmFabricManagerStateEvent.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmLogInfo.hpp"
 #include "nsmManagers/nsmFabricManager.hpp"
@@ -882,6 +883,12 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             mgmtSerIntf);
 
         device->addSensor(fabricMgrState, false, false);
+
+        auto event = std::make_shared<NsmFabricManagerStateEvent>(
+            name, type, fabricMgrIntf, opStateIntf);
+        device->deviceEvents.push_back(event);
+        device->eventDispatcher.addEvent(NSM_TYPE_NETWORK_PORT,
+                                         NSM_FABRIC_MANAGER_STATE_EVENT, event);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
