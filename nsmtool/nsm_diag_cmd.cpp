@@ -373,8 +373,11 @@ class QueryTokenStatus : public CommandInterface
         result["Reason code"] = reason_code;
         switch (status)
         {
-            case NSM_DEBUG_TOKEN_STATUS_QUERY_FAILURE:
-                result["Status"] = "Query failure";
+            case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED:
+                result["Status"] = "Debug session ended";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_OPERATION_FAILURE:
+                result["Status"] = "Operation failure";
                 break;
             case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE:
                 result["Status"] = "Debug session active";
@@ -402,6 +405,13 @@ class QueryTokenStatus : public CommandInterface
                 break;
             case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NO_DEBUG_SESSION:
                 result["Additional info"] = "No debug session";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_FIRMWARE_NOT_SECURED:
+                result["Additional info"] = "Firmware not secured";
+                break;
+            case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_END_REQUEST_NOT_ACCEPTED:
+                result["Additional info"] =
+                    "Debug session end request not accepted";
                 break;
             case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_QUERY_DISALLOWED:
                 result["Additional info"] = "Debug session query disallowed";
