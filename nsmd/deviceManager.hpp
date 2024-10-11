@@ -77,6 +77,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         static DeviceManager inst(event, handler, instanceIdDb, objServer,
                                   eidTable, nsmDevices);
         instance = &inst;
+        instance->registerDbusMethods();
     }
 
     DeviceManager(const DeviceManager&) = delete;
@@ -118,6 +119,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     requester::Coroutine
         updateFruDeviceIntf(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
 
+    std::string getObjectPath(uint8_t deviceType, uint8_t instanceNumber);
+
   private:
     DeviceManager(
         sdeventplus::Event& event,
@@ -132,6 +135,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         eidTable(eidTable), nsmDevices(nsmDevices)
     {}
 
+    void registerDbusMethods();
     void discoverNsmDevice(const MctpInfos& mctpInfos);
 
     requester::Coroutine discoverNsmDeviceTask();
@@ -174,5 +178,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     std::queue<MctpInfos> queuedMctpInfos;
     std::coroutine_handle<> discoverNsmDeviceTaskHandle;
     NsmDeviceTable& nsmDevices;
+    std::map<std::pair<uint8_t, uint8_t>, std::string> nsmDeviceMap;
+    std::unique_ptr<sdbusplus::asio::dbus_interface> nsmDeviceIntf;
 };
 } // namespace nsm

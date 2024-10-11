@@ -758,10 +758,51 @@ requester::Coroutine
                                                          eid),
             [](void* ptr) {
         delete static_cast<nsm::nsmRawCommand::NsmRawCommandHandler*>(ptr);
-    });
+            });
+
+    std::pair<uint8_t, uint8_t> key = {nsmDevice->getDeviceType(),
+                                       nsmDevice->getInstanceNumber()};
+    nsmDeviceMap[key] = objPath;
 
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
+std::string DeviceManager::getObjectPath(uint8_t deviceType,
+                                         uint8_t instanceNumber)
+{
+    std::pair<uint8_t, uint8_t> key = {deviceType, instanceNumber};
+    auto it = nsmDeviceMap.find(key);
+    if (it != nsmDeviceMap.end())
+    {
+        return it->second;
+    }
+
+    lg2::error(
+        "DeviceManager: NSM device not found for deviceType={DEVICE_TYPE}, instanceID={INSTANCE_ID}",
+        "DEVICE_TYPE", deviceType, "INSTANCE_ID", instanceNumber);
+    return "";
+}
+
+void DeviceManager::registerDbusMethods()
+{
+    // Use shared_ptr to manage the interface lifetime
+    nsmDeviceIntf = objServer.add_unique_interface("/xyz/openbmc_project/NSM",
+                                                   "com.nvidia.NSM.NSMDevice");
+
+    if (!nsmDeviceIntf)
+    {
+        lg2::error(
+            "NSMRawCommandHandler: Failed to create D-Bus interface for NSMDevice.");
+        return;
+    }
+
+    nsmDeviceIntf->register_method(
+        "getNSMDeviceObjectPath",
+        [this](uint8_t deviceType, uint8_t instanceNumber) -> std::string {
+            return this->getObjectPath(deviceType, instanceNumber);
+        });
+
+    nsmDeviceIntf->initialize();
+}
 } // namespace nsm

@@ -66,6 +66,10 @@ std::tuple<sdbusplus::message::object_path, uint8_t>
             sdbusplus::message::object_path(commandStatusPath), rc);
     }
 
+    // Re-initialize command response params
+    commandResponse = sdbusplus::message::unix_fd(-1);
+    completionCode = NSM_ERROR;
+    reasonCode = ERR_NULL;
     statusHandler->status(
         sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
             SetOperationStatus::CommandInProgress);
