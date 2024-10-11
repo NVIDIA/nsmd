@@ -297,8 +297,11 @@ requester::Coroutine
     DebugToken::TokenStatus dbusStatus;
     switch (status)
     {
-        case NSM_DEBUG_TOKEN_STATUS_QUERY_FAILURE:
-            dbusStatus = DebugToken::TokenStatus::QueryFailure;
+        case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ENDED:
+            dbusStatus = DebugToken::TokenStatus::DebugSessionEnded;
+            break;
+        case NSM_DEBUG_TOKEN_STATUS_OPERATION_FAILURE:
+            dbusStatus = DebugToken::TokenStatus::OperationFailure;
             break;
         case NSM_DEBUG_TOKEN_STATUS_DEBUG_SESSION_ACTIVE:
             dbusStatus = DebugToken::TokenStatus::DebugSessionActive;
@@ -318,7 +321,7 @@ requester::Coroutine
         default:
             lg2::error("DebugToken: invalid token status received: "
                        "eid={EID} status={STAT}",
-                       "STAT", status);
+                       "EID", eid, "STAT", status);
             finishOperation(Progress::OperationStatus::Aborted);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
@@ -332,6 +335,13 @@ requester::Coroutine
         case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_NO_DEBUG_SESSION:
             dbusAdditionalInfo = DebugToken::AdditionalInfo::NoDebugSession;
             break;
+        case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_FIRMWARE_NOT_SECURED:
+            dbusAdditionalInfo = DebugToken::AdditionalInfo::FirmwareNotSecured;
+            break;
+        case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_END_REQUEST_NOT_ACCEPTED:
+            dbusAdditionalInfo =
+                DebugToken::AdditionalInfo::DebugSessionEndRequestNotAccepted;
+            break;
         case NSM_DEBUG_TOKEN_STATUS_ADDITIONAL_INFO_DEBUG_SESSION_QUERY_DISALLOWED:
             dbusAdditionalInfo =
                 DebugToken::AdditionalInfo::DebugSessionQueryDisallowed;
@@ -342,7 +352,7 @@ requester::Coroutine
         default:
             lg2::error("DebugToken: invalid additional info received: "
                        "eid={EID} info={INFO}",
-                       "INFO", additionalInfo);
+                       "EID", eid, "INFO", additionalInfo);
             finishOperation(Progress::OperationStatus::Aborted);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
