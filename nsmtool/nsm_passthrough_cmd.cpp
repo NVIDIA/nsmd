@@ -29,6 +29,7 @@ std::vector<std::unique_ptr<WaitCommandStatusComplete>>
 std::vector<std::unique_ptr<GetNSMResponse>> getNSMResponseObjects;
 std::vector<std::unique_ptr<GetDebugInfoFromFD>> getDebugInfoFromFDObjects;
 std::vector<std::unique_ptr<GetLogInfoFromFD>> getLogInfoFromFDObjects;
+std::vector<std::unique_ptr<CallEraseDbusAPI>> callEraseDbusAPIForObject;
 
 void readAndPrintFDData(sdbusplus::message::unix_fd& unixfd)
 {
@@ -606,6 +607,65 @@ void GetLogInfoFromFD::execute(const std::string& objectPath)
     }
 }
 
+CallEraseDbusAPI::CallEraseDbusAPI(CLI::App* app)
+{
+    std::string objectPath;
+
+    auto subcmd = app->add_subcommand(
+        "callEraseDbusAPI", "Call Erase Dbus API for Network Device as client");
+    subcmd->add_option("-o, --object_path", objectPath, "D-Bus Object Path")
+        ->required();
+
+    subcmd->callback([this, &objectPath]() { this->execute(objectPath); });
+}
+
+void CallEraseDbusAPI::execute(const std::string& objectPath)
+{
+    auto bus = sdbusplus::bus::new_default();
+    try
+    {
+        // Call Erase API for objectPath
+        sdbusplus::message::message method =
+            bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
+                                "com.nvidia.Dump.Erase", "Erase");
+        auto reply = bus.call(method);
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        std::cout << "Error while Erase API call" << std::endl;
+    }
+
+    try
+    {
+        // Check Status
+        std::variant<std::tuple<std::string, std::string>> allStatus;
+        sdbusplus::message::message method =
+            bus.new_method_call("xyz.openbmc_project.NSM", objectPath.c_str(),
+                                "org.freedesktop.DBus.Properties", "Get");
+        method.append("com.nvidia.Dump.Erase", "EraseInfo");
+        std::tuple<std::string, std::string> operationAndEraseStatus;
+
+        do
+        {
+            auto reply = bus.call(method);
+            reply.read(allStatus);
+
+            operationAndEraseStatus =
+                std::get<std::tuple<std::string, std::string>>(allStatus);
+        } while (std::get<0>(operationAndEraseStatus) ==
+                 "com.nvidia.Dump.Erase.OperationStatus.InProgress");
+
+        std::cout << "[Operation Status] = "
+                  << std::get<0>(operationAndEraseStatus) << std::endl;
+        std::cout << "[Erase Status] = " << std::get<1>(operationAndEraseStatus)
+                  << std::endl;
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        std::cout << "Error while fetching status from Erase PDI" << std::endl;
+    }
+}
+
 void registerCommand(CLI::App& app)
 {
     auto* passthroughApp = app.add_subcommand(
@@ -620,6 +680,7 @@ void registerCommand(CLI::App& app)
     auto getDebugInfoFromFD =
         std::make_unique<GetDebugInfoFromFD>(passthroughApp);
     auto getLogInfoFromFD = std::make_unique<GetLogInfoFromFD>(passthroughApp);
+    auto callEraseDbusAPI = std::make_unique<CallEraseDbusAPI>(passthroughApp);
 
     // Push the unique_ptrs to the global vector to keep them alive
     sendNSMCommandObjects.push_back(std::move(sendNSMCommand));
@@ -629,6 +690,7 @@ void registerCommand(CLI::App& app)
     getNSMResponseObjects.push_back(std::move(getNSMResponse));
     getDebugInfoFromFDObjects.push_back(std::move(getDebugInfoFromFD));
     getLogInfoFromFDObjects.push_back(std::move(getLogInfoFromFD));
+    callEraseDbusAPIForObject.push_back(std::move(callEraseDbusAPI));
 }
 
 } // namespace passthrough
