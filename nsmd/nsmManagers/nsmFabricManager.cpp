@@ -22,6 +22,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace nsm
@@ -62,7 +63,7 @@ requester::Coroutine NsmFabricManagerState::update(SensorManager& manager,
                                          responseLen);
     if (rc)
     {
-        lg2::error(
+        lg2::debug(
             "NsmFabricManagerState SendRecvNsmMsg failed for {EID} eid with rc={RC}",
             "EID", eid, "RC", rc);
         co_return rc;
@@ -72,6 +73,8 @@ requester::Coroutine NsmFabricManagerState::update(SensorManager& manager,
     uint16_t reason_code = ERR_NULL;
     uint16_t dataLen = 0;
     struct nsm_fabric_manager_state_data fmStateData;
+    std::string funNameAndEid =
+        "decode_get_fabric_manager_state_resp for eid " + std::to_string(eid);
 
     rc = decode_get_fabric_manager_state_resp(responseMsg.get(), responseLen,
                                               &cc, &reason_code, &dataLen,
@@ -128,13 +131,11 @@ requester::Coroutine NsmFabricManagerState::update(SensorManager& manager,
         fabricManagerIntf->lastRestartDuration(
             fmStateData.duration_since_last_restart_sec);
 
+        clearErrorBitMap(funNameAndEid);
         co_return NSM_SW_SUCCESS;
     }
 
-    lg2::error(
-        "responseHandler: decode_get_fabric_manager_state_resp unsuccessfull for {EID} eid. reasonCode={RSNCOD} cc={CC} rc={RC}",
-        "EID", eid, "RSNCOD", reason_code, "CC", cc, "RC", rc);
-
+    logHandleResponseMsg(funNameAndEid, reason_code, cc, rc);
     co_return NSM_SW_ERROR_COMMAND_FAIL;
 }
 } // namespace nsm
