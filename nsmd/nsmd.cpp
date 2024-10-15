@@ -118,8 +118,16 @@ int main(int argc, char** argv)
 
         requester::Handler<requester::Request> reqHandler(event, instanceIdDb,
                                                           sockManager, verbose);
-        mctp_socket::Handler sockHandler(event, reqHandler, eventManager,
-                                         sockManager, verbose);
+
+#ifdef MCTP_IN_KERNEL
+        mctp_socket::InKernelHandler sockHandler(
+            event, reqHandler, eventManager, sockManager, verbose);
+#else
+        mctp_socket::DaemonHandler sockHandler(event, reqHandler, eventManager,
+                                               sockManager, verbose);
+#endif
+
+        reqHandler.setSocketHandler(&sockHandler);
 
         nsm::NsmDeviceTable nsmDevices;
 

@@ -189,8 +189,8 @@ class Handler
         }
 
         auto request = std::make_unique<RequestInterface>(
-            sockManager.getSocket(eid), eid, tag, event, std::move(requestMsg),
-            numRetries, responseTimeOut, verbose);
+            sockManager.getSocket(eid), eid, tag, event, socketHandler,
+            std::move(requestMsg), numRetries, responseTimeOut, verbose);
         auto timer = std::make_unique<sdbusplus::Timer>(
             event.get(), instanceIdExpiryCallBack);
 
@@ -311,35 +311,37 @@ class Handler
                         [[maybe_unused]] uint8_t command,
                         const nsm_msg* response, size_t respMsgLen)
     {
-        switch (tag)
+        // Check if response is for Regular request
+        auto requestFound = handleResponseImpl(
+            eid, instanceId, type, command, response, respMsgLen,
+            handlersRegular, instanceIdExpiryIntervalRegular);
+
+        if (!requestFound)
         {
-            case MCTP_TAG_NSM:
-                handleResponseImpl(eid, instanceId, type, command, response,
-                                   respMsgLen, handlersRegular,
-                                   instanceIdExpiryIntervalRegular);
-                break;
+            // Check if response is for Long-running request
+            auto requestFoundLongRunning = handleResponseImpl(
+                eid, instanceId, type, command, response, respMsgLen,
+                handlersLongRunning, instanceIdExpiryIntervalLongRunning);
 
-            case MCTP_TAG_NSM_ASYNC:
-                handleResponseImpl(eid, instanceId, type, command, response,
-                                   respMsgLen, handlersLongRunning,
-                                   instanceIdExpiryIntervalLongRunning);
-                break;
-
-            default:
-                lg2::error(
-                    "Received invalid MCTP Tag {TAG}. EID={EID}, Type={TYPE}, Command={CMD}.",
-                    "TAG", tag, "EID", eid, "TYPE", type, "CMD", command);
-                break;
+            if (!requestFoundLongRunning)
+            {
+                lg2::error("Received response doesn't match any request. "
+                           "Tag={TAG}, EID={EID}, Type={TYPE}, Command={CMD}.",
+                           "TAG", tag, "EID", eid, "TYPE", type, "CMD",
+                           command);
+            }
         }
     }
 
-    void handleResponseImpl(eid_t eid, uint8_t instanceId,
+    bool handleResponseImpl(eid_t eid, uint8_t instanceId,
                             [[maybe_unused]] uint8_t type,
                             [[maybe_unused]] uint8_t command,
                             const nsm_msg* response, size_t respMsgLen,
                             std::unordered_map<eid_t, RequestQueue>& handlers,
                             std::chrono::seconds instanceIdExpiryInterval)
     {
+        bool requestFound{false};
+
         if (handlers.contains(eid) && !handlers[eid].empty())
         {
             auto& [request, responseHandler, timerInstance,
@@ -372,10 +374,13 @@ class Handler
                 instanceIdDb.free(eid, request->getInstanceId());
                 handlers[eid].pop();
                 unique_handler(eid, response, respMsgLen);
+                requestFound = true;
             }
         }
 
         runRegisteredRequest(eid, handlers, instanceIdExpiryInterval);
+
+        return requestFound;
     }
 
     bool hasInProgressRequest(eid_t eid)
@@ -431,6 +436,11 @@ class Handler
         }
     }
 
+    void setSocketHandler(const mctp_socket::Handler* handler)
+    {
+        socketHandler = handler;
+    }
+
   private:
     sdeventplus::Event& event; //!< reference to NSM daemon's main event loop
     nsm::InstanceIdDb& instanceIdDb; //!< reference to instanceIdDb object
@@ -466,6 +476,8 @@ class Handler
         timerToFreeRegular;
     std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>
         timerToFreeLongRunning;
+
+    const mctp_socket::Handler* socketHandler; // MCTP socket handler
 
     /** @brief Remove request entry for which the instance ID expired
      *

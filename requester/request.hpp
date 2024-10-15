@@ -22,6 +22,7 @@
 
 #include "common/types.hpp"
 #include "common/utils.hpp"
+#include "nsmd/socket_handler.hpp"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -169,11 +170,12 @@ class Request final : public RequestRetryTimer
      *  @param[in] verbose - verbose tracing flag
      */
     explicit Request(int fd, eid_t eid, uint8_t tag, sdeventplus::Event& event,
+                     const mctp_socket::Handler* handler,
                      std::vector<uint8_t>&& requestMsg, uint8_t numRetries,
                      std::chrono::milliseconds timeout, bool verbose) :
         RequestRetryTimer(event, numRetries, timeout),
         fd(fd), eid(eid), tag(tag), requestMsg(std::move(requestMsg)),
-        verbose(verbose)
+        verbose(verbose), socketHandler(handler)
     {}
 
     uint8_t getInstanceId()
@@ -203,8 +205,9 @@ class Request final : public RequestRetryTimer
     int fd;      //!< file descriptor of MCTP communications socket
     eid_t eid;   //!< endpoint ID of the remote MCTP endpoint
     uint8_t tag; //!< tag mctp message tag to be used
-    std::vector<uint8_t> requestMsg; //!< NSM request message
-    bool verbose;                    //!< verbose tracing flag
+    std::vector<uint8_t> requestMsg;           //!< NSM request message
+    bool verbose;                              //!< verbose tracing flag
+    const mctp_socket::Handler* socketHandler; // MCTP socket handler
 
     /** @brief Sends the NSM request message on the socket
      *
@@ -217,7 +220,8 @@ class Request final : public RequestRetryTimer
             utils::printBuffer(utils::Tx, requestMsg);
         }
 
-        auto rc = nsm_send(eid, tag, fd, requestMsg.data(), requestMsg.size());
+        auto rc = socketHandler->sendMsg(tag, eid, fd, requestMsg.data(),
+                                         requestMsg.size());
         if (rc < 0)
         {
             lg2::error("Failed to send NSM message. RC={RC}, errno={ERRNO}",

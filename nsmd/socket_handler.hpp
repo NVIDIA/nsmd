@@ -18,7 +18,6 @@
 #pragma once
 
 #include "eventManager.hpp"
-#include "requester/handler.hpp"
 #include "socket_manager.hpp"
 #include "types.hpp"
 
@@ -28,6 +27,14 @@
 #include <map>
 #include <optional>
 #include <unordered_map>
+
+namespace requester
+{
+template <class>
+class Handler;
+
+class Request;
+} // namespace requester
 
 namespace mctp_socket
 {
@@ -70,27 +77,69 @@ class Handler
                      requester::Handler<requester::Request>& handler,
                      nsm::EventManager& eventManager, Manager& manager,
                      bool verbose) :
-        event(event),
-        handler(handler), eventManager(eventManager), manager(manager),
+        handler(handler),
+        eventManager(eventManager), manager(manager), event(event),
         verbose(verbose)
     {}
 
-    int registerMctpEndpoint(eid_t eid, int type, int protocol,
-                             const std::vector<uint8_t>& pathName);
+    virtual int registerMctpEndpoint(eid_t eid, int type, int protocol,
+                                     const std::vector<uint8_t>& pathName) = 0;
+
+    virtual int sendMsg(uint8_t tag, eid_t eid, int mctpFd,
+                        const uint8_t* nsmMsg, size_t nsmMsgLen) const = 0;
 
   private:
-    sdeventplus::Event& event;
+    virtual void handleReceivedMsg(IO& io, int fd, uint32_t revents) = 0;
+
     requester::Handler<requester::Request>& handler;
     nsm::EventManager& eventManager;
+
+  protected:
     Manager& manager;
+    sdeventplus::Event& event;
     bool verbose;
 
-    SocketInfo initSocket(int type, int protocol,
+    std::optional<Response> processRxMsg(uint8_t tag, uint8_t eid, uint8_t type,
+                                         const uint8_t* nsmMsg,
+                                         size_t nsmMsgSize);
+};
+
+class InKernelHandler : public Handler
+{
+  public:
+    using Handler::Handler;
+
+    int registerMctpEndpoint(eid_t eid, int type, int protocol,
+                             const std::vector<uint8_t>& pathName) override;
+
+    int sendMsg(uint8_t tag, eid_t eid, int mctpFd, const uint8_t* nsmMsg,
+                size_t nsmMsgLen) const override;
+
+  private:
+    void handleReceivedMsg(IO& io, int fd, uint32_t revents) override;
+
+    std::unique_ptr<IO> io;
+    int fd;
+    int sendBufferSize;
+    bool isFdValid{false};
+};
+
+class DaemonHandler : public Handler
+{
+  public:
+    using Handler::Handler;
+
+    int registerMctpEndpoint(eid_t eid, int type, int protocol,
+                             const std::vector<uint8_t>& pathName) override;
+
+    int sendMsg(uint8_t tag, eid_t eid, int mctpFd, const uint8_t* nsmMsg,
+                size_t nsmMsgLen) const override;
+
+  private:
+    SocketInfo initSocket(eid_t eid, int type, int protocol,
                           const std::vector<uint8_t>& pathName);
 
-    std::optional<Response>
-        processRxMsg(const std::vector<uint8_t>& requestMsg);
-
+    void handleReceivedMsg(IO& io, int fd, uint32_t revents) override;
     /** @brief Socket information for MCTP Tx/Rx daemons */
     std::map<std::vector<uint8_t>,
              std::tuple<std::unique_ptr<utils::CustomFD>, SendBufferSize,
