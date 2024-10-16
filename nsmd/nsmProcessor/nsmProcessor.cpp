@@ -23,6 +23,8 @@
 #include "pci-links.h"
 #ifdef ENABLE_SYSTEM_GUID
 #include "network-ports.h"
+
+#include <sys/random.h> // uuid_generate for sysguid
 #endif
 #include "platform-environmental.h"
 
@@ -146,19 +148,6 @@ bool NsmSysGuidIntf::sysGuidGenerated = false;
 
 requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
 {
-    // We only need to generate sysGUID once
-    // (unique per tray)
-    if (!sysGuidGenerated)
-    {
-        lg2::info("First instance, generating SysGUID");
-        sysGuidGenerated = true;
-        srand(time(NULL));
-        for (auto i = 0; i < 8; i++)
-        {
-            sysGUID[i] = rand();
-        }
-    }
-
     Request readSysGuid(sizeof(nsm_msg_hdr) +
                         sizeof(struct nsm_get_system_guid_req));
     auto readSysGuidMsg = reinterpret_cast<struct nsm_msg*>(readSysGuid.data());
@@ -195,6 +184,44 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        bool sysGuidAllZeros = true;
+        for (auto i = 0; i < 8; i++)
+        {
+            if (data[i] != 0x00)
+            {
+                sysGuidAllZeros = false;
+            }
+        }
+
+        if (!sysGuidGenerated)
+        {
+            lg2::info("First instance, generating SysGUID");
+            if (sysGuidAllZeros)
+            {
+                lg2::info("GPU returned 0x00's, generating random SysGUID");
+
+                for (auto i = 0; i < 8; i++)
+                {
+                    auto sysrc = getrandom(sysGUID, 8, 0);
+
+                    if (sysrc != 8)
+                    {
+                        lg2::error("getrandom failed. Return={RC}", "RC",
+                                   sysrc);
+                    }
+                }
+            }
+            else
+            {
+                lg2::info("GPU returned a SysGUID, using it");
+                for (auto i = 0; i < 8; i++)
+                {
+                    sysGUID[i] = data[i];
+                }
+            }
+            sysGuidGenerated = true;
+        }
+
         bool setSysGuidNeeded = false;
         for (auto i = 0; i < 8; i++)
         {
