@@ -33,11 +33,6 @@ struct MockSensorManager : public SensorManager
                  std::shared_ptr<const nsm_msg>& responseMsg,
                  size_t& responseLen, bool isLongRunning),
                 (override));
-    MOCK_METHOD(uint8_t, SendRecvNsmMsgSync,
-                (eid_t eid, Request& request,
-                 std::shared_ptr<const nsm_msg>& responseMsg,
-                 size_t& responseLen),
-                (override));
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));
     MOCK_METHOD(void, startPolling, (uuid_t uuid), (override));
@@ -76,26 +71,6 @@ class SensorManagerTest
         EXPECT_GE(lastResponse.size(), lastResponseOffset + sizeof(DataType));
         return *reinterpret_cast<DataType*>(lastResponse.data() +
                                             lastResponseOffset);
-    }
-    auto mockSendRecvNsmMsgSync(const Response& response,
-                                nsm_completion_codes code = NSM_SUCCESS)
-    {
-        lastResponse = response;
-        return [response, code](eid_t, Request&,
-                                std::shared_ptr<const nsm_msg>& responseMsg,
-                                size_t& responseLen) {
-            allocMessage(response, responseMsg, responseLen);
-            return code;
-        };
-    }
-    auto mockSendRecvNsmMsgSync(const Response& header, const Response& data,
-                                nsm_completion_codes code = NSM_SUCCESS)
-    {
-        return mockSendRecvNsmMsgSync(joinResponse(header, data), code);
-    }
-    auto mockSendRecvNsmMsgSync(nsm_completion_codes code = NSM_SUCCESS)
-    {
-        return mockSendRecvNsmMsgSync(Response(), code);
     }
     auto mockSendRecvNsmMsg(const Response& response,
                             nsm_completion_codes code = NSM_SUCCESS)

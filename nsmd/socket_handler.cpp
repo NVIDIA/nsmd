@@ -200,20 +200,6 @@ void DaemonHandler::handleReceivedMsg(IO& io, int fd, uint32_t revents)
         return;
     }
 
-    struct pollfd pollSet[1];
-    pollSet[0].fd = fd;
-    pollSet[0].events = POLLIN;
-    int numFds = 1;
-    int timeout = 1;
-    // The sendRecvNsmMsgSync() API also poll the same fd and recv data from
-    // the fd just before the callback invoked. So add poll checking again
-    // to avoid the recv() API blocking forever.
-    int ret = poll(pollSet, numFds, timeout);
-    if (ret <= 0)
-    {
-        return;
-    }
-
     // Outgoing message.
     struct iovec iov[2]{};
 

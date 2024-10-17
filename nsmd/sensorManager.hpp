@@ -69,21 +69,6 @@ class SensorManager
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t& responseLen, bool isLongRunning = false) = 0;
 
-    /** @brief Send request NSM message to eid by blocking socket API
-     * directly. The function will return when received the response message
-     * from NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
-     *         request.
-     *
-     *  @param[in] eid endpoint ID
-     *  @param[in] request request NSM message
-     *  @param[out] responseMsg response NSM message
-     *  @param[out] responseLen length of response NSM message
-     *  @return return_value - nsm_requester_error_codes
-     */
-    virtual uint8_t
-        SendRecvNsmMsgSync(eid_t eid, Request& request,
-                           std::shared_ptr<const nsm_msg>& responseMsg,
-                           size_t& responseLen) = 0;
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual void startPolling(uuid_t uuid) = 0;
     virtual void stopPolling(uuid_t uuid) = 0;
@@ -190,9 +175,6 @@ class SensorManagerImpl : public SensorManager
                        bool isLongRunning = false) override;
     requester::Coroutine
         doPollingTaskLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
-    uint8_t SendRecvNsmMsgSync(eid_t eid, Request& request,
-                               std::shared_ptr<const nsm_msg>& responseMsg,
-                               size_t& responseLen) override;
     void scanInventory();
     requester::Coroutine pollEvents(eid_t eid);
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
