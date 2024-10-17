@@ -60,7 +60,8 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    struct ::nsm_firmware_erot_state_info_resp erotInfo;
+    struct ::nsm_firmware_erot_state_info_resp erotInfo
+    {};
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reasonCode, &erotInfo);
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
@@ -73,6 +74,7 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
         logHandleResponseMsg(
             "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE)",
             reasonCode, cc, rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
     if (erotInfo.fq_resp_hdr.firmware_slot_count < fwSlotObjects.size())
     {
@@ -80,14 +82,20 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
             "GET_NSM_BUILD_TYPE sc={SlOT_COUNT}, but expected slots not less than {SLOTS}",
             "SC", erotInfo.fq_resp_hdr.firmware_slot_count, "SLOTS",
             fwSlotObjects.size());
-        free(erotInfo.slot_info);
-        return NSM_SW_ERROR;
+        if (erotInfo.fq_resp_hdr.firmware_slot_count > 0)
+        {
+            free(erotInfo.slot_info);
+        }
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
     for (int i = 0; i < erotInfo.fq_resp_hdr.firmware_slot_count; i++)
     {
         fwSlotObjects[i]->update(erotInfo.slot_info[i], erotInfo.fq_resp_hdr);
     }
-    free(erotInfo.slot_info);
+    if (erotInfo.fq_resp_hdr.firmware_slot_count > 0)
+    {
+        free(erotInfo.slot_info);
+    }
     return cc;
 }
 
