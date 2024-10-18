@@ -46,6 +46,7 @@ requester::Coroutine
 
     // first argument instanceid=0 is irrelevant
     bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
+    std::string mask = utils::vectorTo256BitHexString(bytes);
     auto rc = encode_enable_workload_power_profile_req(0, profile_mask,
                                                        requestMsg);
 
@@ -54,6 +55,8 @@ requester::Coroutine
         lg2::error(
             "requestEnablePresetProfile  encode_enable_workload_power_profile_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -67,6 +70,8 @@ requester::Coroutine
         lg2::error(
             "requestEnablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -86,6 +91,8 @@ requester::Coroutine
         lg2::error(
             "requestEnablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -146,6 +153,7 @@ requester::Coroutine
 
     // first argument instanceid=0 is irrelevant
     bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
+    std::string mask = utils::vectorTo256BitHexString(bytes);
     auto rc = encode_disable_workload_power_profile_req(0, profile_mask,
                                                         requestMsg);
 
@@ -154,6 +162,8 @@ requester::Coroutine
         lg2::error(
             "requestDisablePresetProfile  encode_disable_workload_power_profile_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -167,6 +177,8 @@ requester::Coroutine
         lg2::error(
             "requestDisablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -186,6 +198,8 @@ requester::Coroutine
         lg2::error(
             "requestDisablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
+                   "MASK", mask);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -278,11 +292,11 @@ uint8_t NsmWorkLoadProfileStatus::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_current_profile_info_resp");
+        clearErrorBitMap("decode_get_workload_power_profile_status_resp");
     }
     else
     {
-        logHandleResponseMsg("decode_get_current_profile_info_resp",
+        logHandleResponseMsg("decode_get_workload_power_profile_status_resp",
                              reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -300,11 +314,11 @@ void NsmWorkLoadProfileStatus::updateReading(
 
     // Update values on iface
     profileStatusInfo->ProfileInfoIntf::supportedProfileMask(
-        utils::bitfield256_tToBitMap(data->supported_profile_mask));
+        utils::bitfield256_tToBitArray(data->supported_profile_mask));
     profileStatusInfo->ProfileInfoIntf::requestedProfileMask(
-        utils::bitfield256_tToBitMap(data->requested_profile_maks));
+        utils::bitfield256_tToBitArray(data->requested_profile_maks));
     profileStatusInfo->ProfileInfoIntf::enforcedProfileMask(
-        utils::bitfield256_tToBitMap(data->enforced_profile_mask));
+        utils::bitfield256_tToBitArray(data->enforced_profile_mask));
 }
 
 //  Get Preset Profile Information
@@ -353,7 +367,7 @@ void NsmWorkloadPowerProfileCollection::updateSupportedProfile(
         obj->WorkLoadPowerProfileIntf::profileId(data->profile_id);
         obj->WorkLoadPowerProfileIntf::priority(data->priority);
         obj->WorkLoadPowerProfileIntf::conflictMask(
-            utils::bitfield256_tToBitMap(data->conflict_mask));
+            utils::bitfield256_tToBitArray(data->conflict_mask));
     }
 }
 

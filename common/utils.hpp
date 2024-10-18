@@ -530,19 +530,21 @@ std::pair<std::vector<uint8_t>, std::vector<uint8_t>>
 std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
                                      const size_t size = 0);
 
+std::vector<uint8_t> bitfield256_tToBitArray(bitfield256_t bf);
+
 /**
- * @brief Converts a bitfield representing update methods into a list of update
- * method enums.
+ * @brief Converts a bitfield representing update methods into a list of
+ * update method enums.
  *
  * @param[in] updateMethodBitfield - A bitfield where each bit represents a
  * different update method.
- * @return A vector of SecurityCommon::UpdateMethods enums corresponding to the
- * set bits in the bitfield.
+ * @return A vector of SecurityCommon::UpdateMethods enums corresponding to
+ * the set bits in the bitfield.
  *
  * @note The function checks specific bits in the bitfield and adds the
- * corresponding update method enum to the returned vector. Only the bits that
- * are set in the bitfield will have their corresponding enums included in the
- * list.
+ * corresponding update method enum to the returned vector. Only the bits
+ * that are set in the bitfield will have their corresponding enums included
+ * in the list.
  */
 std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
                 UpdateMethods>
@@ -555,4 +557,6 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
  * @param bitmap Pointer to the bitmap structure.
  **/
 bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap);
+
+std::string vectorTo256BitHexString(const std::vector<uint8_t>& value);
 } // namespace utils
