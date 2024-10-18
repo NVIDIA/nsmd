@@ -284,11 +284,11 @@ uint8_t NsmWorkLoadProfileStatus::handleResponseMsg(
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_current_profile_info_resp");
+        clearErrorBitMap("decode_get_workload_power_profile_status_resp");
     }
     else
     {
-        logHandleResponseMsg("decode_get_current_profile_info_resp",
+        logHandleResponseMsg("decode_get_workload_power_profile_status_resp",
                              reason_code, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -306,11 +306,11 @@ void NsmWorkLoadProfileStatus::updateReading(
 
     // Update values on iface
     profileStatusInfo->ProfileInfoIntf::supportedProfileMask(
-        utils::bitfield256_tToBitMap(data->supported_profile_mask));
+        utils::bitfield256_tToBitArray(data->supported_profile_mask));
     profileStatusInfo->ProfileInfoIntf::requestedProfileMask(
-        utils::bitfield256_tToBitMap(data->requested_profile_maks));
+        utils::bitfield256_tToBitArray(data->requested_profile_maks));
     profileStatusInfo->ProfileInfoIntf::enforcedProfileMask(
-        utils::bitfield256_tToBitMap(data->enforced_profile_mask));
+        utils::bitfield256_tToBitArray(data->enforced_profile_mask));
 }
 
 //  Get Preset Profile Information
@@ -359,7 +359,7 @@ void NsmWorkloadPowerProfileCollection::updateSupportedProfile(
         obj->WorkLoadPowerProfileIntf::profileId(data->profile_id);
         obj->WorkLoadPowerProfileIntf::priority(data->priority);
         obj->WorkLoadPowerProfileIntf::conflictMask(
-            utils::bitfield256_tToBitMap(data->conflict_mask));
+            utils::bitfield256_tToBitArray(data->conflict_mask));
     }
 }
 

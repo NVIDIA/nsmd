@@ -2715,7 +2715,7 @@ int decode_get_current_clock_event_reason_code_resp(const struct nsm_msg *msg,
 	if ((*data_size) < sizeof(bitfield32_t)) {
 		return NSM_SW_ERROR_DATA;
 	}
-	flags->byte = le32toh(resp->flags.byte);
+	flags->byte = (resp->flags.byte);
 	return NSM_SW_SUCCESS;
 }
 
@@ -5526,20 +5526,72 @@ int decode_get_workload_power_profile_status_req(const struct nsm_msg *msg,
 static void
 htole32PresetProfileResp(struct workload_power_profile_status *profileInfo)
 {
-	for (int i = 0; i < 8; i++) {
-		profileInfo->supported_profile_mask.fields[i].byte =
+	size_t length = 8 / 2;
+	for (size_t i = 0; i < length; i++) {
+		uint32_t temp =
 		    htole32(profileInfo->supported_profile_mask.fields[i].byte);
-		profileInfo->requested_profile_maks.fields[i].byte =
+		profileInfo->supported_profile_mask.fields[i].byte = htole32(
+		    profileInfo->supported_profile_mask.fields[length - 1 - i]
+			.byte);
+		profileInfo->supported_profile_mask.fields[length - 1 - i]
+		    .byte = temp;
+	}
+
+	for (size_t i = 0; i < length; i++) {
+		uint32_t temp =
 		    htole32(profileInfo->requested_profile_maks.fields[i].byte);
-		profileInfo->enforced_profile_mask.fields[i].byte =
+		profileInfo->requested_profile_maks.fields[i].byte = htole32(
+		    profileInfo->requested_profile_maks.fields[length - 1 - i]
+			.byte);
+		profileInfo->requested_profile_maks.fields[length - 1 - i]
+		    .byte = temp;
+	}
+
+	for (size_t i = 0; i < length; i++) {
+		uint32_t temp =
 		    htole32(profileInfo->enforced_profile_mask.fields[i].byte);
+		profileInfo->enforced_profile_mask.fields[i].byte = htole32(
+		    profileInfo->enforced_profile_mask.fields[length - 1 - i]
+			.byte);
+		profileInfo->enforced_profile_mask.fields[length - 1 - i].byte =
+		    temp;
 	}
 }
 
 static void
 le32tohPresetProfileResp(struct workload_power_profile_status *profileInfo)
 {
-	for (int i = 0; i < 8; i++) {
+	size_t length = 8;
+	for (size_t i = 0; i < length / 2; i++) {
+		uint32_t temp =
+		    profileInfo->supported_profile_mask.fields[i].byte;
+		profileInfo->supported_profile_mask.fields[i].byte =
+		    profileInfo->supported_profile_mask.fields[length - 1 - i]
+			.byte;
+		profileInfo->supported_profile_mask.fields[length - 1 - i]
+		    .byte = temp;
+	}
+
+	for (size_t i = 0; i < length / 2; i++) {
+		uint32_t temp =
+		    profileInfo->requested_profile_maks.fields[i].byte;
+		profileInfo->requested_profile_maks.fields[i].byte =
+		    profileInfo->requested_profile_maks.fields[length - 1 - i]
+			.byte;
+		profileInfo->requested_profile_maks.fields[length - 1 - i]
+		    .byte = temp;
+	}
+
+	for (size_t i = 0; i < length / 2; i++) {
+		uint32_t temp =
+		    profileInfo->enforced_profile_mask.fields[i].byte;
+		profileInfo->enforced_profile_mask.fields[i].byte =
+		    profileInfo->enforced_profile_mask.fields[length - 1 - i]
+			.byte;
+		profileInfo->enforced_profile_mask.fields[length - 1 - i].byte =
+		    temp;
+	}
+	for (size_t i = 0; i < length; i++) {
 		profileInfo->supported_profile_mask.fields[i].byte =
 		    le32toh(profileInfo->supported_profile_mask.fields[i].byte);
 		profileInfo->requested_profile_maks.fields[i].byte =
@@ -5582,10 +5634,9 @@ int encode_get_workload_power_profile_status_resp(
 	response->hdr.data_size =
 	    htole16(sizeof(struct workload_power_profile_status));
 
-	htole32PresetProfileResp(data);
-
 	memcpy(&(response->data), data,
 	       sizeof(struct workload_power_profile_status));
+	htole32PresetProfileResp(data);
 
 	return NSM_SW_SUCCESS;
 }
@@ -5604,7 +5655,7 @@ int decode_get_workload_power_profile_status_resp(
 		return rc;
 	}
 
-	if (msg_len !=
+	if (msg_len <
 	    (sizeof(struct nsm_msg_hdr) +
 	     sizeof(struct nsm_get_workload_power_profile_status_info_resp))) {
 		return NSM_SW_ERROR_LENGTH;
@@ -5628,7 +5679,20 @@ letohgetWorkloadPresetProfiledata(struct nsm_workload_power_profile_data *data)
 {
 	data->profile_id = le16toh(data->profile_id);
 	data->priority = le16toh(data->priority);
+	size_t length = 8;
 	for (int i = 0; i < 8; i++) {
+		data->conflict_mask.fields[i].byte =
+		    le32toh(data->conflict_mask.fields[i].byte);
+	}
+
+	for (size_t i = 0; i < length / 2; i++) {
+		uint32_t temp = data->conflict_mask.fields[i].byte;
+		data->conflict_mask.fields[i].byte =
+		    data->conflict_mask.fields[length - 1 - i].byte;
+		data->conflict_mask.fields[length - 1 - i].byte = temp;
+	}
+
+	for (size_t i = 0; i < length; i++) {
 		data->conflict_mask.fields[i].byte =
 		    le32toh(data->conflict_mask.fields[i].byte);
 	}
