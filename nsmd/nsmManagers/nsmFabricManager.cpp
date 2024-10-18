@@ -18,6 +18,7 @@
 #include "nsmFabricManager.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "interfaceWrapper.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -28,18 +29,46 @@
 namespace nsm
 {
 
-NsmFabricManagerState::NsmFabricManagerState(
-    const std::string& name, const std::string& type,
-    std::string& inventoryObjPath,
-    std::shared_ptr<FabricManagerIntf> fabricMgrIntf,
-    std::shared_ptr<OperaStatusIntf> opStateIntf,
-    std::shared_ptr<ManagementServiceIntf> mgmtSerIntf) :
-    NsmObject(name, type),
-    fabricManagerIntf(fabricMgrIntf), operationalStatusIntf(opStateIntf),
-    managementServiceIntf(mgmtSerIntf)
+NsmFabricManagerState::NsmFabricManagerState(const std::string& name,
+                                             const std::string& type,
+                                             std::string& inventoryObjPath,
+                                             SensorManager& manager,
+                                             sdbusplus::bus_t& bus,
+                                             std::string& description) :
+    NsmObject(name, type)
 {
     lg2::debug("NsmFabricManagerState: {NAME}", "NAME", name.c_str());
     objPath = inventoryObjPath + name;
+
+    auto sensorObjectPathFM = objPath + "/com.nvidia.State.FabricManager";
+    fabricManagerIntf = getInterfaceOnObjectPath<FabricManagerIntf>(
+        sensorObjectPathFM, manager, bus, objPath.c_str());
+
+    sensorObjectPathFM =
+        objPath + "/xyz.openbmc_project.State.Decorator.OperationalStatus";
+    operationalStatusIntf = getInterfaceOnObjectPath<OperaStatusIntf>(
+        sensorObjectPathFM, manager, bus, objPath.c_str());
+
+    sensorObjectPathFM =
+        objPath + "/xyz.openbmc_project.Inventory.Item.ManagementService";
+    managementServiceIntf = getInterfaceOnObjectPath<ManagementServiceIntf>(
+        sensorObjectPathFM, manager, bus, objPath.c_str());
+
+    sensorObjectPathFM = objPath + "/xyz.openbmc_project.Inventory.Item";
+    itemIntf = getInterfaceOnObjectPath<ItemIntf>(sensorObjectPathFM, manager,
+                                                  bus, objPath.c_str());
+    itemIntf->description(description);
+    itemIntf->prettyName("");
+}
+
+std::shared_ptr<FabricManagerIntf> NsmFabricManagerState::getFabricManagerIntf()
+{
+    return fabricManagerIntf;
+}
+
+std::shared_ptr<OperaStatusIntf> NsmFabricManagerState::getOperaStatusIntf()
+{
+    return operationalStatusIntf;
 }
 
 requester::Coroutine NsmFabricManagerState::update(SensorManager& manager,
