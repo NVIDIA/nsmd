@@ -20,6 +20,7 @@
 #include "firmware-utils.h"
 
 #include "globals.hpp"
+#include "nsmFirmwareUtilsCommon.hpp"
 #include "nsmSensor.hpp"
 
 #include <unistd.h>
@@ -28,13 +29,6 @@
 
 namespace nsm
 {
-
-static std::unordered_map<uint16_t, std::string> revokeKeysErrors = {
-    {0x02, "Invalid bitmap"},
-    {0x86, "EFUSE Update Failed"},
-    {0x87, "IrreversibleConfig Disabled"},
-    {0x88, "Nonce Mismatch"},
-};
 
 NsmKeyMgmt::NsmKeyMgmt(sdbusplus::bus::bus& bus, const std::string& chassisName,
                        const std::string& type, const uuid_t& uuid,
@@ -86,15 +80,6 @@ void NsmKeyMgmt::finishOperation(Progress::OperationStatus status)
     opInProgress = false;
 }
 
-std::tuple<uint16_t, std::string> NsmKeyMgmt::getErrorCode(uint16_t cc)
-{
-    if (revokeKeysErrors.find(cc) != revokeKeysErrors.end())
-    {
-        return {cc, revokeKeysErrors[cc]};
-    }
-    return {cc, std::format("Unknown Error: {}", cc)};
-}
-
 requester::Coroutine
     NsmKeyMgmt::revokeKeysAsyncHandler(std::shared_ptr<Request> request)
 {
@@ -110,7 +95,7 @@ requester::Coroutine
         lg2::error("KeyMgmt - revokeKeys - "
                    "SendRecvNsmMsg: eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
-        errorCode(getErrorCode(sendRc));
+        errorCode(getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, sendRc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return sendRc;
@@ -126,7 +111,8 @@ requester::Coroutine
                    "decode_nsm_code_auth_key_perm_update_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
-        errorCode(getErrorCode(cc));
+        errorCode(
+            getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, cc, reasonCode));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return decodeRc;

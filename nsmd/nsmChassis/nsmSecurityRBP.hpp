@@ -118,7 +118,6 @@ class MinSecurityVersion : public MinSecVersionIntf
         minSecVersionAsyncHandler(std::shared_ptr<Request> request);
     int startOperation();
     void finishOperation(Progress::OperationStatus status);
-    inline std::tuple<uint16_t, std::string> getErrorCode(uint16_t cc);
     uuid_t uuid;
     uint16_t classification;
     uint16_t identifier;
