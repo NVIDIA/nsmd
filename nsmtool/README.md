@@ -57,11 +57,13 @@ Options:
   -h,--help                   Print this help message and exit
 
 Subcommands:
-  raw                         Send a raw request and print response
+  raw                         send a raw request and print response
+  config                      Device configuration type command
+  diag                        Diagnostics type command
+  firmware                    Device firmware type commands
   discovery                   Device capability discovery type command
   telemetry                   Network, PCI link and platform telemetry type command
-  diag                        Diagnostics type command
-  config                      Device configuration type command
+  passthrough                 Passthrough command support for dbus API testing
 
 ```
 nsmtool command prompt expects a NSM type to display the list of supported
@@ -89,6 +91,7 @@ Subcommands:
    GetEDPpScalingFactor        get EDPp scaling factor in integer percentage
    SetEDPpScalingFactor        set EDPp scaling factor as an integer percentage
    GetInventoryInfo            get inventory information
+   ........
 ```
 More help on the command usage can be found by specifying the NSM type and the
 command name with **-h** argument as shown below.
@@ -131,7 +134,7 @@ Options:
 **nsmtool request message format:**
 
 ```
-nsmtool raw --data 0x30 <nsmType> <cmdType> <payloadReq>
+nsmtool raw -m <eid> -d 0x10 0xde 0x80 0x89 <nsmType> <cmdType> <dataSize> <payloadReq>
 
 payloadReq - stream of bytes constructed based on the request message format
              defined for the command type as per the spec.
@@ -140,20 +143,20 @@ payloadReq - stream of bytes constructed based on the request message format
 **nsmtool response message format:**
 
 ```
-<instanceId> <hdrVersion> <nsmType> <cmdType> <completionCode> <payloadResp>
+<instanceId> <hdrVersion> <nsmType> <cmdType> <completionCode> <reserved> <dataSize> <payloadResp>
 
 payloadResp - stream of bytes displayed based on the response message format
               defined for the command type as per the spec.
 ```
-Example:
+Example: for ping command
 
 ```
-root@e4869:~# ./nsmtool raw -v -m 30 -d 0x7e 0xde 0x10 0x80 0x01 0x00 0x00 0x02 0x00 0x00
-nsmtool: <6> Tx: 1e 7e 7e de 10 80 01 00 00 02 00 00
+root@hgxb:~# nsmtool raw -v -m 23 -d 0x10 0xde 0x80 0x89 0x00 0x00 0x00
+nsmtool: <6> Tx: 10 de 80 89 00 00 00
 Success in creating the socket : RC = 5
 Success in connecting to socket : RC = 0
-Success in sending message type as VDM to mctp demux daemon : RC = 1
-nsmtool: <6> Rx: 7e de 10 00 00 00 00 00 00 00
+Success in sending message type as VDM to mctp demux daemon : RC = 4
+nsmtool: <6> Rx: 10 de 00 89 00 00 00 00 00 00 00
 ```
 
 ## nsmtool with mctp_eid option
@@ -165,7 +168,7 @@ end point and by default nsmtool consider mctp_eid value as **'30'**.
 Command format:
 
 nsmtool <nsmType> <cmdType> -m <mctpId>
-nsmtool raw -d 0x80 <nsmType> <cmdType> <payloadReq> -m <mctpId>
+nsmtool raw -d 0x10 0xde 0x80 0x89 <nsmType> <cmdType> <dataSize> <payloadReq> -m <mctpId>
 ```
 
 ## nsmtool verbosity
