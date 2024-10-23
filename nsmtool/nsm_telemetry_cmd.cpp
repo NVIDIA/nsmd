@@ -1058,7 +1058,11 @@ class GetInventoryInformation : public CommandInterface
             case MINIMUM_DEVICE_POWER_LIMIT:
             case MAXIMUM_DEVICE_POWER_LIMIT:
             case MINIMUM_MODULE_POWER_LIMIT:
-            case MAXMUM_MODULE_POWER_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case MAXIMUM_MODULE_POWER_LIMIT:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
             case RATED_MODULE_POWER_LIMIT:
             case DEFAULT_BOOST_CLOCKS:
             case DEFAULT_BASE_CLOCKS:
