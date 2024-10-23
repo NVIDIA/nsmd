@@ -76,10 +76,10 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
             reasonCode, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
-    if (erotInfo.fq_resp_hdr.firmware_slot_count < fwSlotObjects.size())
+    if (erotInfo.fq_resp_hdr.firmware_slot_count != fwSlotObjects.size())
     {
         lg2::debug(
-            "GET_NSM_BUILD_TYPE sc={SlOT_COUNT}, but expected slots not less than {SLOTS}",
+            "GET_NSM_BUILD_TYPE sc={SlOT_COUNT}, but expected slots {SLOTS}",
             "SC", erotInfo.fq_resp_hdr.firmware_slot_count, "SLOTS",
             fwSlotObjects.size());
         if (erotInfo.fq_resp_hdr.firmware_slot_count > 0)
@@ -184,7 +184,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 {
                     apFirmwareType = std::make_shared<NsmBuildTypeObject>(
                         name, type, uuid, classification, identifier);
-                    device->addSensor(apFirmwareType, false);
                 }
                 apFirmwareType->addSlotObject(slotObject);
                 if (apProgressIntf == nullptr)
@@ -200,7 +199,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                         bus, chassisName, type, uuid, apProgressIntf,
                         classification, identifier,
                         static_cast<uint8_t>(index));
-                    device->addSensor(apKeyMgmt, false);
                 }
                 apKeyMgmt->addSlotObject(slotObject);
                 if (apMinSecVersion == nullptr)
@@ -225,7 +223,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 {
                     ecFirmwareType = std::make_shared<NsmBuildTypeObject>(
                         name, type, uuid, classification, identifier);
-                    device->addSensor(ecFirmwareType, false);
                 }
                 ecFirmwareType->addSlotObject(slotObject);
                 if (ecProgressIntf == nullptr)
@@ -241,7 +238,6 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                         bus, chassisName, type, uuid, ecProgressIntf,
                         classification, identifier,
                         static_cast<uint8_t>(index));
-                    device->addSensor(ecKeyMgmt, false);
                 }
                 ecKeyMgmt->addSlotObject(slotObject);
                 if (ecMinSecVersion == nullptr)
@@ -257,6 +253,22 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                     rotProgressIntf = ecProgressIntf;
                 }
             }
+        }
+        if (apFirmwareType)
+        {
+            device->addSensor(apFirmwareType, false);
+        }
+        if (apKeyMgmt)
+        {
+            device->addSensor(apKeyMgmt, false);
+        }
+        if (ecFirmwareType)
+        {
+            device->addSensor(ecFirmwareType, false);
+        }
+        if (ecKeyMgmt)
+        {
+            device->addSensor(ecKeyMgmt, false);
         }
         if (rotProgressIntf == nullptr)
         {
