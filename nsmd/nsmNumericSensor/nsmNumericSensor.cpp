@@ -296,4 +296,37 @@ void NsmNumericSensorCompositeChildValue::updateReading(double value,
     }
 }
 
+requester::Coroutine NsmNumericSensor::update(SensorManager& manager, eid_t eid)
+{
+    if (isLongRunning)
+    {
+        co_return NSM_SW_SUCCESS; // Temporarily disabling long-running commands
+    }
+
+    auto requestMsg = genRequestMsg(eid, 0);
+    if (!requestMsg.has_value())
+    {
+        lg2::error(
+            "NsmNumericSensorComposite::update: genRequestMsg failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", eid);
+        co_return NSM_SW_ERROR;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
+                                              responseLen, isLongRunning);
+    if (rc)
+    {
+        for (const auto& sensor : sensorValue->getObjects())
+        {
+            sensor->updateReading(std::numeric_limits<double>::quiet_NaN());
+        }
+
+        co_return rc;
+    }
+
+    rc = handleResponseMsg(responseMsg.get(), responseLen);
+    co_return rc;
+}
 } // namespace nsm
