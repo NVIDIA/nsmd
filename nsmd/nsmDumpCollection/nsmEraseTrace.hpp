@@ -43,8 +43,10 @@ class NsmEraseTraceObject : public NsmObject, public EraseIntf
     NsmEraseTraceObject(sdbusplus::bus::bus& bus, const std::string& name,
                         const std::string& inventoryPath,
                         const std::string& type, const uuid_t& uuid);
-    void erase() override;
+    void eraseTrace() override;
+    void eraseDebugInfo(EraseInfoType infoType) override;
     requester::Coroutine eraseTraceOnDevice();
+    requester::Coroutine eraseDebugInfoOnDevice(uint8_t infoType);
 
   private:
     std::string objPath;
