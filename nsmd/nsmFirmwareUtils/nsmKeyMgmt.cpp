@@ -120,6 +120,14 @@ requester::Coroutine
     bitfield32_t updateMethodBitfield{updMethod};
     updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
+    // update the objects
+    sendRc = co_await update(manager, eid);
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        lg2::error("UpdateCodeAuth Method is success."
+                   "But updating key revocation properties failed rc={RC}",
+                   "RC", sendRc);
+    }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
