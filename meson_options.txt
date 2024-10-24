@@ -211,6 +211,13 @@ option(
 )
 
 option(
+    'tracing',
+    type: 'feature',
+    description: 'Enable UST tracing with LTTng',
+    value: 'disabled',
+)
+
+option(
     'nvidia-fpga-pcie-reference-clock-count',
     type: 'feature',
     value: 'enabled',

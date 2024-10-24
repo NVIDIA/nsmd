@@ -143,6 +143,17 @@ if get_option('accelerator-dbus').allowed()
     conf_data.set('ACCELERATOR_DBUS', 0)
 endif
 
+if get_option('tracing').enabled() and get_option('tests').enabled()
+    error('Cannot enable both features "tracing" and "tests" at a time. Please disable one of them.')
+endif
+
+if get_option('tracing').enabled()
+    summary('tracing','-DLTTNG_TRACING', section : 'Enabled Tracing')
+    conf_data.set('LTTNG_TRACING', 1)
+    liblttng = dependency('lttng-ust', required : true)
+    ldl = dependency('dl', required : true)
+endif
+
 conf_data.set('LOCAL_EID', get_option('local-eid'))
 
 if get_option('enable-in-kernel-mctp').enabled()

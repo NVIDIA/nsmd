@@ -30,6 +30,10 @@
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
+#ifdef LTTNG_TRACING
+#include "tracepoints/nsmd-tp.h"
+#endif
+
 namespace nsm
 {
 
@@ -713,12 +717,20 @@ requester::Coroutine
         // iterators and hence using index based element access.
         size_t sensorIndex{0};
 
+#ifdef LTTNG_TRACING
+        lttng_ust_tracepoint(nsmd, priority_polling_started, eid);
+#endif
+
         while (sensorIndex < prioritySensorCount)
         {
             auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
             ++sensorIndex;
         }
+
+#ifdef LTTNG_TRACING
+        lttng_ust_tracepoint(nsmd, priority_polling_ended, eid);
+#endif
 
         // update roundRobin sensors for rest of polling time interval
         nsmDevice->setPollingState(POLL_NON_PRIORITY);
