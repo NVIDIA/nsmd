@@ -17,6 +17,7 @@
 
 #include "nsmSecurityRBP.hpp"
 
+#include "nsmFirmwareUtilsCommon.hpp"
 #include "sensorManager.hpp"
 
 #include <charconv>
@@ -25,13 +26,6 @@
 
 namespace nsm
 {
-
-static std::unordered_map<uint16_t, std::string> minSecVersionErrors = {
-    {0x02, "Invalid MinimumSecurityVersion"},
-    {0x86, "EFUSE Update Failed"},
-    {0x87, "IrreversibleConfig Disabled"},
-    {0x88, "Nonce Mismatch"},
-};
 
 SecurityConfiguration::SecurityConfiguration(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
@@ -252,16 +246,6 @@ MinSecurityVersion::MinSecurityVersion(
         std::make_unique<SecurityVersionIntf>(bus, settingsPath.c_str());
 }
 
-inline std::tuple<uint16_t, std::string>
-    MinSecurityVersion::getErrorCode(uint16_t cc)
-{
-    if (minSecVersionErrors.find(cc) != minSecVersionErrors.end())
-    {
-        return {cc, minSecVersionErrors[cc]};
-    }
-    return {cc, std::format("Unknown Error: {}", cc)};
-}
-
 void MinSecurityVersion::updateProperties(
     const struct ::nsm_firmware_security_version_number_resp& sec_info)
 {
@@ -332,7 +316,8 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
         lg2::error("minSecVersionAsyncHandler: SendRecvNsmMsg error :"
                    " eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
-        errorCode(getErrorCode(sendRc));
+        errorCode(
+            getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, sendRc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return sendRc;
@@ -347,7 +332,8 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
         lg2::error("decode_nsm_firmware_update_sec_ver_resp failed for :"
                    " eid={EID} rc={RC}, cc={CC}",
                    "EID", eid, "RC", sendRc, "CC", cc);
-        errorCode(getErrorCode(cc));
+        errorCode(getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, cc,
+                               reason_code));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
