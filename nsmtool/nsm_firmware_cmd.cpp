@@ -362,10 +362,6 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
         }
         if (requestType == 1)
         {
-            if (revokedKeysString.empty())
-            {
-                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
-            }
             std::istringstream iss{revokedKeysString};
             std::string indexStr;
             while (getline(iss, indexStr, ','))

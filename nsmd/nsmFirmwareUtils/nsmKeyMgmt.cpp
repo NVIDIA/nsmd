@@ -158,10 +158,6 @@ void NsmKeyMgmt::revokeKeys(SecurityCommon::RequestTypes requestType,
     else if (requestType == SecurityCommon::RequestTypes::SpecifiedValue)
     {
         type = NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE;
-        if (indices.size() == 0)
-        {
-            throw Common::Error::InvalidArgument();
-        }
         try
         {
             bitmap = utils::indicesToBitmap(indices, bitmapLength);
