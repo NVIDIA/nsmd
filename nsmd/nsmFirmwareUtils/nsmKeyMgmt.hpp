@@ -70,7 +70,6 @@ class NsmKeyMgmt :
 
     int startOperation();
     void finishOperation(Progress::OperationStatus status);
-    std::tuple<uint16_t, std::string> getErrorCode(uint16_t cc);
     requester::Coroutine
         revokeKeysAsyncHandler(std::shared_ptr<Request> request);
 
