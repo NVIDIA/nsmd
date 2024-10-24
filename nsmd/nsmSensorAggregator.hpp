@@ -69,6 +69,8 @@ class NsmSensorAggregator : public NsmSensor
         TIMESTAMP = 0xFF
     };
 
+    // we are relying on samples in NsmSensorAggregator to be preserved across
+    // invocations of NsmSensor::update
     std::vector<TelemetrySample> samples;
 };
 } // namespace nsm
