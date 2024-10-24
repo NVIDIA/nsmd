@@ -139,6 +139,11 @@ class NsmNumericSensorValueAggregate : public NsmNumericSensorValue
     void append(std::unique_ptr<NsmNumericSensorValue> elem);
 
     void updateReading(double value, uint64_t timestamp = 0) override;
+    const std::vector<std::unique_ptr<NsmNumericSensorValue>>&
+        getObjects() const
+    {
+        return objects;
+    }
 
   private:
     std::vector<std::unique_ptr<NsmNumericSensorValue>> objects;
@@ -168,6 +173,8 @@ class NsmNumericSensor : public NsmSensor
     }
 
     virtual std::string getSensorType() = 0;
+    // Override the update function
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   protected:
     uint8_t sensorId;
