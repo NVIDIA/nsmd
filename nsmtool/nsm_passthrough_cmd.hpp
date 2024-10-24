@@ -95,15 +95,23 @@ class GetLogInfoFromFD
     std::string objectPath;
 };
 
-class CallEraseDbusAPI
+class CallEraseTraceDbusAPI
 {
   public:
-    CallEraseDbusAPI(CLI::App* app);
+    CallEraseTraceDbusAPI(CLI::App* app);
     void execute(const std::string& objectPath);
 
   private:
     std::string objectPath;
 };
+
+class CallEraseDebugInfoDbusAPI
+{
+  public:
+    CallEraseDebugInfoDbusAPI(CLI::App* app);
+    void execute(const std::string& objectPath);
+};
+
 void registerCommand(CLI::App& app);
 } // namespace passthrough
 } // namespace nsmtool
