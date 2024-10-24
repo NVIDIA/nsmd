@@ -51,7 +51,8 @@ class SecurityConfiguration : public SecurityConfigIntf
   public:
     SecurityConfiguration(sdbusplus::bus::bus& bus, const std::string& objPath,
                           const uuid_t& uuidIn,
-                          std::shared_ptr<ProgressIntf> progressIntfIn);
+                          std::shared_ptr<ProgressIntf> progressIntfIn,
+                          NsmSensor* nsmSensorIn);
 
     virtual ~SecurityConfiguration() = default;
     void updateState(
@@ -71,6 +72,7 @@ class SecurityConfiguration : public SecurityConfigIntf
     uuid_t uuid;
     std::mutex mutex;
     std::shared_ptr<ProgressIntf> progressIntf = nullptr;
+    NsmSensor* nsmSensor = nullptr;
 };
 
 class NsmSecurityCfgObject : public NsmSensor
@@ -104,7 +106,8 @@ class MinSecurityVersion : public MinSecVersionIntf
     MinSecurityVersion(sdbusplus::bus::bus& bus, const std::string& objPath,
                        const uuid_t& uuidIn, uint16_t classificationIn,
                        uint16_t identifierIn, uint8_t indexIn,
-                       std::shared_ptr<ProgressIntf> progressIntfIn);
+                       std::shared_ptr<ProgressIntf> progressIntfIn,
+                       NsmSensor* nsmSensorIn);
 
     virtual ~MinSecurityVersion() = default;
     void updateProperties(
@@ -127,6 +130,7 @@ class MinSecurityVersion : public MinSecVersionIntf
     std::unique_ptr<SecurityVersionIntf> securityVersionSettingsObject =
         nullptr;
     std::shared_ptr<ProgressIntf> progressIntf = nullptr;
+    NsmSensor* nsmSensor = nullptr;
 };
 
 class NsmMinSecVersionObject : public NsmSensor

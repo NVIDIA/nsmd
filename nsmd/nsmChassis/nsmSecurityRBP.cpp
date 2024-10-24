@@ -29,9 +29,9 @@ namespace nsm
 
 SecurityConfiguration::SecurityConfiguration(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
-    std::shared_ptr<ProgressIntf> progressIntfIn) :
+    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor* nsmSensorIn) :
     SecurityConfigIntf(bus, objPath.c_str()),
-    uuid(uuidIn), progressIntf(progressIntfIn)
+    uuid(uuidIn), progressIntf(progressIntfIn), nsmSensor(nsmSensorIn)
 {}
 
 void SecurityConfiguration::updateState(
@@ -139,6 +139,13 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
         }
         finishOperation(Progress::OperationStatus::Completed);
     }
+    sendRc = co_await nsmSensor->update(manager, eid);
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        lg2::error("IrreversibleConfig Method is success."
+                   "But updating IrreversibleConfigState failed rc={RC}",
+                   "RC", sendRc);
+    }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -183,7 +190,7 @@ NsmSecurityCfgObject::NsmSecurityCfgObject(
     lg2::info("NsmSecurityCfgObject: create object: {PATH}", "PATH",
               objectPath.c_str());
     securityCfgObject = std::make_unique<SecurityConfiguration>(
-        bus, objectPath, uuid, progressIntfIn);
+        bus, objectPath, uuid, progressIntfIn, this);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -234,10 +241,10 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
 MinSecurityVersion::MinSecurityVersion(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
-    std::shared_ptr<ProgressIntf> progressIntfIn) :
+    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor* nsmSensorIn) :
     MinSecVersionIntf(bus, objPath.c_str()),
     uuid(uuidIn), classification(classificationIn), identifier(identifierIn),
-    index(indexIn), progressIntf(progressIntfIn)
+    index(indexIn), progressIntf(progressIntfIn), nsmSensor(nsmSensorIn)
 {
     securityVersionObject =
         std::make_unique<SecurityVersionIntf>(bus, objPath.c_str());
@@ -341,6 +348,13 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     bitfield32_t updateMethodBitfield{sec_resp.update_methods};
     updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
+    sendRc = co_await nsmSensor->update(manager, eid);
+    if (sendRc != NSM_SW_SUCCESS)
+    {
+        lg2::error("UpdateMinSecVersion Method is success."
+                   "But updating sec version properties failed rc={RC}",
+                   "RC", sendRc);
+    }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -389,7 +403,7 @@ NsmMinSecVersionObject::NsmMinSecVersionObject(
               objectPath.c_str());
     minSecVersion = std::make_unique<MinSecurityVersion>(
         bus, objectPath, uuid, classification, identifier, index,
-        progressIntfIn);
+        progressIntfIn, this);
 }
 
 std::optional<std::vector<uint8_t>>
