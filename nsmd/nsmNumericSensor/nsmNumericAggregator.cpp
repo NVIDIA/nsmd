@@ -71,4 +71,46 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
 
     return NSM_SW_SUCCESS;
 }
+
+requester::Coroutine NsmNumericAggregator::update(SensorManager& manager,
+                                                  eid_t eid)
+{
+    if (isLongRunning)
+    {
+        // TODO: Temporarily disabling long running commands.
+        // To be removed after backend starts support long running commands.
+
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    }
+
+    auto requestMsg = genRequestMsg(eid, 0);
+    if (!requestMsg.has_value())
+    {
+        lg2::error(
+            "NsmNumericAggregator::update: genRequestMsg failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", eid);
+        co_return NSM_SW_ERROR;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
+                                              responseLen, isLongRunning);
+    if (rc)
+    {
+        // we are relying on samples in NsmSensorAggregator to
+        // be preserved across invocations of
+        // NsmSensor::update for this to work.
+        for (const auto& sample : samples)
+        {
+            updateSensorNotWorking(sample.tag, false);
+        }
+
+        co_return rc;
+    }
+
+    rc = handleResponseMsg(responseMsg.get(), responseLen);
+    co_return rc;
+}
 } // namespace nsm
