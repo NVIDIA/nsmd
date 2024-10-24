@@ -31,6 +31,10 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#ifdef LTTNG_TRACING
+#include "tracepoints/nsmd-tp.h"
+#endif
+
 namespace mctp_socket
 {
 std::optional<Response> Handler::processRxMsg(uint8_t tag, uint8_t eid,
@@ -70,6 +74,11 @@ std::optional<Response> Handler::processRxMsg(uint8_t tag, uint8_t eid,
     {
         auto response = reinterpret_cast<const nsm_msg*>(hdr);
         size_t responseLen = nsmMsgSize;
+
+#ifdef LTTNG_TRACING
+        lttng_ust_tracepoint(nsmd, socket_recv, eid, response, responseLen);
+#endif
+
         handler.handleResponse(tag, eid, hdrFields.instance_id,
                                hdrFields.nvidia_msg_type, response->payload[0],
                                response, responseLen);

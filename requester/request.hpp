@@ -39,6 +39,10 @@
 #include <functional>
 #include <iostream>
 
+#ifdef LTTNG_TRACING
+#include "tracepoints/nsmd-tp.h"
+#endif
+
 namespace requester
 {
 
@@ -215,6 +219,10 @@ class Request final : public RequestRetryTimer
      */
     int send() const
     {
+#ifdef LTTNG_TRACING
+        lttng_ust_tracepoint(nsmd, socket_send, eid, requestMsg.data(),
+                             requestMsg.size());
+#endif
         auto rc = socketHandler->sendMsg(tag, eid, fd, requestMsg.data(),
                                          requestMsg.size());
         if (rc < 0)

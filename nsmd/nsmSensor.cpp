@@ -18,6 +18,10 @@
 
 #include "sensorManager.hpp"
 
+#ifdef LTTNG_TRACING
+#include "tracepoints/nsmd-tp.h"
+#endif
+
 namespace nsm
 {
 requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
@@ -32,6 +36,11 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
         co_return NSM_SW_ERROR;
     }
 
+#ifdef LTTNG_TRACING
+    lttng_ust_tracepoint(nsmd, sensor_polling_request_generated, eid,
+                         requestMsg.value().data(), this->getName().c_str());
+#endif
+
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
@@ -43,6 +52,12 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
     }
 
     rc = handleResponseMsg(responseMsg.get(), responseLen);
+
+#ifdef LTTNG_TRACING
+    lttng_ust_tracepoint(nsmd, dbus_sensor_reading_updated, eid,
+                         responseMsg.get(), this->getName().c_str());
+#endif
+
     // coverity[missing_return]
     co_return rc;
 }

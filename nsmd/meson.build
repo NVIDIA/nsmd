@@ -61,6 +61,12 @@ subdir('nsmHistograms')
 subdir('nsmReady')
 subdir('nsmLongRunning')
 
+if get_option('tracing').enabled()
+  deps += [ liblttng, ldl ]
+  sources += [ '../tracepoints/nsmd-tp.c' ]
+  nsmd_headers += [ '../tracepoints' ]
+endif
+
 executable(
     'nsmd',
     sources,
