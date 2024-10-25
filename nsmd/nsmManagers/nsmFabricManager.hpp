@@ -28,6 +28,7 @@
 #include <com/nvidia/State/FabricManager/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/ManagementService/server.hpp>
+#include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
 #include <unordered_map>
@@ -38,6 +39,7 @@ namespace nsm
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
+using ItemIntf = object_t<Inventory::server::Item>;
 using ManagementServiceIntf =
     object_t<Inventory::Item::server::ManagementService>;
 using OperaStatusIntf = sdbusplus::xyz::openbmc_project::State::Decorator::
@@ -55,18 +57,20 @@ class NsmFabricManagerState : public NsmObject
 {
   public:
     NsmFabricManagerState(const std::string& name, const std::string& type,
-                          std::string& inventoryObjPath,
-                          std::shared_ptr<FabricManagerIntf> fabricMgrIntf,
-                          std::shared_ptr<OperaStatusIntf> opStateIntf,
-                          std::shared_ptr<ManagementServiceIntf> mgmtSerIntf);
+                          std::string& inventoryObjPath, SensorManager& manager,
+                          sdbusplus::bus_t& bus, std::string& description);
     NsmFabricManagerState() = default;
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+    std::shared_ptr<FabricManagerIntf> getFabricManagerIntf();
+    std::shared_ptr<OperaStatusIntf> getOperaStatusIntf();
 
   private:
     std::shared_ptr<FabricManagerIntf> fabricManagerIntf = nullptr;
     std::shared_ptr<OperaStatusIntf> operationalStatusIntf = nullptr;
     std::shared_ptr<ManagementServiceIntf> managementServiceIntf = nullptr;
+    std::shared_ptr<ItemIntf> itemIntf = nullptr;
     std::string objPath;
 };
 
