@@ -570,6 +570,8 @@ std::optional<std::vector<uint8_t>>
                     return eraseTraceHandler(request, requestLen);
                 case NSM_GET_NETWORK_DEVICE_LOG_INFO:
                     return getNetworkDeviceLogInfoHandler(request, requestLen);
+                case NSM_ERASE_DEBUG_INFO:
+                    return eraseDebugInfoHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -764,9 +766,9 @@ std::optional<std::vector<uint8_t>>
                  {4,
                   {NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_RESET_NETWORK_DEVICE,
-                   NSM_QUERY_TOKEN_PARAMETERS, NSM_PROVIDE_TOKEN,
-                   NSM_DISABLE_TOKENS, NSM_QUERY_TOKEN_STATUS,
-                   NSM_QUERY_DEVICE_IDS}},
+                   NSM_QUERY_TOKEN_PARAMETERS, NSM_ERASE_DEBUG_INFO,
+                   NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
                  {5, {3, 4, 5, 6, 7}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
@@ -4814,6 +4816,41 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_get_network_device_log_info_resp failed: rc={RC}",
                    "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::eraseDebugInfoHandler(const nsm_msg* requestMsg,
+                                           size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("eraseDebugInfoHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t info_type;
+    auto rc = decode_erase_debug_info_req(requestMsg, requestLen, &info_type);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_erase_debug_info_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_erase_debug_info_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_erase_debug_info_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                      reason_code, ERASE_TRACE_DATA_ERASED,
+                                      responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_erase_debug_info_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
     return response;

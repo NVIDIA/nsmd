@@ -596,3 +596,126 @@ int decode_get_network_device_log_info_resp(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_erase_debug_info_req(uint8_t instance_id, uint8_t info_type,
+				struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_erase_debug_info_req *request =
+	    (struct nsm_erase_debug_info_req *)msg->payload;
+
+	request->hdr.command = NSM_ERASE_DEBUG_INFO;
+	request->hdr.data_size = sizeof(struct nsm_erase_debug_info_req) -
+				 sizeof(struct nsm_common_req);
+	request->debug_info_type = info_type;
+	request->reserved = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_erase_debug_info_req(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *info_type)
+{
+	if (msg == NULL || info_type == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_erase_debug_info_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_erase_debug_info_req *request =
+	    (struct nsm_erase_debug_info_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(struct nsm_erase_debug_info_req) -
+					  sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*info_type = request->debug_info_type;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_erase_debug_info_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint8_t result_status,
+				 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_ERASE_TRACE,
+					  msg);
+	}
+
+	struct nsm_erase_debug_info_resp *response =
+	    (struct nsm_erase_debug_info_resp *)msg->payload;
+
+	response->hdr.command = NSM_ERASE_DEBUG_INFO;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(sizeof(struct nsm_erase_debug_info_resp) -
+		    sizeof(struct nsm_common_resp));
+	response->result_status = result_status;
+	response->reserved = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_erase_debug_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint8_t *result_status)
+{
+	if (result_status == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_erase_debug_info_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_erase_debug_info_resp *response =
+	    (struct nsm_erase_debug_info_resp *)msg->payload;
+
+	uint16_t data_size = le16toh(response->hdr.data_size);
+	if (data_size != sizeof(struct nsm_erase_debug_info_resp) -
+			     sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*result_status = response->result_status;
+
+	return NSM_SW_SUCCESS;
+}

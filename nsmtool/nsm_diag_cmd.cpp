@@ -903,6 +903,83 @@ class GetNetworkDeviceLogInfo : public CommandInterface
     uint32_t recordHandle;
 };
 
+class EraseDebugInfo : public CommandInterface
+{
+  public:
+    ~EraseDebugInfo() = default;
+    EraseDebugInfo() = delete;
+    EraseDebugInfo(const EraseDebugInfo&) = delete;
+    EraseDebugInfo(EraseDebugInfo&&) = default;
+    EraseDebugInfo& operator=(const EraseDebugInfo&) = delete;
+    EraseDebugInfo& operator=(EraseDebugInfo&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit EraseDebugInfo(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto eraseDebugInfoOptionGroup =
+            app->add_option_group("Required", "Erase debug info options.");
+
+        infoType = 0;
+        eraseDebugInfoOptionGroup->add_option(
+            "-t, --infoType", infoType,
+            "Debug information type [0-FW saved debug info]");
+        eraseDebugInfoOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_erase_debug_info_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_erase_debug_info_req(instanceId, infoType, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t resStatus = 0;
+
+        auto rc = decode_erase_debug_info_resp(responsePtr, payloadLength, &cc,
+                                               &reasonCode, &resStatus);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        switch (resStatus)
+        {
+            case ERASE_TRACE_NO_DATA_ERASED:
+                result["Result status"] =
+                    "0: No data was erased, FLASH storage is empty.";
+                break;
+            case ERASE_TRACE_DATA_ERASED:
+                result["Result status"] = "1: Flash storage is erased.";
+                break;
+            case ERASE_TRACE_DATA_ERASE_INPROGRESS:
+                result["Result status"] =
+                    "2: Flash storage erase is in progress.";
+                break;
+            default:
+                result["Result status"] = "Unknown value";
+                break;
+        }
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t infoType;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto diag = app.add_subcommand("diag", "Diagnostics type command");
@@ -955,6 +1032,11 @@ void registerCommand(CLI::App& app)
         "GetNetworkDeviceLogInfo", "Get Network Device Log Info");
     commands.push_back(std::make_unique<GetNetworkDeviceLogInfo>(
         "diag", "GetNetworkDeviceLogInfo", getNetworkDeviceLogInfo));
+
+    auto eraseDebugInfo = diag->add_subcommand("EraseDebugInfo",
+                                               "Erase Debug Info");
+    commands.push_back(std::make_unique<EraseDebugInfo>(
+        "diag", "EraseDebugInfo", eraseDebugInfo));
 }
 
 } // namespace diag
