@@ -118,14 +118,15 @@ class NsmPowerProfileCollection : public NsmSensor
 };
 
 // Power Smoothing Control: Apply Admin Override and Activate a preset profile
-
+class NsmCurrentPowerSmoothingProfile;
 class NsmPowerSmoothingAction : public NsmObject, public ProfileActionAsyncIntf
 {
   public:
-    NsmPowerSmoothingAction(sdbusplus::bus::bus& bus, const std::string& name,
-                            const std::string& type,
-                            std::string& inventoryObjPath,
-                            std::shared_ptr<NsmDevice> device);
+    NsmPowerSmoothingAction(
+        sdbusplus::bus::bus& bus, const std::string& name,
+        const std::string& type, std::string& inventoryObjPath,
+        std::shared_ptr<NsmCurrentPowerSmoothingProfile> currentProfile,
+        std::shared_ptr<NsmDevice> device);
 
     // dbus method override for ProfileActionAsyncIntf
     sdbusplus::message::object_path
@@ -146,6 +147,7 @@ class NsmPowerSmoothingAction : public NsmObject, public ProfileActionAsyncIntf
         requestApplyAdminOverride(AsyncOperationStatusType* status);
 
   private:
+    std::shared_ptr<NsmCurrentPowerSmoothingProfile> currentProfile;
     std::shared_ptr<NsmDevice> device;
     std::string inventoryObjPath;
 };

@@ -2566,7 +2566,7 @@ std::optional<std::vector<uint8_t>>
             doubleToNvUFXP4_12(0.1 * (i + 1));
         profiles[i].ramp_up_rate_in_miliwattspersec = 20 * (i + 1);
         profiles[i].ramp_down_rate_in_miliwattspersec = 30 * (i + 1);
-        profiles[i].ramp_hysterisis_rate_in_miliwattspersec = 40 * (i + 1);
+        profiles[i].ramp_hysterisis_rate_in_milisec = 40 * (i + 1);
     }
 
     uint16_t meta_data_size =

@@ -103,17 +103,26 @@ class OemAdminProfileIntf :
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
+            // fraction to percent
             AdminPowerProfileIntf::tmpFloorPercent(
-                adminProfiledata.admin_override_percent_tmp_floor);
+                NvUFXP4_12ToDouble(
+                    adminProfiledata.admin_override_percent_tmp_floor) *
+                100);
+            // mw/sec to watts/sec
             AdminPowerProfileIntf::rampUpRate(
                 adminProfiledata
-                    .admin_override_ramup_rate_in_miliwatts_per_second);
+                    .admin_override_ramup_rate_in_miliwatts_per_second /
+                1000);
+            // mw/sec to watts/sec
             AdminPowerProfileIntf::rampDownRate(
                 adminProfiledata
-                    .admin_override_rampdown_rate_in_miliwatts_per_second);
+                    .admin_override_rampdown_rate_in_miliwatts_per_second /
+                1000);
+            // miliseconds to seconds
             AdminPowerProfileIntf::rampDownHysteresis(
                 adminProfiledata
-                    .admin_override_rampdown_hysteresis_value_in_milisec);
+                    .admin_override_rampdown_hysteresis_value_in_milisec /
+                1000);
             lg2::info("getAdminProfileFromDevice for EID: {EID} completed ",
                       "EID", eid);
         }
@@ -135,15 +144,26 @@ class OemAdminProfileIntf :
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info("overrideAdminProfileParam for EID: {EID} parameterId:{ID}",
-                  "EID", eid, "ID", parameterId);
+        lg2::info(
+            "overrideAdminProfileParam for EID: {EID} parameterId:{ID}, parameterValue: {PARAMVALUE}",
+            "EID", eid, "ID", parameterId, "PARAMVALUE", paramValue);
 
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_setup_admin_override_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+        uint32_t parameValueTobeSet = paramValue;
+        if (parameterId == 0)
+        {
+            parameValueTobeSet = doubleToNvUFXP4_12(paramValue);
+        }
+        else
+        {
+            // watts/sec to watts/msec or seconds to miliseconds
+            parameValueTobeSet = paramValue * 1000;
+        }
         // first argument instanceid=0 is irrelevant
-        auto rc = encode_setup_admin_override_req(0, parameterId, paramValue,
-                                                  requestMsg);
+        auto rc = encode_setup_admin_override_req(
+            0, parameterId, parameValueTobeSet, requestMsg);
 
         if (rc)
         {
@@ -203,9 +223,9 @@ class OemAdminProfileIntf :
             throw sdbusplus::error::xyz::openbmc_project::common::
                 InvalidArgument{};
         }
-
-        const auto rc = co_await overrideAdminProfileParam(0, *floorPercent,
-                                                           status);
+        // percent to fraction
+        const auto rc =
+            co_await overrideAdminProfileParam(0, *floorPercent / 100, status);
         // coverity[missing_return]
         co_return rc;
     }

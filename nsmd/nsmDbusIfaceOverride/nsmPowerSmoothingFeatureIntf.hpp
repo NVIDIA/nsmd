@@ -101,14 +101,24 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
             bool rampDownEnabled = (data.feature_flag & (1u << 2)) != 0 ? true
                                                                         : false;
             PowerSmoothingIntf::immediateRampDownEnabled(rampDownEnabled);
-
-            PowerSmoothingIntf::currentTempSetting(data.currentTmpSetting);
-            PowerSmoothingIntf::currentTempFloorSetting(
-                data.currentTmpFloorSetting);
+            // mw to Watts
+            double reading = (static_cast<uint32_t>(data.currentTmpSetting) ==
+                              INVALID_POWER_LIMIT)
+                                 ? INVALID_POWER_LIMIT
+                                 : data.currentTmpSetting / 1000;
+            PowerSmoothingIntf::currentTempSetting(reading);
+            // mw to Watts
+            reading = (static_cast<uint32_t>(data.currentTmpFloorSetting) ==
+                       INVALID_POWER_LIMIT)
+                          ? INVALID_POWER_LIMIT
+                          : data.currentTmpFloorSetting / 1000;
+            PowerSmoothingIntf::currentTempFloorSetting(reading);
+            // fraction to percent
             PowerSmoothingIntf::maxAllowedTmpFloorPercent(
-                NvUFXP4_12ToDouble(data.maxTmpFloorSettingInPercent));
+                NvUFXP4_12ToDouble(data.maxTmpFloorSettingInPercent) * 100);
+            // fraction to percent
             PowerSmoothingIntf::minAllowedTmpFloorPercent(
-                NvUFXP4_12ToDouble(data.minTmpFloorSettingInPercent));
+                NvUFXP4_12ToDouble(data.minTmpFloorSettingInPercent) * 100);
             lg2::info("getPwrSmoothingControlsFromDevice completed");
         }
         else
@@ -129,7 +139,9 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info("togglePowerSmoothingOnDevice for EID: {EID}", "EID", eid);
+        lg2::info(
+            "togglePowerSmoothingOnDevice for EID: {EID} to Enable = {ENABLE}",
+            "EID", eid, "ENABLE", featureEnabled);
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_toggle_feature_state_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -209,7 +221,9 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info("toggleImmediateRampDownOnDevice for EID: {EID}", "EID", eid);
+        lg2::info(
+            "toggleImmediateRampDownOnDevice for EID: {EID} to Enable = {ENABLE}",
+            "EID", eid, "ENABLE", ramdownEnabled);
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_toggle_immediate_rampdown_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());

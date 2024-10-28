@@ -3662,14 +3662,15 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
                 nsmDevice);
 
-        std::shared_ptr<NsmPowerSmoothingAction> pwrSmoothingAction =
-            std::make_shared<NsmPowerSmoothingAction>(
-                bus, name, type, inventoryObjPath, nsmDevice);
-
         auto currentProfileSensor =
             std::make_shared<NsmCurrentPowerSmoothingProfile>(
                 name, type, inventoryObjPath, pwrSmoothingCurProfileIntf,
                 getAllPowerProfileSensor, adminProfileSensor);
+
+        std::shared_ptr<NsmPowerSmoothingAction> pwrSmoothingAction =
+            std::make_shared<NsmPowerSmoothingAction>(
+                bus, name, type, inventoryObjPath, currentProfileSensor,
+                nsmDevice);
         /*,pwrSmoothingAction*/
         // nsmDevice->deviceSensors.emplace_back(currentProfileSensor);
         nsmDevice->deviceSensors.emplace_back(pwrSmoothingAction);
