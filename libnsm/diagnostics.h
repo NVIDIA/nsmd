@@ -29,6 +29,7 @@ enum diagnostics_command {
 	NSM_ERASE_TRACE = 0x51,
 	NSM_GET_NETWORK_DEVICE_LOG_INFO = 0x52,
 	NSM_RESET_NETWORK_DEVICE = 0x53,
+	NSM_ERASE_DEBUG_INFO = 0x59,
 	NSM_ENABLE_DISABLE_WP = 0x65
 };
 
@@ -78,7 +79,7 @@ enum nsm_debug_information_type {
 	INFO_TYPE_DEVICE_DUMP = 3
 };
 
-enum nsm_erase_information_type { INFO_TYPE_DEVICE_DEBUG_INFO = 0 };
+enum nsm_erase_information_type { INFO_TYPE_FW_SAVED_DUMP_INFO = 0 };
 
 enum nsm_erase_trace_status {
 	ERASE_TRACE_NO_DATA_ERASED = 0,
@@ -205,6 +206,26 @@ struct nsm_get_network_device_log_info_resp {
 	uint32_t next_record_handle;
 	struct nsm_device_log_info log_info;
 	uint8_t log_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_erase_debug_info_req
+ *
+ *  Structure representing NSM Erase debug info request.
+ */
+struct nsm_erase_debug_info_req {
+	struct nsm_common_req hdr;
+	uint8_t debug_info_type;
+	uint8_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_erase_debug_info_resp
+ *
+ *  Structure representing NSM Erase debug info response.
+ */
+struct nsm_erase_debug_info_resp {
+	struct nsm_common_resp hdr;
+	uint8_t result_status;
+	uint8_t reserved;
 } __attribute__((packed));
 
 /** @brief Encode a Diagnostics Enable/Disable WP request message
@@ -452,6 +473,52 @@ int decode_get_network_device_log_info_resp(
     uint16_t *reason_code, uint32_t *next_handle,
     struct nsm_device_log_info_breakdown *log_info, uint8_t *log_data,
     uint16_t *log_data_size);
+
+/** @brief Encode a Erase Debug Info request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] info_type - Information type to erase
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_erase_debug_info_req(uint8_t instance_id, uint8_t info_type,
+				struct nsm_msg *msg);
+
+/** @brief Decode a Erase Debug Info request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] info_type - Information type to erase
+ *  @return nsm_completion_codes
+ */
+int decode_erase_debug_info_req(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *info_type);
+
+/** @brief Encode a Erase Debug Info response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] result_status - erase trace result status
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_erase_debug_info_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint8_t result_status,
+				 struct nsm_msg *msg);
+
+/** @brief Decode a Erase Debug Info response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] result_status - erase trace result status
+ *  @return nsm_completion_codes
+ */
+int decode_erase_debug_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint8_t *result_status);
 
 #ifdef __cplusplus
 }
