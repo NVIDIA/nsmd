@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-#include "utils.hpp"
+#include "config.h"
 
-#include "base.h"
+#include "utils.hpp"
 
 #include "dBusAsyncUtils.hpp"
 
@@ -286,32 +286,50 @@ void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
     switch (deviceType)
     {
         case NSM_DEV_ID_GPU:
-            if (instanceNumber > 7)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 7 for GPU");
+            if (instanceNumber >= MAX_GPU_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum GPUs count {}",
+                    instanceNumber, MAX_GPU_COUNT));
+            }
             break;
         case NSM_DEV_ID_SWITCH:
-            if (instanceNumber > 3)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 3 for NvSwitch");
+            if (instanceNumber >= MAX_NV_SWITCH_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum NV Switches count {}",
+                    instanceNumber, MAX_NV_SWITCH_COUNT));
+            }
             break;
         case NSM_DEV_ID_PCIE_BRIDGE:
-            if (instanceNumber > 0)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 0 for PCIe Bridge");
+            if (instanceNumber >= MAX_PCIE_BRIDGE_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum PCIe Bridges count {}",
+                    instanceNumber, MAX_PCIE_BRIDGE_COUNT));
+            }
             break;
         case NSM_DEV_ID_BASEBOARD:
-            if (!retimer && instanceNumber > 0)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 0 for Baseboard");
-            else if (instanceNumber > 7)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 7 for Retimer");
+            if (!retimer && instanceNumber >= MAX_BASEBOARD_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum Baseboards count {}",
+                    instanceNumber, MAX_BASEBOARD_COUNT));
+            }
+            else if (retimer && instanceNumber >= MAX_RETIMER_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum PCIe Retimers count {}",
+                    instanceNumber, MAX_RETIMER_COUNT));
+            }
             break;
         case NSM_DEV_ID_EROT:
-            if (instanceNumber > 4)
-                throw std::invalid_argument(
-                    "Instance number cannot be bigger than 4 for ERoT");
+            if (instanceNumber >= MAX_EROT_COUNT)
+            {
+                throw std::invalid_argument(std::format(
+                    "Instance number {} cannot be bigger than maximum ERoTs count {}",
+                    instanceNumber, MAX_EROT_COUNT));
+            }
             break;
         default:
             throw std::invalid_argument("Unknown device type: " +

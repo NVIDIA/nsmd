@@ -1532,6 +1532,7 @@ struct NsmProcessorTest :
         {"Name", name},
         {"Type", "NSM_Processor"},
         {"UUID", gpuUuid},
+        {"DEVICE_UUID", gpuUuid},
         {"InventoryObjPath", objPath},
     };
     const PropertyValuesCollection prcKnobs = {
@@ -1577,11 +1578,10 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "UUID"));
-    values.push(get(error, "Type"));
-    values.push(get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(error, "Type"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
@@ -1591,11 +1591,10 @@ TEST_F(NsmProcessorTest, badTestTypeError)
 TEST_F(NsmProcessorTest, badTestNoDevideFound)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(error, "UUID"));
-    values.push(get(basic, "Type"));
-    values.push(get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(error, "UUID"));
+    values.push(objPath, get(basic, "Type"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
@@ -1605,14 +1604,13 @@ TEST_F(NsmProcessorTest, badTestNoDevideFound)
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "UUID"));
-    values.push(get(prcKnobs, "Type"));
-    values.push(get(basic, "InventoryObjPath"));
-    values.push(get(prcKnobs, "Priority"));
-    values.push(get(prcKnobs, "Features"));
-    ;
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(prcKnobs, "Type"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
+    values.push(objPath, get(prcKnobs, "Priority"));
+    values.push(objPath, get(prcKnobs, "Features"));
+
     createNsmProcessorSensor(
         mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
 
@@ -1662,11 +1660,11 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "UUID"));
-    values.push(get(basic, "Type"));
-    values.push(get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(basic, "Type"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "DEVICE_UUID"));
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
 
     auto capabilitiesCount =

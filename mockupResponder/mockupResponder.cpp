@@ -4664,6 +4664,18 @@ std::optional<std::vector<uint8_t>>
         case RETIMER_EEPROM_8:
             writeProtected.retimer8 = value;
             break;
+        case CPU_SPI_FLASH_1:
+            writeProtected.cpu1 = value;
+            break;
+        case CPU_SPI_FLASH_2:
+            writeProtected.cpu2 = value;
+            break;
+        case CPU_SPI_FLASH_3:
+            writeProtected.cpu3 = value;
+            break;
+        case CPU_SPI_FLASH_4:
+            writeProtected.cpu4 = value;
+            break;
         default:
             lg2::error(
                 "enableDisableWriteProtectedHandler: Invalid Data Index");

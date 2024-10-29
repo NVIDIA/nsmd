@@ -87,8 +87,7 @@ struct NsmThresholdEventTest :
 TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(error, "UUID"));
+    values.push(objPath, get(error, "UUID"));
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.deviceEvents.size());
@@ -97,16 +96,15 @@ TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
 TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    for (auto& [key, value] : basic)
+    for (auto& pair : basic)
     {
-        if (key == "MessageArgs")
+        if (pair.first == "MessageArgs")
         {
-            values.push(get(error, key));
+            values.push(objPath, get(error, pair.first));
         }
         else
         {
-            values.push(value);
+            values.push(objPath, pair);
         }
     }
 
@@ -117,10 +115,9 @@ TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    for (auto& [_, value] : basic)
+    for (auto& it : basic)
     {
-        values.push(value);
+        values.push(objPath, it);
     }
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);

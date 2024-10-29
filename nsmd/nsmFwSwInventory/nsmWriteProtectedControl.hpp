@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "nsmInterface.hpp"
+#include "nsmSetWriteProtected.hpp"
 
 #include <xyz/openbmc_project/Software/Settings/server.hpp>
 
@@ -34,18 +34,15 @@ class NsmWriteProtectedControl :
     public NsmInterfaceContainer<SettingsIntf>
 {
   private:
-    NsmDeviceIdentification deviceType;
-    uint8_t instanceNumber;
-    const bool retimer;
+    const diagnostics_enable_disable_wp_data_index dataIndex;
 
   public:
-    NsmWriteProtectedControl(const NsmInterfaceProvider<SettingsIntf>& provider,
-                             NsmDeviceIdentification deviceType,
-                             uint8_t instanceNumber, bool retimer);
+    NsmWriteProtectedControl(
+        const NsmInterfaceProvider<SettingsIntf>& provider,
+        const diagnostics_enable_disable_wp_data_index dataIndex);
     NsmWriteProtectedControl() = delete;
 
-    std::optional<Request> genRequestMsg(eid_t eid,
-                                         uint8_t instanceNumber) override;
+    std::optional<Request> genRequestMsg(eid_t eid, uint8_t) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
 };

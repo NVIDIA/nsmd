@@ -26,18 +26,17 @@ IDBusHandler& DBusHandler()
     return MockDBusHandler::instance();
 }
 
-PropertyValue DBusTest::get(const PropertyValuesCollection& properties,
-                            const std::string& name)
+const PropertyValuesCollection::value_type
+    DBusTest::get(const PropertyValuesCollection& properties,
+                  const DbusProp& name)
 {
-    auto it = std::find_if(
-        properties.begin(), properties.end(),
-        [&name](const std::pair<std::string, PropertyValue>& pair) {
-        return pair.first == name;
-    });
+    auto it =
+        std::find_if(properties.begin(), properties.end(),
+                     [&name](const auto& pair) { return pair.first == name; });
     if (it == properties.end())
         throw std::out_of_range("Property " + name +
                                 " not found in collection");
-    return it->second;
+    return *it;
 }
 
 } // namespace utils

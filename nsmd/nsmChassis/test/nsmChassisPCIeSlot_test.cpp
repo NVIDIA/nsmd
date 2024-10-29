@@ -77,13 +77,12 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     auto& map = utils::MockDbusAsync::getServiceMap();
     map = serviceMap;
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "UUID"));
-    values.push(get(basic, "DeviceIndex"));
-    values.push(get(basic, "SlotType"));
-    values.push(get(basic, "Priority"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(basic, "DeviceIndex"));
+    values.push(objPath, get(basic, "SlotType"));
+    values.push(objPath, get(basic, "Priority"));
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(0, baseboard.prioritySensors.size());
@@ -106,13 +105,12 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(error, "UUID"));
-    values.push(get(basic, "DeviceIndex"));
-    values.push(get(basic, "SlotType"));
-    values.push(get(basic, "Priority"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(error, "UUID"));
+    values.push(objPath, get(basic, "DeviceIndex"));
+    values.push(objPath, get(basic, "SlotType"));
+    values.push(objPath, get(basic, "Priority"));
 
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, baseboard.prioritySensors.size());
