@@ -183,9 +183,8 @@ struct NsmPCIePortTest :
 TEST_F(NsmPCIePortTest, badTestCreateDeviceSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "InventoryObjPath"));
-    values.push(get(error, "UUID"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
+    values.push(objPath, get(error, "UUID"));
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, cx7.prioritySensors.size());
@@ -198,17 +197,16 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     utils::MockDbusAsync::getServiceMap() = serviceMap;
 
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "InventoryObjPath"));
-    values.push(get(basic, "UUID"));
-    values.push(get(associations[0], "Forward"));
-    values.push(get(associations[0], "Backward"));
-    values.push(get(associations[0], "AbsolutePath"));
-    values.push(get(basic, "Health"));
-    values.push(get(basic, "PortType"));
-    values.push(get(basic, "PortProtocol"));
-    values.push(get(basic, "LinkState"));
-    values.push(get(basic, "LinkStatus"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(associations[0], "Forward"));
+    values.push(objPath, get(associations[0], "Backward"));
+    values.push(objPath, get(associations[0], "AbsolutePath"));
+    values.push(objPath, get(basic, "Health"));
+    values.push(objPath, get(basic, "PortType"));
+    values.push(objPath, get(basic, "PortProtocol"));
+    values.push(objPath, get(basic, "LinkState"));
+    values.push(objPath, get(basic, "LinkStatus"));
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
 

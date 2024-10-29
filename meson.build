@@ -128,6 +128,13 @@ if get_option('enable-in-kernel-mctp').enabled()
     conf_data.set('MCTP_IN_KERNEL', 0)
 endif
 
+conf_data.set('MAX_GPU_COUNT', get_option('max-gpu-count'))
+conf_data.set('MAX_NV_SWITCH_COUNT', get_option('max-nv-switch-count'))
+conf_data.set('MAX_PCIE_BRIDGE_COUNT', get_option('max-pcie-bridge-count'))
+conf_data.set('MAX_BASEBOARD_COUNT', get_option('max-baseboard-count'))
+conf_data.set('MAX_RETIMER_COUNT', get_option('max-retimer-count'))
+conf_data.set('MAX_EROT_COUNT', get_option('max-erot-count'))
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []

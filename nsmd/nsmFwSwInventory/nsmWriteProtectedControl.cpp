@@ -19,8 +19,6 @@
 
 #include "device-configuration.h"
 
-#include "nsmSetWriteProtected.hpp"
-
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
@@ -28,13 +26,10 @@ namespace nsm
 
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
-    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer) :
+    const diagnostics_enable_disable_wp_data_index dataIndex) :
     NsmSensor(provider),
-    NsmInterfaceContainer(provider), deviceType(deviceType),
-    instanceNumber(instanceNumber), retimer(retimer)
-{
-    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
-}
+    NsmInterfaceContainer(provider), dataIndex(dataIndex)
+{}
 
 std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,
                                                                uint8_t)
@@ -67,10 +62,8 @@ uint8_t NsmWriteProtectedControl::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        auto value = NsmSetWriteProtected::getValue(data, deviceType,
-                                                    instanceNumber, retimer);
         // Updates WriteProtected in FirmwareInventory
-        pdi().writeProtected(value);
+        pdi().writeProtected(NsmSetWriteProtected::getValue(data, dataIndex));
         clearErrorBitMap("decode_get_fpga_diagnostics_settings_wp_resp");
     }
     else

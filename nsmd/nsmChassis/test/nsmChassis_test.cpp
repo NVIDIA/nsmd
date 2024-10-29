@@ -154,10 +154,9 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
 TEST_F(NsmChassisTest, badTestCreateDeviceSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(error, "Type"));
-    values.push(get(basic, "UUID"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(error, "Type"));
+    values.push(objPath, get(basic, "UUID"));
 
     nsmChassisCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -173,44 +172,35 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     map = gpuServiceMap;
 
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(basic, "DeviceType"));
-    values.push(get(basic, "DEVICE_UUID"));
-    values.push(get(association, "Forward"));
-    values.push(get(association, "Backward"));
-    values.push(get(association, "AbsolutePath"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(basic, "DeviceType"));
+    values.push(objPath, get(basic, "DEVICE_UUID"));
+    values.push(objPath, get(association, "Forward"));
+    values.push(objPath, get(association, "Backward"));
+    values.push(objPath, get(association, "AbsolutePath"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(chassisType, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(chassisType, "ChassisType"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(chassisType, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(chassisType, "ChassisType"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisType",
                             objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(health, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(health, "Health"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(health, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(health, "Health"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Health", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(location, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(location, "LocationType"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(location, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(location, "LocationType"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Location", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(locationCode, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(locationCode, "LocationCode"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(locationCode, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(locationCode, "LocationCode"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".LocationCode",
                             objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -302,19 +292,16 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     map = fpgaServiceMap;
 
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(fpgaProperties, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(fpgaProperties, "DeviceType"));
-    values.push(get(fpgaProperties, "DEVICE_UUID"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(fpgaProperties, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(fpgaProperties, "DeviceType"));
+    values.push(objPath, get(fpgaProperties, "DEVICE_UUID"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(fpgaAsset, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(fpgaAsset, "Manufacturer"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(fpgaAsset, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(fpgaAsset, "Manufacturer"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -348,25 +335,20 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
 TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(asset, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(asset, "Manufacturer"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(asset, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(asset, "Manufacturer"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(dimension, "Type"));
-    values.push(get(basic, "UUID"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(dimension, "Type"));
+    values.push(objPath, get(basic, "UUID"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Dimension", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(writeProtect, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(fpgaProperties, "DeviceType"));
-    values.push(get(fpgaProperties, "INSTANCE_NUMBER"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(writeProtect, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(fpgaProperties, "DeviceType"));
+    values.push(objPath, get(fpgaProperties, "INSTANCE_NUMBER"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
                             objPath);
 
@@ -421,33 +403,28 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "Name"));
-    values.push(get(powerLimit, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(powerLimit, "Priority"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(powerLimit, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(powerLimit, "Priority"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerLimit",
                             objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(operationalStatus, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(fpgaProperties, "DeviceType"));
-    values.push(get(operationalStatus, "InstanceNumber"));
-    values.push(get(operationalStatus, "InventoryObjPaths"));
-    values.push(get(operationalStatus, "Priority"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(operationalStatus, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(fpgaProperties, "DeviceType"));
+    values.push(objPath, get(operationalStatus, "InstanceNumber"));
+    values.push(objPath, get(operationalStatus, "InventoryObjPaths"));
+    values.push(objPath, get(operationalStatus, "Priority"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
                             objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(powerState, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(fpgaProperties, "DeviceType"));
-    values.push(get(powerState, "InstanceNumber"));
-    values.push(get(powerState, "InventoryObjPaths"));
-    values.push(get(powerState, "Priority"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(powerState, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(fpgaProperties, "DeviceType"));
+    values.push(objPath, get(powerState, "InstanceNumber"));
+    values.push(objPath, get(powerState, "InventoryObjPaths"));
+    values.push(objPath, get(powerState, "Priority"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
                             objPath);
     EXPECT_EQ(1, fpga.prioritySensors.size());
@@ -461,11 +438,10 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
 TEST_F(NsmChassisTest, badTestCreateStaticSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(writeProtect, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(basic, "DeviceType"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(writeProtect, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(basic, "DeviceType"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
                             objPath);
 }
@@ -473,19 +449,16 @@ TEST_F(NsmChassisTest, badTestCreateStaticSensors)
 TEST_F(NsmChassisTest, badTestCreateDynamicSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(operationalStatus, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(basic, "DeviceType"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(operationalStatus, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(basic, "DeviceType"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
                             objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(fpgaProperties, "Name"));
-    values.push(get(powerState, "Type"));
-    values.push(get(fpgaProperties, "UUID"));
-    values.push(get(basic, "DeviceType"));
+    values.push(objPath, get(fpgaProperties, "Name"));
+    values.push(objPath, get(powerState, "Type"));
+    values.push(objPath, get(fpgaProperties, "UUID"));
+    values.push(objPath, get(basic, "DeviceType"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
                             objPath);
 }

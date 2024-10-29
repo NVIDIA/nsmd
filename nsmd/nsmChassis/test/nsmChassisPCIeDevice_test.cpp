@@ -132,11 +132,10 @@ struct NsmChassisPCIeDeviceTest :
 TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(error, "Type"));
-    values.push(get(basic, "UUID"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(error, "Type"));
+    values.push(objPath, get(basic, "UUID"));
 
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -152,26 +151,23 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     map = gpuServiceMap;
 
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(basic, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(basic, "DEVICE_UUID"));
-    values.push(get(associations[0], "Forward"));
-    values.push(get(associations[0], "Backward"));
-    values.push(get(associations[0], "AbsolutePath"));
-    values.push(get(associations[1], "Forward"));
-    values.push(get(associations[1], "Backward"));
-    values.push(get(associations[1], "AbsolutePath"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(basic, "DEVICE_UUID"));
+    values.push(objPath, get(associations[0], "Forward"));
+    values.push(objPath, get(associations[0], "Backward"));
+    values.push(objPath, get(associations[0], "AbsolutePath"));
+    values.push(objPath, get(associations[1], "Forward"));
+    values.push(objPath, get(associations[1], "Backward"));
+    values.push(objPath, get(associations[1], "AbsolutePath"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(health, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(health, "Health"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(health, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(health, "Health"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Health",
                                       objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -202,43 +198,36 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(asset, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(asset, "Manufacturer"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(asset, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(asset, "Manufacturer"));
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(pcieDevice, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(pcieDevice, "DeviceType"));
-    values.push(get(pcieDevice, "Functions"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(pcieDevice, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(pcieDevice, "DeviceType"));
+    values.push(objPath, get(pcieDevice, "Functions"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(ltssmState, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(ltssmState, "DeviceIndex"));
-    values.push(get(ltssmState, "Priority"));
-    values.push(get(ltssmState, "InventoryObjPath"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(ltssmState, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(ltssmState, "DeviceIndex"));
+    values.push(objPath, get(ltssmState, "Priority"));
+    values.push(objPath, get(ltssmState, "InventoryObjPath"));
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
-
-    values = std::queue<PropertyValue>();
-    values.push(get(basic, "ChassisName"));
-    values.push(get(basic, "Name"));
-    values.push(get(clockOutputEnableState, "Type"));
-    values.push(get(basic, "UUID"));
-    values.push(get(clockOutputEnableState, "DeviceType"));
-    values.push(get(clockOutputEnableState, "InstanceNumber"));
+    values.push(objPath, get(basic, "ChassisName"));
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(clockOutputEnableState, "Type"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(clockOutputEnableState, "DeviceType"));
+    values.push(objPath, get(clockOutputEnableState, "InstanceNumber"));
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 

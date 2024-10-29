@@ -34,13 +34,13 @@ class NsmFirmwareInventory : public NsmInterfaceProvider<IntfType>
   public:
     NsmFirmwareInventory() = delete;
     NsmFirmwareInventory(const std::string& name) :
-        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory",
+        NsmInterfaceProvider<IntfType>(name, "NSM_WriteProtect",
                                        firmwareInventoryBasePath)
     {}
     NsmFirmwareInventory(const std::string& name, const path& inventoryPath,
                          const std::shared_ptr<IntfType>& pdi) :
-        NsmInterfaceProvider<IntfType>(name, "NSM_FirmwareInventory",
-                                       inventoryPath, pdi)
+        NsmInterfaceProvider<IntfType>(name, "NSM_WriteProtect", inventoryPath,
+                                       pdi)
     {}
 };
 
