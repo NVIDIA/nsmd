@@ -94,6 +94,8 @@ class SensorManager
     std::vector<std::shared_ptr<NsmDefaultPowerCap>> defaultPowerCapList;
     std::vector<std::shared_ptr<NsmMaxPowerCap>> maxPowerCapList;
     std::vector<std::shared_ptr<NsmMinPowerCap>> minPowerCapList;
+    std::map<std::string, std::vector<std::shared_ptr<NsmDevice>>>
+        processorModuleToDeviceMap;
 
   protected:
     static std::unique_ptr<SensorManager> instance;

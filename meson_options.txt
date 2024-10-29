@@ -26,6 +26,12 @@ option(
     value: 150,
 )
 option(
+    'num-gpu-per-module',
+    type: 'integer',
+    description: 'Total number of GPU in each processor module.',
+    value: 2,
+)
+option(
     'gpio-name',
     type: 'string',
     value: 'GPU_BASE_PWR_GD',
