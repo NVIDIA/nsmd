@@ -62,7 +62,7 @@ using MapperServiceMap = std::vector<std::pair<ServiceName, dbus::Interfaces>>;
 using GetSubTreeResponse = std::vector<std::pair<ObjectPath, MapperServiceMap>>;
 using GetAssociatedObjectsResponse = std::variant<std::vector<ObjectPath>>;
 using PropertyValuesCollection =
-    std::vector<std::pair<std::string, PropertyValue>>;
+    std::vector<std::pair<DbusProp, PropertyValue>>;
 
 #define UUID_INT_SIZE 16
 #define UUID_LEN 36

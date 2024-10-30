@@ -18,11 +18,9 @@
             },
             {
                 "Name": "HGX_FW_PCIeRetimer_$INSTANCE_NUMBER",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 3,
-                "IsRetimer": true,
-                "InstanceNumber": "$INSTANCE_NUMBER",
+                "DataIndex": "$INSTANCE_NUMBER + 192",
                 "Asset": {
                     "Type": "NSM_Asset",
                     "Manufacturer": "NVIDIA"
@@ -40,7 +38,8 @@
                     }
                 ],
                 "Version": {
-                    "Type": "NSM_FirmwareVersion"
+                    "Type": "NSM_FirmwareVersion",
+                    "InstanceNumber": "$INSTANCE_NUMBER"
                 }
             }
         ],

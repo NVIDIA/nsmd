@@ -36,12 +36,11 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
     NiceMock<MockSensorManager> mockManager{devices};
     std::unique_ptr<NsmSetWriteProtected> writeProtectedIntf;
 
-    void init(NsmDeviceIdentification deviceType, uint8_t instanceNumber,
-              bool retimer = false)
+    void init(const diagnostics_enable_disable_wp_data_index dataIndex)
     {
         writeProtectedIntf = std::make_unique<NsmSetWriteProtected>(
-            "TEST", mockManager, instanceNumber, deviceType,
-            (firmwareInventoryBasePath / "HGX_FW_TEST_DEV").string(), retimer);
+            "TEST", mockManager, dataIndex,
+            (firmwareInventoryBasePath / "HGX_FW_TEST_DEV").string());
     }
 
     const Response enableDisableMsg{
@@ -72,9 +71,8 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
                 WriteFailure{};
         }
         lastResponse = resp;
-        value = NsmSetWriteProtected::getValue(
-            data(), writeProtectedIntf->deviceType,
-            writeProtectedIntf->instanceNumber, writeProtectedIntf->retimer);
+        value = NsmSetWriteProtected::getValue(data(),
+                                               writeProtectedIntf->dataIndex);
         return value && result.await_resume() == NSM_SW_SUCCESS &&
                status == AsyncOperationStatusType::Success;
     }
@@ -82,7 +80,7 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
 
 TEST_F(NsmSetWriteProtectedTest, badTestBaseboardWrite)
 {
-    init(NSM_DEV_ID_BASEBOARD, 0);
+    init(HMC_SPI_FLASH);
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .Times(1)
         .WillOnce(mockSendRecvNsmMsg(enableDisableMsg, Response(),
@@ -95,7 +93,7 @@ TEST_F(NsmSetWriteProtectedTest, badTestBaseboardWrite)
 
 TEST_F(NsmSetWriteProtectedTest, goodTestBaseboardWrite)
 {
-    init(NSM_DEV_ID_BASEBOARD, 0);
+    init(HMC_SPI_FLASH);
     const Response enabled{0b00,       0x00, 0b00, 0x00,
                            0b00010000, 0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -107,7 +105,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestBaseboardWrite)
 
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer1Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 0, true);
+    init(RETIMER_EEPROM_1);
     const Response enabled{0b00000001, 0x00, 0b00000001, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -119,7 +117,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer1Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer2Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 1, true);
+    init(RETIMER_EEPROM_2);
     const Response enabled{0b00000001, 0x00, 0b00000010, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -131,7 +129,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer2Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer3Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 2, true);
+    init(RETIMER_EEPROM_3);
     const Response enabled{0b00000001, 0x00, 0b00000100, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -143,7 +141,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer3Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer4Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 3, true);
+    init(RETIMER_EEPROM_4);
     const Response enabled{0b00000001, 0x00, 0b00001000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -155,7 +153,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer4Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer5Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 4, true);
+    init(RETIMER_EEPROM_5);
     const Response enabled{0b00000001, 0x00, 0b00010000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -167,7 +165,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer5Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer6Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 5, true);
+    init(RETIMER_EEPROM_6);
     const Response enabled{0b00000001, 0x00, 0b00100000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -179,7 +177,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer6Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer7Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 6, true);
+    init(RETIMER_EEPROM_7);
     const Response enabled{0b00000001, 0x00, 0b01000000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -191,7 +189,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer7Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestRetimer8Write)
 {
-    init(NSM_DEV_ID_BASEBOARD, 7, true);
+    init(RETIMER_EEPROM_8);
     const Response enabled{0b00000001, 0x00, 0b10000000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -201,10 +199,57 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer8Write)
     EXPECT_EQ(1, data().retimer);
     EXPECT_EQ(1, data().retimer8);
 }
+TEST_F(NsmSetWriteProtectedTest, goodTestCpu1Write)
+{
+    init(CPU_SPI_FLASH_1);
+    const Response enabled{0x00,       0b00000010, 0x00, 0x00,
+                           0b00100000, 0x00,       0x00, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
 
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().cpu1_4);
+    EXPECT_EQ(1, data().cpu1);
+}
+TEST_F(NsmSetWriteProtectedTest, goodTestCpu2Write)
+{
+    init(CPU_SPI_FLASH_2);
+    const Response enabled{0x00,       0b00000010, 0x00, 0x00,
+                           0b01000000, 0x00,       0x00, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().cpu1_4);
+    EXPECT_EQ(1, data().cpu2);
+}
+TEST_F(NsmSetWriteProtectedTest, goodTestCpu3Write)
+{
+    init(CPU_SPI_FLASH_3);
+    const Response enabled{0x00,       0b00000010, 0x00, 0x00,
+                           0b10000000, 0x00,       0x00, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().cpu1_4);
+    EXPECT_EQ(1, data().cpu3);
+}
+TEST_F(NsmSetWriteProtectedTest, goodTestCpu4Write)
+{
+    init(CPU_SPI_FLASH_4);
+    const Response enabled{0x00, 0b00000010, 0x00, 0x00,
+                           0x00, 0b00000001, 0x00, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().cpu1_4);
+    EXPECT_EQ(1, data().cpu4);
+}
 TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch1Write)
 {
-    init(NSM_DEV_ID_SWITCH, 0);
+    init(NVSW_EEPROM_1);
     const Response enabled{0b00001000, 0x00, 0x00, 0b0000001,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -216,7 +261,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch1Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch2Write)
 {
-    init(NSM_DEV_ID_SWITCH, 1);
+    init(NVSW_EEPROM_2);
     const Response enabled{0b00001000, 0x00, 0x00, 0b0000010,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -228,7 +273,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch2Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestNvLinkManagementWrite)
 {
-    init(NSM_DEV_ID_PCIE_BRIDGE, 0);
+    init(PEX_SW_EEPROM);
     const Response enabled{0b00000100, 0x00, 0x00, 0x00,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -240,7 +285,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvLinkManagementWrite)
 
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu1Write)
 {
-    init(NSM_DEV_ID_GPU, 0);
+    init(GPU_SPI_FLASH_1);
     const Response enabled{0b10000000, 0x00, 0x00, 0b00010000,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -252,7 +297,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu1Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu2Write)
 {
-    init(NSM_DEV_ID_GPU, 1);
+    init(GPU_SPI_FLASH_2);
     const Response enabled{0b10000000, 0x00, 0x00, 0b00100000,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -264,7 +309,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu2Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu3Write)
 {
-    init(NSM_DEV_ID_GPU, 2);
+    init(GPU_SPI_FLASH_3);
     const Response enabled{0b10000000, 0x00, 0x00, 0b01000000,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -276,7 +321,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu3Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu4Write)
 {
-    init(NSM_DEV_ID_GPU, 3);
+    init(GPU_SPI_FLASH_4);
     const Response enabled{0b10000000, 0x00, 0x00, 0b10000000,
                            0x00,       0x00, 0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -288,7 +333,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu4Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu5Write)
 {
-    init(NSM_DEV_ID_GPU, 4);
+    init(GPU_SPI_FLASH_5);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000001, 0x00,       0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -300,7 +345,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu5Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu6Write)
 {
-    init(NSM_DEV_ID_GPU, 5);
+    init(GPU_SPI_FLASH_6);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000010, 0x00,       0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -312,7 +357,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu6Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu7Write)
 {
-    init(NSM_DEV_ID_GPU, 6);
+    init(GPU_SPI_FLASH_7);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000100, 0x00,       0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -324,7 +369,7 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu7Write)
 }
 TEST_F(NsmSetWriteProtectedTest, goodTestGpu8Write)
 {
-    init(NSM_DEV_ID_GPU, 7);
+    init(GPU_SPI_FLASH_8);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00001000, 0x00,       0x00, 0x00};
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
@@ -333,57 +378,4 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu8Write)
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu5_8);
     EXPECT_EQ(1, data().gpu8);
-}
-TEST_F(NsmSetWriteProtectedTest, goodTestGetDataIndex)
-{
-    EXPECT_EQ(GPU_SPI_FLASH_1,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 0));
-    EXPECT_EQ(GPU_SPI_FLASH_2,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 1));
-    EXPECT_EQ(GPU_SPI_FLASH_3,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 2));
-    EXPECT_EQ(GPU_SPI_FLASH_4,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 3));
-    EXPECT_EQ(GPU_SPI_FLASH_5,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 4));
-    EXPECT_EQ(GPU_SPI_FLASH_6,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 5));
-    EXPECT_EQ(GPU_SPI_FLASH_7,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 6));
-    EXPECT_EQ(GPU_SPI_FLASH_8,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 7));
-    EXPECT_EQ(NVSW_EEPROM_1,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_SWITCH, 0));
-    EXPECT_EQ(NVSW_EEPROM_2,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_SWITCH, 1));
-    EXPECT_EQ(PEX_SW_EEPROM,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_PCIE_BRIDGE, 0));
-    EXPECT_EQ(HMC_SPI_FLASH,
-              NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_BASEBOARD, 0));
-    EXPECT_EQ(RETIMER_EEPROM_1, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 0, true));
-    EXPECT_EQ(RETIMER_EEPROM_2, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 1, true));
-    EXPECT_EQ(RETIMER_EEPROM_3, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 2, true));
-    EXPECT_EQ(RETIMER_EEPROM_4, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 3, true));
-    EXPECT_EQ(RETIMER_EEPROM_5, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 4, true));
-    EXPECT_EQ(RETIMER_EEPROM_6, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 5, true));
-    EXPECT_EQ(RETIMER_EEPROM_7, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 6, true));
-    EXPECT_EQ(RETIMER_EEPROM_8, NsmSetWriteProtected::getDataIndex(
-                                    NSM_DEV_ID_BASEBOARD, 7, true));
-}
-
-TEST_F(NsmSetWriteProtectedTest, badTestGetDataIndex)
-{
-    EXPECT_EQ(0, NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 8));
-    EXPECT_EQ(0, NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_GPU, 8));
-    EXPECT_EQ(0, NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_SWITCH, 2));
-    EXPECT_EQ(
-        0, NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_BASEBOARD, 8, true));
-    EXPECT_EQ(0, NsmSetWriteProtected::getDataIndex(NSM_DEV_ID_UNKNOWN, 0));
 }

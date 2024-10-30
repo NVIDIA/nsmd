@@ -79,18 +79,19 @@ struct SdBusTestError : public sdbusplus::exception::exception
         return error;
     };
 };
+
 class DBusTest
 {
   protected:
     MockDBusHandler& mockDBus = MockDBusHandler::instance();
 
-    static PropertyValue get(const PropertyValuesCollection& properties,
-                             const std::string& name);
+    static const PropertyValuesCollection::value_type
+        get(const PropertyValuesCollection& properties, const DbusProp& name);
     template <typename T>
     static T get(const PropertyValuesCollection& properties,
-                 const std::string& name)
+                 const DbusProp& name)
     {
-        return std::get<T>(get(properties, name));
+        return std::get<T>(get(properties, name).second);
     }
 };
 
