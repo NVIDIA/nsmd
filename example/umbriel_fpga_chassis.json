@@ -739,94 +739,105 @@
             },
             {
                 "Name": "HGX_FW_GPU_SXM_1",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 0
+                "DataIndex": 162
             },
             {
                 "Name": "HGX_FW_GPU_SXM_2",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 1
+                "DataIndex": 163
             },
             {
                 "Name": "HGX_FW_GPU_SXM_3",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 2
+                "DataIndex": 164
             },
             {
                 "Name": "HGX_FW_GPU_SXM_4",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 3
+                "DataIndex": 165
             },
             {
                 "Name": "HGX_FW_GPU_SXM_5",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 4
+                "DataIndex": 166
             },
             {
                 "Name": "HGX_FW_GPU_SXM_6",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 5
+                "DataIndex": 167
             },
             {
                 "Name": "HGX_FW_GPU_SXM_7",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 6
+                "DataIndex": 168
             },
             {
                 "Name": "HGX_FW_GPU_SXM_8",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 0,
-                "InstanceNumber": 7
+                "DataIndex": 169
             },
             {
                 "Name": "HGX_FW_NVSwitch_0",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 1,
-                "InstanceNumber": 0
+                "DataIndex": 133
             },
             {
                 "Name": "HGX_FW_NVSwitch_1",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 1,
-                "InstanceNumber": 1
+                "DataIndex": 134
             },
             {
                 "Name": "HGX_FW_NVLinkManagementNIC_0",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 2,
-                "InstanceNumber": 0
+                "DataIndex": 130
             },
             {
                 "Name": "HGX_FW_FPGA_0",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 3,
-                "InstanceNumber": 0
+                "DataIndex": 129
             },
             {
                 "Name": "HGX_FW_BMC_0",
-                "Type": "NSM_FirmwareInventory",
+                "Type": "NSM_WriteProtect",
                 "UUID": "$UUID",
-                "DeviceType": 3,
-                "InstanceNumber": 0
+                "DataIndex": 176
+            },
+            {
+                "Name": "HGX_FW_CPU_0",
+                "Type": "NSM_WriteProtect",
+                "UUID": "$UUID",
+                "DataIndex": 224
+            },
+            {
+                "Name": "HGX_FW_CPU_1",
+                "Type": "NSM_WriteProtect",
+                "UUID": "$UUID",
+                "DataIndex": 225
+            },
+            {
+                "Name": "HGX_FW_CPU_2",
+                "Type": "NSM_WriteProtect",
+                "UUID": "$UUID",
+                "DataIndex": 226
+            },
+            {
+                "Name": "HGX_FW_CPU_3",
+                "Type": "NSM_WriteProtect",
+                "UUID": "$UUID",
+                "DataIndex": 227
             }
         ],
         "Probe": "xyz.openbmc_project.NsmDevice({'DEVICE_TYPE': 3})",

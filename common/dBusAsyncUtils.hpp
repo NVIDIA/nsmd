@@ -61,7 +61,7 @@ struct coGetDbusProperty
      * method will send out NSM request message, register a call back function
      * for the event when D-Bus method done.
      */
-    bool await_suspend(std::coroutine_handle<> handle) noexcept
+    bool await_suspend(std::coroutine_handle<> handle)
     {
         auto& asioConnection = utils::DBusHandler::getAsioConnection();
 
@@ -78,6 +78,7 @@ struct coGetDbusProperty
             }
             else
             {
+                // can throw std::bad_variant_access
                 ret = std::get<type>(value);
             }
             resumeHandle();
@@ -183,10 +184,20 @@ struct coGetServiceMap
 
 struct MockDbusAsync
 {
+    struct DbusPropsMap :
+        std::map<std::string, std::map<DbusProp, PropertyValue>>
+    {
+        void push(const std::string& objPath,
+                  const std::pair<DbusProp, PropertyValue>& property)
+        {
+            (*this)[objPath][property.first] = property.second;
+        }
+    };
+
     /** @brief Get the values reference for gtest. */
     static auto& getValues()
     {
-        static std::queue<PropertyValue> values{};
+        static DbusPropsMap values{};
         return values;
     }
 
@@ -207,17 +218,20 @@ struct coGetDbusProperty
 
     type ret;
 
-    bool await_ready() noexcept
+    bool await_ready()
     {
-        auto& values = utils::MockDbusAsync::getValues();
-        if (values.empty())
+        auto& values = MockDbusAsync::getValues();
+        auto it = values[objectPath].find(property);
+        if (it == values[objectPath].end())
         {
-            ret = type();
+            throw std::out_of_range(std::format(
+                "error while DbusProperties.Get for intf={}, prop={} and path={}.",
+                interface, property, objectPath));
         }
         else
         {
-            ret = std::get<type>(values.front());
-            values.pop();
+            // can throw std::bad_variant_access
+            ret = std::get<type>(it->second);
         }
 
         return true;

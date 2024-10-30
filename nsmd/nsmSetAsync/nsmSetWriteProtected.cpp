@@ -17,8 +17,6 @@
 
 #include "nsmSetWriteProtected.hpp"
 
-#include "diagnostics.h"
-
 #include "sensorManager.hpp"
 
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -27,182 +25,86 @@
 namespace nsm
 {
 
-NsmSetWriteProtected::NsmSetWriteProtected(const std::string& name,
-                                           SensorManager& manager,
-                                           uint8_t instanceNumber,
-                                           NsmDeviceIdentification deviceType,
-                                           std::string objPath, bool retimer) :
+NsmSetWriteProtected::NsmSetWriteProtected(
+    const std::string& name, SensorManager& manager,
+    const diagnostics_enable_disable_wp_data_index dataIndex,
+    const std::string objPath) :
     NsmInterfaceProvider<SettingsIntf>(name, "NSM_WriteProtected",
                                        dbus::Interfaces{objPath}),
-    manager(manager), instanceNumber(instanceNumber), deviceType(deviceType),
-    retimer(retimer)
-{
-    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
-}
+    manager(manager), dataIndex(dataIndex)
+{}
 
 bool NsmSetWriteProtected::getValue(
     const nsm_fpga_diagnostics_settings_wp& data,
-    NsmDeviceIdentification deviceType, uint8_t instanceNumber, bool retimer)
+    const diagnostics_enable_disable_wp_data_index dataIndex)
 {
-    auto writeProtected = false;
-    switch (deviceType)
+    switch (dataIndex)
     {
-        case NSM_DEV_ID_GPU:
-            switch (instanceNumber)
-            {
-                case 0:
-                    writeProtected = data.gpu1;
-                    break;
-                case 1:
-                    writeProtected = data.gpu2;
-                    break;
-                case 2:
-                    writeProtected = data.gpu3;
-                    break;
-                case 3:
-                    writeProtected = data.gpu4;
-                    break;
-                case 4:
-                    writeProtected = data.gpu5;
-                    break;
-                case 5:
-                    writeProtected = data.gpu6;
-                    break;
-                case 6:
-                    writeProtected = data.gpu7;
-                    break;
-                case 7:
-                    writeProtected = data.gpu8;
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case NSM_DEV_ID_SWITCH:
-            switch (instanceNumber)
-            {
-                case 0:
-                    writeProtected = data.nvSwitch1;
-                    break;
-                case 1:
-                    writeProtected = data.nvSwitch2;
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case NSM_DEV_ID_PCIE_BRIDGE:
-            writeProtected = data.pex;
-            break;
-        case NSM_DEV_ID_BASEBOARD:
-            if (retimer)
-            {
-                switch (instanceNumber)
-                {
-                    case 0:
-                        writeProtected = data.retimer1;
-                        break;
-                    case 1:
-                        writeProtected = data.retimer2;
-                        break;
-                    case 2:
-                        writeProtected = data.retimer3;
-                        break;
-                    case 3:
-                        writeProtected = data.retimer4;
-                        break;
-                    case 4:
-                        writeProtected = data.retimer5;
-                        break;
-                    case 5:
-                        writeProtected = data.retimer6;
-                        break;
-                    case 6:
-                        writeProtected = data.retimer7;
-                        break;
-                    case 7:
-                        writeProtected = data.retimer8;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                writeProtected = data.hmc;
-            }
-            break;
+        case RETIMER_EEPROM:
+            return data.retimer;
+        case BASEBOARD_FRU_EEPROM:
+        case CX7_FRU_EEPROM:
+        case HMC_FRU_EEPROM:
+            return data.baseboard;
+        case PEX_SW_EEPROM:
+            return data.pex;
+        case NVSW_EEPROM_BOTH:
+            return data.nvSwitch;
+        case NVSW_EEPROM_1:
+            return data.nvSwitch1;
+        case NVSW_EEPROM_2:
+            return data.nvSwitch2;
+        case GPU_1_4_SPI_FLASH:
+            return data.gpu1_4;
+        case GPU_5_8_SPI_FLASH:
+            return data.gpu5_8;
+        case GPU_SPI_FLASH_1:
+            return data.gpu1;
+        case GPU_SPI_FLASH_2:
+            return data.gpu2;
+        case GPU_SPI_FLASH_3:
+            return data.gpu3;
+        case GPU_SPI_FLASH_4:
+            return data.gpu4;
+        case GPU_SPI_FLASH_5:
+            return data.gpu5;
+        case GPU_SPI_FLASH_6:
+            return data.gpu6;
+        case GPU_SPI_FLASH_7:
+            return data.gpu7;
+        case GPU_SPI_FLASH_8:
+            return data.gpu8;
+        case HMC_SPI_FLASH:
+            return data.hmc;
+        case RETIMER_EEPROM_1:
+            return data.retimer1;
+        case RETIMER_EEPROM_2:
+            return data.retimer2;
+        case RETIMER_EEPROM_3:
+            return data.retimer3;
+        case RETIMER_EEPROM_4:
+            return data.retimer4;
+        case RETIMER_EEPROM_5:
+            return data.retimer5;
+        case RETIMER_EEPROM_6:
+            return data.retimer6;
+        case RETIMER_EEPROM_7:
+            return data.retimer7;
+        case RETIMER_EEPROM_8:
+            return data.retimer8;
+        case CPU_SPI_FLASH_1:
+            return data.cpu1;
+        case CPU_SPI_FLASH_2:
+            return data.cpu2;
+        case CPU_SPI_FLASH_3:
+            return data.cpu3;
+        case CPU_SPI_FLASH_4:
+            return data.cpu4;
         default:
-            break;
+            return false;
     }
-    return writeProtected;
 }
-int NsmSetWriteProtected::getDataIndex(NsmDeviceIdentification deviceType,
-                                       uint8_t instanceNumber, bool retimer)
-{
-    auto dataIndex = 0;
-    switch (deviceType)
-    {
-        case NSM_DEV_ID_GPU:
-            switch (instanceNumber)
-            {
-                case 0:
-                case 1:
-                case 2:
-                case 3:
-                case 4:
-                case 5:
-                case 6:
-                case 7:
-                    dataIndex = GPU_SPI_FLASH_1 + instanceNumber;
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case NSM_DEV_ID_SWITCH:
-            switch (instanceNumber)
-            {
-                case 0:
-                case 1:
-                    dataIndex = NVSW_EEPROM_1 + instanceNumber;
-                    break;
-                default:
-                    break;
-            }
-            break;
-        case NSM_DEV_ID_PCIE_BRIDGE:
-            dataIndex = PEX_SW_EEPROM;
-            break;
-        case NSM_DEV_ID_BASEBOARD:
-            if (retimer)
-            {
-                switch (instanceNumber)
-                {
-                    case 0:
-                    case 1:
-                    case 2:
-                    case 3:
-                    case 4:
-                    case 5:
-                    case 6:
-                    case 7:
-                        dataIndex = RETIMER_EEPROM_1 + instanceNumber;
-                        break;
-                    default:
-                        break;
-                }
-            }
-            else
-            {
-                dataIndex = HMC_SPI_FLASH;
-            }
-            break;
-        default:
-            break;
-    }
-    return dataIndex;
-}
+
 requester::Coroutine NsmSetWriteProtected::writeProtected(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
@@ -224,11 +126,8 @@ requester::Coroutine
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_req));
 
     auto eid = manager.getEid(device);
-    auto dataIndex = getDataIndex(deviceType, instanceNumber, retimer);
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_enable_disable_wp_req(
-        0, (diagnostics_enable_disable_wp_data_index)dataIndex, value,
-        requestPtr);
+    auto rc = encode_enable_disable_wp_req(0, dataIndex, value, requestPtr);
 
     if (rc != NSM_SW_SUCCESS)
     {

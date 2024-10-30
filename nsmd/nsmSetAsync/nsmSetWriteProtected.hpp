@@ -18,6 +18,7 @@
 #pragma once
 
 #include "device-configuration.h"
+#include "diagnostics.h"
 
 #include "asyncOperationManager.hpp"
 #include "nsmInterface.hpp"
@@ -33,9 +34,7 @@ class NsmSetWriteProtected : public NsmInterfaceProvider<SettingsIntf>
 {
   private:
     SensorManager& manager;
-    uint8_t instanceNumber;
-    NsmDeviceIdentification deviceType;
-    bool retimer;
+    const diagnostics_enable_disable_wp_data_index dataIndex;
 
     requester::Coroutine setWriteProtected(bool value,
                                            AsyncOperationStatusType& status,
@@ -43,10 +42,20 @@ class NsmSetWriteProtected : public NsmInterfaceProvider<SettingsIntf>
 
   public:
     NsmSetWriteProtected() = delete;
-    NsmSetWriteProtected(const std::string& name, SensorManager& manager,
-                         uint8_t instanceNumber,
-                         NsmDeviceIdentification deviceType,
-                         std::string objPath, bool retimer = false);
+
+    /**
+     * @brief Construct a new Nsm Set Write Protected object
+     *
+     * @param name Name of the object
+     * @param manager Sensor manager object
+     * @param dataIndex Index for diagnostics enable/disable write protection
+     * data
+     * @param objPath DBus object path
+     */
+    NsmSetWriteProtected(
+        const std::string& name, SensorManager& manager,
+        const diagnostics_enable_disable_wp_data_index dataIndex,
+        const std::string objPath);
 
     requester::Coroutine writeProtected(const AsyncSetOperationValueType& value,
                                         AsyncOperationStatusType* status,
@@ -54,30 +63,15 @@ class NsmSetWriteProtected : public NsmInterfaceProvider<SettingsIntf>
 
     /**
      * @brief Get the Write Protected value from
-     * nsm_fpga_diagnostics_settings_wp structure depending on device type and
-     * instance number
+     * nsm_fpga_diagnostics_settings_wp structure depending on the data index
      *
      * @param data Data structure to get value from
-     * @param deviceType Device type
-     * @param instanceNumber Device instance number
-     * @param retimer Retimer flag for Baseboard device
+     * @param dataIndex Data index to identify the specific value
      * @return bool WriteProtect value from data structure
      */
-    static bool getValue(const nsm_fpga_diagnostics_settings_wp& data,
-                         NsmDeviceIdentification deviceType,
-                         uint8_t instanceNumber, bool retimer);
-
-    /**
-     * @brief Get the Write Protected data index depending on device type and
-     * instance number
-     *
-     * @param deviceType Device type
-     * @param instanceNumber Device instance number
-     * @param retimer Retimer flag for Baseboard device
-     * @return int dataIndex Data index for device type and instance number
-     */
-    static int getDataIndex(NsmDeviceIdentification deviceType,
-                            uint8_t instanceNumber, bool retimer = false);
+    static bool
+        getValue(const nsm_fpga_diagnostics_settings_wp& data,
+                 const diagnostics_enable_disable_wp_data_index dataIndex);
 };
 
 } // namespace nsm

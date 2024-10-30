@@ -34,7 +34,7 @@ requester::Coroutine
                                       const std::string& objPath)
 {
     std::string baseInterface =
-        "xyz.openbmc_project.Configuration.NSM_FirmwareInventory";
+        "xyz.openbmc_project.Configuration.NSM_WriteProtect";
 
     auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
@@ -42,14 +42,9 @@ requester::Coroutine
         objPath.c_str(), "Type", interface.c_str());
     auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", baseInterface.c_str());
-    auto deviceType =
-        (NsmDeviceIdentification) co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceType", baseInterface.c_str());
-    auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "InstanceNumber", baseInterface.c_str());
     auto device = manager.getNsmDevice(uuid);
 
-    if (type == "NSM_FirmwareInventory")
+    if (type == "NSM_WriteProtect")
     {
         std::vector<utils::Association> associations{};
         co_await utils::coGetAssociations(objPath, interface + ".Associations",
@@ -63,13 +58,59 @@ requester::Coroutine
             device->addStaticSensor(associationsObject);
         }
 
+        auto dataIndex =
+            (diagnostics_enable_disable_wp_data_index) co_await utils::
+                coGetDbusProperty<uint64_t>(objPath.c_str(), "DataIndex",
+                                            baseInterface.c_str());
+
+        switch (dataIndex)
+        {
+            case RETIMER_EEPROM:
+            case BASEBOARD_FRU_EEPROM:
+            case PEX_SW_EEPROM:
+            case NVSW_EEPROM_BOTH:
+            case NVSW_EEPROM_1:
+            case NVSW_EEPROM_2:
+            case GPU_1_4_SPI_FLASH:
+            case GPU_5_8_SPI_FLASH:
+            case GPU_SPI_FLASH_1:
+            case GPU_SPI_FLASH_2:
+            case GPU_SPI_FLASH_3:
+            case GPU_SPI_FLASH_4:
+            case GPU_SPI_FLASH_5:
+            case GPU_SPI_FLASH_6:
+            case GPU_SPI_FLASH_7:
+            case GPU_SPI_FLASH_8:
+            case HMC_SPI_FLASH:
+            case RETIMER_EEPROM_1:
+            case RETIMER_EEPROM_2:
+            case RETIMER_EEPROM_3:
+            case RETIMER_EEPROM_4:
+            case RETIMER_EEPROM_5:
+            case RETIMER_EEPROM_6:
+            case RETIMER_EEPROM_7:
+            case RETIMER_EEPROM_8:
+            case CPU_SPI_FLASH_1:
+            case CPU_SPI_FLASH_2:
+            case CPU_SPI_FLASH_3:
+            case CPU_SPI_FLASH_4:
+            case CPU_SPI_FLASH_5:
+            case CPU_SPI_FLASH_6:
+            case CPU_SPI_FLASH_7:
+            case CPU_SPI_FLASH_8:
+            case CX7_FRU_EEPROM:
+            case HMC_FRU_EEPROM:
+                break;
+            default:
+                throw std::out_of_range("Invalid data index");
+                break;
+        }
+
         auto pdiObjPath = (firmwareInventoryBasePath / name).string();
-        auto retimer = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "IsRetimer", interface.c_str());
         auto settingsIntf = std::make_shared<NsmSetWriteProtected>(
-            name, manager, instanceNumber, deviceType, pdiObjPath, retimer);
+            name, manager, dataIndex, pdiObjPath);
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
-            *settingsIntf, deviceType, instanceNumber, retimer);
+            *settingsIntf, dataIndex);
         device->deviceSensors.emplace_back(settingsIntf);
         device->addSensor(writeProtectControl, false);
 
@@ -92,6 +133,8 @@ requester::Coroutine
     }
     else if (type == "NSM_FirmwareVersion")
     {
+        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
+            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
         firmwareInventoryVersion.pdi().purpose(
             VersionIntf::VersionPurpose::Other);
@@ -106,9 +149,9 @@ requester::Coroutine
 }
 
 dbus::Interfaces firmwareInventoryInterfaces = {
-    "xyz.openbmc_project.Configuration.NSM_FirmwareInventory",
-    "xyz.openbmc_project.Configuration.NSM_FirmwareInventory.Asset",
-    "xyz.openbmc_project.Configuration.NSM_FirmwareInventory.Version",
+    "xyz.openbmc_project.Configuration.NSM_WriteProtect",
+    "xyz.openbmc_project.Configuration.NSM_WriteProtect.Asset",
+    "xyz.openbmc_project.Configuration.NSM_WriteProtect.Version",
 };
 
 REGISTER_NSM_CREATION_FUNCTION(nsmFirmwareInventoryCreateSensors,
