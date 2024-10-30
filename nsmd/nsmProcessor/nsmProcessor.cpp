@@ -2934,9 +2934,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, name, type, inventoryObjPath, associations);
         nsmDevice->deviceSensors.push_back(associationSensor);
 
+#ifdef ACCELERATOR_DBUS
         auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
                                                            inventoryObjPath);
         nsmDevice->deviceSensors.push_back(sensor);
+#endif
 
         auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
