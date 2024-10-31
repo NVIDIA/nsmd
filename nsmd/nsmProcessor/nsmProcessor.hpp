@@ -33,12 +33,14 @@
 #include "nsmPowerSmoothingFeatureIntf.hpp"
 #include "nsmResetEdppAsyncIface.hpp"
 #include "nsmSensor.hpp"
+#include "nsmSetEgmMode.hpp"
 #include "nsmSetMigMode.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
 
 #include <stdint.h>
 
 #include <com/nvidia/Edpp/server.hpp>
+#include <com/nvidia/EgmMode/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
 #include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
 #include <com/nvidia/SMUtilization/server.hpp>
@@ -790,6 +792,29 @@ class NsmConfidentialCompute : public NsmSensor
   private:
     void updateReading(uint8_t current_mode, uint8_t pending_mode);
     std::shared_ptr<ConfidentialComputeIntf> confidentialComputeIntf = nullptr;
+    std::string inventoryObjPath;
+};
+
+using EgmModeIntf =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::server::EgmMode>;
+
+class NsmEgmMode : public NsmSensor
+{
+  public:
+    NsmEgmMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+               std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
+               bool isLongRunning);
+    NsmEgmMode() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
+
+  private:
+    void updateReading(uint8_t current_mode, uint8_t pending_mode);
+    std::unique_ptr<EgmModeIntf> egmModeIntf = nullptr;
     std::string inventoryObjPath;
 };
 

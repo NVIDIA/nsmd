@@ -715,6 +715,7 @@ const std::map<reconfiguration_permissions_v1_index, std::string>
          "Power Smoothing Privilege Level 1"},
         {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2,
          "Power Smoothing Privilege Level 2"},
+        {RP_EGM_MODE, "Extend GPU Memory Mode"},
     }};
 class GetReconfigurationPermissionsV1 : public CommandInterface
 {

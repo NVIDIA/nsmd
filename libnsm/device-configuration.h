@@ -36,6 +36,8 @@ enum device_configuration_command {
 	NSM_GET_RECONFIGURATION_PERMISSIONS_V1 = 0x41,
 	NSM_ENABLE_DISABLE_GPU_IST_MODE = 0x62,
 	NSM_GET_FPGA_DIAGNOSTICS_SETTINGS = 0x64,
+	NSM_SET_EGM_MODE = 0x42,
+	NSM_GET_EGM_MODE = 0x43,
 };
 
 enum error_injection_type {
@@ -86,6 +88,7 @@ enum reconfiguration_permissions_v1_index {
 	RP_EDPP_SCALING_FACTOR = 19,
 	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1 = 20,
 	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2 = 21,
+	RP_EGM_MODE = 22,
 };
 
 enum reconfiguration_permissions_v1_setting {
@@ -384,6 +387,24 @@ struct nsm_get_confidential_compute_mode_v1_resp {
 struct nsm_set_confidential_compute_mode_v1_req {
 	struct nsm_common_req hdr;
 	uint8_t mode;
+} __attribute__((packed));
+
+/** @struct nsm_get_EGM_reading_resp
+ *
+ *  Structure representing NSM get EGM Mode response.
+ */
+struct nsm_get_EGM_mode_resp {
+	struct nsm_common_resp hdr;
+	uint8_t pending_mode;
+} __attribute__((packed));
+
+/** @struct nsm_set_EGM_mode_req
+ *
+ *  Structure representing NSM set EGM Mode request.
+ */
+struct nsm_set_EGM_mode_req {
+	struct nsm_common_req hdr;
+	uint8_t requested_mode;
 } __attribute__((packed));
 
 /** @brief Encode a Set Error Injection Mode v1 request message
@@ -1054,6 +1075,90 @@ int decode_set_confidential_compute_mode_v1_resp(const struct nsm_msg *msg,
 						 size_t msg_len, uint8_t *cc,
 						 uint16_t *data_size,
 						 uint16_t *reason_code);
+
+/** @brief Encode a Get EGM mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_EGM_mode_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get EGM mode request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_EGM_mode_req(const struct nsm_msg *msg, size_t msg_len);
+
+/** @brief Encode a Get EGM mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] current_mode - Current EGM mode
+ *  @param[in] pending_mode - Pending EGM mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, uint8_t current_mode,
+			     uint8_t pending_mode, struct nsm_msg *msg);
+
+/** @brief Decode a Get EGM mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] current_mode - Current EGM mode
+ *  @param[in] pending_mode - Pending EGM mode
+ *  @return nsm_completion_codes
+ */
+int decode_get_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code, uint8_t *current_mode,
+			     uint8_t *pending_mode);
+
+/** @brief Encode a Set EGM mode request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] requested_mode - Requested Mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_EGM_mode_req(uint8_t instance, uint8_t requested_mode,
+			    struct nsm_msg *msg);
+
+/** @brief Decode a Set EGM mode request request message
+ *
+ *  @param[in] msg     - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] requested_mode - Requested Mode
+ *  @return nsm_completion_codes
+ */
+int decode_set_EGM_mode_req(const struct nsm_msg *msg, size_t msg_len,
+			    uint8_t *requested_mode);
+
+/** @brief Encode a Get EGM mode response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Get EGM mode response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *data_size,
+			     uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

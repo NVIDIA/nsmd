@@ -1658,3 +1658,165 @@ TEST(setConfidentialComputeMode, testGoodDecodeResponse)
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(0, data_size);
 }
+
+TEST(setEGMMode, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_set_EGM_mode_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint8_t mode = 1;
+	auto rc = encode_set_EGM_mode_req(0, mode, request);
+	struct nsm_set_EGM_mode_req *req =
+	    reinterpret_cast<struct nsm_set_EGM_mode_req *>(request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_EGM_MODE, req->hdr.command);
+	EXPECT_EQ(1, req->hdr.data_size);
+	EXPECT_EQ(mode, req->requested_mode);
+}
+
+TEST(setEGMMode, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x80,			   // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_EGM_MODE,		   // command
+	    1,				   // data size
+	    1				   // mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t mode;
+	auto rc = decode_set_EGM_mode_req(request, msg_len, &mode);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(mode, 1);
+}
+
+TEST(setEGMMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc =
+	    encode_set_EGM_mode_resp(0, NSM_SUCCESS, reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_EGM_MODE, resp->command);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(setEGMMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_EGM_MODE,		   // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+
+	auto rc = decode_set_EGM_mode_resp(response, msg_len, &cc, &data_size,
+					   &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(0, data_size);
+}
+
+TEST(getEGMMode, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_EGM_mode_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t current_mode = 1;
+	uint8_t pending_mode = 1;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_EGM_mode_resp(
+	    0, NSM_SUCCESS, reason_code, current_mode, pending_mode, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_get_EGM_mode_resp *resp =
+	    reinterpret_cast<struct nsm_get_EGM_mode_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_EGM_MODE, resp->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_get_EGM_mode_resp) -
+		      sizeof(struct nsm_common_resp),
+		  le16toh(resp->hdr.data_size));
+
+	EXPECT_EQ(resp->pending_mode, 1);
+}
+
+TEST(getEGMMode, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_EGM_MODE,		   // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    1,
+	    0, // data size
+	    1  // pending mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint16_t data_size = 0;
+	uint8_t current_mode;
+	uint8_t pending_mode;
+
+	auto rc = decode_get_EGM_mode_resp(response, msg_len, &cc, &data_size,
+					   &reason_code, &current_mode,
+					   &pending_mode);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(1, data_size);
+	EXPECT_EQ(1, pending_mode);
+}

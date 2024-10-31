@@ -83,6 +83,8 @@ reconfiguration_permissions_v1_index
             return RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1;
         case ReconfigSettingsIntf::FeatureType::PowerSmoothingPrivilegeLevel2:
             return RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2;
+        case ReconfigSettingsIntf::FeatureType::EGMMode:
+            return RP_EGM_MODE;
         default:
             throw std::invalid_argument("Invalid feature :" +
                                         std::to_string(uint64_t(feature)));

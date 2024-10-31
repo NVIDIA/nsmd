@@ -42,6 +42,7 @@
 #include "nsmReconfigPermissions.hpp"
 #include "nsmSetCpuOperatingConfig.hpp"
 #include "nsmSetECCMode.hpp"
+#include "nsmSetEgmMode.hpp"
 #include "nsmSetReconfigSettings.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
 #include "sharedMemCommon.hpp"
@@ -2906,6 +2907,90 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
     co_return NSM_SW_SUCCESS;
 }
 
+NsmEgmMode::NsmEgmMode(sdbusplus::bus::bus& bus, std::string& name,
+                       std::string& type, std::string& inventoryObjPath,
+                       [[maybe_unused]] std::shared_ptr<NsmDevice> device,
+                       bool isLongRunning) :
+    NsmSensor(name, type, isLongRunning),
+    inventoryObjPath(inventoryObjPath)
+
+{
+    lg2::info("NsmEgmMode: create sensor:{NAME}", "NAME", name.c_str());
+    egmModeIntf = std::make_unique<EgmModeIntf>(bus, inventoryObjPath.c_str());
+    updateMetricOnSharedMemory();
+}
+
+void NsmEgmMode::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(egmModeIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+    nv::sensor_aggregation::DbusVariantType egmModeEnabled{
+        egmModeIntf->EgmModeIntf::egmModeEnabled()};
+    std::string propName = "EGMModeEnabled";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, egmModeEnabled);
+
+    propName = "PendingEGMModeState";
+    nv::sensor_aggregation::DbusVariantType pendingEgmModeState{
+        egmModeIntf->EgmModeIntf::pendingEGMModeState()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, pendingEgmModeState);
+
+#endif
+}
+
+void NsmEgmMode::updateReading(uint8_t current_mode, uint8_t pending_mode)
+{
+    egmModeIntf->EgmModeIntf::egmModeEnabled(current_mode);
+    egmModeIntf->EgmModeIntf::pendingEGMModeState(pending_mode);
+    updateMetricOnSharedMemory();
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmEgmMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_EGM_mode_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_EGM_mode_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmEgmMode::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                      size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint8_t current_mode;
+    uint8_t pending_mode;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+
+    auto rc = decode_get_EGM_mode_resp(responseMsg, responseLen, &cc,
+                                       &data_size, &reason_code, &current_mode,
+                                       &pending_mode);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        updateReading(current_mode, pending_mode);
+        clearErrorBitMap("decode_get_EGM_mode_resp");
+    }
+    else
+    {
+        logHandleResponseMsg("decode_get_EGM_mode_resp", reason_code, cc, rc);
+        return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    return cc;
+}
+
 requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath)
@@ -3110,6 +3195,35 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                     std::bind_front(setMigModeEnabled, isLongRunning), sensor,
                     nsmDevice});
     }
+    else if (type == "NSM_EGM")
+    {
+        auto priority = co_await utils::coGetDbusProperty<bool>(
+            objPath.c_str(), "Priority", interface.c_str());
+
+        bool isLongRunning{false};
+
+        try
+        {
+            isLongRunning = co_await utils::coGetDbusProperty<bool>(
+                objPath.c_str(), "LongRunning", interface.c_str());
+        }
+        catch (...)
+        {}
+
+        auto sensor = std::make_shared<NsmEgmMode>(
+            bus, name, type, inventoryObjPath, nsmDevice, isLongRunning);
+
+        nsmDevice->addSensor(sensor, priority, isLongRunning);
+
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(inventoryObjPath)
+            ->addAsyncSetOperation(
+                "com.nvidia.EgmMode", "EGMModeEnabled",
+                AsyncSetOperationInfo{
+                    std::bind_front(setEgmModeEnabled, isLongRunning), sensor,
+                    nsmDevice});
+    }
+
     if (type == "NSM_PCIe")
     {
         auto priority = co_await utils::coGetDbusProperty<bool>(
@@ -3640,7 +3754,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",
     "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount",
     "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",
-    "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile",
+    "xyz.openbmc_project.Configuration.NSM_Processor.EGMMode"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 
