@@ -14,6 +14,7 @@ dep_src_files = [
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../nsmSetEgmMode.cpp',
 ]
 
 dep_src_headers = [

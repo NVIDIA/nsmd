@@ -5564,4 +5564,67 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getEgmModeHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getEgmModeHandler: request length={LEN}", "LEN", requestLen);
+    }
+    auto rc = decode_common_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode request for getEgmModeHandler failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint8_t current_mode = 1;
+    uint8_t pending_mode = 1;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_EGM_mode_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_get_EGM_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                  reason_code, current_mode, pending_mode,
+                                  responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_EGM_mode_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setEgmModeHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    uint8_t requested_mode;
+    auto rc = decode_set_EGM_mode_req(requestMsg, requestLen, &requested_mode);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_EGM_mode_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_EGM_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                  reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc)
+    {
+        lg2::error("encode_get_EGM_mode_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
 } // namespace MockupResponder

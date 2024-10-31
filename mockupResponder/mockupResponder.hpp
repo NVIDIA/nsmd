@@ -412,6 +412,12 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         updateMinSecurityVersion(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getEgmModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        setEgmModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;

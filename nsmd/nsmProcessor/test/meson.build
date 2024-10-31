@@ -34,6 +34,7 @@ dep_src_files = [
     '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../../nsmSetAsync/nsmSetEgmMode.cpp',
 ]
 
 dep_src_headers = [
