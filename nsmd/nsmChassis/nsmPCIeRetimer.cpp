@@ -64,6 +64,10 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
         std::make_unique<ChassisIntf>(bus, pcieRetimerChaasisBasePath.c_str());
     chassis_->ChassisIntf::type(ChassisIntf::convertChassisTypeFromString(
         "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Component"));
+    health_ = std::make_unique<HealthIntf>(bus,
+                                           pcieRetimerChaasisBasePath.c_str());
+    health_->health(HealthIntf::convertHealthTypeFromString(
+        "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"));
 }
 
 static requester::Coroutine

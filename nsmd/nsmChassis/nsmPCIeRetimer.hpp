@@ -31,6 +31,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>
+#include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
 #include <iostream>
@@ -44,6 +45,7 @@ using namespace sdbusplus::server;
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
 using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
+using HealthIntf = object_t<State::Decorator::server::Health>;
 
 class NsmPCIeRetimerChassis : public NsmObject
 {
@@ -57,5 +59,6 @@ class NsmPCIeRetimerChassis : public NsmObject
     std::unique_ptr<NsmAssetIntf> asset_ = nullptr;
     std::unique_ptr<LocationIntf> location_ = nullptr;
     std::unique_ptr<ChassisIntf> chassis_ = nullptr;
+    std::unique_ptr<HealthIntf> health_ = nullptr;
 };
 } // namespace nsm
