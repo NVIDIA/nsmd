@@ -55,7 +55,7 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	    htole64(portData->port_neighbor_mtu_discards);
 	portData->port_rcv_ibg2_pkts = htole64(portData->port_rcv_ibg2_pkts);
 	portData->port_xmit_ibg2_pkts = htole64(portData->port_xmit_ibg2_pkts);
-	portData->symbol_error = htole64(portData->symbol_error);
+	portData->symbol_ber = htole64(portData->symbol_ber);
 	portData->link_error_recovery_counter =
 	    htole64(portData->link_error_recovery_counter);
 	portData->link_downed_counter = htole64(portData->link_downed_counter);
@@ -66,6 +66,8 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	portData->QP1_dropped = htole64(portData->QP1_dropped);
 	portData->xmit_wait = htole64(portData->xmit_wait);
 	portData->effective_ber = htole64(portData->effective_ber);
+	portData->estimated_effective_ber =
+	    htole64(portData->estimated_effective_ber);
 }
 
 static void letohPortCounterData(struct nsm_port_counter_data *portData)
@@ -102,7 +104,7 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	    le64toh(portData->port_neighbor_mtu_discards);
 	portData->port_rcv_ibg2_pkts = le64toh(portData->port_rcv_ibg2_pkts);
 	portData->port_xmit_ibg2_pkts = le64toh(portData->port_xmit_ibg2_pkts);
-	portData->symbol_error = le64toh(portData->symbol_error);
+	portData->symbol_ber = le64toh(portData->symbol_ber);
 	portData->link_error_recovery_counter =
 	    le64toh(portData->link_error_recovery_counter);
 	portData->link_downed_counter = le64toh(portData->link_downed_counter);
@@ -113,6 +115,8 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	portData->QP1_dropped = le64toh(portData->QP1_dropped);
 	portData->xmit_wait = le64toh(portData->xmit_wait);
 	portData->effective_ber = le64toh(portData->effective_ber);
+	portData->estimated_effective_ber =
+	    le64toh(portData->estimated_effective_ber);
 }
 
 static void

@@ -94,7 +94,7 @@ class GetPortTelemetryCounter : public CommandInterface
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
         uint16_t dataLen = 0;
-        struct nsm_port_counter_data portTeleData;
+        struct nsm_port_counter_data portTeleData = {};
 
         auto rc = decode_get_port_telemetry_counter_resp(
             responsePtr, payloadLength, &cc, &reason_code, &dataLen,
@@ -256,11 +256,11 @@ class GetPortTelemetryCounter : public CommandInterface
                 static_cast<uint64_t>(portData->port_xmit_ibg2_pkts);
         }
 
-        if (portData->supported_counter.symbol_error)
+        if (portData->supported_counter.symbol_ber)
         {
             result[key].push_back(18);
-            countersResult["Symbol Error"] =
-                static_cast<uint64_t>(portData->symbol_error);
+            countersResult["Symbol BER"] =
+                static_cast<uint64_t>(portData->symbol_ber);
         }
 
         if (portData->supported_counter.link_error_recovery_counter)
@@ -311,6 +311,13 @@ class GetPortTelemetryCounter : public CommandInterface
             result[key].push_back(25);
             countersResult["Effective BER"] =
                 static_cast<uint64_t>(portData->effective_ber);
+        }
+
+        if (portData->supported_counter.estimated_effective_ber)
+        {
+            result[key].push_back(26);
+            countersResult["Estimated Effective BER"] =
+                static_cast<uint64_t>(portData->estimated_effective_ber);
         }
         result["Port Counter Information"] = countersResult;
 

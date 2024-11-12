@@ -989,17 +989,20 @@ std::optional<std::vector<uint8_t>>
         0x00, 0x00, 0x00, 0x00,
     }; /*for counter values, 8 bytes each*/
 
-    auto portTelData = reinterpret_cast<nsm_port_counter_data*>(data.data());
+    nsm_port_counter_data portTelData = {};
+    std::memcpy(&portTelData, data.data(), sizeof(portTelData));
     uint16_t reason_code = ERR_NULL;
 
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_resp), 0);
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      sizeof(nsm_common_resp) +
+                                      PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE,
+                                  0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     rc = encode_get_port_telemetry_counter_resp(requestMsg->hdr.instance_id,
                                                 NSM_SUCCESS, reason_code,
-                                                portTelData, responseMsg);
+                                                &portTelData, responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
