@@ -28,9 +28,7 @@ NsmClockOutputEnableStateBase::NsmClockOutputEnableStateBase(
     NsmSensor(provider),
     bufferIndex(bufferIndex), deviceType(deviceType),
     instanceNumber(instanceNumber), retimer(retimer)
-{
-    utils::verifyDeviceAndInstanceNumber(deviceType, instanceNumber, retimer);
-}
+{}
 
 std::optional<Request>
     NsmClockOutputEnableStateBase::genRequestMsg(eid_t eid, uint8_t instanceId)
