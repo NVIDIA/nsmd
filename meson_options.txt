@@ -165,54 +165,6 @@ option(
 )
 
 option(
-    'max-gpu-count',
-    type: 'integer',
-    min: 1,
-    max: 8,
-    value: 8,
-    description: 'Maximum number of GPUs supported by the system',
-)
-option(
-    'max-nv-switch-count',
-    type: 'integer',
-    min: 1,
-    max: 8,
-    value: 4,
-    description: 'Maximum number of NV switches supported by the system',
-)
-option(
-    'max-pcie-bridge-count',
-    type: 'integer',
-    min: 1,
-    max: 8,
-    value: 1,
-    description: 'Maximum number of PCIe bridges supported by the system',
-)
-option(
-    'max-baseboard-count',
-    type: 'integer',
-    min: 1,
-    max: 8,
-    value: 1,
-    description: 'Maximum number of baseboards supported by the system',
-)
-option(
-    'max-retimer-count',
-    type: 'integer',
-    min: 0,
-    max: 8,
-    value: 8,
-    description: 'Maximum number of PCIe retimers supported by the system',
-)
-option(
-    'max-erot-count',
-    type: 'integer',
-    min: 1,
-    max: 8,
-    value: 5,
-    description: 'Maximum number of EROTs supported by the system',
-)
-option(
   'accelerator-dbus',
   type: 'feature',
   value: 'enabled',
