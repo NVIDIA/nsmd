@@ -29,7 +29,7 @@ const static std::unordered_map<uint16_t, std::string> firmwareCommandErrors = {
     {0x87, "IrreversibleConfig Disabled"},
     {0x88, "Nonce Mismatch"},
     {0x89, "Debug Token Installed"},
-    {0x8A, "Firmware Update InProgress"},
+    {0x8A, "Firmware Update or Background Copy InProgress"},
     {0x8B, "Firmware Pending Activation"},
 };
 
