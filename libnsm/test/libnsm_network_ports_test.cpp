@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "network-ports.h"
+#include <cstring>
 #include <gtest/gtest.h>
 
 TEST(getPortTelemetryCounter, testGoodEncodeRequest)
@@ -133,20 +134,22 @@ TEST(getPortTelemetryCounter, testGoodEncodeResponseCCSuccess)
 	    0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}; /*for counter values, 8 bytes each*/
-	auto port_tel_data =
-	    reinterpret_cast<nsm_port_counter_data *>(data.data());
+	nsm_port_counter_data port_tel_data = {};
+	std::memcpy(&port_tel_data, data.data(), sizeof(port_tel_data));
 	uint16_t reason_code = ERR_NULL;
 
 	std::vector<uint8_t> response_msg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_resp),
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+		PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE,
 	    0);
 	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
 
 	// test for cc = 0x0 [NSM_SUCCESS]
 	auto rc = encode_get_port_telemetry_counter_resp(
-	    0, NSM_SUCCESS, reason_code, port_tel_data, response);
+	    0, NSM_SUCCESS, reason_code, &port_tel_data, response);
 
 	struct nsm_get_port_telemetry_counter_resp *resp =
 	    reinterpret_cast<struct nsm_get_port_telemetry_counter_resp *>(
@@ -183,19 +186,23 @@ TEST(getPortTelemetryCounter, testGoodEncodeResponseCCError)
 	    0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}; /*for counter values, 8 bytes each*/
-	auto port_tel_data =
-	    reinterpret_cast<nsm_port_counter_data *>(data.data());
+
+	nsm_port_counter_data port_tel_data = {};
+	std::memcpy(&port_tel_data, data.data(), sizeof(port_tel_data));
 	uint16_t reason_code = ERR_NULL;
 
 	std::vector<uint8_t> response_msg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+		PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE,
+	    0);
 	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
 
 	// test for cc = 0x1 [NSM_ERROR]
 	auto rc = encode_get_port_telemetry_counter_resp(
-	    0, NSM_ERROR, reason_code, port_tel_data, response);
+	    0, NSM_ERROR, reason_code, &port_tel_data, response);
 
 	struct nsm_common_non_success_resp *resp =
 	    reinterpret_cast<struct nsm_common_non_success_resp *>(
@@ -212,9 +219,9 @@ TEST(getPortTelemetryCounter, testGoodEncodeResponseCCError)
 
 TEST(getPortTelemetryCounter, testBadEncodeResponse)
 {
-	uint8_t port_data[PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE];
-	auto port_tel_data =
-	    reinterpret_cast<nsm_port_counter_data *>(port_data);
+	std::vector<uint8_t> port_data(PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE);
+	nsm_port_counter_data port_tel_data = {};
+	std::memcpy(&port_tel_data, port_data.data(), sizeof(port_tel_data));
 	uint16_t reason_code = ERR_NULL;
 
 	std::vector<uint8_t> response_msg(
@@ -223,7 +230,7 @@ TEST(getPortTelemetryCounter, testBadEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
 
 	auto rc = encode_get_port_telemetry_counter_resp(
-	    0, NSM_SUCCESS, reason_code, port_tel_data, nullptr);
+	    0, NSM_SUCCESS, reason_code, &port_tel_data, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = encode_get_port_telemetry_counter_resp(0, NSM_SUCCESS, reason_code,
@@ -255,10 +262,11 @@ TEST(getPortTelemetryCounter, testGoodDecodeResponseCCSuccess)
 	    0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}; /*for counter values, 8 bytes each*/
-	auto port_data_orig =
-	    reinterpret_cast<nsm_port_counter_data *>(data_orig.data());
+	nsm_port_counter_data port_data_orig = {};
+	std::memcpy(&port_data_orig, data_orig.data(), sizeof(port_data_orig));
 
 	std::vector<uint8_t> response_msg{
 	    0x10,
@@ -280,7 +288,7 @@ TEST(getPortTelemetryCounter, testGoodDecodeResponseCCSuccess)
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
-	struct nsm_port_counter_data port_tel_data;
+	struct nsm_port_counter_data port_tel_data = {};
 
 	auto rc = decode_get_port_telemetry_counter_resp(
 	    response, msg_len, &cc, &reason_code, &data_size, &port_tel_data);
@@ -289,9 +297,9 @@ TEST(getPortTelemetryCounter, testGoodDecodeResponseCCSuccess)
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(data_size, 0x00D4);
 	EXPECT_EQ(port_tel_data.port_rcv_pkts,
-		  le64toh(port_data_orig->port_rcv_pkts));
+		  le64toh(port_data_orig.port_rcv_pkts));
 	// just checking some starting data and ending data
-	EXPECT_EQ(port_tel_data.xmit_wait, le64toh(port_data_orig->xmit_wait));
+	EXPECT_EQ(port_tel_data.xmit_wait, le64toh(port_data_orig.xmit_wait));
 }
 
 TEST(getPortTelemetryCounter, testGoodDecodeResponseCCError)
@@ -313,7 +321,7 @@ TEST(getPortTelemetryCounter, testGoodDecodeResponseCCError)
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
-	struct nsm_port_counter_data port_tel_data;
+	struct nsm_port_counter_data port_tel_data = {};
 
 	auto rc = decode_get_port_telemetry_counter_resp(
 	    response, msg_len, &cc, &reason_code, &data_size, &port_tel_data);
@@ -586,8 +594,10 @@ TEST(getPortTelemetryCounter, testBadDecodeResponseWithPayload)
 
 	response_msg[6] = 0x00; // making CC - NSM_SUCCESS
 	rc = decode_get_port_telemetry_counter_resp(
-	    response, msg_len - 10, &cc, &reason_code, &data_size,
-	    &port_tel_data); //-10 from total size which means we should get
+	    response, msg_len - PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE, &cc,
+	    &reason_code, &data_size,
+	    &port_tel_data); //-PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE from total
+			     // size which means we should get
 			     // error
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
@@ -618,29 +628,32 @@ TEST(getPortTelemetryCounter, testGoodhtolePortCounterData)
 	    0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}; /*for counter values, 8 bytes each*/
-	std::vector<uint8_t> port_data_converted = port_data_orig;
-	auto data_orig =
-	    reinterpret_cast<nsm_port_counter_data *>(port_data_orig.data());
-	auto data_converted = reinterpret_cast<nsm_port_counter_data *>(
-	    port_data_converted.data());
+	nsm_port_counter_data data_orig = {};
+	std::memcpy(&data_orig, port_data_orig.data(), sizeof(data_orig));
+	nsm_port_counter_data data_converted = {};
+	std::memcpy(&data_converted, port_data_orig.data(),
+		    sizeof(data_converted));
 
 	uint16_t reason_code = ERR_NULL;
 	std::vector<uint8_t> response_msg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_resp));
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp) +
+		PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE,
+	    0);
 	auto response = reinterpret_cast<nsm_msg *>(response_msg.data());
 
 	// since htolePortCounterData() is a static func we cannot access it
 	// directly
 	auto rc = encode_get_port_telemetry_counter_resp(
-	    0, NSM_SUCCESS, reason_code, data_converted, response);
+	    0, NSM_SUCCESS, reason_code, &data_converted, response);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(data_converted->port_rcv_pkts,
-		  htole64(data_orig->port_rcv_pkts));
+	EXPECT_EQ(data_converted.port_rcv_pkts,
+		  htole64(data_orig.port_rcv_pkts));
 	// only checking first and last counters
-	EXPECT_EQ(data_converted->xmit_wait, htole64(data_orig->xmit_wait));
+	EXPECT_EQ(data_converted.xmit_wait, htole64(data_orig.xmit_wait));
 }
 
 TEST(getPortTelemetryCounter, testGoodletohPortCounterData)
@@ -665,10 +678,11 @@ TEST(getPortTelemetryCounter, testGoodletohPortCounterData)
 	    0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00,
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}; /*for counter values, 8 bytes each*/
-	auto port_data_orig =
-	    reinterpret_cast<nsm_port_counter_data *>(data_orig.data());
+	nsm_port_counter_data port_data_orig = {};
+	std::memcpy(&port_data_orig, data_orig.data(), sizeof(port_data_orig));
 
 	std::vector<uint8_t> response_msg{
 	    0x10,
@@ -680,7 +694,7 @@ TEST(getPortTelemetryCounter, testGoodletohPortCounterData)
 	    0x00,			    // completion code
 	    0x00,			    // reserved
 	    0x00,
-	    0xD4, // data size
+	    0xDC, // data size
 	    0x00};
 
 	response_msg.insert(response_msg.end(), data_orig.begin(),
@@ -690,7 +704,7 @@ TEST(getPortTelemetryCounter, testGoodletohPortCounterData)
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
-	struct nsm_port_counter_data port_data_converted;
+	struct nsm_port_counter_data port_data_converted = {};
 
 	// since letohPortCounterData() is a static func we cannot access it
 	// directly
@@ -700,10 +714,10 @@ TEST(getPortTelemetryCounter, testGoodletohPortCounterData)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(port_data_converted.port_rcv_pkts,
-		  le64toh(port_data_orig->port_rcv_pkts));
+		  le64toh(port_data_orig.port_rcv_pkts));
 	// only checking first and last counters
 	EXPECT_EQ(port_data_converted.xmit_wait,
-		  le64toh(port_data_orig->xmit_wait));
+		  le64toh(port_data_orig.xmit_wait));
 }
 
 TEST(queryPortCharacteristics, testGoodEncodeRequest)
