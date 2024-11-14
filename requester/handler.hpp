@@ -109,7 +109,8 @@ class Handler
         instanceIdExpiryIntervalLongRunning(
             instanceIdExpiryIntervalLongRunning),
         numRetries(numRetries), responseTimeOutRegular(responseTimeOut),
-        responseTimeOutLongRunning(responseTimeOutLongRunning)
+        responseTimeOutLongRunning(responseTimeOutLongRunning),
+        socketHandler(nullptr)
     {}
 
     int registerRequestImpl(
