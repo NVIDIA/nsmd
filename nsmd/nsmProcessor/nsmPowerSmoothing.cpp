@@ -94,14 +94,23 @@ void NsmPowerSmoothing::updateReading(
     pwrSmoothingIntf->PowerSmoothingIntf::immediateRampDownEnabled(
         rampDownEnabled);
 
-    pwrSmoothingIntf->PowerSmoothingIntf::currentTempSetting(
-        data->currentTmpSetting);
-    pwrSmoothingIntf->PowerSmoothingIntf::currentTempFloorSetting(
-        data->currentTmpFloorSetting);
+    // mw to Watts
+    double reading =
+        (static_cast<uint32_t>(data->currentTmpSetting) == INVALID_POWER_LIMIT)
+            ? INVALID_POWER_LIMIT
+            : data->currentTmpSetting / 1000;
+
+    pwrSmoothingIntf->PowerSmoothingIntf::currentTempSetting(reading);
+    // mw to Watts
+    reading = (static_cast<uint32_t>(data->currentTmpFloorSetting) ==
+               INVALID_POWER_LIMIT)
+                  ? INVALID_POWER_LIMIT
+                  : data->currentTmpFloorSetting / 1000;
+    pwrSmoothingIntf->PowerSmoothingIntf::currentTempFloorSetting(reading);
     pwrSmoothingIntf->PowerSmoothingIntf::maxAllowedTmpFloorPercent(
-        NvUFXP4_12ToDouble(data->maxTmpFloorSettingInPercent));
+        NvUFXP4_12ToDouble(data->maxTmpFloorSettingInPercent) * 100);
     pwrSmoothingIntf->PowerSmoothingIntf::minAllowedTmpFloorPercent(
-        NvUFXP4_12ToDouble(data->minTmpFloorSettingInPercent));
+        NvUFXP4_12ToDouble(data->minTmpFloorSettingInPercent) * 100);
 }
 
 // HW lifetime usage
@@ -246,24 +255,24 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
         return;
     }
     // Update values on iface
-
+    // fraction to percent
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercent(
-        NvUFXP4_12ToDouble(data->current_percent_tmp_floor));
+        NvUFXP4_12ToDouble(data->current_percent_tmp_floor) * 100);
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercentApplied(
         data->admin_override_mask.bits.tmp_floor_override);
-
+    // mw/sec to watts/sec
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRate(
-        data->current_rampup_rate_in_miliwatts_per_second);
+        data->current_rampup_rate_in_miliwatts_per_second / 1000);
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRateApplied(
         data->admin_override_mask.bits.rampup_rate_override);
-
+    // miliseconds to seconds
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRate(
-        data->current_rampdown_rate_in_miliwatts_per_second);
+        data->current_rampdown_rate_in_miliwatts_per_second / 1000);
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRateApplied(
         data->admin_override_mask.bits.rampdown_rate_override);
-
+    // miliseconds to seconds
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownHysteresis(
-        data->current_rampdown_hysteresis_value_in_milisec);
+        data->current_rampdown_hysteresis_value_in_milisec / 1000);
     pwrSmoothingCurProfileIntf
         ->CurrentPowerProfileIntf::rampDownHysteresisApplied(
             data->admin_override_mask.bits.hysteresis_value_override);
@@ -332,14 +341,18 @@ void NsmPowerSmoothingAdminOverride::updateReading(
         return;
     }
     // Update values on iface
+    // fraction to percent
     adminProfileIntf->AdminPowerProfileIntf::tmpFloorPercent(
-        NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor));
+        NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor) * 100);
+    // mw/sec to watts/sec
     adminProfileIntf->AdminPowerProfileIntf::rampUpRate(
-        data->admin_override_ramup_rate_in_miliwatts_per_second);
+        data->admin_override_ramup_rate_in_miliwatts_per_second / 1000);
+    // mw/sec to watts/sec
     adminProfileIntf->AdminPowerProfileIntf::rampDownRate(
-        data->admin_override_rampdown_rate_in_miliwatts_per_second);
+        data->admin_override_rampdown_rate_in_miliwatts_per_second / 1000);
+    // milisecs to seconds
     adminProfileIntf->AdminPowerProfileIntf::rampDownHysteresis(
-        data->admin_override_rampdown_hysteresis_value_in_milisec);
+        data->admin_override_rampdown_hysteresis_value_in_milisec / 1000);
 }
 
 std::string NsmPowerSmoothingAdminOverride::getInventoryObjPath()
@@ -390,13 +403,13 @@ void NsmPowerProfileCollection::updateSupportedProfile(
     if (obj)
     {
         obj->PowerProfileIntf::tmpFloorPercent(
-            NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent));
+            NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent) * 100);
         obj->PowerProfileIntf::rampUpRate(
-            data->ramp_up_rate_in_miliwattspersec);
+            data->ramp_up_rate_in_miliwattspersec / 1000);
         obj->PowerProfileIntf::rampDownRate(
-            data->ramp_down_rate_in_miliwattspersec);
+            data->ramp_down_rate_in_miliwattspersec / 1000);
         obj->PowerProfileIntf::rampDownHysteresis(
-            data->ramp_hysterisis_rate_in_miliwattspersec);
+            data->ramp_hysterisis_rate_in_milisec / 1000);
     }
 }
 
@@ -511,9 +524,12 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
 
 NsmPowerSmoothingAction::NsmPowerSmoothingAction(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
-    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
+    std::string& inventoryObjPath,
+    std::shared_ptr<NsmCurrentPowerSmoothingProfile> currentProfile,
+    std::shared_ptr<NsmDevice> device) :
     NsmObject(name, type),
-    ProfileActionAsyncIntf(bus, inventoryObjPath.c_str()), device(device),
+    ProfileActionAsyncIntf(bus, inventoryObjPath.c_str()),
+    currentProfile(currentProfile), device(device),
     inventoryObjPath(inventoryObjPath)
 {}
 
@@ -522,6 +538,9 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
 {
     SensorManager& manager = SensorManager::getInstance();
     auto eid = manager.getEid(device);
+    lg2::info(
+        "requestActivatePresetProfile for EID: {EID}, with  profile Id: {PROFILEID}",
+        "EID", eid, "PROFILEID", profileID);
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_active_preset_profile_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -558,6 +577,8 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        // updating current profile after activating a profile
+        currentProfile->update(manager, eid);
         lg2::info("requestActivatePresetProfile for EID: {EID} completed",
                   "EID", eid);
     }
@@ -618,7 +639,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     if (rc)
     {
         lg2::error(
-            "requestActivatePresetProfile  encode_apply_admin_override_req failed. eid={EID}, rc={RC}",
+            "requestApplyAdminOverride  encode_apply_admin_override_req failed. eid={EID}, rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -631,7 +652,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     if (rc_)
     {
         lg2::error(
-            "requestActivatePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "requestApplyAdminOverride SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -644,13 +665,15 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::info("requestActivatePresetProfile for EID: {EID} completed",
-                  "EID", eid);
+        // updating current profile after activating a profile
+        currentProfile->update(manager, eid);
+        lg2::info("requestApplyAdminOverride for EID: {EID} completed", "EID",
+                  eid);
     }
     else
     {
         lg2::error(
-            "requestActivatePresetProfile decode_set_active_preset_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
+            "requestApplyAdminOverride decode_set_active_preset_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
             "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;

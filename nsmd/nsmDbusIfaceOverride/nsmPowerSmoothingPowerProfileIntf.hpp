@@ -115,14 +115,20 @@ class OemPowerProfileIntf :
                     decode_get_preset_profile_data_from_resp(
                         responseMsg.get(), responseLen, &cc, &reason_code,
                         numberOfprofiles, profileId, &profileData);
+                    // fraction to percent
                     PowerProfileIntf::tmpFloorPercent(
-                        profileData.tmp_floor_setting_in_percent);
+                        NvUFXP4_12ToDouble(
+                            profileData.tmp_floor_setting_in_percent) *
+                        100);
+                    // mw/sec to watts/sec
                     PowerProfileIntf::rampUpRate(
-                        profileData.ramp_up_rate_in_miliwattspersec);
+                        profileData.ramp_up_rate_in_miliwattspersec / 1000);
+                    // mw/sec to watts/sec
                     PowerProfileIntf::rampDownRate(
-                        profileData.ramp_down_rate_in_miliwattspersec);
+                        profileData.ramp_down_rate_in_miliwattspersec / 1000);
+                    // milisec to second
                     PowerProfileIntf::rampDownHysteresis(
-                        profileData.ramp_hysterisis_rate_in_miliwattspersec);
+                        profileData.ramp_hysterisis_rate_in_milisec / 1000);
                     lg2::info(
                         "getProfileInfo for EID: {EID} completed for profile Id: {ID}",
                         "EID", eid, "ID", profileId);
@@ -145,9 +151,6 @@ class OemPowerProfileIntf :
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info(
-            "updateProfileInfoOnDevice for EID: {EID} parameterId:{ID}, profileID: {PROFILEID}",
-            "EID", eid, "ID", parameterId, "PROFILEID", profileId);
 
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_setup_admin_override_req));
@@ -155,8 +158,17 @@ class OemPowerProfileIntf :
         uint32_t parameValueTobeSet = paramValue;
         if (parameterId == 0)
         {
-            parameValueTobeSet = doubleToNvUFXP4_12(paramValue) * 1 << 16;
+            parameValueTobeSet = doubleToNvUFXP4_12(paramValue);
         }
+        else
+        {
+            // watts/sec to watts/msec or seconds to miliseconds
+            parameValueTobeSet = paramValue * 1000;
+        }
+        lg2::info(
+            "updateProfileInfoOnDevice for EID: {EID} parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}",
+            "EID", eid, "ID", parameterId, "PROFILEID", profileId, "VALUE",
+            paramValue);
         // first argument instanceid=0 is irrelevant
         auto rc = encode_update_preset_profile_param_req(
             0, profileId, parameterId, parameValueTobeSet, requestMsg);
@@ -164,9 +176,9 @@ class OemPowerProfileIntf :
         if (rc)
         {
             lg2::error(
-                "updateProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, profileID: {PROFILEID}) for eid={EID}, rc={RC}",
-                "EID", eid, "RC", rc, "ID", parameterId, "PROFILEID",
-                profileId);
+                "updateProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc, "ID", parameterId, "PROFILEID", profileId,
+                "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -178,9 +190,9 @@ class OemPowerProfileIntf :
         if (rc_)
         {
             lg2::error(
-                "updateProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "updateProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
-                profileId);
+                profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -198,9 +210,9 @@ class OemPowerProfileIntf :
         else
         {
             lg2::error(
-                "updateProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
+                "updateProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
-                parameterId, "PROFILEID", profileId);
+                parameterId, "PROFILEID", profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -219,9 +231,9 @@ class OemPowerProfileIntf :
             throw sdbusplus::error::xyz::openbmc_project::common::
                 InvalidArgument{};
         }
-
-        const auto rc = co_await updateProfileInfoOnDevice(0, *floorPercent,
-                                                           status);
+        // percent to fraction
+        const auto rc =
+            co_await updateProfileInfoOnDevice(0, *floorPercent / 100, status);
         // coverity[missing_return]
         co_return rc;
     }
