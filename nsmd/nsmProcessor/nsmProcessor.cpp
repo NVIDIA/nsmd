@@ -2086,7 +2086,11 @@ NsmPowerCap::NsmPowerCap(
     NsmSensor(name, type),
     powerCapIntf(powerCapIntf), parents(parents),
     persistencyIntf(persistencyIntf), inventoryObjPath(inventoryObjPath)
-{}
+{
+    persistencyIntf->persistency(false);
+    persistencyIntf->persistentPowerLimit(std::nan(""));
+    persistencyIntf->oneShotPowerLimit(std::nan(""));
+}
 
 void NsmPowerCap::updateMetricOnSharedMemory()
 {
@@ -2181,6 +2185,33 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
                                ? INVALID_POWER_LIMIT
                                : enforced_limit_in_miliwatts / 1000;
         updateReading(reading);
+
+        if (requested_persistent_limit_in_miliwatts == INVALID_POWER_LIMIT)
+        {
+            persistencyIntf->persistency(false);
+            persistencyIntf->persistentPowerLimit(std::nan(""));
+        }
+        else
+        {
+            double reading =
+                static_cast<double>(requested_persistent_limit_in_miliwatts) /
+                1000;
+            persistencyIntf->persistency(true);
+            persistencyIntf->persistentPowerLimit(reading);
+        }
+
+        if (requested_oneshot_limit_in_miliwatts == INVALID_POWER_LIMIT)
+        {
+            persistencyIntf->oneShotPowerLimit(std::nan(""));
+        }
+        else
+        {
+            double reading =
+                static_cast<double>(requested_oneshot_limit_in_miliwatts) /
+                1000;
+            persistencyIntf->oneShotPowerLimit(reading);
+        }
+
         clearErrorBitMap("decode_get_power_limit_resp");
     }
     else
