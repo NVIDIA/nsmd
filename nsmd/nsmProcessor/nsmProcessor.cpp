@@ -2116,8 +2116,8 @@ NsmPowerCap::NsmPowerCap(
     persistencyIntf(persistencyIntf), inventoryObjPath(inventoryObjPath)
 {
     persistencyIntf->persistency(false);
-    persistencyIntf->persistentPowerLimit(0xFFFFFFFFFFFFFFFF);
-    persistencyIntf->oneShotPowerLimit(0xFFFFFFFFFFFFFFFF);
+    persistencyIntf->persistentPowerLimit(std::nan(""));
+    persistencyIntf->oneShotPowerLimit(std::nan(""));
 }
 
 void NsmPowerCap::updateMetricOnSharedMemory()
@@ -2217,22 +2217,26 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
         if (requested_persistent_limit_in_miliwatts == INVALID_POWER_LIMIT)
         {
             persistencyIntf->persistency(false);
-            persistencyIntf->persistentPowerLimit(0xFFFFFFFFFFFFFFFF);
+            persistencyIntf->persistentPowerLimit(std::nan(""));
         }
         else
         {
-            uint64_t reading = requested_persistent_limit_in_miliwatts / 1000;
+            double reading =
+                static_cast<double>(requested_persistent_limit_in_miliwatts) /
+                1000;
             persistencyIntf->persistency(true);
             persistencyIntf->persistentPowerLimit(reading);
         }
 
         if (requested_oneshot_limit_in_miliwatts == INVALID_POWER_LIMIT)
         {
-            persistencyIntf->oneShotPowerLimit(0xFFFFFFFFFFFFFFFF);
+            persistencyIntf->oneShotPowerLimit(std::nan(""));
         }
         else
         {
-            uint64_t reading = requested_oneshot_limit_in_miliwatts / 1000;
+            double reading =
+                static_cast<double>(requested_oneshot_limit_in_miliwatts) /
+                1000;
             persistencyIntf->oneShotPowerLimit(reading);
         }
 
