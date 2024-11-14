@@ -758,7 +758,7 @@ requester::Coroutine
                                                          eid),
             [](void* ptr) {
         delete static_cast<nsm::nsmRawCommand::NsmRawCommandHandler*>(ptr);
-            });
+    });
 
     std::pair<uint8_t, uint8_t> key = {nsmDevice->getDeviceType(),
                                        nsmDevice->getInstanceNumber()};
@@ -800,8 +800,8 @@ void DeviceManager::registerDbusMethods()
     nsmDeviceIntf->register_method(
         "getNSMDeviceObjectPath",
         [this](uint8_t deviceType, uint8_t instanceNumber) -> std::string {
-            return this->getObjectPath(deviceType, instanceNumber);
-        });
+        return this->getObjectPath(deviceType, instanceNumber);
+    });
 
     nsmDeviceIntf->initialize();
 }

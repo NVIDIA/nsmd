@@ -455,17 +455,6 @@ void convertBitMaskToVector(std::vector<uint8_t>& data,
                             const bitfield8_t* value, uint8_t size);
 
 /**
- * @brief Verify allowed device type and its instance number
- *
- * @param deviceType NSM device type identification
- * @param instanceNumber NSM device instance number
- * @param retimer Verify Retimer subdevice under Baseboard device
- * @throws std::invalid_argument Throws exception when wrong device type or
- * instance number is given
- */
-void verifyDeviceAndInstanceNumber(NsmDeviceIdentification deviceType,
-                                   uint8_t instanceNumber, bool retimer);
-/**
  * @brief Get Device Name associated to Device Type
  *
  * @param deviceType NSM device type number
