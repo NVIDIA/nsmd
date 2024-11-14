@@ -103,7 +103,12 @@ class NsmClearPowerCapAsyncIntf : public ClearPowerCapAsyncIntf
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            powerCapIntf->PowerCapIntf::powerCap(enforced_limit);
+            // check if device returned invalid power limit, report invalid
+            // value as is on dbus
+            uint32_t reading = (enforced_limit == INVALID_POWER_LIMIT)
+                                   ? INVALID_POWER_LIMIT
+                                   : enforced_limit / 1000;
+            powerCapIntf->PowerCapIntf::powerCap(reading);
             lg2::info("getPowerCapFromDevice for EID: {EID} completed", "EID",
                       eid);
         }

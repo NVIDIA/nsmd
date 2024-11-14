@@ -1000,7 +1000,7 @@ struct nsm_preset_profile_data {
 	uint8_t reservedByte2;
 	uint32_t ramp_up_rate_in_miliwattspersec;
 	uint32_t ramp_down_rate_in_miliwattspersec;
-	uint32_t ramp_hysterisis_rate_in_miliwattspersec;
+	uint32_t ramp_hysterisis_rate_in_milisec;
 } __attribute__((packed));
 
 /** @struct nsm_all_preset_profile_resp

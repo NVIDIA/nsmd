@@ -4542,7 +4542,8 @@ int encode_setup_admin_override_req(uint8_t instance_id, uint8_t parameter_id,
 	    (struct nsm_setup_admin_override_req *)msg->payload;
 
 	request->hdr.command = NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE;
-	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
+	request->hdr.data_size = sizeof(struct nsm_setup_admin_override_req) -
+				 sizeof(struct nsm_common_req);
 	request->parameter_id = parameter_id;
 	request->param_value = htole32(param_value);
 	return NSM_SW_SUCCESS;
@@ -4939,8 +4940,8 @@ static void letohgetPresetProfiledata(struct nsm_preset_profile_data *data)
 	    le32toh(data->ramp_up_rate_in_miliwattspersec);
 	data->ramp_down_rate_in_miliwattspersec =
 	    le32toh(data->ramp_down_rate_in_miliwattspersec);
-	data->ramp_hysterisis_rate_in_miliwattspersec =
-	    le32toh(data->ramp_hysterisis_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_milisec =
+	    le32toh(data->ramp_hysterisis_rate_in_milisec);
 }
 
 static void htolegetPresetProfiledata(struct nsm_preset_profile_data *data)
@@ -4951,8 +4952,8 @@ static void htolegetPresetProfiledata(struct nsm_preset_profile_data *data)
 	    htole32(data->ramp_up_rate_in_miliwattspersec);
 	data->ramp_down_rate_in_miliwattspersec =
 	    htole32(data->ramp_down_rate_in_miliwattspersec);
-	data->ramp_hysterisis_rate_in_miliwattspersec =
-	    htole32(data->ramp_hysterisis_rate_in_miliwattspersec);
+	data->ramp_hysterisis_rate_in_milisec =
+	    htole32(data->ramp_hysterisis_rate_in_milisec);
 }
 
 int encode_get_preset_profile_req(uint8_t instance_id, struct nsm_msg *msg)
@@ -5121,7 +5122,8 @@ int encode_update_preset_profile_param_req(uint8_t instance_id,
 
 	request->hdr.command =
 	    NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS;
-	request->hdr.data_size = sizeof(parameter_id) + sizeof(param_value);
+	request->hdr.data_size = sizeof(struct nsm_update_preset_profile_req) -
+				 sizeof(struct nsm_common_req);
 	request->profile_id = profile_id;
 	request->parameter_id = parameter_id;
 	request->param_value = htole32(param_value);
@@ -5223,17 +5225,35 @@ double NvUFXP4_12ToDouble(uint16_t reading)
 	double value = reading / (double)(1 << 12);
 	return value;
 }
-
+// reading should be between 0 - 1
 uint16_t doubleToNvUFXP4_12(double reading)
 {
-	uint16_t value = reading * (1 << 12);
-	return value;
+	if (reading > 1)
+		return 0;
+	// Separate integer and fractional parts
+	int integerPart = (int)(reading);
+	double fractionalPart = reading - integerPart;
+
+	// Convert integer part to 4-bit representation
+	uint16_t result = (integerPart & 0xF) << 12;
+
+	// Convert fractional part to 12-bit representation
+	uint16_t fractionalBits = (uint16_t)(fractionalPart * 4096);
+
+	// Combine integer and fractional parts
+	result |= (fractionalBits & 0xFFF);
+	return result;
 }
 
 double NvUFXP8_24ToDouble(uint32_t reading)
 {
-	double value = reading / (double)(1 << 24);
-	return value;
+	// Extract integer part (4 bits)
+	int integerPart = (reading >> 12) & 0xF;
+
+	// Extract fractional part (12 bits)
+	double fractionalPart = (reading & 0xFFF) / 4096.0;
+
+	return integerPart + fractionalPart;
 }
 
 uint32_t doubleToNvUFXP8_24(double reading)
