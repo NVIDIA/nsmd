@@ -38,8 +38,6 @@ using namespace sdbusplus::server;
 using PowerCapIntf = object_t<Control::Power::server::Cap>;
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
-using PowerModeIntf = object_t<Control::Power::server::Mode>;
-using Mode = sdbusplus::xyz::openbmc_project::Control::Power::server::Mode;
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using ClearPowerCapIntf =
     object_t<sdbusplus::com::nvidia::Common::server::ClearPowerCap>;
@@ -81,7 +79,6 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
                                  const uint8_t action, const uint32_t value);
     std::unique_ptr<AssociationDefinitionsIntf> associationDefinitionsIntf =
         nullptr;
-    std::unique_ptr<PowerModeIntf> powerModeIntf = nullptr;
     std::shared_ptr<PowerCapIntf> powerCapIntf = nullptr;
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;
     std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;
