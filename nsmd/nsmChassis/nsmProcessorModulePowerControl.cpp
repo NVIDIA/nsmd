@@ -53,14 +53,12 @@ NsmProcessorModulePowerControl::NsmProcessorModulePowerControl(
 {
     associationDefinitionsIntf =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
-    powerModeIntf = std::make_unique<PowerModeIntf>(bus, path.c_str());
-    powerModeIntf->powerMode(Mode::PowerMode::OEM);
     powerCapIntf->powerCapEnable(true);
     associationDefinitionsIntf->associations(associations_list);
     decoratorAreaIntf = std::make_unique<DecoratorAreaIntf>(bus, path.c_str());
     decoratorAreaIntf->physicalContext(
         sdbusplus::common::xyz::openbmc_project::inventory::decorator::Area::
-            PhysicalContextType::ProcessorModule);
+            PhysicalContextType::GPUSubsystem);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -96,7 +94,10 @@ uint8_t NsmProcessorModulePowerControl::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        powerCapIntf->powerCap(enforced_limit);
+        uint32_t reading = (enforced_limit == INVALID_POWER_LIMIT)
+                               ? INVALID_POWER_LIMIT
+                               : enforced_limit / 1000;
+        powerCapIntf->powerCap(reading);
         clearErrorBitMap("decode_get_module_power_limit_resp");
     }
     else
@@ -300,13 +301,15 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
+        uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
+                                                          : value / 1000;
         switch (propertyId)
         {
             case MAXIMUM_MODULE_POWER_LIMIT:
-                powerCapIntf->maxPowerCapValue(value);
+                powerCapIntf->maxPowerCapValue(reading);
                 break;
             case MINIMUM_MODULE_POWER_LIMIT:
-                powerCapIntf->minPowerCapValue(value);
+                powerCapIntf->minPowerCapValue(reading);
                 break;
             default:
                 break;
@@ -378,7 +381,9 @@ requester::Coroutine NsmDefaultModulePowerLimit::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
-        clearPowerCapIntf->defaultPowerCap(value);
+        uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
+                                                          : value / 1000;
+        clearPowerCapIntf->defaultPowerCap(reading);
         clearErrorBitMap(
             "NsmDefaultModulePowerLimit decode_get_inventory_information_resp");
     }
