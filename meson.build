@@ -57,6 +57,10 @@ conf_data.set(
     get_option('sensor-polling-time-long-running'),
 )
 conf_data.set(
+    'NUM_GPU_PER_MODULE',
+    get_option('num-gpu-per-module')
+)
+conf_data.set(
     'INSTANCE_ID_EXPIRATION_INTERVAL',
     get_option('instance-id-expiration-interval'),
 )

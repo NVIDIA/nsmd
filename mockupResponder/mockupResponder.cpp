@@ -878,6 +878,15 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case PRODUCT_HEIGHT:
             populateFrom(property, 2600);
             break;
+        case RATED_MODULE_POWER_LIMIT:
+            populateFrom(property, 5555);
+            break;
+        case MAXIMUM_MODULE_POWER_LIMIT:
+            populateFrom(property, 8788);
+            break;
+        case MINIMUM_MODULE_POWER_LIMIT:
+            populateFrom(property, 2754);
+            break;
         case MINIMUM_DEVICE_POWER_LIMIT:
             populateFrom(property, 10000);
             break;
