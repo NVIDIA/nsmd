@@ -162,6 +162,10 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 properties.contains("MediumType"))
             {
                 auto eid = std::get<size_t>(properties.at("EID"));
+                if (eid == MCTP_EID_SPECIAL)
+                {
+                    return;
+                }
                 auto mctpTypes = std::get<std::vector<uint8_t>>(
                     properties.at("SupportedMessageTypes"));
                 auto mediumType =
