@@ -67,8 +67,6 @@ uint8_t
     }
     else
     {
-        memset(&data, 0, sizeof(data));
-        handleResponse(data);
         logHandleResponseMsg(
             "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp",
             reasonCode, cc, rc);
