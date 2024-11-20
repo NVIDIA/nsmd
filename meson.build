@@ -122,6 +122,10 @@ if get_option('confidential-compute-devtool-mode')
     conf_data.set('CONFIDENTIAL_COMPUTE_DEVTOOL_MODE_PRIORITY', 1)
 endif
 
+if get_option('accelerator-dbus').allowed()
+    conf_data.set('ACCELERATOR_DBUS', 0)
+endif
+
 conf_data.set('LOCAL_EID', get_option('local-eid'))
 
 if get_option('enable-in-kernel-mctp').enabled()
