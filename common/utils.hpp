@@ -572,4 +572,5 @@ void readFdToBuffer(int fd, std::vector<uint8_t>& buffer);
  * @param buffer Buffer to write.
  */
 void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer);
+std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg);
 } // namespace utils

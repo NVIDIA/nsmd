@@ -5264,7 +5264,7 @@ uint32_t doubleToNvUFXP8_24(double reading)
 
 //  Enable Workload Power Profiles
 int encode_enable_workload_power_profile_req(uint8_t instance_id,
-					     bitfield256_t profile_mask,
+					     bitfield256_t *profile_mask,
 					     struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -5287,17 +5287,16 @@ int encode_enable_workload_power_profile_req(uint8_t instance_id,
 	request->hdr.command = NSM_ENABLE_WORKLOAD_POWER_PROFILE;
 	request->hdr.data_size = sizeof(bitfield256_t);
 
+	// htole
 	size_t length = 8 / 2;
 	for (size_t i = 0; i < length; i++) {
-		uint32_t temp = profile_mask.fields[i].byte;
-		profile_mask.fields[i].byte =
-		    profile_mask.fields[length - 1 - i].byte;
-		profile_mask.fields[length - 1 - i].byte = temp;
+		request->profile_mask.fields[length - 1 - i].byte =
+		    profile_mask->fields[i].byte;
 	}
 
 	for (size_t i = 0; i < length; i++) {
-		profile_mask.fields[i].byte =
-		    htole32(profile_mask.fields[i].byte);
+		request->profile_mask.fields[i].byte =
+		    htole32(request->profile_mask.fields[i].byte);
 	}
 
 	return NSM_SW_SUCCESS;
@@ -5393,7 +5392,7 @@ int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
 
 //  Enable Workload Power Profiles
 int encode_disable_workload_power_profile_req(uint8_t instance_id,
-					      bitfield256_t profile_mask,
+					      bitfield256_t *profile_mask,
 					      struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -5416,17 +5415,16 @@ int encode_disable_workload_power_profile_req(uint8_t instance_id,
 	request->hdr.command = NSM_DISABLE_WORKLOAD_POWER_PROFILE;
 	request->hdr.data_size = sizeof(bitfield256_t);
 
-	size_t length = 8 / 2;
+	// htole
+	size_t length = 8;
 	for (size_t i = 0; i < length; i++) {
-		uint32_t temp = profile_mask.fields[i].byte;
-		profile_mask.fields[i].byte =
-		    profile_mask.fields[length - 1 - i].byte;
-		profile_mask.fields[length - 1 - i].byte = temp;
+		request->profile_mask.fields[length - 1 - i].byte =
+		    profile_mask->fields[i].byte;
 	}
 
 	for (size_t i = 0; i < length; i++) {
-		profile_mask.fields[i].byte =
-		    htole32(profile_mask.fields[i].byte);
+		request->profile_mask.fields[i].byte =
+		    htole32(request->profile_mask.fields[i].byte);
 	}
 
 	return NSM_SW_SUCCESS;

@@ -47,16 +47,15 @@ requester::Coroutine
     // first argument instanceid=0 is irrelevant
     bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
     std::string mask = utils::vectorTo256BitHexString(bytes);
-    auto rc = encode_enable_workload_power_profile_req(0, profile_mask,
+    auto rc = encode_enable_workload_power_profile_req(0, &profile_mask,
                                                        requestMsg);
+    std::string msg = utils::requestMsgToHexString(request);
 
     if (rc)
     {
         lg2::error(
-            "requestEnablePresetProfile  encode_enable_workload_power_profile_req failed. eid={EID}, rc={RC}",
-            "EID", eid, "RC", rc);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestEnablePresetProfile  encode_enable_workload_power_profile_req failed. eid={EID}, rc={RC}, msg={MSG}",
+            "EID", eid, "RC", rc, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -68,10 +67,8 @@ requester::Coroutine
     if (rc_)
     {
         lg2::error(
-            "requestEnablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestEnablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -83,16 +80,15 @@ requester::Coroutine
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::info("requestEnablePresetProfile for EID: {EID} completed", "EID",
-                  eid);
+        lg2::info(
+            "requestEnablePresetProfile for EID: {EID} completed, msg = {MSG}",
+            "EID", eid, "MSG", msg);
     }
     else
     {
         lg2::error(
-            "requestEnablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestEnablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A}, msg={MSG} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -154,16 +150,15 @@ requester::Coroutine
     // first argument instanceid=0 is irrelevant
     bitfield256_t profile_mask = utils::bitMapToBitfield256_t(bytes);
     std::string mask = utils::vectorTo256BitHexString(bytes);
-    auto rc = encode_disable_workload_power_profile_req(0, profile_mask,
+    auto rc = encode_disable_workload_power_profile_req(0, &profile_mask,
                                                         requestMsg);
+    std::string msg = utils::requestMsgToHexString(request);
 
     if (rc)
     {
         lg2::error(
-            "requestDisablePresetProfile  encode_disable_workload_power_profile_req failed. eid={EID}, rc={RC}",
-            "EID", eid, "RC", rc);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestDisablePresetProfile  encode_disable_workload_power_profile_req failed. eid={EID}, rc={RC}, msg={MSG}",
+            "EID", eid, "RC", rc, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -175,10 +170,8 @@ requester::Coroutine
     if (rc_)
     {
         lg2::error(
-            "requestDisablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestDisablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -190,16 +183,15 @@ requester::Coroutine
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::info("requestDisablePresetProfile for EID: {EID} completed", "EID",
-                  eid);
+        lg2::info(
+            "requestDisablePresetProfile for EID: {EID} completed, msg = {MSG}",
+            "EID", eid, "MSG", msg);
     }
     else
     {
         lg2::error(
-            "requestDisablePresetProfile decode_enable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-        lg2::error("Profile Mask for requestEnablePresetProfile: {MASK}",
-                   "MASK", mask);
+            "requestDisablePresetProfile decode_disable_workload_power_profile_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A}, msg={MSG} ",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }

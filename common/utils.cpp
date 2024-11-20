@@ -548,22 +548,15 @@ bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap)
         return bf;
     }
 
-    // Iterate over each bitfield32_t in the bitfield256_t
+    // Iterate over each group of 4 bytes in the bitmap
     for (int i = 0; i < 8; i++)
     {
-        uint32_t& byte = bf.fields[i].byte;
-        // Iterate over each bit in the bitfield32_t
-        for (int j = 0; j < 32; j++)
-        {
-            // Check if the corresponding bit in the bitmap is set
-            // i * 4 accounts for the 4 bytes (32 bits) per bitfield32_t
-            // j / 8 determines which byte within the 4 bytes the current bit
-            // belongs to
-            if (bitmap[i * 4 + j / 8] & (1 << (j % 8)))
-            {
-                byte |= (1U << j);
-            }
-        }
+        uint32_t byte = 0;
+        byte |= static_cast<uint32_t>(bitmap[i * 4 + 0]) << 24;
+        byte |= static_cast<uint32_t>(bitmap[i * 4 + 1]) << 16;
+        byte |= static_cast<uint32_t>(bitmap[i * 4 + 2]) << 8;
+        byte |= static_cast<uint32_t>(bitmap[i * 4 + 3]);
+        bf.fields[i].byte = byte;
     }
 
     return bf;
@@ -643,6 +636,16 @@ void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer)
         throw std::runtime_error(
             "writeBufferToFd - Fewer bytes written than expected");
     }
+}
+std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg)
+{
+    std::ostringstream oss;
+    for (const auto& byte : requestMsg)
+    {
+        oss << std::setfill('0') << std::setw(2) << std::hex
+            << static_cast<int>(byte) << " ";
+    }
+    return oss.str();
 }
 
 } // namespace utils
