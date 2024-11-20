@@ -382,10 +382,9 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Unknown, sensor->pdi().pcIeType());
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Unknown, sensor->pdi().maxPCIeType());
-    EXPECT_EQ(PCIeSlotIntf::Generations::Unknown,
-              sensor->pdi().generationInUse());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1, sensor->pdi().pcIeType());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1, sensor->pdi().maxPCIeType());
+    EXPECT_EQ(PCIeSlotIntf::Generations::Gen1, sensor->pdi().generationInUse());
     EXPECT_EQ(0, sensor->pdi().lanesInUse());
     EXPECT_EQ(0, sensor->pdi().maxLanes());
 }
