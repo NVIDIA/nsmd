@@ -741,3 +741,20 @@ TEST(commonResp, testCommonResponse)
 	    },
 	    0, 0);
 }
+
+TEST(commonReq, testEncodeRawMsg)
+{
+	auto encodePingRawCmdReq = [](uint8_t instanceId, nsm_msg *msg) {
+		return encode_raw_cmd_req(instanceId,
+					  NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+					  NSM_PING, nullptr, 0, msg);
+	};
+	testEncodeCommonRequest(encodePingRawCmdReq,
+				NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, NSM_PING);
+
+	Request responseMsg(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+	auto msg = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	EXPECT_EQ(NSM_SW_ERROR_NULL,
+		  encode_raw_cmd_req(0, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				     NSM_PING, nullptr, 1, msg));
+}

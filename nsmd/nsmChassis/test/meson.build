@@ -20,7 +20,6 @@ dep_src_files = [
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
     '../../nsmSetAsync/asyncOperationManager.cpp',
-    '../../nsmRawCommand/nsmRawCommandHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

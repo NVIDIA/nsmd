@@ -19,7 +19,6 @@ dep_src_files = [
     '../../nsmSetAsync/asyncOperationManager.cpp',
     '../../nsmSetAsync/nsmSetMigMode.cpp',
     '../../nsmSetAsync/nsmSetECCMode.cpp',
-    '../../nsmRawCommand/nsmRawCommandHandler.cpp',
     '../../nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
     '../../nsmSetAsync/nsmSetErrorInjection.cpp',
     '../../nsmSetAsync/nsmSetReconfigSettings.cpp',

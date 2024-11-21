@@ -130,6 +130,11 @@ struct CustomFD
         return fd;
     }
 
+    operator int() const
+    {
+        return fd;
+    }
+
   private:
     int fd = -1;
 };
@@ -544,4 +549,22 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
  * @param bitmap Pointer to the bitmap structure.
  **/
 bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap);
+
+std::string vectorTo256BitHexString(const std::vector<uint8_t>& value);
+
+/**
+ * @brief Reads the contents of a file descriptor into a buffer.
+ *
+ * @param fd File descriptor to read from.
+ * @param buffer Buffer to store the read data.
+ */
+void readFdToBuffer(int fd, std::vector<uint8_t>& buffer);
+
+/**
+ * @brief Writes the contents of a buffer to a file descriptor.
+ *
+ * @param fd File descriptor to write to.
+ * @param buffer Buffer to write.
+ */
+void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer);
 } // namespace utils
