@@ -16,222 +16,152 @@
  */
 #include "nsmRawCommandHandler.hpp"
 
-#include "libnsm/requester/mctp.h"
+#include "base.h"
 
-#include "instance_id.hpp"
 #include "sensorManager.hpp"
-#include "socket_handler.hpp"
-#include "utils.hpp"
 
-#include <fcntl.h>
-#include <unistd.h>
-
-#include <xyz/openbmc_project/Common/error.hpp>
-
-#include <fstream>
-
-namespace nsm::nsmRawCommand
+#include <sys/mman.h> // for memfd_create
+#include <sys/stat.h> // for fstat
+#include <unistd.h>   // for write and lseek
+namespace nsm
 {
+
+NsmRawCommandHandler* NsmRawCommandHandler::instance = nullptr;
+
 NsmRawCommandHandler::NsmRawCommandHandler(sdbusplus::bus::bus& bus,
-                                           const std::string& path,
-                                           uint8_t eid) :
-    sdbusplus::xyz::openbmc_project::NSM::server::NSMRawCommand(bus,
-                                                                path.c_str()),
-    bus(bus), commandStatusPath(path), commandFd(-1), eid(eid),
-    completionCode(NSM_ERROR), reasonCode(ERR_NULL), commandResponse(-1)
+                                           const char* path) :
+    NsmRawIntf(bus, path)
+{}
+
+void NsmRawCommandHandler::initialize(sdbusplus::bus::bus& bus,
+                                      const char* path)
 {
-    statusHandler = std::make_unique<
-        sdbusplus::server::xyz::openbmc_project::nsm::NSMRawCommandStatus>(
-        bus, path.c_str());
-    statusHandler->status(
-        sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-            SetOperationStatus::NoCommandInProgress);
-    lg2::info("NSMRawCommandHandler initialized on path {PATH}", "PATH", path);
+    static NsmRawCommandHandler instance(bus, path);
+    NsmRawCommandHandler::instance = &instance;
 }
 
-std::tuple<sdbusplus::message::object_path, uint8_t>
-    NsmRawCommandHandler::sendNSMRawCommand(uint8_t messageType,
-                                            uint8_t commandCode,
-                                            sdbusplus::message::unix_fd data)
+NsmRawCommandHandler& NsmRawCommandHandler::getInstance()
 {
-    uint8_t rc = static_cast<uint8_t>(NSM_SW_ERROR_COMMAND_FAIL);
-
-    if (statusHandler->status() ==
-        sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-            SetOperationStatus::CommandInProgress)
+    if (NsmRawCommandHandler::instance == nullptr)
     {
-        lg2::error(
-            "NSMRawCommandHandler: Command already in progress, cannot proceed.");
-        return std::make_tuple(
-            sdbusplus::message::object_path(commandStatusPath), rc);
+        throw std::runtime_error(
+            "NsmRawCommandHandler instance is not initialized yet");
     }
+    return *NsmRawCommandHandler::instance;
+}
 
-    statusHandler->status(
-        sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-            SetOperationStatus::CommandInProgress);
-
-    int fd = static_cast<int>(data);
-
-    std::vector<uint8_t> commandData = {};
-    if (fd >= 0)
+requester::Coroutine NsmRawCommandHandler::doSendRequest(
+    uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
+    uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
+    std::shared_ptr<AsyncStatusIntf> statusInterface,
+    std::shared_ptr<AsyncValueIntf> valueInterface)
+{
+    utils::CustomFD fd(duplicateFdHandle);
+    uint8_t rc = NSM_SW_SUCCESS;
+    try
     {
-        if (!readDataFromFileDescriptor(fd, commandData))
+        std::vector<uint8_t> data;
+        utils::readFdToBuffer(fd, data);
+        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                        data.size());
+        auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
+        rc = encode_raw_cmd_req(0, messageType, commandCode, data.data(),
+                                data.size(), requestMsg);
+        if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error(
-                "NSMRawCommandHandler: Error reading from file descriptor {FD}",
-                "FD", fd);
-            statusHandler->status(
-                sdbusplus::common::xyz::openbmc_project::nsm::
-                    NSMRawCommandStatus::SetOperationStatus::InternalFailure);
-            return std::make_tuple(
-                sdbusplus::message::object_path(commandStatusPath), rc);
+            throw std::invalid_argument(
+                std::format("encode_raw_cmd_req failed, rc={}", rc));
         }
+
+        auto& manager = SensorManager::getInstance();
+        auto device = manager.getNsmDevice(deviceType, instanceId);
+        if (!device)
+        {
+            throw std::invalid_argument(
+                std::format("Device {}:{} not found", deviceType, instanceId));
+        }
+        auto eid = manager.getEid(device);
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                             responseLen, isLongRunning);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            throw std::runtime_error(
+                std::format("SendRecvNsmMsg failed, rc={}", rc));
+        }
+
+        uint8_t cc;
+        uint16_t dataSize, reasonCode;
+        rc = decode_common_resp(responseMsg.get(), responseLen, &cc, &dataSize,
+                                &reasonCode);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            throw std::runtime_error(
+                std::format("decode_common_resp failed, rc={}", rc));
+        }
+        if (cc == NSM_SUCCESS)
+        {
+            // completion code + data
+            data.resize(1 + dataSize);
+            memcpy(data.data() + 1,
+                   responseMsg->payload + sizeof(nsm_common_resp), dataSize);
+        }
+        else
+        {
+            // completion code + data
+            data.resize(3);
+            reasonCode = htole16(reasonCode);
+            memcpy(data.data() + 1, &reasonCode, sizeof(uint16_t));
+        }
+        data[0] = cc;
+        utils::writeBufferToFd(fd, data);
+        valueInterface->value(rc);
+        statusInterface->status(AsyncOperationStatusType::Success);
     }
-    issueNSMCommandAsync(messageType, commandCode, std::move(commandData))
+    catch (const std::invalid_argument& e)
+    {
+        lg2::error(e.what());
+        statusInterface->status(AsyncOperationStatusType::InvalidArgument);
+    }
+    catch (const std::runtime_error& e)
+    {
+        lg2::error(e.what());
+        statusInterface->status(AsyncOperationStatusType::WriteFailure);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error(e.what());
+        statusInterface->status(AsyncOperationStatusType::InternalFailure);
+    }
+    // coverity[missing_return]
+    co_return rc;
+}
+
+sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
+    uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
+    uint8_t messageType, uint8_t commandCode, sdbusplus::message::unix_fd fd)
+{
+    if (deviceType > NSM_DEV_ID_EROT || messageType > NSM_TYPE_FIRMWARE)
+    {
+        throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
+    }
+
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::Unavailable{};
+    }
+
+    doSendRequest(deviceType, instanceId, isLongRunning, messageType,
+                  commandCode, dup(fd), statusInterface, valueInterface)
         .detach();
-    rc = static_cast<uint8_t>(NSM_SW_SUCCESS);
-    return std::make_tuple(sdbusplus::message::object_path(commandStatusPath),
-                           rc);
+
+    return objectPath;
 }
 
-std::tuple<uint8_t, uint16_t, sdbusplus::message::unix_fd>
-    NsmRawCommandHandler::getNSMCommandResponse()
-{
-    std::tuple<uint8_t, uint16_t, sdbusplus::message::unix_fd> ret_code(
-        completionCode, reasonCode, commandResponse);
-    return ret_code;
-}
-
-requester::Coroutine NsmRawCommandHandler::issueNSMCommandAsync(
-    uint8_t messageType, uint8_t commandCode, std::vector<uint8_t> commandData)
-{
-    SensorManager& sensorManager = SensorManager::getInstance();
-
-    Request request(sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_req) +
-                    commandData.size());
-    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-
-    int rc = encode_raw_cmd_req(messageType, commandCode, commandData.data(),
-                                commandData.size(), requestMsg);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "NSMRawCommandHandler: NSM command encoding failed with error code {RC}",
-            "RC", rc);
-        reasonCode = ERR_INVALID_RQD;
-        completionCode = NSM_ERR_INVALID_DATA;
-        statusHandler->status(
-            sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-                SetOperationStatus::InternalFailure);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    std::shared_ptr<const nsm_msg> responseMsg;
-    size_t responseLen = 0;
-
-    rc = co_await sensorManager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc)
-    {
-        lg2::error("NSMRawCommandHandler: NSM command failed with rc={RC}",
-                   "RC", rc);
-        reasonCode = ERR_INVALID_RQD;
-        completionCode = NSM_ERR_INVALID_DATA;
-        statusHandler->status(
-            sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-                SetOperationStatus::InternalFailure);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    uint16_t data_size = 0;
-    rc = decode_common_resp(responseMsg.get(), responseLen, &completionCode,
-                            &data_size, &reasonCode);
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "NSMRawCommandHandler: NSM command response decoding failed with rc={RC} cc={CC}",
-            "RC", rc, "CC", completionCode);
-        statusHandler->status(
-            sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-                SetOperationStatus::InternalFailure);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    saveResponseDataToFile(responseMsg.get(), responseLen);
-
-    statusHandler->status(
-        sdbusplus::common::xyz::openbmc_project::nsm::NSMRawCommandStatus::
-            SetOperationStatus::CommandExecutionComplete);
-
-    co_return NSM_SW_SUCCESS;
-}
-
-void NsmRawCommandHandler::saveResponseDataToFile(const nsm_msg* responseMsg,
-                                                  size_t responseLen)
-{
-    // Deleting old response file if exists.
-    const char* filename =
-        ("/tmp/nsm_response_data" + std::to_string(eid) + ".bin").c_str();
-    unlink(filename);
-
-    int fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, 0644);
-    if (fd == -1)
-    {
-        lg2::error("NSMRawCommandHandler: Failed to open {FILE} for writing.",
-                   "FILE", filename);
-        return;
-    }
-
-    ssize_t bytesWritten = write(fd, responseMsg->payload,
-                                 responseLen - sizeof(nsm_msg_hdr));
-    if (bytesWritten == -1)
-    {
-        lg2::error("NSMRawCommandHandler: Failed to write to {FILE}", "FILE",
-                   filename);
-        close(fd);
-        return;
-    }
-
-    if (lseek(fd, 0, SEEK_SET) == -1)
-    {
-        lg2::error(
-            "NSMRawCommandHandler: Failed to reset file cursor for {FILE}",
-            "FILE", filename);
-        close(fd);
-        return;
-    }
-
-    commandResponse = fd;
-    return;
-}
-
-bool NsmRawCommandHandler::readDataFromFileDescriptor(
-    int fd, std::vector<uint8_t>& data)
-{
-    if (fd < 0)
-    {
-        // No data to read, empty file descriptor.
-        return true;
-    }
-
-    constexpr size_t bufferSize = 1024;
-    uint8_t buffer[bufferSize];
-    ssize_t bytesRead;
-
-    data.clear();
-
-    while ((bytesRead = read(fd, buffer, bufferSize)) > 0)
-    {
-        data.insert(data.end(), buffer, buffer + bytesRead);
-    }
-
-    if (bytesRead < 0)
-    {
-        lg2::error(
-            "NSMRawCommandHandler: Failed to read from file descriptor: {ERROR}",
-            "ERROR", std::system_error(errno, std::generic_category()).what());
-        return false;
-    }
-
-    // Data read successfully from file descriptor.
-    return true;
-}
-
-} // namespace nsm::nsmRawCommand
+} // namespace nsm

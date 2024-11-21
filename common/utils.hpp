@@ -23,8 +23,11 @@
 #include "types.hpp"
 
 #include <stdint.h>
+#include <sys/mman.h> // for memfd_create
+#include <sys/stat.h> // for fstat
 #include <systemd/sd-bus.h>
 #include <unistd.h>
+#include <unistd.h> // for write and lseek
 
 #include <boost/asio.hpp>
 #include <nlohmann/json.hpp>
@@ -126,6 +129,11 @@ struct CustomFD
     }
 
     int operator()() const
+    {
+        return fd;
+    }
+
+    operator int() const
     {
         return fd;
     }
@@ -548,4 +556,20 @@ std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
 bitfield256_t bitMapToBitfield256_t(const std::vector<uint8_t>& bitmap);
 
 std::string vectorTo256BitHexString(const std::vector<uint8_t>& value);
+
+/**
+ * @brief Reads the contents of a file descriptor into a buffer.
+ *
+ * @param fd File descriptor to read from.
+ * @param buffer Buffer to store the read data.
+ */
+void readFdToBuffer(int fd, std::vector<uint8_t>& buffer);
+
+/**
+ * @brief Writes the contents of a buffer to a file descriptor.
+ *
+ * @param fd File descriptor to write to.
+ * @param buffer Buffer to write.
+ */
+void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer);
 } // namespace utils

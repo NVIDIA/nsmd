@@ -21,7 +21,6 @@
 #include "platform-environmental.h"
 
 #include "nsmDevice.hpp"
-#include "nsmRawCommand/nsmRawCommandHandler.hpp"
 #include "sensorManager.hpp"
 
 #include <cstdint>
@@ -749,16 +748,6 @@ requester::Coroutine
     nsmDevice->fruDeviceIntf->register_property("UUID", nsmDevice->uuid);
 
     nsmDevice->fruDeviceIntf->initialize();
-
-    // Add RawCommand Interface
-    auto& bus = utils::DBusHandler::getBus();
-    nsmDevice->nsmRawCmdIntf =
-        std::unique_ptr<void, std::function<void(void*)>>(
-            new nsm::nsmRawCommand::NsmRawCommandHandler(bus, objPath.c_str(),
-                                                         eid),
-            [](void* ptr) {
-        delete static_cast<nsm::nsmRawCommand::NsmRawCommandHandler*>(ptr);
-    });
 
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;

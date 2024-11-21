@@ -146,3 +146,29 @@ TEST(getSetBits, TestSetBits)
 
     EXPECT_EQ(bitMap.getSetBits(), "4, 5, 6, 7, 64");
 }
+
+TEST(memFd, TestGoodWriteRead)
+{
+    int fd = memfd_create("test", 0);
+    std::vector<uint8_t> data{0x01, 0x02, 0x03, 0x04, 0x05};
+    utils::writeBufferToFd(fd, data);
+    EXPECT_GT(fd, 0);
+
+    std::vector<uint8_t> readData;
+    utils::readFdToBuffer(fd, readData);
+
+    EXPECT_THAT(data, ElementsAre(0x01, 0x02, 0x03, 0x04, 0x05));
+}
+
+TEST(memFd, TestGoodWriteReadForEmptyBuffer)
+{
+    int fd = memfd_create("test", 0);
+    std::vector<uint8_t> data;
+    utils::writeBufferToFd(fd, data);
+    EXPECT_GT(fd, 0);
+
+    std::vector<uint8_t> readData;
+    utils::readFdToBuffer(fd, readData);
+
+    EXPECT_THAT(data, ElementsAre());
+}
