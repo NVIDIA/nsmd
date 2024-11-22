@@ -19,6 +19,10 @@
 
 #include "dBusAsyncUtils.hpp"
 
+#include <sys/mman.h> // for memfd_create
+#include <sys/stat.h> // for fstat
+#include <unistd.h>   // for write and lseek
+
 #include <boost/regex.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
@@ -208,18 +212,18 @@ std::vector<Association> getAssociations(const std::string& objPath,
                 auto& association = associations.back();
 
                 association.forward =
-                    utils::DBusHandler().getDbusProperty<std::string>(
+                    DBusHandler().getDbusProperty<std::string>(
                         objPath.c_str(), "Forward", interface.c_str());
 
                 association.backward =
-                    utils::DBusHandler().getDbusProperty<std::string>(
+                    DBusHandler().getDbusProperty<std::string>(
                         objPath.c_str(), "Backward", interface.c_str());
 
                 association.absolutePath =
-                    utils::DBusHandler().getDbusProperty<std::string>(
+                    DBusHandler().getDbusProperty<std::string>(
                         objPath.c_str(), "AbsolutePath", interface.c_str());
                 association.absolutePath =
-                    utils::makeDBusNameValid(association.absolutePath);
+                    makeDBusNameValid(association.absolutePath);
             }
         }
     }
@@ -310,8 +314,7 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
                                        const std::string& interfaceSubStr,
                                        std::vector<Association>& associations)
 {
-    auto mapperResponse = co_await utils::coGetServiceMap(objPath,
-                                                          dbus::Interfaces{});
+    auto mapperResponse = co_await coGetServiceMap(objPath, dbus::Interfaces{});
 
     for (const auto& [service, interfaces] : mapperResponse)
     {
@@ -322,19 +325,17 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
                 associations.push_back({});
                 auto& association = associations.back();
 
-                association.forward =
-                    co_await utils::coGetDbusProperty<std::string>(
-                        objPath.c_str(), "Forward", interface.c_str());
+                association.forward = co_await coGetDbusProperty<std::string>(
+                    objPath.c_str(), "Forward", interface.c_str());
 
-                association.backward =
-                    co_await utils::coGetDbusProperty<std::string>(
-                        objPath.c_str(), "Backward", interface.c_str());
+                association.backward = co_await coGetDbusProperty<std::string>(
+                    objPath.c_str(), "Backward", interface.c_str());
 
                 association.absolutePath =
-                    co_await utils::coGetDbusProperty<std::string>(
+                    co_await coGetDbusProperty<std::string>(
                         objPath.c_str(), "AbsolutePath", interface.c_str());
                 association.absolutePath =
-                    utils::makeDBusNameValid(association.absolutePath);
+                    makeDBusNameValid(association.absolutePath);
             }
         }
     }
@@ -444,7 +445,7 @@ std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
     return bitmap;
 }
 
-bool utils::bitfield256_err_code::isBitSet(const int& errCode)
+bool bitfield256_err_code::isBitSet(const int& errCode)
 {
     if (errCode == NSM_SUCCESS || errCode == NSM_SW_SUCCESS)
     {
@@ -464,7 +465,7 @@ bool utils::bitfield256_err_code::isBitSet(const int& errCode)
     return true;
 }
 
-std::string utils::bitfield256_err_code::getSetBits() const
+std::string bitfield256_err_code::getSetBits() const
 {
     std::ostringstream oss;
 
@@ -585,6 +586,63 @@ std::string vectorTo256BitHexString(const std::vector<uint8_t>& value)
            << static_cast<int>(byte);
     }
     return ss.str();
+}
+
+void readFdToBuffer(int fd, std::vector<uint8_t>& buffer)
+{
+    if (fd < 0)
+    {
+        throw std::runtime_error("readFdToBuffer - Invalid file descriptor");
+    }
+    if (lseek(fd, 0, SEEK_SET) < 0)
+    {
+        throw std::runtime_error("readFdToBuffer - lseek failed");
+    }
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) < 0)
+    {
+        throw std::runtime_error("readFdToBuffer - fstat failed" +
+                                 std::string(strerror(errno)));
+    }
+    if (fileStat.st_size < 0)
+    {
+        throw std::runtime_error("readFdToBuffer - Invalid file size in fd");
+    }
+    buffer.resize(fileStat.st_size);
+    ssize_t bytesRead = read(fd, buffer.data(), buffer.size());
+    if (bytesRead < 0)
+    {
+        throw std::runtime_error("readFdToBuffer - Fd read failed" +
+                                 std::string(strerror(errno)));
+    }
+    else if (static_cast<size_t>(bytesRead) != buffer.size())
+    {
+        throw std::runtime_error(
+            "readFdToBuffer - Read fewer bytes than expected");
+    }
+}
+
+void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer)
+{
+    if (fd < 0)
+    {
+        throw std::runtime_error("writeBufferToFd - Invalid file descriptor");
+    }
+    if (lseek(fd, 0, SEEK_SET) < 0)
+    {
+        throw std::runtime_error("writeBufferToFd - lseek failed");
+    }
+    ssize_t bytesWritten = write(fd, buffer.data(), buffer.size());
+    if (bytesWritten < 0)
+    {
+        throw std::runtime_error("writeBufferToFd - write failed: " +
+                                 std::string(strerror(errno)));
+    }
+    else if (static_cast<size_t>(bytesWritten) != buffer.size())
+    {
+        throw std::runtime_error(
+            "writeBufferToFd - Fewer bytes written than expected");
+    }
 }
 
 } // namespace utils

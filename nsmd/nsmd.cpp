@@ -23,6 +23,7 @@
 #include "instance_id.hpp"
 #include "nsmDbusIfaceOverride/nsmLogDumpOnDemand.hpp"
 #include "nsmDevice.hpp"
+#include "nsmRawCommandHandler.hpp"
 #include "nsmServiceReadyInterface.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
@@ -153,6 +154,9 @@ int main(int argc, char** argv)
         nsm::SensorManagerImpl::initialize(bus, event, reqHandler, instanceIdDb,
                                            objServer, eidTable, nsmDevices,
                                            localEid, sockManager, verbose);
+
+        nsm::NsmRawCommandHandler::initialize(bus,
+                                              "/xyz/openbmc_project/NSM/Raw");
 
         std::unique_ptr<nsm::EventHandler> eventHandlers[] = {
             std::make_unique<nsm::EventType0Handler>(),
