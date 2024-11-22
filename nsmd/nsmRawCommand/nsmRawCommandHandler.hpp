@@ -16,53 +16,36 @@
  */
 #pragma once
 
-#include "libnsm/base.h"
-#include "libnsm/platform-environmental.h"
+#include "asyncOperationManager.hpp"
 
-#include "common/types.hpp"
-#include "common/utils.hpp"
-#include "requester/handler.hpp"
-#include "utils.hpp"
+#include <com/nvidia/Protocol/NSM/Raw/server.hpp>
 
-#include <boost/asio/awaitable.hpp>
-#include <sdbusplus/bus.hpp>
-#include <sdbusplus/server.hpp>
-#include <xyz/openbmc_project/NSM/NSMRawCommand/server.hpp>
-#include <xyz/openbmc_project/NSM/NSMRawCommandStatus/server.hpp>
-
-namespace nsm::nsmRawCommand
+namespace nsm
 {
 
-class NsmRawCommandHandler :
-    public sdbusplus::server::xyz::openbmc_project::nsm::NSMRawCommand
+using NsmRawIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::Protocol::NSM::server::Raw>;
+
+class NsmRawCommandHandler : public NsmRawIntf
 {
-  public:
-    NsmRawCommandHandler(sdbusplus::bus::bus& bus, const std::string& path,
-                         uint8_t eid);
-
-    std::tuple<sdbusplus::message::object_path, uint8_t>
-        sendNSMRawCommand(uint8_t messageType, uint8_t commandCode,
-                          sdbusplus::message::unix_fd data) override;
-
-    std::tuple<uint8_t, uint16_t, sdbusplus::message::unix_fd>
-        getNSMCommandResponse() override;
-
   private:
-    std::unique_ptr<
-        sdbusplus::server::xyz::openbmc_project::nsm::NSMRawCommandStatus>
-        statusHandler;
-    sdbusplus::bus::bus& bus;
-    sdbusplus::message::object_path commandStatusPath;
-    int commandFd; // File descriptor for command response
-    uint8_t eid;
-    uint8_t completionCode;
-    uint16_t reasonCode;
-    int mctpFd;
-    sdbusplus::message::unix_fd commandResponse;
-    requester::Coroutine issueNSMCommandAsync(uint8_t messageType,
-                                              uint8_t commandCode,
-                                              std::vector<uint8_t> commandData);
-    bool readDataFromFileDescriptor(int fd, std::vector<uint8_t>& data);
-    void saveResponseDataToFile(const nsm_msg* responseMsg, size_t responseLen);
+    static NsmRawCommandHandler* instance;
+    NsmRawCommandHandler(sdbusplus::bus::bus& bus, const char* path);
+    requester::Coroutine
+        doSendRequest(uint8_t deviceType, uint8_t instanceId,
+                      bool isLongRunning, uint8_t messageType,
+                      uint8_t commandCode, int duplicateFdHandle,
+                      std::shared_ptr<AsyncStatusIntf> statusInterface,
+                      std::shared_ptr<AsyncValueIntf> valueInterface);
+
+  public:
+    sdbusplus::message::object_path
+        sendRequest(uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
+                    uint8_t messageType, uint8_t commandCode,
+                    sdbusplus::message::unix_fd fd) override;
+
+    static void initialize(sdbusplus::bus::bus& bus, const char* path);
+    NsmRawCommandHandler& getInstance();
 };
-} // namespace nsm::nsmRawCommand
+
+} // namespace nsm

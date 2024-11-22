@@ -605,6 +605,12 @@ requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
     co_return NSM_SW_SUCCESS;
 }
 
+std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uint8_t deviceType,
+                                                       uint8_t instanceNumber)
+{
+    return findNsmDeviceByIdentification(nsmDevices, deviceType,
+                                         instanceNumber);
+}
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 {
     auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);

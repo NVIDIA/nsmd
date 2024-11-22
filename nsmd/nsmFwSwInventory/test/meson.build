@@ -11,7 +11,6 @@ dep_src_files = [
     '../../nsmSetAsync/asyncOperationManager.cpp',
     '../../nsmSetAsync/nsmSetWriteProtected.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
-    '../../nsmRawCommand/nsmRawCommandHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

@@ -8,7 +8,6 @@ dep_src_files = [
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
-    '../../nsmRawCommand/nsmRawCommandHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
