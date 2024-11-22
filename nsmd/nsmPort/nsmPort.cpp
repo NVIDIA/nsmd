@@ -557,12 +557,6 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantIBGTXP);
 
-    nv::sensor_aggregation::DbusVariantType variantSE{
-        iBPortIntf->symbolError()};
-    propName = "SymbolError";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
-
     nv::sensor_aggregation::DbusVariantType variantBER{
         iBPortIntf->bitErrorRate()};
     propName = "BitErrorRate";
@@ -615,6 +609,18 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     propName = "TXBytes";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePortOem2Name, propName, rawSmbpbiData, variantTXB);
+
+    nv::sensor_aggregation::DbusVariantType variantEBER{
+        iBPortIntf->effectiveBER()};
+    propName = "EffectiveBER";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEBER);
+
+    nv::sensor_aggregation::DbusVariantType variantEEBER{
+        iBPortIntf->estimatedEffectiveBER()};
+    propName = "EstimatedEffectiveBER";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEEBER);
 #endif
 }
 
@@ -736,11 +742,9 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
                 iBPortIntf->ibG2TXPkts(portData->port_xmit_ibg2_pkts);
             }
 
-            if (portData->supported_counter.symbol_error)
+            if (portData->supported_counter.symbol_ber)
             {
-                iBPortIntf->symbolError(portData->symbol_error);
-                iBPortIntf->bitErrorRate(
-                    getBitErrorRate(portData->symbol_error));
+                iBPortIntf->bitErrorRate(getBitErrorRate(portData->symbol_ber));
             }
 
             if (portData->supported_counter.link_error_recovery_counter)
@@ -774,6 +778,18 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
             if (portData->supported_counter.xmit_wait)
             {
                 iBPortIntf->txWait(portData->xmit_wait);
+            }
+
+            if (portData->supported_counter.effective_ber)
+            {
+                iBPortIntf->effectiveBER(
+                    getBitErrorRate(portData->effective_ber));
+            }
+
+            if (portData->supported_counter.estimated_effective_ber)
+            {
+                iBPortIntf->estimatedEffectiveBER(
+                    getBitErrorRate(portData->estimated_effective_ber));
             }
         }
         else
