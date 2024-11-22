@@ -72,22 +72,23 @@ TEST(NsmPortMetrics, GoodTest)
         0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
     }; /*for counter values, 8 bytes each*/
-    auto portTelData =
-        reinterpret_cast<nsm_port_counter_data*>(portData.data());
+    struct nsm_port_counter_data portTelData = {};
+    std::memcpy(&portTelData, portData.data(), sizeof(portTelData));
 
-    portTel.updateCounterValues(portTelData);
+    portTel.updateCounterValues(&portTelData);
 
-    EXPECT_EQ(portTel.iBPortIntf->rxPkts(), portTelData->port_rcv_pkts);
+    EXPECT_EQ(portTel.iBPortIntf->rxPkts(), portTelData.port_rcv_pkts);
     // checking only first and last values for iBPortIntf
-    EXPECT_EQ(portTel.iBPortIntf->txWait(), portTelData->xmit_wait);
+    EXPECT_EQ(portTel.iBPortIntf->txWait(), portTelData.xmit_wait);
 
     EXPECT_EQ(portTel.portMetricsOem2Intf->rxBytes(),
-              portTelData->port_rcv_data);
+              portTelData.port_rcv_data);
     // checking only first and last values for portMetricsOem2Intf
     EXPECT_EQ(portTel.portMetricsOem2Intf->txBytes(),
-              portTelData->port_xmit_data);
+              portTelData.port_xmit_data);
 }
 
 namespace nsm

@@ -23,8 +23,11 @@ extern "C" {
 #endif
 
 #include "base.h"
-#define PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE 204
-#define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 212
+
+// Min size is when no counter is sent in response
+#define PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE 4
+// Max size is when all 27 counters are supported
+#define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 220
 #define FABRIC_MANAGER_STATE_DATA_SIZE 18
 #define PORT_MASK_DATA_SIZE 32
 // defined in MBps
@@ -124,7 +127,7 @@ struct nsm_supported_port_counter {
 
 	uint8_t port_rcv_ibg2_pkts : 1;
 	uint8_t port_xmit_ibg2_pkts : 1;
-	uint8_t symbol_error : 1;
+	uint8_t symbol_ber : 1;
 	uint8_t link_error_recovery_counter : 1;
 	uint8_t link_downed_counter : 1;
 	uint8_t port_rcv_remote_physical_errors : 1;
@@ -133,7 +136,8 @@ struct nsm_supported_port_counter {
 
 	uint8_t xmit_wait : 1;
 	uint8_t effective_ber : 1;
-	uint8_t unused : 6;
+	uint8_t estimated_effective_ber : 1;
+	uint8_t unused : 5;
 } __attribute__((packed));
 
 struct nsm_port_counter_data {
@@ -156,7 +160,7 @@ struct nsm_port_counter_data {
 	uint64_t port_neighbor_mtu_discards;
 	uint64_t port_rcv_ibg2_pkts;
 	uint64_t port_xmit_ibg2_pkts;
-	uint64_t symbol_error;
+	uint64_t symbol_ber;
 	uint64_t link_error_recovery_counter;
 	uint64_t link_downed_counter;
 	uint64_t port_rcv_remote_physical_errors;
@@ -164,6 +168,7 @@ struct nsm_port_counter_data {
 	uint64_t QP1_dropped;
 	uint64_t xmit_wait;
 	uint64_t effective_ber;
+	uint64_t estimated_effective_ber;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {
@@ -261,7 +266,7 @@ typedef struct nsm_common_port_req nsm_get_port_telemetry_counter_req;
  */
 struct nsm_get_port_telemetry_counter_resp {
 	struct nsm_common_resp hdr;
-	struct nsm_port_counter_data data;
+	uint8_t data[1];
 } __attribute__((packed));
 
 /** @struct nsm_query_port_status_req
