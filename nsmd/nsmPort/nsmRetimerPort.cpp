@@ -498,15 +498,10 @@ static requester::Coroutine
 
         auto pcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
             portName, type, objPath, portInfoIntf, portWidthIntf, deviceIndex);
-        auto pcieECCIntfSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
-            portName, type, objPath, pcieECCIntf, deviceIndex);
         auto pcieECCIntfSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
             portName, type, objPath, pcieECCIntf, deviceIndex);
-        auto pcieECCIntfSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
-            portName, type, objPath, pcieECCIntf, deviceIndex);
 
-        if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup2 ||
-            !pcieECCIntfSensorGroup3 || !pcieECCIntfSensorGroup4)
+        if (!pcieSensorGroup1 || !pcieECCIntfSensorGroup3)
         {
             lg2::error(
                 "Failed to create NSM PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
