@@ -512,9 +512,7 @@ static requester::Coroutine
         }
 
         nsmDevice->addSensor(pcieSensorGroup1, priority);
-        nsmDevice->addSensor(pcieECCIntfSensorGroup2, priority);
         nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
-        nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
