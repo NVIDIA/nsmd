@@ -3036,7 +3036,7 @@ int decode_get_workload_power_profile_status_resp(
 
 // ** Enable Workload Power Profiles **
 int encode_enable_workload_power_profile_req(uint8_t instance_id,
-					     bitfield256_t profile_mask,
+					     bitfield256_t *profile_mask,
 					     struct nsm_msg *msg);
 int decode_enable_workload_power_profile_req(const struct nsm_msg *msg,
 					     size_t msg_len,
@@ -3050,7 +3050,7 @@ int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
 
 // ** Disable Workload Power Profiles **
 int encode_disable_workload_power_profile_req(uint8_t instance_id,
-					      bitfield256_t profile_mask,
+					      bitfield256_t *profile_mask,
 					      struct nsm_msg *msg);
 int decode_disable_workload_power_profile_req(const struct nsm_msg *msg,
 					      size_t msg_len,
