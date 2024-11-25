@@ -427,6 +427,15 @@ eid_t getEidFromUUID(
  */
 uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr);
 
+/** @brief string conversion from integer array to std::string.
+ *
+ *  @param[in] data - The integer array to be converted to string
+ *  @param[in] dataSize - The size of the string
+ *  @return - std::string
+ */
+std::string convertHexToString(const std::vector<uint8_t>& data,
+                               const size_t dataSize);
+
 /** @brief Make valid D-Bus Object Path of Interface Name by replacing unwanted
  * characters with underscore ('_')
  *

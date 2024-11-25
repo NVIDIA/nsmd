@@ -1073,6 +1073,10 @@ class GetInventoryInformation : public CommandInterface
             case RATED_MODULE_POWER_LIMIT:
             case DEFAULT_BOOST_CLOCKS:
             case DEFAULT_BASE_CLOCKS:
+            case TRAY_SLOT_NUMBER:
+            case TRAY_SLOT_INDEX:
+            case GPU_NODE_INDEX:
+            case GPU_MODULE_ID:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;
             case BOARD_PART_NUMBER:
@@ -1097,6 +1101,37 @@ class GetInventoryInformation : public CommandInterface
                     utils::convertUUIDToString(nvu8ArrVal);
                 break;
             }
+            case GPU_NVLINK_PEER_TYPE:
+            {
+                auto peerTypeNvU32 = le32toh(*(uint32_t*)data.data());
+                if (peerTypeNvU32 == NSM_PEER_TYPE_DIRECT)
+                {
+                    propRecordResult["Data"] = std::string("Direct");
+                }
+                else
+                {
+                    propRecordResult["Data"] = std::string("Bridge");
+                }
+                break;
+            }
+            case CHASSIS_SERIAL_NUMBER:
+            {
+                try
+                {
+                    propRecordResult["Data"] = std::string((char*)data.data(),
+                                                           dataSize);
+                }
+                catch (const std::exception& e)
+                {
+                    propRecordResult["Data"] =
+                        utils::convertHexToString(data, dataSize);
+                }
+                break;
+            }
+            case GPU_IBGUID:
+                propRecordResult["Data"] = utils::convertHexToString(data,
+                                                                     dataSize);
+                break;
             case MINIMUM_MEMORY_CLOCK_LIMIT:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
                 break;

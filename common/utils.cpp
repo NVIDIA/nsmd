@@ -66,6 +66,25 @@ uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr)
     return uuidStr;
 }
 
+std::string convertHexToString(const std::vector<uint8_t>& data,
+                               const size_t dataSize)
+{
+    std::string result("");
+    if (dataSize == 0)
+    {
+        return result;
+    }
+
+    std::vector<uint8_t> nvu8ArrVal(dataSize, 0);
+    memcpy(nvu8ArrVal.data(), data.data(), dataSize);
+
+    for (const auto& token : nvu8ArrVal)
+    {
+        result += std::format("{:02x}", token);
+    }
+    return result;
+}
+
 void printBuffer(bool isTx, const std::vector<uint8_t>& buffer)
 {
     if (!buffer.empty())
