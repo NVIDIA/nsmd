@@ -132,6 +132,10 @@ if get_option('enable-in-kernel-mctp').enabled()
     conf_data.set('MCTP_IN_KERNEL', 0)
 endif
 
+if get_option('system-tray-id').enabled()
+    conf_data.set('SYSTEM_TRAY_ID', 0)
+endif
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []

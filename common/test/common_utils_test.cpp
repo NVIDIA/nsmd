@@ -45,6 +45,26 @@ TEST(ConvertUUIDToString, testGBadConversionToString)
     EXPECT_STREQ(stringUUID.c_str(), "");
 }
 
+TEST(convertHexToString, testGoodHexConversionToString)
+{
+    std::vector<uint8_t> data{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07};
+
+    // convert HEX to a string
+    std::string result = utils::convertHexToString(data, data.size());
+
+    EXPECT_STREQ(result.c_str(), "0001020304050607\0");
+}
+
+TEST(convertHexToString, testBadHexConversionToString)
+{
+    std::vector<uint8_t> data;
+
+    // convert HEX to a string
+    std::string result = utils::convertHexToString(data, data.size());
+
+    EXPECT_STREQ(result.c_str(), "");
+}
+
 TEST(makeDBusNameValid, Functional)
 {
     const std::vector<std::array<std::string, 2>> data{
