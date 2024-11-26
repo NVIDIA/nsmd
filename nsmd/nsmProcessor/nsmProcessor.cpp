@@ -2238,7 +2238,7 @@ void NsmMaxPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->maxPowerCapValue(value);
     powerLimitIntf->maxPowerWatts(value);
-    lg2::info("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
+    lg2::debug("NsmMaxPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 void NsmMaxPowerCap::updateMetricOnSharedMemory()
@@ -2334,7 +2334,7 @@ void NsmMinPowerCap::updateValue(uint32_t value)
 {
     powerCapIntf->minPowerCapValue(value);
     powerLimitIntf->minPowerWatts(value);
-    lg2::info("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
+    lg2::debug("NsmMinPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 void NsmMinPowerCap::updateMetricOnSharedMemory()
@@ -2427,7 +2427,7 @@ NsmDefaultPowerCap::NsmDefaultPowerCap(
 void NsmDefaultPowerCap::updateValue(uint32_t value)
 {
     defaultPowerCapIntf->defaultPowerCap(value);
-    lg2::info("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
+    lg2::debug("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
 requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,

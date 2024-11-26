@@ -164,6 +164,7 @@ class OemAdminProfileIntf :
         // first argument instanceid=0 is irrelevant
         auto rc = encode_setup_admin_override_req(
             0, parameterId, parameValueTobeSet, requestMsg);
+        std::string msg = utils::requestMsgToHexString(request);
 
         if (rc)
         {
@@ -182,8 +183,9 @@ class OemAdminProfileIntf :
         if (rc_)
         {
             lg2::error(
-                "overrideAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}",
-                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue);
+                "overrideAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
+                "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
             co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -201,9 +203,9 @@ class OemAdminProfileIntf :
         else
         {
             lg2::error(
-                "overrideAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}",
+                "overrideAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
-                parameterId, "VAL", paramValue);
+                parameterId, "VAL", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
