@@ -582,4 +582,13 @@ void readFdToBuffer(int fd, std::vector<uint8_t>& buffer);
  */
 void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer);
 std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg);
+
+/**
+ * @brief Writes the contents of a buffer to a file descriptor.
+ *
+ * @param uint32_t value to be scaled down
+ * @param scaleFactor  scaleDown factor.
+ * Eg : value = 200000, will be returned as 200 if scaleFactor = 1000
+ */
+double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor);
 } // namespace utils
