@@ -611,7 +611,10 @@ int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
 	}
 	*event_state = le16toh(event->event_state);
 	*data_size = event->data_size;
-	if (*data_size > 0) {
+	if (msg_len < (sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+		       event->data_size)) {
+		return NSM_SW_ERROR_LENGTH;
+	} else if (*data_size > 0) {
 		if (data == NULL) {
 			return NSM_SW_ERROR_NULL;
 		}

@@ -133,7 +133,7 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
                   .eventsMap[NSM_TYPE_NETWORK_PORT][NSM_THRESHOLD_EVENT]
                   .get());
 
-    const nsm_health_event_payload payload{1, 1, 1, 1, 1, 1, 1, 0, 0};
+    const nsm_health_event_payload payload{0, 0, 1, 1, 1, 1, 1, 1, 1, 0};
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
                                   sizeof(nsm_health_event_payload));
     auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
