@@ -21,6 +21,8 @@
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
+
+#include <cstdint>
 namespace nsm
 {
 using AdminPowerProfileIntf = sdbusplus::server::object_t<
@@ -219,6 +221,80 @@ class OemAdminProfileIntf :
         co_return NSM_SW_SUCCESS;
     }
 
+    bool resetParam(double reading)
+    {
+        if (static_cast<uint32_t>(reading) == INVALID_POWER_LIMIT)
+            return true;
+        return false;
+    }
+
+    requester::Coroutine
+        resetAdminProfileParam(uint8_t parameterId,
+                               AsyncOperationStatusType* status)
+    {
+        SensorManager& manager = SensorManager::getInstance();
+        auto eid = manager.getEid(device);
+        uint32_t paramValue = INVALID_POWER_LIMIT;
+        lg2::info(
+            "resetAdminProfileParam for EID: {EID} parameterId:{ID}, parameterValue: {PARAMVALUE}",
+            "EID", eid, "ID", parameterId, "PARAMVALUE", paramValue);
+
+        Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_setup_admin_override_req));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+        // first argument instanceid=0 is irrelevant
+        auto rc = encode_setup_admin_override_req(0, parameterId, paramValue,
+                                                  requestMsg);
+        std::string msg = utils::requestMsgToHexString(request);
+
+        if (rc)
+        {
+            lg2::error(
+                "resetAdminProfileParam: encode_setup_admin_override_req failed. eid={EID}, rc={RC}, paramId={ID}, paramValue={VAL}",
+                "EID", eid, "RC", rc, "ID", parameterId, "VAL", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
+        if (rc_)
+        {
+            lg2::error(
+                "resetAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
+                "MSG", msg);
+            *status = AsyncOperationStatusType::WriteFailure;
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        rc = decode_setup_admin_override_resp(responseMsg.get(), responseLen,
+                                              &cc, &reason_code);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            co_await getAdminProfileFromDevice();
+        }
+        else
+        {
+            lg2::error(
+                "resetAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                parameterId, "VAL", paramValue, "MSG", msg);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    }
+
     requester::Coroutine
         setTmpFloorPercent(const AsyncSetOperationValueType& value,
                            AsyncOperationStatusType* status,
@@ -231,11 +307,21 @@ class OemAdminProfileIntf :
             throw sdbusplus::error::xyz::openbmc_project::common::
                 InvalidArgument{};
         }
-        // percent to fraction
-        const auto rc =
-            co_await overrideAdminProfileParam(0, *floorPercent / 100, status);
-        // coverity[missing_return]
-        co_return rc;
+
+        if (resetParam(*floorPercent))
+        {
+            auto rc = co_await resetAdminProfileParam(0, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            // percent to fraction
+            auto rc = co_await overrideAdminProfileParam(0, *floorPercent / 100,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine
@@ -251,10 +337,18 @@ class OemAdminProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc = co_await overrideAdminProfileParam(1, *ramupRate,
-                                                           status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*ramupRate))
+        {
+            auto rc = co_await resetAdminProfileParam(1, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            auto rc = co_await overrideAdminProfileParam(1, *ramupRate, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine
@@ -270,10 +364,19 @@ class OemAdminProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc = co_await overrideAdminProfileParam(2, *rampDownRate,
-                                                           status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*rampDownRate))
+        {
+            auto rc = co_await resetAdminProfileParam(2, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            auto rc = co_await overrideAdminProfileParam(2, *rampDownRate,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine setRampDownHysteresis(
@@ -289,10 +392,19 @@ class OemAdminProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc =
-            co_await overrideAdminProfileParam(3, *rampDownHysteresis, status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*rampDownHysteresis))
+        {
+            auto rc = co_await resetAdminProfileParam(3, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            auto rc = co_await overrideAdminProfileParam(3, *rampDownHysteresis,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 };
 } // namespace nsm

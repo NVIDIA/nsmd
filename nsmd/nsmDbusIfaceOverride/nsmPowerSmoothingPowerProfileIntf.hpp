@@ -224,6 +224,79 @@ class OemPowerProfileIntf :
     }
 
     requester::Coroutine
+        resetProfileInfoOnDevice(uint8_t parameterId,
+                                 AsyncOperationStatusType* status)
+    {
+        SensorManager& manager = SensorManager::getInstance();
+        auto eid = manager.getEid(device);
+        uint32_t paramValue = INVALID_POWER_LIMIT;
+        lg2::info(
+            "resetProfileInfoOnDevice for EID: {EID} parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}",
+            "EID", eid, "ID", parameterId, "PROFILEID", profileId, "VALUE",
+            paramValue);
+
+        Request request(sizeof(nsm_msg_hdr) +
+                        sizeof(nsm_setup_admin_override_req));
+        auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+        // first argument instanceid=0 is irrelevant
+        auto rc = encode_update_preset_profile_param_req(
+            0, profileId, parameterId, paramValue, requestMsg);
+
+        if (rc)
+        {
+            lg2::error(
+                "resetProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc, "ID", parameterId, "PROFILEID", profileId,
+                "VALUE", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                                   responseLen);
+        if (rc_)
+        {
+            lg2::error(
+                "resetProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
+                profileId, "VALUE", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        rc = decode_update_preset_profile_param_resp(
+            responseMsg.get(), responseLen, &cc, &reason_code);
+
+        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        {
+            // verify setting is applied on the device
+            co_await getProfileInfoFromDevice();
+        }
+        else
+        {
+            lg2::error(
+                "resetProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
+                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                parameterId, "PROFILEID", profileId, "VALUE", paramValue);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+        co_return NSM_SW_SUCCESS;
+    }
+
+    bool resetParam(double reading)
+    {
+        if (static_cast<uint32_t>(reading) == INVALID_POWER_LIMIT)
+            return true;
+        return false;
+    }
+
+    requester::Coroutine
         setTmpFloorPercent(const AsyncSetOperationValueType& value,
                            AsyncOperationStatusType* status,
                            [[maybe_unused]] std::shared_ptr<NsmDevice> device)
@@ -235,11 +308,20 @@ class OemPowerProfileIntf :
             throw sdbusplus::error::xyz::openbmc_project::common::
                 InvalidArgument{};
         }
-        // percent to fraction
-        const auto rc =
-            co_await updateProfileInfoOnDevice(0, *floorPercent / 100, status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*floorPercent))
+        {
+            auto rc = co_await resetProfileInfoOnDevice(0, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            // percent to fraction
+            auto rc = co_await updateProfileInfoOnDevice(0, *floorPercent / 100,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine
@@ -255,10 +337,19 @@ class OemPowerProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc = co_await updateProfileInfoOnDevice(1, *ramupRate,
-                                                           status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*ramupRate))
+        {
+            auto rc = co_await resetProfileInfoOnDevice(1, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            // percent to fraction
+            auto rc = co_await updateProfileInfoOnDevice(1, *ramupRate, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine
@@ -274,10 +365,20 @@ class OemPowerProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc = co_await updateProfileInfoOnDevice(2, *rampDownRate,
-                                                           status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*rampDownRate))
+        {
+            auto rc = co_await resetProfileInfoOnDevice(2, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            // percent to fraction
+            auto rc = co_await updateProfileInfoOnDevice(2, *rampDownRate,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 
     requester::Coroutine setRampDownHysteresis(
@@ -293,10 +394,20 @@ class OemPowerProfileIntf :
                 InvalidArgument{};
         }
 
-        const auto rc =
-            co_await updateProfileInfoOnDevice(3, *rampDownHysteresis, status);
-        // coverity[missing_return]
-        co_return rc;
+        if (resetParam(*rampDownHysteresis))
+        {
+            auto rc = co_await resetProfileInfoOnDevice(3, status);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        else
+        {
+            // percent to fraction
+            auto rc = co_await updateProfileInfoOnDevice(3, *rampDownHysteresis,
+                                                         status);
+            // coverity[missing_return]
+            co_return rc;
+        }
     }
 };
 } // namespace nsm

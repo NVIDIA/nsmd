@@ -5247,12 +5247,12 @@ uint16_t doubleToNvUFXP4_12(double reading)
 
 double NvUFXP8_24ToDouble(uint32_t reading)
 {
-	  // Extract the MSB (8 bits)
-    int32_t msb = (reading >> 24) & 0xFF;
-    // Extract the LSB (24 bits)
-    uint32_t lsb = reading & 0xFFFFFF;
-    // Combine MSB and LSB
-    double result = (double)msb + (double)lsb / (1 << 24);
+	// Extract the MSB (8 bits)
+	int32_t msb = (reading >> 24) & 0xFF;
+	// Extract the LSB (24 bits)
+	uint32_t lsb = reading & 0xFFFFFF;
+	// Combine MSB and LSB
+	double result = (double)msb + (double)lsb / (1 << 24);
 	return result;
 }
 
