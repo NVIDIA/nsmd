@@ -2971,10 +2971,10 @@ void NsmEgmMode::updateMetricOnSharedMemory()
 #endif
 }
 
-void NsmEgmMode::updateReading(uint8_t current_mode, uint8_t pending_mode)
+void NsmEgmMode::updateReading(bitfield8_t flags)
 {
-    egmModeIntf->EgmModeIntf::egmModeEnabled(current_mode);
-    egmModeIntf->EgmModeIntf::pendingEGMModeState(pending_mode);
+    egmModeIntf->EgmModeIntf::egmModeEnabled(flags.bits.bit0);
+    egmModeIntf->EgmModeIntf::pendingEGMModeState(flags.bits.bit1);
     updateMetricOnSharedMemory();
 }
 
@@ -2999,18 +2999,16 @@ uint8_t NsmEgmMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                                       size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
-    uint8_t current_mode;
-    uint8_t pending_mode;
+    bitfield8_t flags;
     uint16_t data_size;
     uint16_t reason_code = ERR_NULL;
 
     auto rc = decode_get_EGM_mode_resp(responseMsg, responseLen, &cc,
-                                       &data_size, &reason_code, &current_mode,
-                                       &pending_mode);
+                                       &data_size, &reason_code, &flags);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        updateReading(current_mode, pending_mode);
+        updateReading(flags);
         clearErrorBitMap("decode_get_EGM_mode_resp");
     }
     else
