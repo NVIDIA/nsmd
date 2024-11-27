@@ -262,17 +262,20 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
         data->admin_override_mask.bits.tmp_floor_override);
     // mw/sec to watts/sec
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRate(
-        data->current_rampup_rate_in_miliwatts_per_second / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->current_rampup_rate_in_miliwatts_per_second, 1000));
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRateApplied(
         data->admin_override_mask.bits.rampup_rate_override);
     // miliseconds to seconds
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRate(
-        data->current_rampdown_rate_in_miliwatts_per_second / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->current_rampdown_rate_in_miliwatts_per_second, 1000));
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownRateApplied(
         data->admin_override_mask.bits.rampdown_rate_override);
     // miliseconds to seconds
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampDownHysteresis(
-        data->current_rampdown_hysteresis_value_in_milisec / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->current_rampdown_hysteresis_value_in_milisec, 1000));
     pwrSmoothingCurProfileIntf
         ->CurrentPowerProfileIntf::rampDownHysteresisApplied(
             data->admin_override_mask.bits.hysteresis_value_override);
@@ -346,13 +349,16 @@ void NsmPowerSmoothingAdminOverride::updateReading(
         NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor) * 100);
     // mw/sec to watts/sec
     adminProfileIntf->AdminPowerProfileIntf::rampUpRate(
-        data->admin_override_ramup_rate_in_miliwatts_per_second / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->admin_override_ramup_rate_in_miliwatts_per_second, 1000));
     // mw/sec to watts/sec
     adminProfileIntf->AdminPowerProfileIntf::rampDownRate(
-        data->admin_override_rampdown_rate_in_miliwatts_per_second / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->admin_override_rampdown_rate_in_miliwatts_per_second, 1000));
     // milisecs to seconds
     adminProfileIntf->AdminPowerProfileIntf::rampDownHysteresis(
-        data->admin_override_rampdown_hysteresis_value_in_milisec / 1000);
+        utils::convertAndScaleDownUint32ToDouble(
+            data->admin_override_rampdown_hysteresis_value_in_milisec, 1000));
 }
 
 std::string NsmPowerSmoothingAdminOverride::getInventoryObjPath()
@@ -405,11 +411,14 @@ void NsmPowerProfileCollection::updateSupportedProfile(
         obj->PowerProfileIntf::tmpFloorPercent(
             NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent) * 100);
         obj->PowerProfileIntf::rampUpRate(
-            data->ramp_up_rate_in_miliwattspersec / 1000);
+            utils::convertAndScaleDownUint32ToDouble(
+                data->ramp_up_rate_in_miliwattspersec, 1000));
         obj->PowerProfileIntf::rampDownRate(
-            data->ramp_down_rate_in_miliwattspersec / 1000);
+            utils::convertAndScaleDownUint32ToDouble(
+                data->ramp_down_rate_in_miliwattspersec, 1000));
         obj->PowerProfileIntf::rampDownHysteresis(
-            data->ramp_hysterisis_rate_in_milisec / 1000);
+            utils::convertAndScaleDownUint32ToDouble(
+                data->ramp_hysterisis_rate_in_milisec, 1000));
     }
 }
 

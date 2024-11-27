@@ -109,20 +109,26 @@ class OemAdminProfileIntf :
                     adminProfiledata.admin_override_percent_tmp_floor) *
                 100);
             // mw/sec to watts/sec
-            AdminPowerProfileIntf::rampUpRate(
+            double reading = utils::convertAndScaleDownUint32ToDouble(
                 adminProfiledata
-                    .admin_override_ramup_rate_in_miliwatts_per_second /
+                    .admin_override_ramup_rate_in_miliwatts_per_second,
                 1000);
+            AdminPowerProfileIntf::rampUpRate(reading);
+
             // mw/sec to watts/sec
-            AdminPowerProfileIntf::rampDownRate(
+            reading = utils::convertAndScaleDownUint32ToDouble(
                 adminProfiledata
-                    .admin_override_rampdown_rate_in_miliwatts_per_second /
+                    .admin_override_rampdown_rate_in_miliwatts_per_second,
                 1000);
+
+            AdminPowerProfileIntf::rampDownRate(reading);
+
             // miliseconds to seconds
-            AdminPowerProfileIntf::rampDownHysteresis(
+            reading = utils::convertAndScaleDownUint32ToDouble(
                 adminProfiledata
-                    .admin_override_rampdown_hysteresis_value_in_milisec /
+                    .admin_override_rampdown_hysteresis_value_in_milisec,
                 1000);
+            AdminPowerProfileIntf::rampDownHysteresis(reading);
             lg2::info("getAdminProfileFromDevice for EID: {EID} completed ",
                       "EID", eid);
         }

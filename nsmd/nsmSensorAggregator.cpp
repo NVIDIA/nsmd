@@ -71,7 +71,7 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
 
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::debug(
+            lg2::error(
                 "responseHandler: decode_aggregate_resp_sample failed. "
                 "Type={TYPE}, Tag={TAG}, sensor={NAME}, rc={RC}, valid_bit={VALID}",
                 "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
