@@ -122,13 +122,17 @@ class OemPowerProfileIntf :
                         100);
                     // mw/sec to watts/sec
                     PowerProfileIntf::rampUpRate(
-                        profileData.ramp_up_rate_in_miliwattspersec / 1000);
+                        utils::convertAndScaleDownUint32ToDouble(
+                            profileData.ramp_up_rate_in_miliwattspersec, 1000));
                     // mw/sec to watts/sec
                     PowerProfileIntf::rampDownRate(
-                        profileData.ramp_down_rate_in_miliwattspersec / 1000);
+                        utils::convertAndScaleDownUint32ToDouble(
+                            profileData.ramp_down_rate_in_miliwattspersec,
+                            1000));
                     // milisec to second
                     PowerProfileIntf::rampDownHysteresis(
-                        profileData.ramp_hysterisis_rate_in_milisec / 1000);
+                        utils::convertAndScaleDownUint32ToDouble(
+                            profileData.ramp_hysterisis_rate_in_milisec, 1000));
                     lg2::info(
                         "getProfileInfo for EID: {EID} completed for profile Id: {ID}",
                         "EID", eid, "ID", profileId);
