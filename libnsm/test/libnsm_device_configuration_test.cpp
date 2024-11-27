@@ -1766,8 +1766,8 @@ TEST(getEGMMode, testGoodEncodeResponse)
 	flags.byte = 1;
 	uint16_t reason_code = ERR_NULL;
 
-	auto rc = encode_get_EGM_mode_resp(
-	    0, NSM_SUCCESS, reason_code, &flags, response);
+	auto rc = encode_get_EGM_mode_resp(0, NSM_SUCCESS, reason_code, &flags,
+					   response);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	struct nsm_get_EGM_mode_resp *resp =
@@ -1781,7 +1781,7 @@ TEST(getEGMMode, testGoodEncodeResponse)
 	EXPECT_EQ(sizeof(struct nsm_get_EGM_mode_resp) -
 		      sizeof(struct nsm_common_resp),
 		  le16toh(resp->hdr.data_size));
-    EXPECT_EQ(1, resp->flags.byte);
+	EXPECT_EQ(1, resp->flags.byte);
 }
 
 TEST(getEGMMode, testGoodDecodeResponse)
@@ -1807,7 +1807,7 @@ TEST(getEGMMode, testGoodDecodeResponse)
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
-    bitfield8_t flags;
+	bitfield8_t flags;
 
 	auto rc = decode_get_EGM_mode_resp(response, msg_len, &cc, &data_size,
 					   &reason_code, &flags);
