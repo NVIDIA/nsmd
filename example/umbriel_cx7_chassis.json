@@ -205,6 +205,20 @@
                         "AbsolutePath": "/xyz/openbmc_project/inventory/system/chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER/NetworkAdapters/NVLinkManagementNIC_$INSTANCE_NUMBER"
                     }
                 ]
+            },
+            {
+                "Name": "ThresholdEventSetting",
+                "Type": "NSM_Event_Threshold",
+                "UUID": "$UUID",
+                "OriginOfCondition": "/redfish/v1/Chassis/HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
+                "MessageId": "ResourceEvent.1.0.ResourceErrorsDetected",
+                "Severity": "Critical",
+                "LoggingNamespace": "NVLinkManagementNIC_$INSTANCE_NUMBER Threshold",
+                "Resolution": "Regarding Port Error documentation and further actions please refer to (TBD)",
+                "MessageArgs": [
+                    "NVLinkManagementNIC_$INSTANCE_NUMBER",
+                    "No Error"
+                ]
             }
         ],
         "Name": "HGX_NVLinkManagementNIC_$INSTANCE_NUMBER",
