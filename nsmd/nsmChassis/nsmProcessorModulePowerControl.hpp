@@ -61,6 +61,14 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
         const std::string& path,
         const std::vector<std::tuple<std::string, std::string, std::string>>&
             associations_list);
+
+    /**
+     * @brief AsyncSetOperationHandler for setting the processor module power
+     * limit
+     * @param value[in] Pointer to the target power limit value in Watts
+     * @param status[in] Pointer to the async call action result
+     * @param device[in] Pointer to the target nsm device
+     */
     requester::Coroutine
         setModulePowerCap(const AsyncSetOperationValueType& value,
                           AsyncOperationStatusType* status,
@@ -74,6 +82,14 @@ class NsmProcessorModulePowerControl : public NsmSensor, ClearPowerCapAsyncIntf
   private:
     requester::Coroutine doClearPowerCapOnModule(
         std::shared_ptr<AsyncStatusIntf> statusInterface);
+
+    /**
+     * @brief set power limit for the processor module
+     * @param status[in] Pointer to the async call action result
+     * @param action[in] specifies the operation to perform on the power limit.
+     *                   0 = new power limit, 1 = reset to default
+     * @param value[in] target power limit in Watts
+     */
     requester::Coroutine
         updatePowerLimitOnModule(AsyncOperationStatusType* status,
                                  const uint8_t action, const uint32_t value);
