@@ -170,3 +170,10 @@ option(
   value: 'enabled',
   description: 'Expose Accelerator D-Bus Interface for Processor'
 )
+
+option(
+    'system-tray-id',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Enable System Tray ID feature'
+)

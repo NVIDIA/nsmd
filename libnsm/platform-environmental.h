@@ -95,6 +95,11 @@ enum nsm_platform_environmental_events {
 	NSM_XID_EVENT = 0x01,
 };
 
+enum nsm_mnnvlink_peer_type {
+	NSM_PEER_TYPE_DIRECT = 0x00,
+	NSM_PEER_TYPE_BRIDGE = 0x01
+};
+
 enum nsm_inventory_property_identifiers {
 	BOARD_PART_NUMBER = 0,
 	SERIAL_NUMBER = 1,
@@ -125,6 +130,13 @@ enum nsm_inventory_property_identifiers {
 	MAXIMUM_GRAPHICS_CLOCK_LIMIT = 27,
 	MINIMUM_MEMORY_CLOCK_LIMIT = 28,
 	MAXIMUM_MEMORY_CLOCK_LIMIT = 29,
+	GPU_IBGUID = 30,
+	CHASSIS_SERIAL_NUMBER = 31,
+	TRAY_SLOT_NUMBER = 32,
+	TRAY_SLOT_INDEX = 33,
+	GPU_NODE_INDEX = 34,
+	GPU_MODULE_ID = 35,
+	GPU_NVLINK_PEER_TYPE = 36,
 	FPGA_FIRMWARE_VERSION = 128,
 	PCIERETIMER_0_EEPROM_VERSION = 144,
 	PCIERETIMER_1_EEPROM_VERSION = 145,
