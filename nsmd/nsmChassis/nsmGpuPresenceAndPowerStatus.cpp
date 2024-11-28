@@ -60,12 +60,21 @@ requester::Coroutine
         for (auto& [_, pdi] : interfaces)
         {
             if (power && presence)
+            {
                 pdi->state(OperationalStatusIntf::StateType::Enabled);
+                pdi->functional(true);
+            }
             else if (presence)
+            {
                 pdi->state(
                     OperationalStatusIntf::StateType::UnavailableOffline);
+                pdi->functional(false);
+            }
             else
+            {
                 pdi->state(OperationalStatusIntf::StateType::Absent);
+                pdi->functional(false);
+            }
         }
     }
     else
@@ -73,6 +82,7 @@ requester::Coroutine
         for (auto& [_, pdi] : interfaces)
         {
             pdi->state(OperationalStatusIntf::StateType::Fault);
+            pdi->functional(false);
         }
     }
     updateMetricOnSharedMemory();
