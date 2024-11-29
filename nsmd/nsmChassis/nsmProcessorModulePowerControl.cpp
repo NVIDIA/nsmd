@@ -128,7 +128,7 @@ requester::Coroutine NsmProcessorModulePowerControl::setModulePowerCap(
     }
 
     auto rc = co_await updatePowerLimitOnModule(status, NEW_LIMIT,
-                                                (*powerLimit) * 1000);
+                                                (*powerLimit));
     co_return rc;
 }
 
