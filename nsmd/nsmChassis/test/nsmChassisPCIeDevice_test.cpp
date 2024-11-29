@@ -66,7 +66,7 @@ struct NsmChassisPCIeDeviceTest :
     NsmDevice& gpu = *devices[0];
     NsmDevice& fpga = *devices[1];
 
-    NiceMock<MockSensorManager> mockManager{devices};
+    NsmChassisPCIeDeviceTest() : SensorManagerTest(devices) {}
 
     const PropertyValuesCollection error = {
         {"Type", "NSM_ChassispCIeDevice"},
