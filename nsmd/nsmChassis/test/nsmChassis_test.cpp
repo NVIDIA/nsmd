@@ -40,7 +40,10 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 
 using namespace nsm;
 
-struct NsmChassisTest : public testing::Test, public utils::DBusTest
+struct NsmChassisTest :
+    public Test,
+    public utils::DBusTest,
+    public SensorManagerTest
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
@@ -60,7 +63,11 @@ struct NsmChassisTest : public testing::Test, public utils::DBusTest
     NsmDevice& gpu = *devices[0];
     NsmDevice& fpga = *devices[1];
 
-    NiceMock<MockSensorManager> mockManager{devices};
+    NsmChassisTest() : SensorManagerTest(devices)
+    {
+        gpu.deviceType = NSM_DEV_ID_GPU;
+        fpga.deviceType = NSM_DEV_ID_BASEBOARD;
+    }
 
     const PropertyValuesCollection error = {
         {"Type", "NSM_GPU_cassis"},
@@ -782,9 +789,7 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-struct NsmGpuPresenceAndPowerStatusTest :
-    public NsmChassisTest,
-    public SensorManagerTest
+struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
 {
     NsmInterfaceProvider<OperationalStatusIntf> chassisOperationalStatus{
         name, "NSM_OperationalStatus", "/xyz/openbmc_project/dummy"};

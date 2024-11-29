@@ -1509,9 +1509,7 @@ struct NsmProcessorTest :
     NsmDeviceTable devices{{gpuPtr}};
     NsmDevice& gpu = *gpuPtr;
 
-    NiceMock<MockSensorManager> mockManager{devices};
-
-    void SetUp() override
+    NsmProcessorTest() : SensorManagerTest(devices)
     {
         AsyncOperationManager::getInstance()->dispatchers.clear();
     }
