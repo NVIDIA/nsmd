@@ -16,12 +16,16 @@
  */
 
 #pragma once
-#include "sensorManager.hpp"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#define private public
+#define protected public
+#include "sensorManager.hpp"
+
 using namespace nsm;
+using ::testing::NiceMock;
 
 struct MockSensorManager : public SensorManager
 {
@@ -64,6 +68,7 @@ class SensorManagerTest
     }
 
   protected:
+    NiceMock<MockSensorManager> mockManager;
     Response lastResponse;
     template <typename DataType>
     DataType& data(size_t lastResponseOffset)
@@ -94,5 +99,15 @@ class SensorManagerTest
     auto mockSendRecvNsmMsg(nsm_completion_codes code = NSM_SUCCESS)
     {
         return mockSendRecvNsmMsg(Response(), code);
+    }
+
+    SensorManagerTest() = delete;
+    SensorManagerTest(NsmDeviceTable& devices) : mockManager(devices)
+    {
+        SensorManager::instance.reset(&mockManager);
+    }
+    virtual ~SensorManagerTest()
+    {
+        SensorManager::instance.release();
     }
 };
