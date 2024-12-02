@@ -1762,12 +1762,12 @@ TEST(getEGMMode, testGoodEncodeResponse)
 	std::vector<uint8_t> responseMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_EGM_mode_resp), 0);
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
-	uint8_t current_mode = 1;
-	uint8_t pending_mode = 1;
+	bitfield8_t flags;
+	flags.byte = 1;
 	uint16_t reason_code = ERR_NULL;
 
-	auto rc = encode_get_EGM_mode_resp(
-	    0, NSM_SUCCESS, reason_code, current_mode, pending_mode, response);
+	auto rc = encode_get_EGM_mode_resp(0, NSM_SUCCESS, reason_code, &flags,
+					   response);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	struct nsm_get_EGM_mode_resp *resp =
@@ -1781,8 +1781,7 @@ TEST(getEGMMode, testGoodEncodeResponse)
 	EXPECT_EQ(sizeof(struct nsm_get_EGM_mode_resp) -
 		      sizeof(struct nsm_common_resp),
 		  le16toh(resp->hdr.data_size));
-
-	EXPECT_EQ(resp->pending_mode, 1);
+	EXPECT_EQ(1, resp->flags.byte);
 }
 
 TEST(getEGMMode, testGoodDecodeResponse)
@@ -1799,7 +1798,7 @@ TEST(getEGMMode, testGoodDecodeResponse)
 	    0,				   // reserved
 	    1,
 	    0, // data size
-	    1  // pending mode
+	    1  // current mode
 	};
 
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -1808,15 +1807,13 @@ TEST(getEGMMode, testGoodDecodeResponse)
 	uint8_t cc = NSM_SUCCESS;
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
-	uint8_t current_mode;
-	uint8_t pending_mode;
+	bitfield8_t flags;
 
 	auto rc = decode_get_EGM_mode_resp(response, msg_len, &cc, &data_size,
-					   &reason_code, &current_mode,
-					   &pending_mode);
+					   &reason_code, &flags);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(1, data_size);
-	EXPECT_EQ(1, pending_mode);
+	EXPECT_EQ(1, flags.byte);
 }

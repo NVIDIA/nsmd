@@ -5584,15 +5584,14 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    uint8_t current_mode = 1;
-    uint8_t pending_mode = 1;
+    bitfield8_t flags;
+    flags.byte = 1;
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_EGM_mode_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
     rc = encode_get_EGM_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                  reason_code, current_mode, pending_mode,
-                                  responseMsg);
+                                  reason_code, &flags, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {

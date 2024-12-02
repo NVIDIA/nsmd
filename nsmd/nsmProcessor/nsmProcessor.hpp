@@ -813,7 +813,7 @@ class NsmEgmMode : public NsmSensor
     void updateMetricOnSharedMemory() override;
 
   private:
-    void updateReading(uint8_t current_mode, uint8_t pending_mode);
+    void updateReading(bitfield8_t flags);
     std::unique_ptr<EgmModeIntf> egmModeIntf = nullptr;
     std::string inventoryObjPath;
 };

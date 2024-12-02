@@ -395,7 +395,7 @@ struct nsm_set_confidential_compute_mode_v1_req {
  */
 struct nsm_get_EGM_mode_resp {
 	struct nsm_common_resp hdr;
-	uint8_t pending_mode;
+	bitfield8_t flags;
 } __attribute__((packed));
 
 /** @struct nsm_set_EGM_mode_req
@@ -1097,27 +1097,24 @@ int decode_get_EGM_mode_req(const struct nsm_msg *msg, size_t msg_len);
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
- *  @param[in] current_mode - Current EGM mode
- *  @param[in] pending_mode - Pending EGM mode
+ *  @param[in] flags - bits indicating EGM modes
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
 int encode_get_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
-			     uint16_t reason_code, uint8_t current_mode,
-			     uint8_t pending_mode, struct nsm_msg *msg);
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg);
 
 /** @brief Decode a Get EGM mode response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
- *  @param[in] current_mode - Current EGM mode
- *  @param[in] pending_mode - Pending EGM mode
+ *  @param[in] flags - bits indicating EGM modes
  *  @return nsm_completion_codes
  */
 int decode_get_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
-			     uint16_t *reason_code, uint8_t *current_mode,
-			     uint8_t *pending_mode);
+			     uint16_t *reason_code, bitfield8_t *flags);
 
 /** @brief Encode a Set EGM mode request message
  *

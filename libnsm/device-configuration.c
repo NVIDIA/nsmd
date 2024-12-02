@@ -999,10 +999,10 @@ int decode_get_EGM_mode_req(const struct nsm_msg *msg, size_t msg_len)
 
 // Get EGM Mode Command, NSM T5 spec
 int encode_get_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
-			     uint16_t reason_code, uint8_t current_mode,
-			     uint8_t pending_mode, struct nsm_msg *msg)
+			     uint16_t reason_code, bitfield8_t *flags,
+			     struct nsm_msg *msg)
 {
-	if (msg == NULL || current_mode > 1) {
+	if (msg == NULL || flags == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -1027,7 +1027,7 @@ int encode_get_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
 	uint16_t data_size = htole16(sizeof(struct nsm_get_EGM_mode_resp) -
 				     sizeof(struct nsm_common_resp));
 	resp->hdr.data_size = htole16(data_size);
-	resp->pending_mode = pending_mode;
+	memcpy(&(resp->flags), flags, data_size);
 
 	return NSM_SW_SUCCESS;
 }
@@ -1035,11 +1035,9 @@ int encode_get_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
 // Get EGM Mode Command, NSM T5 spec
 int decode_get_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
-			     uint16_t *reason_code, uint8_t *current_mode,
-			     uint8_t *pending_mode)
+			     uint16_t *reason_code, bitfield8_t *flags)
 {
-	if (msg == NULL || cc == NULL || data_size == NULL ||
-	    current_mode == NULL || pending_mode == NULL) {
+	if (msg == NULL || cc == NULL || data_size == NULL || flags == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -1065,8 +1063,7 @@ int decode_get_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     sizeof(struct nsm_common_resp))) {
 		return NSM_SW_ERROR_DATA;
 	}
-	*current_mode = 0;
-	*pending_mode = resp->pending_mode;
+	memcpy(flags, &(resp->flags), sizeof(bitfield8_t));
 
 	return NSM_SW_SUCCESS;
 }
