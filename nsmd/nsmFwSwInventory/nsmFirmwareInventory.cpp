@@ -134,7 +134,7 @@ requester::Coroutine
     else if (type == "NSM_FirmwareVersion")
     {
         auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+            objPath.c_str(), "InstanceNumber", interface.c_str());
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
         firmwareInventoryVersion.pdi().purpose(
             VersionIntf::VersionPurpose::Other);
