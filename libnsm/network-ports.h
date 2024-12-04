@@ -409,6 +409,8 @@ typedef struct nsm_common_resp nsm_set_power_mode_resp;
  *  Structure representing NSM Ports health event payload.
  */
 struct nsm_health_event_payload {
+	uint8_t portNumber;
+	uint32_t reserved1 : 24;
 	uint8_t port_rcv_errors_threshold : 1;
 	uint8_t port_xmit_discard_threshold : 1;
 	uint8_t symbol_ber_threshold : 1;
@@ -416,8 +418,7 @@ struct nsm_health_event_payload {
 	uint8_t port_rcv_switch_relay_errors_threshold : 1;
 	uint8_t effective_ber_threshold : 1;
 	uint8_t estimated_effective_ber_threshold : 1;
-	uint8_t reserved : 1;
-	uint8_t portNumber;
+	uint32_t reserved2 : 25;
 } __attribute__((packed));
 
 /** @struct nsm_get_fabric_manager_state_req

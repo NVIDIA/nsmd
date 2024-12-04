@@ -2347,15 +2347,16 @@ class PortsHealthEventDecode : public testing::Test
 
 	PortsHealthEventDecode()
 	    : eventMsg(eventMsgSize, 0),
-	      expected{.port_rcv_errors_threshold = 0,
+	      expected{.portNumber = 1,
+		       .reserved1 = 0,
+		       .port_rcv_errors_threshold = 0,
 		       .port_xmit_discard_threshold = 0,
 		       .symbol_ber_threshold = 1,
 		       .port_rcv_remote_physical_errors_threshold = 0,
 		       .port_rcv_switch_relay_errors_threshold = 0,
 		       .effective_ber_threshold = 0,
 		       .estimated_effective_ber_threshold = 0,
-		       .reserved = 0,
-		       .portNumber = 1}
+		       .reserved2 = 0}
 	{
 		auto rc = encode_nsm_health_event(
 		    0, true, &expected,
@@ -2387,6 +2388,8 @@ TEST_F(PortsHealthEventDecode, testGoodDecodeEvent)
 
 	EXPECT_EQ(0, eventState);
 
+	EXPECT_EQ(expected.portNumber, payload.portNumber);
+	EXPECT_EQ(expected.reserved1, payload.reserved1);
 	EXPECT_EQ(expected.port_rcv_errors_threshold,
 		  payload.port_rcv_errors_threshold);
 	EXPECT_EQ(expected.port_xmit_discard_threshold,
@@ -2400,8 +2403,7 @@ TEST_F(PortsHealthEventDecode, testGoodDecodeEvent)
 		  payload.effective_ber_threshold);
 	EXPECT_EQ(expected.estimated_effective_ber_threshold,
 		  payload.estimated_effective_ber_threshold);
-	EXPECT_EQ(expected.reserved, payload.reserved);
-	EXPECT_EQ(expected.portNumber, payload.portNumber);
+	EXPECT_EQ(expected.reserved2, payload.reserved2);
 }
 
 TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
@@ -2412,7 +2414,9 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
 	auto rc = decode_nsm_health_event(event, eventMsgSize - 3, &eventState,
 					  &payload);
 	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
-	EXPECT_EQ(1, eventState);
+	EXPECT_EQ(0, eventState);
+	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved1);
 	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
 	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
 	EXPECT_EQ(0, payload.symbol_ber_threshold);
@@ -2420,30 +2424,28 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventLength)
 	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
 	EXPECT_EQ(0, payload.effective_ber_threshold);
 	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
-	EXPECT_EQ(0, payload.reserved);
-	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved2);
 
 	reinterpret_cast<nsm_event *>(const_cast<nsm_msg *>(event)->payload)
-	    ->data_size = 1;
-	rc = decode_nsm_health_event(event, eventMsgSize - 1, &eventState,
-				     &payload);
+	    ->data_size = sizeof(payload.portNumber);
+	rc = decode_nsm_health_event(event,
+				     eventMsgSize -
+					 sizeof(nsm_health_event_payload) +
+					 sizeof(payload.portNumber),
+				     &eventState, &payload);
 	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
 	EXPECT_EQ(0, eventState);
-	EXPECT_EQ(expected.port_rcv_errors_threshold,
-		  payload.port_rcv_errors_threshold);
-	EXPECT_EQ(expected.port_xmit_discard_threshold,
-		  payload.port_xmit_discard_threshold);
-	EXPECT_EQ(expected.symbol_ber_threshold, payload.symbol_ber_threshold);
-	EXPECT_EQ(expected.port_rcv_remote_physical_errors_threshold,
-		  payload.port_rcv_remote_physical_errors_threshold);
-	EXPECT_EQ(expected.port_rcv_switch_relay_errors_threshold,
-		  payload.port_rcv_switch_relay_errors_threshold);
-	EXPECT_EQ(expected.effective_ber_threshold,
-		  payload.effective_ber_threshold);
-	EXPECT_EQ(expected.estimated_effective_ber_threshold,
-		  payload.estimated_effective_ber_threshold);
-	EXPECT_EQ(expected.reserved, payload.reserved);
-	EXPECT_EQ(0, payload.portNumber);
+	// portNumber was copied, but rest not
+	EXPECT_EQ(expected.portNumber, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved1);
+	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
+	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
+	EXPECT_EQ(0, payload.symbol_ber_threshold);
+	EXPECT_EQ(0, payload.port_rcv_remote_physical_errors_threshold);
+	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
+	EXPECT_EQ(0, payload.effective_ber_threshold);
+	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
+	EXPECT_EQ(0, payload.reserved2);
 }
 
 TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)
@@ -2458,6 +2460,8 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)
 
 	rc = decode_nsm_health_event(event, eventMsg.size(), nullptr, &payload);
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved1);
 	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
 	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
 	EXPECT_EQ(0, payload.symbol_ber_threshold);
@@ -2465,8 +2469,7 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)
 	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
 	EXPECT_EQ(0, payload.effective_ber_threshold);
 	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
-	EXPECT_EQ(0, payload.reserved);
-	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved2);
 }
 
 TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
@@ -2482,6 +2485,8 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
 	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 	EXPECT_EQ(1, eventState);
 	EXPECT_EQ(1, dataSize);
+	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved1);
 	EXPECT_EQ(0, payload.port_rcv_errors_threshold);
 	EXPECT_EQ(0, payload.port_xmit_discard_threshold);
 	EXPECT_EQ(0, payload.symbol_ber_threshold);
@@ -2489,8 +2494,7 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
 	EXPECT_EQ(0, payload.port_rcv_switch_relay_errors_threshold);
 	EXPECT_EQ(0, payload.effective_ber_threshold);
 	EXPECT_EQ(0, payload.estimated_effective_ber_threshold);
-	EXPECT_EQ(0, payload.reserved);
-	EXPECT_EQ(0, payload.portNumber);
+	EXPECT_EQ(0, payload.reserved2);
 }
 
 TEST(getSwitchIsolationMode, testGoodEncodeRequest)
