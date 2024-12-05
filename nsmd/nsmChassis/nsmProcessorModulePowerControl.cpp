@@ -452,9 +452,11 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
+    std::string processorModuleName =
+        chassisPath.substr(chassisPath.rfind('/') + 1, chassisPath.size());
     std::string inventoryObjPath =
-        "/xyz/openbmc_project/inventory/system/chassis/power/control/ProcessorModule_" +
-        std::to_string(instanceNumber / NUM_GPU_PER_MODULE);
+        "/xyz/openbmc_project/inventory/system/chassis/power/control/" +
+        processorModuleName;
 
     if (manager.processorModuleToDeviceMap.find(inventoryObjPath) ==
         manager.processorModuleToDeviceMap.end())
