@@ -35,8 +35,9 @@ struct nsmReconfigSettingsTest : public testing::Test, public SensorManagerTest
     NsmDeviceTable devices{{gpu}};
 
     AsyncOperationStatusType status = AsyncOperationStatusType::Success;
-    NiceMock<MockSensorManager> mockManager{devices};
     std::unique_ptr<NsmSetReconfigSettings> reconfigSettings;
+
+    nsmReconfigSettingsTest() : SensorManagerTest(devices) {}
 
     void init(
         reconfiguration_permissions_v1_index settingIndex = RP_IN_SYSTEM_TEST)

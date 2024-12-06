@@ -57,7 +57,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     std::shared_ptr<AsyncValueIntf> valueInterface)
 {
     utils::CustomFD fd(duplicateFdHandle);
-    uint8_t rc = NSM_SW_SUCCESS;
+    uint8_t rc = NSM_SW_ERROR;
     try
     {
         std::vector<uint8_t> data;
@@ -65,13 +65,8 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
                         data.size());
         auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-        rc = encode_raw_cmd_req(0, messageType, commandCode, data.data(),
-                                data.size(), requestMsg);
-        if (rc != NSM_SW_SUCCESS)
-        {
-            throw std::invalid_argument(
-                std::format("encode_raw_cmd_req failed, rc={}", rc));
-        }
+        encode_raw_cmd_req(0, messageType, commandCode, data.data(),
+                           data.size(), requestMsg);
 
         auto& manager = SensorManager::getInstance();
         auto device = manager.getNsmDevice(deviceType, instanceId);
@@ -86,22 +81,31 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
                                              responseLen, isLongRunning);
 
-        if (rc != NSM_SW_SUCCESS)
+        uint8_t cc;
+        uint16_t dataSize, reasonCode;
+        if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+        {
+            cc = NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+            rc = NSM_SW_SUCCESS;
+            dataSize = 0;
+            reasonCode = 0;
+        }
+        else if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(
                 std::format("SendRecvNsmMsg failed, rc={}", rc));
         }
-
-        uint8_t cc;
-        uint16_t dataSize, reasonCode;
-        rc = decode_common_resp(responseMsg.get(), responseLen, &cc, &dataSize,
-                                &reasonCode);
-
-        if (rc != NSM_SW_SUCCESS)
+        else
         {
-            throw std::runtime_error(
-                std::format("decode_common_resp failed, rc={}", rc));
+            rc = decode_common_resp(responseMsg.get(), responseLen, &cc,
+                                    &dataSize, &reasonCode);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                throw std::runtime_error(
+                    std::format("decode_common_resp failed, rc={}", rc));
+            }
         }
+
         if (cc == NSM_SUCCESS)
         {
             // completion code + data

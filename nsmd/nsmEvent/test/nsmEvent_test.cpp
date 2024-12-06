@@ -56,12 +56,10 @@ struct NsmThresholdEventTest :
     };
     NsmDevice& gpu = *devices[0];
 
-    void SetUp() override
+    NsmThresholdEventTest() : SensorManagerTest(devices)
     {
         gpu.uuid = gpuUuid;
     }
-
-    NiceMock<MockSensorManager> mockManager{devices};
 
     const PropertyValuesCollection error = {
         {"UUID", "992b3ec1-e468-f145-8686-badbadbadbad"},

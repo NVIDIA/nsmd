@@ -45,7 +45,7 @@ class NsmRawCommandHandler : public NsmRawIntf
                     sdbusplus::message::unix_fd fd) override;
 
     static void initialize(sdbusplus::bus::bus& bus, const char* path);
-    NsmRawCommandHandler& getInstance();
+    static NsmRawCommandHandler& getInstance();
 };
 
 } // namespace nsm

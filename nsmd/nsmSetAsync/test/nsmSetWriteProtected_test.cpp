@@ -33,8 +33,8 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
     std::shared_ptr<NsmDevice> fpga = std::make_shared<NsmDevice>(fpgaUuid);
     NsmDeviceTable devices{{fpga}};
 
-    NiceMock<MockSensorManager> mockManager{devices};
     std::unique_ptr<NsmSetWriteProtected> writeProtectedIntf;
+    NsmSetWriteProtectedTest() : SensorManagerTest(devices) {}
 
     void init(const diagnostics_enable_disable_wp_data_index dataIndex)
     {

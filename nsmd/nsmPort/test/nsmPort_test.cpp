@@ -135,12 +135,10 @@ struct NsmPCIePortTest :
     };
     NsmDevice& cx7 = *devices[0];
 
-    void SetUp() override
+    NsmPCIePortTest() : SensorManagerTest(devices)
     {
         cx7.uuid = cx7Uuid;
     }
-
-    NiceMock<MockSensorManager> mockManager{devices};
 
     const PropertyValuesCollection error = {
         {"UUID", "992b3ec1-e468-f145-8686-badbadbadbad"},
