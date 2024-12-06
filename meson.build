@@ -141,6 +141,10 @@ conf_data.set(
     get_option('delay-between-concurrent-requests'),
 )
 
+if get_option('fixup-missing-event-notification').enabled()
+    conf_data.set('FIXUP_MISSING_EVENT_NOTIFICATION', 1)
+endif
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []

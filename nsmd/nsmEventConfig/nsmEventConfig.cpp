@@ -206,10 +206,12 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
     std::vector<uint64_t> ackIds{};
     auto sensor = std::make_shared<NsmEventConfig>(name, type, messageType,
                                                    subscribedEventIds, ackIds);
-    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
-
-    // update sensor
-    nsmDevice->addStaticSensor(sensor);
+#ifdef FIXUP_MISSING_EVENT_NOTIFICATION
+    // NOTE: This is a work around
+    // TBD: Fix so we re-run when GPU's come online
+    //      rather than poll
+    nsmDevice->addSensor(sensor, false, true);
+#endif
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
