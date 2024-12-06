@@ -186,3 +186,10 @@ option(
     max: 100000,
     description: 'The minimum required interval time in microseconds between two concurrent requests' ,
 )
+
+option(
+    'fixup-missing-event-notification',
+    type: 'feature',
+    value: 'disabled',
+    description: 'This is a work around to solve an issue on Bianca where we are not getting a MCTP rediscovery event on GPU reset to setup event notifications'
+)
