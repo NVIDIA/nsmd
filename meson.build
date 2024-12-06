@@ -136,6 +136,11 @@ if get_option('system-tray-id').enabled()
     conf_data.set('SYSTEM_TRAY_ID', 0)
 endif
 
+conf_data.set(
+    'DELAY_BETWEEN_CONCURRENT_REQUESTS',
+    get_option('delay-between-concurrent-requests'),
+)
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []

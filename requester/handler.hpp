@@ -28,6 +28,7 @@
 #include "nsmd/socket_manager.hpp"
 #include "request.hpp"
 #include "request_timeout_tracker.hpp"
+#include "sleep.hpp"
 
 #include <function2/function2.hpp>
 #include <phosphor-logging/lg2.hpp>
@@ -242,10 +243,108 @@ class Handler
             responseTimeOutLongRunning, instanceIdExpiryIntervalLongRunning);
     }
 
-    int runRegisteredRequest(eid_t eid,
+    requester::Coroutine sendRegisteredRequestWithDelay(
+        eid_t eid, std::unordered_map<eid_t, RequestQueue>& handlers,
+        std::chrono::seconds instanceIdExpiryInterval)
+    {
+        auto& [request, responseHandler, timerInstance,
+               valid] = handlers[eid].front();
+
+        const auto currTime = static_cast<int64_t>(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count());
+
+        int64_t timeBetweenRequests;
+
+        if (instanceIdExpiryInterval == instanceIdExpiryIntervalRegular)
+        {
+            timeBetweenRequests =
+                DELAY_BETWEEN_CONCURRENT_REQUESTS -
+                (currTime -
+                 lastRequestTimestamps[eid].lastRequestTimestampLongRunning);
+        }
+        else
+        {
+            timeBetweenRequests =
+                DELAY_BETWEEN_CONCURRENT_REQUESTS -
+                (currTime -
+                 lastRequestTimestamps[eid].lastRequestTimestampRegular);
+        }
+
+        if (timeBetweenRequests > 0)
+        {
+            isRequestDelayed[eid] = true;
+            co_await common::Sleep(event, timeBetweenRequests,
+                                   common::Priority);
+        }
+
+        auto rc = request->start();
+        if (rc)
+        {
+            instanceIdDb.free(eid, request->getInstanceId());
+            lg2::error("Failure to send the NSM request message");
+            co_return rc;
+        }
+
+        try
+        {
+            timerInstance->start(duration_cast<std::chrono::microseconds>(
+                instanceIdExpiryInterval));
+        }
+        catch (const std::runtime_error& e)
+        {
+            instanceIdDb.free(eid, request->getInstanceId());
+            lg2::error("Failed to start the instance ID expiry timer.", "ERROR",
+                       e);
+            co_return NSM_ERROR;
+        }
+
+        if (instanceIdExpiryInterval == instanceIdExpiryIntervalRegular)
+        {
+            lastRequestTimestamps[eid].lastRequestTimestampRegular =
+                static_cast<int64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count());
+        }
+        else
+        {
+            lastRequestTimestamps[eid].lastRequestTimestampLongRunning =
+                static_cast<int64_t>(
+                    std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch())
+                        .count());
+        }
+
+        if (!isRequestDelayed[eid])
+        {
+            co_return NSM_SUCCESS;
+        }
+
+        isRequestDelayed[eid] = false;
+
+        if (instanceIdExpiryInterval == instanceIdExpiryIntervalRegular)
+        {
+            co_return runRegisteredRequest(eid, handlersLongRunning,
+                                           instanceIdExpiryIntervalLongRunning);
+        }
+        else
+        {
+            co_return runRegisteredRequest(eid, handlersRegular,
+                                           instanceIdExpiryIntervalRegular);
+        }
+    }
+
+    uint8_t runRegisteredRequest(eid_t eid,
                              std::unordered_map<eid_t, RequestQueue>& handlers,
                              std::chrono::seconds instanceIdExpiryInterval)
     {
+        if (isRequestDelayed[eid])
+        {
+            return NSM_SUCCESS;
+        }
+
         if (handlers[eid].empty())
         {
             return NSM_SUCCESS;
@@ -273,26 +372,8 @@ class Handler
             return NSM_ERROR;
         }
 
-        auto rc = request->start();
-        if (rc)
-        {
-            instanceIdDb.free(eid, request->getInstanceId());
-            lg2::error("Failure to send the NSM request message");
-            return rc;
-        }
-
-        try
-        {
-            timerInstance->start(duration_cast<std::chrono::microseconds>(
-                instanceIdExpiryInterval));
-        }
-        catch (const std::runtime_error& e)
-        {
-            instanceIdDb.free(eid, request->getInstanceId());
-            lg2::error("Failed to start the instance ID expiry timer.", "ERROR",
-                       e);
-            return NSM_ERROR;
-        }
+        sendRegisteredRequestWithDelay(eid, handlers, instanceIdExpiryInterval)
+            .detach();
 
         return NSM_SUCCESS;
     }
@@ -479,6 +560,15 @@ class Handler
         timerToFreeLongRunning;
 
     const mctp_socket::Handler* socketHandler; // MCTP socket handler
+
+    struct RequestTimestamps
+    {
+        int64_t lastRequestTimestampRegular;
+        int64_t lastRequestTimestampLongRunning;
+    };
+
+    std::array<RequestTimestamps, 255> lastRequestTimestamps{};
+    std::array<bool, 255> isRequestDelayed{};
 
     /** @brief Remove request entry for which the instance ID expired
      *
