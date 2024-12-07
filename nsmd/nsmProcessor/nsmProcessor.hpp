@@ -52,6 +52,7 @@
 #include <com/nvidia/SysGUID/SysGUID/server.hpp>
 #endif
 #include <com/nvidia/CCMode/server.hpp>
+#include <com/nvidia/ResetCounters/ResetCounterMetrics/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
