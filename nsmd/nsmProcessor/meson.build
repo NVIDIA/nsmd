@@ -5,6 +5,7 @@ sources += [
     'nsmProcessor/nsmPowerSmoothing.cpp',
     'nsmProcessor/nsmWorkloadPowerProfile.cpp',
     'nsmProcessor/nsmReset.cpp',
+    'nsmProcessor/nsmOemResetStatistics.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmProcessor']
