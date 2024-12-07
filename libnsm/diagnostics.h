@@ -24,7 +24,10 @@ extern "C" {
 
 #include "base.h"
 
+typedef uint8_t enum8;
+
 enum diagnostics_command {
+	NSM_GET_DEVICE_RESET_STATISTICS = 0x00,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
 	NSM_GET_NETWORK_DEVICE_LOG_INFO = 0x52,
@@ -235,6 +238,91 @@ struct nsm_erase_debug_info_resp {
 	uint8_t result_status;
 	uint8_t reserved;
 } __attribute__((packed));
+
+/**
+ * @brief Encode a request message for the Get Device Reset Statistics command.
+ *
+ * This function encodes the request for the Get Device Reset Statistics
+ * command, which retrieves statistics related to device resets. The request
+ * message consists of only the header and does not require additional payload.
+ *
+ * @param[in] instance_id - NSM instance ID to specify the target instance.
+ * @param[out] msg - Pointer to the message buffer where the encoded request
+ * will be stored.
+ *
+ * @return nsm_completion_codes - Returns NSM_SW_SUCCESS on success, or an error
+ * code (e.g., NSM_SW_ERROR_NULL, NSM_SW_ERROR_DATA) on failure.
+ */
+int encode_get_device_reset_statistics_req(uint8_t instance_id,
+					   struct nsm_msg *msg);
+
+/**
+ * @brief Encode a response message for the Get Device Reset Statistics command.
+ *
+ * This function encodes the response for the Get Device Reset Statistics
+ * command, which provides various reset statistics for a device. The response
+ * includes the counts of different types of reset entries and exits, along with
+ * the type of the last reset.
+ *
+ * @param[in] instance_id - NSM instance ID to specify the target instance.
+ * @param[in] cc - Completion code indicating the success or failure of the
+ * request.
+ * @param[in] reason_code - Reason code providing additional context for
+ * failures.
+ * @param[in] reset_data - Pointer to an array containing reset statistics. The
+ * array should contain the following values:
+ *                         - [0] PF-FLR reset entry count
+ *                         - [1] PF-FLR reset exit count
+ *                         - [2] Non-fundamental reset entry count
+ *                         - [3] Non-fundamental reset exit count
+ *                         - [4] Fundamental reset (PERST#) entry count
+ *                         - [5] Fundamental reset (PERST#) exit count
+ *                         - [6] Root of Trust (IRoT) reset exit count
+ * @param[in] last_reset_type - The type of the last reset (0 = PF-FLR, 1 =
+ * Conventional, 2 = Fundamental, 3 = IRoT).
+ * @param[out] msg - Pointer to the message buffer where the encoded response
+ * will be stored.
+ *
+ * @return nsm_completion_codes - Returns NSM_SW_SUCCESS on success, or an error
+ * code (e.g., NSM_SW_ERROR_NULL, NSM_SW_ERROR_DATA) on failure.
+ */
+int encode_get_device_reset_statistics_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    const uint16_t *reset_data,
+					    uint8_t last_reset_type,
+					    struct nsm_msg *msg);
+/**
+ * @brief Decode a response message for the Get Device Reset Statistics command.
+ *
+ * This function decodes the response for the Get Device Reset Statistics
+ * command, extracting reset statistics and the type of the last reset. The
+ * function validates the response length and parses the payload fields.
+ *
+ * @param[in] msg - Pointer to the received message buffer containing the
+ * encoded response.
+ * @param[in] msg_len - Length of the response message in bytes.
+ * @param[out] cc - Pointer to a variable where the completion code will be
+ * stored.
+ * @param[out] reset_data - Pointer to an array where reset statistics will be
+ * stored. The array will contain the following values:
+ *                          - [0] PF-FLR reset entry count
+ *                          - [1] PF-FLR reset exit count
+ *                          - [2] Non-fundamental reset entry count
+ *                          - [3] Non-fundamental reset exit count
+ *                          - [4] Fundamental reset (PERST#) entry count
+ *                          - [5] Fundamental reset (PERST#) exit count
+ *                          - [6] Root of Trust (IRoT) reset exit count
+ * @param[out] last_reset_type - Pointer to a variable where the type of the
+ * last reset will be stored (0 = PF-FLR, 1 = Conventional, 2 = Fundamental, 3 =
+ * IRoT).
+ *
+ * @return nsm_completion_codes - Returns NSM_SW_SUCCESS on success, or an error
+ * code (e.g., NSM_SW_ERROR_NULL, NSM_SW_ERROR_DATA) on failure.
+ */
+int decode_get_device_reset_statistics_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reset_data,
+					    uint8_t *last_reset_type);
 
 /** @brief Encode a Diagnostics Enable/Disable WP request message
  *

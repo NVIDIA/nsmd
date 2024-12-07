@@ -20,6 +20,30 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_get_device_reset_statistics_req(uint8_t instance_id,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
+	request->command = NSM_GET_DEVICE_RESET_STATISTICS;
+	request->data_size = 0; // No additional payload for the request
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_reset_network_device_req(uint8_t instance_id, uint8_t mode,
 				    struct nsm_msg *msg)
 {
