@@ -20,6 +20,64 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_reset_enum_data(uint8_t resetType, uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	*data = resetType; // Enum is 1 byte
+	*data_len = sizeof(uint8_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_reset_count_data(uint16_t count, uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint16_t le_count = htole16(count);
+	memcpy(data, &le_count, sizeof(uint16_t));
+	*data_len = sizeof(uint16_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_reset_enum_data(const uint8_t *data, size_t data_len,
+			   uint8_t *resetType)
+{
+	if (data == NULL || resetType == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*resetType = *data; // Enum is 1 byte
+	return NSM_SW_SUCCESS;
+}
+
+int decode_reset_count_data(const uint8_t *data, size_t data_len,
+			    uint16_t *count)
+{
+	if (data == NULL || count == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint16_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint16_t le_count;
+	memcpy(&le_count, data, sizeof(uint16_t));
+	*count = le16toh(le_count);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_get_device_reset_statistics_req(uint8_t instance_id,
 					   struct nsm_msg *msg)
 {
@@ -40,6 +98,32 @@ int encode_get_device_reset_statistics_req(uint8_t instance_id,
 	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 	request->command = NSM_GET_DEVICE_RESET_STATISTICS;
 	request->data_size = 0; // No additional payload for the request
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_reset_statistics_req(const struct nsm_msg *msg,
+					   size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// Validate message length
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	// Cast the payload to nsm_common_req structure
+	const struct nsm_common_req *request =
+	    (const struct nsm_common_req *)msg->payload;
+
+	// Validate that the data_size field in the common request is 0
+	// (indicating no extra data)
+	if (request->data_size != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
 
 	return NSM_SW_SUCCESS;
 }

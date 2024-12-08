@@ -1,6 +1,18 @@
 /*
  * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
  * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 #include "nsmOemResetStatistics.hpp"
@@ -86,40 +98,34 @@ int ResetStatisticsAggregator::handleSamples(
         // Handle LastResetType (enum8) differently
         if (property == "LastResetType")
         {
-            // Validate data length for enum8
-            if (sample.data_len != sizeof(enum8))
+            uint8_t resetType;
+            if (decode_reset_enum_data(sample.data, sample.data_len,
+                                       &resetType) != NSM_SW_SUCCESS)
             {
                 lg2::error(
-                    "Invalid data length {LEN} for LastResetType. Expected 1 byte.",
-                    "LEN", sample.data_len);
+                    "Failed to decode LastResetType. Tag={TAG}, Data length={LEN}",
+                    "TAG", sample.tag, "LEN", sample.data_len);
                 returnValue = NSM_SW_ERROR_LENGTH;
                 continue;
             }
 
-            // Extract the enum8 value
-            uint8_t value = sample.data[0];
-
             // Update property with enum8 value
-            updateProperty(property, value);
+            updateProperty(property, resetType);
         }
         else
         {
-            // Validate data length for uint16
-            if (sample.data_len != sizeof(uint16_t))
+            uint16_t count;
+            if (decode_reset_count_data(sample.data, sample.data_len, &count) !=
+                NSM_SW_SUCCESS)
             {
                 lg2::error(
-                    "Invalid data length {LEN} for tag {TAG}. Expected 2 bytes.",
-                    "LEN", sample.data_len, "TAG", sample.tag);
+                    "Failed to decode ResetCount. Tag={TAG}, Data length={LEN}",
+                    "TAG", sample.tag, "LEN", sample.data_len);
                 returnValue = NSM_SW_ERROR_LENGTH;
                 continue;
             }
-
-            // Extract uint16 value
-            uint16_t value =
-                le16toh(*reinterpret_cast<const uint16_t*>(sample.data));
-
             // Update property with uint16 value
-            updateProperty(property, value);
+            updateProperty(property, count);
         }
     }
 

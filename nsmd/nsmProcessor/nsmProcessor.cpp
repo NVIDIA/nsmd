@@ -3779,14 +3779,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     std::vector<utils::Association> associations{
         {"parent", "reset_statistics", inventoryObjPath}};
     // Add associations
-    auto resetMetricsAssociationDef = std::make_unique<AssociationDefinitionsIntf>(
-        bus, resetPath.c_str());
+    auto resetMetricsAssociationDef =
+        std::make_unique<AssociationDefinitionsIntf>(bus, resetPath.c_str());
     std::vector<std::tuple<std::string, std::string, std::string>>
         associationsList;
     for (const auto& association : associations)
     {
-        associationsList.emplace_back(association.forward,
-                                      association.backward,
+        associationsList.emplace_back(association.forward, association.backward,
                                       association.absolutePath);
     }
     resetMetricsAssociationDef->associations(associationsList);
@@ -3802,10 +3801,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     resetCountersObj->fundamentalResetExitCount(std::nan(""));
     resetCountersObj->iRoTResetExitCount(std::nan(""));
     // Create the ResetStatistics sensor
-    auto resetStatisticsSensor =
-        std::make_shared<ResetStatisticsAggregator>(
-            resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
-            std::move(resetMetricsAssociationDef));
+    auto resetStatisticsSensor = std::make_shared<ResetStatisticsAggregator>(
+        resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
+        std::move(resetMetricsAssociationDef));
     nsmDevice->deviceSensors.emplace_back(resetStatisticsSensor);
     // Add sensor to the device with priority
     nsmDevice->addSensor(resetStatisticsSensor, resetMetricsPriority);

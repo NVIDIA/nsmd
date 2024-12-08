@@ -34,6 +34,18 @@
 
 namespace MockupResponder
 {
+
+const std::unordered_map<uint8_t, uint64_t> resetMetricsMockTable = {
+    {0, 100}, // PF_FLR_ResetEntryCount
+    {1, 95},  // PF_FLR_ResetExitCount
+    {2, 50},  // ConventionalResetEntryCount
+    {3, 45},  // ConventionalResetExitCount
+    {4, 30},  // FundamentalResetEntryCount
+    {5, 25},  // FundamentalResetExitCount
+    {6, 10},  // IRoTResetExitCount
+    {7, 2}    // LastResetType (enum8: e.g., 2 = Fundamental)
+};
+
 constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
 constexpr uint8_t MCTP_MSG_EMU_PREFIX = 0xFF;
 // these are for use with the mctp-demux-daemon
@@ -302,6 +314,11 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         queryAggregatedGPMMetrics(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        queryAggregatedResetMetrics(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+
     std::optional<std::vector<uint8_t>>
         queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
                                    size_t requestLen);
