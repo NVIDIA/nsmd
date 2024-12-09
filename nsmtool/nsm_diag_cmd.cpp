@@ -23,8 +23,10 @@
 #include "base.h"
 #include "debug-token.h"
 #include "diagnostics.h"
+#include "platform-environmental.h"
 
 #include "cmd_helper.hpp"
+#include "nsm_base.hpp"
 #include "utils.hpp"
 
 #include <CLI/CLI.hpp>
@@ -194,6 +196,103 @@ class QueryTokenParameters : public CommandInterface
 
   private:
     uint8_t tokenOpcode;
+};
+
+/** @class QueryResetStatistics
+ *  @brief Command to query reset statistics.
+ */
+class QueryResetStatistics : public CommandInterface
+{
+  public:
+    ~QueryResetStatistics() = default;
+    QueryResetStatistics() = delete;
+    QueryResetStatistics(const QueryResetStatistics&) = delete;
+    QueryResetStatistics(QueryResetStatistics&&) = default;
+    QueryResetStatistics& operator=(const QueryResetStatistics&) = delete;
+    QueryResetStatistics& operator=(QueryResetStatistics&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+  private:
+    class QueryResetMetricsAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            // Static member initialization
+            const std::unordered_map<uint8_t, std::string> tagToPropertyMap = {
+                {0, "PF_FLR_ResetEntryCount"},
+                {1, "PF_FLR_ResetExitCount"},
+                {2, "ConventionalResetEntryCount"},
+                {3, "ConventionalResetExitCount"},
+                {4, "FundamentalResetEntryCount"},
+                {5, "FundamentalResetExitCount"},
+                {6, "IRoTResetExitCount"},
+                {7, "LastResetType"}};
+
+            auto it = tagToPropertyMap.find(tag);
+            if (it == tagToPropertyMap.end())
+            {
+                // Unknown tag; skip processing
+                return NSM_SW_ERROR_DATA;
+            }
+
+            const std::string& property = it->second;
+
+            // Handle LastResetType (enum8)
+            if (property == "LastResetType")
+            {
+                uint8_t resetType;
+                if (decode_reset_enum_data(data, data_len, &resetType) !=
+                    NSM_SW_SUCCESS)
+                {
+                    return NSM_SW_ERROR_LENGTH;
+                }
+                // Include the tag in the JSON
+                sample_json["Tag"] = static_cast<int>(tag);
+                sample_json["Property"] = property;
+                sample_json["Value"] = resetType;
+            }
+            else
+            {
+                // Handle reset count (uint16_t)
+                uint16_t count;
+                if (decode_reset_count_data(data, data_len, &count) !=
+                    NSM_SW_SUCCESS)
+                {
+                    return NSM_SW_ERROR_LENGTH;
+                }
+
+                // Include the tag in the JSON
+                sample_json["Tag"] = static_cast<int>(tag);
+                sample_json["Property"] = property;
+                sample_json["Value"] = count;
+            }
+
+            return NSM_SW_SUCCESS;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto requestPtr = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        // Encode the request message
+        auto rc = encode_get_device_reset_statistics_req(instanceId,
+                                                         requestPtr);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        QueryResetMetricsAggregateResponseParser{}.parseAggregateResponse(
+            responsePtr, payloadLength);
+    }
 };
 
 class ProvideToken : public CommandInterface
@@ -1047,6 +1146,11 @@ void registerCommand(CLI::App& app)
                                                "Erase Debug Info");
     commands.push_back(std::make_unique<EraseDebugInfo>(
         "diag", "EraseDebugInfo", eraseDebugInfo));
+
+    auto resetMetricsInfo = diag->add_subcommand("GetResetMetrcs",
+                                                 "Get Reset MEtrics Info");
+    commands.push_back(std::make_unique<QueryResetStatistics>(
+        "diag", "GetResetMetrcs", resetMetricsInfo));
 }
 
 } // namespace diag

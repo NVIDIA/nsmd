@@ -20,6 +20,122 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+TEST(ResetMetrics, EncodeResetEnumData)
+{
+	uint8_t resetType = 5; // Example enum value
+	uint8_t data[1];
+	size_t data_len;
+
+	auto rc = encode_reset_enum_data(resetType, data, &data_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data[0], resetType);
+	EXPECT_EQ(data_len, sizeof(uint8_t));
+}
+
+TEST(ResetMetrics, EncodeResetEnumDataNull)
+{
+	uint8_t resetType = 5;
+	size_t data_len;
+
+	auto rc = encode_reset_enum_data(resetType, nullptr, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_reset_enum_data(resetType, reinterpret_cast<uint8_t *>(0),
+				    nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Tests for `encode_reset_count_data`
+TEST(ResetMetrics, EncodeResetCountData)
+{
+	uint16_t count = 256; // Example count value
+	uint8_t data[2];
+	size_t data_len;
+
+	auto rc = encode_reset_count_data(count, data, &data_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data_len, sizeof(uint16_t));
+
+	uint16_t decodedCount;
+	memcpy(&decodedCount, data, sizeof(uint16_t));
+	EXPECT_EQ(decodedCount, htole16(count));
+}
+
+TEST(ResetMetrics, EncodeResetCountDataNull)
+{
+	uint16_t count = 256;
+	size_t data_len;
+
+	auto rc = encode_reset_count_data(count, nullptr, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_reset_count_data(count, reinterpret_cast<uint8_t *>(0),
+				     nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Tests for `decode_reset_enum_data`
+TEST(ResetMetrics, DecodeResetEnumData)
+{
+	uint8_t resetType = 5; // Example encoded value
+	uint8_t data[] = {resetType};
+	uint8_t decodedResetType;
+
+	auto rc = decode_reset_enum_data(data, sizeof(data), &decodedResetType);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(decodedResetType, resetType);
+}
+
+TEST(ResetMetrics, DecodeResetEnumDataInvalidLength)
+{
+	uint8_t data[] = {5};
+	uint8_t decodedResetType;
+
+	auto rc =
+	    decode_reset_enum_data(data, sizeof(data) - 1, &decodedResetType);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// Tests for `decode_reset_count_data`
+TEST(ResetMetrics, DecodeResetCountData)
+{
+	uint16_t count = 256; // Example encoded value
+	uint8_t data[2];
+	memcpy(data, &count, sizeof(count));
+	uint16_t decodedCount;
+
+	auto rc = decode_reset_count_data(data, sizeof(data), &decodedCount);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(decodedCount, le16toh(count));
+}
+
+TEST(ResetMetrics, DecodeResetCountDataInvalidLength)
+{
+	uint16_t count = 256;
+	uint8_t data[2];
+	memcpy(data, &count, sizeof(count));
+	uint16_t decodedCount;
+
+	auto rc =
+	    decode_reset_count_data(data, sizeof(data) - 1, &decodedCount);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(ResetMetrics, DecodeResetCountDataNull)
+{
+	uint16_t decodedCount;
+	auto rc = decode_reset_count_data(nullptr, 2, &decodedCount);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t data[2] = {0};
+	rc = decode_reset_count_data(data, 2, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
 TEST(getDiagnostics, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +

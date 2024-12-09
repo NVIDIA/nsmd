@@ -95,6 +95,9 @@ endif
 if get_option('stanbyToDC').enabled()
     conf_data.set('NVIDIA_STANDBYTODC', 0)
 endif
+if get_option('reset-metrics').enabled()
+    conf_data.set('NVIDIA_RESET_METRICS', 0)
+endif
 
 if get_option('aer-error-status-priority')
     conf_data.set('AER_ERR_SENSOR_PRIORITY', 1)

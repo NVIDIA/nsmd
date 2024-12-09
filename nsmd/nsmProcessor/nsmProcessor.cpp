@@ -36,6 +36,7 @@
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmInterface.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmOemResetStatistics.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #include "nsmPowerSmoothing.hpp"
@@ -3762,6 +3763,52 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             workloadPowerProfilePageCollection, profileMapper, firstPageIndex);
         nsmDevice->addSensor(firstPage, priority);
     }
+#ifdef NVIDIA_RESET_METRICS
+    // Fetch the priority property
+    auto resetMetricsPriority = false;
+    // Fetch the ResetStatistics name property
+    auto resetMetricsName = "ResetMetrics";
+    auto resetPath = inventoryObjPath + "/ResetStatistics";
+    // Create the Reset Statistics D-Bus Interface
+    using ResetCountersServer = sdbusplus::server::object_t<
+        sdbusplus::com::nvidia::ResetCounters::server::ResetCounterMetrics>;
+    auto resetCountersObj =
+        std::make_shared<ResetCountersServer>(bus, resetPath.c_str());
+    // Add association
+    //  Define associations
+    std::vector<utils::Association> associations{
+        {"parent", "reset_statistics", inventoryObjPath}};
+    // Add associations
+    auto resetMetricsAssociationDef =
+        std::make_unique<AssociationDefinitionsIntf>(bus, resetPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    resetMetricsAssociationDef->associations(associationsList);
+    // Initialize all properties to their default values
+    resetCountersObj->lastResetType(
+        sdbusplus::com::nvidia::ResetCounters::server::ResetCounterMetrics::
+            ResetTypes::Conventional);
+    resetCountersObj->pfflrResetEntryCount(std::nan(""));
+    resetCountersObj->pfflrResetExitCount(std::nan(""));
+    resetCountersObj->conventionalResetEntryCount(std::nan(""));
+    resetCountersObj->conventionalResetExitCount(std::nan(""));
+    resetCountersObj->fundamentalResetEntryCount(std::nan(""));
+    resetCountersObj->fundamentalResetExitCount(std::nan(""));
+    resetCountersObj->iRoTResetExitCount(std::nan(""));
+    // Create the ResetStatistics sensor
+    auto resetStatisticsSensor = std::make_shared<ResetStatisticsAggregator>(
+        resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
+        std::move(resetMetricsAssociationDef));
+    nsmDevice->deviceSensors.emplace_back(resetStatisticsSensor);
+    // Add sensor to the device with priority
+    nsmDevice->addSensor(resetStatisticsSensor, resetMetricsPriority);
+#endif
+
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -3785,7 +3832,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount",
     "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile",
-    "xyz.openbmc_project.Configuration.NSM_Processor.EGMMode"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.EGMMode",
+    "xyz.openbmc_project.Configuration.NSM_Processor.ResetStatistics"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 

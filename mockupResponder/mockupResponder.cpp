@@ -548,6 +548,8 @@ std::optional<std::vector<uint8_t>>
         case NSM_TYPE_DIAGNOSTIC:
             switch (command)
             {
+                case NSM_GET_DEVICE_RESET_STATISTICS:
+                    return queryAggregatedResetMetrics(request, requestLen);
                 case NSM_QUERY_TOKEN_PARAMETERS:
                     return queryTokenParametersHandler(request, requestLen);
                 case NSM_PROVIDE_TOKEN:
@@ -793,7 +795,7 @@ std::optional<std::vector<uint8_t>>
                       15,  16,  17,  69,  70,  71,  73,  74,  77,  78,  79,
                       97,  118, 113, 114, 115, 116, 117, 119, 120, 121, 122,
                       123, 124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
-                 {4, {}},
+                 {4, {0}},
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
                  {6, {1, 2, 3, 4, 5, 6}},
              }},
@@ -4878,6 +4880,69 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_erase_debug_info_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryAggregatedResetMetrics(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("queryResetMetrics: request length={LEN}", "LEN", requestLen);
+    }
+
+    // Decode the request message (assuming decode function exists)
+    auto rc = decode_get_device_reset_statistics_req(requestMsg, requestLen);
+    assert(rc == NSM_SW_SUCCESS);
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock reset metric data
+    for (const auto& [tag, mockValue] : resetMetricsMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        if (tag == 7) // Special case for "LastResetType" (enum8)
+        {
+            rc = encode_reset_enum_data(static_cast<uint8_t>(mockValue),
+                                        reading, &sample_len);
+        }
+        else // General case for reset counts (uint16_t)
+        {
+            rc = encode_reset_count_data(static_cast<uint16_t>(mockValue),
+                                         reading, &sample_len);
+        }
+        assert(rc == NSM_SW_SUCCESS);
+
+        // Encode the sample into the response
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        // Add the sample to the response vector
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    // Finalize the aggregate response
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               NSM_GET_DEVICE_RESET_STATISTICS, NSM_SUCCESS,
+                               samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
     return response;
 }
 
