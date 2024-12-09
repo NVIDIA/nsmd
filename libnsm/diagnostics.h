@@ -24,7 +24,10 @@ extern "C" {
 
 #include "base.h"
 
+typedef uint8_t enum8;
+
 enum diagnostics_command {
+	NSM_GET_DEVICE_RESET_STATISTICS = 0x00,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
 	NSM_GET_NETWORK_DEVICE_LOG_INFO = 0x52,
@@ -235,6 +238,23 @@ struct nsm_erase_debug_info_resp {
 	uint8_t result_status;
 	uint8_t reserved;
 } __attribute__((packed));
+
+/**
+ * @brief Encode a request message for the Get Device Reset Statistics command.
+ *
+ * This function encodes the request for the Get Device Reset Statistics
+ * command, which retrieves statistics related to device resets. The request
+ * message consists of only the header and does not require additional payload.
+ *
+ * @param[in] instance_id - NSM instance ID to specify the target instance.
+ * @param[out] msg - Pointer to the message buffer where the encoded request
+ * will be stored.
+ *
+ * @return nsm_completion_codes - Returns NSM_SW_SUCCESS on success, or an error
+ * code (e.g., NSM_SW_ERROR_NULL, NSM_SW_ERROR_DATA) on failure.
+ */
+int encode_get_device_reset_statistics_req(uint8_t instance_id,
+					   struct nsm_msg *msg);
 
 /** @brief Encode a Diagnostics Enable/Disable WP request message
  *
@@ -527,6 +547,69 @@ int encode_erase_debug_info_resp(uint8_t instance_id, uint8_t cc,
 int decode_erase_debug_info_resp(const struct nsm_msg *msg, size_t msg_len,
 				 uint8_t *cc, uint16_t *reason_code,
 				 uint8_t *result_status);
+
+/**
+ * @brief Encodes a reset type enumeration into a byte array.
+ *
+ * @param[in] resetType - Reset type as uint8_t.
+ * @param[out] data - Encoded byte array.
+ * @param[out] data_len - Length of the encoded data.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int encode_reset_enum_data(uint8_t resetType, uint8_t *data, size_t *data_len);
+
+/**
+ * @brief Decodes a reset type enumeration from a byte array.
+ *
+ * @param[in] data - Encoded byte array.
+ * @param[in] data_len - Length of the encoded data.
+ * @param[out] resetType - Decoded reset type as uint8_t.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int decode_reset_enum_data(const uint8_t *data, size_t data_len,
+			   uint8_t *resetType);
+
+/**
+ * @brief Encodes a reset count (e.g., ResetEntryCount) into a byte array.
+ *
+ * @param[in] count - Reset count as uint16_t.
+ * @param[out] data - Encoded byte array.
+ * @param[out] data_len - Length of the encoded data.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int encode_reset_count_data(uint16_t count, uint8_t *data, size_t *data_len);
+
+/**
+ * @brief Decodes a reset count (e.g., ResetEntryCount) from a byte array.
+ *
+ * @param[in] data - Encoded byte array.
+ * @param[in] data_len - Length of the encoded data.
+ * @param[out] count - Decoded reset count as uint16_t.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int decode_reset_count_data(const uint8_t *data, size_t data_len,
+			    uint16_t *count);
+
+/**
+ * @brief Decodes a "Get Device Reset Statistics" request message.
+ *
+ * Validates the message structure and ensures it adheres to the expected
+ * format.
+ *
+ * @param[in] msg - Pointer to the NSM message structure.
+ * @param[in] msg_len - Length of the NSM message.
+ *
+ * @return NSM_SW_SUCCESS on successful decoding.
+ *         NSM_SW_ERROR_NULL if the msg pointer is null.
+ *         NSM_SW_ERROR_LENGTH if the message length is invalid.
+ *         NSM_SW_ERROR_DATA if the data size in the message is unexpected.
+ */
+int decode_get_device_reset_statistics_req(const struct nsm_msg *msg,
+					   size_t msg_len);
 
 #ifdef __cplusplus
 }

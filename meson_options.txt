@@ -12,6 +12,12 @@ option(
     value: 'enabled',
 )
 option(
+    'reset-metrics',
+    type: 'feature',
+    description: 'Enable reset metrics feature',
+    value: 'disabled',
+)
+option(
     'system-guid',
     type: 'feature',
     description: 'Enable System GUID feature',
