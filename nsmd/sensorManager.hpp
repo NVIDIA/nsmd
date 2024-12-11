@@ -157,6 +157,12 @@ class SensorManagerImpl : public SensorManager
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
         mctp_socket::Manager& sockManager, bool verbose);
+    static void dumpReadinessLogs();
+
+    static bool isEMReady();
+    static void markEMReady();
+    static bool isMCTPReady();
+    static bool isNSMPollReady();
 
   private:
     // Regular methods as before
@@ -182,6 +188,16 @@ class SensorManagerImpl : public SensorManager
     void scanInventory();
     requester::Coroutine pollEvents(eid_t eid);
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
+
+    static bool isReadyForReadinessCheck;
+    static bool isMCTPReadyCheck;
+    static bool isEMReadyCheck;
+    static std::map<std::string, std::string> readynessFailureMap;
+    std::unique_ptr<sdbusplus::bus::match_t> mctpReadinessSigMatch;
+    void mctpReadinessSigHandler(sdbusplus::message::message& msg);
+
+    std::unique_ptr<sdbusplus::bus::match_t> emReadinessSigMatch;
+
     void checkAllDevicesReady();
 
     sdbusplus::bus::bus& bus;
