@@ -141,7 +141,8 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
     // Update LastResetType
     {
         nv::sensor_aggregation::DbusVariantType lastResetTypeValue{
-            static_cast<uint8_t>(resetCountersIntf->lastResetType())};
+            resetCountersIntf->convertResetTypesToString(
+                resetCountersIntf->lastResetType())};
         std::string lastResetTypeProp = "LastResetType";
         nsm_shmem_utils::updateSharedMemoryOnSuccess(
             inventoryObjPath, ifaceName, lastResetTypeProp, smbusData,
