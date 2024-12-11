@@ -34,9 +34,13 @@ namespace nsm
 
 // Static instance definition
 std::unique_ptr<SensorManager> SensorManager::instance;
+bool SensorManagerImpl::isReadyForReadinessCheck = false;
+bool SensorManagerImpl::isMCTPReadyCheck = false;
+bool SensorManagerImpl::isEMReadyCheck = false;
+std::map<std::string, std::string> SensorManagerImpl::readynessFailureMap = {};
 
-// Ensuring the constructor remains private and defined here if not explicitly
-// declared in the header
+// Ensuring the constructor remains private and defined here if not
+// explicitly declared in the header
 SensorManagerImpl::SensorManagerImpl(
     sdbusplus::bus::bus& bus, sdeventplus::Event& event,
     requester::Handler<requester::Request>& handler, InstanceIdDb& instanceIdDb,
@@ -71,6 +75,16 @@ SensorManagerImpl::SensorManagerImpl(
         this->gpioStatusPropertyChangedHandler(msg);
     }));
 #endif
+    mctpReadinessSigMatch =
+        std::make_unique<sdbusplus::bus::match_t>(sdbusplus::bus::match_t(
+            bus,
+            sdbusplus::bus::match::rules::propertiesChanged(
+                "/xyz/openbmc_project/state/configurableStateManager/MCTP",
+                "xyz.openbmc_project.State.FeatureReady"),
+            [this](sdbusplus::message::message& msg) {
+        this->mctpReadinessSigHandler(msg);
+    }));
+    isMCTPReady();
 }
 
 void SensorManagerImpl::scanInventory()
@@ -241,6 +255,211 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
     }
 }
 
+void SensorManagerImpl::mctpReadinessSigHandler(
+    sdbusplus::message::message& msg)
+{
+    lg2::info(
+        "SensorManager::mctpReadinessSigHandler: xyz.openbmc_project.State.FeatureReady PropertiesChanged signal received.");
+    std::string interface;
+    std::map<std::string, std::variant<std::string, bool>> properties;
+    try
+    {
+        const std::string propertyName = "State";
+        std::string errStr;
+        msg.read(interface, properties);
+        auto prop = properties.find(propertyName);
+        if (prop == properties.end())
+        {
+            lg2::error(
+                "SensorManager::mctpReadinessSigHandler: Unable to find property: {PROP}",
+                "PROP", propertyName);
+            return;
+        }
+
+        std::string state;
+        state = *std::get_if<std::string>(&(prop->second));
+        if (state == "xyz.openbmc_project.State.FeatureReady.States.Enabled")
+        {
+            isMCTPReadyCheck = true;
+            lg2::info("isMCTPReadyCheck::true");
+            readynessFailureMap["isMCTPReady"] = "True";
+            isNSMPollReady();
+        }
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        lg2::error(
+            "SensorManager::mctpReadinessSigHandler: Unable to read properties from xyz.openbmc_project.State.FeatureReady. ERR={ERR}",
+            "ERR", e.what());
+        readynessFailureMap["isMCTPReady"] =
+            "SensorManager::mctpReadinessSigHandler ";
+        readynessFailureMap["isMCTPReady"] += e.what();
+    }
+}
+
+bool SensorManagerImpl::isEMReady()
+{
+    lg2::info("isEMReady Enter");
+    constexpr auto emService = "xyz.openbmc_project.EntityManager";
+    constexpr auto nsmReadinesspath =
+        "/xyz/openbmc_project/inventory/system/chassis/NSM_Readiness/NSM_Poll_Readyness";
+    constexpr auto DBUS_PROPERTY_IFACE = "org.freedesktop.DBus.Properties";
+    constexpr auto ifaceName =
+        "xyz.openbmc_project.Configuration.NSM_Poll_Ready";
+    auto& bus = utils::DBusHandler::getBus();
+
+    std::variant<std::string> property;
+    bool ready = false;
+
+    try
+    {
+        auto method = bus.new_method_call(emService, nsmReadinesspath,
+                                          DBUS_PROPERTY_IFACE, "Get");
+        method.append(ifaceName, "Status");
+        using namespace std::chrono_literals;
+        sdbusplus::SdBusDuration timeout{2s};
+
+        auto reply = bus.call(method, timeout);
+        if (reply.is_method_error())
+        {
+            readynessFailureMap["isEMReady"] =
+                "Failed reading Status DBus property";
+            return false;
+        }
+        reply.read(property);
+        auto value = std::get<std::string>(property);
+
+        if (value == "Enabled")
+        {
+            ready = true;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        readynessFailureMap["isEMReady"] = e.what();
+        lg2::error(
+            "SensorManagerImpl::isEMReady: Unable to read properties from xyz.openbmc_project.Configuration.NSM_Poll_Ready. ERR={ERR}",
+            "ERR", e.what());
+        ready = false;
+    }
+    // if em is ready already skip check
+    if (!isEMReadyCheck)
+    {
+        isEMReadyCheck = ready;
+        if (isEMReadyCheck)
+        {
+            markEMReady();
+        }
+    }
+    lg2::info("isEMReadyCheck {CHECK}", "CHECK", isEMReadyCheck);
+    lg2::info("isEMReady Exit");
+    return ready;
+}
+
+void SensorManagerImpl::markEMReady()
+{
+    lg2::info("isEMReady : True");
+    readynessFailureMap["isEMReady"] = "True";
+    isNSMPollReady();
+}
+
+bool SensorManagerImpl::isMCTPReady()
+{
+    lg2::info("isMCTPReady Enter");
+    constexpr auto csmService =
+        "xyz.openbmc_project.State.ConfigurableStateManager";
+    constexpr auto mctpReadinesspath =
+        "/xyz/openbmc_project/state/configurableStateManager/MCTP";
+    constexpr auto DBUS_PROPERTY_IFACE = "org.freedesktop.DBus.Properties";
+    constexpr auto ifaceName = "xyz.openbmc_project.State.FeatureReady";
+    auto& bus = utils::DBusHandler::getBus();
+    bool ready = false;
+
+    std::variant<std::string> property;
+
+    try
+    {
+        auto method = bus.new_method_call(csmService, mctpReadinesspath,
+                                          DBUS_PROPERTY_IFACE, "Get");
+        method.append(ifaceName, "State");
+        using namespace std::chrono_literals;
+        sdbusplus::SdBusDuration timeout{2s};
+        auto reply = bus.call(method, timeout);
+        if (reply.is_method_error())
+        {
+            readynessFailureMap["isMCTPReady"] =
+                "Failed reading State DBus property";
+            return false;
+        }
+        reply.read(property);
+        auto value = std::get<std::string>(property);
+        readynessFailureMap["isMCTPReady"] = value;
+        if (value == "xyz.openbmc_project.State.FeatureReady.States.Enabled")
+        {
+            ready = true;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        ready = false;
+        lg2::error(
+            "SensorManagerImpl::isMCTPReady: Unable to read properties from xyz.openbmc_project.State.FeatureReady. ERR={ERR}",
+            "ERR", e.what());
+        readynessFailureMap["isMCTPReady"] = e.what();
+    }
+
+    // if MCTP is ready already skip check
+    if (!isMCTPReadyCheck)
+    {
+        isMCTPReadyCheck = ready;
+        if (isMCTPReadyCheck)
+        {
+            lg2::info("isMCTPReadyCheck : True");
+            readynessFailureMap["isMCTPReadyCheck"] = "True";
+            isNSMPollReady();
+        }
+    }
+    lg2::info("isMCTPReadyCheck {CHECK}", "CHECK", isMCTPReadyCheck);
+    lg2::info("isMCTPReady Exit");
+    return false;
+}
+
+bool SensorManagerImpl::isNSMPollReady()
+{
+    lg2::info("isNSMPollReady Enter");
+    if (!isReadyForReadinessCheck)
+    {
+        isReadyForReadinessCheck = isMCTPReadyCheck && isEMReadyCheck;
+        if (isReadyForReadinessCheck)
+        {
+            lg2::info("isNSMPollReady : True");
+            readynessFailureMap["isNSMPollReady"] = "true";
+        }
+    }
+    lg2::info("isReadyForReadinessCheck {CHECK}", "CHECK",
+              isReadyForReadinessCheck);
+    lg2::info("isNSMPollReady Exit");
+    return isReadyForReadinessCheck;
+}
+
+void SensorManagerImpl::dumpReadinessLogs()
+{
+    lg2::error("******dumpReadinesLogs Start*****");
+    for (std::map<std::string, std::string>::const_iterator it =
+             readynessFailureMap.begin();
+         it != readynessFailureMap.end(); ++it)
+    {
+        std::string fname = it->first;
+        std::string flog = it->second;
+        lg2::error("dumpReadinessLogs {FNAME}: {LOGMSG}", "FNAME", fname,
+                   "LOGMSG", flog);
+    }
+    lg2::error("******dumpReadinesLogs End*****");
+}
+
+/*
+This is called only when device is not ready
+ */
 void SensorManagerImpl::checkAllDevicesReady()
 {
     for (auto nsmDevice : nsmDevices)
@@ -250,7 +469,8 @@ void SensorManagerImpl::checkAllDevicesReady()
          Second when a particular device is not responding from starting or not
          present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not
          presnt*/
-        if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady)
+        if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady &&
+            isReadyForReadinessCheck)
         {
             return;
         }
@@ -462,7 +682,7 @@ requester::Coroutine
                 // Either we were able to succesfully update all sensors in one
                 // iteration or there are no sensors in the queue. Mark ready in
                 // both cases.
-                if (!nsmDevice->isDeviceReady)
+                if (!nsmDevice->isDeviceReady && isReadyForReadinessCheck)
                 {
                     nsmDevice->isDeviceReady = true;
                     checkAllDevicesReady();
@@ -485,7 +705,8 @@ requester::Coroutine
             // ServiceReady Logic:
             // The round-robin queue is circular hence encountering the first
             // refreshed sensor marks a "complete iteration" of the queue.
-            if (!nsmDevice->isDeviceReady && sensor->isRefreshed)
+            if (!nsmDevice->isDeviceReady && sensor->isRefreshed &&
+                isReadyForReadinessCheck)
             {
                 // The Device isn't ready but we have found our first
                 // refreshed sensor. Mark the device ready.
