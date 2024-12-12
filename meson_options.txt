@@ -18,6 +18,12 @@ option(
     value: 'disabled',
 )
 option(
+    'block-unsupported-bianca-messages',
+    type: 'feature',
+    description: 'Temporary WaR to block unsupported NSM messages from filling FPGA error FIFO',
+    value: 'disabled',
+)
+option(
     'system-guid',
     type: 'feature',
     description: 'Enable System GUID feature',
