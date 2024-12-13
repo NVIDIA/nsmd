@@ -4517,7 +4517,6 @@ int decode_set_active_preset_profile_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -4632,7 +4631,6 @@ int decode_setup_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -4704,7 +4702,6 @@ int decode_apply_admin_override_resp(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -4817,8 +4814,6 @@ int decode_toggle_immediate_rampdown_resp(const struct nsm_msg *msg,
 	if (data_size != 0) {
 		return NSM_SW_ERROR_DATA;
 	}
-
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -4928,7 +4923,6 @@ int decode_toggle_feature_state_resp(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -5216,7 +5210,6 @@ int decode_update_preset_profile_param_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -5288,7 +5281,7 @@ int encode_enable_workload_power_profile_req(uint8_t instance_id,
 	request->hdr.data_size = sizeof(bitfield256_t);
 
 	// htole
-	size_t length = 8 / 2;
+	size_t length = 8;
 	for (size_t i = 0; i < length; i++) {
 		request->profile_mask.fields[length - 1 - i].byte =
 		    profile_mask->fields[i].byte;
@@ -5386,7 +5379,6 @@ int decode_enable_workload_power_profile_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
@@ -5514,7 +5506,6 @@ int decode_disable_workload_power_profile_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*cc = resp->completion_code;
 	return NSM_SUCCESS;
 }
 
