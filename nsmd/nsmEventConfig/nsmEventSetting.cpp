@@ -140,6 +140,10 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
     // TBD: Fix so we re-run when GPU's come online
     //      rather than poll
     nsmDevice->addSensor(sensor, false, true);
+#else
+    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
+    // update sensor
+    nsmDevice->addStaticSensor(sensor);
 #endif
     // coverity[missing_return]
     co_return NSM_SUCCESS;
