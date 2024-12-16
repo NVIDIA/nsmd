@@ -63,7 +63,6 @@ using std::filesystem::path;
 
 namespace nsm
 {
-
 NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
                                        std::string& name, std::string& type,
                                        std::string& inventoryObjPath) :
@@ -73,6 +72,17 @@ NsmAcceleratorIntf::NsmAcceleratorIntf(sdbusplus::bus::bus& bus,
         std::make_unique<AcceleratorIntf>(bus, inventoryObjPath.c_str());
     acceleratorIntf->type(accelaratorType::GPU);
 }
+
+#ifdef NVIDIA_RESET_METRICS
+NsmResetCountersSupportedIntf::NsmResetCountersSupportedIntf(
+    sdbusplus::bus::bus& bus, std::string& name, std::string& type,
+    std::string& inventoryObjPath) :
+    NsmObject(name, type)
+{
+    resetMetricsSupportedIntf =
+        std::make_unique<resetMetricsSupported>(bus, inventoryObjPath.c_str());
+}
+#endif
 
 NsmProcessorAssociation::NsmProcessorAssociation(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
@@ -3053,6 +3063,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
                                                            inventoryObjPath);
         nsmDevice->deviceSensors.push_back(sensor);
+#endif
+
+#ifdef NVIDIA_RESET_METRICS
+        auto resetSupportSensor =
+            std::make_shared<NsmResetCountersSupportedIntf>(bus, name, type,
+                                                            inventoryObjPath);
+        nsmDevice->deviceSensors.push_back(resetSupportSensor);
 #endif
 
         auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
