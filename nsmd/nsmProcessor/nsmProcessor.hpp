@@ -43,6 +43,7 @@
 #include <com/nvidia/EgmMode/server.hpp>
 #include <com/nvidia/MigMode/server.hpp>
 #include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
+#include <com/nvidia/ResetCounters/ResetCounterMetricsSupported/server.hpp>
 #include <com/nvidia/SMUtilization/server.hpp>
 #include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -78,6 +79,12 @@ using AcceleratorIntf = sdbusplus::server::object_t<
 using accelaratorType = sdbusplus::xyz::openbmc_project::Inventory::Item::
     server::Accelerator::AcceleratorType;
 
+#ifdef NVIDIA_RESET_METRICS
+using resetMetricsSupported =
+    sdbusplus::server::object_t<sdbusplus::com::nvidia::ResetCounters::server::
+                                    ResetCounterMetricsSupported>;
+#endif
+
 class NsmAcceleratorIntf : public NsmObject
 {
   public:
@@ -87,6 +94,19 @@ class NsmAcceleratorIntf : public NsmObject
   private:
     std::unique_ptr<AcceleratorIntf> acceleratorIntf = nullptr;
 };
+
+#ifdef NVIDIA_RESET_METRICS
+class NsmResetCountersSupportedIntf : public NsmObject
+{
+  public:
+    NsmResetCountersSupportedIntf(sdbusplus::bus::bus& bus, std::string& name,
+                                  std::string& type,
+                                  std::string& inventoryObjPath);
+
+  private:
+    std::unique_ptr<resetMetricsSupported> resetMetricsSupportedIntf = nullptr;
+};
+#endif
 
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
