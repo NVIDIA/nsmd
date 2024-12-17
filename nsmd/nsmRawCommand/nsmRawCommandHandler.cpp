@@ -82,12 +82,11 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                                              responseLen, isLongRunning);
 
         uint8_t cc;
-        uint16_t dataSize, reasonCode;
+        uint16_t reasonCode;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             cc = NSM_ERR_UNSUPPORTED_COMMAND_CODE;
             rc = NSM_SW_SUCCESS;
-            dataSize = 0;
             reasonCode = 0;
         }
         else if (rc != NSM_SW_SUCCESS)
@@ -97,8 +96,8 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         }
         else
         {
-            rc = decode_common_resp(responseMsg.get(), responseLen, &cc,
-                                    &dataSize, &reasonCode);
+            rc = decode_reason_code_and_cc(responseMsg.get(), responseLen, &cc,
+                                           &reasonCode);
             if (rc != NSM_SW_SUCCESS)
             {
                 throw std::runtime_error(
@@ -108,10 +107,10 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
 
         if (cc == NSM_SUCCESS)
         {
+            auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
             // completion code + data
             data.resize(1 + dataSize);
-            memcpy(data.data() + 1,
-                   responseMsg->payload + sizeof(nsm_common_resp), dataSize);
+            memcpy(data.data() + 1, responseMsg->payload + 2, dataSize);
         }
         else
         {
