@@ -1075,9 +1075,11 @@ class GetInventoryInformation : public CommandInterface
             case DEFAULT_BASE_CLOCKS:
             case TRAY_SLOT_NUMBER:
             case TRAY_SLOT_INDEX:
-            case GPU_NODE_INDEX:
-            case GPU_MODULE_ID:
                 propRecordResult["Data"] = le32toh(*(uint32_t*)data.data());
+                break;
+            case GPU_HOST_ID:
+            case GPU_MODULE_ID:
+                propRecordResult["Data"] = le32toh(*(uint32_t*)data.data()) + 1;
                 break;
             case BOARD_PART_NUMBER:
             case SERIAL_NUMBER:

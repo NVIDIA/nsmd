@@ -35,6 +35,7 @@
 #include "nsmDevice.hpp"
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmInterface.hpp"
+#include "nsmMNNVLinkTopologyIntf.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmOemResetStatistics.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
@@ -3780,6 +3781,39 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             workloadPowerProfilePageCollection, profileMapper, firstPageIndex);
         nsmDevice->addSensor(firstPage, priority);
     }
+    else if (type == "NSM_MNNVLTopology")
+    {
+        // create the interface
+        auto mnnvlinkTopologyIntf = std::make_shared<NsmMNNVLinkTopologyIntf>(
+            bus, inventoryObjPath.c_str());
+        // create the interface object
+        auto assetMNNVLinkTopologyObject =
+            NsmInterfaceProvider<NsmMNNVLinkTopologyIntf>(
+                name, type, inventoryObjPath, mnnvlinkTopologyIntf);
+
+        // create MNNVLinkTopology sensors
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, GPU_IBGUID));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, CHASSIS_SERIAL_NUMBER));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, TRAY_SLOT_NUMBER));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, TRAY_SLOT_INDEX));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, GPU_HOST_ID));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, GPU_MODULE_ID));
+        nsmDevice->addStaticSensor(
+            std::make_shared<NsmInventoryProperty<NsmMNNVLinkTopologyIntf>>(
+                assetMNNVLinkTopologyObject, GPU_NVLINK_PEER_TYPE));
+    }
 #ifdef NVIDIA_RESET_METRICS
     // Fetch the priority property
     auto resetMetricsPriority = false;
@@ -3850,7 +3884,8 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_Processor.WorkloadPowerProfile",
     "xyz.openbmc_project.Configuration.NSM_Processor.EGMMode",
-    "xyz.openbmc_project.Configuration.NSM_Processor.ResetStatistics"};
+    "xyz.openbmc_project.Configuration.NSM_Processor.ResetStatistics",
+    "xyz.openbmc_project.Configuration.NSM_Processor.MNNVLTopology"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmProcessorSensor, nsmProcessorInterfaces)
 
