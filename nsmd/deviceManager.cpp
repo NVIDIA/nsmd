@@ -277,27 +277,12 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    DeviceManager::getFRU(eid_t eid, nsm::InventoryProperties& properties,
-                          [[maybe_unused]] const uint8_t& deviceType)
+requester::Coroutine DeviceManager::getFRU(eid_t eid,
+                                           nsm::InventoryProperties& properties)
 {
     std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER,
                                         DEVICE_GUID, MARKETING_NAME,
                                         BUILD_DATE};
-
-#ifdef SYSTEM_TRAY_ID
-    if (deviceType == NSM_DEV_ID_GPU)
-    {
-        std::vector<uint8_t> mnnvlPropertyIds = {
-            GPU_IBGUID,          CHASSIS_SERIAL_NUMBER, TRAY_SLOT_NUMBER,
-            TRAY_SLOT_INDEX,     GPU_NODE_INDEX,        GPU_MODULE_ID,
-            GPU_NVLINK_PEER_TYPE};
-
-        lg2::info("MNNVLink is enabled for eid={EID}", "EID", eid);
-        propertyIds.insert(propertyIds.end(), mnnvlPropertyIds.begin(),
-                           mnnvlPropertyIds.end());
-    }
-#endif
 
     for (auto propertyId : propertyIds)
     {
@@ -471,42 +456,6 @@ requester::Coroutine DeviceManager::getInventoryInformation(
             }
         }
         break;
-        case TRAY_SLOT_NUMBER:
-        case TRAY_SLOT_INDEX:
-        case GPU_NODE_INDEX:
-        case GPU_MODULE_ID:
-            property = decode_inventory_information_as_uint32(data.data(),
-                                                              dataSize);
-            break;
-        case GPU_NVLINK_PEER_TYPE:
-        {
-            auto peerType = decode_inventory_information_as_uint32(data.data(),
-                                                                   dataSize);
-            if (peerType == NSM_PEER_TYPE_DIRECT)
-            {
-                property = std::string("Direct");
-            }
-            else
-            {
-                property = std::string("Bridge");
-            }
-            break;
-        }
-        case CHASSIS_SERIAL_NUMBER:
-        {
-            try
-            {
-                property = std::string((char*)data.data(), dataSize);
-            }
-            catch (const std::exception& e)
-            {
-                property = utils::convertHexToString(data, dataSize);
-            }
-        }
-        break;
-        case GPU_IBGUID:
-            property = utils::convertHexToString(data, dataSize);
-            break;
         default:
         {
             lg2::info("getInventoryInformation unsupported id={ID}", "ID",
@@ -743,7 +692,7 @@ requester::Coroutine
 {
     // get inventory information from device
     InventoryProperties properties{};
-    auto rc = co_await getFRU(eid, properties, nsmDevice->getDeviceType());
+    auto rc = co_await getFRU(eid, properties);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc, "EID",
@@ -757,51 +706,6 @@ requester::Coroutine
                           std::to_string(eid);
     nsmDevice->fruDeviceIntf = objServer.add_unique_interface(
         objPath, "xyz.openbmc_project.FruDevice");
-
-    if (properties.find(GPU_IBGUID) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "GPU_IBGUID", std::get<std::string>(properties[GPU_IBGUID]));
-    }
-
-    if (properties.find(CHASSIS_SERIAL_NUMBER) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "CHASSIS_SERIAL_NUMBER",
-            std::get<std::string>(properties[CHASSIS_SERIAL_NUMBER]));
-    }
-
-    if (properties.find(TRAY_SLOT_NUMBER) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "TRAY_SLOT_NUMBER",
-            std::get<uint32_t>(properties[TRAY_SLOT_NUMBER]));
-    }
-
-    if (properties.find(TRAY_SLOT_INDEX) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "TRAY_SLOT_INDEX", std::get<uint32_t>(properties[TRAY_SLOT_INDEX]));
-    }
-
-    if (properties.find(GPU_NODE_INDEX) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "GPU_NODE_INDEX", std::get<uint32_t>(properties[GPU_NODE_INDEX]));
-    }
-
-    if (properties.find(GPU_MODULE_ID) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "GPU_MODULE_ID", std::get<uint32_t>(properties[GPU_MODULE_ID]));
-    }
-
-    if (properties.find(GPU_NVLINK_PEER_TYPE) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "GPU_NVLINK_PEER_TYPE",
-            std::get<std::string>(properties[GPU_NVLINK_PEER_TYPE]));
-    }
 
     if (properties.find(BOARD_PART_NUMBER) != properties.end())
     {
