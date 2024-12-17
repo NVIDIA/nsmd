@@ -38,10 +38,6 @@ if get_option('tests').enabled()
     gmock = gmock.as_system('system')
 endif
 
-if get_option('block-unsupported-bianca-messages').enabled()
-    add_project_arguments('-DTEMP_BLOCK_BIANCA_UNSUPPORTED_MESSAGES', language: ['cpp', 'c'])
-endif
-
 if get_option('system-guid').enabled()
     add_project_arguments('-DENABLE_SYSTEM_GUID', language: ['cpp', 'c'])
 endif
