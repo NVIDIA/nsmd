@@ -135,10 +135,6 @@ if get_option('enable-in-kernel-mctp').enabled()
     conf_data.set('MCTP_IN_KERNEL', 0)
 endif
 
-if get_option('system-tray-id').enabled()
-    conf_data.set('SYSTEM_TRAY_ID', 0)
-endif
-
 conf_data.set(
     'DELAY_BETWEEN_CONCURRENT_REQUESTS',
     get_option('delay-between-concurrent-requests'),
