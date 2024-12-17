@@ -278,11 +278,34 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
 }
 
 requester::Coroutine DeviceManager::getFRU(eid_t eid,
-                                           nsm::InventoryProperties& properties)
+                                           nsm::InventoryProperties& properties,
+                                           const uint8_t& deviceType)
 {
-    std::vector<uint8_t> propertyIds = {BOARD_PART_NUMBER, SERIAL_NUMBER,
-                                        DEVICE_GUID, MARKETING_NAME,
-                                        BUILD_DATE};
+    // creating map to avoid sending unsupported comamnds to devices
+    // Define a map that stores property IDs based on deviceType
+    static const std::unordered_map<uint8_t, std::vector<uint8_t>>
+        devicePropertyMap = {{NSM_DEV_ID_GPU,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_SWITCH,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_PCIE_BRIDGE,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_BASEBOARD, {}},
+                             {NSM_DEV_ID_EROT,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_UNKNOWN, {}}};
+
+    // Fetch property IDs based on deviceType; fallback to an empty list if not
+    // found
+    auto it = devicePropertyMap.find(deviceType);
+    const std::vector<uint8_t>& propertyIds =
+        (it != devicePropertyMap.end())
+            ? it->second
+            : devicePropertyMap.at(NSM_DEV_ID_UNKNOWN);
 
     for (auto propertyId : propertyIds)
     {
@@ -692,7 +715,7 @@ requester::Coroutine
 {
     // get inventory information from device
     InventoryProperties properties{};
-    auto rc = co_await getFRU(eid, properties);
+    auto rc = co_await getFRU(eid, properties, nsmDevice->getDeviceType());
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc, "EID",
