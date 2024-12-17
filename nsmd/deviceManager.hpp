@@ -144,8 +144,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     requester::Coroutine
         getSupportedCommandCodes(eid_t eid, uint8_t nvidia_message_type,
                                  std::vector<uint8_t>& supportedCommandCodes);
-    requester::Coroutine getFRU(eid_t eid,
-                                nsm::InventoryProperties& properties);
+    requester::Coroutine getFRU(eid_t eid, nsm::InventoryProperties& properties,
+                                const uint8_t& deviceType);
     requester::Coroutine
         getInventoryInformation(eid_t eid, uint8_t& propertyIdentifier,
                                 InventoryProperties& properties);
