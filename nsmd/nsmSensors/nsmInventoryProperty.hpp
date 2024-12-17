@@ -22,6 +22,7 @@
 #include "globals.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
+#include "nsmMNNVLinkTopologyIntf.hpp"
 
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Dimension/server.hpp>
@@ -197,6 +198,77 @@ inline void
             pdi().version(std::string((char*)data.data(), data.size()));
         }
         break;
+        default:
+            throw std::runtime_error("Not implemented PDI");
+            break;
+    }
+}
+
+template <>
+inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
+    const Response& data)
+{
+    switch (property)
+    {
+        case GPU_IBGUID:
+            pdi().ibguid(utils::convertHexToString(data, data.size()));
+            break;
+        case CHASSIS_SERIAL_NUMBER:
+        {
+            std::string chassisSerialNumber("");
+            try
+            {
+                chassisSerialNumber = std::string((char*)data.data(),
+                                                  data.size());
+            }
+            catch (const std::exception& e)
+            {
+                chassisSerialNumber = utils::convertHexToString(data,
+                                                                data.size());
+            }
+            pdi().chassisSerialNumber(chassisSerialNumber);
+            break;
+        }
+        case TRAY_SLOT_NUMBER:
+            pdi().traySlotNumber(decode_inventory_information_as_uint32(
+                data.data(), data.size()));
+            break;
+        case TRAY_SLOT_INDEX:
+            pdi().traySlotIndex(decode_inventory_information_as_uint32(
+                data.data(), data.size()));
+            break;
+        case GPU_HOST_ID:
+        {
+            auto hostID = decode_inventory_information_as_uint32(data.data(),
+                                                                 data.size());
+            // 1-based
+            pdi().hostID(hostID + 1);
+            break;
+        }
+        case GPU_MODULE_ID:
+        {
+            auto moduleID = decode_inventory_information_as_uint32(data.data(),
+                                                                   data.size());
+            // 1-based
+            pdi().moduleID(moduleID + 1);
+            break;
+        }
+        case GPU_NVLINK_PEER_TYPE:
+        {
+            auto peerType = decode_inventory_information_as_uint32(data.data(),
+                                                                   data.size());
+            std::string peerTypeStr("");
+            if (peerType == NSM_PEER_TYPE_DIRECT)
+            {
+                peerTypeStr = std::string("Direct");
+            }
+            else
+            {
+                peerTypeStr = std::string("Bridge");
+            }
+            pdi().peerType(peerTypeStr);
+            break;
+        }
         default:
             throw std::runtime_error("Not implemented PDI");
             break;

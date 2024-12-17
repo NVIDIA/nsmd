@@ -488,6 +488,9 @@
           "UUID": "$UUID",
           "DEVICE_UUID": "$DEVICE_UUID",
           "InventoryObjPath": "/xyz/openbmc_project/inventory/system/accelerator/GPU_$INSTANCE_NUMBER",
+          "MNNVLTopology": {
+            "Type": "NSM_MNNVLTopology"
+          },
           "Asset": {
             "Type": "NSM_Asset",
             "Manufacturer": "NVIDIA",

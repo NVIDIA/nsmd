@@ -178,13 +178,6 @@ option(
 )
 
 option(
-    'system-tray-id',
-    type: 'feature',
-    value: 'disabled',
-    description: 'Enable System Tray ID feature'
-)
-
-option(
     'delay-between-concurrent-requests',
     type: 'integer',
     value: 5000,

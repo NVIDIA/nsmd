@@ -17,6 +17,7 @@ dep_src_files = [
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../nsmDbusIfaceOverride/nsmMNNVLinkTopologyIntf.cpp',
     '../../nsmSensors/nsmErrorInjection.cpp',
     '../../nsmSetAsync/asyncOperationManager.cpp',
     '../../nsmSetAsync/nsmSetMigMode.cpp',
