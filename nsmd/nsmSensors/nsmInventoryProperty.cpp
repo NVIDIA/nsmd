@@ -33,7 +33,7 @@ std::optional<Request>
 {
 #ifdef TEMP_BLOCK_BIANCA_UNSUPPORTED_MESSAGES
     // Temporary fix for 0.8
-    if (((eid == 12) || (eid = 20)) && (property != FPGA_FIRMWARE_VERSION))
+    if (((eid == 12) || (eid == 20)) && (property != FPGA_FIRMWARE_VERSION))
     {
         lg2::error("Tried to read invalid property from FPGA");
 
