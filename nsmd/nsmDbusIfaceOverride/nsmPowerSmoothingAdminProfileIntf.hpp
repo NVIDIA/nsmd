@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 #pragma once
+#include "platform-environmental.h"
+
 #include "asyncOperationManager.hpp"
 
 #include <com/nvidia/PowerSmoothing/AdminPowerProfile/server.hpp>
@@ -106,10 +108,20 @@ class OemAdminProfileIntf :
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
             // fraction to percent
-            AdminPowerProfileIntf::tmpFloorPercent(
-                NvUFXP4_12ToDouble(
-                    adminProfiledata.admin_override_percent_tmp_floor) *
-                100);
+            if (adminProfiledata.admin_override_percent_tmp_floor ==
+                INVALID_UINT16_VALUE)
+            {
+                // on dbus we still show INVALID_UINT32_VALUE to keep consistent
+                AdminPowerProfileIntf::tmpFloorPercent(INVALID_UINT32_VALUE);
+            }
+            else
+            {
+                AdminPowerProfileIntf::tmpFloorPercent(
+                    NvUFXP4_12ToDouble(
+                        adminProfiledata.admin_override_percent_tmp_floor) *
+                    100);
+            }
+
             // mw/sec to watts/sec
             double reading = utils::convertAndScaleDownUint32ToDouble(
                 adminProfiledata

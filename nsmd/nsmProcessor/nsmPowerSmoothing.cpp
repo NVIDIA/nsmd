@@ -256,8 +256,18 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
     }
     // Update values on iface
     // fraction to percent
-    pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercent(
-        NvUFXP4_12ToDouble(data->current_percent_tmp_floor) * 100);
+    if (data->current_percent_tmp_floor == INVALID_UINT16_VALUE)
+    {
+        // on dbus still populate uint32
+        pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercent(
+            INVALID_UINT32_VALUE);
+    }
+    else
+    {
+        pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercent(
+            NvUFXP4_12ToDouble(data->current_percent_tmp_floor) * 100);
+    }
+
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::tmpFloorPercentApplied(
         data->admin_override_mask.bits.tmp_floor_override);
     // mw/sec to watts/sec
@@ -345,8 +355,18 @@ void NsmPowerSmoothingAdminOverride::updateReading(
     }
     // Update values on iface
     // fraction to percent
-    adminProfileIntf->AdminPowerProfileIntf::tmpFloorPercent(
-        NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor) * 100);
+    if (data->admin_override_percent_tmp_floor == INVALID_UINT16_VALUE)
+    {
+        // on dbus keeping uint32
+        adminProfileIntf->AdminPowerProfileIntf::tmpFloorPercent(
+            INVALID_UINT32_VALUE);
+    }
+    else
+    {
+        adminProfileIntf->AdminPowerProfileIntf::tmpFloorPercent(
+            NvUFXP4_12ToDouble(data->admin_override_percent_tmp_floor) * 100);
+    }
+
     // mw/sec to watts/sec
     adminProfileIntf->AdminPowerProfileIntf::rampUpRate(
         utils::convertAndScaleDownUint32ToDouble(
@@ -408,8 +428,17 @@ void NsmPowerProfileCollection::updateSupportedProfile(
 {
     if (obj)
     {
-        obj->PowerProfileIntf::tmpFloorPercent(
-            NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent) * 100);
+        if (data->tmp_floor_setting_in_percent == INVALID_UINT16_VALUE)
+        {
+            // on dbus keep uint32
+            obj->PowerProfileIntf::tmpFloorPercent(INVALID_UINT32_VALUE);
+        }
+        else
+        {
+            obj->PowerProfileIntf::tmpFloorPercent(
+                NvUFXP4_12ToDouble(data->tmp_floor_setting_in_percent) * 100);
+        }
+
         obj->PowerProfileIntf::rampUpRate(
             utils::convertAndScaleDownUint32ToDouble(
                 data->ramp_up_rate_in_miliwattspersec, 1000));
