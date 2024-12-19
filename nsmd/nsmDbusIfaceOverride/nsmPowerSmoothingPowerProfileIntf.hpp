@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 #pragma once
+#include "platform-environmental.h"
+
 #include "asyncOperationManager.hpp"
 
 #include <com/nvidia/PowerSmoothing/PowerProfile/server.hpp>
@@ -116,10 +118,21 @@ class OemPowerProfileIntf :
                         responseMsg.get(), responseLen, &cc, &reason_code,
                         numberOfprofiles, profileId, &profileData);
                     // fraction to percent
-                    PowerProfileIntf::tmpFloorPercent(
-                        NvUFXP4_12ToDouble(
-                            profileData.tmp_floor_setting_in_percent) *
-                        100);
+                    if (profileData.tmp_floor_setting_in_percent ==
+                        INVALID_UINT16_VALUE)
+                    {
+                        // on dbus we still show INVALID_UINT32_VALUE to keep
+                        // consistent
+                        PowerProfileIntf::tmpFloorPercent(INVALID_UINT32_VALUE);
+                    }
+                    else
+                    {
+                        PowerProfileIntf::tmpFloorPercent(
+                            NvUFXP4_12ToDouble(
+                                profileData.tmp_floor_setting_in_percent) *
+                            100);
+                    }
+
                     // mw/sec to watts/sec
                     PowerProfileIntf::rampUpRate(
                         utils::convertAndScaleDownUint32ToDouble(
@@ -242,13 +255,14 @@ class OemPowerProfileIntf :
         // first argument instanceid=0 is irrelevant
         auto rc = encode_update_preset_profile_param_req(
             0, profileId, parameterId, paramValue, requestMsg);
+        std::string msg = utils::requestMsgToHexString(request);
 
         if (rc)
         {
             lg2::error(
-                "resetProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid={EID}, rc={RC}",
+                "resetProfileInfoOnDevice: encode_setup_admin_override_req failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid={EID}, rc={RC}, Reqmsg= {MSG}",
                 "EID", eid, "RC", rc, "ID", parameterId, "PROFILEID", profileId,
-                "VALUE", paramValue);
+                "VALUE", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -260,9 +274,9 @@ class OemPowerProfileIntf :
         if (rc_)
         {
             lg2::error(
-                "resetProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "resetProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
-                profileId, "VALUE", paramValue);
+                profileId, "VALUE", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -280,9 +294,10 @@ class OemPowerProfileIntf :
         else
         {
             lg2::error(
-                "resetProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
+                "resetProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}, Reqmsg= {MSG}",
                 "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
-                parameterId, "PROFILEID", profileId, "VALUE", paramValue);
+                parameterId, "PROFILEID", profileId, "VALUE", paramValue, "MSG",
+                msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }

@@ -33,6 +33,8 @@ enum clock_output_enable_state_index {
 
 const uint8_t MAX_VERSION_STRING_SIZE = 100;
 const uint32_t INVALID_POWER_LIMIT = 0xFFFFFFFF;
+const uint32_t INVALID_UINT32_VALUE = 0xFFFFFFFF;
+const uint16_t INVALID_UINT16_VALUE = 0xFFFF;
 
 /** @brief NSM Type3 platform environmental commands
  */
