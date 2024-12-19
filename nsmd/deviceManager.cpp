@@ -309,17 +309,6 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
 
     for (auto propertyId : propertyIds)
     {
-#ifdef TEMP_BLOCK_BIANCA_UNSUPPORTED_MESSAGES
-        // Temporary fix for 0.8
-        if (((eid == 12) || (eid == 20)) &&
-            (propertyId != FPGA_FIRMWARE_VERSION))
-        {
-            lg2::error("Tried to read invalid property from FPGA");
-
-            co_return NSM_ERROR;
-        }
-#endif
-
         auto rc = co_await getInventoryInformation(eid, propertyId, properties);
         if (rc != NSM_SW_SUCCESS)
         {
@@ -408,16 +397,6 @@ requester::Coroutine
 requester::Coroutine DeviceManager::getInventoryInformation(
     eid_t eid, uint8_t& propertyIdentifier, InventoryProperties& properties)
 {
-#ifdef TEMP_BLOCK_BIANCA_UNSUPPORTED_MESSAGES
-    // Temporary fix for 0.8
-    if (((eid == 12) || (eid == 20)) &&
-        (propertyIdentifier != FPGA_FIRMWARE_VERSION))
-    {
-        lg2::error("Tried to read invalid property from FPGA");
-
-        co_return NSM_ERROR;
-    }
-#endif
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
