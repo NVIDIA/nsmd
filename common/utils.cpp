@@ -364,9 +364,6 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
 // Function to convert bitfield256_t to bitmap
 std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf)
 {
-    // struct workload_power_profile_status profileData;
-    //  memcpy(&profileData, data, sizeof(struct
-    //  workload_power_profile_status));
     std::vector<uint8_t> bitmap(32, 0); // 32 bytes = 256 bits
 
     // Iterate over each bitfield32_t in the bitfield256_t
@@ -385,6 +382,23 @@ std::vector<uint8_t> bitfield256_tToBitMap(bitfield256_t bf)
                 bitmap[i * 4 + j / 8] |= (1 << (j % 8));
             }
         }
+    }
+    return bitmap;
+}
+
+// Function to convert bitfield256_t to bitmap
+std::vector<uint8_t> bitfield256_tToBitArray(bitfield256_t bf)
+{
+    std::vector<uint8_t> bitmap(32, 0); // 32 bytes = 256 bits
+
+    // Iterate over each bitfield32_t in the bitfield256_t
+    for (int i = 0; i < 8; i++)
+    {
+        uint32_t byte = bf.fields[i].byte;
+        bitmap[i * 4 + 0] = (byte >> 24) & 0xFF;
+        bitmap[i * 4 + 1] = (byte >> 16) & 0xFF;
+        bitmap[i * 4 + 2] = (byte >> 8) & 0xFF;
+        bitmap[i * 4 + 3] = (byte >> 0) & 0xFF;
     }
     return bitmap;
 }
