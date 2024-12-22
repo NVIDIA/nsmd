@@ -17,44 +17,23 @@
 
 #pragma once
 
-#include "eventHandler.hpp"
-#include "nsmEvent.hpp"
+#include "nsmEventInfo.hpp"
 
 namespace nsm
 {
 
-class EventType0Handler : public DelegatingEventHandler
+class NsmRediscoveryEvent : public NsmEvent
 {
   public:
-    EventType0Handler();
+    NsmRediscoveryEvent(const std::string& name, const std::string& type,
+                        const NsmEventInfo info);
 
-    uint8_t nsmType() override
-    {
-        // event type0, device capability discovery
-        return NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
-    }
+    int handle(eid_t eid, NsmType type, NsmEventId eventId,
+               const nsm_msg* event, size_t eventLen) final;
+
+  private:
+    const NsmEventInfo info;
+    std::map<std::string, std::string> eventData;
+    std::string messageArgs{};
 };
-
-class EventType1Handler : public DelegatingEventHandler
-{
-  public:
-    EventType1Handler();
-
-    uint8_t nsmType() override
-    {
-        return NSM_TYPE_NETWORK_PORT;
-    }
-};
-
-class EventType3Handler : public DelegatingEventHandler
-{
-  public:
-    EventType3Handler();
-
-    uint8_t nsmType() override
-    {
-        return NSM_TYPE_PLATFORM_ENVIRONMENTAL;
-    }
-};
-
 } // namespace nsm
