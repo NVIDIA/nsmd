@@ -3099,6 +3099,8 @@ void MockupResponder::sendThreasholdEvent(
     bool estimated_effective_ber_threshold, uint8_t portNumber)
 {
     const nsm_health_event_payload payload = {
+        .portNumber = portNumber,
+        .reserved1 = 0,
         .port_rcv_errors_threshold = port_rcv_errors_threshold,
         .port_xmit_discard_threshold = port_xmit_discard_threshold,
         .symbol_ber_threshold = symbol_ber_threshold,
@@ -3108,8 +3110,7 @@ void MockupResponder::sendThreasholdEvent(
             port_rcv_switch_relay_errors_threshold,
         .effective_ber_threshold = effective_ber_threshold,
         .estimated_effective_ber_threshold = estimated_effective_ber_threshold,
-        .reserved = 0,
-        .portNumber = portNumber};
+        .reserved2 = 0};
 
     if (verbose)
     {
