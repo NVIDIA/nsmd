@@ -1,4 +1,5 @@
 sources += [
+    'nsmEvent/nsmRediscoveryEvent.cpp',
     'nsmEvent/nsmXIDEvent.cpp',
     'nsmEvent/nsmThresholdEvent.cpp',
     'nsmEvent/nsmResetRequiredEvent.cpp',
