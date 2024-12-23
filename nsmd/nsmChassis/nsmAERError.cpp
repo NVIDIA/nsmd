@@ -138,6 +138,11 @@ requester::Coroutine
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        if (aerStatusSensor)
+        {
+            lg2::info("refresh AER status on dbus for EID = {EID}", "EID", eid);
+            co_await aerStatusSensor->update(manager, eid);
+        }
         lg2::info("clearAERError for EID: {EID} completed", "EID", eid);
     }
     else
@@ -180,6 +185,12 @@ sdbusplus::message::object_path NsmAERErrorStatusIntf::clearAERStatus()
     doclearAERErrorOnDevice(statusInterface).detach();
 
     return objectPath;
+}
+
+void NsmAERErrorStatusIntf::linkAerStatusSensor(
+    std::shared_ptr<NsmPCIeAERErrorStatus> sensor)
+{
+    aerStatusSensor = sensor;
 }
 
 } // namespace nsm
