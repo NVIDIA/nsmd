@@ -127,6 +127,10 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         configureEventAcknowledgement(const nsm_msg* requestMsg,
                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getHistogramFormatHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getHistogramDataHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     // type3 handlers
     std::optional<std::vector<uint8_t>>

@@ -69,6 +69,10 @@ using PropertyValuesCollection =
 
 #define UUID_INT_SIZE 16
 #define UUID_LEN 36
+
+// Largest safe integer for double precision (2^53 - 1)
+const uint64_t MAX_SAFE_INTEGER_IN_DOUBLE = (1ULL << 53) - 1;
+
 namespace utils
 {
 constexpr bool Tx = true;
@@ -597,4 +601,18 @@ std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg);
  * Eg : value = 200000, will be returned as 200 if scaleFactor = 1000
  */
 double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor);
+
+/**
+ * @brief Convert uint64 to double with safe check.
+ *
+ * @param uint64_t value to be converted to double
+ */
+double uint64ToDoubleSafeConvert(uint64_t value);
+
+/**
+ * @brief Convert int64 to double with safe check.
+ *
+ * @param uint64_t value to be converted to double
+ */
+double int64ToDoubleSafeConvert(int64_t value);
 } // namespace utils

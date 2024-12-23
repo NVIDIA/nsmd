@@ -17,6 +17,7 @@
 
 #include "nsmSwitch.hpp"
 
+#include "base.h"
 #include "network-ports.h"
 
 #include "asyncOperationManager.hpp"
@@ -30,6 +31,7 @@
 #include "nsmErrorInjection.hpp"
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmEvent/nsmFabricManagerStateEvent.hpp"
+#include "nsmHistograms/nsmHistogramInfo.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmLogInfo.hpp"
 #include "nsmManagers/nsmFabricManager.hpp"
@@ -695,6 +697,32 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                 "com.nvidia.SwitchIsolation", "IsolationMode",
                 AsyncSetOperationInfo{setIsolationModeHandler,
                                       isolationModeSensor, device});
+
+#ifdef NVIDIA_HISTOGRAM
+        // add power histogram
+        std::string histoObjName = "Power_0";
+        std::string histoDbusObjPath = dbusObjPath + "/Histograms/" +
+                                       histoObjName;
+        uint32_t powerHistogramID = 0;
+        powerHistogramID =
+            (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_POWER)
+             << SHIFT_BITS_24) |
+            (static_cast<uint32_t>(0) << SHIFT_BITS_16) |
+            (static_cast<uint32_t>(NSM_HISTOGRAM_ID_POWERCONSUMPTION));
+
+        auto powerHistoFormatIntf =
+            std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
+        auto getPowerHistoFormatObject = std::make_shared<NsmHistogramFormat>(
+            bus, histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
+            dbusObjPath, dbusObjPath, powerHistogramID, 0);
+
+        auto getPowerHistoDataObject = std::make_shared<NsmHistogramData>(
+            histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
+            histoDbusObjPath, powerHistogramID, 0);
+
+        device->addStaticSensor(getPowerHistoFormatObject);
+        device->addSensor(getPowerHistoDataObject, false);
+#endif
     }
     else if (type == "NSM_PortDisableFuture")
     {

@@ -105,6 +105,219 @@ uint8_t unpack_nsm_header(const struct nsm_msg_hdr *msg,
 	return NSM_SW_SUCCESS;
 }
 
+static void htoleArrayData(uint8_t *data, uint16_t num_of_element,
+			   uint8_t data_type)
+{
+	switch (data_type) {
+	case NvU8:
+	case NvS8:
+		// No operation for 8-bit types, just return
+		break;
+
+	case NvU16: {
+		uint16_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint16_t)),
+			       sizeof(uint16_t));
+			tmp = htole16(tmp);
+			memcpy(data + (i * sizeof(uint16_t)), &tmp,
+			       sizeof(uint16_t));
+		}
+	} break;
+	case NvS16: {
+		int16_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int16_t)),
+			       sizeof(int16_t));
+			tmp = htole16(tmp);
+			memcpy(data + (i * sizeof(int16_t)), &tmp,
+			       sizeof(int16_t));
+		}
+	} break;
+
+	case NvU32: {
+		uint32_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint32_t)),
+			       sizeof(uint32_t));
+			tmp = htole32(tmp);
+			memcpy(data + (i * sizeof(uint32_t)), &tmp,
+			       sizeof(uint32_t));
+		}
+	} break;
+	case NvS32: {
+		int32_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int32_t)),
+			       sizeof(int32_t));
+			tmp = htole32(tmp);
+			memcpy(data + (i * sizeof(int32_t)), &tmp,
+			       sizeof(int32_t));
+		}
+	} break;
+
+	case NvS24_8: {
+		float tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(float)), sizeof(float));
+			tmp = htole32(tmp);
+			memcpy(data + (i * sizeof(float)), &tmp, sizeof(float));
+		}
+	} break;
+
+	case NvU64: {
+		uint64_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint64_t)),
+			       sizeof(uint64_t));
+			tmp = htole64(tmp);
+			memcpy(data + (i * sizeof(uint64_t)), &tmp,
+			       sizeof(uint64_t));
+		}
+	} break;
+	case NvS64: {
+		int64_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int64_t)),
+			       sizeof(int64_t));
+			tmp = htole64(tmp);
+			memcpy(data + (i * sizeof(int64_t)), &tmp,
+			       sizeof(int64_t));
+		}
+	} break;
+
+	default:
+		// No operation for unknown types
+		break;
+	}
+}
+
+static void letohArrayData(uint8_t *data, uint16_t num_of_element,
+			   uint8_t data_type)
+{
+	switch (data_type) {
+	case NvU8:
+	case NvS8:
+		// No operation for 8-bit types, just return
+		break;
+
+	case NvU16: {
+		uint16_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint16_t)),
+			       sizeof(uint16_t));
+			tmp = le16toh(tmp);
+			memcpy(data + (i * sizeof(uint16_t)), &tmp,
+			       sizeof(uint16_t));
+		}
+	} break;
+	case NvS16: {
+		int16_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int16_t)),
+			       sizeof(int16_t));
+			tmp = le16toh(tmp);
+			memcpy(data + (i * sizeof(int16_t)), &tmp,
+			       sizeof(int16_t));
+		}
+	} break;
+
+	case NvU32: {
+		uint32_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint32_t)),
+			       sizeof(uint32_t));
+			tmp = le32toh(tmp);
+			memcpy(data + (i * sizeof(uint32_t)), &tmp,
+			       sizeof(uint32_t));
+		}
+	} break;
+	case NvS32: {
+		int32_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int32_t)),
+			       sizeof(int32_t));
+			tmp = le32toh(tmp);
+			memcpy(data + (i * sizeof(int32_t)), &tmp,
+			       sizeof(int32_t));
+		}
+	} break;
+
+	case NvS24_8: {
+		float tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(float)), sizeof(float));
+			tmp = le32toh(tmp);
+			memcpy(data + (i * sizeof(float)), &tmp, sizeof(float));
+		}
+	} break;
+
+	case NvU64: {
+		uint64_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(uint64_t)),
+			       sizeof(uint64_t));
+			tmp = le64toh(tmp);
+			memcpy(data + (i * sizeof(uint64_t)), &tmp,
+			       sizeof(uint64_t));
+		}
+	} break;
+	case NvS64: {
+		int64_t tmp = 0;
+		for (size_t i = 0; i < num_of_element; ++i) {
+			memcpy(&tmp, data + (i * sizeof(int64_t)),
+			       sizeof(int64_t));
+			tmp = le64toh(tmp);
+			memcpy(data + (i * sizeof(int64_t)), &tmp,
+			       sizeof(int64_t));
+		}
+	} break;
+
+	default:
+		// No operation for unknown types
+		break;
+	}
+}
+
+static void dataCopy(uint8_t *srcData, uint8_t *destData, uint16_t numOfElement,
+		     uint8_t dataType)
+{
+	size_t dataSize = 0;
+	switch (dataType) {
+	case NvU8:
+		dataSize = sizeof(uint8_t) * numOfElement;
+		break;
+	case NvS8:
+		dataSize = sizeof(int8_t) * numOfElement;
+		break;
+	case NvU16:
+		dataSize = sizeof(uint16_t) * numOfElement;
+		break;
+	case NvS16:
+		dataSize = sizeof(int16_t) * numOfElement;
+		break;
+	case NvU32:
+		dataSize = sizeof(uint32_t) * numOfElement;
+		break;
+	case NvS32:
+		dataSize = sizeof(int32_t) * numOfElement;
+		break;
+	case NvS24_8:
+		dataSize = sizeof(float) * numOfElement;
+		break;
+	case NvU64:
+		dataSize = sizeof(uint64_t) * numOfElement;
+		break;
+	case NvS64:
+		dataSize = sizeof(int64_t) * numOfElement;
+		break;
+	default:
+		// No operation for 8-bit types
+		break;
+	}
+	memcpy(destData, srcData, dataSize);
+}
+
 int encode_cc_only_resp(uint8_t instance_id, uint8_t type, uint8_t command,
 			uint8_t cc, uint16_t reason_code, struct nsm_msg *msg)
 {
@@ -925,6 +1138,306 @@ int encode_raw_cmd_req(uint8_t instanceId, uint8_t messageType,
 	// Set the data_size to the size of the command data
 	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 	request->data_size = dataSize;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_histogram_format_req(uint8_t instance_id, uint32_t histogram_id,
+				    uint16_t parameter, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_histogram_format_req *request =
+	    (struct nsm_get_histogram_format_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	request->hdr.data_size = sizeof(histogram_id) + sizeof(parameter);
+	request->histogram_id = htole32(histogram_id);
+	request->parameter = htole16(parameter);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_histogram_format_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint32_t *histogram_id, uint16_t *parameter)
+{
+	if (msg == NULL || histogram_id == NULL || parameter == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_histogram_format_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_histogram_format_req *request =
+	    (struct nsm_get_histogram_format_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(request->histogram_id) + sizeof(request->parameter)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*histogram_id = le32toh(request->histogram_id);
+	*parameter = le16toh(request->parameter);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_histogram_format_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
+    uint32_t bucket_offsets_size, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_HISTOGRAM_FORMAT, msg);
+	}
+
+	struct nsm_get_histogram_format_resp *resp =
+	    (struct nsm_get_histogram_format_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_HISTOGRAM_FORMAT;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size = htole16(
+	    sizeof(struct nsm_histogram_format_metadata) + bucket_offsets_size);
+	resp->metadata.num_of_buckets = htole16(meta_data->num_of_buckets);
+	resp->metadata.min_sampling_time =
+	    htole32(meta_data->min_sampling_time);
+	resp->metadata.accumulation_cycle = meta_data->accumulation_cycle;
+	resp->metadata.reserved0 = 0;
+	resp->metadata.increment_duration =
+	    htole32(meta_data->increment_duration);
+	resp->metadata.bucket_unit_of_measure =
+	    meta_data->bucket_unit_of_measure;
+	resp->metadata.reserved1 = 0;
+	resp->metadata.bucket_data_type = meta_data->bucket_data_type;
+	resp->metadata.reserved2 = 0;
+
+	if (cc == NSM_SUCCESS) {
+		if (bucket_offsets == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+
+		htoleArrayData(bucket_offsets, meta_data->num_of_buckets,
+			       meta_data->bucket_data_type);
+		dataCopy(bucket_offsets, resp->bucket_offsets,
+			 meta_data->num_of_buckets,
+			 meta_data->bucket_data_type);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_histogram_format_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
+    uint32_t *bucket_offsets_size)
+{
+	if (data_size == NULL || meta_data == NULL || bucket_offsets == NULL ||
+	    bucket_offsets_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_histogram_format_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_histogram_format_resp *resp =
+	    (struct nsm_get_histogram_format_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	meta_data->num_of_buckets = le16toh(resp->metadata.num_of_buckets);
+	meta_data->min_sampling_time =
+	    le32toh(resp->metadata.min_sampling_time);
+	meta_data->accumulation_cycle = resp->metadata.accumulation_cycle;
+	meta_data->reserved0 = 0;
+	meta_data->increment_duration =
+	    le32toh(resp->metadata.increment_duration);
+	meta_data->bucket_unit_of_measure =
+	    resp->metadata.bucket_unit_of_measure;
+	meta_data->reserved1 = 0;
+	meta_data->bucket_data_type = resp->metadata.bucket_data_type;
+	meta_data->reserved2 = 0;
+	*bucket_offsets_size =
+	    *data_size - sizeof(struct nsm_histogram_format_metadata);
+
+	dataCopy(resp->bucket_offsets, bucket_offsets,
+		 meta_data->num_of_buckets, meta_data->bucket_data_type);
+	letohArrayData(bucket_offsets, meta_data->num_of_buckets,
+		       meta_data->bucket_data_type);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_histogram_data_req(uint8_t instance_id, uint32_t histogram_id,
+				  uint16_t parameter, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_histogram_data_req *request =
+	    (nsm_get_histogram_data_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	request->hdr.data_size = sizeof(histogram_id) + sizeof(parameter);
+	request->histogram_id = htole32(histogram_id);
+	request->parameter = htole16(parameter);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_histogram_data_req(const struct nsm_msg *msg, size_t msg_len,
+				  uint32_t *histogram_id, uint16_t *parameter)
+{
+	if (msg == NULL || histogram_id == NULL || parameter == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_get_histogram_data_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_histogram_data_req *request =
+	    (nsm_get_histogram_data_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(request->histogram_id) + sizeof(request->parameter)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*histogram_id = le32toh(request->histogram_id);
+	*parameter = le16toh(request->parameter);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_histogram_data_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t bucket_data_type, uint16_t num_of_buckets, uint8_t *bucket_data,
+    uint32_t bucket_data_size, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_HISTOGRAM_DATA, msg);
+	}
+
+	struct nsm_get_histogram_data_resp *resp =
+	    (struct nsm_get_histogram_data_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_HISTOGRAM_DATA;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(num_of_buckets) + sizeof(bucket_data_type) +
+		    bucket_data_size);
+	resp->bucket_data_type = bucket_data_type;
+	resp->num_of_buckets = htole16(num_of_buckets);
+
+	if (cc == NSM_SUCCESS) {
+		if (bucket_data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+
+		htoleArrayData(bucket_data, num_of_buckets, bucket_data_type);
+		dataCopy(bucket_data, resp->bucket_data, num_of_buckets,
+			 bucket_data_type);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_histogram_data_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
+    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size)
+{
+	if (data_size == NULL || bucket_data_type == NULL ||
+	    num_of_buckets == NULL || bucket_data == NULL ||
+	    bucket_data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_histogram_data_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_histogram_data_resp *resp =
+	    (struct nsm_get_histogram_data_resp *)msg->payload;
+
+	*data_size = le16toh(resp->hdr.data_size);
+	*bucket_data_type = resp->bucket_data_type;
+	*num_of_buckets = le16toh(resp->num_of_buckets);
+	*bucket_data_size = *data_size - sizeof(resp->num_of_buckets) -
+			    sizeof(resp->bucket_data_type);
+
+	dataCopy(resp->bucket_data, bucket_data, *num_of_buckets,
+		 *bucket_data_type);
+	letohArrayData(bucket_data, *num_of_buckets, *bucket_data_type);
 
 	return NSM_SW_SUCCESS;
 }
