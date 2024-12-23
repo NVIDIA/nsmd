@@ -33,7 +33,7 @@ using namespace sdbusplus::server;
 
 using AERErrorStatusIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::pc_ie::AERErrorStatus>;
-
+class NsmPCIeAERErrorStatus; // forward declaration
 class NsmAERErrorStatusIntf : public AERErrorStatusIntf
 {
   public:
@@ -50,6 +50,10 @@ class NsmAERErrorStatusIntf : public AERErrorStatusIntf
 
     uint8_t deviceIndex;
     std::shared_ptr<NsmDevice> device;
+    void linkAerStatusSensor(std::shared_ptr<NsmPCIeAERErrorStatus> sensor);
+
+  private:
+    std::shared_ptr<NsmPCIeAERErrorStatus> aerStatusSensor;
 };
 
 class NsmPCIeAERErrorStatus : public NsmSensor
