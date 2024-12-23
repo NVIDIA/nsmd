@@ -260,6 +260,20 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
+        std::shared_ptr<NsmClearPCIeCounters> sensor =
+            getClearCounterSensorFromGroup(groupId);
+        if (sensor)
+        {
+            lg2::info("clearPCIeErrorCounter refreshing group id : {A}", "A",
+                      groupId);
+            co_await sensor->update(manager, eid);
+        }
+        else
+        {
+            lg2::error(
+                "clearPCIeErrorCounter unable to find groupID {A} sensor ", "A",
+                groupId);
+        }
         lg2::info("clearPCIeErrorCounter for EID: {EID} completed", "EID", eid);
     }
     else
@@ -295,6 +309,7 @@ requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
 sdbusplus::message::object_path
     NsmClearPCIeIntf::clearCounter(std::string Counter)
 {
+    lg2::info("NsmClearPCIeIntf::clearCounter, counter: {A}", "A", Counter);
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
 
@@ -314,6 +329,25 @@ sdbusplus::message::object_path
     doClearPCIeCountersOnDevice(statusInterface, Counter).detach();
 
     return objectPath;
+}
+
+void NsmClearPCIeIntf::addClearCoutnerSensor(
+    uint8_t groupId, std::shared_ptr<NsmClearPCIeCounters> sensor)
+{
+    auto [it, inserted] = clearCoutnerSensorMap.try_emplace(groupId, sensor);
+    if (!inserted)
+    {
+        lg2::error(
+            "NsmClearPCIeIntf::addClearCoutnerSensor, GroupdId already linked: {A}",
+            "A", groupId);
+    }
+}
+
+std::shared_ptr<NsmClearPCIeCounters>
+    NsmClearPCIeIntf::getClearCounterSensorFromGroup(uint8_t groupId)
+{
+    auto it = clearCoutnerSensorMap.find(groupId);
+    return (it != clearCoutnerSensorMap.end()) ? it->second : nullptr;
 }
 
 static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
@@ -376,6 +410,8 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                     std::make_shared<NsmClearPCIeCounters>(
                         name, type, groupId, deviceIndex, clearPCIeIntf);
                 nsmDevice->addStaticSensor(clearPCIeSensorGroup);
+                clearPCIeIntf->addClearCoutnerSensor(groupId,
+                                                     clearPCIeSensorGroup);
             }
 
             auto laneErrorIntf =
