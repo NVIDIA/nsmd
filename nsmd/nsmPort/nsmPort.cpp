@@ -1008,6 +1008,37 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.emplace_back(portMetricsSensor);
             }
         }
+#ifdef NVIDIA_HISTOGRAM
+        if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
+        {
+            // add FEC histogram
+            std::string histoObjName = "FEC_" +
+                                       std::to_string(logicalPortNum - 1);
+            std::string histoDbusObjPath = objPath + "/Histograms/" +
+                                           histoObjName;
+
+            uint32_t fecHistogramID = 0;
+            fecHistogramID =
+                (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_ERROR)
+                 << SHIFT_BITS_24) |
+                (static_cast<uint32_t>(0) << SHIFT_BITS_16) |
+                (static_cast<uint32_t>(NSM_HISTOGRAM_ID_FEC));
+
+            auto fecHistoFormatIntf =
+                std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
+            auto getFECHistoFormatObject = std::make_shared<NsmHistogramFormat>(
+                bus, histoObjName, deviceName + "_FEC_Histogram",
+                fecHistoFormatIntf, objPath, parentObjPath, fecHistogramID,
+                logicalPortNum);
+
+            auto getFECHistoDataObject = std::make_shared<NsmHistogramData>(
+                histoObjName, deviceName + "_FEC_Histogram", fecHistoFormatIntf,
+                histoDbusObjPath, fecHistogramID, logicalPortNum);
+
+            nsmDevice->addStaticSensor(getFECHistoFormatObject);
+            nsmDevice->addSensor(getFECHistoDataObject, false);
+        }
+#endif
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

@@ -64,6 +64,9 @@ extern "C" {
 
 #define UNKNOWN_INSTANCE_ID 255
 
+#define SHIFT_BITS_16 16
+#define SHIFT_BITS_24 24
+
 enum nsm_type {
 	NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY = 0,
 	NSM_TYPE_NETWORK_PORT = 1,
@@ -88,7 +91,10 @@ enum nsm_device_capability_discovery_commands {
 	NSM_GET_EVENT_LOG_RECORD = 0x08,
 	NSM_QUERY_DEVICE_IDENTIFICATION = 0x09,
 	NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT = 0x0A,
-	NSM_GET_DEVICE_CAPABILITIES = 0x0B
+	NSM_GET_DEVICE_CAPABILITIES = 0x0B,
+	NSM_DISCOVER_HISTOGRAM = 0x0C,
+	NSM_GET_HISTOGRAM_FORMAT = 0x0D,
+	NSM_GET_HISTOGRAM_DATA = 0x0E
 };
 
 /** @brief NSM Debug Token Commands
@@ -309,6 +315,7 @@ typedef struct {
 #define NSM_RESPONSE_MIN_LEN NSM_RESPONSE_ERROR_LEN
 
 typedef float real32_t;
+typedef uint8_t enum8;
 
 /** @enum MessageType
  *
@@ -329,6 +336,42 @@ typedef enum {
 	NSM_DEV_ID_EROT = 4,
 	NSM_DEV_ID_UNKNOWN = 0xff,
 } NsmDeviceIdentification;
+
+// Enum for Data Format (data type for bucket info)
+typedef enum {
+	NvU8 = 0,
+	NvS8 = 1,
+	NvU16 = 2,
+	NvS16 = 3,
+	NvU32 = 4,
+	NvS32 = 5,
+	NvU64 = 6,
+	NvS64 = 7,
+	NvS24_8 = 8,
+} BucketFormat;
+
+// Enum for HistogramID (Ids for Histogram type)
+typedef enum {
+	NSM_HISTOGRAM_ID_POWERCONSUMPTION = 0,
+	NSM_HISTOGRAM_ID_LINKSPEEDCAPPING = 1,
+	NSM_HISTOGRAM_ID_FEC = 2
+} HISTOGRAMID;
+
+// Enum for Histogram Namespace ID
+typedef enum {
+	NSM_HISTOGRAM_NAMESPACE_ID_GENERAL = 0x00,
+	NSM_HISTOGRAM_NAMESPACE_ID_NETWORK = 0x01,
+	NSM_HISTOGRAM_NAMESPACE_ID_POWER = 0x02,
+	NSM_HISTOGRAM_NAMESPACE_ID_ERROR = 0x03,
+	NSM_HISTOGRAM_NAMESPACE_ID_RESERVED = 0xFF
+} HISTOGRAMNAMESPACEID;
+
+// Enum for BucketUnit (unit for bucket info)
+typedef enum {
+	NSM_BUCKET_UNIT_WATTS = 0,
+	NSM_BUCKET_UNIT_PERCENT = 1,
+	NSM_BUCKET_UNIT_COUNTS = 2,
+} BucketUnit;
 
 /** @struct nsm_msg_hdr
  *
@@ -524,6 +567,61 @@ struct nsm_query_device_identification_resp {
 	struct nsm_common_resp hdr;
 	uint8_t device_identification;
 	uint8_t instance_id;
+} __attribute__((packed));
+
+struct nsm_histogram_id_format_breakdown {
+	uint8_t name_space;
+	uint8_t revision;
+	uint16_t histogram_instance_id;
+} __attribute__((packed));
+
+/** @struct nsm_get_histogram_format_req
+ *
+ *  Structure representing NSM Get histogram format response.
+ */
+struct nsm_get_histogram_format_req {
+	struct nsm_common_req hdr;
+	uint32_t histogram_id;
+	uint16_t parameter;
+} __attribute__((packed));
+
+struct nsm_histogram_format_metadata {
+	uint16_t num_of_buckets;
+	uint32_t min_sampling_time;
+	uint8_t accumulation_cycle;
+	uint8_t reserved0;
+	uint32_t increment_duration;
+	uint8_t bucket_unit_of_measure;
+	uint8_t reserved1;
+	uint8_t bucket_data_type;
+	uint8_t reserved2;
+} __attribute__((packed));
+
+/** @struct nsm_get_histogram_format_resp
+ *
+ *  Structure representing NSM Get histogram format response.
+ */
+struct nsm_get_histogram_format_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_histogram_format_metadata metadata;
+	uint8_t bucket_offsets[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_histogram_data_req
+ *
+ *  Structure representing NSM get histogram data request.
+ */
+typedef struct nsm_get_histogram_format_req nsm_get_histogram_data_req;
+
+/** @struct nsm_get_histogram_data_resp
+ *
+ *  Structure representing NSM Get histogram data response.
+ */
+struct nsm_get_histogram_data_resp {
+	struct nsm_common_resp hdr;
+	uint8_t bucket_data_type;
+	uint16_t num_of_buckets;
+	uint8_t bucket_data[1];
 } __attribute__((packed));
 
 /**
@@ -941,6 +1039,118 @@ int encode_raw_cmd_req(uint8_t instanceId, uint8_t messageType,
 		       uint8_t commandCode, const uint8_t *payload,
 		       size_t dataSize, struct nsm_msg *msg);
 
+/** @brief Encode Get histogram format request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] histogram_id - histogram id
+ *  @param[in] parameter - parameter
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_histogram_format_req(uint8_t instance_id, uint32_t histogram_id,
+				    uint16_t parameter, struct nsm_msg *msg);
+
+/** @brief Decode Get histogram format request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] histogram_id - histogram id
+ *  @param[out] parameter - parameter
+ *  @return nsm_completion_codes
+ */
+int decode_get_histogram_format_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint32_t *histogram_id,
+				    uint16_t *parameter);
+
+/** @brief Encode a Get histogram format response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] meta_data - meta data about histogram format
+ *  @param[in] bucket_offsets - list of bucket offsets
+ *  @param[in] bucket_offsets_size - total size of list of bucket offsets
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_histogram_format_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
+    uint32_t bucket_offsets_size, struct nsm_msg *msg);
+
+/** @brief Decode a Get histogram format response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] meta_data - meta data about histogram format
+ *  @param[out] bucket_offsets - list of bucket offsets
+ *  @param[out] bucket_offsets_size - total size of list of bucket offsets
+ *  @return nsm_completion_codes
+ */
+int decode_get_histogram_format_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size,
+    struct nsm_histogram_format_metadata *meta_data, uint8_t *bucket_offsets,
+    uint32_t *bucket_offsets_size);
+
+/** @brief Encode Get histogram data request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] histogram_id - histogram id
+ *  @param[in] parameter - parameter
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_histogram_data_req(uint8_t instance_id, uint32_t histogram_id,
+				  uint16_t parameter, struct nsm_msg *msg);
+
+/** @brief Decode Get histogram data request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] histogram_id - histogram id
+ *  @param[out] parameter - parameter
+ *  @return nsm_completion_codes
+ */
+int decode_get_histogram_data_req(const struct nsm_msg *msg, size_t msg_len,
+				  uint32_t *histogram_id, uint16_t *parameter);
+
+/** @brief Encode a Get histogram data response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - response message completion code
+ *  @param[in] reason_code - reason code
+ *  @param[in] num_of_buckets - number of buckets
+ *  @param[in] bucket_data - list of bucket offsets
+ *  @param[in] bucket_data_size - total size of list of bucket offsets
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_histogram_data_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t bucket_data_type, uint16_t num_of_buckets, uint8_t *bucket_data,
+    uint32_t bucket_data_size, struct nsm_msg *msg);
+
+/** @brief Decode a Get histogram data response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc     - pointer to response message completion code
+ *  @param[out] reason_code     - pointer to reason code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] bucket_data_type - data type of buckets
+ *  @param[out] num_of_buckets - number of buckets
+ *  @param[out] bucket_data - list of bucket offsets
+ *  @param[out] bucket_data_size - total size of list of bucket offsets
+ *  @return nsm_completion_codes
+ */
+int decode_get_histogram_data_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
+    uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size);
 #ifdef __cplusplus
 }
 #endif

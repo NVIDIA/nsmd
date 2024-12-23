@@ -190,3 +190,10 @@ option(
     value: 'disabled',
     description: 'This is a work around to solve an issue on Bianca where we are not getting a MCTP rediscovery event on GPU reset to setup event notifications'
 )
+
+option(
+    'enable-histogram',
+    type: 'feature',
+    description: 'Enable histogram feature on devices',
+    value: 'enabled',
+)

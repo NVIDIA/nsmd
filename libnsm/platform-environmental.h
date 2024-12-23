@@ -150,23 +150,6 @@ enum nsm_inventory_property_identifiers {
 	PCIERETIMER_7_EEPROM_VERSION = 151
 };
 
-enum nsm_data_type {
-	NvBool8 = 0,
-	NvU8 = 1,
-	NvS8 = 2,
-	NvU16 = 3,
-	NvS16 = 4,
-	NvU32 = 5,
-	NvS32 = 6,
-	NvU64 = 7,
-	NvS64 = 8,
-	NvS24_8 = 9,
-	NvCString = 10,
-	NvCharArray = 11,
-};
-
-typedef uint8_t enum8;
-
 // Driver states as specified in your documentation.
 typedef enum {
 	DriverStateUnknown = 0,

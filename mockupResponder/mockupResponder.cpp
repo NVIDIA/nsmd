@@ -381,6 +381,10 @@ std::optional<Response>
                     return setCurrentEventSources(request, requestLen);
                 case NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT:
                     return configureEventAcknowledgement(request, requestLen);
+                case NSM_GET_HISTOGRAM_FORMAT:
+                    return getHistogramFormatHandler(request, requestLen);
+                case NSM_GET_HISTOGRAM_DATA:
+                    return getHistogramDataHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -784,7 +788,9 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_SWITCH,
              {
-                 {0, {0, 1, 2, 5, 6, 9, 10}},
+                 {0,
+                  {0, 1, 2, 5, 6, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
                  {1, {1, 8, 9, 10, 11, 14, 68, 69}},
                  {2, {4}},
                  {3, {12}},
@@ -811,7 +817,9 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_GPU,
              {
-                 {0, {0, 1, 2, 5, 6, 9, 10}},
+                 {0,
+                  {0, 1, 2, 5, 6, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
@@ -5834,6 +5842,102 @@ std::optional<std::vector<uint8_t>>
     if (rc)
     {
         lg2::error("encode_get_EGM_mode_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getHistogramFormatHandler(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getHistogramFormatHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint32_t histogramId;
+    uint16_t parameter;
+
+    auto rc = decode_get_histogram_format_req(requestMsg, requestLen,
+                                              &histogramId, &parameter);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_histogram_format_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    struct nsm_histogram_format_metadata metaData;
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint32_t> bucketOffsets = {00, 15, 30, 45, 60, 75};
+    uint32_t totalBucketSize = bucketOffsets.size() * sizeof(bucketOffsets[0]);
+    metaData.num_of_buckets = bucketOffsets.size() - 1;
+    metaData.min_sampling_time = 16;
+    metaData.accumulation_cycle = 12;
+    metaData.increment_duration = 111;
+    metaData.bucket_unit_of_measure = NSM_BUCKET_UNIT_WATTS;
+    metaData.bucket_data_type = NvU32;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp) +
+            sizeof(struct nsm_histogram_format_metadata) + totalBucketSize,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_histogram_format_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &metaData,
+        reinterpret_cast<uint8_t*>(bucketOffsets.data()), totalBucketSize,
+        responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_histogram_format_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getHistogramDataHandler(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getHistogramDataHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint32_t histogramId;
+    uint16_t parameter;
+
+    auto rc = decode_get_histogram_data_req(requestMsg, requestLen,
+                                            &histogramId, &parameter);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_histogram_data_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint32_t> bucketData = {11, 22, 33, 55, 66, 77};
+    uint16_t numOfBuckets = bucketData.size();
+    uint8_t bucketDataType = NvU32;
+    uint32_t bucketDataSize = bucketData.size() * sizeof(bucketData[0]);
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      NSM_RESPONSE_CONVENTION_LEN +
+                                      sizeof(numOfBuckets) + bucketDataSize,
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_histogram_data_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, bucketDataType,
+        numOfBuckets, reinterpret_cast<uint8_t*>(bucketData.data()),
+        bucketDataSize, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_histogram_data_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
     return response;

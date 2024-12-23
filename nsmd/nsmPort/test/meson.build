@@ -10,6 +10,7 @@ dep_src_files = [
     '../../deviceManager.cpp',
     '../../nsmEvent/nsmLongRunningEventDispatcher.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
+    '../../nsmHistograms/nsmHistogramInfo.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',

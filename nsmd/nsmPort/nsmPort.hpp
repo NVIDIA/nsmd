@@ -5,6 +5,7 @@
 #include "common/types.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
+#include "nsmHistograms/nsmHistogramInfo.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
