@@ -152,6 +152,7 @@ requester::Coroutine
                 device);
             auto aerErrorSensor = std::make_shared<NsmPCIeAERErrorStatus>(
                 name, "PCIeAerErrorStatus", aerErrorIntf, 0);
+            aerErrorIntf->linkAerStatusSensor(aerErrorSensor);
             device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
         }
     }
