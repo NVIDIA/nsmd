@@ -42,6 +42,12 @@ if get_option('system-guid').enabled()
     add_project_arguments('-DENABLE_SYSTEM_GUID', language: ['cpp', 'c'])
 endif
 
+if get_option('mctp-eid0-filtering')
+    add_project_arguments('-DFILTER_NULL_MCTP_EID=true', language: ['cpp', 'c'])
+else
+    add_project_arguments('-DFILTER_NULL_MCTP_EID=false', language: ['cpp', 'c'])
+endif
+
 cpp = meson.get_compiler('cpp')
 if cpp.has_header('CLI/CLI.hpp')
     CLI11_dep = declare_dependency()
