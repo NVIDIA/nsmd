@@ -32,6 +32,12 @@ option(
     value: 150,
 )
 option(
+    'mctp-eid0-filtering',
+    type: 'boolean',
+    description: 'Enable MCTP filtering',
+    value: 'false',
+)
+option(
     'num-gpu-per-module',
     type: 'integer',
     description: 'Total number of GPU in each processor module.',

@@ -25,7 +25,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <vector>
-#define MCTP_NULL_EID 0
+
 namespace mctp
 {
 
