@@ -118,13 +118,13 @@ class NsmClearPCIeIntf : public ClearPCIeIntf
     uint8_t deviceIndex;
     std::shared_ptr<NsmDevice> device;
     void addClearCoutnerSensor(uint8_t groupId,
-                               std::shared_ptr<NsmClearPCIeCounters> sensor);
-    std::shared_ptr<NsmClearPCIeCounters>
+                               std::shared_ptr<NsmPcieGroup> sensor);
+    std::shared_ptr<NsmPcieGroup>
         getClearCounterSensorFromGroup(uint8_t groupId);
 
   private:
     // group id to sensor mapping
-    std::map<uint8_t, std::shared_ptr<NsmClearPCIeCounters>>
+    std::unordered_map<uint8_t, std::shared_ptr<NsmPcieGroup>>
         clearCoutnerSensorMap;
 };
 
