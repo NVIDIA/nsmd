@@ -21,6 +21,8 @@
 
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmInterface.hpp"
+#include "nsmPCIeLinkSpeed.hpp"
 
 #include <cstdint>
 
@@ -260,12 +262,12 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        std::shared_ptr<NsmClearPCIeCounters> sensor =
+        std::shared_ptr<NsmPcieGroup> sensor =
             getClearCounterSensorFromGroup(groupId);
         if (sensor)
         {
-            lg2::info("clearPCIeErrorCounter refreshing group id : {A}", "A",
-                      groupId);
+            lg2::info("clearPCIeErrorCounter refreshing group id : {CTR}",
+                      "CTR", groupId);
             co_await sensor->update(manager, eid);
         }
         else
@@ -309,7 +311,7 @@ requester::Coroutine NsmClearPCIeIntf::doClearPCIeCountersOnDevice(
 sdbusplus::message::object_path
     NsmClearPCIeIntf::clearCounter(std::string Counter)
 {
-    lg2::info("NsmClearPCIeIntf::clearCounter, counter: {A}", "A", Counter);
+    lg2::info("NsmClearPCIeIntf::clearCounter, counter: {CTR}", "CTR", Counter);
     const auto [objectPath, statusInterface, valueInterface] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
 
@@ -322,7 +324,7 @@ sdbusplus::message::object_path
 
     if (counterToGroupIdMap.find(Counter) == counterToGroupIdMap.end())
     {
-        lg2::error("Invalid Counter Name. Counter: {A}", "A", Counter);
+        lg2::error("Invalid Counter Name. Counter: {CTR}", "CTR", Counter);
         throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
     }
 
@@ -332,7 +334,7 @@ sdbusplus::message::object_path
 }
 
 void NsmClearPCIeIntf::addClearCoutnerSensor(
-    uint8_t groupId, std::shared_ptr<NsmClearPCIeCounters> sensor)
+    uint8_t groupId, std::shared_ptr<NsmPcieGroup> sensor)
 {
     auto [it, inserted] = clearCoutnerSensorMap.try_emplace(groupId, sensor);
     if (!inserted)
@@ -343,7 +345,7 @@ void NsmClearPCIeIntf::addClearCoutnerSensor(
     }
 }
 
-std::shared_ptr<NsmClearPCIeCounters>
+std::shared_ptr<NsmPcieGroup>
     NsmClearPCIeIntf::getClearCounterSensorFromGroup(uint8_t groupId)
 {
     auto it = clearCoutnerSensorMap.find(groupId);
@@ -368,6 +370,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
 
         auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "InventoryObjPath", GPU_PCIe_INTERFACE);
+        auto processorPath = inventoryObjPath;
         inventoryObjPath = inventoryObjPath + "/Ports/PCIe_0";
 
         auto nsmDevice = manager.getNsmDevice(uuid);
@@ -410,8 +413,6 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                     std::make_shared<NsmClearPCIeCounters>(
                         name, type, groupId, deviceIndex, clearPCIeIntf);
                 nsmDevice->addStaticSensor(clearPCIeSensorGroup);
-                clearPCIeIntf->addClearCoutnerSensor(groupId,
-                                                     clearPCIeSensorGroup);
             }
 
             auto laneErrorIntf =
@@ -420,6 +421,46 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 name, type, laneErrorIntf, deviceIndex, inventoryObjPath);
             nsmDevice->addSensor(perLanErrorSensor,
                                  PER_LANE_ERROR_COUNT_PRIORITY);
+
+            // add PCIe and CC interface and corresponding sensors
+            // TODO: read priority from em config
+
+            bool priority = false;
+            auto pcieDeviceProvider = NsmInterfaceProvider<PCieEccIntf>(
+                name, type, dbus::Interfaces{processorPath});
+            auto pCieECCIntf =
+                pcieDeviceProvider.interfaces[path(processorPath)];
+
+            nsmDevice->addSensor(
+                std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
+                    pcieDeviceProvider, deviceIndex),
+                priority);
+
+            auto pCiePortIntf =
+                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+
+            auto pciPortSensor = std::make_shared<NsmPciePortIntf>(
+                bus, name, type, inventoryObjPath);
+
+            auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
+                processorPath);
+
+            auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
+                processorPath);
+
+            auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
+                processorPath);
+            nsmDevice->deviceSensors.push_back(pciPortSensor);
+            nsmDevice->addSensor(sensorGroup2, priority);
+            nsmDevice->addSensor(sensorGroup3, priority);
+            nsmDevice->addSensor(sensorGroup4, priority);
+            clearPCIeIntf->addClearCoutnerSensor(2, sensorGroup2);
+            clearPCIeIntf->addClearCoutnerSensor(3, sensorGroup3);
+            clearPCIeIntf->addClearCoutnerSensor(4, sensorGroup4);
+            lg2::info("Type NSM_GPU_PCIe_0 all sensors created");
         }
         else if (type == "NSM_PortInfo")
         {
