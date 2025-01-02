@@ -621,6 +621,12 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     propName = "EstimatedEffectiveBER";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEEBER);
+
+    nv::sensor_aggregation::DbusVariantType variantEER{
+        iBPortIntf->effectiveError()};
+    propName = "EffectiveError";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEER);
 #endif
 }
 
@@ -790,6 +796,11 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
             {
                 iBPortIntf->estimatedEffectiveBER(
                     getBitErrorRate(portData->estimated_effective_ber));
+            }
+
+            if (portData->supported_counter.effective_error)
+            {
+                iBPortIntf->effectiveError(portData->effective_error);
             }
         }
         else
