@@ -95,7 +95,7 @@ class NsmGpuPciePortInfo : public NsmObject
 
 using CounterType = sdbusplus::common::xyz::openbmc_project::pc_ie::
     ClearPCIeCounters::CounterType;
-
+class NsmClearPCIeCounters; // forward declaration
 class NsmClearPCIeIntf : public ClearPCIeIntf
 {
   public:
@@ -117,6 +117,15 @@ class NsmClearPCIeIntf : public ClearPCIeIntf
 
     uint8_t deviceIndex;
     std::shared_ptr<NsmDevice> device;
+    void addClearCoutnerSensor(uint8_t groupId,
+                               std::shared_ptr<NsmPcieGroup> sensor);
+    std::shared_ptr<NsmPcieGroup>
+        getClearCounterSensorFromGroup(uint8_t groupId);
+
+  private:
+    // group id to sensor mapping
+    std::unordered_map<uint8_t, std::shared_ptr<NsmPcieGroup>>
+        clearCoutnerSensorMap;
 };
 
 class NsmClearPCIeCounters : public NsmObject
