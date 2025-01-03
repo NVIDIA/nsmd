@@ -97,6 +97,13 @@ enum reconfiguration_permissions_v1_setting {
 	RP_ONESHOT_FLR = 2,
 };
 
+enum roconfiguration_permission {
+	DISALLOW_HOST_DISALLOW_DOE = 0,
+	ALLOW_HOST_DISALLOW_DOE = 1,
+	DISALLOW_HOST_ALLOW_DOE = 2,
+	ALLOW_HOST_ALLOW_DOE = 2,
+};
+
 #define ALL_GPUS_DEVICE_INDEX 0xA
 
 /** @struct nsm_error_injection_mode_v1
@@ -326,13 +333,21 @@ struct nsm_enable_disable_gpu_ist_mode_req {
  */
 struct nsm_reconfiguration_permissions_v1 {
 	// 0 - Allow oneshot configuration of feature by host SW
-	uint8_t oneshot : 1;
+	uint8_t host_oneshot : 1;
 	// 1 - Allow persistent configuration of feature by host SW
-	uint8_t persistent : 1;
+	uint8_t host_persistent : 1;
 	// 2 - Allow FLR persistent configuration of this feature by host SW
-	uint8_t flr_persistent : 1;
-	// 3:7 – reserved
-	uint8_t reserved : 5;
+	uint8_t host_flr_persistent : 1;
+	// 3 - Allow oneshot configuration of feature by Data Object Exchange
+	uint8_t DOE_oneshot : 1;
+	// 4 - Allow persistent configuration of feature by Data Object Exchange
+	uint8_t DOE_persistent : 1;
+	// 5 - Allow FLR persistent configuration of this feature by Data Object
+	// Exchange
+	uint8_t DOE_flr_persistent : 1;
+
+	// 6:7 – reserved
+	uint8_t reserved : 2;
 } __attribute__((packed));
 
 /** @struct nsm_get_reconfiguration_permissions_v1_req

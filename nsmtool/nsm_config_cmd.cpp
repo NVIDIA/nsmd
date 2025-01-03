@@ -792,9 +792,12 @@ class GetReconfigurationPermissionsV1 : public CommandInterface
         ordered_json result;
         result["Completion Code"] = cc;
         result["PRC Knob"] = settingsDictionary.at(settingIndex);
-        result["Oneshot (hot reset)"] = bool(data.oneshot);
-        result["Persistent"] = bool(data.persistent);
-        result["Oneshot (FLR)"] = bool(data.flr_persistent);
+        result["Oneshot (Host)"] = bool(data.host_oneshot);
+        result["Persistent (Host)"] = bool(data.host_persistent);
+        result["FLR_Persistent (Host)"] = bool(data.host_flr_persistent);
+        result["Oneshot (DOE)"] = bool(data.DOE_oneshot);
+        result["Persistent (DOE)"] = bool(data.DOE_persistent);
+        result["FLR_Persistent (DOE)"] = bool(data.DOE_flr_persistent);
         nsmtool::helper::DisplayInJson(result);
     }
 
@@ -852,7 +855,7 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
             "retrieve data source for configuration\n" + configsList);
         setReconfigurationPermissionsV1Group->add_option(
             "-V, --value", permission,
-            "retrieve data source for permission value - \n0 - Disallow\n1 - Allow\n");
+            "retrieve data source for permission value - \n0 - DISALLOW_HOST_DISALLOW_DOE \n1 - ALLOW_HOST_DISALLOW_DOE \n2 - DISALLOW_HOST_ALLOW_DOE \n3 - ALLOW_HOST_ALLOW_DOE\n");
         setReconfigurationPermissionsV1Group->require_option(3);
     }
 
@@ -899,7 +902,7 @@ class SetReconfigurationPermissionsV1 : public CommandInterface
   private:
     reconfiguration_permissions_v1_index settingIndex;
     reconfiguration_permissions_v1_setting configuration;
-    bool permission;
+    uint8_t permission;
 };
 
 class GetConfidentialComputeModeV1 : public CommandInterface

@@ -19,7 +19,9 @@
 
 #include "device-configuration.h"
 
+#include "asyncOperationManager.hpp"
 #include "nsmInterface.hpp"
+#include "sensorManager.hpp"
 
 #include <com/nvidia/InbandReconfigSettings/server.hpp>
 
@@ -28,18 +30,24 @@ namespace nsm
 using ReconfigSettingsIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::server::InbandReconfigSettings>;
 
-class NsmReconfigPermissions :
-    public NsmSensor,
-    public NsmInterfaceContainer<ReconfigSettingsIntf>
+class NsmReconfigPermissions : public NsmSensor
 {
   private:
     ReconfigSettingsIntf::FeatureType feature;
     reconfiguration_permissions_v1_index index;
+    std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf;
+    std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf;
+    requester::Coroutine
+        setAllowPermission(reconfiguration_permissions_v1_setting configuration,
+                           const uint8_t value,
+                           AsyncOperationStatusType& status,
+                           std::shared_ptr<NsmDevice> device);
 
   public:
-    NsmReconfigPermissions(
-        const NsmInterfaceProvider<ReconfigSettingsIntf>& provider,
-        ReconfigSettingsIntf::FeatureType feature);
+    NsmReconfigPermissions(const std::string& name, const std::string& type,
+                           ReconfigSettingsIntf::FeatureType feature,
+                           std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf,
+                           std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf);
     NsmReconfigPermissions() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -56,5 +64,31 @@ class NsmReconfigPermissions :
      */
     static reconfiguration_permissions_v1_index
         getIndex(ReconfigSettingsIntf::FeatureType feature);
+    requester::Coroutine
+        patchHostOneShotConfig(const AsyncSetOperationValueType& value,
+                               AsyncOperationStatusType* status,
+                               std::shared_ptr<NsmDevice> device);
+    requester::Coroutine
+        patchDOEOneShotConfig(const AsyncSetOperationValueType& value,
+                              AsyncOperationStatusType* status,
+                              std::shared_ptr<NsmDevice> device);
+    requester::Coroutine
+        patchHostPersistentConfig(const AsyncSetOperationValueType& value,
+                                  AsyncOperationStatusType* status,
+                                  std::shared_ptr<NsmDevice> device);
+
+    requester::Coroutine
+        patchDOEPersistentConfig(const AsyncSetOperationValueType& value,
+                                 AsyncOperationStatusType* status,
+                                 std::shared_ptr<NsmDevice> device);
+    requester::Coroutine
+        patchHostFLRPersistentConfig(const AsyncSetOperationValueType& value,
+                                     AsyncOperationStatusType* status,
+                                     std::shared_ptr<NsmDevice> device);
+
+    requester::Coroutine
+        patchDOEFLRPersistentConfig(const AsyncSetOperationValueType& value,
+                                    AsyncOperationStatusType* status,
+                                    std::shared_ptr<NsmDevice> device);
 };
 } // namespace nsm
