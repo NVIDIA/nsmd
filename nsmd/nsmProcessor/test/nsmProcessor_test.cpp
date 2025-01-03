@@ -32,7 +32,6 @@ using namespace ::testing;
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmProcessor.hpp"
 #include "nsmReconfigPermissions.hpp"
-#include "nsmSetReconfigSettings.hpp"
 
 using namespace nsm;
 
@@ -1534,7 +1533,7 @@ struct NsmProcessorTest :
         {"InventoryObjPath", objPath},
     };
     const PropertyValuesCollection prcKnobs = {
-        {"Type", "NSM_InbandReconfigPermissions"},
+        {"Type", "NSM_ReconfigPermissions"},
         {"Priority", false},
         {"Features", // features are not propertly sorted and some are
                      // duplicated
@@ -1609,15 +1608,15 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     values.push(objPath, get(prcKnobs, "Priority"));
     values.push(objPath, get(prcKnobs, "Features"));
 
-    createNsmProcessorSensor(
-        mockManager, basicIntfName + ".InbandReconfigPermissions", objPath);
+    createNsmProcessorSensor(mockManager,
+                             basicIntfName + ".ReconfigPermissions", objPath);
 
-    const size_t expectedSensorsCount = 22 * 2;
+    const size_t expectedSensorsCount = 22;
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(22, gpu.roundRobinSensors.size());
     EXPECT_EQ(expectedSensorsCount, gpu.deviceSensors.size());
 
-    nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0};
+    nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0, 0, 1, 1};
     Response response(sizeof(nsm_msg_hdr) +
                           sizeof(nsm_get_reconfiguration_permissions_v1_resp),
                       0);
@@ -1626,17 +1625,13 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, &data, msg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(expectedSensorsCount / 2)
+        .Times(expectedSensorsCount)
         .WillRepeatedly(mockSendRecvNsmMsg(response));
 
-    for (size_t i = 0; i < expectedSensorsCount / 2; i++)
+    for (size_t i = 0; i < expectedSensorsCount; i++)
     {
-        auto baseReconfigPermissionsIntf =
-            dynamic_pointer_cast<NsmInterfaceProvider<ReconfigSettingsIntf>>(
-                gpu.deviceSensors[2 * i]);
-        EXPECT_NE(nullptr, baseReconfigPermissionsIntf);
-        auto reconfigPermissions = dynamic_pointer_cast<NsmReconfigPermissions>(
-            gpu.deviceSensors[2 * i + 1]);
+        auto reconfigPermissions =
+            dynamic_pointer_cast<NsmReconfigPermissions>(gpu.deviceSensors[i]);
         EXPECT_NE(nullptr, reconfigPermissions);
 
         // Test if added permissions are sorted and unique
@@ -1644,14 +1639,15 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
             reconfiguration_permissions_v1_index(i),
             NsmReconfigPermissions::getIndex(reconfigPermissions->feature));
         reconfigPermissions->update(mockManager, eid).detach();
-        EXPECT_EQ(data.oneshot,
-                  reconfigPermissions->pdi().allowOneShotConfig());
-        EXPECT_EQ(data.persistent,
-                  reconfigPermissions->pdi().allowPersistentConfig());
-        EXPECT_EQ(data.flr_persistent,
-                  reconfigPermissions->pdi().allowFLRPersistentConfig());
+        EXPECT_EQ(data.host_oneshot,
+                  reconfigPermissions->hostConfigIntf->allowOneShotConfig());
+        EXPECT_EQ(data.host_persistent,
+                  reconfigPermissions->hostConfigIntf->allowPersistentConfig());
+        EXPECT_EQ(
+            data.host_flr_persistent,
+            reconfigPermissions->hostConfigIntf->allowFLRPersistentConfig());
         EXPECT_EQ(reconfigPermissions->feature,
-                  reconfigPermissions->pdi().type());
+                  reconfigPermissions->hostConfigIntf->type());
     }
 }
 

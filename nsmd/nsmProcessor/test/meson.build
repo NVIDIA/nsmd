@@ -29,7 +29,6 @@ dep_src_files = [
     '../../nsmSetAsync/nsmSetECCMode.cpp',
     '../../nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
     '../../nsmSetAsync/nsmSetErrorInjection.cpp',
-    '../../nsmSetAsync/nsmSetReconfigSettings.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmLongRunning/nsmAsyncLongRunningSensor.cpp',
     '../../../common/utils.cpp',
