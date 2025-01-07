@@ -47,7 +47,7 @@ requester::Coroutine
 }
 
 requester::Coroutine
-    setECCModeOnDevice(const bool isLongRunning, bool eccMode,
+    setECCModeOnDevice([[maybe_unused]] const bool isLongRunning, bool eccMode,
                        [[maybe_unused]] AsyncOperationStatusType* status,
                        std::shared_ptr<NsmDevice> device)
 {
@@ -74,7 +74,7 @@ requester::Coroutine
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen, isLongRunning);
+                                               responseLen);
     if (rc_)
     {
         if (rc_ != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
