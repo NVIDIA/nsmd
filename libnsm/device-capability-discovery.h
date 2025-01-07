@@ -38,6 +38,7 @@ extern "C" {
  */
 enum nsm_device_capability_discovery_event_id {
 	NSM_REDISCOVERY_EVENT = 1,
+	NSM_LONG_RUNNING_EVENT = 2,
 };
 
 typedef enum {

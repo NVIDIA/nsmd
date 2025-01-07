@@ -16,6 +16,7 @@
  */
 
 #include "base.h"
+#include "device-capability-discovery.h"
 
 #include <endian.h>
 #include <string.h>
@@ -563,14 +564,10 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 		     struct nsm_msg *msg)
 {
 	if (msg == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_EVENT;
-	header.instance_id = instance_id & 0x1f;
-	header.nvidia_msg_type = nsm_type;
-
+	struct nsm_header_info header = {NSM_EVENT, instance_id, nsm_type};
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
 	if (rc != NSM_SUCCESS) {
 		return rc;
@@ -593,9 +590,8 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 
 int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
 		     uint8_t event_id, uint8_t event_class,
-		     uint16_t *event_state, uint8_t *data_size, uint8_t *data)
+		     uint16_t *event_state, uint8_t *data_size)
 {
-
 	if (msg == NULL || event_state == NULL || data_size == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
@@ -611,14 +607,32 @@ int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
 	}
 	*event_state = le16toh(event->event_state);
 	*data_size = event->data_size;
+
 	if (msg_len < (sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
 		       event->data_size)) {
 		return NSM_SW_ERROR_LENGTH;
-	} else if (*data_size > 0) {
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_event_with_data(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t event_id, uint8_t event_class,
+			       uint16_t *event_state, uint8_t *data_size,
+			       uint8_t *data)
+{
+	int rc = decode_nsm_event(msg, msg_len, event_id, event_class,
+				  event_state, data_size);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	if (event->data_size > 0) {
 		if (data == NULL) {
 			return NSM_SW_ERROR_NULL;
 		}
-		memcpy(data, event->data, *data_size);
+		memcpy(data, event->data, event->data_size);
 	}
 
 	return NSM_SW_SUCCESS;
