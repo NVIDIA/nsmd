@@ -402,25 +402,25 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
     // By default enable request/response msgs for nsmtool raw commands.
     if (CommandInterface::nsmType == "raw")
     {
-        verbose = true;
+        mctpVerbose = true;
     }
 
-    if (verbose)
+    if (mctpVerbose)
     {
         std::cout << "nsmtool: ";
-        printBuffer(Tx, requestMsg);
+        printBuffer(Tx, requestMsg, MCTP_MSG_TAG_REQ, mctpEid);
     }
 
-    if (mctp_eid != NSM_ENTITY_ID)
+    if (mctpEid != NSM_ENTITY_ID)
     {
 #ifdef MCTP_IN_KERNEL
-        std::vector<uint8_t> reqMsg{MCTP_MSG_TAG_REQ, mctp_eid,
+        std::vector<uint8_t> reqMsg{MCTP_MSG_TAG_REQ, mctpEid,
                                     MCTP_MSG_TYPE_PCI_VDM};
         reqMsg.insert(reqMsg.end(), requestMsg.begin(), requestMsg.end());
 
         inKernelMctpSockSendRecv(reqMsg, responseMsg, mctpVerbose);
 #else
-        auto [type, protocol, sockAddress] = getMctpSockInfo(mctp_eid);
+        auto [type, protocol, sockAddress] = getMctpSockInfo(mctpEid);
         if (sockAddress.empty())
         {
             std::cerr << "nsmtool: Remote MCTP endpoint not found"
@@ -472,7 +472,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
 
         uint8_t* responseMessage = nullptr;
         size_t responseMessageSize{};
-        rc = nsm_send_recv(mctp_eid, sockFd, requestMsg.data(),
+        rc = nsm_send_recv(mctpEid, sockFd, requestMsg.data(),
                            requestMsg.size(), &responseMessage,
                            &responseMessageSize);
         if (rc < 0)
@@ -488,13 +488,13 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         if (verbose)
         {
             std::cout << "nsmtool: ";
-            printBuffer(Rx, responseMsg);
+            printBuffer(Rx, responseMsg, MCTP_TAG_NSM, mctpEid);
         }
     }
     else
     {
         requestMsg.insert(requestMsg.begin(), MCTP_MSG_TAG_REQ);
-        requestMsg.insert(requestMsg.begin(), mctp_eid);
+        requestMsg.insert(requestMsg.begin(), mctpEid);
         requestMsg.insert(requestMsg.begin(), MCTP_MSG_TYPE_PCI_VDM);
 
 #ifdef MCTP_IN_KERNEL
@@ -508,7 +508,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
         if (verbose)
         {
             std::cout << "nsmtool: ";
-            printBuffer(Rx, responseMsg);
+            printBuffer(Rx, responseMsg, MCTP_TAG_NSM, mctpEid);
         }
     }
     return NSM_SW_SUCCESS;

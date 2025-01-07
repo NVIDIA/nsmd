@@ -210,7 +210,6 @@ std::optional<std::vector<uint8_t>>
                    "EID", eid, "RC", rc);
         return std::nullopt;
     }
-    // utils::printBuffer(utils::Tx, request);
     return request;
 }
 
