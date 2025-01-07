@@ -96,7 +96,7 @@ requester::Coroutine NsmNumericAggregator::update(SensorManager& manager,
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen, isLongRunning);
+                                              responseLen);
     if (rc)
     {
         // we are relying on samples in NsmSensorAggregator to

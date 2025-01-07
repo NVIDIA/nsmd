@@ -49,7 +49,7 @@ requester::Coroutine
 }
 
 requester::Coroutine
-    setEgmModeOnDevice(const bool isLongRunning, bool egmMode,
+    setEgmModeOnDevice([[maybe_unused]] const bool isLongRunning, bool egmMode,
                        [[maybe_unused]] AsyncOperationStatusType* status,
                        std::shared_ptr<NsmDevice> device)
 {
@@ -76,7 +76,7 @@ requester::Coroutine
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen, isLongRunning);
+                                               responseLen);
     if (rc_)
     {
         lg2::error(

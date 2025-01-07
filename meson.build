@@ -71,10 +71,6 @@ conf_data.set(
     get_option('instance-id-expiration-interval'),
 )
 conf_data.set(
-    'INSTANCE_ID_EXPIRATION_INTERVAL_LONG_RUNNING',
-    get_option('instance-id-expiration-interval-long-running'),
-)
-conf_data.set(
     'NUMBER_OF_REQUEST_RETRIES',
     get_option('number-of-request-retries'),
 )
