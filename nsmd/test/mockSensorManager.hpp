@@ -35,7 +35,7 @@ struct MockSensorManager : public SensorManager
     MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
                 (eid_t eid, Request& request,
                  std::shared_ptr<const nsm_msg>& responseMsg,
-                 size_t& responseLen, bool isLongRunning),
+                 size_t& responseLen),
                 (override));
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));
@@ -81,11 +81,9 @@ class SensorManagerTest
                             nsm_completion_codes code = NSM_SUCCESS)
     {
         lastResponse = response;
-        return
-            [response, code](
-                eid_t, Request&, std::shared_ptr<const nsm_msg>& responseMsg,
-                size_t& responseLen,
-                [[maybe_unused]] bool isLongRunning) -> requester::Coroutine {
+        return [response, code](eid_t, Request&,
+                                std::shared_ptr<const nsm_msg>& responseMsg,
+                                size_t& responseLen) -> requester::Coroutine {
             allocMessage(response, responseMsg, responseLen);
             // coverity[missing_return]
             co_return code;

@@ -96,20 +96,13 @@ class Handler
         mctp_socket::Manager& sockManager, bool verbose,
         std::chrono::seconds instanceIdExpiryInterval =
             std::chrono::seconds(INSTANCE_ID_EXPIRATION_INTERVAL),
-        std::chrono::seconds instanceIdExpiryIntervalLongRunning =
-            std::chrono::seconds(INSTANCE_ID_EXPIRATION_INTERVAL_LONG_RUNNING),
         uint8_t numRetries = static_cast<uint8_t>(NUMBER_OF_REQUEST_RETRIES),
         std::chrono::milliseconds responseTimeOut =
-            std::chrono::milliseconds(RESPONSE_TIME_OUT),
-        std::chrono::milliseconds responseTimeOutLongRunning =
-            std::chrono::milliseconds(RESPONSE_TIME_OUT_LONG_RUNNING)) :
+            std::chrono::milliseconds(RESPONSE_TIME_OUT)) :
         event(event),
         instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
-        instanceIdExpiryIntervalRegular(instanceIdExpiryInterval),
-        instanceIdExpiryIntervalLongRunning(
-            instanceIdExpiryIntervalLongRunning),
-        numRetries(numRetries), responseTimeOutRegular(responseTimeOut),
-        responseTimeOutLongRunning(responseTimeOutLongRunning),
+        instanceIdExpiryInterval(instanceIdExpiryInterval),
+        numRetries(numRetries), responseTimeOut(responseTimeOut),
         socketHandler(nullptr)
     {}
 
@@ -203,6 +196,7 @@ class Handler
 
     /** @brief Register a NSM request message
      *
+     *  @param[in] tag - MCTP message tag of the request
      *  @param[in] eid - endpoint ID of the remote MCTP endpoint
      *  @param[in] type - NSM message type
      *  @param[in] command - NSM command
@@ -211,35 +205,14 @@ class Handler
      *
      *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
      */
-    int registerRequestRegular(eid_t eid, uint8_t type, uint8_t command,
-                               std::vector<uint8_t>&& requestMsg,
-                               ResponseHandler&& responseHandler)
+    int registerRequest(uint8_t tag, eid_t eid, uint8_t type, uint8_t command,
+                        std::vector<uint8_t>&& requestMsg,
+                        ResponseHandler&& responseHandler)
     {
         return registerRequestImpl(
-            MCTP_MSG_TAG_REQ, eid, type, command, std::move(requestMsg),
-            std::move(responseHandler), handlersRegular, timerToFreeRegular,
-            responseTimeOutRegular, instanceIdExpiryIntervalRegular);
-    }
-
-    /** @brief Register a NSM Long-running request message
-     *
-     *  @param[in] eid - endpoint ID of the remote MCTP endpoint
-     *  @param[in] type - NSM message type
-     *  @param[in] command - NSM command
-     *  @param[in] requestMsg - NSM request message
-     *  @param[in] responseHandler - Response handler for this request
-     *
-     *  @return return NSM_SUCCESS on success and NSM_ERROR otherwise
-     */
-    int registerRequestLongRunning(eid_t eid, uint8_t type, uint8_t command,
-                                   std::vector<uint8_t>&& requestMsg,
-                                   ResponseHandler&& responseHandler)
-    {
-        return registerRequestImpl(
-            MCTP_MSG_TAG_LONG_RUNNING_REQ, eid, type, command,
-            std::move(requestMsg), std::move(responseHandler),
-            handlersLongRunning, timerToFreeLongRunning,
-            responseTimeOutLongRunning, instanceIdExpiryIntervalLongRunning);
+            tag, eid, type, command, std::move(requestMsg),
+            std::move(responseHandler), handlers, timerToFree, responseTimeOut,
+            instanceIdExpiryInterval);
     }
 
     int runRegisteredRequest(eid_t eid,
@@ -313,24 +286,15 @@ class Handler
                         const nsm_msg* response, size_t respMsgLen)
     {
         // Check if response is for Regular request
-        auto requestFound = handleResponseImpl(
-            eid, instanceId, type, command, response, respMsgLen,
-            handlersRegular, instanceIdExpiryIntervalRegular);
+        auto requestFound = handleResponseImpl(eid, instanceId, type, command,
+                                               response, respMsgLen, handlers,
+                                               instanceIdExpiryInterval);
 
         if (!requestFound)
         {
-            // Check if response is for Long-running request
-            auto requestFoundLongRunning = handleResponseImpl(
-                eid, instanceId, type, command, response, respMsgLen,
-                handlersLongRunning, instanceIdExpiryIntervalLongRunning);
-
-            if (!requestFoundLongRunning)
-            {
-                lg2::error("Received response doesn't match any request. "
-                           "Tag={TAG}, EID={EID}, Type={TYPE}, Command={CMD}.",
-                           "TAG", tag, "EID", eid, "TYPE", type, "CMD",
-                           command);
-            }
+            lg2::error("Received response doesn't match any request. "
+                       "Tag={TAG}, EID={EID}, Type={TYPE}, Command={CMD}.",
+                       "TAG", tag, "EID", eid, "TYPE", type, "CMD", command);
         }
     }
 
@@ -394,25 +358,15 @@ class Handler
     nsm::InstanceIdDb& instanceIdDb; //!< reference to instanceIdDb object
     mctp_socket::Manager& sockManager;
 
-    bool verbose;                        //!< verbose tracing flag
+    bool verbose;                 //!< verbose tracing flag
     std::chrono::seconds
-        instanceIdExpiryIntervalRegular; //!< Instance ID expiration interval
-    std::chrono::seconds
-        instanceIdExpiryIntervalLongRunning; //!< Instance ID expiration
-                                             //!< interval for Long Running
-                                             //!< commands
-    uint8_t numRetries;                      //!< number of request retries
+        instanceIdExpiryInterval; //!< Instance ID expiration interval
+    uint8_t numRetries;           //!< number of request retries
     std::chrono::milliseconds
-        responseTimeOutRegular;     //!< time to wait between each retry
-    std::chrono::milliseconds
-        responseTimeOutLongRunning; //!< time to wait between each retry for
-                                    //!< Long Running commands
+        responseTimeOut;          //!< time to wait between each retry
 
     /** @brief Container for storing the NSM request entries */
-    std::unordered_map<eid_t, RequestQueue> handlersRegular;
-
-    /** @brief Container for storing the NSM Long Running request entries */
-    std::unordered_map<eid_t, RequestQueue> handlersLongRunning;
+    std::unordered_map<eid_t, RequestQueue> handlers;
 
     /** @brief Container to store information about the request entries to be
      *         removed after the instance ID timer expires
@@ -420,10 +374,7 @@ class Handler
     std::unordered_map<eid_t, std::unique_ptr<sdeventplus::source::Defer>>
         removeRequestContainer;
 
-    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>
-        timerToFreeRegular;
-    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>>
-        timerToFreeLongRunning;
+    std::unordered_map<eid_t, std::unique_ptr<sdbusplus::Timer>> timerToFree;
 
     const mctp_socket::Handler* socketHandler; // MCTP socket handler
 
@@ -463,10 +414,6 @@ struct SendRecvNsmMsg
     /** @brief The RequesterHandler to send/recv NSM message.
      */
     RequesterHandler& handler;
-
-    /** @brief Whether it is long-running NSM Request.
-     */
-    bool isLongRunning;
 
     /** @brief The EID where NSM message will be sent to.
      */
@@ -509,22 +456,10 @@ struct SendRecvNsmMsg
 
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
-        if (isLongRunning)
-        {
-            rc = handler.registerRequestLongRunning(
-                eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
-                std::move(request),
-                std::move(
-                    std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
-        }
-        else
-        {
-            rc = handler.registerRequestRegular(
-                eid, requestMsg->hdr.nvidia_msg_type, requestMsg->payload[0],
-                std::move(request),
-                std::move(
-                    std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
-        }
+        rc = handler.registerRequest(
+            MCTP_MSG_TAG_REQ, eid, requestMsg->hdr.nvidia_msg_type,
+            requestMsg->payload[0], std::move(request),
+            std::move(std::bind_front(&SendRecvNsmMsg::HandleResponse, this)));
 
         if (rc)
         {
@@ -550,10 +485,10 @@ struct SendRecvNsmMsg
      */
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
-                   size_t* responseLen, bool isLongRunning) :
+                   size_t* responseLen) :
         handler(handler),
-        isLongRunning(isLongRunning), eid(eid), request(request),
-        responseMsg(responseMsg), responseLen(responseLen), rc(NSM_ERROR)
+        eid(eid), request(request), responseMsg(responseMsg),
+        responseLen(responseLen), rc(NSM_ERROR)
     {}
 
     /** @brief The function will be registered by ReqisterHandler for handling

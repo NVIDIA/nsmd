@@ -51,7 +51,7 @@ NsmRawCommandHandler& NsmRawCommandHandler::getInstance()
 }
 
 requester::Coroutine NsmRawCommandHandler::doSendRequest(
-    uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
+    uint8_t deviceType, uint8_t instanceId, [[maybe_unused]] bool isLongRunning,
     uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
     std::shared_ptr<AsyncStatusIntf> statusInterface,
     std::shared_ptr<AsyncValueIntf> valueInterface)
@@ -79,7 +79,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
         rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen, isLongRunning);
+                                             responseLen);
 
         uint8_t cc;
         uint16_t reasonCode;
