@@ -27,7 +27,7 @@ extern "C" {
 // Min size is when no counter is sent in response
 #define PORT_COUNTER_TELEMETRY_MIN_DATA_SIZE 4
 // Max size is when all 27 counters are supported
-#define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 220
+#define PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE 260
 #define FABRIC_MANAGER_STATE_DATA_SIZE 18
 #define PORT_MASK_DATA_SIZE 32
 // defined in MBps
@@ -169,6 +169,11 @@ struct nsm_port_counter_data {
 	uint64_t xmit_wait;
 	uint64_t effective_ber;
 	uint64_t estimated_effective_ber;
+	uint64_t unused_counter_placeholder0;
+	uint64_t unused_counter_placeholder1;
+	uint64_t unused_counter_placeholder2;
+	uint64_t unused_counter_placeholder3;
+	uint64_t unused_counter_placeholder4;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {
