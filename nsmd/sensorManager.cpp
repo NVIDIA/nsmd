@@ -769,7 +769,7 @@ requester::Coroutine
 
 requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen, bool isLongRunning)
+    size_t& responseLen)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -805,7 +805,7 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
 
     const nsm_msg* response = nullptr;
     auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, &response, &responseLen, isLongRunning);
+        handler, eid, request, &response, &responseLen);
     responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
     }); // the memory is allocated and free at sock_handler.cpp
     // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for

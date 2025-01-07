@@ -140,7 +140,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
-                                         responseLen, false);
+                                         responseLen);
     if (rc)
     {
         // coverity[missing_return]
@@ -242,7 +242,7 @@ requester::Coroutine
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
-                                         responseLen, false);
+                                         responseLen);
     if (rc)
     {
         // coverity[missing_return]

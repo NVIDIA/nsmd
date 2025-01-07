@@ -95,8 +95,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
 
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,
-                                        size_t* responseLen,
-                                        bool isLongRunning = false);
+                                        size_t* responseLen);
 
     const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
         getEidTable() const
