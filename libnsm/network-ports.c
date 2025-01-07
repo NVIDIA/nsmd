@@ -381,7 +381,7 @@ int decode_get_port_telemetry_counter_resp(const struct nsm_msg *msg,
 	}
 
 	if (*data_size > sizeof(*data)) {
-		*data_size = sizeof(*data);
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	memcpy(data, &(resp->data), *data_size);
