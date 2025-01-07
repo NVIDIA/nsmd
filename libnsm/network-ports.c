@@ -380,6 +380,10 @@ int decode_get_port_telemetry_counter_resp(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_DATA;
 	}
 
+	if (*data_size > sizeof(*data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	memcpy(data, &(resp->data), *data_size);
 
 	// conversion le64toh for each counter data
