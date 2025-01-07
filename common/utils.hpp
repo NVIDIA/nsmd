@@ -364,24 +364,30 @@ IDBusHandler& DBusHandler();
 
 /** @brief Print the buffer
  *
- *  @param[in]  isTx - True if the buffer is an outgoing NSM message, false if
-                       the buffer is an incoming NSM message
- *  @param[in]  buffer - Buffer to print
+ *  @param[in] isTx - True if the buffer is an outgoing NSM message, false if
+                      the buffer is an incoming NSM message
+ *  @param[in] buffer - Buffer to print
+ *  @param[in] tag - Tag to identify the message
+ *  @param[in] eid - EID of the message
  *
  *  @return - None
  */
-void printBuffer(bool isTx, const std::vector<uint8_t>& buffer);
+void printBuffer(bool isTx, const std::vector<uint8_t>& buffer, uint8_t tag,
+                 eid_t eid);
 
 /** @brief Print the buffer
  *
- *  @param[in]  isTx - True if the buffer is an outgoing NSM message, false if
-                       the buffer is an incoming NSM message
+ *  @param[in] isTx - True if the buffer is an outgoing NSM message, false if
+                      the buffer is an incoming NSM message
  *  @param[in] buffer - NSM message buffer to log
  *  @param[in] bufferLen - NSM message buffer length
+ *  @param[in] tag - Tag to identify the message
+ *  @param[in] eid - EID of the message
  *
  *  @return - None
  */
-void printBuffer(bool isTx, const nsm_msg* buffer, size_t bufferLen);
+void printBuffer(bool isTx, const uint8_t* buffer, size_t bufferLen,
+                 uint8_t tag, eid_t eid);
 
 /** @brief Split strings according to special identifiers
  *

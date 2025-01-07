@@ -253,13 +253,14 @@ int MockupResponder::initSocket()
         if (requestMsg[2] != MCTP_MSG_TYPE_VDM)
         {
             lg2::error("Received non VDM message type={TYPE}", "TYPE",
-                       requestMsg[1]);
+                       requestMsg[2]);
             return;
         }
 
         if (verbose)
         {
-            utils::printBuffer(utils::Rx, requestMsg);
+            utils::printBuffer(utils::Rx, &requestMsg[3], requestMsg.size() - 3,
+                               requestMsg[0], requestMsg[1]);
         }
 
         // Outgoing message.
@@ -287,7 +288,8 @@ int MockupResponder::initSocket()
 
             if (verbose)
             {
-                utils::printBuffer(utils::Tx, *response);
+                utils::printBuffer(utils::Tx, *response, requestMsg[0],
+                                   requestMsg[1]);
             }
 
             int result = sendmsg(fd, &msg, 0);
@@ -2906,7 +2908,7 @@ void Logger(bool verbose, const char* msg, const T& data)
     }
 }
 
-int MockupResponder::mctpSockSend(uint8_t dest_eid,
+int MockupResponder::mctpSockSend(uint8_t destEid,
                                   std::vector<uint8_t>& requestMsg)
 {
     if (sockFd < 0)
@@ -2920,7 +2922,7 @@ int MockupResponder::mctpSockSend(uint8_t dest_eid,
 
     uint8_t prefix[3];
     prefix[0] = MCTP_MSG_TAG_REQ;
-    prefix[1] = dest_eid;
+    prefix[1] = destEid;
     prefix[2] = MCTP_MSG_TYPE_VDM;
 
     iov[0].iov_base = &prefix[0];
@@ -2933,7 +2935,7 @@ int MockupResponder::mctpSockSend(uint8_t dest_eid,
 
     if (verbose)
     {
-        utils::printBuffer(utils::Tx, requestMsg);
+        utils::printBuffer(utils::Tx, requestMsg, prefix[0], prefix[1]);
     }
 
     auto rc = sendmsg(sockFd, &msg, 0);

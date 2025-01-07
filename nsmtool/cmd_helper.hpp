@@ -124,10 +124,9 @@ class CommandInterface
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :
         nsmType(type),
-        commandName(name), mctp_eid(NSM_ENTITY_ID), verbose(false),
-        instanceId(0)
+        commandName(name), mctpEid(NSM_ENTITY_ID), verbose(false), instanceId(0)
     {
-        app->add_option("-m,--mctp_eid", mctp_eid, "MCTP endpoint ID");
+        app->add_option("-m,--mctp_eid", mctpEid, "MCTP endpoint ID");
         app->add_flag("-v, --verbose", verbose);
         app->callback([&]() { exec(); });
     }
@@ -151,7 +150,7 @@ class CommandInterface
      */
     inline uint8_t getMCTPEID()
     {
-        return mctp_eid;
+        return mctpEid;
     }
 
   private:
@@ -169,7 +168,7 @@ class CommandInterface
         getMctpSockInfo(uint8_t remoteEID);
     const std::string nsmType;
     const std::string commandName;
-    uint8_t mctp_eid;
+    uint8_t mctpEid;
     bool verbose;
 
   protected:

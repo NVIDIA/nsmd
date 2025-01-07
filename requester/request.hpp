@@ -215,11 +215,6 @@ class Request final : public RequestRetryTimer
      */
     int send() const
     {
-        if (verbose)
-        {
-            utils::printBuffer(utils::Tx, requestMsg);
-        }
-
         auto rc = socketHandler->sendMsg(tag, eid, fd, requestMsg.data(),
                                          requestMsg.size());
         if (rc < 0)

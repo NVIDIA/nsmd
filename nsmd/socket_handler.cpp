@@ -184,6 +184,11 @@ int DaemonHandler::sendMsg(uint8_t tag, eid_t eid, int mctpFd,
     msg.msg_iov = iov;
     msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
 
+    if (verbose)
+    {
+        utils::printBuffer(utils::Tx, nsmMsg, nsmMsgLen, tag, eid);
+    }
+
     ssize_t rc = sendmsg(mctpFd, &msg, 0);
     if (rc == -1)
     {
@@ -233,7 +238,9 @@ void DaemonHandler::handleReceivedMsg(IO& io, int fd, uint32_t revents)
         {
             if (verbose)
             {
-                utils::printBuffer(utils::Rx, requestMsg);
+                utils::printBuffer(utils::Rx, &requestMsg[3],
+                                   requestMsg.size() - 3, requestMsg[0],
+                                   requestMsg[1]);
             }
 
             if (MCTP_MSG_TYPE_VDM != requestMsg[2])
@@ -248,11 +255,6 @@ void DaemonHandler::handleReceivedMsg(IO& io, int fd, uint32_t revents)
                                              requestMsg.size() - 3);
                 if (response.has_value())
                 {
-                    if (verbose)
-                    {
-                        utils::printBuffer(utils::Tx, *response);
-                    }
-
                     constexpr uint8_t tagOwnerBitPos = 3;
                     constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
                     // Set tag owner bit to 0 for NSM responses
@@ -263,6 +265,12 @@ void DaemonHandler::handleReceivedMsg(IO& io, int fd, uint32_t revents)
                                      sizeof(requestMsg[2]);
                     iov[1].iov_base = (*response).data();
                     iov[1].iov_len = (*response).size();
+
+                    if (verbose)
+                    {
+                        utils::printBuffer(utils::Tx, *response, requestMsg[0],
+                                           requestMsg[1]);
+                    }
 
                     msg.msg_iov = iov;
                     msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
@@ -364,6 +372,11 @@ int InKernelHandler::sendMsg([[maybe_unused]] uint8_t tag, eid_t eid,
     addr.smctp_tag = MCTP_TAG_OWNER;
     addr.smctp_type = MCTP_MSG_TYPE_PCI_VDM;
 
+    if (verbose)
+    {
+        utils::printBuffer(utils::Tx, nsmMsg, nsmMsgLen, addr.smctp_tag, eid);
+    }
+
     ssize_t rc = sendto(mctpFd, nsmMsg, nsmMsgLen, 0,
                         reinterpret_cast<struct sockaddr*>(&addr),
                         sizeof(addr));
@@ -417,7 +430,8 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
         {
             if (verbose)
             {
-                utils::printBuffer(utils::Rx, requestMsg);
+                utils::printBuffer(utils::Rx, requestMsg, addr.smctp_tag,
+                                   addr.smctp_addr.s_addr);
             }
 
             if (MCTP_MSG_TYPE_VDM != addr.smctp_type)
@@ -434,7 +448,8 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
                 {
                     if (verbose)
                     {
-                        utils::printBuffer(utils::Tx, *response);
+                        utils::printBuffer(utils::Tx, *response, addr.smctp_tag,
+                                           addr.smctp_addr.s_addr);
                     }
 
                     struct sockaddr_mctp destAddr;
