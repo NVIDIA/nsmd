@@ -451,14 +451,11 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
     auto rc = decode_get_workload_power_profile_info_metadata_resp(
         responseMsg, responseLen, &cc, &reason_code, &data, &numberOfprofiles);
     nextIdentifier = data.next_identifier;
-    lg2::debug("number of profiles = {PID}", "PID", numberOfprofiles);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         uint16_t firstProfileIndex = pageId * numberOfprofiles;
         uint16_t lastProfileIndex = (pageId + 1) * numberOfprofiles;
-        lg2::debug("firstProfileIndex = {PID}", "PID", firstProfileIndex);
-        lg2::debug("lastProfileIndex = {PID}", "PID", lastProfileIndex);
         uint8_t offset = 0;
         for (int itertor = firstProfileIndex; itertor < lastProfileIndex;
              itertor++)
@@ -468,7 +465,6 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
                 responseMsg, responseLen, &cc, &reason_code, numberOfprofiles,
                 offset, &profileData);
             uint16_t profileId = profileData.profile_id;
-            lg2::debug("profileId = {PID}", "PID", profileId);
             if (!profileCollection->hasProfileId(profileId))
             {
                 auto profileName = profileMapper->toString(profileId);
