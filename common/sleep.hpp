@@ -135,14 +135,13 @@ struct Sleep
      *
      * @param event Reference to the event loop to which the timer will be
      * added.
-     * @param durationInMsec Duration of the sleep in milliseconds.
+     * @param durationInMsec Duration of the sleep in microseconds.
      */
     Sleep(const sdeventplus::Event& event, uint64_t durationInUsec,
           TimerEventPriority priority) :
         event(event),
-        durationInUsec(durationInUsec), // Convert mSec to uSec
-        timerEventPriority(priority),
-        rc(NSM_SW_SUCCESS)              // Initialize the result code to success
+        durationInUsec(durationInUsec), timerEventPriority(priority),
+        rc(NSM_SW_SUCCESS) // Initialize the result code to success
     {}
 };
 } // namespace common

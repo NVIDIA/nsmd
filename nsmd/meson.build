@@ -55,6 +55,7 @@ subdir('nsmFirmwareUtils')
 subdir('nsmRawCommand')
 subdir('nsmManagers')
 subdir('nsmReady')
+subdir('nsmLongRunning')
 
 executable(
     'nsmd',

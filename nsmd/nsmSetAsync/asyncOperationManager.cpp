@@ -215,17 +215,29 @@ requester::Coroutine AsyncSetOperationDispatcher::setImpl(
 
     resultIntf->status(AsyncOperationStatusType::InProgress, false);
 
-    co_await operation.handler(value, &status, operation.device);
-
-    if (operation.sensor)
+    try
     {
-        if (operation.device->isDeviceActive)
+        co_await operation.handler(value, &status, operation.device);
+
+        if (operation.sensor)
         {
-            const eid_t eid =
-                SensorManager::getInstance().getEid(operation.device);
-            co_await operation.sensor->update(SensorManager::getInstance(),
-                                              eid);
+            if (operation.device->isDeviceActive)
+            {
+                const eid_t eid =
+                    SensorManager::getInstance().getEid(operation.device);
+                co_await operation.sensor->update(SensorManager::getInstance(),
+                                                  eid);
+            }
         }
+    }
+    catch (
+        const sdbusplus::error::xyz::openbmc_project::common::InvalidArgument&)
+    {
+        status = AsyncOperationStatusType::InvalidArgument;
+    }
+    catch (...)
+    {
+        status = AsyncOperationStatusType::InternalFailure;
     }
 
     resultIntf->status(status);

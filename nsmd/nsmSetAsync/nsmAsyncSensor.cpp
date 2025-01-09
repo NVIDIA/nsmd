@@ -14,20 +14,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "nsmSensor.hpp"
+
+#include "nsmAsyncSensor.hpp"
 
 #include "sensorManager.hpp"
 
 namespace nsm
 {
-requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmAsyncSensor::set(const AsyncSetOperationValueType& value,
+                        AsyncOperationStatusType* status,
+                        std::shared_ptr<NsmDevice> device)
+{
+    if (status == nullptr)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    this->value = &value;
+    this->status = status;
+    SensorManager& manager = SensorManager::getInstance();
+    auto eid = manager.getEid(device);
+    auto rc = co_await update(manager, eid);
+
+    // coverity[missing_return]
+    co_return rc;
+}
+
+requester::Coroutine NsmAsyncSensor::update(SensorManager& manager, eid_t eid)
 {
     auto requestMsg = genRequestMsg(eid, 0);
     if (!requestMsg.has_value())
     {
         lg2::error(
-            "NsmSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
+            "NsmAsyncSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
             "NAME", getName(), "EID", eid);
+        *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
@@ -38,11 +60,24 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
                                               responseLen);
     if (rc)
     {
+        lg2::error(
+            "NsmAsyncSensor::update: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", eid);
+        *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;
     }
 
     rc = handleResponseMsg(responseMsg.get(), responseLen);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmAsyncSensor::update: handleResponseMsg failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", eid);
+        *status = AsyncOperationStatusType::WriteFailure;
+    }
+
     // coverity[missing_return]
     co_return rc;
 }
