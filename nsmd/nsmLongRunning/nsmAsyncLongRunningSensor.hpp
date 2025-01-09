@@ -17,21 +17,27 @@
 
 #pragma once
 
-#include "nsmAsyncLongRunningSensor.hpp"
+#include "nsmAsyncSensor.hpp"
+#include "nsmLongRunningEvent.hpp"
 
 namespace nsm
 {
-class NsmSetMigMode : public NsmAsyncLongRunningSensor
+
+class NsmAsyncLongRunningSensor :
+    public NsmAsyncSensor,
+    public NsmLongRunningEvent
 {
   public:
-    NsmSetMigMode(bool isLongRunning);
+    explicit NsmAsyncLongRunningSensor(const std::string& name,
+                                       const std::string& type,
+                                       bool isLongRunning);
 
   private:
-    std::optional<Request> genRequestMsg(eid_t eid,
-                                         uint8_t instanceId) override;
-
-    uint8_t handleResponseMsg(const nsm_msg* responseMsg,
-                              size_t responseLen) override;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine updateLongRunningSensor(SensorManager& manager,
+                                                 eid_t eid);
+    int handle(eid_t eid, NsmType type, NsmEventId eventId,
+               const nsm_msg* event, size_t eventLen) override;
 };
 
 } // namespace nsm

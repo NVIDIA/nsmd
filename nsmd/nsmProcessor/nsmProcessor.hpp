@@ -27,6 +27,7 @@
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmInterface.hpp"
 #include "nsmInventoryProperty.hpp"
+#include "nsmLongRunningSensor.hpp"
 #include "nsmPowerCapIface.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
@@ -209,13 +210,13 @@ class NsmLocationCodeIntfProcessor : public NsmObject
 using MigModeIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::server::MigMode>;
 
-class NsmMigMode : public NsmSensor
+class NsmMigMode : public NsmLongRunningSensor
 {
   public:
     NsmMigMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
                std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
                bool isLongRunning);
-    NsmMigMode() = default;
+    NsmMigMode() = delete;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -231,7 +232,7 @@ class NsmMigMode : public NsmSensor
 
 using EccModeIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Memory::server::MemoryECC>;
-class NsmEccMode : public NsmSensor
+class NsmEccMode : public NsmLongRunningSensor
 {
   public:
     NsmEccMode(std::string& name, std::string& type,
@@ -500,7 +501,7 @@ class NsmDefaultBoostClockSpeed : public NsmObject
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
 };
 
-class NsmCurrentUtilization : public NsmSensor
+class NsmCurrentUtilization : public NsmLongRunningSensor
 {
   public:
     NsmCurrentUtilization(const std::string& name, const std::string& type,
@@ -763,7 +764,7 @@ class NsmGpuHealth : public NsmObject
     std::shared_ptr<GpuHealthIntf> healthIntf;
 };
 
-class NsmProcessorThrottleDuration : public NsmSensor
+class NsmProcessorThrottleDuration : public NsmLongRunningSensor
 {
   public:
     NsmProcessorThrottleDuration(
@@ -823,8 +824,7 @@ class NsmEgmMode : public NsmSensor
 {
   public:
     NsmEgmMode(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
-               std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device,
-               bool isLongRunning);
+               std::string& inventoryObjPath);
     NsmEgmMode() = default;
 
     std::optional<std::vector<uint8_t>>

@@ -5,6 +5,7 @@ sources += [
     'nsmEvent/nsmResetRequiredEvent.cpp',
     'nsmEvent/nsmFabricManagerStateEvent.cpp',
     'nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    'nsmEvent/nsmLongRunningEvent.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmEvent']
