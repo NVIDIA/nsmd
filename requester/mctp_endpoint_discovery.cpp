@@ -280,11 +280,22 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
         std::string mediumType{};
         std::string uuid{};
         std::string bindingType{};
+        std::vector<uint8_t> mctpTypes{};
 
         if (allProperties.contains("EID"))
         {
             eid = std::get<uint8_t>(allProperties.at("EID"));
         }
+        if constexpr (FILTER_NULL_MCTP_EID)
+        {
+            // MCTP EID 0 is a special Null EID as per MCTP DMTF
+            // specification doc
+            if (eid == 0)
+            {
+                return;
+            }
+        }
+
         if (allProperties.contains("NetworkId"))
         {
             networkId = std::get<uint32_t>(allProperties.at("NetworkId"));
@@ -302,8 +313,11 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
             bindingType =
                 std::get<std::string>(allProperties.at("BindingType"));
         }
-        lg2::error("refreshEndpoints: EID={EID}, UUID={UUID}", "EID", eid,
-                   "UUID", uuid);
+        if (allProperties.contains("SupportedMessageTypes"))
+        {
+            mctpTypes = std::get<std::vector<uint8_t>>(
+                allProperties.at("SupportedMessageTypes"));
+        }
 
         MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
                                             bindingType);
@@ -311,7 +325,11 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
         {
             if (connectivity == "Available")
             {
-                handler->onlineMctpEndpoint(mctpInfo);
+                if (std::find(mctpTypes.begin(), mctpTypes.end(),
+                              mctpTypeVDM) != mctpTypes.end())
+                {
+                    handler->onlineMctpEndpoint(mctpInfo);
+                }
             }
             else
             {
