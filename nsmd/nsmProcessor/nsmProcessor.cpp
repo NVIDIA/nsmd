@@ -1655,19 +1655,17 @@ uint8_t
                                              size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
-    uint32_t gpu_utilization;
-    uint32_t memory_utilization;
+    nsm_get_current_utilization_data data;
     uint16_t data_size;
     uint16_t reason_code = ERR_NULL;
 
     auto rc = decode_get_current_utilization_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
-        &gpu_utilization, &memory_utilization);
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        cpuOperatingConfigIntf->utilization(gpu_utilization);
-        smUtilizationIntf->smUtilization(gpu_utilization);
+        cpuOperatingConfigIntf->utilization(data.gpu_utilization);
+        smUtilizationIntf->smUtilization(data.memory_utilization);
         updateMetricOnSharedMemory();
         clearErrorBitMap("decode_get_current_utilization_resp");
     }

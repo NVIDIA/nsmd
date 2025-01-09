@@ -4008,14 +4008,12 @@ class GetCurrentUtilization : public CommandInterface
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
         uint8_t cc = NSM_ERROR;
-        uint32_t gpu_utilization;
-        uint32_t memory_utilization;
+        nsm_get_current_utilization_data data;
         uint16_t data_size;
         uint16_t reason_code = ERR_NULL;
 
         auto rc = decode_get_current_utilization_resp(
-            responsePtr, payloadLength, &cc, &data_size, &reason_code,
-            &gpu_utilization, &memory_utilization);
+            responsePtr, payloadLength, &cc, &data_size, &reason_code, &data);
 
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
@@ -4032,8 +4030,8 @@ class GetCurrentUtilization : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["GPU Utilizatin"] = gpu_utilization;
-        result["Memory Utilizatin"] = memory_utilization;
+        result["GPU Utilizatin"] = uint32_t(data.gpu_utilization);
+        result["Memory Utilizatin"] = uint32_t(data.memory_utilization);
         nsmtool::helper::DisplayInJson(result);
     }
 };

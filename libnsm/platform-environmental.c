@@ -1522,6 +1522,25 @@ int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_MIG_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const bitfield8_t *flags,
+				   struct nsm_msg *msg)
+{
+	return encode_long_running_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_MIG_MODE, (const uint8_t *)flags, sizeof(bitfield8_t), msg);
+}
+
+int decode_get_MIG_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   bitfield8_t *flags)
+{
+	return decode_long_running_resp_with_data(
+	    msg, msg_len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_MIG_MODE, cc,
+	    reason_code, (uint8_t *)flags, sizeof(bitfield8_t));
+}
+
 // Set Mig Mode Command, NSM T3 spec
 int encode_set_MIG_mode_req(uint8_t instance_id, uint8_t requested_mode,
 			    struct nsm_msg *msg)
@@ -1557,6 +1576,12 @@ int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
 	if (msg_len !=
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_set_MIG_mode_req)) {
 		return NSM_SW_ERROR_LENGTH;
@@ -1576,30 +1601,9 @@ int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
 int encode_set_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
 			     uint16_t reason_code, struct nsm_msg *msg)
 {
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
-	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SUCCESS) {
-		return rc;
-	}
-	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(cc, reason_code, NSM_SET_MIG_MODE,
-					  msg);
-	}
-
-	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
-	resp->command = NSM_SET_MIG_MODE;
-	resp->completion_code = cc;
-	resp->data_size = 0;
-
-	return NSM_SW_SUCCESS;
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+				  NSM_SET_MIG_MODE, msg);
 }
 
 int decode_set_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
@@ -1607,6 +1611,22 @@ int decode_set_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint16_t *reason_code)
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
+
+int encode_set_MIG_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg)
+{
+	return encode_long_running_resp(instance_id, cc, reason_code,
+					NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+					NSM_SET_MIG_MODE, NULL, 0, msg);
+}
+
+int decode_set_MIG_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code)
+{
+	return decode_long_running_resp(msg, msg_len,
+					NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+					NSM_SET_MIG_MODE, cc, reason_code);
 }
 
 // Get ECC Mode Command, NSM T3 spec
@@ -1696,6 +1716,25 @@ int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 	return NSM_SW_SUCCESS;
 }
 
+int encode_get_ECC_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const bitfield8_t *flags,
+				   struct nsm_msg *msg)
+{
+	return encode_long_running_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_ECC_MODE, (const uint8_t *)flags, sizeof(bitfield8_t), msg);
+}
+
+int decode_get_ECC_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   bitfield8_t *flags)
+{
+	return decode_long_running_resp_with_data(
+	    msg, msg_len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_ECC_MODE, cc,
+	    reason_code, (uint8_t *)flags, sizeof(bitfield8_t));
+}
+
 // Set ECC Mode Command, NSM T3 spec
 int encode_set_ECC_mode_req(uint8_t instance_id, uint8_t requested_mode,
 			    struct nsm_msg *msg)
@@ -1731,6 +1770,12 @@ int decode_set_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len,
 		return NSM_SW_ERROR_NULL;
 	}
 
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
 	if (msg_len !=
 	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_set_ECC_mode_req)) {
 		return NSM_SW_ERROR_LENGTH;
@@ -1750,30 +1795,9 @@ int decode_set_ECC_mode_req(const struct nsm_msg *msg, size_t msg_len,
 int encode_set_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
 			     uint16_t reason_code, struct nsm_msg *msg)
 {
-	if (msg == NULL) {
-		return NSM_SW_ERROR_NULL;
-	}
-
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & INSTANCEID_MASK;
-	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
-
-	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SUCCESS) {
-		return rc;
-	}
-	if (cc != NSM_SUCCESS) {
-		return encode_reason_code(cc, reason_code, NSM_SET_ECC_MODE,
-					  msg);
-	}
-
-	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
-	resp->command = NSM_SET_ECC_MODE;
-	resp->completion_code = cc;
-	resp->data_size = 0;
-
-	return NSM_SW_SUCCESS;
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+				  NSM_SET_ECC_MODE, msg);
 }
 
 int decode_set_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
@@ -1781,6 +1805,21 @@ int decode_set_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint16_t *reason_code)
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
+
+int encode_set_ECC_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg)
+{
+	return encode_long_running_resp(instance_id, cc, reason_code,
+					NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+					NSM_SET_ECC_MODE, NULL, 0, msg);
+}
+int decode_set_ECC_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code)
+{
+	return decode_long_running_resp(msg, msg_len,
+					NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+					NSM_SET_ECC_MODE, cc, reason_code);
 }
 
 static void htoleEccErrorCounts(struct nsm_ECC_error_counts *errorCounts)
@@ -2838,13 +2877,11 @@ int encode_get_current_utilization_req(uint8_t instance, struct nsm_msg *msg)
 	return NSM_SW_SUCCESS;
 }
 
-int encode_get_current_utilization_resp(uint8_t instance_id, uint8_t cc,
-					uint16_t reason_code,
-					uint32_t gpu_utilization,
-					uint32_t memory_utilization,
-					struct nsm_msg *msg)
+int encode_get_current_utilization_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_get_current_utilization_data *data, struct nsm_msg *msg)
 {
-	if (msg == NULL) {
+	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -2866,24 +2903,20 @@ int encode_get_current_utilization_resp(uint8_t instance_id, uint8_t cc,
 	    (struct nsm_get_current_utilization_resp *)msg->payload;
 	resp->hdr.command = NSM_GET_CURRENT_UTILIZATION;
 	resp->hdr.completion_code = cc;
-	uint16_t data_size = 2 * sizeof(uint32_t);
+	uint16_t data_size = sizeof(struct nsm_get_current_utilization_data);
 	resp->hdr.data_size = htole16(data_size);
 
-	resp->gpu_utilization = htole32(gpu_utilization);
-	resp->memory_utilization = htole32(memory_utilization);
+	resp->data.gpu_utilization = htole32(data->gpu_utilization);
+	resp->data.memory_utilization = htole32(data->memory_utilization);
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_get_current_utilization_resp(const struct nsm_msg *msg,
-					size_t msg_len, uint8_t *cc,
-					uint16_t *data_size,
-					uint16_t *reason_code,
-					uint32_t *gpu_utilization,
-					uint32_t *memory_utilization)
+int decode_get_current_utilization_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_get_current_utilization_data *data)
 {
-	if (msg == NULL || cc == NULL || data_size == NULL ||
-	    gpu_utilization == NULL || memory_utilization == NULL) {
+	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -2902,13 +2935,41 @@ int decode_get_current_utilization_resp(const struct nsm_msg *msg,
 
 	*data_size = le16toh(resp->hdr.data_size);
 
-	if ((*data_size) < 2 * sizeof(uint32_t)) {
+	if ((*data_size) < sizeof(struct nsm_get_current_utilization_data)) {
 		return NSM_SW_ERROR_DATA;
 	}
-	*gpu_utilization = le32toh(resp->gpu_utilization);
-	*memory_utilization = le32toh(resp->memory_utilization);
+	data->gpu_utilization = le32toh(resp->data.gpu_utilization);
+	data->memory_utilization = le32toh(resp->data.memory_utilization);
 
 	return NSM_SW_SUCCESS;
+}
+int encode_get_current_utilization_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_current_utilization_data *data, struct nsm_msg *msg)
+{
+	if (data != NULL) {
+		data->gpu_utilization = htole32(data->gpu_utilization);
+		data->memory_utilization = htole32(data->memory_utilization);
+	}
+	return encode_long_running_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_CURRENT_UTILIZATION, (const uint8_t *)data,
+	    sizeof(struct nsm_get_current_utilization_data), msg);
+}
+
+int decode_get_current_utilization_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_get_current_utilization_data *data)
+{
+	int rc = decode_long_running_resp_with_data(
+	    msg, msg_len, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_CURRENT_UTILIZATION, cc, reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_get_current_utilization_data));
+	if (rc == NSM_SW_SUCCESS && data != NULL) {
+		data->gpu_utilization = le32toh(data->gpu_utilization);
+		data->memory_utilization = le32toh(data->memory_utilization);
+	}
+	return rc;
 }
 
 // Get Row Remap State command, NSM T3 spec
@@ -3311,6 +3372,35 @@ int decode_get_memory_capacity_util_resp(
 	data->used_memory = le32toh(resp->data.used_memory);
 
 	return NSM_SW_SUCCESS;
+}
+
+int encode_get_memory_capacity_util_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_memory_capacity_utilization *data, struct nsm_msg *msg)
+{
+	if (data != NULL) {
+		data->reserved_memory = htole32(data->reserved_memory);
+		data->used_memory = htole32(data->used_memory);
+	}
+	return encode_long_running_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, (const uint8_t *)data,
+	    sizeof(struct nsm_memory_capacity_utilization), msg);
+}
+
+int decode_get_memory_capacity_util_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_memory_capacity_utilization *data)
+{
+	int rc = decode_long_running_resp_with_data(
+	    msg, msg_len, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_MEMORY_CAPACITY_UTILIZATION, cc, reason_code,
+	    (uint8_t *)data, sizeof(struct nsm_memory_capacity_utilization));
+	if (rc == NSM_SW_SUCCESS && data != NULL) {
+		data->reserved_memory = le32toh(data->reserved_memory);
+		data->used_memory = le32toh(data->used_memory);
+	}
+	return rc;
 }
 
 int encode_get_clock_output_enable_state_req(uint8_t instance_id, uint8_t index,
@@ -3966,6 +4056,59 @@ int decode_get_violation_duration_resp(const struct nsm_msg *msg,
 	data->counter7 = le64toh(resp->data.counter7);
 
 	return NSM_SW_SUCCESS;
+}
+
+int encode_get_violation_duration_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_violation_duration *data, struct nsm_msg *msg)
+{
+	if (data != NULL) {
+		data->supported_counter.byte =
+		    htole64(data->supported_counter.byte);
+		data->hw_violation_duration =
+		    htole64(data->hw_violation_duration);
+		data->global_sw_violation_duration =
+		    htole64(data->global_sw_violation_duration);
+		data->power_violation_duration =
+		    htole64(data->power_violation_duration);
+		data->thermal_violation_duration =
+		    htole64(data->thermal_violation_duration);
+		data->counter4 = htole64(data->counter4);
+		data->counter5 = htole64(data->counter5);
+		data->counter6 = htole64(data->counter6);
+		data->counter7 = htole64(data->counter7);
+	}
+	return encode_long_running_resp(
+	    instance_id, cc, reason_code, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_VIOLATION_DURATION, (const uint8_t *)data,
+	    sizeof(struct nsm_violation_duration), msg);
+}
+
+int decode_get_violation_duration_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_violation_duration *data)
+{
+	int rc = decode_long_running_resp_with_data(
+	    msg, msg_len, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_VIOLATION_DURATION, cc, reason_code, (uint8_t *)data,
+	    sizeof(struct nsm_violation_duration));
+	if (rc == NSM_SW_SUCCESS && data != NULL) {
+		data->supported_counter.byte =
+		    le64toh(data->supported_counter.byte);
+		data->hw_violation_duration =
+		    le64toh(data->hw_violation_duration);
+		data->global_sw_violation_duration =
+		    le64toh(data->global_sw_violation_duration);
+		data->power_violation_duration =
+		    le64toh(data->power_violation_duration);
+		data->thermal_violation_duration =
+		    le64toh(data->thermal_violation_duration);
+		data->counter4 = le64toh(data->counter4);
+		data->counter5 = le64toh(data->counter5);
+		data->counter6 = le64toh(data->counter6);
+		data->counter7 = le64toh(data->counter7);
+	}
+	return rc;
 }
 
 static void
