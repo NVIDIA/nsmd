@@ -24,6 +24,7 @@
 #include "libnsm/requester/mctp.h"
 
 #include "common/sleep.hpp"
+#include "deviceManager.hpp"
 #include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -631,6 +632,30 @@ requester::Coroutine
 
         if (!nsmDevice->isDeviceActive)
         {
+            // search EID
+            DeviceManager& deviceManager = DeviceManager::getInstance();
+            auto foundEID = deviceManager.searchEID(
+                nsmDevice->getDeviceType(), nsmDevice->getInstanceNumber());
+            if (foundEID.has_value())
+            {
+                lg2::error(
+                    "doPollingTask: found EID:{EID} by searchEID for nsmDevice({DT},{INST})",
+                    "EID", *foundEID, "DT", nsmDevice->getDeviceType(), "INST",
+                    nsmDevice->getInstanceNumber());
+
+                nsmDevice->eid = *foundEID;
+                co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
+                nsmDevice->setOnline();
+                continue;
+            }
+            else
+            {
+                lg2::error(
+                    "doPollingTask: failed to searchEID for nsmDevice({DT},{INST})",
+                    "DT", nsmDevice->getDeviceType(), "INST",
+                    nsmDevice->getInstanceNumber());
+            }
+
             // Sleep. Wait for the device to get active.
             co_await common::Sleep(event, inActiveSleepTimeInUsec,
                                    common::Priority);
