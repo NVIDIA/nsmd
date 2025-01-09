@@ -814,6 +814,30 @@ TEST(LongRunning, testBadEncodeSize)
 					   NSM_TYPE_PLATFORM_ENVIRONMENTAL, 0,
 					   nullptr, 0xFC, response);
 	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+	auto event = reinterpret_cast<nsm_event *>(response->payload);
+	EXPECT_EQ(0, event->data_size);
+}
+
+TEST(LongRunning, testGoodEncodeNullData)
+{
+	Response responseMsg(sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+			     sizeof(struct nsm_long_running_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto rc = encode_long_running_resp(0, NSM_SUCCESS, ERR_NULL,
+					   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+					   0xFC, nullptr, 0, response);
+	EXPECT_EQ(0, rc);
+	auto event = reinterpret_cast<nsm_event *>(response->payload);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+		  response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_EVENT_VERSION, event->version);
+	EXPECT_EQ(false, event->ackr);
+	EXPECT_EQ(0, event->resvd);
+	EXPECT_EQ(NSM_LONG_RUNNING_EVENT, event->event_id);
+	EXPECT_EQ(NSM_NVIDIA_GENERAL_EVENT_CLASS, event->event_class);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL, event->event_state & 0xFF);
+	EXPECT_EQ(0xFC, event->event_state >> 8);
+	EXPECT_EQ(sizeof(nsm_long_running_resp), event->data_size);
 }
 
 TEST(LongRunning, testBadDecode)

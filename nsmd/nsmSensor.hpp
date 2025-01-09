@@ -28,9 +28,8 @@ class NsmSensor : public NsmObject
 {
   public:
     NsmSensor() = delete;
-    NsmSensor(const std::string& name, const std::string& type,
-              bool isLongRunning = false) :
-        NsmObject(name, type, isLongRunning)
+    NsmSensor(const std::string& name, const std::string& type) :
+        NsmObject(name, type)
     {}
     NsmSensor(const NsmObject& copy) : NsmObject(copy) {}
 

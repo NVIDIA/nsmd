@@ -37,9 +37,7 @@ class NsmObject
 {
   public:
     NsmObject() = delete;
-    NsmObject(const std::string& name, const std::string& type,
-              bool isLongRunning = false) :
-        isLongRunning(isLongRunning),
+    NsmObject(const std::string& name, const std::string& type) :
         name(name), type(type)
     {}
     NsmObject(const NsmObject& copy) : name(copy.name), type(copy.type) {}
@@ -148,7 +146,6 @@ class NsmObject
 
     bool isRefreshed = false;
     bool isStatic = false;
-    bool isLongRunning = false;
 
   private:
     const std::string name;

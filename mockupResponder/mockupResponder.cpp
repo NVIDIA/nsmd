@@ -98,6 +98,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                  {EI_NVLINK_ERRORS, false},
              }},
         }, // errorInjection
+        0, // migMode
+        0, // eccMode
     })
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -270,8 +272,9 @@ int MockupResponder::initSocket()
         msghdr msg{};
 
         // process message and send response
-        auto response = processRxMsg(requestMsg);
-        if (response.has_value())
+        std::optional<Response> longRunningEvent;
+        auto response = processRxMsg(requestMsg, longRunningEvent);
+        if (response)
         {
             constexpr uint8_t tagOwnerBitPos = 3;
             constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
@@ -298,6 +301,16 @@ int MockupResponder::initSocket()
                 lg2::error("sendmsg system call failed");
             }
         }
+        if (longRunningEvent)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            auto eid = requestMsg[1];
+            auto rc = mctpSockSend(eid, *longRunningEvent);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("mctpSockSend() failed, rc={RC}", "RC", rc);
+            }
+        }
     };
 
     io = std::make_unique<sdeventplus::source::IO>(event, fd, EPOLLIN,
@@ -305,8 +318,9 @@ int MockupResponder::initSocket()
     return fd;
 }
 
-std::optional<std::vector<uint8_t>>
-    MockupResponder::processRxMsg(const std::vector<uint8_t>& rxMsg)
+std::optional<Response>
+    MockupResponder::processRxMsg(const Request& rxMsg,
+                                  std::optional<Request>& longRunningEvent)
 {
     nsm_header_info hdrFields{};
     auto hdr =
@@ -432,13 +446,17 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_DRIVER_INFO:
                     return getDriverInfoHandler(request, requestLen);
                 case NSM_GET_MIG_MODE:
-                    return getMigModeHandler(request, requestLen);
+                    return getMigModeHandler(request, requestLen, true,
+                                             longRunningEvent);
                 case NSM_SET_MIG_MODE:
-                    return setMigModeHandler(request, requestLen);
+                    return setMigModeHandler(request, requestLen, true,
+                                             longRunningEvent);
                 case NSM_GET_ECC_MODE:
-                    return getEccModeHandler(request, requestLen);
+                    return getEccModeHandler(request, requestLen, true,
+                                             longRunningEvent);
                 case NSM_SET_ECC_MODE:
-                    return setEccModeHandler(request, requestLen);
+                    return setEccModeHandler(request, requestLen, true,
+                                             longRunningEvent);
                 case NSM_GET_ECC_ERROR_COUNTS:
                     return getEccErrorCountsHandler(request, requestLen);
                 case NSM_GET_PROGRAMMABLE_EDPP_SCALING_FACTOR:
@@ -457,7 +475,8 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_ACCUMULATED_GPU_UTILIZATION_TIME:
                     return getAccumCpuUtilTimeHandler(request, requestLen);
                 case NSM_GET_CURRENT_UTILIZATION:
-                    return getCurrentUtilizationHandler(request, requestLen);
+                    return getCurrentUtilizationHandler(request, requestLen,
+                                                        true, longRunningEvent);
                 case NSM_SET_POWER_LIMITS:
                     return setPowerLimitHandler(request, requestLen);
                 case NSM_GET_POWER_LIMITS:
@@ -473,13 +492,15 @@ std::optional<std::vector<uint8_t>>
                 case NSM_GET_ROW_REMAP_AVAILABILITY:
                     return getRowRemapAvailabilityHandler(request, requestLen);
                 case NSM_GET_MEMORY_CAPACITY_UTILIZATION:
-                    return getMemoryCapacityUtilHandler(request, requestLen);
+                    return getMemoryCapacityUtilHandler(request, requestLen,
+                                                        true, longRunningEvent);
                 case NSM_QUERY_AGGREGATE_GPM_METRICS:
                     return queryAggregatedGPMMetrics(request, requestLen);
                 case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
                     return queryPerInstanceGPMMetrics(request, requestLen);
                 case NSM_GET_VIOLATION_DURATION:
-                    return getViolationDurationHandler(request, requestLen);
+                    return getViolationDurationHandler(request, requestLen,
+                                                       true, longRunningEvent);
                 /*
                  ** Power Smoothing related Mockups
                  */
@@ -1876,16 +1897,16 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
+std::optional<Response>
     MockupResponder::getMigModeHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen)
+                                       size_t requestLen, bool isLongRunning,
+                                       std::optional<Request>& longRunningEvent)
 {
     if (verbose)
     {
         lg2::info("getMigModeHandler: request length={LEN}", "LEN", requestLen);
     }
     auto rc = decode_common_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode request for getMigModeHandler failed: rc={RC}", "RC",
@@ -1894,13 +1915,36 @@ std::optional<std::vector<uint8_t>>
     }
 
     bitfield8_t flags;
-    flags.byte = 1;
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_MIG_mode_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_get_MIG_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                  reason_code, &flags, responseMsg);
+    flags.byte = state.migMode;
+    Response response(
+        isLongRunning
+            ? /*common resp*/ (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp))
+            : /* regular resp */ (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_MIG_mode_resp)),
+        0);
+    if (isLongRunning)
+    {
+        auto commonMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_common_resp(requestMsg->hdr.instance_id, NSM_ACCEPTED,
+                                ERR_NULL, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                NSM_GET_MIG_MODE, commonMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        longRunningEvent =
+            Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                      sizeof(nsm_long_running_resp) + sizeof(bitfield8_t)),
+                     0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_get_MIG_mode_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &flags,
+            eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_get_MIG_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                      ERR_NULL, &flags, responseMsg);
+    }
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
@@ -1910,40 +1954,43 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
+std::optional<Response>
     MockupResponder::setMigModeHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen)
+                                       size_t requestLen, bool isLongRunning,
+                                       std::optional<Request>& longRunningEvent)
 {
-    uint8_t requested_mode;
-    auto rc = decode_set_MIG_mode_req(requestMsg, requestLen, &requested_mode);
-    assert(rc == NSM_SW_SUCCESS);
+    auto rc = decode_set_MIG_mode_req(requestMsg, requestLen, &state.migMode);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_MIG_mode_req failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
-                                  0);
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_set_MIG_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                  reason_code, responseMsg);
+    rc = encode_set_MIG_mode_resp(requestMsg->hdr.instance_id,
+                                  isLongRunning ? NSM_ACCEPTED : NSM_SUCCESS,
+                                  ERR_NULL, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
-    if (rc)
+    if (isLongRunning)
     {
-        lg2::error("encode_get_MIG_mode_resp failed: rc={RC}", "RC", rc);
-        return std::nullopt;
+        longRunningEvent = Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                     sizeof(nsm_long_running_resp)),
+                                    0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_set_MIG_mode_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
     }
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
+std::optional<Response>
     MockupResponder::getEccModeHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen)
+                                       size_t requestLen, bool isLongRunning,
+                                       std::optional<Request>& longRunningEvent)
 {
     auto rc = decode_common_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
         lg2::error("decode request for getEccModeHandler failed: rc={RC}", "RC",
@@ -1952,13 +1999,36 @@ std::optional<std::vector<uint8_t>>
     }
 
     bitfield8_t flags;
-    flags.byte = 11;
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_ECC_mode_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_get_ECC_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
-                                  reason_code, &flags, responseMsg);
+    flags.byte = state.eccMode;
+    Response response(
+        isLongRunning
+            ? /*common resp*/ (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp))
+            : /* regular resp */ (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_ECC_mode_resp)),
+        0);
+    if (isLongRunning)
+    {
+        auto commonMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_common_resp(requestMsg->hdr.instance_id, NSM_ACCEPTED,
+                                ERR_NULL, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                NSM_GET_ECC_MODE, commonMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        longRunningEvent =
+            Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                      sizeof(nsm_long_running_resp) + sizeof(bitfield8_t)),
+                     0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_get_ECC_mode_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &flags,
+            eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_get_ECC_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                      ERR_NULL, &flags, responseMsg);
+    }
     assert(rc == NSM_SW_SUCCESS);
 
     if (rc)
@@ -1969,13 +2039,12 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
+std::optional<Response>
     MockupResponder::setEccModeHandler(const nsm_msg* requestMsg,
-                                       size_t requestLen)
+                                       size_t requestLen, bool isLongRunning,
+                                       std::optional<Request>& longRunningEvent)
 {
-    uint8_t requested_mode;
-    auto rc = decode_set_ECC_mode_req(requestMsg, requestLen, &requested_mode);
-    assert(rc == NSM_SW_SUCCESS);
+    auto rc = decode_set_ECC_mode_req(requestMsg, requestLen, &state.eccMode);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_set_ECC_mode_req failed: rc={RC}", "RC", rc);
@@ -1986,13 +2055,19 @@ std::optional<std::vector<uint8_t>>
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
-    rc = encode_set_ECC_mode_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+    rc = encode_set_ECC_mode_resp(requestMsg->hdr.instance_id,
+                                  isLongRunning ? NSM_ACCEPTED : NSM_SUCCESS,
                                   reason_code, responseMsg);
     assert(rc == NSM_SW_SUCCESS);
-    if (rc)
+    if (isLongRunning)
     {
-        lg2::error("encode_get_ECC_mode_resp failed: rc={RC}", "RC", rc);
-        return std::nullopt;
+        longRunningEvent = Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                     sizeof(nsm_long_running_resp)),
+                                    0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_set_ECC_mode_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
     }
     return response;
 }
@@ -4192,12 +4267,11 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
-    MockupResponder::getCurrentUtilizationHandler(const nsm_msg* requestMsg,
-                                                  size_t requestLen)
+std::optional<Response> MockupResponder::getCurrentUtilizationHandler(
+    const nsm_msg* requestMsg, size_t requestLen, bool isLongRunning,
+    std::optional<Request>& longRunningEvent)
 {
     auto rc = decode_common_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
         lg2::error(
@@ -4206,16 +4280,38 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    const nsm_get_current_utilization_data data{36, 75};
+    nsm_get_current_utilization_data data{36, 75};
 
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_utilization_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_get_current_utilization_resp(requestMsg->hdr.instance_id,
-                                             NSM_SUCCESS, reason_code, &data,
-                                             responseMsg);
+    Response response(
+        isLongRunning
+            ? /*common resp*/ (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp))
+            : /* regular resp */ (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_current_utilization_resp)),
+        0);
+    if (isLongRunning)
+    {
+        auto commonMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_common_resp(requestMsg->hdr.instance_id, NSM_ACCEPTED,
+                                ERR_NULL, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                NSM_GET_CURRENT_UTILIZATION, commonMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        longRunningEvent = Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                     sizeof(nsm_long_running_resp) +
+                                     sizeof(nsm_get_current_utilization_data)),
+                                    0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_get_current_utilization_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &data,
+            eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_get_current_utilization_resp(requestMsg->hdr.instance_id,
+                                                 NSM_SUCCESS, ERR_NULL, &data,
+                                                 responseMsg);
+    }
 
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
@@ -4331,9 +4427,9 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
-    MockupResponder::getMemoryCapacityUtilHandler(const nsm_msg* requestMsg,
-                                                  size_t requestLen)
+std::optional<Response> MockupResponder::getMemoryCapacityUtilHandler(
+    const nsm_msg* requestMsg, size_t requestLen, bool isLongRunning,
+    std::optional<Request>& longRunningEvent)
 {
     if (verbose)
     {
@@ -4342,7 +4438,6 @@ std::optional<std::vector<uint8_t>>
     }
 
     auto rc = decode_get_memory_capacity_util_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_memory_capacity_util_req failed: rc={RC}", "RC",
@@ -4352,13 +4447,38 @@ std::optional<std::vector<uint8_t>>
     struct nsm_memory_capacity_utilization data;
     data.reserved_memory = 2345567;
     data.used_memory = 128888;
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_memory_capacity_util_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_get_memory_capacity_util_resp(requestMsg->hdr.instance_id,
-                                              NSM_SUCCESS, reason_code, &data,
-                                              responseMsg);
+
+    Response response(
+        isLongRunning
+            ? /*common resp*/ (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp))
+            : /* regular resp */ (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_memory_capacity_util_resp)),
+        0);
+
+    if (isLongRunning)
+    {
+        auto commonMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_common_resp(requestMsg->hdr.instance_id, NSM_ACCEPTED,
+                                ERR_NULL, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                NSM_GET_MEMORY_CAPACITY_UTILIZATION, commonMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        longRunningEvent = Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                     sizeof(nsm_long_running_resp) +
+                                     sizeof(nsm_memory_capacity_utilization)),
+                                    0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_get_memory_capacity_util_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &data,
+            eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_get_memory_capacity_util_resp(requestMsg->hdr.instance_id,
+                                                  NSM_SUCCESS, ERR_NULL, &data,
+                                                  responseMsg);
+    }
     assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
@@ -5554,12 +5674,11 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
-std::optional<std::vector<uint8_t>>
-    MockupResponder::getViolationDurationHandler(const nsm_msg* requestMsg,
-                                                 size_t requestLen)
+std::optional<Response> MockupResponder::getViolationDurationHandler(
+    const nsm_msg* requestMsg, size_t requestLen, bool isLongRunning,
+    std::optional<Request>& longRunningEvent)
 {
     auto rc = decode_get_violation_duration_req(requestMsg, requestLen);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {
         lg2::error("decode_get_violation_duration_req failed: rc={RC}", "RC",
@@ -5578,13 +5697,37 @@ std::optional<std::vector<uint8_t>>
     data.counter6 = 8000000;
     data.counter7 = 9000000;
 
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_violation_duration_resp), 0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    rc = encode_get_violation_duration_resp(requestMsg->hdr.instance_id,
-                                            NSM_SUCCESS, reason_code, &data,
-                                            responseMsg);
+    Response response(
+        isLongRunning
+            ? /*common resp*/ (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp))
+            : /* regular resp */ (sizeof(nsm_msg_hdr) +
+                                  sizeof(nsm_get_violation_duration_resp)),
+        0);
+
+    if (isLongRunning)
+    {
+        auto commonMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_common_resp(requestMsg->hdr.instance_id, NSM_ACCEPTED,
+                                ERR_NULL, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                NSM_GET_VIOLATION_DURATION, commonMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        longRunningEvent = Response((sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                     sizeof(nsm_long_running_resp) +
+                                     sizeof(nsm_violation_duration)),
+                                    0);
+        auto eventMsg = reinterpret_cast<nsm_msg*>(longRunningEvent->data());
+        auto eventRc = encode_get_violation_duration_event_resp(
+            requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &data,
+            eventMsg);
+        assert(eventRc == NSM_SW_SUCCESS);
+    }
+    else
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        rc = encode_get_violation_duration_resp(requestMsg->hdr.instance_id,
+                                                NSM_SUCCESS, ERR_NULL, &data,
+                                                responseMsg);
+    }
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {

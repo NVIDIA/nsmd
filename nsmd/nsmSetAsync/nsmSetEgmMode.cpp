@@ -25,13 +25,12 @@
 
 namespace nsm
 {
-requester::Coroutine setEgmModeOnDevice(const bool isLongRunning, bool egmMode,
+requester::Coroutine setEgmModeOnDevice(bool egmMode,
                                         AsyncOperationStatusType* status,
                                         std::shared_ptr<NsmDevice> device);
 
 requester::Coroutine
-    setEgmModeEnabled(const bool isLongRunning,
-                      const AsyncSetOperationValueType& value,
+    setEgmModeEnabled(const AsyncSetOperationValueType& value,
                       [[maybe_unused]] AsyncOperationStatusType* status,
                       std::shared_ptr<NsmDevice> device)
 {
@@ -42,16 +41,14 @@ requester::Coroutine
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    const auto rc = co_await setEgmModeOnDevice(isLongRunning, *egmMode, status,
-                                                device);
+    const auto rc = co_await setEgmModeOnDevice(*egmMode, status, device);
     // coverity[missing_return]
     co_return rc;
 }
 
-requester::Coroutine
-    setEgmModeOnDevice([[maybe_unused]] const bool isLongRunning, bool egmMode,
-                       [[maybe_unused]] AsyncOperationStatusType* status,
-                       std::shared_ptr<NsmDevice> device)
+requester::Coroutine setEgmModeOnDevice(bool egmMode,
+                                        AsyncOperationStatusType* status,
+                                        std::shared_ptr<NsmDevice> device)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto eid = manager.getEid(device);
