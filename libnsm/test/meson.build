@@ -15,7 +15,6 @@ dep_src_headers = [
     '.',
     '..',
     '../../common',
-    '../../libnsm',
 ]
 
 test_src = declare_dependency(sources: dep_src_files, include_directories: dep_src_headers)

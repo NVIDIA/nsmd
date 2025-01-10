@@ -111,7 +111,8 @@ enum nsm_completion_codes {
 	NSM_ERR_NOT_READY = 0x04,
 	NSM_ERR_UNSUPPORTED_COMMAND_CODE = 0x05,
 	NSM_ERR_UNSUPPORTED_MSG_TYPE = 0x06,
-	NSM_ACCEPTED = 0x7e,
+	NSM_ACCEPTED = 0x7d,
+	NSM_BUSY = 0x7e,
 	NSM_ERR_BUS_ACCESS = 0x7f
 };
 
@@ -415,6 +416,26 @@ struct nsm_common_non_success_resp {
 struct nsm_long_running_event_state {
 	uint8_t nvidia_message_type;
 	uint8_t command;
+} __attribute__((packed));
+
+/** @struct nsm_long_running_resp
+ *
+ *  Structure representing NSM successful long running event response.
+ */
+struct nsm_long_running_resp {
+	uint8_t instance_id;
+	uint8_t completion_code;
+	uint16_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_long_running_non_success_resp
+ *
+ *  Structure representing NSM non-successful long running event response.
+ */
+struct nsm_long_running_non_success_resp {
+	uint8_t instance_id;
+	uint8_t completion_code;
+	uint16_t reason_code;
 } __attribute__((packed));
 
 /** @struct nsm_common_telemetry_resp
@@ -844,6 +865,68 @@ int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
  */
 int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 		       uint16_t *data_size, uint16_t *reason_code);
+
+/** @brief Encode a long running event response message
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] nvidia_msg_type - NVIDIA message type
+ *  @param[in] command - command identifier
+ *  @param[in] data - Data containing the response
+ *  @param[in] data_size - Size of the data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_long_running_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, uint8_t nvidia_msg_type,
+			     uint8_t command, const uint8_t *data,
+			     uint8_t data_size, struct nsm_msg *msg);
+
+/** @brief Decode a long running event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] instance_id - Request instance ID
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - Reason Code
+ *  @return nsm_completion_codes
+ */
+int decode_long_running_event(const struct nsm_msg *msg, size_t msg_len,
+			      uint8_t *instance_id, uint8_t *cc,
+			      uint16_t *reason_code);
+
+/** @brief Decode a long running event response message and compares the message
+ * type and command
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[in] nvidia_msg_type - NVIDIA message type
+ *  @param[in] command - command identifier
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - Reason Code
+ *  @param[out] data - Event data
+ *  @param[in] data_size - Size of the data buffer
+ *  @return nsm_completion_codes
+ */
+int decode_long_running_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t nvidia_msg_type, uint8_t command,
+			     uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Decode a long running event response message and compares the message
+ * type and command
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[in] nvidia_msg_type - NVIDIA message type
+ *  @param[in] command - command identifier
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - Reason Code
+ *  @param[out] data - Data buffer to copy the event response data
+ *  @param[in] data_size - Size of the data buffer
+ *  @return nsm_completion_codes
+ */
+int decode_long_running_resp_with_data(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t nvidia_msg_type,
+				       uint8_t command, uint8_t *cc,
+				       uint16_t *reason_code, uint8_t *data,
+				       uint8_t data_size);
 
 /** @brief Encode an NSM raw command request message
  *  @param[in] instanceId - NSM instance ID

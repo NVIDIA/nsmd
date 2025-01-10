@@ -19,6 +19,7 @@
 #include "device-capability-discovery.h"
 
 #include <endian.h>
+#include <limits.h>
 #include <string.h>
 
 uint8_t pack_nsm_header(const struct nsm_header_info *hdr,
@@ -494,7 +495,7 @@ int decode_reason_code_and_cc(const struct nsm_msg *msg, size_t msg_len,
 	}
 
 	*cc = ((struct nsm_common_resp *)msg->payload)->completion_code;
-	if (*cc == NSM_SUCCESS) {
+	if (*cc == NSM_SUCCESS || *cc == NSM_ACCEPTED) {
 		return NSM_SW_SUCCESS;
 	}
 
@@ -694,7 +695,7 @@ int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
 		return rc;
 	}
 
-	if (cc != NSM_SUCCESS) {
+	if (cc != NSM_SUCCESS && cc != NSM_ACCEPTED) {
 		return encode_reason_code(cc, reason_code, command, msg);
 	}
 
@@ -726,6 +727,175 @@ int decode_common_resp(const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
 	struct nsm_common_resp *resp = (struct nsm_common_resp *)msg->payload;
 
 	*data_size = le16toh(resp->data_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+/** @brief Encode a long running event state
+ *
+ *  @param[in] event_state - long running event state
+ *  @return uint16_t - Encoded long running event state
+ */
+static uint16_t encode_long_running_event_state(
+    const struct nsm_long_running_event_state *event_state)
+{
+	if (event_state == NULL) {
+		return 0;
+	}
+	return *(uint16_t *)event_state;
+}
+
+int encode_long_running_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, uint8_t nvidia_msg_type,
+			     uint8_t command, const uint8_t *data,
+			     uint8_t data_size, struct nsm_msg *msg)
+{
+	struct nsm_long_running_event_state event_state = {
+	    .nvidia_message_type = nvidia_msg_type, .command = command};
+	int rc = encode_nsm_event(
+	    instance_id, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, false,
+	    NSM_EVENT_VERSION, NSM_LONG_RUNNING_EVENT,
+	    NSM_NVIDIA_GENERAL_EVENT_CLASS,
+	    encode_long_running_event_state(&event_state), 0, NULL, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	if (cc != NSM_SUCCESS) {
+		struct nsm_long_running_non_success_resp *resp =
+		    (struct nsm_long_running_non_success_resp *)event->data;
+
+		event->data_size =
+		    sizeof(struct nsm_long_running_non_success_resp);
+		resp->completion_code = cc;
+		resp->reason_code = htole16(reason_code);
+		resp->instance_id = instance_id;
+
+		rc = NSM_SW_SUCCESS;
+	} else {
+		struct nsm_long_running_resp *resp =
+		    (struct nsm_long_running_resp *)event->data;
+		resp->completion_code = cc;
+		resp->reserved = 0;
+		resp->instance_id = instance_id;
+
+		if (data_size >
+		    (UCHAR_MAX - sizeof(struct nsm_long_running_resp))) {
+			rc = NSM_SW_ERROR_LENGTH;
+		} else if (data_size > 0 && data == NULL) {
+			rc = NSM_SW_ERROR_NULL;
+		} else {
+			event->data_size =
+			    data_size + sizeof(struct nsm_long_running_resp);
+			if (data != NULL) {
+				memcpy(event->data +
+					   sizeof(struct nsm_long_running_resp),
+				       data, data_size);
+			}
+			rc = NSM_SW_SUCCESS;
+		}
+	}
+	return rc;
+}
+
+int decode_long_running_event(const struct nsm_msg *msg, size_t msg_len,
+			      uint8_t *instance_id, uint8_t *cc,
+			      uint16_t *reason_code)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+			  sizeof(struct nsm_long_running_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	event->event_state = le16toh(event->event_state);
+
+	if (instance_id != NULL) {
+		*instance_id =
+		    ((struct nsm_long_running_resp *)event->data)->instance_id;
+	}
+	if (cc != NULL && reason_code != NULL) {
+		*cc = ((struct nsm_long_running_resp *)event->data)
+			  ->completion_code;
+		if (*cc != NSM_SUCCESS) {
+			if (msg_len !=
+			    (sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+			     sizeof(
+				 struct nsm_long_running_non_success_resp))) {
+				return NSM_SW_ERROR_LENGTH;
+			}
+
+			struct nsm_long_running_non_success_resp *response =
+			    (struct nsm_long_running_non_success_resp *)
+				event->data;
+
+			// reason code is expected to be present if CC !=
+			// NSM_SUCCESS
+			*reason_code = le16toh(response->reason_code);
+		}
+	}
+	return NSM_SW_SUCCESS;
+}
+
+int decode_long_running_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t nvidia_msg_type, uint8_t command,
+			     uint8_t *cc, uint16_t *reason_code)
+{
+	if (cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_long_running_event(msg, msg_len, NULL, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	struct nsm_long_running_event_state event_state = {
+	    .nvidia_message_type = nvidia_msg_type, .command = command};
+
+	if (msg->hdr.nvidia_msg_type != NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY ||
+	    event->event_class != NSM_NVIDIA_GENERAL_EVENT_CLASS ||
+	    event->event_id != NSM_LONG_RUNNING_EVENT ||
+	    event->event_state !=
+		encode_long_running_event_state(&event_state)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_long_running_resp_with_data(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t nvidia_msg_type,
+				       uint8_t command, uint8_t *cc,
+				       uint16_t *reason_code, uint8_t *data,
+				       uint8_t data_size)
+{
+	int rc = decode_long_running_resp(msg, msg_len, nvidia_msg_type,
+					  command, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+	if (msg_len < (sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+		       event->data_size) ||
+	    event->data_size < sizeof(struct nsm_long_running_resp) ||
+	    (event->data_size - sizeof(struct nsm_long_running_resp)) <
+		data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	memcpy(data, event->data + sizeof(struct nsm_long_running_resp),
+	       event->data_size - sizeof(struct nsm_long_running_resp));
 
 	return NSM_SW_SUCCESS;
 }
