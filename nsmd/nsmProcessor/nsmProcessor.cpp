@@ -3486,11 +3486,13 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_MemCapacityUtil")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        [[maybe_unused]] auto priority =
+            co_await utils::coGetDbusProperty<bool>(objPath.c_str(), "Priority",
+                                                    interface.c_str());
 
-        auto isLongRunning = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "LongRunning", interface.c_str());
+        [[maybe_unused]] auto isLongRunning =
+            co_await utils::coGetDbusProperty<bool>(
+                objPath.c_str(), "LongRunning", interface.c_str());
 
         auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name, type);
         nsmDevice->addSensor(totalMemorySensor, priority);
@@ -3498,14 +3500,14 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, name, type, inventoryObjPath, totalMemorySensor,
             isLongRunning);
         nsmDevice->deviceSensors.emplace_back(sensor);
-        nsmDevice->addSensor(sensor, priority, isLongRunning);
+        /*nsmDevice->addSensor(sensor, priority, isLongRunning);
 
         if (isLongRunning)
         {
             nsmDevice->longRunningEventDispatcher.addEvent(
                 NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                 NSM_GET_MEMORY_CAPACITY_UTILIZATION, sensor);
-        }
+        }*/
     }
     else if (type == "NSM_PowerCap")
     {
