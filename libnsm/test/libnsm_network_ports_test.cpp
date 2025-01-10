@@ -2577,7 +2577,7 @@ class PortsHealthEventDecode : public testing::Test
 TEST_F(PortsHealthEventDecode, testBadEncodeEvent)
 {
 	auto rc = encode_nsm_health_event(0, false, &expected, nullptr);
-	EXPECT_EQ(NSM_ERR_INVALID_DATA, rc);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
 }
 
 TEST_F(PortsHealthEventDecode, testGoodDecodeEvent)
@@ -2660,7 +2660,7 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventNull)
 	auto rc = decode_nsm_health_event(event, eventMsg.size(), &eventState,
 					  nullptr);
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
-	EXPECT_EQ(0, eventState);
+	EXPECT_EQ(1, eventState);
 
 	rc = decode_nsm_health_event(event, eventMsg.size(), nullptr, &payload);
 	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
@@ -2682,10 +2682,10 @@ TEST_F(PortsHealthEventDecode, testBadDecodeEventData)
 	uint8_t dataSize = 1;
 	nsm_health_event_payload payload{};
 
-	auto rc =
-	    decode_nsm_event(event, eventMsg.size(), NSM_THRESHOLD_EVENT,
-			     NSM_ASSERTION_DEASSERTION_EVENT_CLASS, &eventState,
-			     &dataSize, reinterpret_cast<uint8_t *>(&payload));
+	auto rc = decode_nsm_event_with_data(
+	    event, eventMsg.size(), NSM_THRESHOLD_EVENT,
+	    NSM_ASSERTION_DEASSERTION_EVENT_CLASS, &eventState, &dataSize,
+	    reinterpret_cast<uint8_t *>(&payload));
 	EXPECT_EQ(NSM_SW_ERROR_DATA, rc);
 	EXPECT_EQ(1, eventState);
 	EXPECT_EQ(1, dataSize);
