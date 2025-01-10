@@ -1209,10 +1209,13 @@ int decode_nsm_health_event(const struct nsm_msg *msg, size_t msg_len,
 			    uint16_t *event_state,
 			    struct nsm_health_event_payload *payload)
 {
+	if (payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
 	uint8_t data_size = 0;
-	int result = decode_nsm_event(msg, msg_len, NSM_THRESHOLD_EVENT,
-				      NSM_GENERAL_EVENT_CLASS, event_state,
-				      &data_size, (uint8_t *)payload);
+	int result = decode_nsm_event_with_data(
+	    msg, msg_len, NSM_THRESHOLD_EVENT, NSM_GENERAL_EVENT_CLASS,
+	    event_state, &data_size, (uint8_t *)payload);
 	if (result == NSM_SW_SUCCESS &&
 	    data_size != sizeof(struct nsm_health_event_payload)) {
 		return NSM_SW_ERROR_LENGTH;

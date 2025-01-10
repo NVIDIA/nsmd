@@ -22,6 +22,7 @@
 
 #include "common/types.hpp"
 #include "nsmEvent.hpp"
+#include "nsmLongRunningEventDispatcher.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "types.hpp"
@@ -46,6 +47,7 @@ class NsmDevice
   public:
     NsmDevice(uuid_t uuid) :
         uuid(uuid), isDeviceActive(false),
+        longRunningEventDispatcher(registerLongRunningEventDispatcher()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
@@ -53,6 +55,7 @@ class NsmDevice
 
     NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
         isDeviceActive(false),
+        longRunningEventDispatcher(registerLongRunningEventDispatcher()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
@@ -80,6 +83,7 @@ class NsmDevice
 
     EventDispatcher eventDispatcher;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
+    NsmLongRunningEventDispatcher& longRunningEventDispatcher;
 
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);
@@ -108,7 +112,7 @@ class NsmDevice
      *
      * @param sensor[in] Pointer to dynamic sensor
      * @param priority[in] Flag to add sensor as priority sensor
-     * @param priority[in] Flag to add sensor as Long Running sensor
+     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
      */
     void addSensor(const std::shared_ptr<NsmObject>& sensor, bool priority,
                    bool isLongRunning = false);
@@ -130,6 +134,7 @@ class NsmDevice
     uint8_t eventMode;
     uint8_t deviceType = 0;
     uint8_t instanceNumber = 0;
+    NsmLongRunningEventDispatcher& registerLongRunningEventDispatcher();
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
