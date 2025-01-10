@@ -88,7 +88,7 @@ TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
     values.push(objPath, get(error, "UUID"));
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, gpu.deviceEvents.size());
+    EXPECT_EQ(1, gpu.deviceEvents.size());
 }
 
 TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
@@ -107,7 +107,7 @@ TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
     }
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, gpu.deviceEvents.size());
+    EXPECT_EQ(1, gpu.deviceEvents.size());
 }
 
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
@@ -120,11 +120,11 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(1, gpu.deviceEvents.size());
-    EXPECT_EQ(1, gpu.eventDispatcher.eventsMap.size());
+    EXPECT_EQ(2, gpu.deviceEvents.size());
+    EXPECT_EQ(2, gpu.eventDispatcher.eventsMap.size());
 
     auto event =
-        dynamic_pointer_cast<NsmThresholdEvent>(gpu.deviceEvents.front());
+        dynamic_pointer_cast<NsmThresholdEvent>(gpu.deviceEvents.back());
     EXPECT_NE(nullptr, event);
     EXPECT_EQ(event.get(),
               gpu.eventDispatcher

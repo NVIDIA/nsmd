@@ -193,4 +193,13 @@ void NsmDevice::setOffline()
     }
 }
 
+NsmLongRunningEventDispatcher& NsmDevice::registerLongRunningEventDispatcher()
+{
+    auto dispatcher = std::make_shared<NsmLongRunningEventDispatcher>();
+    deviceEvents.emplace_back(dispatcher);
+    eventDispatcher.addEvent(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                             NSM_LONG_RUNNING_EVENT, dispatcher);
+    return *dispatcher;
+}
+
 } // namespace nsm

@@ -146,7 +146,8 @@ enum nsm_sw_codes {
  */
 enum nsm_evnet_class {
 	NSM_GENERAL_EVENT_CLASS = 0x00,
-	NSM_ASSERTION_DEASSERTION_EVENT_CLASS = 0x01
+	NSM_ASSERTION_DEASSERTION_EVENT_CLASS = 0x01,
+	NSM_NVIDIA_GENERAL_EVENT_CLASS = 0x80,
 };
 
 typedef union {
@@ -405,6 +406,15 @@ struct nsm_common_non_success_resp {
 	uint8_t command;
 	uint8_t completion_code;
 	uint16_t reason_code;
+} __attribute__((packed));
+
+/** @struct nsm_long_running_event_state
+ *
+ *  Structure representing NSM long running event state.
+ */
+struct nsm_long_running_event_state {
+	uint8_t nvidia_message_type;
+	uint8_t command;
 } __attribute__((packed));
 
 /** @struct nsm_common_telemetry_resp
@@ -749,7 +759,29 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
 		     struct nsm_msg *msg);
 
 /**
- * @brief Decode an event message.
+ * @brief Decode an event message and compare id and class.
+ *
+ * This function decodes an event message by extracting the event identifier,
+ * event class, event state and data size from the provided response message.
+ * The provided event identifier and event class are compared
+ * with the decoded values during the process.
+ *
+ * @param[in]  msg         Pointer to the response message containing event
+ * data.
+ * @param[in]  msg_len     Length of the response message.
+ * @param[in]  event_id    Event identifier to compare with the decoded value.
+ * @param[in]  event_class Event class to compare with the decoded value.
+ * @param[out] event_state Pointer to store the decoded event state.
+ * @param[out] data_size   Pointer to store the size of the data payload.
+ *
+ * @return nsm_sw_codes NSM_SW_SUCCESS if the decoded event identifier and event
+ */
+int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
+		     uint8_t event_id, uint8_t event_class,
+		     uint16_t *event_state, uint8_t *data_size);
+
+/**
+ * @brief Decode an event message, compare id and class and copy data payload.
  *
  * This function decodes an event message by extracting the event identifier,
  * event class, event state, data size, and data payload from the provided
@@ -765,11 +797,12 @@ int encode_nsm_event(uint8_t instance_id, uint8_t nsm_type, bool ackr,
  * @param[out] data_size   Pointer to store the size of the data payload.
  * @param[out] data        Pointer to store the decoded data payload.
  *
- * @return nsm_completion_codes Completion status of the decoding process.
+ * @return nsm_sw_codes NSM_SW_SUCCESS if the decoded event identifier and event
  */
-int decode_nsm_event(const struct nsm_msg *msg, size_t msg_len,
-		     uint8_t event_id, uint8_t event_class,
-		     uint16_t *event_state, uint8_t *data_size, uint8_t *data);
+int decode_nsm_event_with_data(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t event_id, uint8_t event_class,
+			       uint16_t *event_state, uint8_t *data_size,
+			       uint8_t *data);
 
 /** @brief Encode a Common request message
  *  @param[in] instance_id - NSM instance ID
