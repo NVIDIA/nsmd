@@ -69,8 +69,9 @@ class MockupResponder
 
     int initSocket();
 
-    std::optional<std::vector<uint8_t>>
-        processRxMsg(const std::vector<uint8_t>& rxMsg);
+    std::optional<Response>
+        processRxMsg(const Request& rxMsg,
+                     std::optional<Request>& longRunningEvent);
 
     // type0 handlers
     std::optional<std::vector<uint8_t>>
@@ -144,17 +145,25 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getDriverInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
-    std::optional<std::vector<uint8_t>>
-        getMigModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<Response>
+        getMigModeHandler(const nsm_msg* requestMsg, size_t requestLen,
+                          bool isLongRunning,
+                          std::optional<Request>& longRunningEvent);
 
-    std::optional<std::vector<uint8_t>>
-        setMigModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<Response>
+        setMigModeHandler(const nsm_msg* requestMsg, size_t requestLen,
+                          bool isLongRunning,
+                          std::optional<Request>& longRunningEvent);
 
-    std::optional<std::vector<uint8_t>>
-        getEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<Response>
+        getEccModeHandler(const nsm_msg* requestMsg, size_t requestLen,
+                          bool isLongRunning,
+                          std::optional<Request>& longRunningEvent);
 
-    std::optional<std::vector<uint8_t>>
-        setEccModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<Response>
+        setEccModeHandler(const nsm_msg* requestMsg, size_t requestLen,
+                          bool isLongRunning,
+                          std::optional<Request>& longRunningEvent);
 
     std::optional<std::vector<uint8_t>>
         getEccErrorCountsHandler(const nsm_msg* requestMsg, size_t requestLen);
@@ -166,9 +175,10 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getCurrClockFreqHandler(const nsm_msg* requestMsg, size_t requestLen);
-    std::optional<std::vector<uint8_t>>
+    std::optional<Response>
         getMemoryCapacityUtilHandler(const nsm_msg* requestMsg,
-                                     size_t requestLen);
+                                     size_t requestLen, bool isLongRunning,
+                                     std::optional<Request>& longRunningEvent);
 
     std::optional<std::vector<uint8_t>>
         getProcessorThrottleReasonHandler(const nsm_msg* requestMsg,
@@ -178,9 +188,10 @@ class MockupResponder
         getAccumCpuUtilTimeHandler(const nsm_msg* requestMsg,
                                    size_t requestLen);
 
-    std::optional<std::vector<uint8_t>>
+    std::optional<Response>
         getCurrentUtilizationHandler(const nsm_msg* requestMsg,
-                                     size_t requestLen);
+                                     size_t requestLen, bool isLongRunning,
+                                     std::optional<Request>& longRunningEvent);
 
     std::optional<std::vector<uint8_t>>
         getClockOutputEnableStateHandler(const nsm_msg* requestMsg,
@@ -191,9 +202,10 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
 
-    std::optional<std::vector<uint8_t>>
+    std::optional<Response>
         getViolationDurationHandler(const nsm_msg* requestMsg,
-                                    size_t requestLen);
+                                    size_t requestLen, bool isLongRunning,
+                                    std::optional<Request>& longRunningEvent);
 
     // send rediscovery event
     void sendRediscoveryEvent(uint8_t eid, bool ackr);
@@ -456,6 +468,8 @@ class MockupResponder
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
+        uint8_t migMode;
+        uint8_t eccMode;
     } state;
 };
 

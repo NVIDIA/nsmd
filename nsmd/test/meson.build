@@ -1,5 +1,6 @@
 dep_src_files = [
     '../nsmDevice.cpp',
+    '../nsmSensor.cpp',
     '../sensorManager.cpp',
     '../nsmObjectFactory.cpp',
     '../nsmEvent.cpp',

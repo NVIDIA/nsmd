@@ -126,10 +126,10 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
     auto event =
         dynamic_pointer_cast<NsmThresholdEvent>(gpu.deviceEvents.back());
     EXPECT_NE(nullptr, event);
-    EXPECT_EQ(event.get(),
-              gpu.eventDispatcher
-                  .eventsMap[NSM_TYPE_NETWORK_PORT][NSM_THRESHOLD_EVENT]
-                  .get());
+    auto& eventMapEntry =
+        *gpu.eventDispatcher.eventsMap[NSM_TYPE_NETWORK_PORT].find(
+            NSM_THRESHOLD_EVENT);
+    EXPECT_EQ(event.get(), eventMapEntry.second.get());
 
     const nsm_health_event_payload payload{0, 0, 1, 1, 1, 1, 1, 1, 1, 0};
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +

@@ -1,3 +1,19 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 #include "nsmCommon.hpp"
 
 #include "platform-environmental.h"
@@ -98,7 +114,7 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory> totalMemory,
     bool isLongRunning) :
-    NsmSensor(name, type, isLongRunning),
+    NsmLongRunningSensor(name, type, isLongRunning),
     totalMemory(totalMemory), inventoryObjPath(inventoryObjPath)
 
 {
@@ -173,21 +189,27 @@ uint8_t
 {
     uint8_t cc = NSM_ERROR;
     struct nsm_memory_capacity_utilization data;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize = 0;
+    uint16_t reasonCode = ERR_NULL;
 
-    auto rc = decode_get_memory_capacity_util_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+    auto handleFunctionName = isLongRunning
+                                  ? "decode_get_memory_capacity_util_event_resp"
+                                  : "decode_get_memory_capacity_util_resp";
+    auto rc = isLongRunning
+                  ? decode_get_memory_capacity_util_event_resp(
+                        responseMsg, responseLen, &cc, &reasonCode, &data)
+                  : decode_get_memory_capacity_util_resp(
+                        responseMsg, responseLen, &cc, &dataSize, &reasonCode,
+                        &data);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_get_memory_capacity_util_resp");
+        clearErrorBitMap(handleFunctionName);
     }
     else
     {
-        logHandleResponseMsg("decode_get_memory_capacity_util_resp",
-                             reason_code, cc, rc);
+        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 

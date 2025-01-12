@@ -17,21 +17,32 @@
 
 #pragma once
 
-#include "nsmAsyncLongRunningSensor.hpp"
+#include "asyncOperationManager.hpp"
+#include "nsmSensor.hpp"
 
 namespace nsm
 {
-class NsmSetMigMode : public NsmAsyncLongRunningSensor
+class NsmAsyncSensor : public NsmSensor
 {
   public:
-    NsmSetMigMode(bool isLongRunning);
+    using NsmSensor::NsmSensor;
+
+    requester::Coroutine set(const AsyncSetOperationValueType& value,
+                             AsyncOperationStatusType* status,
+                             std::shared_ptr<NsmDevice> device);
+
+  protected:
+    AsyncOperationStatusType* status = nullptr;
+    template <typename T>
+    T getValue()
+    {
+        return std::get<T>(*value);
+    }
+
+    virtual requester::Coroutine update(SensorManager& manager,
+                                        eid_t eid) override;
 
   private:
-    std::optional<Request> genRequestMsg(eid_t eid,
-                                         uint8_t instanceId) override;
-
-    uint8_t handleResponseMsg(const nsm_msg* responseMsg,
-                              size_t responseLen) override;
+    const AsyncSetOperationValueType* value = nullptr;
 };
-
 } // namespace nsm
