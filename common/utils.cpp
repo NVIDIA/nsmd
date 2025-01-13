@@ -85,33 +85,32 @@ std::string convertHexToString(const std::vector<uint8_t>& data,
     return result;
 }
 
-void printBuffer(bool isTx, const std::vector<uint8_t>& buffer)
+void printBuffer(bool isTx, const std::vector<uint8_t>& buffer, uint8_t tag,
+                 eid_t eid)
 {
     if (!buffer.empty())
     {
-        std::ostringstream tempStream;
-        for (int byte : buffer)
+        constexpr size_t headerSize = strlen("EID: 1d, TAG: 03, Tx: ");
+        constexpr size_t hexWithSpaceSize = strlen("89 ");
+        std::string output(headerSize + buffer.size() * hexWithSpaceSize, '\0');
+        sprintf(output.data(), "EID: %02x, TAG: %02x, %s: ", eid, tag,
+                isTx ? "Tx" : "Rx");
+        for (size_t i = 0; i < buffer.size(); i++)
         {
-            tempStream << std::setfill('0') << std::setw(2) << std::hex << byte
-                       << " ";
+            sprintf(&output[headerSize + i * hexWithSpaceSize], "%02x ",
+                    buffer[i]);
         }
-        if (isTx)
-        {
-            lg2::info("Tx: {TX}", "TX", tempStream.str());
-        }
-        else
-        {
-            lg2::info("Rx: {RX}", "RX", tempStream.str());
-        }
+        // Changing last trailing space to string null terminator
+        output.back() = '\0';
+        lg2::info("{OUTPUT}", "OUTPUT", output);
     }
 }
 
-void printBuffer(bool isTx, const nsm_msg* buffer, size_t bufferLen)
+void printBuffer(bool isTx, const uint8_t* ptr, size_t bufferLen, uint8_t tag,
+                 eid_t eid)
 {
-    auto ptr = reinterpret_cast<const uint8_t*>(buffer);
-    auto outBuffer =
-        std::vector<uint8_t>(ptr, ptr + (sizeof(nsm_msg_hdr) + bufferLen));
-    printBuffer(isTx, outBuffer);
+    auto outBuffer = std::vector<uint8_t>(ptr, ptr + bufferLen);
+    printBuffer(isTx, outBuffer, tag, eid);
 }
 
 std::vector<std::string> split(std::string_view srcStr, std::string_view delim,
@@ -200,10 +199,6 @@ eid_t getEidFromUUID(
     if (eid == std::numeric_limits<uint8_t>::max())
     {
         lg2::error("EID not Found for UUID={UUID}", "UUID", uuid);
-    }
-    else
-    {
-        lg2::debug("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
     }
 
     return eid;
