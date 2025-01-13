@@ -55,7 +55,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds for NSM Long-running requests',
-    value: 30000,
+    value: 1499,
 )
 option(
     'allowed-buffer-in-ms-for-polling',
@@ -181,15 +181,6 @@ option(
   type: 'feature',
   value: 'enabled',
   description: 'Expose Accelerator D-Bus Interface for Processor'
-)
-
-option(
-    'delay-between-concurrent-requests',
-    type: 'integer',
-    value: 5000,
-    min: 1,
-    max: 100000,
-    description: 'The minimum required interval time in microseconds between two concurrent requests' ,
 )
 
 option(

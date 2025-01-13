@@ -141,11 +141,6 @@ if get_option('enable-in-kernel-mctp').enabled()
     conf_data.set('MCTP_IN_KERNEL', 0)
 endif
 
-conf_data.set(
-    'DELAY_BETWEEN_CONCURRENT_REQUESTS',
-    get_option('delay-between-concurrent-requests'),
-)
-
 if get_option('fixup-missing-event-notification').enabled()
     conf_data.set('FIXUP_MISSING_EVENT_NOTIFICATION', 1)
 endif
