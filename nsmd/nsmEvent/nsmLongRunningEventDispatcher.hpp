@@ -15,40 +15,26 @@
  * limitations under the License.
  */
 
-#include "eventTypeHandlers.hpp"
+#pragma once
 
-#include "device-capability-discovery.h"
-#include "network-ports.h"
-#include "platform-environmental.h"
-
-#include "deviceManager.hpp"
-#include "nsmDevice.hpp"
-#include "sensorManager.hpp"
-#include "utils.hpp"
-
-#include <phosphor-logging/lg2.hpp>
-
-#include <memory>
+#include "nsmEvent.hpp"
 
 namespace nsm
 {
 
-EventType0Handler::EventType0Handler()
+class NsmLongRunningEventDispatcher : public NsmEvent
 {
-    enableDelegation(NSM_REDISCOVERY_EVENT);
-    enableDelegation(NSM_LONG_RUNNING_EVENT);
-}
+  public:
+    NsmLongRunningEventDispatcher();
+    int addEvent(NsmType type, uint8_t command,
+                 std::shared_ptr<NsmEvent> event);
 
-EventType1Handler::EventType1Handler()
-{
-    enableDelegation(NSM_THRESHOLD_EVENT);
-    enableDelegation(NSM_FABRIC_MANAGER_STATE_EVENT);
-}
-
-EventType3Handler::EventType3Handler()
-{
-    enableDelegation(NSM_XID_EVENT);
-    enableDelegation(NSM_RESET_REQUIRED_EVENT);
-}
+  private:
+    std::unordered_map<NsmType,
+                       std::unordered_map<uint8_t, std::shared_ptr<NsmEvent>>>
+        eventsMap{};
+    int handle(eid_t eid, NsmType type, NsmEventId eventId,
+               const nsm_msg* event, size_t eventLen) override;
+};
 
 } // namespace nsm

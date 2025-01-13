@@ -3644,9 +3644,9 @@ int decode_nsm_reset_required_event(const struct nsm_msg *msg, size_t msg_len,
 				    uint8_t *event_class, uint16_t *event_state)
 {
 	uint8_t data_size = 0;
-	int result = decode_nsm_event(msg, msg_len, NSM_RESET_REQUIRED_EVENT,
-				      NSM_GENERAL_EVENT_CLASS, event_state,
-				      &data_size, NULL);
+	int result =
+	    decode_nsm_event(msg, msg_len, NSM_RESET_REQUIRED_EVENT,
+			     NSM_GENERAL_EVENT_CLASS, event_state, &data_size);
 	if (data_size > 0) {
 		return NSM_SW_ERROR_DATA;
 	}
