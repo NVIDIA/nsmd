@@ -60,6 +60,12 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     uint8_t rc = NSM_SW_ERROR;
     try
     {
+        if (isLongRunning)
+        {
+            lg2::error("isLongRunning is not implemented");
+            statusInterface->status(AsyncOperationStatusType::InternalFailure);
+            co_return NSM_SW_ERROR;
+        }
         std::vector<uint8_t> data;
         utils::readFdToBuffer(fd, data);
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
