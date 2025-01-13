@@ -27,31 +27,108 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+using ::testing::Test;
+
 #define private public
 #define protected public
 #include "mockupResponder.hpp"
-
-using ::testing::ElementsAre;
-
-class MockupResponderTest : public testing::Test
+class MockupResponderTest : public Test
 {
+  private:
+    template <typename ResponseStruct>
+    void test(
+        const nsm_msg* requestMsg, size_t requestMsgLen,
+        std::function<std::optional<Response>(const nsm_msg*, size_t)> handler,
+        uint8_t command, ResponseStruct& response)
+    {
+        // Good Test
+        auto resp = handler(requestMsg, requestMsgLen);
+
+        EXPECT_TRUE(resp.has_value());
+        EXPECT_EQ(resp.value().size(),
+                  sizeof(nsm_msg_hdr) + sizeof(ResponseStruct));
+
+        auto msg = reinterpret_cast<nsm_msg*>(resp.value().data());
+        EXPECT_GE(sizeof(ResponseStruct), sizeof(nsm_common_resp));
+        auto common = reinterpret_cast<nsm_common_resp*>(msg->payload);
+        EXPECT_EQ(command, common->command);
+        EXPECT_EQ(sizeof(ResponseStruct) - sizeof(nsm_common_resp),
+                  common->data_size);
+        response = *reinterpret_cast<ResponseStruct*>(msg->payload);
+
+        // Bad tests
+        resp = handler(nullptr, requestMsgLen);
+        EXPECT_FALSE(resp.has_value());
+        resp = handler(requestMsg, requestMsgLen - 1);
+        EXPECT_FALSE(resp.has_value());
+
+        auto badRequest = Request((uint8_t*)requestMsg,
+                                  (uint8_t*)requestMsg + requestMsgLen);
+        auto badRequestMsg = reinterpret_cast<nsm_msg*>(badRequest.data());
+        badRequestMsg->hdr.ocp_type = 0;
+        resp = handler(badRequestMsg, requestMsgLen);
+        EXPECT_FALSE(resp.has_value());
+    }
+
+    template <typename ResponseStruct>
+    void
+        test(const nsm_msg* requestMsg, size_t requestMsgLen,
+             std::function<std::optional<Response>(const nsm_msg*, size_t, bool,
+                                                   std::optional<Request>&)>
+                 handler,
+             uint8_t command, ResponseStruct& response)
+    {
+        std::optional<Request> longRunningEvent;
+        // test as not long running
+        test(
+            requestMsg, requestMsgLen,
+            [&handler, &longRunningEvent](const nsm_msg* request, size_t len) {
+            return handler(request, len, false, longRunningEvent);
+        },
+            command, response);
+
+        // test as long running
+        auto resp = handler(requestMsg, requestMsgLen, true, longRunningEvent);
+
+        EXPECT_TRUE(resp.has_value());
+        EXPECT_EQ(resp.value().size(),
+                  sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+        auto respMsg = reinterpret_cast<nsm_msg*>(resp.value().data());
+        auto commonResp = reinterpret_cast<nsm_common_resp*>(respMsg->payload);
+        EXPECT_EQ(command, commonResp->command);
+        EXPECT_EQ(NSM_ACCEPTED, commonResp->completion_code);
+        EXPECT_EQ(0, commonResp->reserved);
+        EXPECT_EQ(0, commonResp->data_size);
+
+        EXPECT_TRUE(longRunningEvent.has_value());
+        EXPECT_EQ(longRunningEvent.value().size(),
+                  sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                      sizeof(nsm_long_running_resp) + sizeof(ResponseStruct) -
+                      sizeof(nsm_common_resp));
+    }
+
   protected:
     MockupResponderTest() : event(sdeventplus::Event::get_default())
 
     {
-        systemBus = std::make_shared<sdbusplus::asio::connection>(io);
-        objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
-        mockupResponder = std::make_shared<MockupResponder::MockupResponder>(
-            true, event, *objServer, 30, NSM_DEV_ID_GPU, 0);
+        init(30, NSM_DEV_ID_GPU, 2);
     }
 
+    uint8_t instanceId = 0;
     sdeventplus::Event event;
-
     boost::asio::io_context io;
     std::shared_ptr<sdbusplus::asio::connection> systemBus;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::shared_ptr<MockupResponder::MockupResponder> mockupResponder;
-    uint8_t instanceId = 0;
+
+    void init(eid_t eid, uint8_t deviceType, uint8_t instanceId)
+    {
+        this->instanceId = instanceId;
+        systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+        objServer = std::make_shared<sdbusplus::asio::object_server>(systemBus);
+        mockupResponder = std::make_shared<MockupResponder::MockupResponder>(
+            true, event, *objServer, eid, deviceType, instanceId);
+    }
 
     void testProperty(uint8_t propertyIdentifier,
                       const std::string& expectedValue)
@@ -78,57 +155,26 @@ class MockupResponderTest : public testing::Test
     using MockupResponderFunction = std::optional<Response> (
         MockupResponder::MockupResponder::*)(const nsm_msg*, size_t);
 
-    template <typename ResponseStruct>
-    void test(nsm_msg* requestMsg, size_t requestMsgLen,
-              MockupResponderFunction handlerFunction, uint8_t command,
-              ResponseStruct& response)
-    {
-        // Good Test
-        auto handler = std::bind(handlerFunction, mockupResponder.get(),
-                                 std::placeholders::_1, std::placeholders::_2);
-        auto resp = handler(requestMsg, requestMsgLen);
-
-        EXPECT_TRUE(resp.has_value());
-        EXPECT_EQ(resp.value().size(),
-                  sizeof(nsm_msg_hdr) + sizeof(ResponseStruct));
-
-        auto msg = reinterpret_cast<nsm_msg*>(resp.value().data());
-        EXPECT_GE(sizeof(ResponseStruct), sizeof(nsm_common_resp));
-        auto common = reinterpret_cast<nsm_common_resp*>(msg->payload);
-        EXPECT_EQ(command, common->command);
-        EXPECT_EQ(sizeof(ResponseStruct) - sizeof(nsm_common_resp),
-                  common->data_size);
-        response = *reinterpret_cast<ResponseStruct*>(msg->payload);
-
-        // Bad tests
-        resp = handler(nullptr, requestMsgLen);
-        EXPECT_FALSE(resp.has_value());
-        resp = handler(requestMsg, requestMsgLen - 1);
-        EXPECT_FALSE(resp.has_value());
-        requestMsg->hdr.ocp_type = 0;
-        resp = handler(requestMsg, requestMsgLen);
-        EXPECT_FALSE(resp.has_value());
-    }
-
-    template <typename RequestPayload, typename ResponseStruct>
+    template <typename RequestPayload, typename ResponseStruct,
+              typename MockupFunction>
     void test(std::function<int(uint8_t, RequestPayload, nsm_msg*)>
                   encodeRequestFunction,
-              RequestPayload requestPayload,
-              MockupResponderFunction handlerFunction, uint8_t command,
-              ResponseStruct& response)
+              RequestPayload requestPayload, MockupFunction handlerFunction,
+              uint8_t command, ResponseStruct& response)
     {
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
                         sizeof(RequestPayload));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         auto rc = encodeRequestFunction(instanceId, requestPayload, requestMsg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
-        test(requestMsg, request.size(), handlerFunction, command, response);
+        auto handler = std::bind_front(handlerFunction, mockupResponder.get());
+        test(requestMsg, request.size(), handler, command, response);
     }
-    template <typename RequestPayload>
+    template <typename RequestPayload, typename MockupFunction>
     void test(std::function<int(uint8_t, RequestPayload, nsm_msg*)>
                   encodeRequestFunction,
-              RequestPayload requestPayload,
-              MockupResponderFunction handlerFunction, uint8_t command)
+              RequestPayload requestPayload, MockupFunction handlerFunction,
+              uint8_t command)
     {
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
                         sizeof(RequestPayload));
@@ -136,19 +182,21 @@ class MockupResponderTest : public testing::Test
         auto rc = encodeRequestFunction(instanceId, requestPayload, requestMsg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
         nsm_common_resp response;
-        test(requestMsg, request.size(), handlerFunction, command, response);
+        auto handler = std::bind_front(handlerFunction, mockupResponder.get());
+        test(requestMsg, request.size(), handler, command, response);
         EXPECT_EQ(NSM_SUCCESS, response.completion_code);
     }
-    template <typename ResponseStruct>
+    template <typename ResponseStruct, typename MockupFunction>
     void test(std::function<int(uint8_t, nsm_msg*)> encodeRequestFunction,
-              MockupResponderFunction handlerFunction, uint8_t command,
+              MockupFunction handlerFunction, uint8_t command,
               ResponseStruct& response)
     {
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         auto rc = encodeRequestFunction(instanceId, requestMsg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
-        test(requestMsg, request.size(), handlerFunction, command, response);
+        auto handler = std::bind_front(handlerFunction, mockupResponder.get());
+        test(requestMsg, request.size(), handler, command, response);
     }
 };
 
@@ -367,4 +415,62 @@ TEST_F(MockupResponderTest, testGetCurrentErrorInjectionTypesHandler)
     {
         EXPECT_EQ(enabled, response.data.mask[type / 8] & (1 << (type % 8)));
     }
+}
+
+TEST_F(MockupResponderTest, testMigModeHandler)
+{
+    nsm_get_MIG_mode_resp response;
+    test(&encode_get_MIG_mode_req,
+         &MockupResponder::MockupResponder::getMigModeHandler, NSM_GET_MIG_MODE,
+         response);
+    EXPECT_EQ(mockupResponder->state.migMode, response.flags.byte);
+    uint8_t data = 1;
+    test<uint8_t>(&encode_set_MIG_mode_req, data,
+                  &MockupResponder::MockupResponder::setMigModeHandler,
+                  NSM_SET_MIG_MODE);
+    test(&encode_get_MIG_mode_req,
+         &MockupResponder::MockupResponder::getMigModeHandler, NSM_GET_MIG_MODE,
+         response);
+    EXPECT_EQ(mockupResponder->state.migMode, response.flags.byte);
+}
+
+TEST_F(MockupResponderTest, testEccModeHandler)
+{
+    nsm_get_ECC_mode_resp response;
+    test(&encode_get_ECC_mode_req,
+         &MockupResponder::MockupResponder::getEccModeHandler, NSM_GET_ECC_MODE,
+         response);
+    EXPECT_EQ(mockupResponder->state.eccMode, response.flags.byte);
+    uint8_t data = 1;
+    test<uint8_t>(&encode_set_ECC_mode_req, data,
+                  &MockupResponder::MockupResponder::setEccModeHandler,
+                  NSM_SET_ECC_MODE);
+    test(&encode_get_ECC_mode_req,
+         &MockupResponder::MockupResponder::getEccModeHandler, NSM_GET_ECC_MODE,
+         response);
+    EXPECT_EQ(mockupResponder->state.eccMode, response.flags.byte);
+}
+
+TEST_F(MockupResponderTest, testGetMemoryCapacityUtilHandler)
+{
+    nsm_get_memory_capacity_util_resp response;
+    test(&encode_get_memory_capacity_util_req,
+         &MockupResponder::MockupResponder::getMemoryCapacityUtilHandler,
+         NSM_GET_MEMORY_CAPACITY_UTILIZATION, response);
+}
+
+TEST_F(MockupResponderTest, testGetCurrentUtilizationHandler)
+{
+    nsm_get_current_utilization_resp response;
+    test(&encode_get_current_utilization_req,
+         &MockupResponder::MockupResponder::getCurrentUtilizationHandler,
+         NSM_GET_CURRENT_UTILIZATION, response);
+}
+
+TEST_F(MockupResponderTest, testGetViolationDurationHandler)
+{
+    nsm_get_violation_duration_resp response;
+    test(&encode_get_violation_duration_req,
+         &MockupResponder::MockupResponder::getViolationDurationHandler,
+         NSM_GET_VIOLATION_DURATION, response);
 }

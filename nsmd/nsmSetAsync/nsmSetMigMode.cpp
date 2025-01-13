@@ -17,43 +17,18 @@
 
 #include "nsmSetMigMode.hpp"
 
-#include "sensorManager.hpp"
-
-#include <phosphor-logging/lg2.hpp>
+#include "platform-environmental.h"
 
 namespace nsm
 {
-requester::Coroutine setMigModeOnDevice(const bool isLongRunning, bool migMode,
-                                        AsyncOperationStatusType* status,
-                                        std::shared_ptr<NsmDevice> device);
+NsmSetMigMode::NsmSetMigMode(bool isLongRunning) :
+    NsmAsyncLongRunningSensor("NsmSetMigMode", "NSM_MIG", isLongRunning)
+{}
 
-requester::Coroutine
-    setMigModeEnabled(const bool isLongRunning,
-                      const AsyncSetOperationValueType& value,
-                      [[maybe_unused]] AsyncOperationStatusType* status,
-                      std::shared_ptr<NsmDevice> device)
+std::optional<Request> NsmSetMigMode::genRequestMsg(eid_t eid,
+                                                    uint8_t /*instanceId*/)
 {
-    const bool* migMode = std::get_if<bool>(&value);
-
-    if (!migMode)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    const auto rc = co_await setMigModeOnDevice(isLongRunning, *migMode, status,
-                                                device);
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine
-    setMigModeOnDevice([[maybe_unused]] const bool isLongRunning, bool migMode,
-                       [[maybe_unused]] AsyncOperationStatusType* status,
-                       std::shared_ptr<NsmDevice> device)
-{
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
-    lg2::info("setMigModeOnDevice for EID: {EID}", "EID", eid);
+    auto migMode = getValue<bool>();
     uint8_t requestedMigMode = static_cast<uint8_t>(migMode);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_MIG_mode_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -63,49 +38,35 @@ requester::Coroutine
     if (rc)
     {
         lg2::error(
-            "setMigModeOnDevice encode_set_MIG_mode_req failed. eid={EID} rc={RC}",
+            "NsmSetMigMode::genRequestMsg encode_set_MIG_mode_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    return request;
+}
 
-    std::shared_ptr<const nsm_msg> responseMsg;
-    size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc_)
-    {
-        lg2::error(
-            "setMigModeOnDevice SendRecvNsmMsg failed for while setting MigMode "
-            "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
+uint8_t NsmSetMigMode::handleResponseMsg(const nsm_msg* responseMsg,
+                                         size_t responseLen)
+{
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
-    uint16_t data_size = 0;
-    rc = decode_set_MIG_mode_resp(responseMsg.get(), responseLen, &cc,
-                                  &reason_code, &data_size);
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    auto rc = isLongRunning
+                  ? decode_set_MIG_mode_event_resp(responseMsg, responseLen,
+                                                   &cc, &reasonCode)
+                  : decode_set_MIG_mode_resp(responseMsg, responseLen, &cc,
+                                             &dataSize, &reasonCode);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::info("setMigModeOnDevice for EID: {EID} completed", "EID", eid);
+        lg2::info("NsmSetMigMode::handleResponseMsg completed");
     }
     else
     {
         lg2::error(
-            "setMigModeOnDevice decode_set_MIG_mode_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-        lg2::error("throwing write failure exception");
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+            "NsmSetMigMode::handleResponseMsg decode_set_MIG_mode_resp failed. cc={CC}, reasonCode={REASON}, rc={RC}",
+            "CC", cc, "REASON", reasonCode, "RC", rc);
     }
-    // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
+
 } // namespace nsm

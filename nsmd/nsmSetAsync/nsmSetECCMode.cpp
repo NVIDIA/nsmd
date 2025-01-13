@@ -17,44 +17,19 @@
 
 #include "nsmSetECCMode.hpp"
 
-#include "sensorManager.hpp"
-
-#include <phosphor-logging/lg2.hpp>
+#include "platform-environmental.h"
 
 namespace nsm
 {
-requester::Coroutine setECCModeOnDevice(const bool isLongRunning, bool migMode,
-                                        AsyncOperationStatusType* status,
-                                        std::shared_ptr<NsmDevice> device);
 
-requester::Coroutine
-    setECCModeEnabled(const bool isLongRunning,
-                      const AsyncSetOperationValueType& value,
-                      [[maybe_unused]] AsyncOperationStatusType* status,
-                      std::shared_ptr<NsmDevice> device)
+NsmSetEccMode::NsmSetEccMode(bool isLongRunning) :
+    NsmAsyncLongRunningSensor("NsmSetEccMode", "NSM_ECC", isLongRunning)
+{}
+
+std::optional<Request> NsmSetEccMode::genRequestMsg(eid_t eid,
+                                                    uint8_t /*instanceId*/)
 {
-    const bool* eccMode = std::get_if<bool>(&value);
-
-    if (!eccMode)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    const auto rc = co_await setECCModeOnDevice(isLongRunning, *eccMode, status,
-                                                device);
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine
-    setECCModeOnDevice([[maybe_unused]] const bool isLongRunning, bool eccMode,
-                       [[maybe_unused]] AsyncOperationStatusType* status,
-                       std::shared_ptr<NsmDevice> device)
-{
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
-    lg2::info("setECCModeOnDevice for EID: {EID}", "EID", eid);
-    // NSM spec expects  requestedECCMode mode to be uint8_t
+    auto eccMode = getValue<bool>();
     uint8_t requestedECCMode = static_cast<uint8_t>(eccMode);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_ECC_mode_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -64,52 +39,34 @@ requester::Coroutine
     if (rc)
     {
         lg2::error(
-            "setECCModeOnDevice encode_set_ECC_mode_req failed. eid={EID} rc={RC}",
+            "NsmSetEccMode::genRequestMsg encode_set_ECC_mode_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+    return request;
+}
 
-    std::shared_ptr<const nsm_msg> responseMsg;
-    size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc_)
-    {
-        if (rc_ != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
-        {
-            lg2::error(
-                "setECCModeOnDevice SendRecvNsmMsg failed for while setting ECCMode "
-                "eid={EID} rc={RC}",
-                "EID", eid, "RC", rc_);
-        }
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
+uint8_t NsmSetEccMode::handleResponseMsg(const nsm_msg* responseMsg,
+                                         size_t responseLen)
+{
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
-    uint16_t data_size = 0;
-    rc = decode_set_ECC_mode_resp(responseMsg.get(), responseLen, &cc,
-                                  &data_size, &reason_code);
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    auto rc = isLongRunning
+                  ? decode_set_ECC_mode_event_resp(responseMsg, responseLen,
+                                                   &cc, &reasonCode)
+                  : decode_set_ECC_mode_resp(responseMsg, responseLen, &cc,
+                                             &dataSize, &reasonCode);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        lg2::info("setECCModeOnDevice for EID: {EID} completed", "EID", eid);
+        lg2::info("NsmSetEccMode::handleResponseMsg completed");
     }
     else
     {
         lg2::error(
-            "setECCModeOnDevice decode_set_ECC_mode_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-        lg2::error("throwing write failure exception");
-        *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+            "NsmSetEccMode::handleResponseMsg decode_set_ECC_mode_resp failed. cc={CC}, reasonCode={REASON}, rc={RC}",
+            "CC", cc, "REASON", reasonCode, "RC", rc);
     }
-    // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 } // namespace nsm

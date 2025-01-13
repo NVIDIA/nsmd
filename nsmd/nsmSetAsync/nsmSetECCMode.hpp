@@ -17,14 +17,20 @@
 
 #pragma once
 
-#include "asyncOperationManager.hpp"
-
-#include <xyz/openbmc_project/Memory/MemoryECC/server.hpp>
+#include "nsmAsyncLongRunningSensor.hpp"
 
 namespace nsm
 {
-requester::Coroutine setECCModeEnabled(const bool isLongRunning,
-                                       const AsyncSetOperationValueType& value,
-                                       AsyncOperationStatusType* status,
-                                       std::shared_ptr<NsmDevice> device);
+class NsmSetEccMode : public NsmAsyncLongRunningSensor
+{
+  public:
+    NsmSetEccMode(bool isLongRunning);
+
+  private:
+    std::optional<Request> genRequestMsg(eid_t eid,
+                                         uint8_t instanceId) override;
+
+    uint8_t handleResponseMsg(const nsm_msg* responseMsg,
+                              size_t responseLen) override;
+};
 } // namespace nsm

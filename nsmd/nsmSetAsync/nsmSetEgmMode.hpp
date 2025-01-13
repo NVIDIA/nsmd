@@ -26,8 +26,7 @@ namespace nsm
 using EgmModeIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::server::EgmMode>;
 
-requester::Coroutine setEgmModeEnabled(const bool isLongRunning,
-                                       const AsyncSetOperationValueType& value,
+requester::Coroutine setEgmModeEnabled(const AsyncSetOperationValueType& value,
                                        AsyncOperationStatusType* status,
                                        std::shared_ptr<NsmDevice> device);
 } // namespace nsm

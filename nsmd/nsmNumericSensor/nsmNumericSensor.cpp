@@ -298,11 +298,6 @@ void NsmNumericSensorCompositeChildValue::updateReading(double value,
 
 requester::Coroutine NsmNumericSensor::update(SensorManager& manager, eid_t eid)
 {
-    if (isLongRunning)
-    {
-        co_return NSM_SW_SUCCESS; // Temporarily disabling long-running commands
-    }
-
     auto requestMsg = genRequestMsg(eid, 0);
     if (!requestMsg.has_value())
     {

@@ -21,6 +21,7 @@
 #include "platform-environmental.h"
 
 #include "nsmCommon/sharedMemCommon.hpp"
+#include "nsmLongRunningSensor.hpp"
 #include "nsmSensor.hpp"
 
 #include <telemetry_mrd_producer.hpp>
@@ -63,7 +64,7 @@ using DimmMemoryMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Dimm::server::MemoryMetrics>;
 
-class NsmMemoryCapacityUtil : public NsmSensor
+class NsmMemoryCapacityUtil : public NsmLongRunningSensor
 {
   public:
     NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
