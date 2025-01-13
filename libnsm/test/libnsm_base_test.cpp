@@ -17,6 +17,7 @@
 
 #include "base.h"
 #include "common-tests.hpp"
+#include "device-capability-discovery.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -757,4 +758,127 @@ TEST(commonReq, testEncodeRawMsg)
 	EXPECT_EQ(NSM_SW_ERROR_NULL,
 		  encode_raw_cmd_req(0, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
 				     NSM_PING, nullptr, 1, msg));
+}
+
+TEST(LongRunning, testDecodeEventState)
+{
+	const uint8_t instanceId = 0;
+	const uint8_t commandCode = 0x4d;
+	Response responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    (instanceId & 0x1f), // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    0x08,			    // NSM_EVENT_VERSION=0, ACK=1, RES=0
+	    NSM_LONG_RUNNING_EVENT,	    // EVENT_ID
+	    NSM_NVIDIA_GENERAL_EVENT_CLASS, // EVENT_CLASS
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL,	  // EVENT_STATE >> 8
+	    commandCode,			  // EVENT_STATE & 0xFF
+	    sizeof(struct nsm_long_running_resp), // data size
+	    instanceId,				  // instance id
+	    0,					  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    0,					  // data
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto len = responseMsg.size();
+	uint8_t dataSize;
+	uint16_t eventState;
+	EXPECT_EQ(NSM_SW_ERROR_NULL,
+		  decode_nsm_event(response, len, NSM_LONG_RUNNING_EVENT,
+				   NSM_NVIDIA_GENERAL_EVENT_CLASS, nullptr,
+				   &dataSize));
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH,
+		  decode_nsm_event_with_data(
+		      response, sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN,
+		      NSM_LONG_RUNNING_EVENT, NSM_NVIDIA_GENERAL_EVENT_CLASS,
+		      &eventState, &dataSize, nullptr));
+	EXPECT_EQ(NSM_SW_SUCCESS,
+		  decode_nsm_event(response, len, NSM_LONG_RUNNING_EVENT,
+				   NSM_NVIDIA_GENERAL_EVENT_CLASS, &eventState,
+				   &dataSize));
+	nsm_long_running_event_state state;
+	memcpy(&state, &eventState, sizeof(uint16_t));
+	EXPECT_EQ(0x4d, state.command);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL, state.nvidia_message_type);
+}
+
+TEST(LongRunning, testBadEncodeSize)
+{
+	Response responseMsg(sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+			     sizeof(struct nsm_long_running_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto rc = encode_long_running_resp(0, NSM_SUCCESS, ERR_NULL,
+					   NSM_TYPE_PLATFORM_ENVIRONMENTAL, 0,
+					   nullptr, 0xFC, response);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(LongRunning, testBadDecode)
+{
+	const uint8_t instanceId = 0;
+	const uint8_t commandCode = 0x4d;
+	Response responseMsg{
+	    0x10,
+	    0xDE,		 // PCI VID: NVIDIA 0x10DE
+	    (instanceId & 0x1f), // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		 // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    0x08,			    // NSM_EVENT_VERSION=0, ACK=1, RES=0
+	    NSM_LONG_RUNNING_EVENT,	    // EVENT_ID
+	    NSM_NVIDIA_GENERAL_EVENT_CLASS, // EVENT_CLASS
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL,	  // EVENT_STATE >> 8
+	    commandCode,			  // EVENT_STATE & 0xFF
+	    sizeof(struct nsm_long_running_resp), // data size
+	    instanceId,				  // instance id
+	    0,					  // completion code
+	    0,					  // reserved
+	    0,					  // reserved
+	    0,					  // data
+	};
+	uint8_t data;
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto event = reinterpret_cast<nsm_event *>(response->payload);
+	auto longRunning =
+	    reinterpret_cast<nsm_long_running_resp *>(event->data);
+	auto len = responseMsg.size();
+	auto badLen = sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+		      sizeof(struct nsm_long_running_resp) - 1;
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reasonCode = ERR_NULL;
+
+	auto rc = decode_long_running_resp_with_data(
+	    response, badLen, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	const auto offset = [response](uint8_t *data) {
+		return size_t(data) - size_t(response);
+	};
+
+	responseMsg[offset(&event->data_size)] =
+	    sizeof(struct nsm_long_running_resp) - 1;
+	rc = decode_long_running_resp_with_data(
+	    response, len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	responseMsg[offset(&event->data_size)] =
+	    sizeof(struct nsm_long_running_resp);
+
+	responseMsg[offset(&event->data_size)] =
+	    sizeof(struct nsm_long_running_resp) + 1;
+	rc = decode_long_running_resp_with_data(
+	    response, badLen, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	responseMsg[offset(&longRunning->completion_code)] = NSM_ERROR;
+	rc = decode_long_running_resp_with_data(
+	    response, len, NSM_TYPE_PLATFORM_ENVIRONMENTAL, commandCode, &cc,
+	    &reasonCode, &data, sizeof(bitfield8_t));
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+	EXPECT_EQ(cc, NSM_ERROR);
+	responseMsg[offset(&longRunning->completion_code)] = NSM_SUCCESS;
 }

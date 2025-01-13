@@ -94,7 +94,7 @@ enum nsm_platform_environmental_commands {
  */
 enum nsm_platform_environmental_events {
 	NSM_RESET_REQUIRED_EVENT = 0x00,
-	NSM_XID_EVENT = 0x01,
+	NSM_XID_EVENT = 0x01
 };
 
 enum nsm_mnnvlink_peer_type {
@@ -522,14 +522,18 @@ struct nsm_get_accum_GPU_util_time_resp {
 	uint32_t SM_util_time;
 } __attribute__((packed));
 
+struct nsm_get_current_utilization_data {
+	uint32_t gpu_utilization;
+	uint32_t memory_utilization;
+} __attribute__((packed));
+
 /** @struct nsm_get_current_utilization
  *
  *  Structure representing Get Current Utilization response.
  */
 struct nsm_get_current_utilization_resp {
 	struct nsm_common_resp hdr;
-	uint32_t gpu_utilization;
-	uint32_t memory_utilization;
+	struct nsm_get_current_utilization_data data;
 } __attribute__((packed));
 
 /** @struct nsm_xid_event_payload
@@ -1689,6 +1693,32 @@ int decode_get_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code, bitfield8_t *flags);
 
+/** @brief Encode a Get MIG mode event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating MIG modes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_MIG_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const bitfield8_t *flags,
+				   struct nsm_msg *msg);
+
+/** @brief Decode a Get MIG mode event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - completion code
+ *  @param[out] reason_code - completion code
+ *  @param[out] flags - flags indicating MIG modes
+ *  @return nsm_completion_codes
+ */
+int decode_get_MIG_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   bitfield8_t *flags);
+
 /** @brief Encode a Set Mig Mode request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -1709,7 +1739,7 @@ int encode_set_MIG_mode_req(uint8_t instance, uint8_t requested_mode,
 int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
 			    uint8_t *requested_mode);
 
-/** @brief Encode a Get MIG mode response message
+/** @brief Encode a Set MIG mode response message
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
@@ -1720,15 +1750,38 @@ int decode_set_MIG_mode_req(const struct nsm_msg *msg, size_t msg_len,
 int encode_set_MIG_mode_resp(uint8_t instance_id, uint8_t cc,
 			     uint16_t reason_code, struct nsm_msg *msg);
 
-/** @brief Decode a Get MIG mode response message
+/** @brief Decode a Set MIG mode response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] reason_code - completion code
  *  @return nsm_completion_codes
  */
 int decode_set_MIG_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code);
+
+/** @brief Encode a Set MIG mode event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_MIG_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Set MIG mode event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_MIG_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Encode a Get ECC mode request message
  *
@@ -1751,16 +1804,44 @@ int encode_get_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
 			     uint16_t reason_code, bitfield8_t *flags,
 			     struct nsm_msg *msg);
 
-/** @brief Dncode a Get ECC mode response message
+/** @brief Decode a Get ECC mode response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] reason_code - completion code
  *  @param[out] flags - flags indicating ECC modes
  *  @return nsm_completion_codes
  */
 int decode_get_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code, bitfield8_t *flags);
+
+/** @brief Encode a Get ECC mode event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] flags - bits indicating ECC modes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_ECC_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const bitfield8_t *flags,
+				   struct nsm_msg *msg);
+
+/** @brief Decode a Get ECC mode event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] flags - flags indicating ECC modes
+ *  @return nsm_completion_codes
+ */
+int decode_get_ECC_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   bitfield8_t *flags);
 
 /** @brief Encode a Set ECC Mode request message
  *
@@ -1797,11 +1878,34 @@ int encode_set_ECC_mode_resp(uint8_t instance_id, uint8_t cc,
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - data size in bytes
+ *  @param[out] reason_code - completion code
  *  @return nsm_completion_codes
  */
 int decode_set_ECC_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code);
+
+/** @brief Encode a Set ECC mode event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_ECC_mode_event_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg);
+
+/** @brief Decode a Set ECC mode event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_ECC_mode_event_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code);
 
 /** @brief Encode a Get ECC error counts request message
  *
@@ -2206,35 +2310,57 @@ int encode_get_current_utilization_req(uint8_t instance, struct nsm_msg *msg);
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] cc - pointer to response message completion code
  *  @param[in] reason_code - NSM reason code
- *  @param[in] gpu_utilization - Current SM Utilization for the GPU (in
+ *  @param[in] data - Current SM Utilization for the GPU (in percentage) and
+ *                    Current memory bandwidth utilization for the GPU (in
  * percentage)
- *  @param[in] memory_utilization - Current memory bandwidth utilization for the
- * GPU (in percentage)
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_current_utilization_resp(uint8_t instance_id, uint8_t cc,
-					uint16_t reason_code,
-					uint32_t gpu_utilization,
-					uint32_t memory_utilization,
-					struct nsm_msg *msg);
+int encode_get_current_utilization_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_get_current_utilization_data *data, struct nsm_msg *msg);
 
-/** @brief Dncode a Get Current Utilization response message
+/** @brief Decode a Get Current Utilization response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
- *  @param[out] gpu_utilization - Current SM Utilization for the GPU (in
+ *  @param[out] data - Current SM Utilization for the GPU (in percentage) and
+ *                     Current memory bandwidth utilization for the GPU (in
  * percentage)
- *  @param[out] memory_utilization - Current memory bandwidth utilization for
- * the GPU (in percentage)
  *  @return nsm_completion_codes
  */
-int decode_get_current_utilization_resp(const struct nsm_msg *msg,
-					size_t msg_len, uint8_t *cc,
-					uint16_t *data_size,
-					uint16_t *reason_code,
-					uint32_t *gpu_utilization,
-					uint32_t *memory_utilization);
+int decode_get_current_utilization_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_get_current_utilization_data *data);
+
+/** @brief Encode a Get Current Utilization event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - Current SM Utilization for the GPU (in percentage) and
+ *                    Current memory bandwidth utilization for the GPU (in
+ * percentage)
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_current_utilization_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_get_current_utilization_data *data, struct nsm_msg *msg);
+
+/** @brief Decode a Get Current Utilization event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] data - Current SM Utilization for the GPU (in percentage) and
+ *                     Current memory bandwidth utilization for the GPU (in
+ * percentage)
+ *  @return nsm_completion_codes
+ */
+int decode_get_current_utilization_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_get_current_utilization_data *data);
 
 /** @brief Encode a Set Power Limits request message
  *
@@ -2544,7 +2670,7 @@ int encode_get_memory_capacity_util_resp(
     uint8_t instance_id, uint8_t cc, uint16_t reason_code,
     struct nsm_memory_capacity_utilization *data, struct nsm_msg *msg);
 
-/** @brief Dncode a Get Memory Capacity Utilization response message
+/** @brief Decode a Get Memory Capacity Utilization response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
@@ -2554,6 +2680,31 @@ int encode_get_memory_capacity_util_resp(
  */
 int decode_get_memory_capacity_util_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *data_size,
+    uint16_t *reason_code, struct nsm_memory_capacity_utilization *data);
+
+/** @brief Encode a Get Memory Capacity Utilization event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct representing memory capacity Utilization
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_memory_capacity_util_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_memory_capacity_utilization *data, struct nsm_msg *msg);
+
+/** @brief Decode a Get Memory Capacity Utilization event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] data - struct representing memory capacity Utilization
+ *  @return nsm_completion_codes
+ */
+int decode_get_memory_capacity_util_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_memory_capacity_utilization *data);
 
 /** @brief Create a xid (Driver Event Message) event message
@@ -2747,7 +2898,7 @@ int encode_get_violation_duration_resp(uint8_t instance_id, uint8_t cc,
 				       struct nsm_violation_duration *data,
 				       struct nsm_msg *msg);
 
-/** @brief Dncode a Get Violation Duration response message
+/** @brief Decode a Get Violation Duration response message
  *  @param[in] msg    - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to response message completion code
@@ -2760,6 +2911,31 @@ int decode_get_violation_duration_resp(const struct nsm_msg *msg,
 				       uint16_t *data_size,
 				       uint16_t *reason_code,
 				       struct nsm_violation_duration *data);
+
+/** @brief Encode a Get Violation Duration event response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct representing violation duration
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_violation_duration_event_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    struct nsm_violation_duration *data, struct nsm_msg *msg);
+
+/** @brief Decode a Get Violation Duration event response message
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - reason code
+ *  @param[out] data - struct representing violation duration
+ *  @return nsm_completion_codes
+ */
+int decode_get_violation_duration_event_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_violation_duration *data);
 
 /** @brief Encode a Get Power Smoothing Feature Info request message
  *

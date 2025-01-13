@@ -16,6 +16,7 @@
  */
 
 #include "base.h"
+#include "common-tests.hpp"
 #include "platform-environmental.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -4814,13 +4815,14 @@ TEST(getCurrentUtilization, testGoodEncodeResponse)
 	    0);
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 
-	uint32_t gpu_utilization = 36;
-	uint32_t memory_utilization = 75;
+	nsm_get_current_utilization_data data{
+	    .gpu_utilization = 36,
+	    .memory_utilization = 75,
+	};
 	uint16_t reason_code = ERR_NULL;
 
 	auto rc = encode_get_current_utilization_resp(
-	    0, NSM_SUCCESS, reason_code, gpu_utilization, memory_utilization,
-	    response);
+	    0, NSM_SUCCESS, reason_code, &data, response);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
 	struct nsm_get_current_utilization_resp *resp =
@@ -4833,11 +4835,12 @@ TEST(getCurrentUtilization, testGoodEncodeResponse)
 		  response->hdr.nvidia_msg_type);
 
 	EXPECT_EQ(NSM_GET_CURRENT_UTILIZATION, resp->hdr.command);
-	EXPECT_EQ(sizeof(gpu_utilization) + sizeof(memory_utilization),
+	EXPECT_EQ(sizeof(nsm_get_current_utilization_data),
 		  le16toh(resp->hdr.data_size));
 
-	EXPECT_EQ(le32toh(resp->gpu_utilization), gpu_utilization);
-	EXPECT_EQ(le32toh(resp->memory_utilization), memory_utilization);
+	EXPECT_EQ(le32toh(resp->data.gpu_utilization), data.gpu_utilization);
+	EXPECT_EQ(le32toh(resp->data.memory_utilization),
+		  data.memory_utilization);
 }
 
 TEST(getCurrentUtilization, testGoodDecodeResponse)
@@ -4870,18 +4873,16 @@ TEST(getCurrentUtilization, testGoodDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	uint32_t gpu_utilization;
-	uint32_t memory_utilization;
+	nsm_get_current_utilization_data data;
 
 	auto rc = decode_get_current_utilization_resp(
-	    response, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
-	    &memory_utilization);
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(8, data_size);
-	EXPECT_EQ(272, gpu_utilization);
-	EXPECT_EQ(17, memory_utilization);
+	EXPECT_EQ(272, data.gpu_utilization);
+	EXPECT_EQ(17, data.memory_utilization);
 }
 
 TEST(getCurrentUtilization, testBadDecodeResponse)
@@ -4914,38 +4915,31 @@ TEST(getCurrentUtilization, testBadDecodeResponse)
 	uint16_t reason_code = ERR_NULL;
 	uint16_t data_size = 0;
 
-	uint32_t gpu_utilization;
-	uint32_t memory_utilization;
+	nsm_get_current_utilization_data data;
 
 	auto rc = decode_get_current_utilization_resp(
-	    NULL, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
-	    &memory_utilization);
+	    NULL, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_current_utilization_resp(
-	    response, msg_len, NULL, &data_size, &reason_code, &gpu_utilization,
-	    &memory_utilization);
+	    response, msg_len, NULL, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_current_utilization_resp(response, msg_len, &cc, NULL,
-						 &reason_code, &gpu_utilization,
-						 &memory_utilization);
+						 &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_current_utilization_resp(response, msg_len, &cc, NULL,
-						 &reason_code, NULL,
-						 &memory_utilization);
+						 &reason_code, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode_get_current_utilization_resp(
-	    response, msg_len - 1, &cc, &data_size, &reason_code,
-	    &gpu_utilization, &memory_utilization);
+	    response, msg_len - 1, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
 	responseMsg[9] = 6;
 	rc = decode_get_current_utilization_resp(
-	    response, msg_len, &cc, &data_size, &reason_code, &gpu_utilization,
-	    &memory_utilization);
+	    response, msg_len, &cc, &data_size, &reason_code, &data);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
 
@@ -5755,4 +5749,28 @@ TEST(getViolationDuration, testBadDecodeResponse)
 	rc = decode_get_violation_duration_resp(
 	    response, msg_len, &cc, &data_size, &reason_code, &data_resp);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(LongRunningGetMigMode, testEncodeDecode)
+{
+	bitfield8_t flags;
+	const bitfield8_t expected = {.byte = 1};
+	testEncodeLongRunningResponse<bitfield8_t>(
+	    &encode_get_MIG_mode_event_resp, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_MIG_MODE, expected, flags);
+	testDecodeLongRunningResponse<bitfield8_t>(
+	    &decode_get_MIG_mode_event_resp, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_MIG_MODE, expected, flags);
+}
+
+TEST(LongRunningGetEccMode, testEncodeDecode)
+{
+	bitfield8_t flags;
+	const bitfield8_t expected = {.byte = 1};
+	testEncodeLongRunningResponse<bitfield8_t>(
+	    &encode_get_ECC_mode_event_resp, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_ECC_MODE, expected, flags);
+	testDecodeLongRunningResponse<bitfield8_t>(
+	    &decode_get_ECC_mode_event_resp, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+	    NSM_GET_ECC_MODE, expected, flags);
 }

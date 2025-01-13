@@ -4206,17 +4206,16 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    uint32_t gpu_utilization = 36;
-    uint32_t memory_utilization = 75;
+    const nsm_get_current_utilization_data data{36, 75};
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_utilization_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     uint16_t reason_code = ERR_NULL;
-    rc = encode_get_current_utilization_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, gpu_utilization,
-        memory_utilization, responseMsg);
+    rc = encode_get_current_utilization_resp(requestMsg->hdr.instance_id,
+                                             NSM_SUCCESS, reason_code, &data,
+                                             responseMsg);
 
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
