@@ -54,6 +54,7 @@ subdir('nsmGPM')
 subdir('nsmFirmwareUtils')
 subdir('nsmRawCommand')
 subdir('nsmManagers')
+subdir('nsmHistograms')
 subdir('nsmReady')
 subdir('nsmLongRunning')
 

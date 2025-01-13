@@ -674,4 +674,41 @@ double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor)
     }
 }
 
+double uint64ToDoubleSafeConvert(uint64_t value)
+{
+    if (value > MAX_SAFE_INTEGER_IN_DOUBLE)
+    {
+        lg2::error(
+            "Warning: Uint64 Value ({VAL}) exceeds safe range for double precision. Capping to maximum safe value.",
+            "VAL", value);
+        return static_cast<double>(MAX_SAFE_INTEGER_IN_DOUBLE);
+    }
+    return static_cast<double>(value);
+}
+
+double int64ToDoubleSafeConvert(int64_t value)
+{
+    if (value < 0)
+    {
+        if (static_cast<uint64_t>(-value) > MAX_SAFE_INTEGER_IN_DOUBLE)
+        {
+            lg2::error(
+                "Warning: Int64 Value ({VAL}) exceeds safe range for double precision. Capping to maximum safe value.",
+                "VAL", value);
+            return static_cast<double>(-MAX_SAFE_INTEGER_IN_DOUBLE);
+        }
+    }
+    else
+    {
+        if (static_cast<uint64_t>(value) > MAX_SAFE_INTEGER_IN_DOUBLE)
+        {
+            lg2::error(
+                "Warning: Int64 Value ({VAL}) exceeds safe range for double precision. Capping to maximum safe value.",
+                "VAL", value);
+            return static_cast<double>(MAX_SAFE_INTEGER_IN_DOUBLE);
+        }
+    }
+
+    return static_cast<double>(value);
+}
 } // namespace utils
