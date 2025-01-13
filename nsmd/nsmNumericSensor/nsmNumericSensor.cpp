@@ -315,7 +315,7 @@ requester::Coroutine NsmNumericSensor::update(SensorManager& manager, eid_t eid)
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen, isLongRunning);
+                                              responseLen);
     if (rc)
     {
         for (const auto& sensor : sensorValue->getObjects())
