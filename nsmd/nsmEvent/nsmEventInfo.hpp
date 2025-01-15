@@ -30,6 +30,7 @@ struct NsmEventInfo
     Level severity;
     std::string loggingNamespace;
     std::string resolution;
+    std::string errorId;
     std::vector<std::string> messageArgs;
 };
 
