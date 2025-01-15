@@ -45,7 +45,6 @@
 #include "nsmSetCpuOperatingConfig.hpp"
 #include "nsmSetECCMode.hpp"
 #include "nsmSetEgmMode.hpp"
-#include "nsmSetReconfigSettings.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
 #include "sharedMemCommon.hpp"
 
@@ -3568,7 +3567,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addStaticSensor(maxPowerCap);
         nsmDevice->addStaticSensor(minPowerCap);
     }
-    else if (type == "NSM_InbandReconfigPermissions")
+    else if (type == "NSM_ReconfigPermissions")
     {
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
@@ -3584,40 +3583,93 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         }
         for (auto [feature, featureName] : features)
         {
-            auto pdiObjPath = inventoryObjPath + "/InbandReconfigPermissions/" +
-                              featureName;
+            auto hostConfigPdiPath =
+                inventoryObjPath + "/InbandReconfigPermissions/" + featureName;
+            auto doeConfigPdiPath = inventoryObjPath +
+                                    "/DOEReconfigPermissions/" + featureName;
 
-            auto nsmReconfigSettings = std::make_shared<NsmSetReconfigSettings>(
-                featureName, manager, pdiObjPath,
-                NsmReconfigPermissions::getIndex(feature));
+            auto hostConfigIntf = std::make_shared<ReconfigSettingsIntf>(
+                bus, hostConfigPdiPath.c_str());
+            auto doeConfigIntf = std::make_shared<ReconfigSettingsIntf>(
+                bus, doeConfigPdiPath.c_str());
             auto sensor = std::make_shared<NsmReconfigPermissions>(
-                *nsmReconfigSettings, feature);
-            nsmDevice->deviceSensors.emplace_back(nsmReconfigSettings);
+                name, featureName, feature, hostConfigIntf, doeConfigIntf);
             nsmDevice->addSensor(sensor, priority);
+            // Patch AllowOneShotConfig for HOST
+            nsm::AsyncSetOperationHandler patchHostOneShotConfig =
+                std::bind(&NsmReconfigPermissions::patchHostOneShotConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(hostConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings", "AllowOneShotConfig",
+                    AsyncSetOperationInfo{patchHostOneShotConfig, sensor,
+                                          nsmDevice});
 
-            auto& asyncDispatcher =
-                *AsyncOperationManager::getInstance()->getDispatcher(
-                    pdiObjPath);
-            auto allowOneShotConfig =
-                std::bind_front(&NsmSetReconfigSettings::allowOneShotConfig,
-                                nsmReconfigSettings.get());
-            auto allowPersistentConfig =
-                std::bind_front(&NsmSetReconfigSettings::allowPersistentConfig,
-                                nsmReconfigSettings.get());
-            auto allowFLRPersistentConfig = std::bind_front(
-                &NsmSetReconfigSettings::allowFLRPersistentConfig,
-                nsmReconfigSettings.get());
-            asyncDispatcher.addAsyncSetOperation(
-                "com.nvidia.InbandReconfigSettings", "AllowOneShotConfig",
-                AsyncSetOperationInfo{allowOneShotConfig, sensor, nsmDevice});
-            asyncDispatcher.addAsyncSetOperation(
-                "com.nvidia.InbandReconfigSettings", "AllowPersistentConfig",
-                AsyncSetOperationInfo{allowPersistentConfig, sensor,
-                                      nsmDevice});
-            asyncDispatcher.addAsyncSetOperation(
-                "com.nvidia.InbandReconfigSettings", "AllowFLRPersistentConfig",
-                AsyncSetOperationInfo{allowFLRPersistentConfig, sensor,
-                                      nsmDevice});
+            // Patch AllowOneShotConfig for DOE
+            nsm::AsyncSetOperationHandler patchDOEOneShotConfig =
+                std::bind(&NsmReconfigPermissions::patchDOEOneShotConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(doeConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings", "AllowOneShotConfig",
+                    AsyncSetOperationInfo{patchDOEOneShotConfig, sensor,
+                                          nsmDevice});
+
+            // Patch AllowPersistentConfig for HOST
+            nsm::AsyncSetOperationHandler patchHostPersistentConfig =
+                std::bind(&NsmReconfigPermissions::patchHostPersistentConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(hostConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings",
+                    "AllowPersistentConfig",
+                    AsyncSetOperationInfo{patchHostPersistentConfig, sensor,
+                                          nsmDevice});
+
+            // Patch AllowPersistentConfig for DOE
+            nsm::AsyncSetOperationHandler patchDOEPersistentConfig =
+                std::bind(&NsmReconfigPermissions::patchDOEPersistentConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(doeConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings",
+                    "AllowPersistentConfig",
+                    AsyncSetOperationInfo{patchDOEPersistentConfig, sensor,
+                                          nsmDevice});
+
+            // Patch AllowFLRPersistentConfig for HOST
+            nsm::AsyncSetOperationHandler patchHostFLRPersistentConfig =
+                std::bind(&NsmReconfigPermissions::patchHostFLRPersistentConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(hostConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings",
+                    "AllowFLRPersistentConfig",
+                    AsyncSetOperationInfo{patchHostFLRPersistentConfig, sensor,
+                                          nsmDevice});
+
+            // Patch AllowFLRPersistentConfig for DOE
+            nsm::AsyncSetOperationHandler patchDOEFLRPersistentConfig =
+                std::bind(&NsmReconfigPermissions::patchDOEFLRPersistentConfig,
+                          sensor, std::placeholders::_1, std::placeholders::_2,
+                          std::placeholders::_3);
+            AsyncOperationManager::getInstance()
+                ->getDispatcher(doeConfigPdiPath)
+                ->addAsyncSetOperation(
+                    "com.nvidia.InbandReconfigSettings",
+                    "AllowFLRPersistentConfig",
+                    AsyncSetOperationInfo{patchDOEFLRPersistentConfig, sensor,
+                                          nsmDevice});
         }
     }
     else if (type == "NSM_PowerSmoothing")
@@ -3889,7 +3941,7 @@ dbus::Interfaces nsmProcessorInterfaces = {
     "xyz.openbmc_project.Configuration.NSM_Processor.Asset",
     "xyz.openbmc_project.Configuration.NSM_Processor.PortDisableFuture",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerCap",
-    "xyz.openbmc_project.Configuration.NSM_Processor.InbandReconfigPermissions",
+    "xyz.openbmc_project.Configuration.NSM_Processor.ReconfigPermissions",
     "xyz.openbmc_project.Configuration.NSM_Processor.PowerSmoothing",
     "xyz.openbmc_project.Configuration.NSM_Processor.TotalNvLinksCount",
     "xyz.openbmc_project.Configuration.NSM_Processor.PCIeDevice",

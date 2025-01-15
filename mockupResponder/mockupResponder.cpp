@@ -5414,13 +5414,34 @@ std::optional<std::vector<uint8_t>>
     switch (configuration)
     {
         case RP_ONESHOOT_HOT_RESET:
-            state.prcKnobs[settingsIndex].oneshot = permission;
+            if (permission & 1)
+            {
+                state.prcKnobs[settingsIndex].host_oneshot = 1;
+            }
+            if ((permission >> 1) & 1)
+            {
+                state.prcKnobs[settingsIndex].DOE_oneshot = 1;
+            }
             break;
         case RP_PERSISTENT:
-            state.prcKnobs[settingsIndex].persistent = permission;
+            if (permission & 1)
+            {
+                state.prcKnobs[settingsIndex].host_persistent = 1;
+            }
+            if ((permission >> 1) & 1)
+            {
+                state.prcKnobs[settingsIndex].DOE_persistent = 1;
+            }
             break;
         case RP_ONESHOT_FLR:
-            state.prcKnobs[settingsIndex].flr_persistent = permission;
+            if (permission & 1)
+            {
+                state.prcKnobs[settingsIndex].host_flr_persistent = 1;
+            }
+            if ((permission >> 1) & 1)
+            {
+                state.prcKnobs[settingsIndex].DOE_flr_persistent = 1;
+            }
             break;
         default:
             lg2::error(

@@ -1,7 +1,6 @@
 dep_src_files = [
     '../asyncOperationManager.cpp',
     '../nsmAsyncSensor.cpp',
-    '../nsmSetReconfigSettings.cpp',
     '../nsmSetWriteProtected.cpp',
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
@@ -39,7 +38,6 @@ test_src = declare_dependency(sources: dep_src_files, include_directories: dep_s
 
 tests = [
     'asyncOperationManager_test',
-    'nsmSetReconfigSettings_test',
     'nsmSetWriteProtected_test',
 ]
 

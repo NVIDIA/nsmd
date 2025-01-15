@@ -328,11 +328,11 @@ TEST_F(MockupResponderTest, goodTestGetReconfigurationPermissionsV1Handler)
         reinterpret_cast<nsm_get_reconfiguration_permissions_v1_resp*>(
             msg->payload);
 
-    nsm_reconfiguration_permissions_v1 expected = {0, 0, 0, 0};
+    nsm_reconfiguration_permissions_v1 expected = {0, 0, 0, 0, 1, 0, 1};
     EXPECT_EQ(NSM_GET_RECONFIGURATION_PERMISSIONS_V1, response->hdr.command);
-    EXPECT_EQ(expected.oneshot, response->data.oneshot);
-    EXPECT_EQ(expected.persistent, response->data.persistent);
-    EXPECT_EQ(expected.flr_persistent, response->data.flr_persistent);
+    EXPECT_EQ(expected.host_oneshot, response->data.host_oneshot);
+    EXPECT_EQ(expected.host_persistent, response->data.host_persistent);
+    EXPECT_EQ(expected.host_flr_persistent, response->data.host_flr_persistent);
 }
 
 TEST_F(MockupResponderTest, goodTestSetReconfigurationPermissionsV1Handler)

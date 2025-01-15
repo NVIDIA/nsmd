@@ -4,7 +4,6 @@ sources += [
     'nsmSetAsync/nsmSetMigMode.cpp',
     'nsmSetAsync/nsmSetECCMode.cpp',
     'nsmSetAsync/nsmSetCpuOperatingConfig.cpp',
-    'nsmSetAsync/nsmSetReconfigSettings.cpp',
     'nsmSetAsync/nsmSetWriteProtected.cpp',
     'nsmSetAsync/nsmSetEgmMode.cpp',
     'nsmSetAsync/nsmAsyncSensor.cpp',
