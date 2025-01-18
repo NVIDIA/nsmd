@@ -24,7 +24,7 @@ namespace nsm
 class NsmSetEccMode : public NsmAsyncLongRunningSensor
 {
   public:
-    NsmSetEccMode(bool isLongRunning);
+    NsmSetEccMode(bool isLongRunning, std::shared_ptr<NsmDevice> device);
 
   private:
     std::optional<Request> genRequestMsg(eid_t eid,

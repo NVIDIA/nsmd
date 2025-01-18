@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "nsmDevice.hpp"
 #include "nsmLongRunningEvent.hpp"
 #include "nsmSensor.hpp"
 
@@ -26,14 +27,17 @@ class NsmLongRunningSensor : public NsmSensor, public NsmLongRunningEvent
 {
   public:
     explicit NsmLongRunningSensor(const std::string& name,
-                                  const std::string& type, bool isLongRunning);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+                                  const std::string& type, bool isLongRunning,
+                                  std::shared_ptr<NsmDevice> device);
+    requester::Coroutine update(SensorManager& manager,
+                                eid_t eid) override final;
 
   private:
     requester::Coroutine updateLongRunningSensor(SensorManager& manager,
                                                  eid_t eid);
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) override;
+    std::shared_ptr<NsmDevice> device = nullptr;
 };
 
 } // namespace nsm

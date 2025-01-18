@@ -24,7 +24,7 @@ namespace nsm
 class NsmSetMigMode : public NsmAsyncLongRunningSensor
 {
   public:
-    NsmSetMigMode(bool isLongRunning);
+    NsmSetMigMode(bool isLongRunning, std::shared_ptr<NsmDevice> device);
 
   private:
     std::optional<Request> genRequestMsg(eid_t eid,
