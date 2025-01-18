@@ -22,8 +22,9 @@
 namespace nsm
 {
 
-NsmSetEccMode::NsmSetEccMode(bool isLongRunning) :
-    NsmAsyncLongRunningSensor("NsmSetEccMode", "NSM_ECC", isLongRunning)
+NsmSetEccMode::NsmSetEccMode(bool isLongRunning,
+                             std::shared_ptr<NsmDevice> device) :
+    NsmAsyncLongRunningSensor("NsmSetEccMode", "NSM_ECC", isLongRunning, device)
 {}
 
 std::optional<Request> NsmSetEccMode::genRequestMsg(eid_t eid,

@@ -24,11 +24,12 @@
 namespace nsm
 {
 
-NsmAsyncLongRunningSensor::NsmAsyncLongRunningSensor(const std::string& name,
-                                                     const std::string& type,
-                                                     bool isLongRunning) :
+NsmAsyncLongRunningSensor::NsmAsyncLongRunningSensor(
+    const std::string& name, const std::string& type, bool isLongRunning,
+    std::shared_ptr<NsmDevice> device) :
     NsmAsyncSensor(name, type),
-    NsmLongRunningEvent(name, type + "_LongRunningEvent", isLongRunning)
+    NsmLongRunningEvent(name, type + "_LongRunningEvent", isLongRunning),
+    device(device)
 {}
 
 requester::Coroutine NsmAsyncLongRunningSensor::update(SensorManager& manager,
@@ -37,6 +38,8 @@ requester::Coroutine NsmAsyncLongRunningSensor::update(SensorManager& manager,
     uint8_t rc = NSM_SW_SUCCESS;
     if (isLongRunning)
     {
+        // Acquire the semaphore before proceeding
+        co_await device->getSemaphore().acquire(eid);
         rc = co_await NsmAsyncLongRunningSensor::updateLongRunningSensor(
             manager, eid);
         if (rc == NSM_SW_SUCCESS)
@@ -56,6 +59,8 @@ requester::Coroutine NsmAsyncLongRunningSensor::update(SensorManager& manager,
                 rc = NSM_SW_ERROR;
             }
         }
+        // Release the semaphore after the update is complete
+        device->getSemaphore().release();
     }
     else
     {

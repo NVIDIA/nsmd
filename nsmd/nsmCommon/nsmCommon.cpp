@@ -113,8 +113,8 @@ const uint32_t* NsmTotalMemory::getReading()
 NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory> totalMemory,
-    bool isLongRunning) :
-    NsmLongRunningSensor(name, type, isLongRunning),
+    bool isLongRunning, std::shared_ptr<NsmDevice> device) :
+    NsmLongRunningSensor(name, type, isLongRunning, device),
     totalMemory(totalMemory), inventoryObjPath(inventoryObjPath)
 
 {
