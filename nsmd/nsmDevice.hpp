@@ -20,6 +20,7 @@
 #include "base.h"
 #include "device-capability-discovery.h"
 
+#include "common/coroutineSemaphore.hpp"
 #include "common/types.hpp"
 #include "nsmEvent.hpp"
 #include "nsmLongRunningEventDispatcher.hpp"
@@ -129,12 +130,21 @@ class NsmDevice
         return instanceNumber;
     }
 
+    /** @brief Getter for the longRunningSemaphore */
+    common::CoroutineSemaphore& getSemaphore()
+    {
+        return longRunningSemaphore;
+    }
+
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     uint8_t eventMode;
     uint8_t deviceType = 0;
     uint8_t instanceNumber = 0;
     NsmLongRunningEventDispatcher& registerLongRunningEventDispatcher();
+    common::CoroutineSemaphore
+        longRunningSemaphore; // Semaphore for synchronizing long running
+                              // commands
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

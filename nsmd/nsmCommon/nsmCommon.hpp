@@ -71,7 +71,8 @@ class NsmMemoryCapacityUtil : public NsmLongRunningSensor
                           const std::string& type,
                           std::string& inventoryObjPath,
                           std::shared_ptr<NsmTotalMemory> totalMemory,
-                          bool isLongRunning);
+                          bool isLongRunning,
+                          std::shared_ptr<NsmDevice> device);
     NsmMemoryCapacityUtil() = default;
 
     std::optional<std::vector<uint8_t>>

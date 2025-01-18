@@ -850,7 +850,7 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                                                                       type);
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
                 bus, name, type, inventoryObjPath, totalMemorySensor,
-                isLongRunning);
+                isLongRunning, nsmDevice);
 
             nsmDevice->addSensor(sensor, priority, isLongRunning);
             nsmDevice->addSensor(totalMemorySensor, priority);

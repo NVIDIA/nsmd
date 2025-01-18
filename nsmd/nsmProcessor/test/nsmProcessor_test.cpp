@@ -996,11 +996,13 @@ TEST(nsmProcessorRevision, BadHandleResp)
 
 TEST(nsmProcessorThrottleDuration, GoodGenReq)
 {
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
                                              processorPerformanceIntf,
-                                             inventoryObjPath, false);
+                                             inventoryObjPath, false, gpuPtr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -1016,11 +1018,13 @@ TEST(nsmProcessorThrottleDuration, GoodGenReq)
 
 TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 {
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
                                              processorPerformanceIntf,
-                                             inventoryObjPath, false);
+                                             inventoryObjPath, false, gpuPtr);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_violation_duration_resp),
@@ -1050,11 +1054,13 @@ TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 
 TEST(nsmProcessorThrottleDuration, BadHandleResp)
 {
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
                                              processorPerformanceIntf,
-                                             inventoryObjPath, false);
+                                             inventoryObjPath, false, gpuPtr);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_violation_duration_resp),

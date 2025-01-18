@@ -21,8 +21,9 @@
 
 namespace nsm
 {
-NsmSetMigMode::NsmSetMigMode(bool isLongRunning) :
-    NsmAsyncLongRunningSensor("NsmSetMigMode", "NSM_MIG", isLongRunning)
+NsmSetMigMode::NsmSetMigMode(bool isLongRunning,
+                             std::shared_ptr<NsmDevice> device) :
+    NsmAsyncLongRunningSensor("NsmSetMigMode", "NSM_MIG", isLongRunning, device)
 {}
 
 std::optional<Request> NsmSetMigMode::genRequestMsg(eid_t eid,
