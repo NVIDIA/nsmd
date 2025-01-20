@@ -73,8 +73,8 @@ uint8_t
     if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         auto hexFormat = [](const uint32_t value) -> std::string {
-            std::string hexStr(8, '\0');
-            sprintf(hexStr.data(), "0x%08X", value);
+            std::string hexStr(sizeof("0x00000000"), '\0');
+            snprintf(hexStr.data(), hexStr.size(), "0x%08X", value);
             return hexStr;
         };
 
