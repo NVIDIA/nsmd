@@ -18,6 +18,7 @@
 #pragma once
 
 #include "nsmEvent.hpp"
+#include "nsmManagers/nsmFabricManager.hpp"
 
 #include <com/nvidia/State/FabricManager/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
@@ -45,7 +46,9 @@ class NsmFabricManagerStateEvent : public NsmEvent
   public:
     NsmFabricManagerStateEvent(const std::string& name, const std::string& type,
                                std::shared_ptr<FabricManagerIntf> fabricMgrIntf,
-                               std::shared_ptr<OperaStatusIntf> opStateIntf);
+                               std::shared_ptr<OperaStatusIntf> opStateIntf,
+                               std::shared_ptr<NsmAggregateFabricManagerState>
+                                   nsmAggregateFabricManagerState);
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) override;
@@ -53,6 +56,8 @@ class NsmFabricManagerStateEvent : public NsmEvent
   private:
     std::shared_ptr<FabricManagerIntf> fabricManagerIntf = nullptr;
     std::shared_ptr<OperaStatusIntf> operationalStatusIntf = nullptr;
+    std::shared_ptr<NsmAggregateFabricManagerState>
+        nsmAggregateFabricManagerState = nullptr;
 };
 
 } // namespace nsm
