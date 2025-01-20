@@ -48,17 +48,22 @@ using FormatIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::histogram::decorator::Format>;
 using BucketUnits =
     sdbusplus::common::com::nvidia::histogram::decorator::Format::BucketUnits;
+
+using BucketDataTypes = sdbusplus::common::com::nvidia::histogram::decorator::
+    Format::BucketDataTypes;
 using HistogramIds = sdbusplus::common::com::nvidia::histogram::decorator::
     SupportedHistogram::HistogramIds;
 
 class NsmHistogramFormat : public NsmSensor
 {
   public:
-    NsmHistogramFormat(sdbusplus::bus::bus& bus, std::string& name,
-                       const std::string& type,
-                       std::shared_ptr<FormatIntf>& formatIntf,
-                       std::string& parentObjPath, std::string& deviceObjPath,
-                       uint32_t histogramId, uint16_t parameter);
+    NsmHistogramFormat(
+        sdbusplus::bus::bus& bus, std::string& name, const std::string& type,
+        std::shared_ptr<FormatIntf>& formatIntf,
+        std::shared_ptr<BucketInfoIntf>& bucketInfoIntf, std::string& objPath,
+        std::vector<std::tuple<std::string, std::string, std::string>>&
+            associationsList,
+        uint32_t histogramId, uint16_t parameter);
     NsmHistogramFormat() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -68,9 +73,9 @@ class NsmHistogramFormat : public NsmSensor
 
   private:
     std::shared_ptr<FormatIntf> formatIntf = nullptr;
+    std::shared_ptr<BucketInfoIntf> bucketInfoIntf = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDefIntf = nullptr;
     std::string histogramName;
-    std::string objPath;
     std::string deviceType;
     uint32_t histogramId;
     uint16_t parameter;
@@ -81,8 +86,8 @@ class NsmHistogramData : public NsmSensor
   public:
     NsmHistogramData(std::string& name, const std::string& type,
                      std::shared_ptr<FormatIntf>& formatIntf,
-                     std::string& inventoryObjPath, uint32_t histogramId,
-                     uint16_t parameter);
+                     std::shared_ptr<BucketInfoIntf>& bucketInfoIntf,
+                     uint32_t histogramId, uint16_t parameter);
     NsmHistogramData() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -92,8 +97,8 @@ class NsmHistogramData : public NsmSensor
 
   private:
     std::shared_ptr<FormatIntf> formatIntf = nullptr;
+    std::shared_ptr<BucketInfoIntf> bucketInfoIntf = nullptr;
     std::string histogramName;
-    std::string objPath;
     std::string deviceType;
     uint32_t histogramId;
     uint16_t parameter;

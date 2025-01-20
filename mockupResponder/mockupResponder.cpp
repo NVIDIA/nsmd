@@ -5898,7 +5898,7 @@ std::optional<std::vector<uint8_t>>
     uint16_t reason_code = ERR_NULL;
     std::vector<uint32_t> bucketOffsets = {00, 15, 30, 45, 60, 75};
     uint32_t totalBucketSize = bucketOffsets.size() * sizeof(bucketOffsets[0]);
-    metaData.num_of_buckets = bucketOffsets.size() - 1;
+    metaData.num_of_buckets = bucketOffsets.size();
     metaData.min_sampling_time = 16;
     metaData.accumulation_cycle = 12;
     metaData.increment_duration = 111;

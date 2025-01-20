@@ -103,8 +103,6 @@ endif
 
 if get_option('enable-histogram').enabled()
     conf_data.set('NVIDIA_HISTOGRAM', 1)
-else
-    conf_data.set('NVIDIA_HISTOGRAM', 0)
 endif
 
 if get_option('aer-error-status-priority')
