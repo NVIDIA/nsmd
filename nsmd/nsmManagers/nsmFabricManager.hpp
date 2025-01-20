@@ -53,24 +53,59 @@ using FMState =
 using FMReportStatus = sdbusplus::common::com::nvidia::state::FabricManager::
     FabricManagerReportStatus;
 
-class NsmFabricManagerState : public NsmObject
+class NsmAggregateFabricManagerState
+{
+  private:
+    NsmAggregateFabricManagerState(const std::string& inventoryObjPath,
+                                   const std::string& description);
+
+    static std::vector<std::shared_ptr<FabricManagerIntf>>
+        associatedFabricManagerIntfs;
+    static std::vector<std::shared_ptr<OperaStatusIntf>>
+        associatedOperationalStatusIntfs;
+    static std::string aggregateFMObjPath;
+    std::shared_ptr<FabricManagerIntf> fabricManagerIntf;
+    std::shared_ptr<OperaStatusIntf> operationalStatusIntf;
+    std::shared_ptr<ManagementServiceIntf> managementServiceIntf = nullptr;
+    std::shared_ptr<ItemIntf> itemIntf = nullptr;
+
+    static std::shared_ptr<NsmAggregateFabricManagerState>
+        nsmAggregateFabricManagerState;
+
+  public:
+    static std::shared_ptr<NsmAggregateFabricManagerState> getInstance(
+        const std::string& inventoryObjPath,
+        std::shared_ptr<FabricManagerIntf> associatedFabricManagerIntf,
+        std::shared_ptr<OperaStatusIntf> associatedOperationalStatusIntf,
+        const std::string& description);
+
+    void updateAggregateFabricManagerState();
+};
+
+class NsmFabricManagerState : public NsmSensor
 {
   public:
     NsmFabricManagerState(const std::string& name, const std::string& type,
-                          std::string& inventoryObjPath, SensorManager& manager,
+                          std::string& inventoryObjPath,
+                          std::string& inventoryObjPathFM,
                           sdbusplus::bus_t& bus, std::string& description);
     NsmFabricManagerState() = default;
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
 
     std::shared_ptr<FabricManagerIntf> getFabricManagerIntf();
     std::shared_ptr<OperaStatusIntf> getOperaStatusIntf();
+    std::shared_ptr<NsmAggregateFabricManagerState>
+        getAggregateFabricManagerState();
 
   private:
     std::shared_ptr<FabricManagerIntf> fabricManagerIntf = nullptr;
     std::shared_ptr<OperaStatusIntf> operationalStatusIntf = nullptr;
-    std::shared_ptr<ManagementServiceIntf> managementServiceIntf = nullptr;
-    std::shared_ptr<ItemIntf> itemIntf = nullptr;
+    std::shared_ptr<NsmAggregateFabricManagerState>
+        nsmAggregateFabricManagerState;
     std::string objPath;
 };
 
