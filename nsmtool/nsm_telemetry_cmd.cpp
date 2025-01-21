@@ -319,6 +319,13 @@ class GetPortTelemetryCounter : public CommandInterface
             countersResult["Estimated Effective BER"] =
                 static_cast<uint64_t>(portData->estimated_effective_ber);
         }
+
+        if (portData->supported_counter.effective_error)
+        {
+            result[key].push_back(27);
+            countersResult["Effective Error"] =
+                static_cast<uint64_t>(portData->effective_error);
+        }
         result["Port Counter Information"] = countersResult;
 
         nsmtool::helper::DisplayInJson(result);
