@@ -87,7 +87,7 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
             AsyncSetOperationInfo{
                 std::bind_front(&NsmSetErrorInjectionEnabled::enabled,
                                 setErrorInjectionEnabled.get()),
-                errorInjectionSensor, device});
+                errorInjectionEnabled, device});
         device->deviceSensors.emplace_back(setErrorInjectionEnabled);
     }
 }
