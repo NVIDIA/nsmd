@@ -4,7 +4,7 @@ sources += [
     'nsmEvent/nsmThresholdEvent.cpp',
     'nsmEvent/nsmResetRequiredEvent.cpp',
     'nsmEvent/nsmFabricManagerStateEvent.cpp',
-    'nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    'nsmEvent/nsmLongRunningEventHandler.cpp',
     'nsmEvent/nsmLongRunningEvent.cpp',
 ]
 

@@ -854,13 +854,6 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 
             nsmDevice->addSensor(sensor, priority, isLongRunning);
             nsmDevice->addSensor(totalMemorySensor, priority);
-
-            if (isLongRunning)
-            {
-                nsmDevice->longRunningEventDispatcher.addEvent(
-                    NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                    NSM_GET_MEMORY_CAPACITY_UTILIZATION, sensor);
-            }
         }
     }
 
