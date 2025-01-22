@@ -17,6 +17,9 @@
 
 #include "nsmDevice.hpp"
 
+#include "nsmEvent/nsmFabricManagerStateEvent.hpp"
+#include "nsmEvent/nsmLongRunningEventHandler.hpp"
+#include "nsmLongRunning/nsmLongRunningSensor.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
@@ -193,13 +196,98 @@ void NsmDevice::setOffline()
     }
 }
 
-NsmLongRunningEventDispatcher& NsmDevice::registerLongRunningEventDispatcher()
+NsmLongRunningEventHandler& NsmDevice::registerLongRunningEventHandler()
 {
-    auto dispatcher = std::make_shared<NsmLongRunningEventDispatcher>();
-    deviceEvents.emplace_back(dispatcher);
+    auto longRunningEventHandler =
+        std::make_shared<NsmLongRunningEventHandler>();
+    deviceEvents.emplace_back(longRunningEventHandler);
     eventDispatcher.addEvent(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-                             NSM_LONG_RUNNING_EVENT, dispatcher);
-    return *dispatcher;
+                             NSM_LONG_RUNNING_EVENT, longRunningEventHandler);
+    return *longRunningEventHandler;
+}
+
+void NsmDevice::registerLongRunningHandler(uint8_t messageType,
+                                           uint8_t commandCode,
+                                           NsmLongRunningEvent* sensorInstance)
+{
+    clearLongRunningHandler();
+    lg2::debug(
+        "Registering long-running handler for MessageType={MT}, CommandCode={CC}",
+        "MT", messageType, "CC", commandCode);
+
+    longRunningHandler = ActiveLongRunningHandlerInfo{messageType, commandCode,
+                                                      sensorInstance};
+}
+
+void NsmDevice::clearLongRunningHandler()
+{
+    if (!longRunningHandler.has_value())
+    {
+        lg2::info("No long-running handler to clear");
+        return;
+    }
+
+    lg2::debug(
+        "Clearing long-running handler for MessageType={MT}, CommandCode={CC}",
+        "MT", longRunningHandler->messageType, "CC",
+        longRunningHandler->commandCode);
+
+    longRunningHandler.reset();
+}
+
+std::optional<ActiveLongRunningHandlerInfo>
+    NsmDevice::getActiveLongRunningHandler() const
+{
+    return longRunningHandler;
+}
+
+int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
+                                        NsmEventId eventId,
+                                        const nsm_msg* event, size_t eventLen)
+{
+    if (!longRunningHandler.has_value())
+    {
+        lg2::error(
+            "NsmDevice::invokeLongRunningHandler: No active handler registered for long-running event, EID={EID}",
+            "EID", eid);
+        return NSM_SW_ERROR_DATA;
+    }
+
+    uint16_t eventState = 0;
+    uint8_t dataSize = 0;
+    auto rc = decode_nsm_event(event, eventLen, eventId,
+                               NSM_NVIDIA_GENERAL_EVENT_CLASS, &eventState,
+                               &dataSize);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmLongRunningEventHandler : Failed to decode long running event state : EID={EID}",
+            "EID", eid);
+        return rc;
+    }
+    nsm_long_running_event_state state{};
+    memcpy(&state, &eventState, sizeof(uint16_t));
+
+    const auto& [messageType, commandCode,
+                 sensorInstance] = *longRunningHandler;
+
+    if (state.nvidia_message_type != messageType ||
+        state.command != commandCode)
+    {
+        lg2::error(
+            "NsmDevice::invokeLongRunningHandler: Mismatched message type or command code, "
+            "Expected MessageType={EXPECTED_MSG_TYPE}, Received MessageType={RECEIVED_MSG_TYPE}, "
+            "Expected CommandCode={EXPECTED_COMMAND_CODE}, Received CommandCode={RECEIVED_COMMAND_CODE}, EID={EID}",
+            "EXPECTED_MSG_TYPE", messageType, "RECEIVED_MSG_TYPE",
+            uint8_t(state.nvidia_message_type), "EXPECTED_COMMAND_CODE",
+            commandCode, "RECEIVED_COMMAND_CODE", uint8_t(state.command), "EID",
+            eid);
+        return NSM_SW_ERROR_DATA;
+    }
+
+    // Call the `handle` method directly on the instance
+    return sensorInstance->handle(eid, type, eventId, event, eventLen);
 }
 
 } // namespace nsm

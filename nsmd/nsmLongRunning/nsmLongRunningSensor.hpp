@@ -28,7 +28,8 @@ class NsmLongRunningSensor : public NsmSensor, public NsmLongRunningEvent
   public:
     explicit NsmLongRunningSensor(const std::string& name,
                                   const std::string& type, bool isLongRunning,
-                                  std::shared_ptr<NsmDevice> device);
+                                  std::shared_ptr<NsmDevice> device,
+                                  uint8_t messageType, uint8_t commandCode);
     requester::Coroutine update(SensorManager& manager,
                                 eid_t eid) override final;
 
@@ -38,6 +39,8 @@ class NsmLongRunningSensor : public NsmSensor, public NsmLongRunningEvent
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) override;
     std::shared_ptr<NsmDevice> device = nullptr;
+    uint8_t messageType;
+    uint8_t commandCode;
 };
 
 } // namespace nsm
