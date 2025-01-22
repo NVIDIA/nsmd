@@ -1124,7 +1124,7 @@ TEST(getReconfigurationPermissionsV1, testGoodEncodeResponse)
 	uint16_t reason_code = ERR_NULL;
 
 	nsm_reconfiguration_permissions_v1 data = {};
-	data.persistent = 1;
+	data.host_persistent = 1;
 
 	auto rc = encode_get_reconfiguration_permissions_v1_resp(
 	    0, NSM_SUCCESS, reason_code, &data, response);
@@ -1142,7 +1142,7 @@ TEST(getReconfigurationPermissionsV1, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_GET_RECONFIGURATION_PERMISSIONS_V1, resp->hdr.command);
 	EXPECT_EQ(sizeof(nsm_reconfiguration_permissions_v1),
 		  le16toh(resp->hdr.data_size));
-	EXPECT_EQ(1, data.persistent);
+	EXPECT_EQ(1, data.host_persistent);
 }
 
 TEST(getReconfigurationPermissionsV1, testGoodDecodeResponse)
@@ -1172,9 +1172,9 @@ TEST(getReconfigurationPermissionsV1, testGoodDecodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_EQ(0, data.oneshot);
-	EXPECT_EQ(1, data.persistent);
-	EXPECT_EQ(1, data.flr_persistent);
+	EXPECT_EQ(0, data.host_oneshot);
+	EXPECT_EQ(1, data.host_persistent);
+	EXPECT_EQ(1, data.host_flr_persistent);
 }
 
 TEST(getReconfigurationPermissionsV1, testBadDecodeResponse)
