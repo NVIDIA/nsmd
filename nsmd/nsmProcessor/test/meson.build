@@ -13,7 +13,7 @@ dep_src_files = [
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
     '../../nsmEvent.cpp',
-    '../../nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmChassis/nsmPowerControl.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',

@@ -6,7 +6,7 @@ dep_src_files = [
     '../nsmObjectFactory.cpp',
     '../nsmEvent.cpp',
     '../deviceManager.cpp',
-    '../nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    '../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../libnsm/instance-id.c',
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',

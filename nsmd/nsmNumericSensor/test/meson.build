@@ -26,7 +26,7 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
     '../../deviceManager.cpp',
-    '../../nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',

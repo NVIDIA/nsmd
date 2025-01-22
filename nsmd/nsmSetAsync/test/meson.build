@@ -9,7 +9,7 @@ dep_src_files = [
     '../../nsmObjectFactory.cpp',
     '../../nsmEvent.cpp',
     '../../deviceManager.cpp',
-    '../../nsmEvent/nsmLongRunningEventDispatcher.cpp',
+    '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmLongRunning/nsmAsyncLongRunningSensor.cpp',

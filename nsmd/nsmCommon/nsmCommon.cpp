@@ -114,9 +114,10 @@ NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory> totalMemory,
     bool isLongRunning, std::shared_ptr<NsmDevice> device) :
-    NsmLongRunningSensor(name, type, isLongRunning, device),
+    NsmLongRunningSensor(name, type, isLongRunning, device,
+                         NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_GET_MEMORY_CAPACITY_UTILIZATION),
     totalMemory(totalMemory), inventoryObjPath(inventoryObjPath)
-
 {
     lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
               name.c_str());
