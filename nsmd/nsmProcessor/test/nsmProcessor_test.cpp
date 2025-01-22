@@ -1664,10 +1664,17 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     auto capabilitiesCount =
         size_t(ErrorInjectionCapabilityIntf::Type::Unknown);
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(7, gpu.roundRobinSensors.size());
-    EXPECT_EQ(11 + capabilitiesCount, gpu.deviceSensors.size());
+    // Total 10 RR sensor for type = NSM_Processor are added.
+    // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
+    // of createNsmErrorInjectionSensors()
+    EXPECT_EQ(10, gpu.roundRobinSensors.size());
+    // Total 18 device sensor for type = NSM_Processor are added.
+    // 10 are added as part of createNsmProcessorSensor() (NOTE:
+    // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
+    // run) and 8 are added as part of createNsmErrorInjectionSensors()
+    EXPECT_EQ(14 + capabilitiesCount, gpu.deviceSensors.size());
 
-    int si = 6;
+    int si = 9;
 
     auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown);
     auto setErrorInjection =
