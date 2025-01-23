@@ -1748,6 +1748,37 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, setEnableResponseMsg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(supportedResponse))
+        .WillOnce(mockSendRecvNsmMsg(setModeResponse))
+        .WillOnce(mockSendRecvNsmMsg(modeResponse));
+
+    errorInjectionSupported->update(mockManager, eid).detach();
+
+    const auto errorInjectionBasePath = processorsInventoryBasePath / name /
+                                        "ErrorInjection";
+    const auto memoryErrorsPath = errorInjectionBasePath / "MemoryErrors";
+    const auto nvLinkErrorsPath = errorInjectionBasePath / "NVLinkErrors";
+    const auto pcieErrorsPath = errorInjectionBasePath / "PCIeErrors";
+    const auto thermalErrorsPath = errorInjectionBasePath / "ThermalErrors";
+    EXPECT_TRUE(
+        errorInjectionSupported->interfaces[memoryErrorsPath]->supported());
+    EXPECT_FALSE(
+        errorInjectionSupported->interfaces[nvLinkErrorsPath]->supported());
+    EXPECT_FALSE(
+        errorInjectionSupported->interfaces[pcieErrorsPath]->supported());
+    EXPECT_TRUE(
+        errorInjectionSupported->interfaces[thermalErrorsPath]->supported());
+
+    auto status = AsyncOperationStatusType::Success;
+    setErrorInjection->errorInjectionModeEnabled(true, &status, gpuPtr);
+    EXPECT_EQ(AsyncOperationStatusType::Success, status);
+    errorInjectionSensor->update(mockManager, eid);
+
+    EXPECT_TRUE(errorInjectionSensor->pdi().errorInjectionModeEnabled());
+    EXPECT_TRUE(errorInjectionSensor->pdi().persistentDataModified());
+
+    // test set async
     nsm_error_injection_types_mask enabledData = {0b00001000, 0, 0, 0,
                                                   0,          0, 0, 0};
     Response enableResponse(sizeof(nsm_msg_hdr) +
@@ -1758,62 +1789,25 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, &enabledData, enableResponseMsg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
+    gpu.isDeviceActive = true;
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(supportedResponse))
-        .WillOnce(mockSendRecvNsmMsg(setModeResponse))
-        .WillOnce(mockSendRecvNsmMsg(modeResponse));
-
-    errorInjectionSupported->update(mockManager, eid).detach();
-
-    auto errorInjectionBasePath = processorsInventoryBasePath / name /
-                                  "ErrorInjection";
-    EXPECT_TRUE(errorInjectionSupported
-                    ->interfaces[errorInjectionBasePath / "MemoryErrors"]
-                    ->supported());
-    EXPECT_FALSE(errorInjectionSupported
-                     ->interfaces[errorInjectionBasePath / "NVLinkErrors"]
-                     ->supported());
-    EXPECT_FALSE(errorInjectionSupported
-                     ->interfaces[errorInjectionBasePath / "PCIeErrors"]
-                     ->supported());
-    EXPECT_TRUE(errorInjectionSupported
-                    ->interfaces[errorInjectionBasePath / "ThermalErrors"]
-                    ->supported());
-
-    auto status = AsyncOperationStatusType::Success;
-    setErrorInjection->errorInjectionModeEnabled(true, &status, gpuPtr)
-        .detach();
-    EXPECT_EQ(AsyncOperationStatusType::Success, status);
-    errorInjectionSensor->update(mockManager, eid).detach();
-
-    EXPECT_TRUE(errorInjectionSensor->pdi().errorInjectionModeEnabled());
-    EXPECT_TRUE(errorInjectionSensor->pdi().persistentDataModified());
-
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(capabilitiesCount)
-        .WillRepeatedly(mockSendRecvNsmMsg(setEnableResponse));
-    for (size_t i = 0; i < capabilitiesCount; i++)
-    {
-        status = AsyncOperationStatusType::Success;
-        setErrorInjectionEnabled[i]->enabled(true, &status, gpuPtr).detach();
-        EXPECT_EQ(AsyncOperationStatusType::Success, status);
-    }
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(2)
+        .WillOnce(mockSendRecvNsmMsg(setEnableResponse))
         .WillOnce(mockSendRecvNsmMsg(enableResponse));
-    errorInjectionEnabled->update(mockManager, eid).detach();
+    const AsyncSetOperationValueType value{};
+    auto dispatcher =
+        AsyncOperationManager::getInstance()->getDispatcher(thermalErrorsPath);
+    auto result = AsyncOperationManager::getInstance()->getNewStatusInterface();
+    dispatcher->setImpl("com.nvidia.ErrorInjection.ErrorInjectionCapability",
+                        "Enabled", true, result.second);
 
-    EXPECT_FALSE(errorInjectionEnabled
-                     ->interfaces[errorInjectionBasePath / "MemoryErrors"]
-                     ->enabled());
-    EXPECT_FALSE(errorInjectionEnabled
-                     ->interfaces[errorInjectionBasePath / "NVLinkErrors"]
-                     ->enabled());
     EXPECT_FALSE(
-        errorInjectionEnabled->interfaces[errorInjectionBasePath / "PCIeErrors"]
-            ->enabled());
-    EXPECT_TRUE(errorInjectionEnabled
-                    ->interfaces[errorInjectionBasePath / "ThermalErrors"]
-                    ->enabled());
+        errorInjectionEnabled->interfaces[memoryErrorsPath]->enabled());
+    EXPECT_FALSE(
+        errorInjectionEnabled->interfaces[nvLinkErrorsPath]->enabled());
+    EXPECT_FALSE(errorInjectionEnabled->interfaces[pcieErrorsPath]->enabled());
+    EXPECT_TRUE(
+        errorInjectionEnabled->interfaces[thermalErrorsPath]->enabled());
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)
