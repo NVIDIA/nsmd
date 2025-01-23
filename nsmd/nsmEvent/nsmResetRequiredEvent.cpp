@@ -51,6 +51,7 @@ NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
         {"REDFISH_MESSAGE_ARGS", messageArgs},
         {"REDFISH_MESSAGE_ID", info.messageId},
         {"namespace", info.loggingNamespace},
+        {"xyz.openbmc_project.Logging.Entry.EventId", info.errorId},
         {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}};
 };
 
@@ -115,6 +116,9 @@ static requester::Coroutine
 
     auto severityStr = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Severity", interface.c_str());
+
+    info.errorId = co_await utils::coGetDbusProperty<std::string>(
+        objPath.c_str(), "ErrorId", interface.c_str());
 
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
         Entry::convertStringToLevel("xyz.openbmc_project.Logging.Entry.Level." +
