@@ -83,14 +83,9 @@ class NsmChassisClockControl : public NsmSensor
     void updateMetricOnSharedMemory() override;
 
     requester::Coroutine
-        setMinClockLimits(const AsyncSetOperationValueType& value,
-                          [[maybe_unused]] AsyncOperationStatusType* status,
-                          std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setMaxClockLimits(const AsyncSetOperationValueType& value,
-                          [[maybe_unused]] AsyncOperationStatusType* status,
-                          std::shared_ptr<NsmDevice> device);
+        setRangeClockLimits(const AsyncSetOperationValueType& value,
+                            [[maybe_unused]] AsyncOperationStatusType* status,
+                            std::shared_ptr<NsmDevice> device);
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
