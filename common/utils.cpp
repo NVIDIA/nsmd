@@ -19,6 +19,7 @@
 
 #include "dBusAsyncUtils.hpp"
 
+#include <fcntl.h>    // For ftruncate
 #include <sys/mman.h> // for memfd_create
 #include <sys/stat.h> // for fstat
 #include <unistd.h>   // for write and lseek
@@ -649,6 +650,11 @@ void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer)
     {
         throw std::runtime_error(
             "writeBufferToFd - Fewer bytes written than expected");
+    }
+    if (ftruncate(fd, buffer.size()) < 0)
+    {
+        throw std::runtime_error("writeBufferToFd - ftruncate failed: " +
+                                 std::string(strerror(errno)));
     }
 }
 std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg)
