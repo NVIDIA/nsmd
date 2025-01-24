@@ -17,22 +17,19 @@
 
 #pragma once
 
+#include "nsmDevice.hpp"
 #include "nsmEvent.hpp"
 
+class NsmDevice;
 namespace nsm
 {
 
-class NsmLongRunningEventDispatcher : public NsmEvent
+class NsmLongRunningEventHandler : public NsmEvent
 {
   public:
-    NsmLongRunningEventDispatcher();
-    int addEvent(NsmType type, uint8_t command,
-                 std::shared_ptr<NsmEvent> event);
+    NsmLongRunningEventHandler();
 
   private:
-    std::unordered_map<NsmType,
-                       std::unordered_map<uint8_t, std::shared_ptr<NsmEvent>>>
-        eventsMap{};
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) override;
 };
