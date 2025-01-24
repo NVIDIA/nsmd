@@ -22,7 +22,9 @@
 
 namespace nsm
 {
-class NsmLongRunningEvent : public NsmEvent
+class NsmLongRunningEvent :
+    public NsmEvent,
+    public std::enable_shared_from_this<NsmLongRunningEvent>
 {
   public:
     explicit NsmLongRunningEvent(const std::string& name,

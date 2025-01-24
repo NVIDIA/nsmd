@@ -45,7 +45,8 @@ requester::Coroutine NsmLongRunningSensor::update(SensorManager& manager,
         co_await device->getSemaphore().acquire(eid);
         // Register the active handler in the device with messageType and
         // commandCode
-        device->registerLongRunningHandler(messageType, commandCode, this);
+        device->registerLongRunningHandler(messageType, commandCode,
+                                           shared_from_this());
         rc = co_await NsmLongRunningSensor::updateLongRunningSensor(manager,
                                                                     eid);
         if (rc == NSM_SW_SUCCESS)
