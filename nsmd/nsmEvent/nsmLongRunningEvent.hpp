@@ -27,16 +27,13 @@ class NsmLongRunningEvent : public NsmEvent
   public:
     explicit NsmLongRunningEvent(const std::string& name,
                                  const std::string& type, bool isLongRunning);
-
-  protected:
+    uint8_t acceptInstanceId = 0xFF;
     const bool isLongRunning;
     common::TimerAwaiter timer;
 
+  protected:
     bool initAcceptInstanceId(uint8_t instanceId, uint8_t cc, uint8_t rc);
     bool validateEvent(eid_t eid, const nsm_msg* event, size_t eventLen);
-
-  private:
-    uint8_t acceptInstanceId = 0xFF;
 };
 
 } // namespace nsm
