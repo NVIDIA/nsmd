@@ -894,15 +894,16 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                 objPath.c_str(), "InventoryObjPath", interface.c_str());
         auto description = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Description", interface.c_str());
-
+        inventoryObjPathFM = inventoryObjPathFM + nameFM;
         auto fabricMgrState = std::make_shared<NsmFabricManagerState>(
-            nameFM, type, inventoryObjPathFM, manager, bus, description);
+            name, type, inventoryObjPath, inventoryObjPathFM, bus, description);
 
         device->addSensor(fabricMgrState, false, false);
 
         auto event = std::make_shared<NsmFabricManagerStateEvent>(
             name, type, fabricMgrState->getFabricManagerIntf(),
-            fabricMgrState->getOperaStatusIntf());
+            fabricMgrState->getOperaStatusIntf(),
+            fabricMgrState->getAggregateFabricManagerState());
         device->deviceEvents.push_back(event);
         device->eventDispatcher.addEvent(NSM_TYPE_NETWORK_PORT,
                                          NSM_FABRIC_MANAGER_STATE_EVENT, event);
