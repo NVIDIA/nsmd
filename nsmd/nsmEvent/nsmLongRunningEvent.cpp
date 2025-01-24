@@ -39,6 +39,9 @@ bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,
 bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
                                         size_t eventLen)
 {
+    // TODO: Add CC and RC error log tracking to prevent log flooding.
+    // Track issue: "Refactor error handling and logging in NSM components" MR.
+    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
     if (!timer.stop())
     {
         lg2::error(
@@ -52,7 +55,7 @@ bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
                                         nullptr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmLongRunningEvent::validateEvent: Failed to decode long running event, eid: {EID}, rc: {RC}",
             "EID", eid, "RC", rc);
         return false;

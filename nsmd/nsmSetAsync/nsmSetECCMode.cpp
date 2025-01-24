@@ -59,11 +59,7 @@ uint8_t NsmSetEccMode::handleResponseMsg(const nsm_msg* responseMsg,
                   : decode_set_ECC_mode_resp(responseMsg, responseLen, &cc,
                                              &dataSize, &reasonCode);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        lg2::info("NsmSetEccMode::handleResponseMsg completed");
-    }
-    else
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "NsmSetEccMode::handleResponseMsg decode_set_ECC_mode_resp failed. cc={CC}, reasonCode={REASON}, rc={RC}",

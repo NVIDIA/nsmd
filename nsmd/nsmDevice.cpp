@@ -102,9 +102,12 @@ std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
 
 void NsmDevice::setEventMode(uint8_t mode)
 {
+    // TODO: Add CC and RC error log tracking to prevent log flooding.
+    // Track issue: "Refactor error handling and logging in NSM components" MR.
+    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
     if (mode > GLOBAL_EVENT_GENERATION_ENABLE_PUSH)
     {
-        lg2::error("event generation setting: invalid value={SETTING} provided",
+        lg2::debug("event generation setting: invalid value={SETTING} provided",
                    "SETTING", mode);
         return;
     }
@@ -223,7 +226,6 @@ void NsmDevice::clearLongRunningHandler()
 {
     if (!longRunningHandler.has_value())
     {
-        lg2::info("No long-running handler to clear");
         return;
     }
 
@@ -245,9 +247,12 @@ int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
                                         NsmEventId eventId,
                                         const nsm_msg* event, size_t eventLen)
 {
+    // TODO: Add CC and RC error log tracking to prevent log flooding.
+    // Track issue: "Refactor error handling and logging in NSM components" MR.
+    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
     if (!longRunningHandler.has_value())
     {
-        lg2::error(
+        lg2::debug(
             "NsmDevice::invokeLongRunningHandler: No active handler registered for long-running event, EID={EID}",
             "EID", eid);
         return NSM_SW_ERROR_DATA;
@@ -261,7 +266,7 @@ int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
+        lg2::debug(
             "NsmLongRunningEventHandler : Failed to decode long running event state : EID={EID}",
             "EID", eid);
         return rc;
