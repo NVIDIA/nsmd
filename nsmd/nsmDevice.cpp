@@ -206,9 +206,9 @@ NsmLongRunningEventHandler& NsmDevice::registerLongRunningEventHandler()
     return *longRunningEventHandler;
 }
 
-void NsmDevice::registerLongRunningHandler(uint8_t messageType,
-                                           uint8_t commandCode,
-                                           NsmLongRunningEvent* sensorInstance)
+void NsmDevice::registerLongRunningHandler(
+    uint8_t messageType, uint8_t commandCode,
+    std::shared_ptr<NsmLongRunningEvent> sensorInstance)
 {
     clearLongRunningHandler();
     lg2::debug(
