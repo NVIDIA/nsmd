@@ -354,7 +354,8 @@ NsmMigMode::NsmMigMode(sdbusplus::bus::bus& bus, std::string& name,
                        std::string& type, std::string& inventoryObjPath,
                        [[maybe_unused]] std::shared_ptr<NsmDevice> device,
                        bool isLongRunning) :
-    NsmLongRunningSensor(name, type, isLongRunning, device),
+    NsmLongRunningSensor(name, type, isLongRunning, device,
+                         NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_MIG_MODE),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -433,7 +434,8 @@ NsmEccMode::NsmEccMode(std::string& name, std::string& type,
                        std::shared_ptr<EccModeIntf> eccIntf,
                        std::string& inventoryObjPath, bool isLongRunning,
                        std::shared_ptr<NsmDevice> device) :
-    NsmLongRunningSensor(name, type, isLongRunning, device),
+    NsmLongRunningSensor(name, type, isLongRunning, device,
+                         NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_ECC_MODE),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -1614,7 +1616,9 @@ NsmCurrentUtilization::NsmCurrentUtilization(
     std::shared_ptr<SMUtilizationIntf> smUtilizationIntf,
     std::string& inventoryObjPath, bool isLongRunning,
     std::shared_ptr<NsmDevice> device) :
-    NsmLongRunningSensor(name, type, isLongRunning, device),
+    NsmLongRunningSensor(name, type, isLongRunning, device,
+                         NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_GET_CURRENT_UTILIZATION),
     cpuOperatingConfigIntf(cpuConfigIntf), smUtilizationIntf(smUtilizationIntf),
     inventoryObjPath(inventoryObjPath),
     smUtilizationIntfName(smUtilizationIntf->interface),
@@ -2554,7 +2558,9 @@ NsmProcessorThrottleDuration::NsmProcessorThrottleDuration(
     std::shared_ptr<ProcessorPerformanceIntf> processorPerfIntf,
     std::string& inventoryObjPath, bool isLongRunning,
     std::shared_ptr<NsmDevice> device) :
-    NsmLongRunningSensor(name, type, isLongRunning, device),
+    NsmLongRunningSensor(name, type, isLongRunning, device,
+                         NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                         NSM_GET_VIOLATION_DURATION),
     processorPerformanceIntf(processorPerfIntf),
     inventoryObjPath(inventoryObjPath)
 
@@ -3278,15 +3284,6 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 "com.nvidia.MigMode", "MIGModeEnabled",
                 {std::bind_front(&NsmSetMigMode::set, setMigModeEnabled.get()),
                  sensor, nsmDevice});
-
-        if (isLongRunning)
-        {
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_MIG_MODE, sensor);
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_SET_MIG_MODE,
-                setMigModeEnabled);
-        }
     }
     else if (type == "NSM_EGM")
     {
@@ -3374,16 +3371,6 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 eccIntf->interface, "ECCModeEnabled",
                 {std::bind_front(&NsmSetEccMode::set, setEccModeEnabled.get()),
                  eccModeSensor, nsmDevice});
-
-        if (isLongRunning)
-        {
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_ECC_MODE,
-                eccModeSensor);
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_SET_ECC_MODE,
-                setEccModeEnabled);
-        }
     }
     else if (type == "NSM_EDPp")
     {
@@ -3463,13 +3450,6 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 AsyncSetOperationInfo{
                     std::bind_front(setCPUSpeedConfig, GRAPHICS_CLOCK),
                     clockLimitSensor, nsmDevice});
-
-        if (isLongRunning)
-        {
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_CURRENT_UTILIZATION,
-                currentUtilization);
-        }
     }
     else if (type == "NSM_ProcessorPerformance")
     {
@@ -3503,13 +3483,6 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addSensor(pciRxTxSensor, priority);
         nsmDevice->addSensor(throttleReasonSensor, priority);
         nsmDevice->addSensor(throttleDurationSensor, priority, isLongRunning);
-
-        if (isLongRunning)
-        {
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL, NSM_GET_VIOLATION_DURATION,
-                throttleDurationSensor);
-        }
     }
     else if (type == "NSM_MemCapacityUtil")
     {
@@ -3527,14 +3500,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, name, type, inventoryObjPath, totalMemorySensor, isLongRunning,
             nsmDevice);
         nsmDevice->deviceSensors.emplace_back(sensor);
-        /*nsmDevice->addSensor(sensor, priority, isLongRunning);
-
-        if (isLongRunning)
-        {
-            nsmDevice->longRunningEventDispatcher.addEvent(
-                NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                NSM_GET_MEMORY_CAPACITY_UTILIZATION, sensor);
-        }*/
+        /*nsmDevice->addSensor(sensor, priority, isLongRunning);*/
     }
     else if (type == "NSM_PowerCap")
     {

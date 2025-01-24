@@ -23,7 +23,6 @@
 #include "common/coroutineSemaphore.hpp"
 #include "common/types.hpp"
 #include "nsmEvent.hpp"
-#include "nsmLongRunningEventDispatcher.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "types.hpp"
@@ -41,14 +40,23 @@ namespace nsm
 class SensorManager;
 class NsmNumericAggregator;
 class NsmDevice;
+class NsmLongRunningEventHandler;
+class NsmLongRunningEvent;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
+
+struct ActiveLongRunningHandlerInfo
+{
+    uint8_t messageType;
+    uint8_t commandCode;
+    NsmLongRunningEvent* sensorInstance;
+};
 
 class NsmDevice
 {
   public:
     NsmDevice(uuid_t uuid) :
         uuid(uuid), isDeviceActive(false),
-        longRunningEventDispatcher(registerLongRunningEventDispatcher()),
+        longRunningEventHandler(registerLongRunningEventHandler()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
@@ -56,7 +64,7 @@ class NsmDevice
 
     NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
         isDeviceActive(false),
-        longRunningEventDispatcher(registerLongRunningEventDispatcher()),
+        longRunningEventHandler(registerLongRunningEventHandler()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
@@ -84,7 +92,7 @@ class NsmDevice
 
     EventDispatcher eventDispatcher;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
-    NsmLongRunningEventDispatcher& longRunningEventDispatcher;
+    NsmLongRunningEventHandler& longRunningEventHandler;
 
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);
@@ -136,15 +144,46 @@ class NsmDevice
         return longRunningSemaphore;
     }
 
+  public:
+    /**
+     * @brief Registers a long-running handler for a specific message type and
+     * command code.
+     *
+     * @param messageType The message type associated with the long-running
+     * event.
+     * @param commandCode The command code associated with the long-running
+     * event.
+     * @param handler The event handler to register.
+     */
+    void registerLongRunningHandler(uint8_t messageType, uint8_t commandCode,
+                                    NsmLongRunningEvent* sensorInstance);
+
+    /**
+     * @brief Clears the registered long-running handler.
+     */
+    void clearLongRunningHandler();
+
+    /**
+     * @brief Retrieves the active long-running handler, if any.
+     *
+     * @return std::optional<ActiveLongRunningHandlerInfo> containing the active
+     * handler, or an empty optional if no handler is active.
+     */
+    std::optional<nsm::ActiveLongRunningHandlerInfo>
+        getActiveLongRunningHandler() const;
+    int invokeLongRunningHandler(eid_t eid, NsmType type, NsmEventId eventId,
+                                 const nsm_msg* event, size_t eventLen);
+
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     uint8_t eventMode;
     uint8_t deviceType = 0;
     uint8_t instanceNumber = 0;
-    NsmLongRunningEventDispatcher& registerLongRunningEventDispatcher();
+    NsmLongRunningEventHandler& registerLongRunningEventHandler();
     common::CoroutineSemaphore
         longRunningSemaphore; // Semaphore for synchronizing long running
                               // commands
+    std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
