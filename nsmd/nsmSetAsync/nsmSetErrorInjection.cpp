@@ -60,10 +60,6 @@ requester::Coroutine
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_set_error_injection_mode_v1_req(0, mode, requestPtr);
 
-    lg2::debug(
-        "NsmSetErrorInjection::setModeEnabled encode_set_error_injection_mode_v1_req call - mode={MODE}",
-        "MODE", mode);
-
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -97,13 +93,7 @@ requester::Coroutine
 
     rc = decode_set_error_injection_mode_v1_resp(responseMsg.get(), responseLen,
                                                  &cc, &reasonCode);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        lg2::debug(
-            "NsmSetErrorInjection::setModeEnabled decode_set_error_injection_mode_v1_resp success - mode={MODE}",
-            "MODE", mode);
-    }
-    else
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "NsmSetErrorInjection::setModeEnabled: decode_set_error_injection_mode_v1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
@@ -164,10 +154,6 @@ requester::Coroutine
     auto rc = encode_set_current_error_injection_types_v1_req(0, &data,
                                                               requestPtr);
 
-    lg2::debug(
-        "NsmSetErrorInjectionEnabled::setEnabled encode_set_current_error_injection_types_v1_req call - value={VALUE}",
-        "VALUE", value);
-
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -201,13 +187,7 @@ requester::Coroutine
 
     rc = decode_set_current_error_injection_types_v1_resp(
         responseMsg.get(), responseLen, &cc, &reasonCode);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        lg2::debug(
-            "NsmSetErrorInjectionEnabled::setEnabled decode_set_current_error_injection_types_v1_resp success - value={VALUE}",
-            "VALUE", value);
-    }
-    else
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "NsmSetErrorInjectionEnabled::setEnabled: decode_set_current_error_injection_types_v1_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
