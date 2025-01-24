@@ -65,19 +65,20 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         device = manager.getNsmDevice(deviceType, instanceId);
         if (!device)
         {
-            throw std::invalid_argument(
-                std::format("Device {}:{} not found", deviceType, instanceId));
+            statusInterface->status(AsyncOperationStatusType::InvalidArgument);
+            co_return rc;
         }
 
         // Acquire the semaphore before proceeding
         co_await device->getSemaphore().acquire(device->eid);
         // Create the long-running event handler
-        auto longRunningHandler = std::make_shared<NsmRawLongRunningEventHandler>(
-            "RawLongRunningHandler", "RawEvent", isLongRunning);
+        auto longRunningHandler =
+            std::make_shared<NsmRawLongRunningEventHandler>(
+                "RawLongRunningHandler", "RawEvent", isLongRunning);
         // Register the active handler in the device with messageType and
         // commandCode
         device->registerLongRunningHandler(messageType, commandCode,
-                                           longRunningHandler.get());
+                                           longRunningHandler);
 
         std::vector<uint8_t> data;
         utils::readFdToBuffer(fd, data);
@@ -129,7 +130,8 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
             else
             {
                 auto accepted = rc == NSM_SW_SUCCESS && cc == NSM_ACCEPTED;
-                longRunningHandler->acceptInstanceId = accepted ? responseMsg->hdr.instance_id : 0xFF;
+                longRunningHandler->acceptInstanceId =
+                    accepted ? responseMsg->hdr.instance_id : 0xFF;
                 if (!accepted)
                 {
                     throw std::runtime_error(
@@ -157,12 +159,6 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
                 device->getSemaphore().release();
             }
         }
-    }
-    catch (const std::invalid_argument& e)
-    {
-        lg2::error(e.what());
-        statusInterface->status(AsyncOperationStatusType::InvalidArgument);
-        // no need to free semaphore, we have not acquired when thsi error comes
     }
     catch (const std::runtime_error& e)
     {
