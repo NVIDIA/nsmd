@@ -104,56 +104,56 @@ static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
     return true;
 }
 
-static double getValueFromBucketArray(uint8_t* data, uint8_t data_type,
+static double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
                                       size_t index)
 {
     switch (data_type)
     {
-        case NvU8:
+        case BucketDataTypes::NvU8:
             return static_cast<double>(data[index]);
-        case NvS8:
+        case BucketDataTypes::NvS8:
         {
             int8_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(int8_t)), sizeof(int8_t));
             return static_cast<double>(tmp);
         }
-        case NvU16:
+        case BucketDataTypes::NvU16:
         {
             uint16_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(uint16_t)), sizeof(uint16_t));
             return static_cast<double>(tmp);
         }
-        case NvS16:
+        case BucketDataTypes::NvS16:
         {
             int16_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(int16_t)), sizeof(int16_t));
             return static_cast<double>(tmp);
         }
-        case NvU32:
+        case BucketDataTypes::NvU32:
         {
             uint32_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(uint32_t)), sizeof(uint32_t));
             return static_cast<double>(tmp);
         }
-        case NvS32:
+        case BucketDataTypes::NvS32:
         {
             int32_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(int32_t)), sizeof(int32_t));
             return static_cast<double>(tmp);
         }
-        case NvS24_8:
+        case BucketDataTypes::NvS24_8:
         {
             float tmp = 0;
             memcpy(&tmp, data + (index * sizeof(float)), sizeof(float));
             return static_cast<double>(tmp);
         }
-        case NvU64:
+        case BucketDataTypes::NvU64:
         {
             uint64_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(uint64_t)), sizeof(uint64_t));
             return utils::uint64ToDoubleSafeConvert(tmp);
         }
-        case NvS64:
+        case BucketDataTypes::NvS64:
         {
             int64_t tmp = 0;
             memcpy(&tmp, data + (index * sizeof(int64_t)), sizeof(int64_t));
@@ -165,20 +165,69 @@ static double getValueFromBucketArray(uint8_t* data, uint8_t data_type,
     }
 }
 
+static BucketDataTypes getDataTypeEnum(uint8_t data_type)
+{
+    switch (data_type)
+    {
+        case NvU8:
+        {
+            return BucketDataTypes::NvU8;
+        }
+        case NvS8:
+        {
+            return BucketDataTypes::NvS8;
+        }
+        case NvU16:
+        {
+            return BucketDataTypes::NvU16;
+        }
+        case NvS16:
+        {
+            return BucketDataTypes::NvS16;
+        }
+        case NvU32:
+        {
+            return BucketDataTypes::NvU32;
+        }
+        case NvS32:
+        {
+            return BucketDataTypes::NvS32;
+        }
+        case NvS24_8:
+        {
+            return BucketDataTypes::NvS24_8;
+        }
+        case NvU64:
+        {
+            return BucketDataTypes::NvU64;
+        }
+        case NvS64:
+        {
+            return BucketDataTypes::NvS64;
+        }
+        default:
+        {
+            return BucketDataTypes::Unknown;
+        }
+    }
+    return BucketDataTypes::Unknown;
+}
+
 NsmHistogramFormat::NsmHistogramFormat(
     sdbusplus::bus::bus& bus, std::string& name, const std::string& type,
-    std::shared_ptr<FormatIntf>& formatIntf, std::string& parentObjPath,
-    std::string& deviceObjPath, uint32_t histogramId, uint16_t parameter) :
+    std::shared_ptr<FormatIntf>& formatIntf,
+    std::shared_ptr<BucketInfoIntf>& bucketInfoIntf, std::string& objPath,
+    std::vector<std::tuple<std::string, std::string, std::string>>&
+        associationsList,
+    uint32_t histogramId, uint16_t parameter) :
     NsmSensor(name, type),
-    formatIntf(formatIntf), histogramId(histogramId), parameter(parameter)
+    formatIntf(formatIntf), bucketInfoIntf(bucketInfoIntf),
+    histogramId(histogramId), parameter(parameter)
 {
-    lg2::error("NsmHistogramFormat: {NAME}", "NAME", name.c_str());
+    lg2::info("NsmHistogramFormat: {NAME}", "NAME", name.c_str());
     histogramName = name;
     deviceType = type;
-    objPath = parentObjPath + "/Histograms/" + histogramName;
-    std::vector<std::tuple<std::string, std::string, std::string>>
-        associationsList;
-    associationsList.emplace_back("parent_device", "histograms", deviceObjPath);
+    objPath = objPath + "/Histograms/" + histogramName;
     associationDefIntf =
         std::make_unique<AssociationDefinitionsInft>(bus, objPath.c_str());
 
@@ -208,8 +257,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
                                               size_t responseLen)
 {
-    auto& bus = utils::DBusHandler::getBus();
-    SensorManager& sensorManager = SensorManager::getInstance();
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
@@ -235,8 +282,7 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
             static_cast<uint64_t>(metaData.accumulation_cycle));
         formatIntf->incrementDuration(
             static_cast<uint64_t>(metaData.increment_duration));
-        formatIntf->bucketDataType(
-            static_cast<uint8_t>(metaData.bucket_data_type));
+        formatIntf->bucketDataType(getDataTypeEnum(metaData.bucket_data_type));
         switch (metaData.bucket_unit_of_measure)
         {
             case NSM_BUCKET_UNIT_WATTS:
@@ -264,47 +310,44 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
             associationsList;
         associationsList = associationDefIntf->associations();
         bucket_offsets.resize(total_bucket_offset_size);
+        std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
+            bucketData;
         for (size_t i = 0; i < metaData.num_of_buckets; i++)
         {
-            auto bucketObjPath = objPath + "/Buckets/" + std::to_string(i);
-            auto bucketSensorObjectPath = bucketObjPath +
-                                          "/com.nvidia.Histogram.BucketInfo";
-
-            auto bucketInfoIntf = getInterfaceOnObjectPath<BucketInfoIntf>(
-                bucketSensorObjectPath, sensorManager, bus,
-                bucketObjPath.c_str());
-
-            associationsList.emplace_back("histogram_buckets",
-                                          "parent_histogram", bucketObjPath);
-            bucketInfoIntf->start(getValueFromBucketArray(
-                bucket_offsets.data(), metaData.bucket_data_type, i));
+            auto start = getValueFromBucketArray(
+                bucket_offsets.data(),
+                getDataTypeEnum(metaData.bucket_data_type), i);
+            auto end = start;
 
             if ((i + 1) < metaData.num_of_buckets)
             {
-                bucketInfoIntf->end(getValueFromBucketArray(
-                    bucket_offsets.data(), metaData.bucket_data_type, i + 1));
+                end = getValueFromBucketArray(
+                    bucket_offsets.data(),
+                    getDataTypeEnum(metaData.bucket_data_type), i + 1);
             }
             else
             {
-                bucketInfoIntf->end(
-                    getMaxValueForType(metaData.bucket_data_type));
+                end = getMaxValueForType(metaData.bucket_data_type);
             }
 
-            switch (metaData.bucket_unit_of_measure)
-            {
-                case NSM_BUCKET_UNIT_WATTS:
-                    bucketInfoIntf->unit(BucketUnits::Watts);
-                    break;
-                case NSM_BUCKET_UNIT_PERCENT:
-                    bucketInfoIntf->unit(BucketUnits::Percent);
-                    break;
-                case NSM_BUCKET_UNIT_COUNTS:
-                    bucketInfoIntf->unit(BucketUnits::Count);
-                    break;
-                default:
-                    bucketInfoIntf->unit(BucketUnits::Others);
-                    break;
-            }
+            bucketData.push_back(
+                std::make_tuple(i, std::make_tuple(start, end, 0)));
+        }
+        bucketInfoIntf->bucketData(bucketData);
+        switch (metaData.bucket_unit_of_measure)
+        {
+            case NSM_BUCKET_UNIT_WATTS:
+                bucketInfoIntf->unit(BucketUnits::Watts);
+                break;
+            case NSM_BUCKET_UNIT_PERCENT:
+                bucketInfoIntf->unit(BucketUnits::Percent);
+                break;
+            case NSM_BUCKET_UNIT_COUNTS:
+                bucketInfoIntf->unit(BucketUnits::Count);
+                break;
+            default:
+                bucketInfoIntf->unit(BucketUnits::Others);
+                break;
         }
         associationDefIntf->associations(associationsList);
     }
@@ -322,13 +365,14 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
     return NSM_SW_SUCCESS;
 }
 
-NsmHistogramData::NsmHistogramData(std::string& name, const std::string& type,
-                                   std::shared_ptr<FormatIntf>& formatIntf,
-                                   std::string& inventoryObjPath,
-                                   uint32_t histogramId, uint16_t parameter) :
+NsmHistogramData::NsmHistogramData(
+    std::string& name, const std::string& type,
+    std::shared_ptr<FormatIntf>& formatIntf,
+    std::shared_ptr<BucketInfoIntf>& bucketInfoIntf, uint32_t histogramId,
+    uint16_t parameter) :
     NsmSensor(name, type),
-    formatIntf(formatIntf), objPath(inventoryObjPath), histogramId(histogramId),
-    parameter(parameter)
+    formatIntf(formatIntf), bucketInfoIntf(bucketInfoIntf),
+    histogramId(histogramId), parameter(parameter)
 {
     lg2::debug("NsmHistogramData: {NAME}", "NAME", name.c_str());
     histogramName = name;
@@ -357,8 +401,6 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-    auto& bus = utils::DBusHandler::getBus();
-    SensorManager& sensorManager = SensorManager::getInstance();
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
@@ -369,7 +411,6 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
     std::vector<uint8_t> bucket_data(65520, 0);
     uint32_t total_bucket_data_size;
     uint8_t dataTypeOfBucket;
-
     auto rc = decode_get_histogram_data_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize,
         &dataTypeOfBucket, &number_of_buckets, bucket_data.data(),
@@ -380,27 +421,23 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         clearErrorBitMap("decode_get_histogram_data_resp");
 
         if ((formatIntf->numOfBuckets() != number_of_buckets) ||
-            (formatIntf->bucketDataType() != dataTypeOfBucket) ||
+            (formatIntf->bucketDataType() !=
+             getDataTypeEnum(dataTypeOfBucket)) ||
             !checkSizeOfBucketArrayIsValid(total_bucket_data_size,
                                            number_of_buckets, dataTypeOfBucket))
         {
             return NSM_SW_ERROR_COMMAND_FAIL;
         }
-
+        std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
+            bucketData = bucketInfoIntf->bucketData();
         bucket_data.resize(total_bucket_data_size);
         for (size_t i = 0; i < number_of_buckets; i++)
         {
-            auto bucketObjPath = objPath + "/Buckets/" + std::to_string(i);
-            auto bucketSensorObjectPath = bucketObjPath +
-                                          "/com.nvidia.Histogram.BucketInfo";
-
-            auto bucketInfoIntf = getInterfaceOnObjectPath<BucketInfoIntf>(
-                bucketSensorObjectPath, sensorManager, bus,
-                bucketObjPath.c_str());
-
-            bucketInfoIntf->value(getValueFromBucketArray(
-                bucket_data.data(), formatIntf->bucketDataType(), i));
+            auto value = getValueFromBucketArray(
+                bucket_data.data(), formatIntf->bucketDataType(), i);
+            std::get<2>(std::get<1>(bucketData[i])) = value;
         }
+        bucketInfoIntf->bucketData(bucketData);
     }
     else
     {

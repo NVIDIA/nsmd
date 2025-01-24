@@ -712,13 +712,20 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
 
         auto powerHistoFormatIntf =
             std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
+        auto powerHistoBucketDataIntf =
+            std::make_shared<BucketInfoIntf>(bus, histoDbusObjPath.c_str());
+        std::vector<std::tuple<std::string, std::string, std::string>>
+            associationsList;
+        associationsList.emplace_back("parent_device", "histograms",
+                                      dbusObjPath);
         auto getPowerHistoFormatObject = std::make_shared<NsmHistogramFormat>(
             bus, histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
-            dbusObjPath, dbusObjPath, powerHistogramID, 0);
+            powerHistoBucketDataIntf, dbusObjPath, associationsList,
+            powerHistogramID, 0);
 
         auto getPowerHistoDataObject = std::make_shared<NsmHistogramData>(
             histoObjName, "NvSwitch_Power_Histogram", powerHistoFormatIntf,
-            histoDbusObjPath, powerHistogramID, 0);
+            powerHistoBucketDataIntf, powerHistogramID, 0);
 
         device->addStaticSensor(getPowerHistoFormatObject);
         device->addSensor(getPowerHistoDataObject, false);
