@@ -37,42 +37,40 @@ requester::Coroutine NsmAsyncLongRunningSensor::update(SensorManager& manager,
                                                        eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    if (isLongRunning)
+
+    // Acquire the semaphore before proceeding
+    co_await device->getSemaphore().acquire(eid);
+    // by default command will be treated as long running
+    isLongRunning = true;
+    // Register the active handler in the device with messageType and
+    // commandCode
+    device->registerLongRunningHandler(messageType, commandCode,
+                                       shared_from_this());
+    rc = co_await NsmAsyncLongRunningSensor::updateLongRunningSensor(manager,
+                                                                     eid);
+    if (rc == NSM_SW_SUCCESS && isLongRunning)
     {
-        // Acquire the semaphore before proceeding
-        co_await device->getSemaphore().acquire(eid);
-        // Register the active handler in the device with messageType and
-        // commandCode
-        device->registerLongRunningHandler(messageType, commandCode,
-                                           shared_from_this());
-        rc = co_await NsmAsyncLongRunningSensor::updateLongRunningSensor(
-            manager, eid);
-        if (rc == NSM_SW_SUCCESS)
+        // if(isLongRunning) means event will be there as second response
+        rc = co_await timer;
+        if (rc != NSM_SW_SUCCESS)
         {
-            rc = co_await timer;
-            if (rc != NSM_SW_SUCCESS)
-            {
-                lg2::error(
-                    "NsmAsyncLongRunningSensor::update: LongRunning timer start failed, name={NAME}, eid={EID}",
-                    "NAME", NsmSensor::getName(), "EID", eid);
-            }
-            else if (timer.expired())
-            {
-                lg2::error(
-                    "NsmAsyncLongRunningSensor::update: LongRunning sensor timeout expired, name={NAME}, eid={EID}",
-                    "NAME", NsmSensor::getName(), "EID", eid);
-                rc = NSM_SW_ERROR;
-            }
+            lg2::error(
+                "NsmAsyncLongRunningSensor::update: LongRunning timer start failed, name={NAME}, eid={EID}",
+                "NAME", NsmSensor::getName(), "EID", eid);
         }
-        // Unregister the active handler in the device
-        device->clearLongRunningHandler();
-        // Release the semaphore after the update is complete
-        device->getSemaphore().release();
+        else if (timer.expired())
+        {
+            lg2::error(
+                "NsmAsyncLongRunningSensor::update: LongRunning sensor timeout, name={NAME}, eid={EID}",
+                "NAME", NsmSensor::getName(), "EID", eid);
+            rc = NSM_SW_ERROR;
+        }
     }
-    else
-    {
-        rc = co_await NsmAsyncSensor::update(manager, eid);
-    }
+
+    // Unregister the active handler in the device
+    device->clearLongRunningHandler();
+    // Release the semaphore after the update is complete
+    device->getSemaphore().release();
 
     // coverity[missing_return]
     co_return rc;
@@ -86,9 +84,8 @@ requester::Coroutine
     if (!requestMsg.has_value())
     {
         lg2::error(
-            "NsmAsyncLongRunningSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: genRequestMsg failed, name={NAME}, eid={EID}",
             "NAME", NsmSensor::getName(), "EID", eid);
-        *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
@@ -97,10 +94,11 @@ requester::Coroutine
     size_t responseLen = 0;
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
                                               responseLen);
+
     if (rc)
     {
         lg2::error(
-            "NsmAsyncLongRunningSensor::update: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
             "NAME", NsmAsyncSensor::getName(), "EID", eid);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -110,18 +108,28 @@ requester::Coroutine
     uint16_t reasonCode = 0, dataSize = 0;
     rc = decode_common_resp(responseMsg.get(), responseLen, &cc, &dataSize,
                             &reasonCode);
+
+    if (cc == NSM_SUCCESS)
+    {
+        // treat it as normal request and return here itself
+        isLongRunning = false;
+        rc = handleResponseMsg(responseMsg.get(), responseLen);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    // if cc != NSM_SUCCESS proceed for event handling
     if (!initAcceptInstanceId(responseMsg->hdr.instance_id, cc, rc))
     {
         logHandleResponseMsg(
-            "NsmAsyncLongRunningSensor::update: Failed to accept LongRunning",
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning",
             reasonCode, cc, rc);
-        *status = AsyncOperationStatusType::InternalFailure;
         rc = NSM_SW_ERROR_COMMAND_FAIL;
     }
     else
     {
         clearErrorBitMap(
-            "NsmAsyncLongRunningSensor::update: Failed to accept LongRunning");
+            "NsmAsyncLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning");
     }
 
     // coverity[missing_return]
