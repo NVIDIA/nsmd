@@ -623,6 +623,7 @@ requester::Coroutine
     uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
     uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
+    bool hasFailedToSearchEID = false;
 
     do
     {
@@ -650,10 +651,14 @@ requester::Coroutine
             }
             else
             {
-                lg2::error(
-                    "doPollingTask: failed to searchEID for nsmDevice({DT},{INST})",
-                    "DT", nsmDevice->getDeviceType(), "INST",
-                    nsmDevice->getInstanceNumber());
+                if (!hasFailedToSearchEID)
+                {
+                    lg2::error(
+                        "doPollingTask: failed to searchEID for nsmDevice({DT},{INST})",
+                        "DT", nsmDevice->getDeviceType(), "INST",
+                        nsmDevice->getInstanceNumber());
+                    hasFailedToSearchEID = true;
+                }
             }
 
             // Sleep. Wait for the device to get active.
@@ -663,6 +668,7 @@ requester::Coroutine
         }
 
         eid_t eid = getEid(nsmDevice);
+        hasFailedToSearchEID = false;
 #if false
 //place holder: to be implemented once related specification is available
         if (nsmDevice->getEventMode() == GLOBAL_EVENT_GENERATION_ENABLE_POLLING)
