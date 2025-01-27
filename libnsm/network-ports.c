@@ -68,6 +68,7 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	portData->effective_ber = htole64(portData->effective_ber);
 	portData->estimated_effective_ber =
 	    htole64(portData->estimated_effective_ber);
+	portData->effective_error = htole64(portData->effective_error);
 }
 
 static void letohPortCounterData(struct nsm_port_counter_data *portData)
@@ -117,6 +118,7 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	portData->effective_ber = le64toh(portData->effective_ber);
 	portData->estimated_effective_ber =
 	    le64toh(portData->estimated_effective_ber);
+	portData->effective_error = le64toh(portData->effective_error);
 }
 
 static void
