@@ -42,13 +42,6 @@ bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
     // TODO: Add CC and RC error log tracking to prevent log flooding.
     // Track issue: "Refactor error handling and logging in NSM components" MR.
     // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
-    if (!timer.stop())
-    {
-        lg2::error(
-            "NsmLongRunningEvent::validateEvent: LongRunning timer not stopped, eid={EID}",
-            "EID", eid);
-        return false;
-    }
 
     uint8_t instanceId;
     auto rc = decode_long_running_event(event, eventLen, &instanceId, nullptr,

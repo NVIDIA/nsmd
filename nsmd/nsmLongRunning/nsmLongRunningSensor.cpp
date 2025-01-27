@@ -140,12 +140,18 @@ requester::Coroutine
 int NsmLongRunningSensor::handle(eid_t eid, NsmType, NsmEventId,
                                  const nsm_msg* event, size_t eventLen)
 {
-    if (!validateEvent(eid, event, eventLen))
+    int rc = NSM_SW_ERROR_COMMAND_FAIL;
+    if (validateEvent(eid, event, eventLen))
     {
-        // All false cases are logged in validateEvent
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        rc = handleResponseMsg(event, eventLen);
     }
-    return handleResponseMsg(event, eventLen);
+    if (!timer.stop())
+    {
+        lg2::error(
+            "NsmLongRunningSensor::handle: LongRunning timer not stopped, eid={EID}",
+            "EID", eid);
+    }
+    return rc;
 }
 
 } // namespace nsm
