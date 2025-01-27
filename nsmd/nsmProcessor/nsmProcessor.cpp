@@ -3492,7 +3492,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             bus, name, type, inventoryObjPath, totalMemorySensor, isLongRunning,
             nsmDevice);
         nsmDevice->deviceSensors.emplace_back(sensor);
-        /*nsmDevice->addSensor(sensor, priority, isLongRunning);*/
+        nsmDevice->addSensor(sensor, priority, isLongRunning);
     }
     else if (type == "NSM_PowerCap")
     {
