@@ -129,31 +129,45 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
             }
             else
             {
-                auto accepted = rc == NSM_SW_SUCCESS && cc == NSM_ACCEPTED;
-                longRunningHandler->acceptInstanceId =
-                    accepted ? responseMsg->hdr.instance_id : 0xFF;
-                if (!accepted)
+                if (cc == NSM_SUCCESS)
                 {
-                    throw std::runtime_error(
-                        std::format("Failed to accept LongRunning, cc={}", cc));
+                    auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
+                    // completion code + data
+                    data.resize(1 + dataSize);
+                    memcpy(data.data() + 1, responseMsg->payload + 2, dataSize);
+                    data[0] = cc;
+                    utils::writeBufferToFd(fd, data);
+                    valueInterface->value(rc);
+                    statusInterface->status(AsyncOperationStatusType::Success);
                 }
+                else
+                {
+                    auto accepted = rc == NSM_SW_SUCCESS && cc == NSM_ACCEPTED;
+                    longRunningHandler->acceptInstanceId =
+                        accepted ? responseMsg->hdr.instance_id : 0xFF;
+                    if (!accepted)
+                    {
+                        throw std::runtime_error(std::format(
+                            "Failed to accept LongRunning, cc={}", cc));
+                    }
 
-                rc = co_await longRunningHandler->timer;
-                if (rc != NSM_SW_SUCCESS)
-                {
-                    throw std::runtime_error(std::format(
-                        "NsmRawLongRunningSensor::update: LongRunning timer start"));
+                    rc = co_await longRunningHandler->timer;
+                    if (rc != NSM_SW_SUCCESS)
+                    {
+                        throw std::runtime_error(std::format(
+                            "NsmRawLongRunningSensor::update: LongRunning timer start"));
+                    }
+                    if (!longRunningHandler->isLongRunnningEventValidated)
+                    {
+                        throw std::runtime_error(std::format(
+                            "NsmRawLongRunningSensor::update: LongRunning sensor event validation fails"));
+                    }
+                    // event validation completes
+                    utils::writeBufferToFd(
+                        fd, longRunningHandler->longRunningEventData);
+                    valueInterface->value(longRunningHandler->longRunningRc);
+                    statusInterface->status(AsyncOperationStatusType::Success);
                 }
-                if (!longRunningHandler->isLongRunnningEventValidated)
-                {
-                    throw std::runtime_error(std::format(
-                        "NsmRawLongRunningSensor::update: LongRunning sensor event validation fails"));
-                }
-                // event validation completes
-                utils::writeBufferToFd(
-                    fd, longRunningHandler->longRunningEventData);
-                valueInterface->value(longRunningHandler->longRunningRc);
-                statusInterface->status(AsyncOperationStatusType::Success);
                 // degister handler and release semaphore
                 device->clearLongRunningHandler();
                 device->getSemaphore().release();
