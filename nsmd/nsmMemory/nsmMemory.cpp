@@ -843,8 +843,7 @@ static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
             auto priority = co_await utils::coGetDbusProperty<bool>(
                 objPath.c_str(), "Priority", interface.c_str());
 
-            auto isLongRunning = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "LongRunning", interface.c_str());
+            auto isLongRunning = true;
 
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);

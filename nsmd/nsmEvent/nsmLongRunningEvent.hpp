@@ -30,7 +30,7 @@ class NsmLongRunningEvent :
     explicit NsmLongRunningEvent(const std::string& name,
                                  const std::string& type, bool isLongRunning);
     uint8_t acceptInstanceId = 0xFF;
-    const bool isLongRunning;
+    bool isLongRunning;
     common::TimerAwaiter timer;
 
   protected:
