@@ -53,7 +53,7 @@ class NsmRawCommandHandlerTest : public Test, public SensorManagerTest
         const auto [_, statusInterface, valueInterface] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
         auto rc = NsmRawCommandHandler::getInstance()
-                      .doSendRequest(deviceType, instanceId, false, messageType,
+                      .doSendRequest(deviceType, instanceId, messageType,
                                      commandCode, dup(fd), statusInterface,
                                      valueInterface)
                       .await_resume();

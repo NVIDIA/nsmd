@@ -48,7 +48,7 @@ struct ActiveLongRunningHandlerInfo
 {
     uint8_t messageType;
     uint8_t commandCode;
-    NsmLongRunningEvent* sensorInstance;
+    std::shared_ptr<NsmLongRunningEvent> sensorInstance;
 };
 
 class NsmDevice
@@ -155,8 +155,9 @@ class NsmDevice
      * event.
      * @param handler The event handler to register.
      */
-    void registerLongRunningHandler(uint8_t messageType, uint8_t commandCode,
-                                    NsmLongRunningEvent* sensorInstance);
+    void registerLongRunningHandler(
+        uint8_t messageType, uint8_t commandCode,
+        std::shared_ptr<NsmLongRunningEvent> sensorInstance);
 
     /**
      * @brief Clears the registered long-running handler.
