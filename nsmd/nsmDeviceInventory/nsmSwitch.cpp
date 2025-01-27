@@ -886,34 +886,18 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         auto inventoryObjPathFM =
             co_await utils::coGetDbusProperty<std::string>(
                 objPath.c_str(), "InventoryObjPath", interface.c_str());
-
-        auto objPathFM = inventoryObjPathFM + nameFM;
-        auto sensorObjectPathFM = objPathFM + "/com.nvidia.State.FabricManager";
-        std::shared_ptr<FabricManagerIntf> fabricMgrIntf =
-            getInterfaceOnObjectPath<FabricManagerIntf>(
-                sensorObjectPathFM, manager, bus, objPathFM.c_str());
-
-        sensorObjectPathFM =
-            objPathFM +
-            "/xyz.openbmc_project.State.Decorator.OperationalStatus";
-        std::shared_ptr<OperaStatusIntf> opStateIntf =
-            getInterfaceOnObjectPath<OperaStatusIntf>(
-                sensorObjectPathFM, manager, bus, objPathFM.c_str());
-
-        sensorObjectPathFM =
-            objPathFM + "/xyz.openbmc_project.Inventory.Item.ManagementService";
-        std::shared_ptr<ManagementServiceIntf> mgmtSerIntf =
-            getInterfaceOnObjectPath<ManagementServiceIntf>(
-                sensorObjectPathFM, manager, bus, objPathFM.c_str());
-
+        auto description = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "Description", interface.c_str());
+        inventoryObjPathFM = inventoryObjPathFM + nameFM;
         auto fabricMgrState = std::make_shared<NsmFabricManagerState>(
-            nameFM, type, inventoryObjPathFM, fabricMgrIntf, opStateIntf,
-            mgmtSerIntf);
+            name, type, inventoryObjPath, inventoryObjPathFM, bus, description);
 
         device->addSensor(fabricMgrState, false, false);
 
         auto event = std::make_shared<NsmFabricManagerStateEvent>(
-            name, type, fabricMgrIntf, opStateIntf);
+            name, type, fabricMgrState->getFabricManagerIntf(),
+            fabricMgrState->getOperaStatusIntf(),
+            fabricMgrState->getAggregateFabricManagerState());
         device->deviceEvents.push_back(event);
         device->eventDispatcher.addEvent(NSM_TYPE_NETWORK_PORT,
                                          NSM_FABRIC_MANAGER_STATE_EVENT, event);

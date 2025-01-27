@@ -31,9 +31,12 @@ namespace nsm
 NsmFabricManagerStateEvent::NsmFabricManagerStateEvent(
     const std::string& name, const std::string& type,
     std::shared_ptr<FabricManagerIntf> fabricMgrIntf,
-    std::shared_ptr<OperaStatusIntf> opStateIntf) :
+    std::shared_ptr<OperaStatusIntf> opStateIntf,
+    std::shared_ptr<NsmAggregateFabricManagerState>
+        nsmAggregateFabricManagerState) :
     NsmEvent(name, type),
-    fabricManagerIntf(fabricMgrIntf), operationalStatusIntf(opStateIntf)
+    fabricManagerIntf(fabricMgrIntf), operationalStatusIntf(opStateIntf),
+    nsmAggregateFabricManagerState(nsmAggregateFabricManagerState)
 {
     lg2::debug("NsmFabricManagerStateEvent: Name {NAME}.", "NAME", name);
 }
@@ -61,54 +64,67 @@ int NsmFabricManagerStateEvent::handle(eid_t eid, NsmType /*type*/,
         return NSM_SW_ERROR;
     }
 
-    switch (payload.fm_state)
-    {
-        case NSM_FM_STATE_OFFLINE:
-            fabricManagerIntf->fmState(FMState::Offline);
-            operationalStatusIntf->state(OpState::Starting);
-            break;
-        case NSM_FM_STATE_STANDBY:
-            fabricManagerIntf->fmState(FMState::Standby);
-            operationalStatusIntf->state(OpState::StandbyOffline);
-            break;
-        case NSM_FM_STATE_CONFIGURED:
-            fabricManagerIntf->fmState(FMState::Configured);
-            operationalStatusIntf->state(OpState::Enabled);
-            break;
-        case NSM_FM_STATE_RESERVED_TIMEOUT:
-            fabricManagerIntf->fmState(FMState::Timeout);
-            operationalStatusIntf->state(OpState::UnavailableOffline);
-            break;
-        case NSM_FM_STATE_ERROR:
-            fabricManagerIntf->fmState(FMState::Error);
-            operationalStatusIntf->state(OpState::UnavailableOffline);
-            break;
-        default:
-            fabricManagerIntf->fmState(FMState::Unknown);
-            operationalStatusIntf->state(OpState::None);
-            break;
-    }
-
     switch (payload.report_status)
     {
         case NSM_FM_REPORT_STATUS_NOT_RECEIVED:
+        {
+            // Report not received yet hence ignore
             fabricManagerIntf->reportStatus(FMReportStatus::NotReceived);
             break;
+        }
         case NSM_FM_REPORT_STATUS_RECEIVED:
+        {
+            // Report received hence update everything
             fabricManagerIntf->reportStatus(FMReportStatus::Received);
+
+            switch (payload.fm_state)
+            {
+                case NSM_FM_STATE_OFFLINE:
+                    fabricManagerIntf->fmState(FMState::Offline);
+                    operationalStatusIntf->state(OpState::Starting);
+                    break;
+                case NSM_FM_STATE_STANDBY:
+                    fabricManagerIntf->fmState(FMState::Standby);
+                    operationalStatusIntf->state(OpState::StandbyOffline);
+                    break;
+                case NSM_FM_STATE_CONFIGURED:
+                    fabricManagerIntf->fmState(FMState::Configured);
+                    operationalStatusIntf->state(OpState::Enabled);
+                    break;
+                case NSM_FM_STATE_RESERVED_TIMEOUT:
+                    fabricManagerIntf->fmState(FMState::Timeout);
+                    operationalStatusIntf->state(OpState::UnavailableOffline);
+                    break;
+                case NSM_FM_STATE_ERROR:
+                    fabricManagerIntf->fmState(FMState::Error);
+                    operationalStatusIntf->state(OpState::UnavailableOffline);
+                    break;
+                default:
+                    fabricManagerIntf->fmState(FMState::Unknown);
+                    operationalStatusIntf->state(OpState::StandbyOffline);
+                    break;
+            }
+
+            fabricManagerIntf->lastRestartTime(payload.last_restart_timestamp);
+            fabricManagerIntf->lastRestartDuration(
+                payload.duration_since_last_restart_sec);
             break;
+        }
         case NSM_FM_REPORT_STATUS_TIMEOUT:
+        {
+            // Report timedout hence update to unknown and ignore timestamps
             fabricManagerIntf->reportStatus(FMReportStatus::Timeout);
+            fabricManagerIntf->fmState(FMState::Unknown);
+            operationalStatusIntf->state(OpState::StandbyOffline);
             break;
+        }
         default:
             fabricManagerIntf->reportStatus(FMReportStatus::Unknown);
+            fabricManagerIntf->fmState(FMState::Unknown);
+            operationalStatusIntf->state(OpState::StandbyOffline);
             break;
     }
-
-    fabricManagerIntf->lastRestartTime(payload.last_restart_timestamp);
-    fabricManagerIntf->lastRestartDuration(
-        payload.duration_since_last_restart_sec);
-
+    nsmAggregateFabricManagerState->updateAggregateFabricManagerState();
     return NSM_SW_SUCCESS;
 }
 
