@@ -170,8 +170,6 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
         double threshold = co_await utils::coGetDbusProperty<double>(
             objPath.c_str(), "Value", intfName.c_str());
 
-        std::cout << "Value : " << threshold << '\n';
-
         thresholdValue->updateReading(threshold);
 
         nsmDevice->deviceSensors.push_back(std::move(thresholdValue));
