@@ -110,10 +110,15 @@ requester::Coroutine
                             &reasonCode);
     if (!initAcceptInstanceId(responseMsg->hdr.instance_id, cc, rc))
     {
-        lg2::error(
-            "NsmLongRunningSensor::update: Failed to accept LongRunning - cc: {CC}, sensor: {NAME}, eid: {EID}",
-            "CC", cc, "NAME", NsmSensor::getName(), "EID", eid);
+        logHandleResponseMsg(
+            "NsmLongRunningSensor::update: Failed to accept LongRunning",
+            reasonCode, cc, rc);
         rc = NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    else
+    {
+        clearErrorBitMap(
+            "NsmAsyncLongRunningSensor::update: Failed to accept LongRunning");
     }
 
     // coverity[missing_return]
