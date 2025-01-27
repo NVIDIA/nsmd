@@ -137,7 +137,8 @@ struct nsm_supported_port_counter {
 	uint8_t xmit_wait : 1;
 	uint8_t effective_ber : 1;
 	uint8_t estimated_effective_ber : 1;
-	uint8_t unused : 5;
+	uint8_t effective_error : 1;
+	uint8_t unused : 4;
 } __attribute__((packed));
 
 struct nsm_port_counter_data {
@@ -169,11 +170,11 @@ struct nsm_port_counter_data {
 	uint64_t xmit_wait;
 	uint64_t effective_ber;
 	uint64_t estimated_effective_ber;
+	uint64_t effective_error;
 	uint64_t unused_counter_placeholder0;
 	uint64_t unused_counter_placeholder1;
 	uint64_t unused_counter_placeholder2;
 	uint64_t unused_counter_placeholder3;
-	uint64_t unused_counter_placeholder4;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {
