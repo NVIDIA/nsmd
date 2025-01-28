@@ -85,66 +85,66 @@ std::optional<Request> NsmPCIeErrors::genRequestMsg(eid_t eid,
 void NsmPCIeErrors::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    std::vector<uint8_t> data;
-    switch (groupId)
-    {
-        case GROUP_ID_2:
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "CorrectableErrorCount", data,
-                                        pdi().ceCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "NonFatalErrorCount", data,
-                                        pdi().nonfeCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "FatalErrorCount", data,
-                                        pdi().feCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "UnsupportedRequestCount", data,
-                                        pdi().unsupportedRequestCount());
-            break;
-        case GROUP_ID_3:
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "L0ToRecoveryCount", data,
-                                        pdi().ceCount());
-            break;
-        case GROUP_ID_4:
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "ReplayCount", data,
-                                        pdi().replayCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "ReplayRolloverCount", data,
-                                        pdi().replayRolloverCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "NAKSentCount", data,
-                                        pdi().nakSentCount());
-            updateSharedMemoryOnSuccess(pdiPath(), pdi().interface,
-                                        "NAKReceivedCount", data,
-                                        pdi().nakReceivedCount());
-            break;
-    }
+    invoke([&](const auto& path, auto& pdi) {
+        std::vector<uint8_t> data;
+        switch (groupId)
+        {
+            case GROUP_ID_2:
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "CorrectableErrorCount", data,
+                                            pdi.ceCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "NonFatalErrorCount", data,
+                                            pdi.nonfeCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "FatalErrorCount", data,
+                                            pdi.feCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "UnsupportedRequestCount", data,
+                                            pdi.unsupportedRequestCount());
+                break;
+            case GROUP_ID_3:
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "L0ToRecoveryCount", data,
+                                            pdi.ceCount());
+                break;
+            case GROUP_ID_4:
+                updateSharedMemoryOnSuccess(path, pdi.interface, "ReplayCount",
+                                            data, pdi.replayCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "ReplayRolloverCount", data,
+                                            pdi.replayRolloverCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface, "NAKSentCount",
+                                            data, pdi.nakSentCount());
+                updateSharedMemoryOnSuccess(path, pdi.interface,
+                                            "NAKReceivedCount", data,
+                                            pdi.nakReceivedCount());
+                break;
+        }
+    });
 #endif
 }
 
 void NsmPCIeErrors::handleResponse(
     const nsm_query_scalar_group_telemetry_group_2& data)
 {
-    pdi().nonfeCount(data.non_fatal_errors);
-    pdi().feCount(data.fatal_errors);
-    pdi().ceCount(data.correctable_errors);
-    pdi().unsupportedRequestCount(data.unsupported_request_count);
+    invoke(pdiMethod(nonfeCount), data.non_fatal_errors);
+    invoke(pdiMethod(feCount), data.fatal_errors);
+    invoke(pdiMethod(ceCount), data.correctable_errors);
+    invoke(pdiMethod(unsupportedRequestCount), data.unsupported_request_count);
 }
 void NsmPCIeErrors::handleResponse(
     const nsm_query_scalar_group_telemetry_group_3& data)
 {
-    pdi().l0ToRecoveryCount(data.L0ToRecoveryCount);
+    invoke(pdiMethod(l0ToRecoveryCount), data.L0ToRecoveryCount);
 }
 void NsmPCIeErrors::handleResponse(
     const nsm_query_scalar_group_telemetry_group_4& data)
 {
-    pdi().replayCount(data.replay_cnt);
-    pdi().replayRolloverCount(data.replay_rollover_cnt);
-    pdi().nakSentCount(data.NAK_sent_cnt);
-    pdi().nakReceivedCount(data.NAK_recv_cnt);
+    invoke(pdiMethod(replayCount), data.replay_cnt);
+    invoke(pdiMethod(replayRolloverCount), data.replay_rollover_cnt);
+    invoke(pdiMethod(nakSentCount), data.NAK_sent_cnt);
+    invoke(pdiMethod(nakReceivedCount), data.NAK_recv_cnt);
 }
 
 uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -163,20 +163,13 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)                         \
         {                                                                      \
             handleResponse(data);                                              \
-            updateMetricOnSharedMemory();                                      \
         }                                                                      \
         else                                                                   \
         {                                                                      \
             memset(&data, 0, sizeof(data));                                    \
             handleResponse(data);                                              \
-            updateMetricOnSharedMemory();                                      \
-            lg2::debug(                                                        \
-                "NsmPCIeErrors::handleResponseMsg: "                           \
-                "decode_query_scalar_group_telemetry_v1_group{GROUPID}_resp"   \
-                "failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",    \
-                "GROUPID", groupId, "REASONCODE", reasonCode, "CC", cc, "RC",  \
-                rc);                                                           \
         }                                                                      \
+        updateMetricOnSharedMemory();                                          \
     }
 
     switch (groupId)

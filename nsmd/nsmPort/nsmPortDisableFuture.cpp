@@ -67,7 +67,7 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
         // parse the mask and update the dbus property
         std::vector<uint8_t> maskArray;
         utils::convertBitMaskToVector(maskArray, mask, PORT_MASK_DATA_SIZE);
-        this->pdi().portDisableFuture(maskArray);
+        invoke(pdiMethod(portDisableFuture), maskArray);
         clearErrorBitMap("decode_get_port_disable_future_resp");
     }
     else

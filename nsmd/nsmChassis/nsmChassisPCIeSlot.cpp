@@ -48,8 +48,8 @@ requester::Coroutine
     auto device = manager.getNsmDevice(uuid);
 
     auto pcieSlotProvider = NsmChassisPCIeSlot<PCIeSlotIntf>(chassisName, name);
-    pcieSlotProvider.pdi().slotType(
-        PCIeSlotIntf::convertSlotTypesFromString(slotType));
+    pcieSlotProvider.invoke(pdiMethod(slotType),
+                            PCIeSlotIntf::convertSlotTypesFromString(slotType));
     device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
                           pcieSlotProvider, deviceIndex),
                       priority);
@@ -60,8 +60,8 @@ requester::Coroutine
     auto associationsObject =
         std::make_shared<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
             chassisName, name);
-    associationsObject->pdi().associations(
-        utils::getAssociations(associations));
+    associationsObject->invoke(pdiMethod(associations),
+                               utils::getAssociations(associations));
     device->addStaticSensor(associationsObject);
     // coverity[missing_return]
     co_return NSM_SUCCESS;

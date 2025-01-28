@@ -72,13 +72,13 @@ uint8_t NsmPCIeSlot::handleResponseMsg(const struct nsm_msg* responseMsg,
             return value == 0 ? PCIeSlotIntf::SlotTypes::Unknown
                               : PCIeSlotIntf::SlotTypes(value - 1);
         };
-        pdi().slotType(slotType(data.negotiated_link_speed));
+        invoke(pdiMethod(slotType), slotType(slotType(data.negotiated_link_speed));
         clearErrorBitMap(
             "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp");
     }
     else
     {
-        pdi().slotType(PCIeSlotIntf::SlotTypes::Unknown);
+        invoke(pdiMethod(slotType), PCIeSlotIntf::SlotTypes::Unknown);
 
         logHandleResponseMsg(
             "NsmPCIeSlot decode_query_scalar_group_telemetry_v1_group1_resp",

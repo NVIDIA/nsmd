@@ -83,16 +83,20 @@ requester::Coroutine createNsmPCIePort(SensorManager& manager,
     auto pcieErrorsGroup4 = std::make_shared<NsmPCIeErrors>(portPCIeEccObject,
                                                             0, GROUP_ID_4);
 
-    associationsObject->pdi().associations(
-        utils::getAssociations(associations));
-    healthObject->pdi().health(HealthIntf::convertHealthTypeFromString(health));
-    portInfoObject.pdi().type(
-        PortInfoIntf::convertPortTypeFromString(portType));
-    portInfoObject.pdi().protocol(
+    associationsObject->invoke(pdiMethod(associations),
+                               utils::getAssociations(associations));
+    healthObject->invoke(pdiMethod(health),
+                         HealthIntf::convertHealthTypeFromString(health));
+    portInfoObject.invoke(pdiMethod(type),
+                          PortInfoIntf::convertPortTypeFromString(portType));
+    portInfoObject.invoke(
+        pdiMethod(protocol),
         PortInfoIntf::convertPortProtocolFromString(portProtocol));
-    portStateObject->pdi().linkState(
+    portStateObject->invoke(
+        pdiMethod(linkState),
         PortStateIntf::convertLinkStatesFromString(linkState));
-    portStateObject->pdi().linkStatus(
+    portStateObject->invoke(
+        pdiMethod(linkStatus),
         PortStateIntf::convertLinkStatusTypeFromString(linkStatus));
 
     device->deviceSensors.emplace_back(associationsObject);

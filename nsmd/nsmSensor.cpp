@@ -46,4 +46,19 @@ requester::Coroutine NsmSensor::update(SensorManager& manager, eid_t eid)
     // coverity[missing_return]
     co_return rc;
 }
+
+bool NsmSensor::equals(const NsmSensor& other) const
+{
+    // name and type are used only for debbuging purposes
+    // comparing shall be only based on the request data sended to the device
+    auto requestMsg = const_cast<NsmSensor*>(this)->genRequestMsg(0, 0);
+    auto sensorRequestMsg = const_cast<NsmSensor&>(other).genRequestMsg(0, 0);
+    return requestMsg && sensorRequestMsg && *requestMsg == *sensorRequestMsg;
+}
+
+bool NsmSensor::operator==(const NsmSensor& other) const
+{
+    return equals(other);
+}
+
 } // namespace nsm
