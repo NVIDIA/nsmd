@@ -170,8 +170,6 @@ requester::Coroutine
         device->addSensor(
             std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
             priority);
-        lg2::debug("Created LTSSMStateIntf sensor {NAME} path: {PATH}", "NAME",
-                   name, "PATH", inventoryObjPath);
     }
     else if (type == "NSM_ClockOutputEnableState")
     {

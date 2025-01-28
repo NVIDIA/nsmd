@@ -137,7 +137,7 @@ requester::Coroutine DeviceManager::ping(eid_t eid)
 }
 
 requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
-    eid_t eid, std::vector<uint8_t>& supportedTypes)
+    eid_t eid, std::vector<uint8_t>& supportedNvidiaMessageTypes)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_supported_nvidia_message_types_req));
@@ -176,10 +176,18 @@ requester::Coroutine DeviceManager::getSupportedNvidiaMessageType(
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    // copy contents of types into supportedTypes
-    supportedTypes.resize(SUPPORTED_MSG_TYPE_DATA_SIZE);
-    std::memcpy(supportedTypes.data(), types,
-                SUPPORTED_MSG_TYPE_DATA_SIZE * sizeof(bitfield8_t));
+    // convert bit matrix of types into supportedTypes
+    supportedNvidiaMessageTypes.clear();
+    for (size_t i = 0; i < SUPPORTED_MSG_TYPE_DATA_SIZE * 8; i++)
+    {
+        auto bi = i % 8;
+        auto ti = i / 8;
+        if (types[ti].byte & (1 << bi))
+        {
+            supportedNvidiaMessageTypes.push_back(i);
+        }
+    }
+
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -285,12 +293,23 @@ requester::Coroutine
     nsmDevice->messageTypesToCommandCodeMatrix.assign(
         NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false));
 
+    std::vector<uint8_t> supportedMessageTypes;
+    auto rc = co_await getSupportedNvidiaMessageType(eid,
+                                                     supportedMessageTypes);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("getSupportedNvidiaMessageType() failed, rc={RC} eid={EID}",
+                   "RC", rc, "EID", eid);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
     // Loop through supported message types
     for (uint8_t messageType : supportedMessageTypes)
     {
         std::vector<uint8_t> supportedCommands;
-        auto rc = co_await getSupportedCommandCodes(eid, messageType,
-                                                    supportedCommands);
+        rc = co_await getSupportedCommandCodes(eid, messageType,
+                                               supportedCommands);
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error(
@@ -316,7 +335,7 @@ requester::Coroutine
     }
 
     // Update fruDevice interface
-    auto rc = co_await updateFruDeviceIntf(nsmDevice, eid);
+    rc = co_await updateFruDeviceIntf(nsmDevice, eid);
     if (rc)
     {
         lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}", "RC", rc,
@@ -335,7 +354,7 @@ requester::Coroutine
         ++sensorIndex;
     }
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return rc;
 }
 
 requester::Coroutine DeviceManager::getInventoryInformation(
