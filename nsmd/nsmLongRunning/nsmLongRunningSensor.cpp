@@ -140,8 +140,8 @@ requester::Coroutine
 int NsmLongRunningSensor::handle(eid_t eid, NsmType, NsmEventId,
                                  const nsm_msg* event, size_t eventLen)
 {
-    int rc = NSM_SW_ERROR_COMMAND_FAIL;
-    if (validateEvent(eid, event, eventLen))
+    auto rc = validateEvent(eid, event, eventLen);
+    if (rc == NSM_SW_SUCCESS)
     {
         rc = handleResponseMsg(event, eventLen);
     }

@@ -50,6 +50,27 @@ NsmRawCommandHandler& NsmRawCommandHandler::getInstance()
     return *NsmRawCommandHandler::instance;
 }
 
+static Response copySuccessResponse(uint8_t cc, const nsm_msg* responseMsg,
+                                    size_t responseLen)
+{
+    auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
+    // completion code + data
+    Response data(1 + dataSize, 0);
+    data[0] = cc;
+    memcpy(data.data() + 1, responseMsg->payload + 2, dataSize);
+    return data;
+}
+
+static Response copyReasonCodeResponse(uint8_t cc, uint16_t reasonCode)
+{
+    // completion code + reason code
+    Response data(3, 0);
+    data[0] = cc;
+    reasonCode = htole16(reasonCode);
+    memcpy(data.data() + 1, &reasonCode, sizeof(uint16_t));
+    return data;
+}
+
 requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
     uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
     uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
@@ -75,6 +96,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         auto longRunningHandler =
             std::make_shared<NsmRawLongRunningEventHandler>(
                 "RawLongRunningHandler", "RawEvent", isLongRunning);
+        longRunningHandler->isLongRunning = true;
         // Register the active handler in the device with messageType and
         // commandCode
         device->registerLongRunningHandler(messageType, commandCode,
@@ -100,23 +122,13 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
             cc = NSM_ERR_UNSUPPORTED_COMMAND_CODE;
             rc = NSM_SW_SUCCESS;
             reasonCode = 0;
-            // completion code + data
-            data.resize(3);
-            reasonCode = htole16(reasonCode);
-            memcpy(data.data() + 1, &reasonCode, sizeof(uint16_t));
-            data[0] = cc;
-            utils::writeBufferToFd(fd, data);
-            valueInterface->value(rc);
-            statusInterface->status(AsyncOperationStatusType::Success);
-            // degister handler and release semaphore
-            device->clearLongRunningHandler();
-            device->getSemaphore().release();
-            co_return rc;
+            data = copyReasonCodeResponse(cc, reasonCode);
         }
         else if (rc != NSM_SW_SUCCESS)
         {
-            throw std::runtime_error(
-                std::format("SendRecvNsmMsg failed, rc={}", rc));
+            throw std::runtime_error(std::format(
+                "NsmRawCommandHandler::doSendLongRunningRequest: SendRecvNsmMsg failed, rc={}",
+                rc));
         }
         else
         {
@@ -124,72 +136,64 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
                                            &reasonCode);
             if (rc != NSM_SW_SUCCESS)
             {
-                throw std::runtime_error(
-                    std::format("decode_common_resp failed, rc={}", rc));
+                throw std::runtime_error(std::format(
+                    "NsmRawCommandHandler::doSendLongRunningRequest: decode_common_resp failed, rc={}",
+                    rc));
+            }
+            else if (cc == NSM_SUCCESS)
+            {
+                longRunningHandler->isLongRunning = false;
+                data = copySuccessResponse(cc, responseMsg.get(), responseLen);
             }
             else
             {
-                if (cc == NSM_SUCCESS)
+                auto accepted = longRunningHandler->initAcceptInstanceId(
+                    responseMsg->hdr.instance_id, cc, rc);
+                if (!accepted)
                 {
-                    auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
-                    // completion code + data
-                    data.resize(1 + dataSize);
-                    memcpy(data.data() + 1, responseMsg->payload + 2, dataSize);
-                    data[0] = cc;
-                    utils::writeBufferToFd(fd, data);
-                    valueInterface->value(rc);
-                    statusInterface->status(AsyncOperationStatusType::Success);
+                    data = copyReasonCodeResponse(cc, reasonCode);
                 }
                 else
                 {
-                    auto accepted = rc == NSM_SW_SUCCESS && cc == NSM_ACCEPTED;
-                    longRunningHandler->acceptInstanceId =
-                        accepted ? responseMsg->hdr.instance_id : 0xFF;
-                    if (!accepted)
-                    {
-                        throw std::runtime_error(std::format(
-                            "Failed to accept LongRunning, cc={}", cc));
-                    }
-
                     rc = co_await longRunningHandler->timer;
                     if (rc != NSM_SW_SUCCESS)
                     {
-                        throw std::runtime_error(std::format(
-                            "NsmRawLongRunningSensor::update: LongRunning timer start"));
+                        lg2::error(
+                            "NsmRawCommandHandler::doSendLongRunningRequest: LongRunning timer start failed, eid={EID}",
+                            "EID", eid);
                     }
-                    if (!longRunningHandler->isLongRunnningEventValidated)
+                    else if (longRunningHandler->timer.expired())
                     {
-                        throw std::runtime_error(std::format(
-                            "NsmRawLongRunningSensor::update: LongRunning sensor event validation fails"));
+                        lg2::error(
+                            "NsmRawCommandHandler::doSendLongRunningRequest:: LongRunning sensor timeout, eid={EID}",
+                            "EID", eid);
+                        rc = NSM_SW_ERROR;
                     }
-                    // event validation completes
-                    utils::writeBufferToFd(
-                        fd, longRunningHandler->longRunningEventData);
-                    valueInterface->value(longRunningHandler->longRunningRc);
-                    statusInterface->status(AsyncOperationStatusType::Success);
+                    else
+                    {
+                        data = std::move(longRunningHandler->data);
+                        rc = longRunningHandler->rc;
+                    }
                 }
-                // degister handler and release semaphore
-                device->clearLongRunningHandler();
-                device->getSemaphore().release();
             }
         }
+        utils::writeBufferToFd(fd, data);
+        valueInterface->value(rc);
+        statusInterface->status(AsyncOperationStatusType::Success);
     }
     catch (const std::runtime_error& e)
     {
         lg2::error(e.what());
         statusInterface->status(AsyncOperationStatusType::WriteFailure);
-        // degister handler and release semaphore
-        device->clearLongRunningHandler();
-        device->getSemaphore().release();
     }
     catch (const std::exception& e)
     {
         lg2::error(e.what());
         statusInterface->status(AsyncOperationStatusType::InternalFailure);
-        // degister handler and release semaphore
-        device->clearLongRunningHandler();
-        device->getSemaphore().release();
     }
+    // degister handler and release semaphore
+    device->clearLongRunningHandler();
+    device->getSemaphore().release();
     // coverity[missing_return]
     co_return rc;
 }
@@ -197,58 +201,20 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
 int NsmRawLongRunningEventHandler::handle(eid_t eid, NsmType, NsmEventId,
                                           const nsm_msg* event, size_t eventLen)
 {
-    uint8_t instanceId;
-    uint8_t cc = NSM_ERROR;
-    // uint16_t reasonCode = ERR_NULL;
-    auto rc = decode_long_running_event(event, eventLen, &instanceId, &cc,
-                                        nullptr);
-    if (rc != NSM_SW_SUCCESS)
+    rc = validateEvent(eid, event, eventLen);
+    if (rc == NSM_SW_SUCCESS)
     {
-        lg2::error(
-            "NsmRawLongRunningEventHandler::validateEvent: Failed to decode long running event, eid: {EID}, rc: {RC}",
-            "EID", eid, "RC", rc);
-        isLongRunnningEventValidated = false;
+        auto cc = ((nsm_long_running_resp*)((nsm_event*)event->payload)->data)
+                      ->completion_code;
+        data = copySuccessResponse(cc, event, eventLen);
     }
-    else if (timer.expired())
+    if (!timer.stop())
     {
         lg2::error(
-            "NsmRawLongRunningEventHandler::validateEvent: LongRunning timer expired, eid: {EID}",
+            "NsmRawLongRunningEventHandler::handle: LongRunning timer not stopped, eid={EID}",
             "EID", eid);
-        isLongRunnningEventValidated = false;
     }
-    else if (acceptInstanceId == 0xFF)
-    {
-        lg2::error(
-            "NsmRawLongRunningEventHandler::validateEvent: LongRunning not started or not accepted, eid: {EID}",
-            "EID", eid);
-        isLongRunnningEventValidated = false;
-    }
-    else if (acceptInstanceId != instanceId)
-    {
-        lg2::error(
-            "NsmRawLongRunningEventHandler::validateEvent: Instance ID mismatch, eid: {EID}, acceptInstanceId: {ACCEPT_INSTANCE_ID}, instanceId: {INSTANCE_ID}",
-            "EID", eid, "ACCEPT_INSTANCE_ID", acceptInstanceId, "INSTANCE_ID",
-            instanceId);
-        isLongRunnningEventValidated = false;
-    }
-
-    longRunningRc = rc;
-    if (!isLongRunnningEventValidated)
-    {
-        timer.stop();
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    // whether cc is success or fail we will show event paylaod
-    auto dataSize = eventLen - sizeof(nsm_msg_hdr) - 2;
-    // completion code + data
-    longRunningEventData.resize(1 + dataSize);
-    memcpy(longRunningEventData.data() + 1, event->payload + 2, dataSize);
-    longRunningEventData[0] = cc;
-    timer.stop();
-
-    // what should be return type
-    return 0;
+    return rc;
 }
 
 requester::Coroutine NsmRawCommandHandler::doSendRequest(
@@ -308,19 +274,12 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
 
         if (cc == NSM_SUCCESS)
         {
-            auto dataSize = responseLen - sizeof(nsm_msg_hdr) - 2;
-            // completion code + data
-            data.resize(1 + dataSize);
-            memcpy(data.data() + 1, responseMsg->payload + 2, dataSize);
+            data = copySuccessResponse(cc, responseMsg.get(), responseLen);
         }
         else
         {
-            // completion code + data
-            data.resize(3);
-            reasonCode = htole16(reasonCode);
-            memcpy(data.data() + 1, &reasonCode, sizeof(uint16_t));
+            data = copyReasonCodeResponse(cc, reasonCode);
         }
-        data[0] = cc;
         utils::writeBufferToFd(fd, data);
         valueInterface->value(rc);
         statusInterface->status(AsyncOperationStatusType::Success);

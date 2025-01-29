@@ -32,10 +32,10 @@ class NsmLongRunningEvent :
     uint8_t acceptInstanceId = 0xFF;
     bool isLongRunning;
     common::TimerAwaiter timer;
+    bool initAcceptInstanceId(uint8_t instanceId, uint8_t cc, uint8_t rc);
 
   protected:
-    bool initAcceptInstanceId(uint8_t instanceId, uint8_t cc, uint8_t rc);
-    bool validateEvent(eid_t eid, const nsm_msg* event, size_t eventLen);
+    int validateEvent(eid_t eid, const nsm_msg* event, size_t eventLen);
 };
 
 } // namespace nsm
