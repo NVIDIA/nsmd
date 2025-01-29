@@ -38,10 +38,8 @@ class NsmRawLongRunningEventHandler : public NsmLongRunningEvent
 
     int handle(eid_t eid, NsmType type, NsmEventId eventId,
                const nsm_msg* event, size_t eventLen) override;
-    bool isLongRunnningEventValidated = true;
-    std::vector<uint8_t> longRunningEventData;
-    uint8_t longRunningRc;
-    uint8_t acceptInstanceId = 0xFF;
+    Response data;
+    uint8_t rc;
 };
 
 class NsmRawCommandHandler : public NsmRawIntf

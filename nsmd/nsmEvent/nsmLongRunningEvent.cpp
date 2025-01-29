@@ -36,8 +36,8 @@ bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,
     acceptInstanceId = accepted ? instanceId : 0xFF;
     return accepted;
 }
-bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
-                                        size_t eventLen)
+int NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
+                                       size_t eventLen)
 {
     // TODO: Add CC and RC error log tracking to prevent log flooding.
     // Track issue: "Refactor error handling and logging in NSM components" MR.
@@ -51,21 +51,21 @@ bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
         lg2::debug(
             "NsmLongRunningEvent::validateEvent: Failed to decode long running event, eid: {EID}, rc: {RC}",
             "EID", eid, "RC", rc);
-        return false;
+        return rc;
     }
     else if (timer.expired())
     {
         lg2::error(
             "NsmLongRunningEvent::validateEvent: LongRunning timer expired, eid: {EID}",
             "EID", eid);
-        return false;
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
     else if (acceptInstanceId == 0xFF || !isLongRunning)
     {
         lg2::error(
             "NsmLongRunningEvent::validateEvent: LongRunning not started or not accepted, eid: {EID}",
             "EID", eid);
-        return false;
+        return NSM_SW_ERROR_COMMAND_FAIL;
     }
     else if (acceptInstanceId != instanceId)
     {
@@ -73,9 +73,9 @@ bool NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
             "NsmLongRunningEvent::validateEvent: Instance ID mismatch, eid: {EID}, acceptInstanceId: {ACCEPT_INSTANCE_ID}, instanceId: {INSTANCE_ID}",
             "EID", eid, "ACCEPT_INSTANCE_ID", acceptInstanceId, "INSTANCE_ID",
             instanceId);
-        return false;
+        return NSM_SW_ERROR_DATA;
     }
-    return true;
+    return NSM_SW_SUCCESS;
 }
 
 } // namespace nsm
