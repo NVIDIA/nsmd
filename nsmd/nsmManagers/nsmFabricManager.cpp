@@ -43,8 +43,11 @@ NsmAggregateFabricManagerState::NsmAggregateFabricManagerState(
     auto& bus = utils::DBusHandler::getBus();
     fabricManagerIntf =
         std::make_shared<FabricManagerIntf>(bus, inventoryObjPath.c_str());
+    fabricManagerIntf->reportStatus(FMReportStatus::NotReceived);
+    fabricManagerIntf->fmState(FMState::Unknown);
     operationalStatusIntf =
         std::make_shared<OperationalStatusIntf>(bus, inventoryObjPath.c_str());
+    operationalStatusIntf->state(OpState::UnavailableOffline);
     managementServiceIntf =
         std::make_shared<ManagementServiceIntf>(bus, inventoryObjPath.c_str());
     itemIntf = std::make_shared<ItemIntf>(bus, inventoryObjPath.c_str());
@@ -115,6 +118,7 @@ void NsmAggregateFabricManagerState::updateAggregateFabricManagerState()
                 associatedFabricManagerIntfs[idx]->lastRestartTime();
             lastRestartDuration =
                 associatedFabricManagerIntfs[idx]->lastRestartDuration();
+            state = associatedOperationalStatusIntfs[idx]->state();
         }
     }
 
@@ -138,9 +142,11 @@ NsmFabricManagerState::NsmFabricManagerState(const std::string& name,
 
     fabricManagerIntf = std::make_shared<FabricManagerIntf>(bus,
                                                             objPath.c_str());
-
+    fabricManagerIntf->reportStatus(FMReportStatus::NotReceived);
+    fabricManagerIntf->fmState(FMState::Unknown);
     operationalStatusIntf = std::make_shared<OperaStatusIntf>(bus,
                                                               objPath.c_str());
+    operationalStatusIntf->state(OpState::UnavailableOffline);
     nsmAggregateFabricManagerState =
         NsmAggregateFabricManagerState::getInstance(
             inventoryObjPathFM, fabricManagerIntf, operationalStatusIntf,
@@ -201,6 +207,8 @@ uint8_t
             {
                 // Report not received yet hence ignore
                 fabricManagerIntf->reportStatus(FMReportStatus::NotReceived);
+                fabricManagerIntf->fmState(FMState::Unknown);
+                operationalStatusIntf->state(OpState::StandbyOffline);
                 break;
             }
             case NSM_FM_REPORT_STATUS_RECEIVED:
