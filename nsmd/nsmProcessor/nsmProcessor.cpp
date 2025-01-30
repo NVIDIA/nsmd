@@ -1080,7 +1080,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
         std::get_if<std::tuple<bool, uint32_t>>(&value);
     if (reqSetPoint == NULL)
     {
-        *status = AsyncOperationStatusType::WriteFailure;
+        *status = AsyncOperationStatusType::InvalidArgument;
         co_return NSM_SW_ERROR_DATA;
     }
 
@@ -1097,7 +1097,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
     if (allowableMin > reqLimit || allowableMax < reqLimit)
     {
         lg2::error("req SetPoint Limit not in allowed range");
-        *status = AsyncOperationStatusType::WriteFailure;
+        *status = AsyncOperationStatusType::InvalidArgument;
         co_return NSM_SW_ERROR_DATA;
     }
 
