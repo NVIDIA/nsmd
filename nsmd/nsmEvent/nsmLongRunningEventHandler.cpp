@@ -40,15 +40,8 @@ int NsmLongRunningEventHandler::handle(eid_t eid, NsmType type,
     {
         uuid_t uuid = *uuidOptional;
         // findNSMDevice instance for that eid
-        lg2::debug("LongRunning event : UUID found: {UUID}", "UUID", uuid);
         nsmDevice = sensorManager.getNsmDevice(uuid);
-        if (nsmDevice)
-        {
-            lg2::debug(
-                "LongRunning event : The NSM device has been discovered for , uuid={UUID}",
-                "UUID", uuid);
-        }
-        else
+        if (!nsmDevice)
         {
             lg2::error(
                 "LongRunning event : The NSM device has not been discovered for , uuid={UUID}",
