@@ -30,6 +30,7 @@
 
 #include <map>
 #include <queue>
+#include <tuple>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -38,6 +39,13 @@ namespace nsm
 {
 
 using RequesterHandler = requester::Handler<requester::Request>;
+
+using Active = bool;
+using DeviceType = uint8_t;
+using InstanceNumber = uint8_t;
+using DiscoveredEIDs =
+    std::map<mctp_eid_t,
+             std::tuple<uuid_t, DeviceType, InstanceNumber, Active>>;
 
 /** @class DeviceManager
  *
@@ -113,12 +121,16 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
                                          uint8_t eid);
 
     requester::Coroutine
-        updateDeviceSensors(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
-
-    requester::Coroutine
         updateFruDeviceIntf(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
 
     std::string getObjectPath(uint8_t deviceType, uint8_t instanceNumber);
+    std::optional<mctp_eid_t> searchEID(uint8_t deviceType,
+                                        uint8_t instanceNumber);
+
+    std::map<DeviceType, std::vector<uint64_t>>
+        mapInstanceNumberToInstanceNumber;
+    std::map<DeviceType, std::vector<std::string>> mapUuidToInstanceNumber;
+    std::map<DeviceType, std::vector<uint64_t>> mapEidToInstanceNumber;
 
   private:
     DeviceManager(
@@ -129,9 +141,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices) :
-        event(event),
-        handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-        eidTable(eidTable), nsmDevices(nsmDevices)
+        event(event), handler(handler), instanceIdDb(instanceIdDb),
+        objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
     {}
 
     void registerDbusMethods();
@@ -154,19 +165,11 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
                                 InventoryProperties& properties);
 
     requester::Coroutine
-        getQueryDeviceIdentification(eid_t eid, uuid_t uuid,
-                                     uint8_t& deviceIdentification,
-                                     uint8_t& instanceId);
+        getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
+                                     uint8_t& deviceInstance);
 
-    template <typename TypeOfKey, typename TypeOfVector>
-    uint8_t fetchInstanceIdFromEM(const std::string& path,
-                                  const std::string& intf,
-                                  const TypeOfKey& keyToUse);
-
-    void updateInstanceIdViaRemapping(const uint8_t& deviceType,
-                                      uint8_t& deviceInstanceID,
-                                      const eid_t& deviceEID,
-                                      const uuid_t& deviceUUID);
+    uint8_t remapInstanceNumber(uint8_t instanceNumber, uint8_t deviceType,
+                                uuid_t& uuid, mctp_eid_t eid);
 
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
@@ -179,5 +182,6 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     NsmDeviceTable& nsmDevices;
     std::map<std::pair<uint8_t, uint8_t>, std::string> nsmDeviceMap;
     std::unique_ptr<sdbusplus::asio::dbus_interface> nsmDeviceIntf;
+    DiscoveredEIDs discoveredEIDs;
 };
 } // namespace nsm
