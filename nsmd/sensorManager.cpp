@@ -52,7 +52,7 @@ SensorManagerImpl::SensorManagerImpl(
     SensorManager(nsmDevices, localEid),
     bus(bus), event(event), handler(handler), instanceIdDb(instanceIdDb),
     objServer(objServer), eidTable(eidTable), sockManager(sockManager),
-    verbose(verbose)
+    verbose(verbose), globalPollingStateManager(nsmDevices)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -587,6 +587,13 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
 
         while (sensorIndex < sensors.size())
         {
+            if (globalPollingStateManager.getState() != POLL_NON_PRIORITY)
+            {
+                // Sleep for 20ms and then check again if we have time.
+                co_await common::Sleep(event.get(), 20000, common::Priority);
+                continue;
+            }
+
             auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
             if (nsmDevice->stopPolling)
@@ -678,6 +685,8 @@ requester::Coroutine
         }
 #endif
         // update all priority sensors
+        nsmDevice->setPollingState(POLL_PRIORITY);
+
         auto& sensors = nsmDevice->prioritySensors;
         const size_t prioritySensorCount = sensors.size();
 
@@ -700,13 +709,15 @@ requester::Coroutine
         }
 
         // update roundRobin sensors for rest of polling time interval
+        nsmDevice->setPollingState(POLL_NON_PRIORITY);
+
         auto toBeUpdated = nsmDevice->roundRobinSensors.size();
 
         // Make sure the first round-robin sensor is not compared
         // to an uninitialised timestamp
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
 
-        do
+        while ((t1 - t0) < pollingTimeInUsec)
         {
             if (!toBeUpdated)
             {
@@ -719,6 +730,18 @@ requester::Coroutine
                     checkAllDevicesReady();
                 }
                 break;
+            }
+
+            if (globalPollingStateManager.getState() != POLL_NON_PRIORITY &&
+                nsmDevice
+                    ->isDeviceReady) // Throttling logic shouldn't affect HMC
+                                     // Ready. Check if the device is ready and
+                                     // only then implement the throttling logic
+            {
+                // Sleep for 20ms and then check again if we have time.
+                co_await common::Sleep(event.get(), 20000, common::Priority);
+                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+                continue;
             }
 
             auto sensor = nsmDevice->roundRobinSensors.front();
@@ -764,8 +787,7 @@ requester::Coroutine
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
             sensor->setLastUpdatedTimeStamp(t1);
-
-        } while ((t1 - t0) < pollingTimeInUsec);
+        }
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
 

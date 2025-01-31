@@ -63,7 +63,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'Max allowable deviation in milliseconds from the desired polling interval. If within buffer, skip sleeping. Helps in minimizing delay.',
-    value: 50,
+    value: 5,
 )
 option(
     'inactive-sleep-time-in-ms',
