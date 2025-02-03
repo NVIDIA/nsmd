@@ -568,8 +568,10 @@ void SensorManagerImpl::doPollingLongRunning(
 requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
     std::shared_ptr<NsmDevice> nsmDevice)
 {
+    uint64_t t0 = 0, t1 = 0;
     uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
+    uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
 
     do
     {
@@ -585,6 +587,9 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
         auto& sensors = nsmDevice->longRunningSensors;
         size_t sensorIndex{0};
 
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
+        t1 = t0;
+
         while (sensorIndex < sensors.size())
         {
             if (globalPollingStateManager.getState() != POLL_NON_PRIORITY)
@@ -595,20 +600,49 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             }
 
             auto sensor = sensors[sensorIndex];
+
+            if (!sensor->needsUpdate(t1))
+            {
+                // Skip the LongRunning Sensor
+                ++sensorIndex;
+                continue;
+            }
+
             co_await sensor->update(*this, eid);
+
             if (nsmDevice->stopPolling)
             {
                 // coverity[missing_return]
                 co_return NSM_SW_ERROR;
             }
 
+            sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+
+            sensor->setLastUpdatedTimeStamp(t1);
+
             ++sensorIndex;
         }
 
+        uint64_t diff = t1 - t0;
+        if (diff > pollingTimeInUsec)
+        {
+            // We have already crossed the polling interval. Don't sleep
+            continue;
+        }
+
+        uint64_t sleepDeltaInUsec = pollingTimeInUsec - diff;
+        if (sleepDeltaInUsec < allowedBufferInUsec)
+        {
+            // If the delta is within the allowed buffer, we can skip sleeping
+            // and continue polling.
+            continue;
+        }
+
         co_await common::Sleep(
-            event, pollingTimeInUsec,
+            event, sleepDeltaInUsec,
             common::NonPriority); // The timer for long running commands can
                                   // have a normal priority
+
     } while (true);
 
     // coverity[missing_return]

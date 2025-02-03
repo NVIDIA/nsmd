@@ -55,7 +55,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds for NSM Long-running requests',
-    value: 1499,
+    value: 10000,
 )
 option(
     'allowed-buffer-in-ms-for-polling',
