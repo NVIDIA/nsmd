@@ -23,6 +23,7 @@
 #include "nsmDevice.hpp"
 #include "nsmObject.hpp"
 #include "nsmServiceReadyInterface.hpp"
+#include "nsmd/globalPollingStateManager.hpp"
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
 
@@ -220,5 +221,6 @@ class SensorManagerImpl : public SensorManager
         queuedAddedInterfaces;
     std::coroutine_handle<> interfaceAddedTaskHandle;
     requester::Coroutine interfaceAddedTask();
+    GlobalPollingStateManager globalPollingStateManager;
 };
 } // namespace nsm

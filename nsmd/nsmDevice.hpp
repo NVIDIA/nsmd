@@ -144,6 +144,16 @@ class NsmDevice
         return longRunningSemaphore;
     }
 
+    inline PollingState getPollingState()
+    {
+        return devicePollingState;
+    }
+
+    inline void setPollingState(const PollingState s)
+    {
+        devicePollingState = s;
+    }
+
   public:
     /**
      * @brief Registers a long-running handler for a specific message type and
@@ -185,6 +195,7 @@ class NsmDevice
         longRunningSemaphore; // Semaphore for synchronizing long running
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
+    PollingState devicePollingState;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

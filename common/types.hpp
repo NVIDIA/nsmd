@@ -51,6 +51,13 @@ using InventoryPropertyData =
                  uint64_t, int64_t, float, std::string, std::vector<uint8_t>>;
 using InventoryProperties =
     std::map<InventoryPropertyId, InventoryPropertyData>;
+
+enum PollingState
+{
+    POLL_PRIORITY,
+    POLL_NON_PRIORITY,
+};
+
 } // namespace nsm
 
 namespace dbus
