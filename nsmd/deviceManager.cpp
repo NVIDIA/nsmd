@@ -335,7 +335,7 @@ requester::Coroutine
     }
 
     // Update fruDevice interface
-    auto rc = co_await updateFruDeviceIntf(nsmDevice, eid);
+    rc = co_await updateFruDeviceIntf(nsmDevice, eid);
     if (rc)
     {
         lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}", "RC", rc,
