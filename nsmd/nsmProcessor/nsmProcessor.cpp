@@ -3275,7 +3275,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                                                  nsmDevice);
 
         nsmDevice->addSensor(sensor, priority, isLongRunning);
-        nsmDevice->deviceSensors.emplace_back(setMigModeEnabled);
+        nsmDevice->setSensors.emplace_back(setMigModeEnabled);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
@@ -3361,7 +3361,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             name, type, eccIntf, inventoryObjPath);
 
         nsmDevice->addSensor(eccErrorCntSensor, priority);
-        nsmDevice->deviceSensors.emplace_back(setEccModeEnabled);
+        nsmDevice->setSensors.emplace_back(setEccModeEnabled);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
