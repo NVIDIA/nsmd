@@ -596,6 +596,7 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             {
                 // Sleep for 20ms and then check again if we have time.
                 co_await common::Sleep(event.get(), 20000, common::Priority);
+                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
                 continue;
             }
 
