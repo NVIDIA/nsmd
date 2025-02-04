@@ -86,6 +86,7 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> prioritySensors;
     std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
     std::vector<std::shared_ptr<NsmObject>> longRunningSensors;
+    std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;

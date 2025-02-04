@@ -36,7 +36,7 @@ class NsmAsyncSensor : public NsmSensor
     template <typename T>
     T getValue()
     {
-        return std::get<T>(*value);
+        return value == nullptr ? T{} : std::get<T>(*value);
     }
 
     virtual requester::Coroutine update(SensorManager& manager,
