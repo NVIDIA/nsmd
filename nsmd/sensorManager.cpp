@@ -493,7 +493,6 @@ void SensorManagerImpl::startPolling(uuid_t uuid)
     auto nsmDevice = getNsmDevice(uuid);
     if (nsmDevice)
     {
-        nsmDevice->stopPolling = false;
         doPolling(nsmDevice);
         doPollingLongRunning(nsmDevice);
     }
@@ -503,26 +502,8 @@ void SensorManagerImpl::startPolling()
 {
     for (auto& nsmDevice : nsmDevices)
     {
-        nsmDevice->stopPolling = false;
         doPolling(nsmDevice);
         doPollingLongRunning(nsmDevice);
-    }
-}
-
-void SensorManagerImpl::stopPolling(uuid_t uuid)
-{
-    auto nsmDevice = getNsmDevice(uuid);
-    if (nsmDevice)
-    {
-        nsmDevice->stopPolling = true;
-    }
-}
-
-void SensorManagerImpl::stopPolling()
-{
-    for (auto& nsmDevice : nsmDevices)
-    {
-        nsmDevice->stopPolling = true;
     }
 }
 
@@ -610,12 +591,6 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
             }
 
             co_await sensor->update(*this, eid);
-
-            if (nsmDevice->stopPolling)
-            {
-                // coverity[missing_return]
-                co_return NSM_SW_ERROR;
-            }
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
 
@@ -734,12 +709,6 @@ requester::Coroutine
         {
             auto sensor = sensors[sensorIndex];
             co_await sensor->update(*this, eid);
-            if (nsmDevice->stopPolling)
-            {
-                // coverity[missing_return]
-                co_return NSM_SW_ERROR;
-            }
-
             ++sensorIndex;
         }
 
@@ -812,12 +781,6 @@ requester::Coroutine
                 // Only re-queue non-static sensors or static sensors that
                 // failed to update succesfully.
                 nsmDevice->roundRobinSensors.push_back(sensor);
-            }
-
-            if (nsmDevice->stopPolling)
-            {
-                // coverity[missing_return]
-                co_return NSM_SW_ERROR;
             }
 
             sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
