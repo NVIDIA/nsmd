@@ -176,8 +176,6 @@ void NsmDevice::setOnline()
         // Mark all the sensors as unrefreshed.
         sensor->isRefreshed = false;
     }
-    SensorManager& sensorManager = SensorManager::getInstance();
-    sensorManager.startPolling(uuid);
 }
 
 void NsmDevice::setOffline()
@@ -186,8 +184,6 @@ void NsmDevice::setOffline()
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
         "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
-    SensorManager& sensorManager = SensorManager::getInstance();
-    sensorManager.stopPolling(uuid);
 
     size_t sensorIndex{0};
     auto& sensors = deviceSensors;
