@@ -79,7 +79,6 @@ class NsmDevice
     uuid_t deviceUuid;
     bool isDeviceActive;
     bool isDeviceReady = false;
-    bool stopPolling = false;
     std::coroutine_handle<> doPollingTaskHandle;
     std::coroutine_handle<> doPollingTaskHandleLongRunning;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
