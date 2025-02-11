@@ -47,7 +47,7 @@ requester::Coroutine NsmChassisPCIeDevice<IntfType>::update(
             auto nsmDevice = manager.getNsmDevice(*uuid);
             if (nsmDevice)
             {
-                this->pdi().uuid(nsmDevice->deviceUuid);
+                this->invoke(pdiMethod(uuid), nsmDevice->deviceUuid);
             }
         }
     }
@@ -87,9 +87,9 @@ requester::Coroutine
             std::make_shared<NsmChassisPCIeDevice<AssociationDefinitionsIntf>>(
                 chassisName, name);
 
-        uuidObject->pdi().uuid(deviceUuid);
-        associationsObject->pdi().associations(
-            utils::getAssociations(associations));
+        uuidObject->invoke(pdiMethod(uuid), deviceUuid);
+        associationsObject->invoke(pdiMethod(associations),
+                                   utils::getAssociations(associations));
 
         device->addStaticSensor(uuidObject);
         device->addStaticSensor(associationsObject);
@@ -100,7 +100,7 @@ requester::Coroutine
                                                               name);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        assetObject.pdi().manufacturer(manufacturer);
+        assetObject.invoke(pdiMethod(manufacturer), manufacturer);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, DEVICE_PART_NUMBER);
@@ -119,8 +119,8 @@ requester::Coroutine
             objPath.c_str(), "Health", interface.c_str());
         auto healthObject = std::make_shared<NsmChassisPCIeDevice<HealthIntf>>(
             chassisName, name);
-        healthObject->pdi().health(
-            HealthIntf::convertHealthTypeFromString(health));
+        healthObject->invoke(pdiMethod(health),
+                             HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_PCIeDevice")
@@ -132,7 +132,7 @@ requester::Coroutine
                 objPath.c_str(), "Functions", interface.c_str());
         auto pcieDeviceObject =
             NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
-        pcieDeviceObject.pdi().deviceType(deviceType);
+        pcieDeviceObject.invoke(pdiMethod(deviceType), deviceType);
         device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
                               pcieDeviceObject, 0),
                           PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);

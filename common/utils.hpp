@@ -22,6 +22,7 @@
 #include "coroutine.hpp"
 #include "types.hpp"
 
+#include <cxxabi.h>   // abi::__cxa_demangle
 #include <stdint.h>
 #include <sys/mman.h> // for memfd_create
 #include <sys/stat.h> // for fstat
@@ -41,6 +42,7 @@
 #include <iostream>
 #include <queue>
 #include <string>
+#include <typeinfo> // typeid().name()
 #include <variant>
 #include <vector>
 
@@ -615,4 +617,22 @@ double uint64ToDoubleSafeConvert(uint64_t value);
  * @param uint64_t value to be converted to double
  */
 double int64ToDoubleSafeConvert(int64_t value);
+
+/**
+ * @brief Gets type from templated type
+ *
+ * @tparam T Type to get name of
+ * @return std::string Name of the type
+ */
+template <typename T>
+std::string typeName()
+{
+    auto mangled = typeid(T).name();
+    int status = 0;
+    auto demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
+    std::string type = (status == 0 && demangled) ? demangled : mangled;
+    // Free memory allocated by abi::__cxa_demangle
+    std::free(demangled);
+    return type;
+}
 } // namespace utils

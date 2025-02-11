@@ -190,9 +190,10 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_NE(nullptr, associationsObject);
     EXPECT_NE(nullptr, healthObject);
 
-    EXPECT_EQ(gpuDeviceUuid, uuidObject->pdi().uuid());
-    EXPECT_EQ(2, associationsObject->pdi().associations().size());
-    EXPECT_EQ(HealthIntf::HealthType::OK, healthObject->pdi().health());
+    EXPECT_EQ(gpuDeviceUuid, uuidObject->invoke(pdiMethod(uuid)));
+    EXPECT_EQ(2, associationsObject->invoke(pdiMethod(associations)).size());
+    EXPECT_EQ(HealthIntf::HealthType::OK,
+              healthObject->invoke(pdiMethod(health)));
 }
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
@@ -276,9 +277,9 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
     EXPECT_EQ(MARKETING_NAME, model->property);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              model->pdi().manufacturer());
+              model->invoke(pdiMethod(manufacturer)));
     EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
-              pcieDeviceObject->pdi().deviceType());
+              pcieDeviceObject->invoke(pdiMethod(deviceType)));
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               ltssmStateSensor->deviceIndex);
     EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
@@ -348,11 +349,14 @@ TEST_F(NsmPCIeDeviceTest, goodTestResponse)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen4, sensor->pdi().pcIeType());
-    EXPECT_EQ(PCIeSlotIntf::Generations::Gen4, sensor->pdi().generationInUse());
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen5, sensor->pdi().maxPCIeType());
-    EXPECT_EQ(1, sensor->pdi().lanesInUse());
-    EXPECT_EQ(2, sensor->pdi().maxLanes());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen4,
+              sensor->invoke(pdiMethod(pcIeType)));
+    EXPECT_EQ(PCIeSlotIntf::Generations::Gen4,
+              sensor->invoke(pdiMethod(generationInUse)));
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen5,
+              sensor->invoke(pdiMethod(maxPCIeType)));
+    EXPECT_EQ(1, sensor->invoke(pdiMethod(lanesInUse)));
+    EXPECT_EQ(2, sensor->invoke(pdiMethod(maxLanes)));
 }
 TEST_F(NsmPCIeDeviceTest, badTestResponseSize)
 {
@@ -382,11 +386,14 @@ TEST_F(NsmPCIeDeviceTest, badTestCompletionErrorResponse)
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1, sensor->pdi().pcIeType());
-    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1, sensor->pdi().maxPCIeType());
-    EXPECT_EQ(PCIeSlotIntf::Generations::Gen1, sensor->pdi().generationInUse());
-    EXPECT_EQ(0, sensor->pdi().lanesInUse());
-    EXPECT_EQ(0, sensor->pdi().maxLanes());
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1,
+              sensor->invoke(pdiMethod(pcIeType)));
+    EXPECT_EQ(PCIeDeviceIntf::PCIeTypes::Gen1,
+              sensor->invoke(pdiMethod(maxPCIeType)));
+    EXPECT_EQ(PCIeSlotIntf::Generations::Gen1,
+              sensor->invoke(pdiMethod(generationInUse)));
+    EXPECT_EQ(0, sensor->invoke(pdiMethod(lanesInUse)));
+    EXPECT_EQ(0, sensor->invoke(pdiMethod(maxLanes)));
 }
 
 struct NsmPCIeFunctionTest : public NsmPCIeDeviceTest
@@ -439,10 +446,12 @@ TEST_F(NsmPCIeFunctionTest, goodTestResponse)
         rc = sensor->handleResponseMsg(responseMsg, response.size());
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
 #define EXPECT_EQ_PcieFunction(X)                                              \
-    EXPECT_EQ("0x000A", sensor->pdi().function##X##VendorId());                \
-    EXPECT_EQ("0x0003", sensor->pdi().function##X##DeviceId());                \
-    EXPECT_EQ("0x0010", sensor->pdi().function##X##SubsystemVendorId());       \
-    EXPECT_EQ("0xFB0C", sensor->pdi().function##X##SubsystemId());
+    sensor->invoke([](auto& pdi) {                                             \
+        EXPECT_EQ("0x000A", pdi.function##X##VendorId());                      \
+        EXPECT_EQ("0x0003", pdi.function##X##DeviceId());                      \
+        EXPECT_EQ("0x0010", pdi.function##X##SubsystemVendorId());             \
+        EXPECT_EQ("0xFB0C", pdi.function##X##SubsystemId());                   \
+    });
         switch (i)
         {
             case 0:
@@ -502,10 +511,10 @@ TEST_F(NsmPCIeFunctionTest, badTestCompletionErrorResponse)
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
-    EXPECT_EQ("", sensor->pdi().function0VendorId());
-    EXPECT_EQ("", sensor->pdi().function0DeviceId());
-    EXPECT_EQ("", sensor->pdi().function0SubsystemVendorId());
-    EXPECT_EQ("", sensor->pdi().function0SubsystemId());
+    EXPECT_EQ("", sensor->invoke(pdiMethod(function0VendorId)));
+    EXPECT_EQ("", sensor->invoke(pdiMethod(function0DeviceId)));
+    EXPECT_EQ("", sensor->invoke(pdiMethod(function0SubsystemVendorId)));
+    EXPECT_EQ("", sensor->invoke(pdiMethod(function0SubsystemId)));
 }
 TEST(NsmPCIeLinkSpeedTest, testGenerationTypeConvertion)
 {
@@ -578,10 +587,12 @@ TEST_F(NsmPCIeLTSSMStateTest, goodTestResponse)
     for (uint32_t state = 0x0; state < 0x12; state++)
     {
         testResponse(state);
-        EXPECT_EQ(LTSSMStateIntf::State(state), sensor->pdi().ltssmState());
+        EXPECT_EQ(LTSSMStateIntf::State(state),
+                  sensor->invoke(pdiMethod(ltssmState)));
     }
     testResponse(0xFF);
-    EXPECT_EQ(LTSSMStateIntf::State::IllegalState, sensor->pdi().ltssmState());
+    EXPECT_EQ(LTSSMStateIntf::State::IllegalState,
+              sensor->invoke(pdiMethod(ltssmState)));
 }
 TEST_F(NsmPCIeLTSSMStateTest, badTestResponseSize)
 {
@@ -594,7 +605,7 @@ TEST_F(NsmPCIeLTSSMStateTest, badTestResponseSize)
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
-    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->pdi().ltssmState());
+    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->invoke(pdiMethod(ltssmState)));
 }
 TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
 {
@@ -612,5 +623,5 @@ TEST_F(NsmPCIeLTSSMStateTest, badTestCompletionErrorResponse)
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
     EXPECT_EQ(rc, NSM_ERROR);
-    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->pdi().ltssmState());
+    EXPECT_EQ(LTSSMStateIntf::State::NA, sensor->invoke(pdiMethod(ltssmState)));
 }
