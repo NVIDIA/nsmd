@@ -70,6 +70,8 @@ enum nsm_platform_environmental_commands {
 	NSM_QUERY_AGGREGATE_GPM_METRICS = 0x49,
 	NSM_QUERY_PER_INSTANCE_GPM_METRICS = 0x4A,
 	NSM_GET_VIOLATION_DURATION = 0x45,
+	NSM_SET_SPI = 0x80,
+	NSM_GET_SPI = 0x81,
 	// Power Smoothing Opcodes
 	NSM_PWR_SMOOTHING_TOGGLE_FEATURESTATE = 0x75,
 	NSM_PWR_SMOOTHING_GET_FEATURE_INFO = 0x76,
@@ -89,6 +91,49 @@ enum nsm_platform_environmental_commands {
 	NSM_ENABLE_WORKLOAD_POWER_PROFILE = 0xA5,
 	NSM_DISABLE_WORKLOAD_POWER_PROFILE = 0xA6
 };
+
+#ifdef ENABLE_GRACE_SPI_OPERATIONS
+/** @brief NSM Set SPI Commands
+ */
+enum nsm_set_spi_command {
+	NSM_CONFIGURE_SPI_TRANSACTION = 0x00,
+	NSM_WRITE_SPI_DATA = 0x02
+};
+
+/** @brief NSM Set SPI Configure payload */
+struct nsm_spi_configure_transaction {
+	uint8_t command_byte;
+	uint8_t unused;
+	uint8_t bytes_to_write_lsb;
+	uint8_t bytes_to_write_msb;
+	uint8_t bytes_to_read_lsb;
+	uint8_t bytes_to_read_msb;
+	uint8_t mode;
+	uint8_t target;
+	uint8_t bus;
+	uint8_t reserved;
+	uint8_t turnaround_cycles;
+	uint8_t command_bytes;
+};
+
+/** @brief NSM Get SPI Commands
+ */
+enum nsm_get_spi_command {
+	NSM_GET_SPI_TRANSACTION_STATUS = 0x01,
+	NSM_READ_SPI_DATA = 0x03
+};
+
+enum nsm_spi_command {
+	NSM_SPI_STATUS_REG = 0x05,
+	NSM_SPI_WRITE_ENABLE = 0x06,
+	NSM_SPI_4_BYTE_ADDRESS_MODE = 0xb7,
+	NSM_SPI_READ = 0x13,
+	NSM_SPI_WRITE = 0x12,
+	NSM_SPI_ERASE = 0xdc
+};
+
+enum nsm_spi_status { NSM_SPI_READY, NSM_SPI_BUSY, NSM_SPI_ERROR };
+#endif
 
 /** @brief NSM Type3 platform environmental events
  */
@@ -237,6 +282,126 @@ struct nsm_iblink_clock_buffer_data {
 	uint8_t clk_buf_reserved16_23;
 	uint8_t clk_buf_reserved24_31;
 } __attribute__((packed));
+
+#ifdef ENABLE_GRACE_SPI_OPERATIONS
+/** @struct nsm_send_spi_command_req
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_command_req {
+	struct nsm_common_req hdr;
+	uint8_t nsm_spi_command;
+	uint8_t spi_data_select;
+	uint8_t spi_command;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_command_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_command_resp {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_transaction_req
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_transaction_req {
+	struct nsm_common_req hdr;
+	uint8_t command_byte;
+	uint8_t unused;
+	uint8_t bytes_to_write_lsb;
+	uint8_t bytes_to_write_msb;
+	uint8_t bytes_to_read_lsb;
+	uint8_t bytes_to_read_msb;
+	uint8_t mode;
+	uint8_t target;
+	uint8_t bus;
+	uint8_t reserved;
+	uint8_t turnaround_cycles;
+	uint8_t command_bytes;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_transaction_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_transaction_resp {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_read_set_addr_req
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_operation_req {
+	struct nsm_common_req hdr;
+	uint8_t command_byte;
+	uint8_t block;
+	uint8_t spi_command;
+	uint8_t addr_byte_3;
+	uint8_t addr_byte_2;
+	uint8_t addr_byte_1;
+	uint8_t addr_byte_0;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_read_set_addr_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_send_spi_operation_resp {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_read_set_addr_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_read_spi_status_req {
+	struct nsm_common_req hdr;
+	uint8_t nsm_spi_command;
+} __attribute__((packed));
+
+/** @struct nsm_send_spi_read_set_addr_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_read_spi_status_resp {
+	struct nsm_common_resp hdr;
+	uint8_t spi_status;
+	uint16_t target_availability;
+	uint16_t bus_availability;
+} __attribute__((packed));
+
+/** @struct nsm_read_spi_byte_req
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_read_spi_block_req {
+	struct nsm_common_req hdr;
+	uint8_t nsm_spi_command;
+	uint8_t spi_data_select;
+} __attribute__((packed));
+
+/** @struct nsm_read_spi_byte_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_read_spi_block_resp {
+	struct nsm_common_resp hdr;
+	uint8_t data[30];
+} __attribute__((packed));
+
+/** @struct nsm_read_spi_byte_resp
+ *
+ *  Structure representing NSM send spi command.
+ */
+struct nsm_read_spi_last_block_resp {
+	struct nsm_common_resp hdr;
+	uint8_t data[16];
+} __attribute__((packed));
+#endif
 
 /** @struct nsm_get_driver_info_resp
  *
@@ -617,6 +782,123 @@ struct nsm_get_row_remap_availability_resp {
 	struct nsm_row_remap_availability data;
 } __attribute__((packed));
 
+#ifdef ENABLE_GRACE_SPI_OPERATIONS
+/** @brief Encode a spi command request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] command - SPI command
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_send_spi_command_req(uint8_t instance_id, struct nsm_msg *msg,
+				enum nsm_spi_command command);
+
+/** @brief Decode a send spi command response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_send_spi_command_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a spi transaction request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_send_spi_transaction_req(uint8_t instance_id, struct nsm_msg *msg,
+				    uint16_t write_bytes, uint16_t read_bytes);
+
+/** @brief Decode a send spi command response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_send_spi_transaction_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a spi set operation request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] spi_address
+ *  @param[in] operation
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_send_spi_operation_req(uint8_t instance_id, struct nsm_msg *msg,
+				  uint32_t address,
+				  enum nsm_spi_command command);
+
+/** @brief Decode a read spi command response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_send_spi_operation_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code);
+
+/** @brief Encode a spi read status register request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_read_spi_status_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a read spi status register response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_read_spi_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				enum nsm_spi_status *spiStatus);
+
+/** @brief Encode a spi read request
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_read_spi_block_req(uint8_t instance_id, struct nsm_msg *msg,
+			      uint8_t block);
+
+/** @brief Decode a read spi command response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+
+int decode_read_spi_last_block_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *reason_code,
+				    uint8_t *data, uint8_t data_size);
+/** @brief Decode a read spi command response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int decode_read_spi_block_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint8_t *data, uint8_t data_size);
+#endif
+
 /** @brief Encode a platform env metric request that doesnt have any request
  * payload
  *
@@ -627,6 +909,7 @@ struct nsm_get_row_remap_availability_resp {
 int encode_get_platform_env_command_no_payload_req(
     uint8_t instance_id, struct nsm_msg *msg,
     enum nsm_platform_environmental_commands command);
+
 /** @brief Encode a platform env metric request that doesnt have any request
  * payload
  *
