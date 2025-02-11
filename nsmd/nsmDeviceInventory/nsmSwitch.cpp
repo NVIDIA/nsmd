@@ -72,7 +72,7 @@ requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
             auto nsmDevice = manager.getNsmDevice(*uuid);
             if (nsmDevice)
             {
-                this->pdi().uuid(nsmDevice->deviceUuid);
+                this->invoke(pdiMethod(uuid), nsmDevice->deviceUuid);
             }
         }
     }
@@ -80,20 +80,20 @@ requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-struct nsm_power_mode_data NsmSwitchDIPowerMode::getPowerModeData()
+nsm_power_mode_data NsmSwitchDIPowerMode::getPowerModeData()
 {
-    struct nsm_power_mode_data powerModeData;
-    powerModeData.l1_hw_mode_control = this->pdi().hwModeControl();
+    nsm_power_mode_data powerModeData;
+    powerModeData.l1_hw_mode_control = invoke(pdiMethod(hwModeControl));
     powerModeData.l1_hw_mode_threshold =
-        static_cast<uint32_t>(this->pdi().hwThreshold());
-    powerModeData.l1_fw_throttling_mode = this->pdi().fwThrottlingMode();
-    powerModeData.l1_prediction_mode = this->pdi().predictionMode();
+        static_cast<uint32_t>(invoke(pdiMethod(hwThreshold)));
+    powerModeData.l1_fw_throttling_mode = invoke(pdiMethod(fwThrottlingMode));
+    powerModeData.l1_prediction_mode = invoke(pdiMethod(predictionMode));
     powerModeData.l1_hw_active_time =
-        static_cast<uint16_t>(this->pdi().hwActiveTime());
+        static_cast<uint16_t>(invoke(pdiMethod(hwActiveTime)));
     powerModeData.l1_hw_inactive_time =
-        static_cast<uint16_t>(this->pdi().hwInactiveTime());
+        static_cast<uint16_t>(invoke(pdiMethod(hwInactiveTime)));
     powerModeData.l1_prediction_inactive_time =
-        static_cast<uint16_t>(this->pdi().hwPredictionInactiveTime());
+        static_cast<uint16_t>(invoke(pdiMethod(hwPredictionInactiveTime)));
 
     return powerModeData;
 }
@@ -126,7 +126,7 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
-    struct nsm_power_mode_data data;
+    nsm_power_mode_data data;
 
     rc = decode_get_power_mode_resp(responseMsg.get(), responseLen, &cc,
                                     &dataSize, &reasonCode, &data);
@@ -134,19 +134,23 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         // update values
-        (data.l1_hw_mode_control == 1) ? this->pdi().hwModeControl(true)
-                                       : this->pdi().hwModeControl(false);
-        this->pdi().hwThreshold(
-            static_cast<uint64_t>(data.l1_hw_mode_threshold));
-        (data.l1_fw_throttling_mode == 1) ? this->pdi().fwThrottlingMode(true)
-                                          : this->pdi().fwThrottlingMode(false);
-        (data.l1_prediction_mode == 1) ? this->pdi().predictionMode(true)
-                                       : this->pdi().predictionMode(false);
-        this->pdi().hwActiveTime(static_cast<uint64_t>(data.l1_hw_active_time));
-        this->pdi().hwInactiveTime(
-            static_cast<uint64_t>(data.l1_hw_inactive_time));
-        this->pdi().hwPredictionInactiveTime(
-            static_cast<uint64_t>(data.l1_prediction_inactive_time));
+        (data.l1_hw_mode_control == 1)
+            ? invoke(pdiMethod(hwModeControl), true)
+            : invoke(pdiMethod(hwModeControl), false);
+        invoke(pdiMethod(hwThreshold),
+               static_cast<uint64_t>(data.l1_hw_mode_threshold));
+        (data.l1_fw_throttling_mode == 1)
+            ? invoke(pdiMethod(fwThrottlingMode), true)
+            : invoke(pdiMethod(fwThrottlingMode), false);
+        (data.l1_prediction_mode == 1)
+            ? invoke(pdiMethod(predictionMode), true)
+            : invoke(pdiMethod(predictionMode), false);
+        invoke(pdiMethod(hwActiveTime),
+               static_cast<uint64_t>(data.l1_hw_active_time));
+        invoke(pdiMethod(hwInactiveTime),
+               static_cast<uint64_t>(data.l1_hw_inactive_time));
+        invoke(pdiMethod(hwPredictionInactiveTime),
+               static_cast<uint64_t>(data.l1_prediction_inactive_time));
         clearErrorBitMap("decode_get_power_mode_resp");
     }
     else
@@ -648,8 +652,8 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                            association.backward,
                                            association.absolutePath);
         }
-        nvSwitchAssociation->pdi().associations(associations_list);
-        nvSwitchUuid->pdi().uuid(uuid);
+        nvSwitchAssociation->invoke(pdiMethod(associations), associations_list);
+        nvSwitchUuid->invoke(pdiMethod(uuid), uuid);
 
         device->deviceSensors.emplace_back(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
@@ -740,8 +744,8 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             std::make_shared<nsm::NsmDevicePortDisableFuture>(name, type,
                                                               inventoryObjPath);
 
-        nvSwitchPortDisableFuture->pdi().portDisableFuture(
-            std::vector<uint8_t>{});
+        nvSwitchPortDisableFuture->invoke(pdiMethod(portDisableFuture),
+                                          std::vector<uint8_t>{});
         device->addSensor(nvSwitchPortDisableFuture, priority);
 
         nsm::AsyncSetOperationHandler setPortDisableFutureHandler =
@@ -763,13 +767,13 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         auto nvSwitchL1PowerMode =
             std::make_shared<NsmSwitchDIPowerMode>(name, inventoryObjPath);
 
-        nvSwitchL1PowerMode->pdi().hwModeControl(false);
-        nvSwitchL1PowerMode->pdi().hwThreshold(0);
-        nvSwitchL1PowerMode->pdi().fwThrottlingMode(false);
-        nvSwitchL1PowerMode->pdi().predictionMode(false);
-        nvSwitchL1PowerMode->pdi().hwActiveTime(0);
-        nvSwitchL1PowerMode->pdi().hwInactiveTime(0);
-        nvSwitchL1PowerMode->pdi().hwPredictionInactiveTime(0);
+        nvSwitchL1PowerMode->invoke(pdiMethod(hwModeControl), false);
+        nvSwitchL1PowerMode->invoke(pdiMethod(hwThreshold), 0);
+        nvSwitchL1PowerMode->invoke(pdiMethod(fwThrottlingMode), false);
+        nvSwitchL1PowerMode->invoke(pdiMethod(predictionMode), false);
+        nvSwitchL1PowerMode->invoke(pdiMethod(hwActiveTime), 0);
+        nvSwitchL1PowerMode->invoke(pdiMethod(hwInactiveTime), 0);
+        nvSwitchL1PowerMode->invoke(pdiMethod(hwPredictionInactiveTime), 0);
 
         device->addSensor(nvSwitchL1PowerMode, priority);
         auto objectPath = nvSwitchL1PowerMode->getInventoryObjectPath();
@@ -867,9 +871,11 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             supported_protocols.emplace_back(
                 SwitchIntf::convertSwitchTypeFromString(protocol));
         }
-        nvSwitchObject->pdi().type(
+        nvSwitchObject->invoke(
+            pdiMethod(type),
             SwitchIntf::convertSwitchTypeFromString(switchType));
-        nvSwitchObject->pdi().supportedProtocols(supported_protocols);
+        nvSwitchObject->invoke(pdiMethod(supportedProtocols),
+                               supported_protocols);
 
         // maxSpeed and currentSpeed from PLDM T2
 
@@ -882,7 +888,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
 
-        nvSwitchAsset->pdi().manufacturer(manufacturer);
+        nvSwitchAsset->invoke(pdiMethod(manufacturer), manufacturer);
         device->addStaticSensor(nvSwitchAsset);
     }
     else if (type == "NSM_FabricManager")

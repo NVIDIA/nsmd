@@ -23,6 +23,8 @@
 #include "common/coroutineSemaphore.hpp"
 #include "common/types.hpp"
 #include "nsmEvent.hpp"
+#include "nsmGroupSensor.hpp"
+#include "nsmInterface.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "types.hpp"
@@ -33,6 +35,7 @@
 
 #include <coroutine>
 #include <deque>
+#include <ranges> // For ranges::find_if
 
 namespace nsm
 {
@@ -108,23 +111,139 @@ class NsmDevice
     void setOffline();
 
     /**
-     * @brief Adds device/static sensor to to NsmDevice.
+     * @brief Inserts device/static sensor to to NsmDevice.
      *
-     * @param sensor[in] Pointer to device/static sensor
-     * @return NsmObject& Sensor reference
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in,out] Pointer to device/static sensor
      */
-    NsmObject& addStaticSensor(std::shared_ptr<NsmObject> sensor);
+    template <typename SensorType>
+    void addStaticSensor(std::shared_ptr<SensorType>& sensor)
+    {
+        sensor->isStatic = true;
+        addSensor(sensor, false, false);
+    }
 
     /**
-     * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority'
-     * for the provided interface
+     * @brief Inserts device/static sensor to to NsmDevice.
      *
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in] Pointer to device/static sensor
+     */
+    template <typename SensorType>
+    void addStaticSensor(const std::shared_ptr<SensorType>& sensor)
+    {
+        sensor->isStatic = true;
+        addSensor(sensor, false, false);
+    }
+
+    /**
+     * @brief Inserts dynamic sensor to NsmDevice. If sensor of same type is
+     * already added, it will add the interfaces to the existing sensor instead
+     * of adding duplicated sensor
+     *
+     * @tparam SensorType Final derived sensor type
      * @param sensor[in] Pointer to dynamic sensor
      * @param priority[in] Flag to add sensor as priority sensor
      * @param isLongRunning[in] Flag to add sensor as Long Running sensor
      */
-    void addSensor(const std::shared_ptr<NsmObject>& sensor, bool priority,
-                   bool isLongRunning = false);
+    template <typename SensorType>
+    void addSensor(const std::shared_ptr<SensorType>& sensor, bool priority,
+                   bool isLongRunning = false)
+    {
+        auto sensorCopy = sensor;
+        addSensor(sensorCopy, priority, isLongRunning);
+    }
+
+    /**
+     * @brief Inserts dynamic sensor to NsmDevice. If sensor of same type is
+     * already added, it will add the interfaces to the existing sensor instead
+     * of adding duplicated sensor
+     *
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in,out] Pointer to dynamic sensor
+     * @param priority[in] Flag to add sensor as priority sensor
+     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
+     */
+    template <typename SensorType>
+    void addSensor(std::shared_ptr<SensorType>& sensor, bool priority,
+                   bool isLongRunning = false)
+        requires std::is_base_of_v<NsmSensor, SensorType> &&
+                 std::is_base_of_v<
+                     NsmInterfaces<typename SensorType::IntfType_t>, SensorType>
+    {
+        auto it = std::ranges::find_if(
+            deviceSensors, [&sensor](const std::shared_ptr<NsmObject>& object) {
+            auto objectAsSensor = std::dynamic_pointer_cast<SensorType>(object);
+            // find object that can be casted to same type and NsmSensor
+            // requests are equal
+            return objectAsSensor && *sensor == *objectAsSensor;
+        });
+        if (it != deviceSensors.end())
+        {
+            // SensorType must be derived from
+            // NsmInterfaces<InterfaceType>
+            auto existingSensor = std::static_pointer_cast<SensorType>(*it);
+            if constexpr (std::is_base_of_v<NsmGroupSensor, SensorType>)
+            {
+                existingSensor->sensors.emplace_back(sensor);
+                // clang-format off
+                lg2::info(
+                    "{STATIC} sensor {NAME} ({TYPE}, {SENSOR_TYPE}, {INTF_TYPE}) already exists. "
+                    "Grouped it into the existing sensor {EXISTING_NAME} ({EXISTING_TYPE}). "
+                    "It now contains {COUNT} subsensors.",
+                    "STATIC", std::string(existingSensor->isStatic ? "Static" : "Dynamic"),
+                    "NAME", sensor->NsmObject::getName(), 
+                    "TYPE", sensor->NsmObject::getType(), 
+                    "SENSOR_TYPE", utils::typeName<SensorType>(),
+                    "INTF_TYPE", SensorType::interface(), 
+                    "EXISTING_NAME", existingSensor->NsmObject::getName(), 
+                    "EXISTING_TYPE", existingSensor->NsmObject::getType(), 
+                    "COUNT", (existingSensor->sensors.size() + 1));
+                // clang-format on
+            }
+            else if (existingSensor->moveInterfaces(*sensor))
+            {
+                // clang-format off
+                lg2::info(
+                    "{STATIC} sensor {NAME} ({TYPE}, {SENSOR_TYPE}, {INTF_TYPE}) already exists. "
+                    "Merged its PDIs into the existing sensor {EXISTING_NAME} ({EXISTING_TYPE}). "
+                    "It now contains {COUNT} PDIs.",
+                    "STATIC", std::string(existingSensor->isStatic ? "Static" : "Dynamic"),
+                    "NAME", sensor->NsmObject::getName(), 
+                    "TYPE", sensor->NsmObject::getType(), 
+                    "SENSOR_TYPE", utils::typeName<SensorType>(),
+                    "INTF_TYPE", SensorType::interface(), 
+                    "EXISTING_NAME", existingSensor->NsmObject::getName(), 
+                    "EXISTING_TYPE", existingSensor->NsmObject::getType(), 
+                    "COUNT", existingSensor->size());
+                // clang-format on
+            }
+            // updating sensor with existing sensor
+            sensor = existingSensor;
+        }
+        else
+        {
+            // sensors was not added to deviceSensors
+            addSensorBase(sensor, priority, isLongRunning);
+        }
+    }
+
+    /**
+     * @brief Adds dynamic sensor to NsmDevice. If sensor of same type is
+     * already added, it will add the interfaces to the existing sensor instead
+     * of adding duplicated sensor
+     *
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in,out] Pointer to dynamic sensor
+     * @param priority[in] Flag to add sensor as priority sensor
+     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
+     */
+    template <typename SensorType>
+    void addSensor(std::shared_ptr<SensorType>& sensor, bool priority,
+                   bool isLongRunning = false)
+    {
+        addSensorBase(sensor, priority, isLongRunning);
+    }
 
     /** @brief getter of deviceType */
     uint8_t getDeviceType()
@@ -196,6 +315,17 @@ class NsmDevice
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
     PollingState devicePollingState;
+
+    /**
+     * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority'
+     * for the provided interface
+     *
+     * @param sensor[in] Pointer to dynamic sensor
+     * @param priority[in] Flag to add sensor as priority sensor
+     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
+     */
+    void addSensorBase(const std::shared_ptr<NsmObject>& sensor, bool priority,
+                       bool isLongRunning = false);
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

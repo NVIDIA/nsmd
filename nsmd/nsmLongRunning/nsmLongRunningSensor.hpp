@@ -30,8 +30,7 @@ class NsmLongRunningSensor : public NsmSensor, public NsmLongRunningEvent
                                   const std::string& type, bool isLongRunning,
                                   std::shared_ptr<NsmDevice> device,
                                   uint8_t messageType, uint8_t commandCode);
-    requester::Coroutine update(SensorManager& manager,
-                                eid_t eid) override final;
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     requester::Coroutine updateLongRunningSensor(SensorManager& manager,

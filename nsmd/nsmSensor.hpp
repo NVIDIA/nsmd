@@ -41,6 +41,9 @@ class NsmSensor : public NsmObject
 
     virtual requester::Coroutine update(SensorManager& manager,
                                         eid_t eid) override;
+
+    virtual bool equals(const NsmSensor& other) const;
+    bool operator==(const NsmSensor& other) const;
 };
 
 } // namespace nsm

@@ -98,11 +98,11 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeDeviceIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    pdi().pcIeType(pcieType(data.negotiated_link_speed));
-    pdi().generationInUse(generation(data.negotiated_link_speed));
-    pdi().maxPCIeType(pcieType(data.max_link_speed));
-    pdi().lanesInUse(linkWidth(data.negotiated_link_width));
-    pdi().maxLanes(linkWidth(data.max_link_width));
+    invoke(pdiMethod(pcIeType), pcieType(data.negotiated_link_speed));
+    invoke(pdiMethod(generationInUse), generation(data.negotiated_link_speed));
+    invoke(pdiMethod(maxPCIeType), pcieType(data.max_link_speed));
+    invoke(pdiMethod(lanesInUse), linkWidth(data.negotiated_link_width));
+    invoke(pdiMethod(maxLanes), linkWidth(data.max_link_width));
 }
 
 template <>
@@ -112,47 +112,52 @@ template <>
 inline void NsmPCIeLinkSpeed<PCIeSlotIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    pdi().generation(generation(data.negotiated_link_speed));
-    pdi().lanes(linkWidth(data.negotiated_link_width));
+    invoke(pdiMethod(generation), generation(data.negotiated_link_speed));
+    invoke(pdiMethod(lanes), linkWidth(data.negotiated_link_width));
 }
 
 template <>
 inline void NsmPCIeLinkSpeed<PCIeEccIntf>::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    std::vector<uint8_t> data;
-    updateSharedMemoryOnSuccess(
-        pdiPath(), pdi().interface, "PCIeType", data,
-        PCIeEccIntf::convertPCIeTypesToString(pdi().pcIeType()));
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().interface, "LanesInUse", data,
-                                pdi().lanesInUse());
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().interface, "MaxLanes", data,
-                                pdi().maxLanes());
+    invoke([](const auto& path, auto& pdi) {
+        std::vector<uint8_t> data;
+        updateSharedMemoryOnSuccess(
+            path, pdi.interface, "PCIeType", data,
+            PCIeEccIntf::convertPCIeTypesToString(pdi.pcIeType()));
+        updateSharedMemoryOnSuccess(path, pdi.interface, "LanesInUse", data,
+                                    pdi.lanesInUse());
+        updateSharedMemoryOnSuccess(path, pdi.interface, "MaxLanes", data,
+                                    pdi.maxLanes());
+    });
 #endif
 }
 template <>
 inline void NsmPCIeLinkSpeed<PCIeEccIntf>::handleResponse(
     const nsm_query_scalar_group_telemetry_group_1& data)
 {
-    pdi().pcIeType(
-        (PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
-    pdi().lanesInUse(linkWidth(data.negotiated_link_width));
-    pdi().maxLanes(linkWidth(data.max_link_width));
+    invoke(pdiMethod(pcIeType),
+           (PCIeEccIntf::PCIeTypes)pcieType(data.negotiated_link_speed));
+    invoke(pdiMethod(lanesInUse), linkWidth(data.negotiated_link_width));
+    invoke(pdiMethod(maxLanes), linkWidth(data.max_link_width));
 }
 
 template <>
 inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    std::vector<uint8_t> data;
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortInfoIntf::interface,
-                                "CurrentSpeedGbps", data, pdi().currentSpeed());
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortInfoIntf::interface,
-                                "MaxSpeedGbps", data, pdi().maxSpeed());
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortWidth::interface,
-                                "ActiveWidth", data, pdi().activeWidth());
-    updateSharedMemoryOnSuccess(pdiPath(), pdi().PortWidth::interface, "Width",
-                                data, pdi().width());
+    invoke([](const auto& path, auto& pdi) {
+        std::vector<uint8_t> data;
+        updateSharedMemoryOnSuccess(path, pdi.PortInfoIntf::interface,
+                                    "CurrentSpeedGbps", data,
+                                    pdi.currentSpeed());
+        updateSharedMemoryOnSuccess(path, pdi.PortInfoIntf::interface,
+                                    "MaxSpeedGbps", data, pdi.maxSpeed());
+        updateSharedMemoryOnSuccess(path, pdi.PortWidth::interface,
+                                    "ActiveWidth", data, pdi.activeWidth());
+        updateSharedMemoryOnSuccess(path, pdi.PortWidth::interface, "Width",
+                                    data, pdi.width());
+    });
 #endif
 }
 template <>
@@ -195,10 +200,11 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::handleResponse(
             }
         }
     };
-    pdi().currentSpeed(convertToTransferRate(data.negotiated_link_speed));
-    pdi().maxSpeed(convertToTransferRate(data.max_link_speed));
-    pdi().activeWidth(linkWidth(data.negotiated_link_width));
-    pdi().width(linkWidth(data.max_link_width));
+    invoke(pdiMethod(currentSpeed),
+           convertToTransferRate(data.negotiated_link_speed));
+    invoke(pdiMethod(maxSpeed), convertToTransferRate(data.max_link_speed));
+    invoke(pdiMethod(activeWidth), linkWidth(data.negotiated_link_width));
+    invoke(pdiMethod(width), linkWidth(data.max_link_width));
 }
 
 } // namespace nsm

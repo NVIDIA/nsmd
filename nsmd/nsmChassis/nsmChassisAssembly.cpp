@@ -59,7 +59,8 @@ requester::Coroutine
             objPath.c_str(), "PhysicalContext", interface.c_str());
         auto chassisArea =
             std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
-        chassisArea->pdi().physicalContext(
+        chassisArea->invoke(
+            pdiMethod(physicalContext),
             AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
         device->addStaticSensor(chassisArea);
     }
@@ -76,8 +77,8 @@ requester::Coroutine
                                            : BOARD_PART_NUMBER;
 
         auto assetObject = NsmChassisAssembly<NsmAssetIntf>(chassisName, name);
-        assetObject.pdi().manufacturer(vendor);
-        assetObject.pdi().name(assetsName);
+        assetObject.invoke(pdiMethod(manufacturer), vendor);
+        assetObject.invoke(pdiMethod(name), assetsName);
         //  create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             assetObject, partNumberId);
@@ -99,8 +100,8 @@ requester::Coroutine
             objPath.c_str(), "Health", interface.c_str());
         auto healthObject =
             std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
-        healthObject->pdi().health(
-            HealthIntf::convertHealthTypeFromString(health));
+        healthObject->invoke(pdiMethod(health),
+                             HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_Location")
@@ -110,7 +111,8 @@ requester::Coroutine
         auto locationObject =
             std::make_shared<NsmChassisAssembly<LocationIntf>>(chassisName,
                                                                name);
-        locationObject->pdi().locationType(
+        locationObject->invoke(
+            pdiMethod(locationType),
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }

@@ -43,7 +43,7 @@ requester::Coroutine
             auto nsmDevice = manager.getNsmDevice(*uuid);
             if (nsmDevice)
             {
-                this->pdi().uuid(nsmDevice->deviceUuid);
+                this->invoke(pdiMethod(uuid), nsmDevice->deviceUuid);
             }
         }
     }
@@ -74,11 +74,11 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
-        chassisUuid->pdi().uuid(deviceUuid);
+        chassisUuid->invoke(pdiMethod(uuid), deviceUuid);
         device->addStaticSensor(chassisUuid);
 
         auto mctpUuid = std::make_shared<NsmChassis<MctpUuidIntf>>(name);
-        mctpUuid->pdi().uuid(uuid);
+        mctpUuid->invoke(pdiMethod(uuid), uuid);
         device->addStaticSensor(mctpUuid);
 
         std::vector<utils::Association> associations{};
@@ -88,8 +88,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         {
             auto associationsObject =
                 std::make_shared<NsmChassis<AssociationDefinitionsInft>>(name);
-            associationsObject->pdi().associations(
-                utils::getAssociations(associations));
+            associationsObject->invoke(pdiMethod(associations),
+                                       utils::getAssociations(associations));
             device->addStaticSensor(associationsObject);
         }
 
@@ -105,7 +105,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        chassisAsset->pdi().manufacturer(manufacturer);
+        chassisAsset->invoke(pdiMethod(manufacturer), manufacturer);
         device->deviceSensors.emplace_back(chassisAsset);
     }
     else if (type == "NSM_Asset")
@@ -113,7 +113,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto chassisAsset = NsmChassis<NsmAssetIntf>(name);
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
-        chassisAsset.pdi().manufacturer(manufacturer);
+        chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
             chassisAsset, BOARD_PART_NUMBER);
@@ -131,8 +131,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto chassisType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "ChassisType", interface.c_str());
         auto chassis = std::make_shared<NsmChassis<ChassisIntf>>(name);
-        chassis->pdi().type(
-            ChassisIntf::convertChassisTypeFromString(chassisType));
+        chassis->invoke(pdiMethod(type),
+                        ChassisIntf::convertChassisTypeFromString(chassisType));
         device->addStaticSensor(chassis);
     }
     else if (type == "NSM_Dimension")
@@ -153,8 +153,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
         auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
-        chassisHealth->pdi().health(
-            HealthIntf::convertHealthTypeFromString(health));
+        chassisHealth->invoke(pdiMethod(health),
+                              HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(chassisHealth);
     }
     else if (type == "NSM_Location")
@@ -162,7 +162,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto locationType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
         auto chassisLocation = std::make_shared<NsmChassis<LocationIntf>>(name);
-        chassisLocation->pdi().locationType(
+        chassisLocation->invoke(
+            pdiMethod(locationType),
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(chassisLocation);
     }
@@ -172,7 +173,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
             objPath.c_str(), "LocationCode", interface.c_str());
         auto chassisLocationCode =
             std::make_shared<NsmChassis<LocationCodeIntf>>(name);
-        chassisLocationCode->pdi().locationCode(locationCode);
+        chassisLocationCode->invoke(pdiMethod(locationCode), locationCode);
         device->addStaticSensor(chassisLocationCode);
     }
     else if (type == "NSM_PowerLimit")
@@ -255,7 +256,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto prettyName = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
         auto chassisPrettyName = std::make_shared<NsmChassis<ItemIntf>>(name);
-        chassisPrettyName->pdi().prettyName(prettyName);
+        chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
 

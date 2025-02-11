@@ -35,6 +35,10 @@ class NsmPortInfoIntf : public PortInfoIntf, public PortWidthIntf
     NsmPortInfoIntf(sdbusplus::bus::bus& bus, const char* path) :
         PortInfoIntf(bus, path), PortWidthIntf(bus, path)
     {}
+    /* Resolves ambiguity in NsmInterfaces<NsmPortInfoIntf>::interface by
+     * explicitly defining the interface */
+    static constexpr auto interface =
+        "xyz.openbmc_project.Inventory.Decorator.PortInfoAndPortWidth";
 };
 
 } // namespace nsm

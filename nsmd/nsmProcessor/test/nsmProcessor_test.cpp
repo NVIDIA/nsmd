@@ -205,12 +205,12 @@ TEST(nsmEccErrorCounts, BadHandleResp)
 
 TEST(NsmPCIeGroup2, GoodGenReq)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
@@ -231,12 +231,12 @@ TEST(NsmPCIeGroup2, GoodGenReq)
 
 TEST(NsmPCIeGroup2, GoodHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
@@ -262,12 +262,12 @@ TEST(NsmPCIeGroup2, GoodHandleResp)
 
 TEST(NsmPCIeGroup2, BadHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_2 data;
@@ -295,13 +295,13 @@ TEST(NsmPCIeGroup2, BadHandleResp)
 
 TEST(NsmPCIeGroup3, GoodGenReq)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
 
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
@@ -322,12 +322,12 @@ TEST(NsmPCIeGroup3, GoodGenReq)
 
 TEST(NsmPCIeGroup3, GoodHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
@@ -349,12 +349,12 @@ TEST(NsmPCIeGroup3, GoodHandleResp)
 
 TEST(NsmPCIeGroup3, BadHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_3 data;
@@ -378,12 +378,12 @@ TEST(NsmPCIeGroup3, BadHandleResp)
 
 TEST(NsmPCIeGroup4, GoodGenReq)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     const uint8_t eid{12};
@@ -404,12 +404,12 @@ TEST(NsmPCIeGroup4, GoodGenReq)
 
 TEST(NsmPCIeGroup4, GoodHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
@@ -438,12 +438,12 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
 
 TEST(NsmPCIeGroup4, BadHandleResp)
 {
-    auto pCieECCIntf = std::make_shared<PCieEccIntf>(bus,
+    auto pcieECCIntf = std::make_shared<PCieEccIntf>(bus,
                                                      inventoryObjPath.c_str());
     auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_0";
-    auto pCiePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
+    auto pciePortIntf = std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
     uint8_t deviceId = 0;
-    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pCieECCIntf, pCiePortIntf,
+    nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_4 data;
@@ -1506,6 +1506,10 @@ struct NsmProcessorTest :
         "xyz.openbmc_project.Configuration.NSM_Processor";
     const std::string name = "GPU_SXM_1";
     const std::string objPath = processorsInventoryBasePath / name;
+    const std::string memoryBasicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_Processor";
+    const std::string memoryName = "GPU_Memory_1";
+    const std::string memoryObjPath = processorsInventoryBasePath / memoryName;
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
@@ -1537,6 +1541,7 @@ struct NsmProcessorTest :
         {"UUID", gpuUuid},
         {"DEVICE_UUID", gpuUuid},
         {"InventoryObjPath", objPath},
+        {"Priority", false},
     };
     const PropertyValuesCollection prcKnobs = {
         {"Type", "NSM_ReconfigPermissions"},
@@ -1569,6 +1574,11 @@ struct NsmProcessorTest :
              "PowerSmoothingPrivilegeLevel1",
          }},
     };
+    const PropertyValuesCollection memory = {
+        {"Name", memoryName}, {"Type", "NSM_MemCapacityUtil"},
+        {"UUID", gpuUuid},    {"InventoryObjPath", memoryObjPath},
+        {"Priority", false},
+    };
 };
 
 namespace nsm
@@ -1576,7 +1586,10 @@ namespace nsm
 requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                               const std::string& interface,
                                               const std::string& objPath);
-};
+requester::Coroutine createNsmMemorySensor(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath);
+}; // namespace nsm
 
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
@@ -1775,8 +1788,10 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_EQ(AsyncOperationStatusType::Success, status);
     errorInjectionSensor->update(mockManager, eid);
 
-    EXPECT_TRUE(errorInjectionSensor->pdi().errorInjectionModeEnabled());
-    EXPECT_TRUE(errorInjectionSensor->pdi().persistentDataModified());
+    EXPECT_TRUE(
+        errorInjectionSensor->invoke(pdiMethod(errorInjectionModeEnabled)));
+    EXPECT_TRUE(
+        errorInjectionSensor->invoke(pdiMethod(persistentDataModified)));
 
     // test set async
     nsm_error_injection_types_mask enabledData = {0b00001000, 0, 0, 0,
@@ -1808,6 +1823,43 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_FALSE(errorInjectionEnabled->interfaces[pcieErrorsPath]->enabled());
     EXPECT_TRUE(
         errorInjectionEnabled->interfaces[thermalErrorsPath]->enabled());
+}
+
+TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
+{
+    auto& values = utils::MockDbusAsync::getValues();
+    values.push(objPath, get(basic, "Name"));
+    values.push(objPath, get(basic, "UUID"));
+    values.push(objPath, get(memory, "Type"));
+    values.push(objPath, get(basic, "InventoryObjPath"));
+    values.push(objPath, get(basic, "Priority"));
+    createNsmProcessorSensor(mockManager, basicIntfName + ".MemCapacityUtil",
+                             objPath);
+    EXPECT_EQ(1, gpu.deviceSensors.size());
+    EXPECT_EQ(1, gpu.longRunningSensors.size());
+
+    auto memoryCapacityUtilSensor =
+        dynamic_pointer_cast<NsmMemoryCapacityUtil>(gpu.deviceSensors.back());
+    EXPECT_NE(nullptr, memoryCapacityUtilSensor);
+    EXPECT_EQ(1, memoryCapacityUtilSensor->interfaces.size());
+
+    values.push(memoryObjPath, get(memory, "Name"));
+    values.push(memoryObjPath, get(memory, "UUID"));
+    values.push(memoryObjPath, get(memory, "Type"));
+    values.push(memoryObjPath, get(memory, "InventoryObjPath"));
+    values.push(memoryObjPath, get(memory, "Priority"));
+    createNsmMemorySensor(mockManager, memoryBasicIntfName + ".MemCapacityUtil",
+                          memoryObjPath);
+
+    // Check if the sensors isn't duplicated
+    EXPECT_EQ(1, gpu.deviceSensors.size());
+    EXPECT_EQ(1, gpu.longRunningSensors.size());
+    EXPECT_EQ(memoryCapacityUtilSensor.get(), gpu.deviceSensors.back().get());
+    // Check if the sensor interface is added as expected
+    EXPECT_EQ(2, memoryCapacityUtilSensor->interfaces.size());
+
+    gpu.deviceSensors.clear();
+    gpu.longRunningSensors.clear();
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)
