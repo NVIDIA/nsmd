@@ -22,6 +22,340 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef ENABLE_GRACE_SPI_OPERATIONS
+int encode_send_spi_command_req(uint8_t instance_id, struct nsm_msg *msg,
+				enum nsm_spi_command command)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_send_spi_command_req *request =
+	    (struct nsm_send_spi_command_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_SPI;
+	request->hdr.data_size = 3;
+	request->nsm_spi_command = NSM_WRITE_SPI_DATA;
+	request->spi_data_select = 0x00;
+	request->spi_command = command;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_send_spi_command_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_send_spi_command_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_send_spi_transaction_req(uint8_t instance_id, struct nsm_msg *msg,
+				    uint16_t write_bytes, uint16_t read_bytes)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// The max number of bytes that can be written or read is 256, so check
+	// sizes
+	if (write_bytes > 256) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	if (read_bytes > 256) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_send_spi_transaction_req *request =
+	    (struct nsm_send_spi_transaction_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_SPI;
+	request->hdr.data_size = 0x0c;
+	request->command_byte = NSM_CONFIGURE_SPI_TRANSACTION;
+	request->unused = 0x00;
+	request->bytes_to_write_lsb = write_bytes & 0xff;
+	request->bytes_to_write_msb = write_bytes >> 8;
+	request->bytes_to_read_lsb = read_bytes & 0xff;
+	request->bytes_to_read_msb = read_bytes >> 8;
+	request->mode = 0x00;
+	request->target = 0x00;
+	request->bus = 0x00;
+	request->reserved = 0x00;
+	request->turnaround_cycles = 0x00;
+	request->command_bytes = 0x01;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_send_spi_transaction_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_send_spi_transaction_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	// struct nsm_send_spi_command_resp *resp =
+	//     (struct nsm_send_spi_command_resp*)msg->payload;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_send_spi_operation_req(uint8_t instance_id, struct nsm_msg *msg,
+				  uint32_t address,
+				  enum nsm_spi_command command)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_send_spi_operation_req *request =
+	    (struct nsm_send_spi_operation_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_SPI;
+	request->hdr.data_size = 7;
+	request->command_byte = NSM_WRITE_SPI_DATA;
+	request->block = 0x00;
+	request->spi_command = command;
+	// The address passed in is a 4byte address in a uint32_t
+	// Split the address out to individual bytes (uin8_t)
+	request->addr_byte_3 = (address & 0xff000000) >> 24;
+	request->addr_byte_2 = (address & 0x00ff0000) >> 16;
+	request->addr_byte_1 = (address & 0x0000ff00) >> 8;
+	request->addr_byte_0 = (address & 0x000000ff);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_send_spi_operation_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_send_spi_operation_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_read_spi_status_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_read_spi_status_req *request =
+	    (struct nsm_read_spi_status_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_SPI;
+	request->hdr.data_size = 1;
+	request->nsm_spi_command = NSM_GET_SPI_TRANSACTION_STATUS;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_read_spi_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				enum nsm_spi_status *spiStatus)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (spiStatus == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_read_spi_status_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_read_spi_status_resp *resp =
+	    (struct nsm_read_spi_status_resp *)msg->payload;
+
+	if ((resp->spi_status & 0x03) == 0x00) {
+		*spiStatus = NSM_SPI_READY;
+	} else if ((resp->spi_status & 0x01) == 0x01) {
+		*spiStatus = NSM_SPI_BUSY;
+	} else if (((resp->spi_status & 0x02) >> 1) == 0x01) {
+		*spiStatus = NSM_SPI_ERROR;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_read_spi_block_req(uint8_t instance_id, struct nsm_msg *msg,
+			      uint8_t block)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_read_spi_block_req *request =
+	    (struct nsm_read_spi_block_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_SPI;
+	request->hdr.data_size = 2;
+	request->nsm_spi_command = NSM_READ_SPI_DATA;
+	request->spi_data_select = block;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_read_spi_block_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint8_t *data, uint8_t data_size)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_read_spi_block_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (data_size < 30) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_read_spi_block_resp *resp =
+	    (struct nsm_read_spi_block_resp *)msg->payload;
+
+	for (uint8_t i = 0; i < 30; i++) {
+		data[i] = resp->data[i];
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_read_spi_last_block_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *reason_code,
+				    uint8_t *data, uint8_t data_size)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_read_spi_last_block_resp))) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (data_size < 16) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_read_spi_block_resp *resp =
+	    (struct nsm_read_spi_block_resp *)msg->payload;
+
+	for (uint8_t i = 0; i < 16; i++) {
+		data[i] = resp->data[i];
+	}
+
+	return NSM_SW_SUCCESS;
+}
+#endif
+
 int encode_get_inventory_information_req(uint8_t instance_id,
 					 uint8_t property_identifier,
 					 struct nsm_msg *msg)

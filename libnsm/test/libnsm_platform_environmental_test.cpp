@@ -21,6 +21,535 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#ifdef ENABLE_GRACE_SPI_OPERATIONS
+TEST(graceSpiOperations, testGoodEncodeSpiCommandRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_send_spi_command_req));
+
+	nsm_spi_command spi_command = NSM_SPI_STATUS_REG;
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_send_spi_command_req(0, request, spi_command);
+
+	struct nsm_send_spi_command_req *req =
+	    reinterpret_cast<struct nsm_send_spi_command_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(3, req->hdr.data_size);
+	EXPECT_EQ(NSM_SET_SPI, req->hdr.command);
+
+	EXPECT_EQ(NSM_WRITE_SPI_DATA, req->nsm_spi_command);
+	EXPECT_EQ(0x0, req->spi_data_select);
+	EXPECT_EQ(spi_command, req->spi_command);
+}
+
+TEST(graceSpiOperations, testBadEncodeSpiCommandRequest)
+{
+	auto rc = encode_send_spi_command_req(0, nullptr, NSM_SPI_STATUS_REG);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(graceSpiOperations, testGoodDecodeSpiCommandResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    0,				     // CC
+	    0,
+	    0, // RC
+	    0,
+	    0 // Size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_command_resp(response, msg_len,
+					       &completion_code, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+}
+
+TEST(graceSpiOperations, testBadDecodeSpiCommandResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    NSM_ERR_NOT_READY,		     // CC
+	    ERR_TIMEOUT,
+	    0 // RC
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_command_resp(response, 4, &completion_code,
+					       &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_send_spi_command_resp(response, msg_len, nullptr,
+					  &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_command_resp(response, msg_len, &completion_code,
+					  nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_command_resp(response, msg_len, &completion_code,
+					  &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_ERR_NOT_READY);
+	EXPECT_EQ(reason_code, ERR_TIMEOUT);
+}
+
+TEST(graceSpiOperations, testGoodEncodeSpiTransactionRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_send_spi_transaction_req));
+
+	uint16_t readBytes = 16;
+	uint16_t writeBytes = 8;
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc =
+	    encode_send_spi_transaction_req(0, request, writeBytes, readBytes);
+
+	struct nsm_send_spi_transaction_req *req =
+	    reinterpret_cast<struct nsm_send_spi_transaction_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_SPI, req->hdr.command);
+	EXPECT_EQ(0x0c, req->hdr.data_size);
+
+	EXPECT_EQ(NSM_CONFIGURE_SPI_TRANSACTION, req->command_byte);
+	EXPECT_EQ(0x0, req->unused);
+	EXPECT_EQ(writeBytes, req->bytes_to_write_lsb);
+	EXPECT_EQ(0x0, req->bytes_to_write_msb);
+	EXPECT_EQ(readBytes, req->bytes_to_read_lsb);
+	EXPECT_EQ(0x0, req->bytes_to_read_msb);
+	EXPECT_EQ(0x0, req->mode);
+	EXPECT_EQ(0x0, req->target);
+	EXPECT_EQ(0x0, req->bus);
+	EXPECT_EQ(0x0, req->reserved);
+	EXPECT_EQ(0x0, req->turnaround_cycles);
+	EXPECT_EQ(0x1, req->command_bytes);
+}
+
+TEST(graceSpiOperations, testBadEncodeSpiTransactionRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_send_spi_transaction_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint16_t readBytes = 16;
+	uint16_t writeBytes = 8;
+
+	auto rc =
+	    encode_send_spi_transaction_req(0, nullptr, writeBytes, readBytes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_send_spi_transaction_req(0, request, 280, readBytes);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+
+	rc = encode_send_spi_transaction_req(0, request, writeBytes, 280);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(graceSpiOperations, testGoodDecodeSpiTransactionResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    0,				     // CC
+	    0,
+	    0, // RC
+	    0,
+	    0 // Size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_transaction_resp(
+	    response, msg_len, &completion_code, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+}
+
+TEST(graceSpiOperations, testBadDecodeSpiTransactionResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    NSM_ERR_NOT_READY,		     // CC
+	    ERR_TIMEOUT,
+	    0 // RC
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_transaction_resp(
+	    response, 4, &completion_code, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_send_spi_transaction_resp(response, msg_len, nullptr,
+					      &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_transaction_resp(response, msg_len,
+					      &completion_code, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_transaction_resp(response, msg_len,
+					      &completion_code, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_ERR_NOT_READY);
+	EXPECT_EQ(reason_code, ERR_TIMEOUT);
+}
+
+TEST(graceSpiOperations, testGoodEncodeSpiOperationRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_send_spi_operation_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_spi_command command = NSM_SPI_ERASE;
+	uint32_t address = 0x01aa02bb;
+
+	auto rc = encode_send_spi_operation_req(0, request, address, command);
+
+	struct nsm_send_spi_operation_req *req =
+	    reinterpret_cast<struct nsm_send_spi_operation_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_SPI, req->hdr.command);
+	EXPECT_EQ(7, req->hdr.data_size);
+
+	EXPECT_EQ(NSM_WRITE_SPI_DATA, req->command_byte);
+	EXPECT_EQ(0, req->block);
+	EXPECT_EQ(command, req->spi_command);
+
+	EXPECT_EQ(0x01, req->addr_byte_3);
+	EXPECT_EQ(0xaa, req->addr_byte_2);
+	EXPECT_EQ(0x02, req->addr_byte_1);
+	EXPECT_EQ(0xbb, req->addr_byte_0);
+}
+
+TEST(graceSpiOperations, testBadEncodeSpiOperationRequest)
+{
+	auto rc = encode_send_spi_operation_req(0, nullptr, 0x00000000,
+						NSM_SPI_ERASE);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(graceSpiOperations, testGoodDecodeSpiOperationResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    0,				     // CC
+	    0,
+	    0, // RC
+	    0,
+	    0 // Size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_operation_resp(
+	    response, msg_len, &completion_code, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+}
+
+TEST(graceSpiOperations, testBadDecodeSpiOperationResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    NSM_ERR_NOT_READY,		     // CC
+	    ERR_TIMEOUT,
+	    0 // RC
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+
+	auto rc = decode_send_spi_operation_resp(response, 4, &completion_code,
+						 &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_send_spi_operation_resp(response, msg_len, nullptr,
+					    &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_operation_resp(response, msg_len, &completion_code,
+					    nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_send_spi_operation_resp(response, msg_len, &completion_code,
+					    &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_ERR_NOT_READY);
+	EXPECT_EQ(reason_code, ERR_TIMEOUT);
+}
+
+TEST(graceSpiOperations, testGoodEncodeSpiStatusRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_read_spi_status_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_read_spi_status_req(0, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(graceSpiOperations, testBadEncodeSpiStatusRequest)
+{
+	auto rc = encode_read_spi_status_req(0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(graceSpiOperations, testGoodDecodeSpiStatusResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_GET_SPI,		     // command
+	    0,				     // CC
+	    0,
+	    0, // RC
+	    0,
+	    5,	  // Size
+	    0x00, // status
+	    0x00,
+	    0x00, // target available
+	    0x00,
+	    0x00 // bus available
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+	enum nsm_spi_status status = NSM_SPI_ERROR;
+
+	auto rc = decode_read_spi_status_resp(
+	    response, msg_len, &completion_code, &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(status, NSM_SPI_READY);
+
+	responseMsg[11] = 0x01;
+
+	rc = decode_read_spi_status_resp(response, msg_len, &completion_code,
+					 &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(status, NSM_SPI_BUSY);
+
+	responseMsg[11] = 0x02;
+
+	rc = decode_read_spi_status_resp(response, msg_len, &completion_code,
+					 &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_SW_SUCCESS);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(status, NSM_SPI_ERROR);
+}
+
+TEST(graceSpiOperations, testBadDecodeSpiStatusResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_SET_SPI,		     // command
+	    NSM_ERR_NOT_READY,		     // CC
+	    ERR_TIMEOUT,
+	    0 // RC
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	size_t msg_len = responseMsg.size();
+
+	uint8_t completion_code = 0;
+	uint16_t reason_code = 0;
+	enum nsm_spi_status status = NSM_SPI_ERROR;
+
+	auto rc = decode_read_spi_status_resp(response, 4, &completion_code,
+					      &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_read_spi_status_resp(response, msg_len, nullptr,
+					 &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_read_spi_status_resp(response, msg_len, &completion_code,
+					 nullptr, &status);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_read_spi_status_resp(response, msg_len, &completion_code,
+					 &reason_code, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_read_spi_status_resp(response, msg_len, &completion_code,
+					 &reason_code, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(completion_code, NSM_ERR_NOT_READY);
+	EXPECT_EQ(reason_code, ERR_TIMEOUT);
+}
+
+TEST(graceSpiOperations, testGoodEncodeSpiReadRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_read_spi_block_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_read_spi_block_req(0, request, 0);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(graceSpiOperations, testBadEncodeSpiReadRequest)
+{
+	auto rc = encode_read_spi_block_req(0, nullptr, 0);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+#endif
+
 TEST(getInventoryInformation, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(
