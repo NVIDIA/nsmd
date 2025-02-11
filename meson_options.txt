@@ -24,6 +24,18 @@ option(
     value: 'disabled',
 )
 option(
+    'grace-spi-operations',
+    type: 'feature',
+    description: 'Enable nsm spi operations',
+    value: 'disabled',
+)
+option(
+    'grace-spi-operations-raw-debug-dump',
+    type: 'feature',
+    description: 'Enable dumping raw nsm spi operation messages for debugging',
+    value: 'disabled',
+)
+option(
     'sensor-polling-time',
     type: 'integer',
     min: 1,
