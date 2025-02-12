@@ -17,6 +17,7 @@ dep_src_files = [
     '../../nsmChassis/nsmPowerControl.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
+    '../../nsmMemory/nsmMemory.cpp',
     '../../nsmPort/nsmPortDisableFuture.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',

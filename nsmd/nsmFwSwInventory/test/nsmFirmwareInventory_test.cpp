@@ -130,7 +130,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
             fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAsset);
     EXPECT_EQ(get<std::string>(retimer, "Manufacturer"),
-              retimerAsset->pdi().manufacturer());
+              retimerAsset->invoke(pdiMethod(manufacturer)));
 
     map = serviceMap;
     values.push(objPath, get(retimer, "Name"));
@@ -149,17 +149,17 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         dynamic_pointer_cast<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
             fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAssociation);
-    EXPECT_EQ(2, retimerAssociation->pdi().associations().size());
+    EXPECT_EQ(2, retimerAssociation->invoke(pdiMethod(associations)).size());
 
     auto retimerSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
         fpga.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerSettings);
     EXPECT_EQ(get<uint64_t>(retimer, "DataIndex"), retimerSettings->dataIndex);
 
-    auto retimerWriteProtectedSensor =
-        dynamic_pointer_cast<NsmWriteProtectedControl>(
-            fpga.deviceSensors[sensors++]);
-    EXPECT_NE(nullptr, retimerWriteProtectedSensor);
+    auto writeProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
+        fpga.deviceSensors[sensors++]);
+    EXPECT_NE(nullptr, writeProtectedSensor);
+    EXPECT_TRUE(writeProtectedSensor->sensors.empty());
 
     values.push(objPath, get(retimer, "Name"));
     values.push(objPath, get(retimerVersion, "Type"));
@@ -187,12 +187,9 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, gpuSettings);
     EXPECT_EQ(get<uint64_t>(gpu, "DataIndex"), gpuSettings->dataIndex);
 
-    auto gpuWriteProtectedSensor =
-        dynamic_pointer_cast<NsmWriteProtectedControl>(
-            fpga.deviceSensors[sensors++]);
-    EXPECT_NE(nullptr, gpuWriteProtectedSensor);
+    EXPECT_EQ(1, writeProtectedSensor->sensors.size());
 
-    EXPECT_EQ(5, fpga.roundRobinSensors.size());
+    EXPECT_EQ(4, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(sensors, fpga.deviceSensors.size());
 }

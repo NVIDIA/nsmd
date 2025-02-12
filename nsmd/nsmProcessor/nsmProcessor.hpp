@@ -309,8 +309,8 @@ class NsmPciGroup2 : public NsmPcieGroup
 {
   public:
     NsmPciGroup2(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::shared_ptr<PCieEccIntf> pcieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pciePortIntf, uint8_t deviceId,
                  std::string& inventoryObjPath);
     NsmPciGroup2() = default;
 
@@ -321,7 +321,7 @@ class NsmPciGroup2 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_2& data);
-    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
+    std::shared_ptr<PCieEccIntf> pciePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
     std::string inventoryObjPath;
 };
@@ -330,8 +330,8 @@ class NsmPciGroup3 : public NsmPcieGroup
 {
   public:
     NsmPciGroup3(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::shared_ptr<PCieEccIntf> pcieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pciePortIntf, uint8_t deviceId,
                  std::string& inventoryObjPath);
     NsmPciGroup3() = default;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -341,7 +341,7 @@ class NsmPciGroup3 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_3& data);
-    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
+    std::shared_ptr<PCieEccIntf> pciePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
     std::string inventoryObjPath;
 };
@@ -350,8 +350,8 @@ class NsmPciGroup4 : public NsmPcieGroup
 {
   public:
     NsmPciGroup4(const std::string& name, const std::string& type,
-                 std::shared_ptr<PCieEccIntf> pCieECCIntf,
-                 std::shared_ptr<PCieEccIntf> pCiePortIntf, uint8_t deviceId,
+                 std::shared_ptr<PCieEccIntf> pcieECCIntf,
+                 std::shared_ptr<PCieEccIntf> pciePortIntf, uint8_t deviceId,
                  std::string& inventoryObjPath);
 
     NsmPciGroup4() = default;
@@ -362,7 +362,7 @@ class NsmPciGroup4 : public NsmPcieGroup
   private:
     void updateReading(
         const struct nsm_query_scalar_group_telemetry_group_4& data);
-    std::shared_ptr<PCieEccIntf> pCiePortIntf = nullptr;
+    std::shared_ptr<PCieEccIntf> pciePortIntf = nullptr;
     std::shared_ptr<PCieEccIntf> pCieEccIntf = nullptr;
     std::string inventoryObjPath;
 };

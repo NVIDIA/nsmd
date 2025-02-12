@@ -219,7 +219,7 @@ class NsmMemCapacity : public NsmMemoryCapacity
     NsmMemCapacity() = default;
 
   private:
-    void updateReading(uint32_t* maximumMemoryCapacity);
+    void updateReading(std::optional<uint32_t> maximumMemoryCapacity);
     std::shared_ptr<DimmIntf> dimmIntf;
 };
 

@@ -83,15 +83,17 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     };
 
 #define pcieFunction(X)                                                        \
-    pdi().function##X##VendorId(hexFormat(data.pci_vendor_id));                \
-    pdi().function##X##DeviceId(hexFormat(data.pci_device_id));                \
-    pdi().function##X##ClassCode("0x000000");                                  \
-    pdi().function##X##RevisionId("0x00");                                     \
-    pdi().function##X##FunctionType("Physical");                               \
-    pdi().function##X##DeviceClass("ProcessingAccelerators");                  \
-    pdi().function##X##SubsystemVendorId(                                      \
-        hexFormat(data.pci_subsystem_vendor_id));                              \
-    pdi().function##X##SubsystemId(hexFormat(data.pci_subsystem_device_id));
+    invoke([hexFormat, data](auto& pdi) {                                      \
+        pdi.function##X##VendorId(hexFormat(data.pci_vendor_id));              \
+        pdi.function##X##DeviceId(hexFormat(data.pci_device_id));              \
+        pdi.function##X##ClassCode("0x000000");                                \
+        pdi.function##X##RevisionId("0x00");                                   \
+        pdi.function##X##FunctionType("Physical");                             \
+        pdi.function##X##DeviceClass("ProcessingAccelerators");                \
+        pdi.function##X##SubsystemVendorId(                                    \
+            hexFormat(data.pci_subsystem_vendor_id));                          \
+        pdi.function##X##SubsystemId(hexFormat(data.pci_subsystem_device_id)); \
+    });
 
     switch (functionId)
     {

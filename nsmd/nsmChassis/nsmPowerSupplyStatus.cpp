@@ -26,7 +26,7 @@ namespace nsm
 NsmPowerSupplyStatus::NsmPowerSupplyStatus(
     const NsmInterfaceProvider<PowerStateIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmSensor(provider),
+    NsmGroupSensor(provider),
     NsmInterfaceContainer(provider), gpuInstanceId(gpuInstanceId)
 {}
 
@@ -49,9 +49,8 @@ std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,
     return request;
 }
 
-uint8_t
-    NsmPowerSupplyStatus::handleResponseMsg(const struct nsm_msg* responseMsg,
-                                            size_t responseLen)
+uint8_t NsmPowerSupplyStatus::handleResponse(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
@@ -69,20 +68,16 @@ uint8_t
 
     if (cc == NSM_SUCCESS)
     {
-        for (auto& [_, pdi] : interfaces)
-        {
-            pdi->currentPowerState(((status >> gpuInstanceId) & 0x01) != 0
-                                       ? PowerStateIntf::PowerState::On
-                                       : PowerStateIntf::PowerState::Off);
-        }
+        invoke(pdiMethod(currentPowerState),
+               ((status >> gpuInstanceId) & 0x01) != 0
+                   ? PowerStateIntf::PowerState::On
+                   : PowerStateIntf::PowerState::Off);
         clearErrorBitMap("decode_get_power_supply_status_resp");
     }
     else
     {
-        for (auto& [_, pdi] : interfaces)
-        {
-            pdi->currentPowerState(PowerStateIntf::PowerState::Unknown);
-        }
+        invoke(pdiMethod(currentPowerState),
+               PowerStateIntf::PowerState::Unknown);
         logHandleResponseMsg("decode_get_power_supply_status_resp", reasonCode,
                              cc, rc);
         return rc;

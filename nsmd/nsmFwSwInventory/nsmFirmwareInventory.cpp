@@ -53,8 +53,8 @@ requester::Coroutine
         {
             auto associationsObject = std::make_shared<
                 NsmFirmwareInventory<AssociationDefinitionsIntf>>(name);
-            associationsObject->pdi().associations(
-                utils::getAssociations(associations));
+            associationsObject->invoke(pdiMethod(associations),
+                                       utils::getAssociations(associations));
             device->addStaticSensor(associationsObject);
         }
 
@@ -128,7 +128,7 @@ requester::Coroutine
         auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Manufacturer", interface.c_str());
         auto asset = std::make_shared<NsmFirmwareInventory<NsmAssetIntf>>(name);
-        asset->pdi().manufacturer(manufacturer);
+        asset->invoke(pdiMethod(manufacturer), manufacturer);
         device->addStaticSensor(asset);
     }
     else if (type == "NSM_FirmwareVersion")
@@ -136,8 +136,8 @@ requester::Coroutine
         auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "InstanceNumber", interface.c_str());
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
-        firmwareInventoryVersion.pdi().purpose(
-            VersionIntf::VersionPurpose::Other);
+        firmwareInventoryVersion.invoke(pdiMethod(purpose),
+                                        VersionIntf::VersionPurpose::Other);
         auto version = std::make_shared<NsmInventoryProperty<VersionIntf>>(
             firmwareInventoryVersion,
             nsm_inventory_property_identifiers(PCIERETIMER_0_EEPROM_VERSION +

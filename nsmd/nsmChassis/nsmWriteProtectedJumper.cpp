@@ -61,8 +61,8 @@ uint8_t NsmWriteProtectedJumper::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        pdi().writeProtected(data.presence);
-        pdi().writeProtectedControl(data.presence);
+        invoke(pdiMethod(writeProtected), uint8_t(data.presence));
+        invoke(pdiMethod(writeProtectedControl), uint8_t(data.presence));
         clearErrorBitMap("encode_get_fpga_diagnostics_settings_wp_jumper_resp");
     }
     else
