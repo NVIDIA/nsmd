@@ -243,22 +243,22 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     EXPECT_NE(nullptr, pcieErrorsGroup3);
     EXPECT_NE(nullptr, pcieErrorsGroup4);
 
-    EXPECT_EQ(1, associationsObject->invoke(pdiMethod(associations)).size());
-    EXPECT_EQ(get<std::string>(basic, "Health"),
-              HealthIntf::convertHealthTypeToString(
-                  healthObject->invoke(pdiMethod(health))));
-    EXPECT_EQ(get<std::string>(basic, "PortType"),
-              PortInfoIntf::convertPortTypeToString(
-                  pcieLinkSpeed->invoke(pdiMethod(type))));
+    EXPECT_EQ(1, associationsObject->pdi().associations().size());
+    EXPECT_EQ(
+        get<std::string>(basic, "Health"),
+        HealthIntf::convertHealthTypeToString(healthObject->pdi().health()));
+    EXPECT_EQ(
+        get<std::string>(basic, "PortType"),
+        PortInfoIntf::convertPortTypeToString(pcieLinkSpeed->pdi().type()));
     EXPECT_EQ(get<std::string>(basic, "PortProtocol"),
               PortInfoIntf::convertPortProtocolToString(
-                  pcieLinkSpeed->invoke(pdiMethod(protocol))));
+                  pcieLinkSpeed->pdi().protocol()));
     EXPECT_EQ(get<std::string>(basic, "LinkState"),
               PortStateIntf::convertLinkStatesToString(
-                  portStateObject->invoke(pdiMethod(linkState))));
+                  portStateObject->pdi().linkState()));
     EXPECT_EQ(get<std::string>(basic, "LinkStatus"),
               PortStateIntf::convertLinkStatusTypeToString(
-                  portStateObject->invoke(pdiMethod(linkStatus))));
+                  portStateObject->pdi().linkStatus()));
     EXPECT_EQ(GROUP_ID_2, pcieErrorsGroup2->groupId);
     EXPECT_EQ(GROUP_ID_3, pcieErrorsGroup3->groupId);
     EXPECT_EQ(GROUP_ID_4, pcieErrorsGroup4->groupId);

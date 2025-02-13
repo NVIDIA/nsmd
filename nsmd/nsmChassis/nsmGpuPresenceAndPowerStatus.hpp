@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "nsmGroupSensor.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
@@ -30,7 +29,7 @@ using OperationalStatusIntf =
     object_t<State::Decorator::server::OperationalStatus>;
 
 class NsmGpuPresenceAndPowerStatus :
-    public NsmGroupSensor,
+    public NsmSensor,
     public NsmInterfaceContainer<OperationalStatusIntf>
 {
   public:
@@ -41,8 +40,8 @@ class NsmGpuPresenceAndPowerStatus :
 
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;
-    uint8_t handleResponse(const struct nsm_msg* responseMsg,
-                           size_t responseLen) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 

@@ -30,7 +30,7 @@ namespace nsm
 NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
     const NsmInterfaceProvider<OperationalStatusIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmGroupSensor(provider),
+    NsmSensor(provider),
     NsmInterfaceContainer(provider), gpuInstanceId(gpuInstanceId),
     gpusPresence{}, gpusPower{}, state{}
 {
@@ -57,27 +57,33 @@ requester::Coroutine
         bool power = ((gpusPower >> (gpuInstanceId)) & 0x1) != 0;
         bool presence = ((gpusPresence >> (gpuInstanceId)) & 0x1) != 0;
 
-        if (power && presence)
+        for (auto& [_, pdi] : interfaces)
         {
-            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Enabled);
-            invoke(pdiMethod(functional), true);
-        }
-        else if (presence)
-        {
-            invoke(pdiMethod(state),
-                   OperationalStatusIntf::StateType::UnavailableOffline);
-            invoke(pdiMethod(functional), false);
-        }
-        else
-        {
-            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Absent);
-            invoke(pdiMethod(functional), false);
+            if (power && presence)
+            {
+                pdi->state(OperationalStatusIntf::StateType::Enabled);
+                pdi->functional(true);
+            }
+            else if (presence)
+            {
+                pdi->state(
+                    OperationalStatusIntf::StateType::UnavailableOffline);
+                pdi->functional(false);
+            }
+            else
+            {
+                pdi->state(OperationalStatusIntf::StateType::Absent);
+                pdi->functional(false);
+            }
         }
     }
     else
     {
-        invoke(pdiMethod(state), OperationalStatusIntf::StateType::Fault);
-        invoke(pdiMethod(functional), false);
+        for (auto& [_, pdi] : interfaces)
+        {
+            pdi->state(OperationalStatusIntf::StateType::Fault);
+            pdi->functional(false);
+        }
     }
     updateMetricOnSharedMemory();
 
@@ -88,12 +94,13 @@ requester::Coroutine
 void NsmGpuPresenceAndPowerStatus::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    invoke([](const auto& path, auto& pdi) {
-        std::vector<uint8_t> data;
+    std::vector<uint8_t> data;
+    for (auto& [path, pdi] : interfaces)
+    {
         nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            path, pdi.interface, "State", data,
-            OperationalStatusIntf::convertStateTypeToString(pdi.state()));
-    });
+            path, pdi->interface, "State", data,
+            OperationalStatusIntf::convertStateTypeToString(pdi->state()));
+    }
 #endif
 }
 
@@ -132,7 +139,7 @@ std::optional<Request>
     return request;
 }
 
-uint8_t NsmGpuPresenceAndPowerStatus::handleResponse(
+uint8_t NsmGpuPresenceAndPowerStatus::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
     uint8_t rc = NSM_SW_ERROR;

@@ -701,10 +701,9 @@ NsmMemCapacity::NsmMemCapacity(const std::string& name, const std::string& type,
     lg2::info("NsmMemCapacity: create sensor:{NAME}", "NAME", name.c_str());
 }
 
-void NsmMemCapacity::updateReading(
-    std::optional<uint32_t> maximumMemoryCapacity)
+void NsmMemCapacity::updateReading(uint32_t* maximumMemoryCapacity)
 {
-    if (!maximumMemoryCapacity)
+    if (maximumMemoryCapacity == NULL)
     {
         lg2::debug(
             "NsmMemCapacity::updateReading unable to fetch Maximum Memory Capacity");
@@ -713,10 +712,11 @@ void NsmMemCapacity::updateReading(
     dimmIntf->memorySizeInKB(*maximumMemoryCapacity * 1024);
 }
 
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath)
+static requester::Coroutine createNsmMemorySensor(SensorManager& manager,
+                                                  const std::string& interface,
+                                                  const std::string& objPath)
 {
+    try
     {
         auto& bus = utils::DBusHandler::getBus();
         auto name = co_await utils::coGetDbusProperty<std::string>(
@@ -847,12 +847,22 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 
             auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
                                                                       type);
-            auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-                name, type, dbus::Interfaces{inventoryObjPath});
             auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-                provider, totalMemorySensor, isLongRunning, nsmDevice);
+                bus, name, type, inventoryObjPath, totalMemorySensor,
+                isLongRunning, nsmDevice);
+
             nsmDevice->addSensor(sensor, priority, isLongRunning);
+            nsmDevice->addSensor(totalMemorySensor, priority);
         }
+    }
+
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "Error while addSensor for path {PATH} and interface {INTF}, {ERROR}",
+            "PATH", objPath, "INTF", interface, "ERROR", e);
+        // coverity[missing_return]
+        co_return NSM_ERROR;
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

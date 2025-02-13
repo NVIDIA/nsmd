@@ -129,8 +129,16 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
     return supported;
 }
 
-void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
-                              bool priority, bool isLongRunning)
+NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
+{
+    sensor->isStatic = true;
+    deviceSensors.emplace_back(sensor);
+    roundRobinSensors.emplace_back(sensor);
+    return *sensor;
+}
+
+void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
+                          bool priority, bool isLongRunning)
 {
     std::string deviceInstanceName =
         utils::getDeviceInstanceName(getDeviceType(), getInstanceNumber());

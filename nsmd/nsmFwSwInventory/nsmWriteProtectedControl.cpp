@@ -27,7 +27,7 @@ namespace nsm
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
     const diagnostics_enable_disable_wp_data_index dataIndex) :
-    NsmGroupSensor(provider),
+    NsmSensor(provider),
     NsmInterfaceContainer(provider), dataIndex(dataIndex)
 {}
 
@@ -50,9 +50,8 @@ std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,
     return request;
 }
 
-uint8_t
-    NsmWriteProtectedControl::handleResponse(const struct nsm_msg* responseMsg,
-                                             size_t responseLen)
+uint8_t NsmWriteProtectedControl::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
@@ -63,8 +62,8 @@ uint8_t
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        invoke(pdiMethod(writeProtected),
-               NsmSetWriteProtected::getValue(data, dataIndex));
+        // Updates WriteProtected in FirmwareInventory
+        pdi().writeProtected(NsmSetWriteProtected::getValue(data, dataIndex));
         clearErrorBitMap("decode_get_fpga_diagnostics_settings_wp_resp");
     }
     else

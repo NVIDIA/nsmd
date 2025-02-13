@@ -82,17 +82,15 @@ template <>
 inline void NsmClockOutputEnableState<NVLinkRefClockIntf>::handleResponse(
     const uint32_t& data)
 {
-    invoke(pdiMethod(nvLinkReferenceClockEnabled),
-           getNVHSClockBufferData(
-               reinterpret_cast<const nsm_nvhs_clock_buffer_data&>(data)));
+    pdi().nvLinkReferenceClockEnabled(getNVHSClockBufferData(
+        reinterpret_cast<const nsm_nvhs_clock_buffer_data&>(data)));
 }
 
 template <>
 inline void NsmClockOutputEnableState<PCIeRefClockIntf>::handleResponse(
     const uint32_t& data)
 {
-    invoke(pdiMethod(pcIeReferenceClockEnabled),
-           getPCIeClockBufferData(
-               reinterpret_cast<const nsm_pcie_clock_buffer_data&>(data)));
+    pdi().pcIeReferenceClockEnabled(getPCIeClockBufferData(
+        reinterpret_cast<const nsm_pcie_clock_buffer_data&>(data)));
 }
 } // namespace nsm

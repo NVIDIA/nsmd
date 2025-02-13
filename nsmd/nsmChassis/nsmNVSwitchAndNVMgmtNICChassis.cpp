@@ -40,7 +40,7 @@ requester::Coroutine
             auto nsmDevice = manager.getNsmDevice(*uuid);
             if (nsmDevice)
             {
-                this->invoke(pdiMethod(uuid), nsmDevice->deviceUuid);
+                this->pdi().uuid(nsmDevice->deviceUuid);
             }
             nsmDeviceAssociationIntf =
                 manager.getObjServer().add_unique_interface(
@@ -81,7 +81,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             objPath.c_str(), "UUID", interface.c_str());
 
         // initial value update
-        chassisUuid->invoke(pdiMethod(uuid), uuid);
+        chassisUuid->pdi().uuid(uuid);
 
         // add sensor
         device->addStaticSensor(chassisUuid);
@@ -97,8 +97,8 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             objPath.c_str(), "ChassisType", interface.c_str());
 
         // initial value update
-        chassis->invoke(pdiMethod(type),
-                        ChassisIntf::convertChassisTypeFromString(chassisType));
+        chassis->pdi().type(
+            ChassisIntf::convertChassisTypeFromString(chassisType));
 
         device->addStaticSensor(chassis);
     }
@@ -114,7 +114,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             objPath.c_str(), "Manufacturer", interface.c_str());
 
         // initial value update
-        chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
+        chassisAsset.pdi().manufacturer(manufacturer);
 
         // create sensor
         auto partNumberSensor =
@@ -141,8 +141,8 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             objPath.c_str(), "Health", interface.c_str());
 
         // initial value update
-        chassisHealth->invoke(pdiMethod(health),
-                              HealthIntf::convertHealthTypeFromString(health));
+        chassisHealth->pdi().health(
+            HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(chassisHealth);
     }
     else if (type == "NSM_Location")
@@ -158,8 +158,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             objPath.c_str(), "LocationType", interface.c_str());
 
         // initial value update
-        chassisLocation->invoke(
-            pdiMethod(locationType),
+        chassisLocation->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(chassisLocation);
     }
@@ -170,7 +169,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
         auto chassisPrettyName =
             std::make_shared<NsmNVSwitchAndNicChassis<ItemIntf>>(name,
                                                                  baseType);
-        chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
+        chassisPrettyName->pdi().prettyName(prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
     // coverity[missing_return]
