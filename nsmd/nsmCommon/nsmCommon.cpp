@@ -68,8 +68,8 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        uint32_t* maximumMemoryCapacityMiB =
-            reinterpret_cast<uint32_t*>(data.data());
+        uint32_t maximumMemoryCapacityMiB =
+            *reinterpret_cast<uint32_t*>(data.data());
         updateReading(maximumMemoryCapacityMiB);
         clearErrorBitMap(
             "decode_get_inventory_information_resp for Maximum Memory Capacity");
@@ -79,7 +79,7 @@ uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
         logHandleResponseMsg(
             "decode_get_inventory_information_resp for Maximum Memory Capacity",
             reason_code, cc, rc);
-        updateReading(NULL);
+        updateReading(std::nullopt);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
@@ -93,77 +93,59 @@ NsmTotalMemory::NsmTotalMemory(const std::string& name,
     lg2::info("NsmTotalMemory : create sensor:{NAME}", "NAME", name.c_str());
 }
 
-void NsmTotalMemory::updateReading(uint32_t* maximumMemoryCapacity)
+void NsmTotalMemory::updateReading(
+    std::optional<uint32_t> maximumMemoryCapacity)
 {
-    if (maximumMemoryCapacity)
-    {
-        totalMemoryCapacity = new uint32_t(*maximumMemoryCapacity);
-    }
-    else
-    {
-        totalMemoryCapacity = nullptr;
-    }
+    totalMemoryCapacity = maximumMemoryCapacity;
 }
 
-const uint32_t* NsmTotalMemory::getReading()
+const std::optional<uint32_t> NsmTotalMemory::getReading()
 {
     return totalMemoryCapacity;
 }
 
 NsmMemoryCapacityUtil::NsmMemoryCapacityUtil(
-    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
-    std::string& inventoryObjPath, std::shared_ptr<NsmTotalMemory> totalMemory,
-    bool isLongRunning, std::shared_ptr<NsmDevice> device) :
-    NsmLongRunningSensor(name, type, isLongRunning, device,
-                         NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+    const NsmInterfaceProvider<DimmMemoryMetricsIntf>& provider,
+    std::shared_ptr<NsmTotalMemory> totalMemory, bool isLongRunning,
+    std::shared_ptr<NsmDevice> device) :
+    NsmLongRunningSensor(provider.getName(), provider.getType(), isLongRunning,
+                         device, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                          NSM_GET_MEMORY_CAPACITY_UTILIZATION),
-    totalMemory(totalMemory), inventoryObjPath(inventoryObjPath)
+    NsmInterfaceContainer(provider), totalMemory(totalMemory)
 {
     lg2::info("NsmMemoryCapacityUtil: create sensor:{NAME}", "NAME",
-              name.c_str());
-    dimmMemoryMetricsIntf =
-        std::make_unique<DimmMemoryMetricsIntf>(bus, inventoryObjPath.c_str());
+              NsmSensor::getName().c_str());
     updateMetricOnSharedMemory();
 }
 
 void NsmMemoryCapacityUtil::updateMetricOnSharedMemory()
 {
 #ifdef NVIDIA_SHMEM
-    auto ifaceName = std::string(dimmMemoryMetricsIntf->interface);
-    std::vector<uint8_t> smbusData = {};
-
-    std::string propName = "CapacityUtilizationPercent";
-    nv::sensor_aggregation::DbusVariantType capacityUtilizationPercent{
-        static_cast<uint16_t>(
-            dimmMemoryMetricsIntf->capacityUtilizationPercent())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 capacityUtilizationPercent);
-
+    invoke([](const auto& path, auto& pdi) {
+        std::vector<uint8_t> smbusData = {};
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            path, pdi.interface, "CapacityUtilizationPercent", smbusData,
+            static_cast<uint16_t>(pdi.capacityUtilizationPercent()));
+    });
 #endif
 }
 
 void NsmMemoryCapacityUtil::updateReading(
     const struct nsm_memory_capacity_utilization& data)
 {
-    const uint32_t* totalMemoryCapacity = totalMemory->getReading();
-    if (totalMemoryCapacity == NULL)
+    const auto totalMemoryCapacity = totalMemory->getReading();
+    if (!totalMemoryCapacity)
     {
-        lg2::error(
-            "NsmMemoryCapacityUtil::updateReading unable to fetch total Memory Capacity data");
         return;
     }
     else if ((*totalMemoryCapacity) == 0)
     {
-        lg2::error(
-            "NsmMemoryCapacityUtil::updateReading total Memory Capacity value is {A}",
-            "A", (*totalMemoryCapacity));
         return;
     }
 
     uint8_t usedMemoryPercent = (data.used_memory + data.reserved_memory) *
                                 100 / (*totalMemoryCapacity);
-    dimmMemoryMetricsIntf->capacityUtilizationPercent(usedMemoryPercent);
+    invoke(pdiMethod(capacityUtilizationPercent), usedMemoryPercent);
     updateMetricOnSharedMemory();
 }
 
@@ -215,6 +197,24 @@ uint8_t
     }
 
     return cc;
+}
+requester::Coroutine NsmMemoryCapacityUtil::update(SensorManager& manager,
+                                                   eid_t eid)
+{
+    auto rc = co_await totalMemory->update(manager, eid);
+    rc = co_await NsmLongRunningSensor::update(manager, eid);
+    // coverity[missing_return]
+    co_return rc;
+}
+
+bool NsmMemoryCapacityUtil::equals(const NsmSensor& other) const
+{
+    auto otherAsMemoryCapacityUtil =
+        dynamic_cast<const NsmMemoryCapacityUtil*>(&other);
+
+    return otherAsMemoryCapacityUtil &&
+           totalMemory->equals(*otherAsMemoryCapacityUtil->totalMemory) &&
+           NsmSensor::equals(other);
 }
 
 NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(

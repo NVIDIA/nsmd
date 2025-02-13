@@ -60,8 +60,9 @@ uint8_t NsmErrorInjection::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        pdi().errorInjectionModeEnabled(data.mode);
-        pdi().persistentDataModified(data.flags.bits.bit0);
+        invoke(pdiMethod(errorInjectionModeEnabled), data.mode);
+        invoke(pdiMethod(persistentDataModified),
+               uint8_t(data.flags.bits.bit0));
         clearErrorBitMap("decode_get_error_injection_mode_v1_resp");
     }
     else
@@ -78,14 +79,13 @@ NsmErrorInjectionSupported::NsmErrorInjectionSupported(
     NsmSensor(provider),
     NsmInterfaceContainer<ErrorInjectionCapabilityIntf>(provider)
 {
-    for (auto& [_, pdi] : interfaces)
-    {
-        if (pdi->type() == ErrorInjectionCapabilityIntf::Type::Unknown)
+    invoke([](const auto& pdi) {
+        if (pdi.type() == ErrorInjectionCapabilityIntf::Type::Unknown)
         {
             throw std::invalid_argument(
                 "NsmErrorInjectionSupported::ctor: PDI type cannot be Unknown");
         }
-    }
+    });
 }
 
 std::optional<Request>
@@ -118,11 +118,10 @@ uint8_t NsmErrorInjectionSupported::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        for (auto& [_, pdi] : interfaces)
-        {
-            auto type = pdi->type();
-            pdi->supported(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
-        }
+        invoke([data](auto& pdi) {
+            auto type = pdi.type();
+            pdi.supported(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
+        });
         clearErrorBitMap("decode_get_error_injection_types_v1_resp");
     }
     else
@@ -164,11 +163,10 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        for (auto& [_, pdi] : interfaces)
-        {
-            auto type = pdi->type();
-            pdi->enabled(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
-        }
+        invoke([data](auto& pdi) {
+            auto type = pdi.type();
+            pdi.enabled(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
+        });
         clearErrorBitMap("decode_get_error_injection_types_v1_resp");
     }
     else

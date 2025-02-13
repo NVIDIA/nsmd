@@ -95,12 +95,12 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, sensor);
     EXPECT_EQ(PCIeSlotIntf::convertSlotTypesFromString(
                   get<std::string>(basic, "SlotType")),
-              sensor->pdi().slotType());
+              sensor->invoke(pdiMethod(slotType)));
     auto associations =
         dynamic_pointer_cast<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
             baseboard.deviceSensors[sensors++]);
     EXPECT_NE(nullptr, associations);
-    EXPECT_EQ(0, associations->pdi().associations().size());
+    EXPECT_EQ(0, associations->invoke(pdiMethod(associations)).size());
 }
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {

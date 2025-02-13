@@ -75,7 +75,7 @@ class NsmInventoryProperty :
     {
         if constexpr (std::is_same_v<IntfType, NsmAssetIntf>)
         {
-            this->pdi().buildDate(nullDate);
+            this->invoke(pdiMethod(buildDate), nullDate);
         }
     }
 };
@@ -87,24 +87,28 @@ inline void
     switch (property)
     {
         case BOARD_PART_NUMBER:
-            pdi().partNumber(std::string((char*)data.data(), data.size()));
+            invoke(pdiMethod(partNumber),
+                   std::string((char*)data.data(), data.size()));
             break;
         case SERIAL_NUMBER:
-            pdi().serialNumber(std::string((char*)data.data(), data.size()));
+            invoke(pdiMethod(serialNumber),
+                   std::string((char*)data.data(), data.size()));
             break;
         case MARKETING_NAME:
-            pdi().model(std::string((char*)data.data(), data.size()));
+            invoke(pdiMethod(model),
+                   std::string((char*)data.data(), data.size()));
             break;
         case DEVICE_PART_NUMBER:
-            pdi().partNumber(std::string((char*)data.data(), data.size()));
+            invoke(pdiMethod(partNumber),
+                   std::string((char*)data.data(), data.size()));
             break;
         case BUILD_DATE:
         {
             std::string dateValue((char*)data.data(), data.size());
             if (dateValue == "0")
-                pdi().buildDate(nullDate);
+                invoke(pdiMethod(buildDate), nullDate);
             else
-                pdi().buildDate(dateValue);
+                invoke(pdiMethod(buildDate), dateValue);
             break;
         }
         default:
@@ -120,16 +124,16 @@ inline void
     switch (property)
     {
         case PRODUCT_LENGTH:
-            pdi().depth(decode_inventory_information_as_uint32(data.data(),
-                                                               data.size()));
+            invoke(pdiMethod(depth), decode_inventory_information_as_uint32(
+                                         data.data(), data.size()));
             break;
         case PRODUCT_HEIGHT:
-            pdi().height(decode_inventory_information_as_uint32(data.data(),
-                                                                data.size()));
+            invoke(pdiMethod(height), decode_inventory_information_as_uint32(
+                                          data.data(), data.size()));
             break;
         case PRODUCT_WIDTH:
-            pdi().width(decode_inventory_information_as_uint32(data.data(),
-                                                               data.size()));
+            invoke(pdiMethod(width), decode_inventory_information_as_uint32(
+                                         data.data(), data.size()));
             break;
         default:
             throw std::runtime_error("Not implemented PDI");
@@ -144,14 +148,16 @@ inline void
     switch (property)
     {
         case MINIMUM_DEVICE_POWER_LIMIT:
-            pdi().minPowerWatts(decode_inventory_information_as_uint32(
-                                    data.data(), data.size()) /
-                                1000);
+            invoke(pdiMethod(minPowerWatts),
+                   decode_inventory_information_as_uint32(data.data(),
+                                                          data.size()) /
+                       1000);
             break;
         case MAXIMUM_DEVICE_POWER_LIMIT:
-            pdi().maxPowerWatts(decode_inventory_information_as_uint32(
-                                    data.data(), data.size()) /
-                                1000);
+            invoke(pdiMethod(maxPowerWatts),
+                   decode_inventory_information_as_uint32(data.data(),
+                                                          data.size()) /
+                       1000);
             break;
         default:
             throw std::runtime_error("Not implemented PDI");
@@ -178,7 +184,7 @@ inline void
             iss << int(data[0]) << '.' << int(data[2]);
             iss << '.';
             iss << int(((data[4] << 8) | data[6]));
-            pdi().version(iss.str());
+            invoke(pdiMethod(version), iss.str());
         }
         break;
         default:
@@ -194,10 +200,9 @@ inline void
     switch (property)
     {
         case INFO_ROM_VERSION:
-        {
-            pdi().version(std::string((char*)data.data(), data.size()));
-        }
-        break;
+            invoke(pdiMethod(version),
+                   std::string((char*)data.data(), data.size()));
+            break;
         default:
             throw std::runtime_error("Not implemented PDI");
             break;
@@ -211,7 +216,8 @@ inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
     switch (property)
     {
         case GPU_IBGUID:
-            pdi().ibguid(utils::convertHexToString(data, data.size()));
+            invoke(pdiMethod(ibguid),
+                   utils::convertHexToString(data, data.size()));
             break;
         case CHASSIS_SERIAL_NUMBER:
         {
@@ -226,23 +232,25 @@ inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
                 chassisSerialNumber = utils::convertHexToString(data,
                                                                 data.size());
             }
-            pdi().chassisSerialNumber(chassisSerialNumber);
+            invoke(pdiMethod(chassisSerialNumber), chassisSerialNumber);
             break;
         }
         case TRAY_SLOT_NUMBER:
-            pdi().traySlotNumber(decode_inventory_information_as_uint32(
-                data.data(), data.size()));
+            invoke(pdiMethod(traySlotNumber),
+                   decode_inventory_information_as_uint32(data.data(),
+                                                          data.size()));
             break;
         case TRAY_SLOT_INDEX:
-            pdi().traySlotIndex(decode_inventory_information_as_uint32(
-                data.data(), data.size()));
+            invoke(pdiMethod(traySlotIndex),
+                   decode_inventory_information_as_uint32(data.data(),
+                                                          data.size()));
             break;
         case GPU_HOST_ID:
         {
             auto hostID = decode_inventory_information_as_uint32(data.data(),
                                                                  data.size());
             // 1-based
-            pdi().hostID(hostID + 1);
+            invoke(pdiMethod(hostID), hostID + 1);
             break;
         }
         case GPU_MODULE_ID:
@@ -250,7 +258,7 @@ inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
             auto moduleID = decode_inventory_information_as_uint32(data.data(),
                                                                    data.size());
             // 1-based
-            pdi().moduleID(moduleID + 1);
+            invoke(pdiMethod(moduleID), moduleID + 1);
             break;
         }
         case GPU_NVLINK_PEER_TYPE:
@@ -266,7 +274,7 @@ inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
             {
                 peerTypeStr = std::string("Bridge");
             }
-            pdi().peerType(peerTypeStr);
+            invoke(pdiMethod(peerType), peerTypeStr);
             break;
         }
         default:

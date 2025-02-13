@@ -144,13 +144,15 @@ requester::Coroutine
     auto eid = manager.getEid(device);
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     nsm_error_injection_types_mask data = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (const auto& [_, pdi] : interfaces)
-    {
-        auto type = int(pdi->type());
-        data.mask[type / 8] |=
-            (int(pdi->type() == this->type ? value : pdi->enabled())
-             << (type % 8));
-    }
+    invoke([&data, this, value](const auto& pdi) {
+        // Update the error injection mask based on the PDI type.
+        // If the PDI type matches the current type, use the provided value.
+        // Otherwise, retain the current enabled state to ensure only the mask
+        // for the current type is updated, preserving the state of other types.
+        auto type = int(pdi.type());
+        auto setValue = int(pdi.type() == this->type ? value : pdi.enabled());
+        data.mask[type / 8] |= setValue << (type % 8);
+    });
     auto rc = encode_set_current_error_injection_types_v1_req(0, &data,
                                                               requestPtr);
 

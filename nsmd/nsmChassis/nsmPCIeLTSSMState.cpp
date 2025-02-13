@@ -87,12 +87,12 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
         LTSSMStateIntf::State state =
             data.ltssm_state == 0xFF ? LTSSMStateIntf::State::IllegalState
                                      : LTSSMStateIntf::State(data.ltssm_state);
-        pdi().ltssmState(state);
+        invoke(pdiMethod(ltssmState), state);
         clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group6_resp");
     }
     else
     {
-        pdi().ltssmState(LTSSMStateIntf::State::NA);
+        invoke(pdiMethod(ltssmState), LTSSMStateIntf::State::NA);
         logHandleResponseMsg(
             "decode_query_scalar_group_telemetry_v1_group6_resp", reasonCode,
             cc, rc);
