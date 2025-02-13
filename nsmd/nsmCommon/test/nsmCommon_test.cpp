@@ -27,10 +27,9 @@ TEST(nsmMemCapacityUtil, GoodGenReq)
     std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
-
-    auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-        sensorName, sensorType, dbus::Interfaces{inventoryObjPath});
-    NsmMemoryCapacityUtil sensor(provider, totalMemorySensor, false, gpuPtr);
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath, totalMemorySensor,
+                                      false, gpuPtr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -50,10 +49,9 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
     std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
-
-    auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-        sensorName, sensorType, dbus::Interfaces{inventoryObjPath});
-    NsmMemoryCapacityUtil sensor(provider, totalMemorySensor, false, gpuPtr);
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath, totalMemorySensor,
+                                      false, gpuPtr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),
         0);
@@ -78,10 +76,9 @@ TEST(nsmMemCapacityUtil, BadHandleResp)
     std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
-
-    auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-        sensorName, sensorType, dbus::Interfaces{inventoryObjPath});
-    NsmMemoryCapacityUtil sensor(provider, totalMemorySensor, false, gpuPtr);
+    nsm::NsmMemoryCapacityUtil sensor(bus, sensorName, sensorType,
+                                      inventoryObjPath, totalMemorySensor,
+                                      false, gpuPtr);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_memory_capacity_util_resp),

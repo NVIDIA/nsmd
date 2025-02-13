@@ -85,7 +85,7 @@ class NsmSwitchDIPowerMode : public NsmInterfaceProvider<L1PowerModeIntf>
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
-    nsm_power_mode_data getPowerModeData();
+    struct nsm_power_mode_data getPowerModeData();
 
     requester::Coroutine setL1PowerDevice(struct nsm_power_mode_data data,
                                           AsyncOperationStatusType* status,

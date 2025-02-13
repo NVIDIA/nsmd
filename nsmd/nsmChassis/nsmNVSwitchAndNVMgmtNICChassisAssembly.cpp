@@ -68,8 +68,7 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         auto assemblyArea =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<AreaIntf>>(
                 chassisName, name, baseType);
-        assemblyArea->invoke(
-            pdiMethod(physicalContext),
+        assemblyArea->pdi().physicalContext(
             AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
         device->addStaticSensor(assemblyArea);
     }
@@ -87,8 +86,8 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
             objPath.c_str(), "Vendor", interface.c_str());
 
         // initial value update
-        assetObject.invoke(pdiMethod(name), assemblyName);
-        assetObject.invoke(pdiMethod(manufacturer), vendor);
+        assetObject.pdi().name(assemblyName);
+        assetObject.pdi().manufacturer(vendor);
 
         // create sensor
         auto partNumberSensor =
@@ -118,8 +117,8 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         auto health = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Health", interface.c_str());
 
-        healthObject->invoke(pdiMethod(health),
-                             HealthIntf::convertHealthTypeFromString(health));
+        healthObject->pdi().health(
+            HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(healthObject);
     }
     else if (type == "NSM_Location")
@@ -134,8 +133,7 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         auto locationType = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "LocationType", interface.c_str());
 
-        locationObject->invoke(
-            pdiMethod(locationType),
+        locationObject->pdi().locationType(
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(locationObject);
     }

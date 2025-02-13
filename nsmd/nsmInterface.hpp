@@ -24,10 +24,7 @@
 #include <sdbusplus/bus.hpp>
 
 #include <filesystem>
-#include <functional>
 #include <stdexcept>
-#include <type_traits>
-#include <unordered_map>
 
 using std::filesystem::path;
 
@@ -43,13 +40,9 @@ using Interfaces = std::unordered_map<path, std::shared_ptr<IntfType>>;
  * @tparam IntfType type of the PDI (i.e. Asset, Dimension ect.)
  */
 template <typename IntfType>
-class NsmInterfaces
+struct NsmInterfaces
 {
-  private:
     Interfaces<IntfType> interfaces;
-
-  public:
-    using IntfType_t = IntfType;
     NsmInterfaces() = delete;
     NsmInterfaces(const Interfaces<IntfType>& interfaces) :
         interfaces(interfaces)
@@ -60,110 +53,26 @@ class NsmInterfaces
                 "NsmInterfaces::NsmInterfaces - interfaces cannot be empty");
         }
     }
-    NsmInterfaces(const NsmInterfaces<IntfType>&& other) :
-        interfaces(std::move(other.interfaces))
-    {}
-
     /**
-     * @brief Moves interfaces from other container to the current object
+     * @brief Returns first pdi path from interfaces collection
      *
-     * @param container Container with interfaces to move
-     * @return true if interfaces were moved, false otherwise
+     * @return First PDI path in interfaces collection
      */
-    bool moveInterfaces(NsmInterfaces<IntfType>& container)
+    std::string pdiPath() const
     {
-        auto interfacesMoved = false;
-        for (const auto& [path, intf] : container.interfaces)
-        {
-            // Add the interfaces to the existing sensor if path is not
-            // found to avoid duplicated interfaces
-            if (interfaces.find(path) == interfaces.end())
-            {
-                interfaces[path] = intf;
-                interfacesMoved = true;
-            }
-        }
-        container.interfaces.clear();
-        return interfacesMoved;
+        return interfaces.begin()->first.string();
     }
 
     /**
-     * @brief Returns interface name
+     * @brief Returns first pdi pointer from interfaces collection
      *
-     * @return std::string Interface name
+     * @return Reference to IntfType First PDI in interfaces collection
      */
-    static std::string interface()
+    IntfType& pdi()
     {
-        return IntfType::interface;
-    }
-
-    /**
-     * @brief Returns size of the interfaces collection
-     *
-     * @return size_t Size of the interfaces collection
-     */
-    size_t size()
-    {
-        return interfaces.size();
-    }
-
-    /**
-     * @brief Invokes a method on all interfaces and returns a value if
-     * requested (const version).
-     *
-     * @param func Method to invoke.
-     * @return The return value of the method.
-     */
-    template <typename Func,
-              typename T = typename std::invoke_result<Func, IntfType&>::type>
-    T invoke(Func&& func)
-        requires(!std::is_void_v<T>)
-    {
-        auto it = interfaces.begin();
-        T value = func(*it->second);
-
-        for (++it; it != interfaces.end(); ++it)
-        {
-            T otherValue = func(*it->second);
-            if (otherValue != value)
-            {
-                lg2::error("Different values returned in {TYPE}", "TYPE",
-                           utils::typeName<NsmInterfaces<IntfType>>());
-                throw std::runtime_error("Different values returned");
-            }
-        }
-        return value;
-    }
-
-    /**
-     * @brief Invokes a method on all interfaces.
-     *
-     * @param func Method to invoke.
-     * @param args Arguments to pass to the method.
-     */
-    template <typename Func, typename... Args>
-    void invoke(Func&& func, Args&&... args)
-    {
-        for (auto& [path, pdi] : interfaces)
-        {
-            if constexpr (std::is_invocable_v<Func, std::string, IntfType&,
-                                              Args...>)
-            {
-                func(path, *pdi, std::forward<Args>(args)...);
-            }
-            else
-            {
-                func(*pdi, std::forward<Args>(args)...);
-            }
-        }
+        return *interfaces.begin()->second;
     }
 };
-
-// Macro for invoking a method
-#define pdiMethod(method, ...)                                                 \
-    [](auto& pdi, auto&&... args) -> decltype(auto) {                          \
-        return (pdi.method)(std::forward<decltype(args)>(args)...);            \
-    }
 
 /**
  * @brief Class which is creating and providing PDI object
@@ -215,12 +124,12 @@ class NsmInterfaceProvider : public NsmObject, public NsmInterfaces<IntfType>
  *
  */
 template <typename IntfType>
-class NsmInterfaceContainer : public NsmInterfaces<IntfType>
+class NsmInterfaceContainer : protected NsmInterfaces<IntfType>
 {
   public:
     NsmInterfaceContainer() = delete;
     NsmInterfaceContainer(const NsmInterfaceProvider<IntfType>& provider) :
-        NsmInterfaces<IntfType>(std::move(provider))
+        NsmInterfaces<IntfType>(provider.interfaces)
     {}
     NsmInterfaceContainer(const Interfaces<IntfType>& interfaces) :
         NsmInterfaces<IntfType>(interfaces)

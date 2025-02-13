@@ -223,7 +223,8 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(gpuDeviceUuid,
               dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(uuid)));
+                  ->pdi()
+                  .uuid());
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
                            gpu.deviceSensors[sensors++]));
     EXPECT_NE(
@@ -244,15 +245,18 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(gpuDeviceUuid,
               dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(uuid)));
+                  ->pdi()
+                  .uuid());
     EXPECT_EQ(gpuUuid, dynamic_pointer_cast<NsmInterfaceProvider<MctpUuidIntf>>(
                            gpu.deviceSensors[sensors++])
-                           ->invoke(pdiMethod(uuid)));
+                           ->pdi()
+                           .uuid());
     EXPECT_EQ(
         1,
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
             gpu.deviceSensors[sensors++])
-            ->invoke(pdiMethod(associations))
+            ->pdi()
+            .associations()
             .size());
 
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
@@ -260,21 +264,24 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(ChassisIntf::ChassisType::Module,
               dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(type)));
+                  ->pdi()
+                  .type());
 
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
                            gpu.deviceSensors[sensors]));
     EXPECT_EQ(HealthIntf::HealthType::OK,
               dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(health)));
+                  ->pdi()
+                  .health());
 
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                            gpu.deviceSensors[sensors]));
     EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationType)));
+                  ->pdi()
+                  .locationType());
 
     EXPECT_NE(nullptr,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
@@ -282,7 +289,8 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(get<std::string>(locationCode, "LocationCode"),
               dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
                   gpu.deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationCode)));
+                  ->pdi()
+                  .locationCode());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
@@ -326,9 +334,9 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     EXPECT_NE(nullptr, pcieRefClock);
     EXPECT_NE(nullptr, chassisAsset);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              chassisAsset->invoke(pdiMethod(manufacturer)));
+              chassisAsset->pdi().manufacturer());
 
-    EXPECT_EQ(fpgaUuid, chassisUuid->invoke(pdiMethod(uuid)));
+    EXPECT_EQ(fpgaUuid, chassisUuid->pdi().uuid());
 }
 
 TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
@@ -385,7 +393,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_EQ(PRODUCT_WIDTH, width->property);
     EXPECT_EQ(PRODUCT_HEIGHT, height->property);
     EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              model->invoke(pdiMethod(manufacturer)));
+              model->pdi().manufacturer());
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
@@ -518,7 +526,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestPartNumberResponse)
     sensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         chassisAsset, BOARD_PART_NUMBER);
     testResponse((uint8_t*)partNumber.c_str(), partNumber.size());
-    EXPECT_EQ(chassisAsset.invoke(pdiMethod(partNumber)), partNumber);
+    EXPECT_EQ(chassisAsset.pdi().partNumber(), partNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberRequest)
 {
@@ -532,7 +540,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestSerialNumberResponse)
     sensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         chassisAsset, SERIAL_NUMBER);
     testResponse((uint8_t*)serialNumber.c_str(), serialNumber.size());
-    EXPECT_EQ(chassisAsset.invoke(pdiMethod(serialNumber)), serialNumber);
+    EXPECT_EQ(chassisAsset.pdi().serialNumber(), serialNumber);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestModelRequest)
 {
@@ -546,7 +554,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestModelResponse)
     sensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
         chassisAsset, MARKETING_NAME);
     testResponse((uint8_t*)model.c_str(), model.size());
-    EXPECT_EQ(chassisAsset.invoke(pdiMethod(model)), model);
+    EXPECT_EQ(chassisAsset.pdi().model(), model);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestDepthRequest)
 {
@@ -560,7 +568,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestDepthResponse)
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, PRODUCT_LENGTH);
     testResponse((uint8_t*)&depth, sizeof(depth));
-    EXPECT_EQ(chassisDimension.invoke(pdiMethod(depth)), (double)depth);
+    EXPECT_EQ(chassisDimension.pdi().depth(), (double)depth);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestHeightRequest)
 {
@@ -574,7 +582,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestHeightResponse)
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, PRODUCT_HEIGHT);
     testResponse((uint8_t*)&height, sizeof(height));
-    EXPECT_EQ(chassisDimension.invoke(pdiMethod(height)), (double)height);
+    EXPECT_EQ(chassisDimension.pdi().height(), (double)height);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestWidthRequest)
 {
@@ -588,7 +596,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestWidthResponse)
     sensor = std::make_shared<NsmInventoryProperty<DimensionIntf>>(
         chassisDimension, PRODUCT_WIDTH);
     testResponse((uint8_t*)&width, sizeof(width));
-    EXPECT_EQ(chassisDimension.invoke(pdiMethod(width)), (double)width);
+    EXPECT_EQ(chassisDimension.pdi().width(), (double)width);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsRequest)
 {
@@ -602,7 +610,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestMinPowerWattsResponse)
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&minPowerMilliWatts, sizeof(minPowerMilliWatts));
-    EXPECT_EQ(chassisPowerLimit.invoke(pdiMethod(minPowerWatts)),
+    EXPECT_EQ(chassisPowerLimit.pdi().minPowerWatts(),
               (size_t)minPowerMilliWatts / 1000);
 }
 TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsRequest)
@@ -617,7 +625,7 @@ TEST_F(NsmInventoryPropertyTest, goodTestMaxPowerWattsResponse)
     sensor = std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
         chassisPowerLimit, MAXIMUM_DEVICE_POWER_LIMIT);
     testResponse((uint8_t*)&maxPowerMilliWatts, sizeof(maxPowerMilliWatts));
-    EXPECT_EQ(chassisPowerLimit.invoke(pdiMethod(maxPowerWatts)),
+    EXPECT_EQ(chassisPowerLimit.pdi().maxPowerWatts(),
               (size_t)maxPowerMilliWatts / 1000);
 }
 TEST_F(NsmInventoryPropertyTest, badTestRequest)
@@ -739,8 +747,7 @@ TEST_F(NsmPowerSupplyStatusTest, goodTestResponse)
         {
             uint8_t status = (state == PowerState::On) << i;
             testResponse(status);
-            EXPECT_EQ(chassisPowerState.invoke(pdiMethod(currentPowerState)),
-                      state);
+            EXPECT_EQ(chassisPowerState.pdi().currentPowerState(), state);
         }
     }
 }
@@ -865,8 +872,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x01 << i);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-                  StateType::Enabled);
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Enabled);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest,
@@ -879,7 +885,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x00);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(),
                   StateType::UnavailableOffline);
     }
 }
@@ -895,8 +901,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
         .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
         .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg, NSM_ERROR));
     sensor->update(mockManager, eid);
-    EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-              StateType::Fault);
+    EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Fault);
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
 {
@@ -907,8 +912,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0, 0);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-                  StateType::Absent);
+        EXPECT_EQ(chassisOperationalStatus.pdi().state(), StateType::Absent);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestRequest)

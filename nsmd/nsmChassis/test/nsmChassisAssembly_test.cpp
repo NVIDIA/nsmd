@@ -150,15 +150,18 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(AreaIntf::PhysicalContextType::GPU,
               dynamic_pointer_cast<NsmInterfaceProvider<AreaIntf>>(
                   gpu.deviceSensors[1])
-                  ->invoke(pdiMethod(physicalContext)));
+                  ->pdi()
+                  .physicalContext());
     EXPECT_EQ(HealthIntf::HealthType::OK,
               dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
                   gpu.deviceSensors[2])
-                  ->invoke(pdiMethod(health)));
+                  ->pdi()
+                  .health());
     EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                   gpu.deviceSensors[3])
-                  ->invoke(pdiMethod(locationType)));
+                  ->pdi()
+                  .locationType());
 }
 
 TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
@@ -191,9 +194,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu.deviceSensors[2]);
-    EXPECT_EQ(get<std::string>(asset, "Vendor"),
-              model->invoke(pdiMethod(manufacturer)));
-    EXPECT_EQ(get<std::string>(asset, "Name"), model->invoke(pdiMethod(name)));
+    EXPECT_EQ(get<std::string>(asset, "Vendor"), model->pdi().manufacturer());
+    EXPECT_EQ(get<std::string>(asset, "Name"), model->pdi().name());
 }
 
 TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)

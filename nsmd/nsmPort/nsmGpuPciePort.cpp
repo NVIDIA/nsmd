@@ -426,32 +426,32 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             // TODO: read priority from em config
 
             bool priority = false;
-            auto pcieECCIntf =
-                std::make_shared<PCieEccIntf>(bus, processorPath.c_str());
-            auto pcieDeviceProvider =
-                NsmInterfaceProvider(name, type, processorPath, pcieECCIntf);
+            auto pcieDeviceProvider = NsmInterfaceProvider<PCieEccIntf>(
+                name, type, dbus::Interfaces{processorPath});
+            auto pCieECCIntf =
+                pcieDeviceProvider.interfaces[path(processorPath)];
 
             nsmDevice->addSensor(
                 std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
                     pcieDeviceProvider, deviceIndex),
                 priority);
 
-            auto pciePortIntf =
+            auto pCiePortIntf =
                 std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
 
             auto pciPortSensor = std::make_shared<NsmPciePortIntf>(
                 bus, name, type, inventoryObjPath);
 
             auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
-                name, type, pcieECCIntf, pciePortIntf, deviceIndex,
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
                 processorPath);
 
             auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
-                name, type, pcieECCIntf, pciePortIntf, deviceIndex,
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
                 processorPath);
 
             auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
-                name, type, pcieECCIntf, pciePortIntf, deviceIndex,
+                name, type, pCieECCIntf, pCiePortIntf, deviceIndex,
                 processorPath);
             nsmDevice->deviceSensors.push_back(pciPortSensor);
             nsmDevice->addSensor(sensorGroup2, priority);

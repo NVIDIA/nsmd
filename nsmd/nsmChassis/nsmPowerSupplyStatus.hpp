@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "nsmGroupSensor.hpp"
 #include "nsmInterface.hpp"
 
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
@@ -29,7 +28,7 @@ using namespace sdbusplus::server;
 using PowerStateIntf = object_t<State::server::Chassis>;
 
 class NsmPowerSupplyStatus :
-    public NsmGroupSensor,
+    public NsmSensor,
     public NsmInterfaceContainer<PowerStateIntf>
 {
   public:
@@ -39,8 +38,8 @@ class NsmPowerSupplyStatus :
 
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;
-    uint8_t handleResponse(const struct nsm_msg* responseMsg,
-                           size_t responseLen) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
 
   private:
     uint8_t gpuInstanceId;

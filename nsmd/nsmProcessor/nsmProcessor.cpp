@@ -636,11 +636,11 @@ std::optional<std::vector<uint8_t>>
 }
 
 NsmPciGroup2::NsmPciGroup2(const std::string& name, const std::string& type,
-                           std::shared_ptr<PCieEccIntf> pcieECCIntf,
-                           std::shared_ptr<PCieEccIntf> pciePortIntf,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
     NsmPcieGroup(name, type, deviceId, GROUP_ID_2),
-    pciePortIntf(pciePortIntf), pCieEccIntf(pcieECCIntf),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -678,22 +678,22 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
                                                  unsupportedRequestCount);
 
     // pcie port metrics
-    ifaceName = std::string(pciePortIntf->interface);
+    ifaceName = std::string(pCiePortIntf->interface);
     propName = "nonfeCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, nonfeCountVal);
 
-    ifaceName = std::string(pciePortIntf->interface);
+    ifaceName = std::string(pCiePortIntf->interface);
     propName = "feCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, feCountVal);
 
-    ifaceName = std::string(pciePortIntf->interface);
+    ifaceName = std::string(pCiePortIntf->interface);
     propName = "ceCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
 
-    ifaceName = std::string(pciePortIntf->interface);
+    ifaceName = std::string(pCiePortIntf->interface);
     propName = "UnsupportedRequestCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
                                                  propName, smbusData,
@@ -710,10 +710,10 @@ void NsmPciGroup2::updateReading(
     pCieEccIntf->ceCount(data.correctable_errors);
     pCieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
     // pcie port metrics
-    pciePortIntf->nonfeCount(data.non_fatal_errors);
-    pciePortIntf->feCount(data.fatal_errors);
-    pciePortIntf->ceCount(data.correctable_errors);
-    pciePortIntf->unsupportedRequestCount(data.unsupported_request_count);
+    pCiePortIntf->nonfeCount(data.non_fatal_errors);
+    pCiePortIntf->feCount(data.fatal_errors);
+    pCiePortIntf->ceCount(data.correctable_errors);
+    pCiePortIntf->unsupportedRequestCount(data.unsupported_request_count);
     updateMetricOnSharedMemory();
 }
 
@@ -745,11 +745,11 @@ uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
-                           std::shared_ptr<PCieEccIntf> pcieECCIntf,
-                           std::shared_ptr<PCieEccIntf> pciePortIntf,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
     NsmPcieGroup(name, type, deviceId, GROUP_ID_3),
-    pciePortIntf(pciePortIntf), pCieEccIntf(pcieECCIntf),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -770,7 +770,7 @@ void NsmPciGroup3::updateMetricOnSharedMemory()
         inventoryObjPath, ifaceName, propName, smbusData, l0ToRecoveryCountVal);
 
     // pcie port metrics
-    ifaceName = std::string(pciePortIntf->interface);
+    ifaceName = std::string(pCiePortIntf->interface);
     propName = "L0ToRecoveryCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, l0ToRecoveryCountVal);
@@ -782,7 +782,7 @@ void NsmPciGroup3::updateReading(
 {
     pCieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
     // pcie port metrics
-    pciePortIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
+    pCiePortIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
     updateMetricOnSharedMemory();
 }
 
@@ -814,11 +814,11 @@ uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
-                           std::shared_ptr<PCieEccIntf> pcieECCIntf,
-                           std::shared_ptr<PCieEccIntf> pciePortIntf,
+                           std::shared_ptr<PCieEccIntf> pCieECCIntf,
+                           std::shared_ptr<PCieEccIntf> pCiePortIntf,
                            uint8_t deviceId, std::string& inventoryObjPath) :
     NsmPcieGroup(name, type, deviceId, GROUP_ID_4),
-    pciePortIntf(pciePortIntf), pCieEccIntf(pcieECCIntf),
+    pCiePortIntf(pCiePortIntf), pCieEccIntf(pCieECCIntf),
     inventoryObjPath(inventoryObjPath)
 
 {
@@ -885,10 +885,10 @@ void NsmPciGroup4::updateReading(
     pCieEccIntf->nakSentCount(data.NAK_sent_cnt);
     pCieEccIntf->nakReceivedCount(data.NAK_recv_cnt);
     // pcie port metrics
-    pciePortIntf->replayCount(data.replay_cnt);
-    pciePortIntf->replayRolloverCount(data.replay_rollover_cnt);
-    pciePortIntf->nakSentCount(data.NAK_sent_cnt);
-    pciePortIntf->nakReceivedCount(data.NAK_recv_cnt);
+    pCiePortIntf->replayCount(data.replay_cnt);
+    pCiePortIntf->replayRolloverCount(data.replay_rollover_cnt);
+    pCiePortIntf->nakSentCount(data.NAK_sent_cnt);
+    pCiePortIntf->nakReceivedCount(data.NAK_recv_cnt);
     updateMetricOnSharedMemory();
 }
 
@@ -3209,8 +3209,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             std::make_shared<NsmDevicePortDisableFuture>(processorName, type,
                                                          basePath);
 
-        nvProcessorPortDisableFuture->invoke(pdiMethod(portDisableFuture),
-                                             std::vector<uint8_t>{});
+        nvProcessorPortDisableFuture->pdi().portDisableFuture(
+            std::vector<uint8_t>{});
         nsmDevice->addSensor(nvProcessorPortDisableFuture, priority);
 
         nsm::AsyncSetOperationHandler setPortDisableFutureHandler =
@@ -3250,7 +3250,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto assetObject = NsmInterfaceProvider<NsmAssetIntf>(
             name, type, inventoryObjPath, assetIntf);
-        assetObject.invoke(pdiMethod(manufacturer), manufacturer);
+        assetObject.pdi().manufacturer(manufacturer);
         // create sensor
         nsmDevice->addStaticSensor(
             std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
@@ -3310,10 +3310,10 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             objPath.c_str(), "DeviceId", interface.c_str());
         int count = co_await utils::coGetDbusProperty<uint64_t>(
             objPath.c_str(), "Count", interface.c_str());
-        auto pcieECCIntf =
-            std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
-        auto pcieDeviceProvider =
-            NsmInterfaceProvider(name, type, inventoryObjPath, pcieECCIntf);
+        auto pcieDeviceProvider = NsmInterfaceProvider<PCieEccIntf>(
+            name, type, dbus::Interfaces{inventoryObjPath});
+        auto pCieECCIntf =
+            pcieDeviceProvider.interfaces[path(inventoryObjPath)];
         nsmDevice->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeEccIntf>>(
                                  pcieDeviceProvider, deviceId),
                              priority);
@@ -3321,18 +3321,18 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         {
             auto pcieObjPath = inventoryObjPath + "/Ports/PCIe_" +
                                std::to_string(idx); // port metrics dbus path
-            auto pciePortIntf =
+            auto pCiePortIntf =
                 std::make_shared<PCieEccIntf>(bus, pcieObjPath.c_str());
             auto pciPortSensor =
                 std::make_shared<NsmPciePortIntf>(bus, name, type, pcieObjPath);
             auto sensorGroup2 = std::make_shared<NsmPciGroup2>(
-                name, type, pcieECCIntf, pciePortIntf, deviceId,
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
                 inventoryObjPath);
             auto sensorGroup3 = std::make_shared<NsmPciGroup3>(
-                name, type, pcieECCIntf, pciePortIntf, deviceId,
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
                 inventoryObjPath);
             auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
-                name, type, pcieECCIntf, pciePortIntf, deviceId,
+                name, type, pCieECCIntf, pCiePortIntf, deviceId,
                 inventoryObjPath);
             nsmDevice->deviceSensors.push_back(pciPortSensor);
             nsmDevice->addSensor(sensorGroup2, priority);
@@ -3480,16 +3480,18 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_MemCapacityUtil")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        [[maybe_unused]] auto priority =
+            co_await utils::coGetDbusProperty<bool>(objPath.c_str(), "Priority",
+                                                    interface.c_str());
 
         auto isLongRunning = true;
 
         auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name, type);
-        auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-            name, type, dbus::Interfaces{inventoryObjPath});
+        nsmDevice->addSensor(totalMemorySensor, priority);
         auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-            provider, totalMemorySensor, isLongRunning, nsmDevice);
+            bus, name, type, inventoryObjPath, totalMemorySensor, isLongRunning,
+            nsmDevice);
+        nsmDevice->deviceSensors.emplace_back(sensor);
         nsmDevice->addSensor(sensor, priority, isLongRunning);
     }
     else if (type == "NSM_PowerCap")

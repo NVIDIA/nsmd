@@ -21,7 +21,6 @@
 #include "platform-environmental.h"
 
 #include "nsmCommon/sharedMemCommon.hpp"
-#include "nsmInterface.hpp"
 #include "nsmLongRunningSensor.hpp"
 #include "nsmSensor.hpp"
 
@@ -46,8 +45,7 @@ class NsmMemoryCapacity : public NsmSensor
                               size_t responseLen) override;
 
   private:
-    virtual void
-        updateReading(std::optional<uint32_t> maximumMemoryCapacity) = 0;
+    virtual void updateReading(uint32_t* maximumMemoryCapacity) = 0;
 };
 
 class NsmTotalMemory : public NsmMemoryCapacity
@@ -55,39 +53,39 @@ class NsmTotalMemory : public NsmMemoryCapacity
   public:
     NsmTotalMemory(const std::string& name, const std::string& type);
     NsmTotalMemory() = default;
-    const std::optional<uint32_t> getReading();
+    const uint32_t* getReading();
 
   private:
-    void updateReading(std::optional<uint32_t> maximumMemoryCapacity) override;
-    std::optional<uint32_t> totalMemoryCapacity = std::nullopt;
+    void updateReading(uint32_t* maximumMemoryCapacity) override;
+    uint32_t* totalMemoryCapacity = nullptr;
 };
 
 using DimmMemoryMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::xyz::openbmc_project::Inventory::
                                     Item::Dimm::server::MemoryMetrics>;
 
-class NsmMemoryCapacityUtil :
-    public NsmLongRunningSensor,
-    public NsmInterfaceContainer<DimmMemoryMetricsIntf>
+class NsmMemoryCapacityUtil : public NsmLongRunningSensor
 {
   public:
-    NsmMemoryCapacityUtil(
-        const NsmInterfaceProvider<DimmMemoryMetricsIntf>& provider,
-        std::shared_ptr<NsmTotalMemory> totalMemory, bool isLongRunning,
-        std::shared_ptr<NsmDevice> device);
+    NsmMemoryCapacityUtil(sdbusplus::bus::bus& bus, const std::string& name,
+                          const std::string& type,
+                          std::string& inventoryObjPath,
+                          std::shared_ptr<NsmTotalMemory> totalMemory,
+                          bool isLongRunning,
+                          std::shared_ptr<NsmDevice> device);
     NsmMemoryCapacityUtil() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
-    bool equals(const NsmSensor& other) const override;
 
   private:
     std::shared_ptr<NsmTotalMemory> totalMemory;
     void updateReading(const struct nsm_memory_capacity_utilization& data);
+    std::string inventoryObjPath;
     void updateMetricOnSharedMemory();
-    requester::Coroutine update(SensorManager& manager, eid_t eid);
+    std::unique_ptr<DimmMemoryMetricsIntf> dimmMemoryMetricsIntf = nullptr;
 };
 
 using CpuOperatingConfigIntf =
