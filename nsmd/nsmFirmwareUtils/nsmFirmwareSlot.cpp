@@ -105,8 +105,12 @@ void NsmFirmwareSlot::update(
     state(fstate);
     slotId(info.slot_id);
     isActive(fq_resp_hdr.active_slot == info.slot_id);
-    extendedVersion(std::string(
-        reinterpret_cast<const char*>(info.firmware_version_string)));
+    const std::string firmwareVersion{
+        reinterpret_cast<const char*>(info.firmware_version_string)};
+    extendedVersion((fstate == FirmwareState::WriteInProgress && !isActive() &&
+                     firmwareVersion.empty())
+                        ? "NA"
+                        : firmwareVersion);
     firmwareComparisonNumber(info.version_comparison_stamp);
     writeProtected(info.write_protect_state);
     version(info.security_version_number);
