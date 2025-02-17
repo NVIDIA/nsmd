@@ -41,45 +41,31 @@ requester::Coroutine
     NsmGpuPresenceAndPowerStatus::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    for (int state = (int)State::GetPresence;
-         state <= (int)State::GetPowerStatus && rc == NSM_SW_SUCCESS; state++)
+    for (int state = int(State::GetPresence);
+         state <= int(State::GetPowerStatus) && rc == NSM_SW_SUCCESS; state++)
     {
-        NsmGpuPresenceAndPowerStatus::state = (State)state;
+        this->state = static_cast<State>(state);
+        for (const auto& sensor : sensors)
+        {
+            dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(sensor)->state =
+                this->state;
+        }
         rc = co_await NsmSensor::update(manager, eid);
     }
 
-    if (rc == NSM_SW_SUCCESS)
-    {
-        // "State": "Enabled" if presence=active, power=active
-        // "State": "UnavailableOffline" if presence=active,
-        // power=inactive "State": "Absent" if presence=inactive
-
-        bool power = ((gpusPower >> (gpuInstanceId)) & 0x1) != 0;
-        bool presence = ((gpusPresence >> (gpuInstanceId)) & 0x1) != 0;
-
-        if (power && presence)
-        {
-            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Enabled);
-            invoke(pdiMethod(functional), true);
-        }
-        else if (presence)
-        {
-            invoke(pdiMethod(state),
-                   OperationalStatusIntf::StateType::UnavailableOffline);
-            invoke(pdiMethod(functional), false);
-        }
-        else
-        {
-            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Absent);
-            invoke(pdiMethod(functional), false);
-        }
-    }
-    else
+    if (rc != NSM_SW_SUCCESS)
     {
         invoke(pdiMethod(state), OperationalStatusIntf::StateType::Fault);
         invoke(pdiMethod(functional), false);
+        for (const auto& sensor : sensors)
+        {
+            auto gpuSensor =
+                dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(sensor);
+            gpuSensor->invoke(pdiMethod(state),
+                              OperationalStatusIntf::StateType::Fault);
+            gpuSensor->invoke(pdiMethod(functional), false);
+        }
     }
-    updateMetricOnSharedMemory();
 
     // coverity[missing_return]
     co_return rc;
@@ -159,15 +145,42 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponse(
             break;
     }
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        clearErrorBitMap(decodeMethodName);
-    }
-    else
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
         logHandleResponseMsg(decodeMethodName, reasonCode, cc, rc);
+        invoke(pdiMethod(state), OperationalStatusIntf::StateType::Fault);
+        invoke(pdiMethod(functional), false);
     }
-    return rc;
+    else if (state == State::GetPowerStatus)
+    {
+        clearErrorBitMap(decodeMethodName);
+        // "State": "Enabled" if presence=active, power=active
+        // "State": "UnavailableOffline" if presence=active,
+        // power=inactive "State": "Absent" if presence=inactive
+
+#define LSB_MASK 0x1
+        bool power = ((gpusPower >> (gpuInstanceId)) & LSB_MASK) != 0;
+        bool presence = ((gpusPresence >> (gpuInstanceId)) & LSB_MASK) != 0;
+
+        if (power && presence)
+        {
+            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Enabled);
+            invoke(pdiMethod(functional), true);
+        }
+        else if (presence)
+        {
+            invoke(pdiMethod(state),
+                   OperationalStatusIntf::StateType::UnavailableOffline);
+            invoke(pdiMethod(functional), false);
+        }
+        else
+        {
+            invoke(pdiMethod(state), OperationalStatusIntf::StateType::Absent);
+            invoke(pdiMethod(functional), false);
+        }
+    }
+    updateMetricOnSharedMemory();
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

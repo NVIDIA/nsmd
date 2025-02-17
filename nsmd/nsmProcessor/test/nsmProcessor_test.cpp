@@ -1500,16 +1500,22 @@ struct NsmProcessorTest :
     public utils::DBusTest,
     public SensorManagerTest
 {
-    eid_t eid = 0;
+    eid_t eid = 28;
     uint8_t instanceId = 0;
     const std::string basicIntfName =
         "xyz.openbmc_project.Configuration.NSM_Processor";
     const std::string name = "GPU_SXM_1";
     const std::string objPath = processorsInventoryBasePath / name;
+
     const std::string memoryBasicIntfName =
-        "xyz.openbmc_project.Configuration.NSM_Processor";
+        "xyz.openbmc_project.Configuration.NSM_Memory";
     const std::string memoryName = "GPU_Memory_1";
     const std::string memoryObjPath = processorsInventoryBasePath / memoryName;
+
+    const std::string chassisBasicIntfName =
+        "xyz.openbmc_project.Configuration.NSM_Chassis";
+    const std::string chassisName = "HGX_GPU_SXM_1";
+    const std::string chassisObjPath = chassisInventoryBasePath / chassisName;
 
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
     const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
@@ -1521,6 +1527,7 @@ struct NsmProcessorTest :
     NsmProcessorTest() : SensorManagerTest(devices)
     {
         AsyncOperationManager::getInstance()->dispatchers.clear();
+        gpu.eid = eid;
     }
 
     const PropertyValuesCollection error = {
@@ -1579,6 +1586,20 @@ struct NsmProcessorTest :
         {"UUID", gpuUuid},    {"InventoryObjPath", memoryObjPath},
         {"Priority", false},
     };
+    const PropertyValuesCollection asset = {
+        {"Name", name},
+        {"Type", "NSM_Asset"},
+        {"UUID", gpuUuid},
+        {"Manufacturer", "NVIDIA"},
+        {"InventoryObjPath", objPath},
+    };
+    const PropertyValuesCollection chassisAsset = {
+        {"Name", chassisName},
+        {"Type", "NSM_Asset"},
+        {"UUID", gpuUuid},
+        {"Manufacturer", "NVIDIA"},
+        {"InventoryObjPath", chassisObjPath},
+    };
 };
 
 namespace nsm
@@ -1589,6 +1610,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                                            const std::string& interface,
                                            const std::string& objPath);
+requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath);
 }; // namespace nsm
 
 TEST_F(NsmProcessorTest, badTestTypeError)
@@ -1855,11 +1879,88 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     EXPECT_EQ(1, gpu.deviceSensors.size());
     EXPECT_EQ(1, gpu.longRunningSensors.size());
     EXPECT_EQ(memoryCapacityUtilSensor.get(), gpu.deviceSensors.back().get());
-    // Check if the sensor interface is added as expected
+    // Check if the sensor interface is moved as expected
     EXPECT_EQ(2, memoryCapacityUtilSensor->interfaces.size());
 
     gpu.deviceSensors.clear();
     gpu.longRunningSensors.clear();
+}
+TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
+{
+    auto& values = utils::MockDbusAsync::getValues();
+    values.push(objPath, get(asset, "Name"));
+    values.push(objPath, get(asset, "UUID"));
+    values.push(objPath, get(asset, "Type"));
+    values.push(objPath, get(asset, "InventoryObjPath"));
+    values.push(objPath, get(asset, "Manufacturer"));
+    createNsmProcessorSensor(mockManager, basicIntfName + ".Asset", objPath);
+
+    EXPECT_EQ(3, gpu.deviceSensors.size());
+    auto devicePartNumberSensor =
+        dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+            gpu.deviceSensors[0]);
+    auto serialNumberSensor =
+        dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+            gpu.deviceSensors[1]);
+    auto modelSensor = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+        gpu.deviceSensors[2]);
+    EXPECT_NE(nullptr, devicePartNumberSensor);
+    EXPECT_NE(nullptr, serialNumberSensor);
+    EXPECT_NE(nullptr, modelSensor);
+    EXPECT_EQ(1, devicePartNumberSensor->interfaces.size());
+    EXPECT_EQ(1, serialNumberSensor->interfaces.size());
+    EXPECT_EQ(1, modelSensor->interfaces.size());
+    EXPECT_EQ(DEVICE_PART_NUMBER, devicePartNumberSensor->property);
+    EXPECT_EQ(SERIAL_NUMBER, serialNumberSensor->property);
+    EXPECT_EQ(MARKETING_NAME, modelSensor->property);
+
+    values.push(chassisObjPath, get(chassisAsset, "Name"));
+    values.push(chassisObjPath, get(chassisAsset, "UUID"));
+    values.push(chassisObjPath, get(chassisAsset, "Type"));
+    values.push(chassisObjPath, get(chassisAsset, "InventoryObjPath"));
+    values.push(chassisObjPath, get(chassisAsset, "Manufacturer"));
+    nsmChassisCreateSensors(mockManager, chassisBasicIntfName + ".Asset",
+                            chassisObjPath);
+
+    // only BOARD_PART_NUMBER shall be added as new sensor
+    EXPECT_EQ(4, gpu.deviceSensors.size());
+    auto partNumberSensor =
+        dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
+            gpu.deviceSensors[3]);
+    EXPECT_NE(nullptr, partNumberSensor);
+    EXPECT_EQ(1, partNumberSensor->interfaces.size());
+    EXPECT_EQ(BOARD_PART_NUMBER, partNumberSensor->property);
+
+    // Check if the sensor interface is moved as expected
+    EXPECT_EQ(1, devicePartNumberSensor->interfaces.size());
+    EXPECT_EQ(2, serialNumberSensor->interfaces.size());
+    EXPECT_EQ(2, modelSensor->interfaces.size());
+
+    auto response = [](std::string data) {
+        Response response(sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN +
+                          data.size());
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+        auto rc = encode_get_inventory_information_resp(
+            0, NSM_SUCCESS, ERR_NULL, data.size(), (uint8_t*)data.data(),
+            responseMsg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    };
+
+    auto serialNumberResponse = response("NV1234567890");
+    auto modelResponse = response("NVIDIA B200");
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(2)
+        .WillOnce(mockSendRecvNsmMsg(serialNumberResponse))
+        .WillOnce(mockSendRecvNsmMsg(modelResponse));
+
+    serialNumberSensor->update(mockManager, eid);
+    modelSensor->update(mockManager, eid);
+
+    EXPECT_EQ("NV1234567890",
+              serialNumberSensor->invoke(pdiMethod(serialNumber)));
+    EXPECT_EQ("NVIDIA B200", modelSensor->invoke(pdiMethod(model)));
 }
 
 TEST(nsmTotalNvLinks, GoodGenReq)
