@@ -144,25 +144,25 @@ class NsmInterfaces
     template <typename Func, typename... Args>
     void invoke(Func&& func, Args&&... args)
     {
+        static_assert(sizeof...(args) <= 1, "Only one argument is allowed");
         for (auto& [path, pdi] : interfaces)
         {
-            if constexpr (std::is_invocable_v<Func, std::string, IntfType&,
-                                              Args...>)
+            if constexpr (std::is_invocable_v<Func, std::string, IntfType&>)
             {
-                func(path, *pdi, std::forward<Args>(args)...);
+                func(path, *pdi);
             }
             else
             {
-                func(*pdi, std::forward<Args>(args)...);
+                func(*pdi, args...);
             }
         }
     }
 };
 
 // Macro for invoking a method
-#define pdiMethod(method, ...)                                                 \
+#define pdiMethod(method)                                                      \
     [](auto& pdi, auto&&... args) -> decltype(auto) {                          \
-        return (pdi.method)(std::forward<decltype(args)>(args)...);            \
+        return (pdi.method)(args...);                                          \
     }
 
 /**

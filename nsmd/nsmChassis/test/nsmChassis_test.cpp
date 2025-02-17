@@ -120,12 +120,6 @@ struct NsmChassisTest :
         {"Type", "NSM_PowerLimit"},
         {"Priority", false},
     };
-    const PropertyValuesCollection operationalStatus = {
-        {"Type", "NSM_OperationalStatus"},
-        {"InstanceNumber", uint64_t(1)},
-        {"InventoryObjPaths", std::vector<std::string>{objPath}},
-        {"Priority", true},
-    };
     const PropertyValuesCollection powerState = {
         {"Type", "NSM_PowerState"},
         {"InstanceNumber", uint64_t(2)},
@@ -409,15 +403,6 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerLimit",
                             objPath);
     values.push(objPath, get(fpgaProperties, "Name"));
-    values.push(objPath, get(operationalStatus, "Type"));
-    values.push(objPath, get(fpgaProperties, "UUID"));
-    values.push(objPath, get(fpgaProperties, "DeviceType"));
-    values.push(objPath, get(operationalStatus, "InstanceNumber"));
-    values.push(objPath, get(operationalStatus, "InventoryObjPaths"));
-    values.push(objPath, get(operationalStatus, "Priority"));
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            objPath);
-    values.push(objPath, get(fpgaProperties, "Name"));
     values.push(objPath, get(powerState, "Type"));
     values.push(objPath, get(fpgaProperties, "UUID"));
     values.push(objPath, get(fpgaProperties, "DeviceType"));
@@ -426,9 +411,9 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
     values.push(objPath, get(powerState, "Priority"));
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
                             objPath);
-    EXPECT_EQ(1, fpga.prioritySensors.size());
+    EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
-    EXPECT_EQ(2, fpga.deviceSensors.size());
+    EXPECT_EQ(1, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(2, gpu.roundRobinSensors.size());
     EXPECT_EQ(2, gpu.deviceSensors.size());
@@ -448,12 +433,6 @@ TEST_F(NsmChassisTest, badTestCreateStaticSensors)
 TEST_F(NsmChassisTest, badTestCreateDynamicSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(fpgaProperties, "Name"));
-    values.push(objPath, get(operationalStatus, "Type"));
-    values.push(objPath, get(fpgaProperties, "UUID"));
-    values.push(objPath, get(basic, "DeviceType"));
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".OperationalStatus",
-                            objPath);
     values.push(objPath, get(fpgaProperties, "Name"));
     values.push(objPath, get(powerState, "Type"));
     values.push(objPath, get(fpgaProperties, "UUID"));
@@ -784,23 +763,77 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
 
 struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
 {
-    NsmInterfaceProvider<OperationalStatusIntf> chassisOperationalStatus{
-        name, "NSM_OperationalStatus", "/xyz/openbmc_project/dummy"};
+    const PropertyValuesCollection operationalStatus = {
+        {"Name", "HGX_GPU_SXM_1"},
+        {"Type", "NSM_OperationalStatus"},
+        {"UUID", fpgaUuid},
+        {"DeviceType", uint64_t(NSM_DEV_ID_BASEBOARD)},
+        {"InstanceNumber", uint64_t(0)},
+        {"InventoryObjPaths",
+         std::vector<std::string>{objPath,
+                                  processorsInventoryBasePath / "GPU_SXM_1"}},
+        {"Priority", true},
+    };
+    std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor,
+        chassisOperationalStatus;
     void SetUp() override
     {
-        EXPECT_EQ(chassisOperationalStatus.getName(), name);
-        EXPECT_EQ(chassisOperationalStatus.getType(), "NSM_OperationalStatus");
+        auto& values = utils::MockDbusAsync::getValues();
+        values.push(objPath, get(operationalStatus, "Name"));
+        values.push(objPath, get(operationalStatus, "Type"));
+        values.push(objPath, get(operationalStatus, "UUID"));
+        values.push(objPath, get(operationalStatus, "DeviceType"));
+        values.push(objPath, get(operationalStatus, "InstanceNumber"));
+        values.push(objPath, get(operationalStatus, "InventoryObjPaths"));
+        values.push(objPath, get(operationalStatus, "Priority"));
+        nsmChassisCreateSensors(mockManager,
+                                basicIntfName + ".OperationalStatus", objPath);
+
+        EXPECT_EQ(1, fpga.deviceSensors.size());
+        EXPECT_EQ(1, fpga.prioritySensors.size());
+        chassisOperationalStatus =
+            std::dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(
+                fpga.deviceSensors[0]);
+        EXPECT_NE(chassisOperationalStatus, nullptr);
+        EXPECT_EQ(0, chassisOperationalStatus->sensors.size());
+
+        for (size_t i = 1; i < 8; i++)
+        {
+            auto gpuName = ("HGX_GPU_SXM_" + std::to_string(i + 1));
+            auto gpuPath = chassisInventoryBasePath / gpuName;
+            auto gpuOperationalStatus = operationalStatus;
+            gpuOperationalStatus[0].second = gpuName.c_str();
+            gpuOperationalStatus[4].second = uint64_t(i);
+            gpuOperationalStatus[5].second = std::vector<std::string>{
+                gpuPath, processorsInventoryBasePath /
+                             ("GPU_SXM_" + std::to_string(i + 1))};
+            values.push(gpuPath, get(gpuOperationalStatus, "Name"));
+            values.push(gpuPath, get(gpuOperationalStatus, "Type"));
+            values.push(gpuPath, get(gpuOperationalStatus, "UUID"));
+            values.push(gpuPath, get(gpuOperationalStatus, "DeviceType"));
+            values.push(gpuPath, get(gpuOperationalStatus, "InstanceNumber"));
+            values.push(gpuPath,
+                        get(gpuOperationalStatus, "InventoryObjPaths"));
+            values.push(gpuPath, get(gpuOperationalStatus, "Priority"));
+            nsmChassisCreateSensors(
+                mockManager, basicIntfName + ".OperationalStatus", gpuPath);
+        }
+        // Sensors shall be added as sub sensor
+        EXPECT_EQ(1, fpga.deviceSensors.size());
+        EXPECT_EQ(1, fpga.prioritySensors.size());
+        EXPECT_EQ(7, chassisOperationalStatus->sensors.size());
     }
-    std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor;
     void init(uint8_t gpuInstanceId)
     {
-        eid = 12;
-        sensor = std::make_shared<NsmGpuPresenceAndPowerStatus>(
-            chassisOperationalStatus, gpuInstanceId);
-        EXPECT_NE(sensor, nullptr);
-        EXPECT_EQ(sensor->getName(), name);
-        EXPECT_EQ(sensor->getType(), "NSM_OperationalStatus");
-        EXPECT_EQ(sensor->gpuInstanceId, gpuInstanceId);
+        if (gpuInstanceId == 0)
+        {
+            sensor = chassisOperationalStatus;
+        }
+        else
+        {
+            sensor = std::dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(
+                chassisOperationalStatus->sensors[gpuInstanceId - 1]);
+        }
     }
 
     const Response diagHeader{
@@ -865,8 +898,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x01 << i);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-                  StateType::Enabled);
+        EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Enabled);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest,
@@ -879,7 +911,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0x01 << i, 0x00);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
+        EXPECT_EQ(sensor->invoke(pdiMethod(state)),
                   StateType::UnavailableOffline);
     }
 }
@@ -890,13 +922,35 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
         server::OperationalStatus::StateType;
     const Response presenceMsg{0};
     const Response powerStatusMsg{0};
+    auto ccError = diagHeader;
+    ccError[6] = NSM_ERROR;
+
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
         .Times(2)
         .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
         .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg, NSM_ERROR));
     sensor->update(mockManager, eid);
-    EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-              StateType::Fault);
+    EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
+
+    sensor->invoke(pdiMethod(state), StateType::None);
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg, NSM_ERROR));
+    sensor->update(mockManager, eid);
+    EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
+
+    sensor->invoke(pdiMethod(state), StateType::None);
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(ccError, presenceMsg));
+    sensor->update(mockManager, eid);
+    EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
+
+    sensor->invoke(pdiMethod(state), StateType::None);
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .Times(2)
+        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
+        .WillOnce(mockSendRecvNsmMsg(ccError, powerStatusMsg));
+    sensor->update(mockManager, eid);
+    EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
 {
@@ -907,8 +961,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
         using StateType = sdbusplus::xyz::openbmc_project::State::Decorator::
             server::OperationalStatus::StateType;
         testResponse(0, 0);
-        EXPECT_EQ(chassisOperationalStatus.invoke(pdiMethod(state)),
-                  StateType::Absent);
+        EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Absent);
     }
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestRequest)
@@ -952,5 +1005,5 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestCompletionErrorResponse)
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(rc, NSM_ERROR);
 }
