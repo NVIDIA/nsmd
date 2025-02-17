@@ -1,0 +1,111 @@
+# Build options for GPU Telemetry
+
+# Feature options
+option('build_examples',
+    type: 'boolean',
+    value: true,
+    description: 'Build example programs'
+)
+
+option('build_tests',
+    type: 'boolean',
+    value: true,
+    description: 'Build and enable testing'
+)
+
+option('build_docs',
+    type: 'boolean',
+    value: true,
+    description: 'Build documentation (requires Doxygen)'
+)
+
+# Installation options
+option('install_examples',
+    type: 'boolean',
+    value: true,
+    description: 'Install example programs and source'
+)
+
+option('socket_path',
+    type: 'string',
+    value: '/tmp/gpu-telemetry.sock',
+    description: 'Default socket path for IPC'
+)
+
+# Debug options
+option('enable_debug_logging',
+    type: 'boolean',
+    value: false,
+    description: 'Enable debug logging'
+)
+
+option('enable_trace',
+    type: 'boolean',
+    value: false,
+    description: 'Enable function tracing'
+)
+
+# Performance options
+option('max_clients',
+    type: 'integer',
+    min: 1,
+    max: 100,
+    value: 10,
+    description: 'Maximum number of concurrent clients'
+)
+
+option('buffer_size',
+    type: 'integer',
+    min: 1024,
+    max: 1048576,
+    value: 8192,
+    description: 'IPC buffer size in bytes'
+)
+
+# Security options
+option('socket_permissions',
+    type: 'string',
+    value: '0666',
+    description: 'Default socket permissions (octal)'
+)
+
+option('enable_sandbox',
+    type: 'boolean',
+    value: true,
+    description: 'Enable process sandboxing'
+)
+
+# Testing options
+option('enable_coverage',
+    type: 'boolean',
+    value: false,
+    description: 'Enable code coverage reporting'
+)
+
+option('enable_sanitizers',
+    type: 'boolean',
+    value: false,
+    description: 'Enable address and undefined behavior sanitizers'
+)
+
+option('test_timeout',
+    type: 'integer',
+    min: 10,
+    max: 300,
+    value: 30,
+    description: 'Test timeout in seconds'
+)
+
+# Documentation options
+option('doc_format',
+    type: 'combo',
+    choices: ['html', 'pdf', 'both'],
+    value: 'html',
+    description: 'Documentation output format'
+)
+
+option('doc_private',
+    type: 'boolean',
+    value: false,
+    description: 'Include private members in documentation'
+)
