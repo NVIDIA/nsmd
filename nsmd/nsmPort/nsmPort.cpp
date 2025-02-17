@@ -1055,6 +1055,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             nsmDevice->addSensor(getFECHistoDataObject, false);
         }
 #endif
+
+        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
