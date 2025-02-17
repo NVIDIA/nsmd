@@ -162,6 +162,7 @@ systemd_system_unit_dir = systemd.get_variable(
 subdir('services')
 subdir('nsmtool')
 subdir('nsmd')
+subdir('gpu-telemetry')
 
 if get_option('mockup-responder').enabled()
     subdir('mockupResponder')
