@@ -1061,6 +1061,54 @@ class GetInventoryInformation : public CommandInterface
         std::stringstream iss;
         std::string firmwareVersion;
 
+        std::unordered_map<uint8_t, uint16_t> inventoryLengthMap = {
+            // identifier, expected length
+            {MAXIMUM_MEMORY_CAPACITY, sizeof(uint32_t)},
+            {PRODUCT_LENGTH, sizeof(uint32_t)},
+            {PRODUCT_WIDTH, sizeof(uint32_t)},
+            {PRODUCT_HEIGHT, sizeof(uint32_t)},
+            {RATED_DEVICE_POWER_LIMIT, sizeof(uint32_t)},
+            {MINIMUM_DEVICE_POWER_LIMIT, sizeof(uint32_t)},
+            {MAXIMUM_DEVICE_POWER_LIMIT, sizeof(uint32_t)},
+            {MINIMUM_MODULE_POWER_LIMIT, sizeof(uint32_t)},
+            {MAXIMUM_MODULE_POWER_LIMIT, sizeof(uint32_t)},
+            {RATED_MODULE_POWER_LIMIT, sizeof(uint32_t)},
+            {DEFAULT_BOOST_CLOCKS, sizeof(uint32_t)},
+            {DEFAULT_BASE_CLOCKS, sizeof(uint32_t)},
+            {TRAY_SLOT_NUMBER, sizeof(uint32_t)},
+            {TRAY_SLOT_INDEX, sizeof(uint32_t)},
+            {GPU_HOST_ID, sizeof(uint32_t)},
+            {GPU_MODULE_ID, sizeof(uint32_t)},
+            {DEVICE_GUID, UUID_INT_SIZE},
+            {GPU_NVLINK_PEER_TYPE, sizeof(uint32_t)},
+            {GPU_IBGUID, sizeof(uint64_t)},
+            {MINIMUM_MEMORY_CLOCK_LIMIT, sizeof(uint32_t)},
+            {MAXIMUM_MEMORY_CLOCK_LIMIT, sizeof(uint32_t)},
+            {MINIMUM_GRAPHICS_CLOCK_LIMIT, sizeof(uint32_t)},
+            {MAXIMUM_GRAPHICS_CLOCK_LIMIT, sizeof(uint32_t)},
+            {MINIMUM_EDPP_SCALING_FACTOR, sizeof(uint8_t)},
+            {MAXIMUM_EDPP_SCALING_FACTOR, sizeof(uint8_t)},
+            {PCIERETIMER_0_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_1_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_2_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_3_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_4_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_5_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_6_EEPROM_VERSION, sizeof(uint64_t)},
+            {PCIERETIMER_7_EEPROM_VERSION, sizeof(uint64_t)}};
+
+        if (inventoryLengthMap.contains(propertyIdentifier))
+        {
+            // help do length check
+            if (inventoryLengthMap[propertyIdentifier] != dataSize)
+            {
+                std::cerr << "the response length was unexpected. expected: "
+                          << inventoryLengthMap[propertyIdentifier]
+                          << ", but got: " << dataSize << std::endl;
+                return;
+            }
+        }
+
         // todo: display aggregate data
         switch (propertyIdentifier)
         {
@@ -1125,16 +1173,8 @@ class GetInventoryInformation : public CommandInterface
             }
             case CHASSIS_SERIAL_NUMBER:
             {
-                try
-                {
-                    propRecordResult["Data"] = std::string((char*)data.data(),
-                                                           dataSize);
-                }
-                catch (const std::exception& e)
-                {
-                    propRecordResult["Data"] =
-                        utils::convertHexToString(data, dataSize);
-                }
+                propRecordResult["Data"] = std::string(
+                    std::bit_cast<const char*>(data.data()), dataSize);
                 break;
             }
             case GPU_IBGUID:

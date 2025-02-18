@@ -90,7 +90,9 @@ static inline std::string bytesToHexString(const uint8_t* data, size_t len)
  */
 static inline void DisplayInJson(const ordered_json& data)
 {
-    std::cout << data.dump(4) << std::endl;
+    std::cout << data.dump(4, ' ', false,
+                           nlohmann::json::error_handler_t::replace)
+              << std::endl;
 }
 
 /** @brief MCTP socket read/recieve
