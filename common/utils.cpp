@@ -107,6 +107,76 @@ void printBuffer(bool isTx, const std::vector<uint8_t>& buffer, uint8_t tag,
     }
 }
 
+bool isValidDbusString(std::string_view input)
+{
+    const uint8_t* token = std::bit_cast<const uint8_t*>(input.data());
+    const uint8_t* end = token + input.size();
+
+    while (token < end)
+    {
+        uint32_t codepoint = 0;
+        int numBytes = 0;
+
+        // utf8 can be up to 4 bytes, check the leading byte to determine its
+        // size
+        if (*token < 0x80) // 1-byte - ascii
+        {
+            codepoint = *token;
+            numBytes = 1;
+        }
+        else if ((*token & 0xE0) == 0xC0) // 2-byte
+        {
+            codepoint = *token & 0x1F;
+            numBytes = 2;
+        }
+        else if ((*token & 0xF0) == 0xE0) // 3-byte
+        {
+            codepoint = *token & 0x0F;
+            numBytes = 3;
+        }
+        else if ((*token & 0xF8) == 0xF0) // 4-byte
+        {
+            codepoint = *token & 0x07;
+            numBytes = 4;
+        }
+        else
+        {
+            // the leading byte is invalid
+            return false;
+        }
+
+        // check if it's overflow
+        if (token + numBytes > end)
+            return false;
+
+        // check if the subsequent byte is 10xxxxxx and do OR to codepoint
+        for (int i = 1; i < numBytes; ++i)
+        {
+            if ((token[i] & 0xC0) != 0x80)
+            {
+                return false;
+            }
+            codepoint = (codepoint << 6) | (token[i] & 0x3F);
+        }
+
+        // check if it's overlong
+        if ((numBytes == 2 && codepoint < 0x80) ||
+            (numBytes == 3 && codepoint < 0x800) ||
+            (numBytes == 4 && codepoint < 0x10000))
+        {
+            return false;
+        }
+
+        // it can't be 0x0000 or higher than 0x10FFFF based on the dbus spec.
+        if (codepoint > 0x10FFFF || codepoint == 0x0000)
+            return false;
+
+        token += numBytes;
+    }
+
+    return true;
+}
+
 void printBuffer(bool isTx, const uint8_t* ptr, size_t bufferLen, uint8_t tag,
                  eid_t eid)
 {
