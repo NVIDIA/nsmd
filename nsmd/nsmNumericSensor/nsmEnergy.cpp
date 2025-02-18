@@ -76,13 +76,14 @@ uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
-    uint64_t reading = 0;
+    uint64_t readingInMilliJoules = 0;
 
-    auto rc = decode_get_current_energy_count_resp(responseMsg, responseLen,
-                                                   &cc, &reason_code, &reading);
+    auto rc = decode_get_current_energy_count_resp(
+        responseMsg, responseLen, &cc, &reason_code, &readingInMilliJoules);
+    double readingInJoules = (double)readingInMilliJoules / 1000.0;
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        sensorValue->updateReading(reading);
+        sensorValue->updateReading(readingInJoules);
         clearErrorBitMap("decode_get_current_energy_count_resp");
     }
     else
