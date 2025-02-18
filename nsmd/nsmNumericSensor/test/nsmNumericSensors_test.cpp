@@ -406,12 +406,13 @@ TEST(nsmEnergy, GoodHandleResp)
     const uint8_t cc = NSM_SUCCESS;
     const uint16_t reason_code = ERR_NULL;
     const uint64_t reading{34320907};
+    double readingInJoules = (double)reading / 1000.0;
 
     auto rc = encode_get_current_energy_count_resp(instance_id, cc, reason_code,
                                                    reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(reading, 0)).Times(1);
+    EXPECT_CALL(*value, updateReading(readingInJoules, 0)).Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
 }
