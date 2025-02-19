@@ -104,10 +104,28 @@ int NsmThresholdEvent::handle(eid_t eid, NsmType /*type*/,
         appendError("estimated_effective_ber_threshold"sv);
     }
 
+    SensorManager& manager = SensorManager::getInstance();
+    auto nsmDevice = manager.getNsmDevice(info.uuid);
+    auto messageArg = info.messageArgs[0];
+    if (nsmDevice)
+    {
+        if (manager.deviceToPortMap.find(nsmDevice) !=
+            manager.deviceToPortMap.end())
+        {
+            auto deviceToPortMap = manager.deviceToPortMap[nsmDevice];
+            if (deviceToPortMap.find(payload.portNumber) !=
+                deviceToPortMap.end())
+            {
+                messageArg = messageArg + " " +
+                             deviceToPortMap[payload.portNumber];
+            }
+        }
+    }
+
     logEvent(
         "NsmThresholdEvent", info.severity,
         {{"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
-         {"REDFISH_MESSAGE_ARGS", info.messageArgs[0] + ", " + errors + ""},
+         {"REDFISH_MESSAGE_ARGS", messageArg + ", " + errors + ""},
          {"REDFISH_MESSAGE_ID", info.messageId},
          {"namespace", info.loggingNamespace},
          {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}});
