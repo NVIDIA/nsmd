@@ -249,7 +249,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                                              responseLen);
 
         uint8_t cc;
-        uint16_t reasonCode;
+        uint16_t reasonCode = 0;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             cc = NSM_ERR_UNSUPPORTED_COMMAND_CODE;
