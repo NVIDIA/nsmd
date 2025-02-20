@@ -172,10 +172,10 @@ requester::Coroutine
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     rc = decode_read_spi_status_resp(spiStatusResponseMsg.get(),
-                                     spiStatusResponseLen, &cc, &reason_code,
+                                     spiStatusResponseLen, &cc, &reasonCode,
                                      status);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
@@ -187,16 +187,12 @@ requester::Coroutine
                 (sizeof(nsm_msg_hdr) + sizeof(nsm_read_spi_status_resp))));
 #endif
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        co_return NSM_SW_SUCCESS;
-    }
-    else
-    {
-        logHandleResponseMsg("NsmGraceSpi decode_read_spi_status_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+    LG2_ERROR_FLT(
+        "decode_read_spi_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -249,11 +245,11 @@ requester::Coroutine
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint8_t data[30];
 
     rc = decode_read_spi_block_resp(spiStatusResponseMsg.get(),
-                                    spiStatusResponseLen, &cc, &reason_code,
+                                    spiStatusResponseLen, &cc, &reasonCode,
                                     data, 30);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
@@ -267,16 +263,12 @@ requester::Coroutine
 
     *writeComplete = !(data[1] & 0x01);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        co_return NSM_SW_SUCCESS;
-    }
-    else
-    {
-        logHandleResponseMsg("NsmGraceSpi decode_read_spi_block_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+    LG2_ERROR_FLT(
+        "decode_read_spi_block_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
@@ -326,11 +318,11 @@ requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     rc = decode_send_spi_transaction_resp(spiTransactionResponseMsg.get(),
                                           spiTransactionResponseLen, &cc,
-                                          &reason_code);
+                                          &reasonCode);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
@@ -341,16 +333,12 @@ requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
                 (sizeof(nsm_msg_hdr) + sizeof(nsm_send_spi_transaction_resp))));
 #endif
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-    {
-        co_return NSM_SW_SUCCESS;
-    }
-    else
-    {
-        logHandleResponseMsg("NsmGraceSpi decode_send_spi_transaction_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+    LG2_ERROR_FLT(
+        "decode_send_spi_transaction_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -415,10 +403,10 @@ requester::Coroutine
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     rc = decode_send_spi_command_resp(spiCommandResponseMsg.get(),
-                                      spiCommandResponseLen, &cc, &reason_code);
+                                      spiCommandResponseLen, &cc, &reasonCode);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
@@ -441,15 +429,14 @@ requester::Coroutine
         {
             rc = co_await executeSpiTransaction(manager, eid, 0x01);
         }
+    }
 
-        co_return rc;
-    }
-    else
-    {
-        logHandleResponseMsg("NsmGraceSpi decode_send_spi_command_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+    LG2_ERROR_FLT(
+        "decode_send_spi_command_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -543,10 +530,10 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     rc = decode_send_spi_operation_resp(
-        eraseBlockResponseMsg.get(), eraseBlockResponseLen, &cc, &reason_code);
+        eraseBlockResponseMsg.get(), eraseBlockResponseLen, &cc, &reasonCode);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
@@ -596,12 +583,13 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
             co_return rc;
         }
     }
-    else
-    {
-        logHandleResponseMsg("NsmGraceSpi decode_send_spi_operation_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+
+    LG2_ERROR_FLT(
+        "decode_send_spi_operation_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
@@ -649,11 +637,11 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     rc = decode_send_spi_operation_resp(transferBlockResponseMsg.get(),
                                         transferBlockResponseLen, &cc,
-                                        &reason_code);
+                                        &reasonCode);
 
 #ifdef ENABLE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
@@ -670,12 +658,13 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
 
         co_return rc;
     }
-    else
-    {
-        logHandleResponseMsg("NsmSpiRead decode_send_spi_operation_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
+
+    LG2_ERROR_FLT(
+        "decode_send_spi_operation_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -722,7 +711,7 @@ requester::Coroutine
         }
 
         uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         uint8_t buffer[30];
         size_t dataRead = 0;
 
@@ -730,14 +719,14 @@ requester::Coroutine
         {
             rc = decode_read_spi_block_resp(readBlockResponseMsg.get(),
                                             readBlockResponseLen, &cc,
-                                            &reason_code, buffer, 30);
+                                            &reasonCode, buffer, 30);
             dataRead = 30;
         }
         else
         {
             rc = decode_read_spi_last_block_resp(readBlockResponseMsg.get(),
                                                  readBlockResponseLen, &cc,
-                                                 &reason_code, buffer, 30);
+                                                 &reasonCode, buffer, 30);
             dataRead = 16;
         }
 
@@ -763,8 +752,9 @@ requester::Coroutine
         }
         else
         {
-            logHandleResponseMsg("NsmSpiRead decode_send_spi_operation_resp",
-                                 reason_code, cc, rc);
+            LG2_ERROR_FLT(
+                "NsmSpiRead decode_send_spi_operation_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                "REASONCODE", reasonCode, "CC", cc, "RC", rc);
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
     }

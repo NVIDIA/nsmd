@@ -60,15 +60,12 @@ uint8_t NsmClockOutputEnableStateBase::handleResponseMsg(
     auto rc = decode_get_clock_output_enable_state_resp(
         responseMsg, responseLen, &cc, &reasonCode, &size, &data);
 
-    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
-    {
-        clearErrorBitMap("decode_get_clock_output_enable_state_resp");
-    }
-    else
+    LG2_ERROR_FLT(
+        "decode_get_clock_output_enable_state_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         memset(&data, 0, sizeof(data));
-        logHandleResponseMsg("decode_get_clock_output_enable_state_resp",
-                             reasonCode, cc, rc);
     }
     handleResponse(data);
 

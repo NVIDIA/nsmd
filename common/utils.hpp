@@ -20,6 +20,7 @@
 #include "base.h"
 
 #include "coroutine.hpp"
+#include "log.hpp"
 #include "types.hpp"
 
 #include <cxxabi.h>   // abi::__cxa_demangle
@@ -32,7 +33,6 @@
 
 #include <boost/asio.hpp>
 #include <nlohmann/json.hpp>
-#include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Software/SecurityCommon/common.hpp>
@@ -94,23 +94,37 @@ struct Association
 using Associations =
     std::vector<std::tuple<std::string, std::string, std::string>>;
 
-struct bitfield256_err_code
+struct Bitfield256 : bitfield256_t
 {
-    bitfield256_t bitMap;
-    bool isAnyBitSet; // Flag indicating if any bits are set
-
-    bitfield256_err_code()
-    {
-        // Initialize cc_map and rc_map with all bits set to zero
-        for (int i = 0; i < 8; i++)
-        {
-            bitMap.fields[i].byte = 0;
-        }
-        isAnyBitSet = false;
-    }
-
-    bool isBitSet(const int& errCode);
+    /**
+     * @brief Constructor for Bitfield256, clears all the bits
+     *
+     */
+    Bitfield256();
+    /**
+     * @brief Set the bit at the given bitNumber
+     *
+     * @param bitNumber Number of the bit to set
+     * @return true if the bit was not set before
+     */
+    bool setBit(const uint8_t& bitNumber);
+    /**
+     * @brief Check if any bit is set
+     *
+     * @return true if any bit is set
+     */
+    bool isAnyBitSet() const;
+    /**
+     * @brief Get comma separated list of set bits
+     *
+     * @return Comma separated list of set bits
+     */
     std::string getSetBits() const;
+    /**
+     * @brief Clear all the bits
+     *
+     */
+    void clear();
 };
 
 /** @struct CustomFD

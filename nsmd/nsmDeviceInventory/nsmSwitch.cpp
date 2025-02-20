@@ -131,7 +131,10 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     rc = decode_get_power_mode_resp(responseMsg.get(), responseLen, &cc,
                                     &dataSize, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_power_mode_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         (data.l1_hw_mode_control == 1)
@@ -151,16 +154,9 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
                static_cast<uint64_t>(data.l1_hw_inactive_time));
         invoke(pdiMethod(hwPredictionInactiveTime),
                static_cast<uint64_t>(data.l1_prediction_inactive_time));
-        clearErrorBitMap("decode_get_power_mode_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_power_mode_resp", reasonCode, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return NSM_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
@@ -207,7 +203,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
     rc = decode_set_power_mode_resp(responseMsg.get(), responseLen, &cc,
                                     &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info("setL1PowerDevice for EID: {EID} completed", "EID", eid);
     }
@@ -500,7 +496,10 @@ uint8_t
     auto rc = decode_get_switch_isolation_mode_resp(
         responseMsg, responseLen, &cc, &reason_code, &isolationMode);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_switch_isolation_mode_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         if (isolationMode == SWITCH_COMMUNICATION_MODE_ENABLED)
         {
@@ -517,15 +516,8 @@ uint8_t
             switchIsolationIntf->isolationMode(
                 SwitchCommunicationMode::SwitchCommunicationUnknown);
         }
-        clearErrorBitMap("decode_get_switch_isolation_mode_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_switch_isolation_mode_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
@@ -595,7 +587,7 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
     rc = decode_set_switch_isolation_mode_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "NsmSwitchIsolationMode::setSwitchIsolationMode for EID: {EID} completed",

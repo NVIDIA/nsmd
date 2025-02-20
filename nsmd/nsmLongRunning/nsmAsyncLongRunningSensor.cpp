@@ -95,11 +95,13 @@ requester::Coroutine
     auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
                                               responseLen);
 
+    if (shouldLog("SendRecvNsmMsg", nsm_sw_codes(rc)))
+    {
+        LG2_ERROR("SendRecvNsmMsg failed, rc: {RC}, eid: {EID}", "RC", rc,
+                  "EID", eid);
+    }
     if (rc)
     {
-        lg2::error(
-            "NsmAsyncLongRunningSensor::updateLongRunningSensor: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
-            "NAME", NsmAsyncSensor::getName(), "EID", eid);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;
@@ -121,16 +123,11 @@ requester::Coroutine
     // if cc != NSM_SUCCESS proceed for event handling
     if (!initAcceptInstanceId(responseMsg->hdr.instance_id, cc, rc))
     {
-        logHandleResponseMsg(
-            "NsmAsyncLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning",
-            reasonCode, cc, rc);
         rc = NSM_SW_ERROR_COMMAND_FAIL;
     }
-    else
-    {
-        clearErrorBitMap(
-            "NsmAsyncLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning");
-    }
+    LG2_ERROR_FLT(
+        "Failed to accept LongRunning failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
 
     // coverity[missing_return]
     co_return rc;

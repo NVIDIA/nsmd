@@ -45,30 +45,28 @@ uint8_t
                                            size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     uint32_t reading = 0;
 
     auto rc = decode_get_altitude_pressure_resp(responseMsg, responseLen, &cc,
-                                                &reason_code, &reading);
+                                                &reasonCode, &reading);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_altitude_pressure_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // unit of pressure is hPa in NSM Command Response and selected unit
         // in SensorValue PDI is Pa. Hence it is converted to Watts.
         sensorValue->updateReading(reading * 100.0);
-        clearErrorBitMap("decode_get_altitude_pressure_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-
-        logHandleResponseMsg("decode_get_altitude_pressure_resp", reason_code,
-                             cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,

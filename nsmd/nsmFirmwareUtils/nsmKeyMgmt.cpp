@@ -221,15 +221,13 @@ uint8_t NsmKeyMgmt::handleResponseMsg(const nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &activeComponentKeyIndex,
         &pendingComponentKeyIndex, &permissionBitmapLength, NULL, NULL, NULL,
         NULL);
+
+    LG2_ERROR_FLT(
+        "decode_nsm_code_auth_key_perm_query_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        logHandleResponseMsg("decode_nsm_code_auth_key_perm_query_resp",
-                             reasonCode, cc, rc);
         return rc;
-    }
-    else
-    {
-        clearErrorBitMap("decode_nsm_code_auth_key_perm_query_resp");
     }
     std::vector<uint8_t> activeComponentKeyPermBitmap(permissionBitmapLength);
     std::vector<uint8_t> pendingComponentKeyPermBitmap(permissionBitmapLength);

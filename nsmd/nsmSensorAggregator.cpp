@@ -41,14 +41,14 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
     auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumed_len,
                                     &cc, &telemetry_count);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
     {
-        clearErrorBitMap("decode_aggregate_resp");
+        LG2_ERROR("decode_aggregate_resp | cc: {CC}, rc: {RC}", "CC", cc, "RC",
+                  rc);
     }
-    else
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
-        logHandleResponseMsg("decode_aggregate_resp", ERR_NULL, cc, rc);
-        return rc;
+        return cc ? cc : rc;
     }
 
     samples.clear();

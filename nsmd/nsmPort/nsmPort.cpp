@@ -157,7 +157,14 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                                        &reasonCode, &dataSize, &portState,
                                        &portStatus);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (shouldLog("decode_query_port_status_resp", reasonCode, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_query_port_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, portState: {PORTSTATE}, portStatus: {PORTSTATUS}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "PORTSTATE",
+            portState, "PORTSTATUS", portStatus);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         switch (portState)
         {
@@ -202,24 +209,10 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                 break;
         }
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_query_port_status_resp");
-    }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: decode_query_port_status_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
-                cc, "RC", rc);
-        }
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     // coverity[missing_return]
-
-    co_return NSM_SW_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -348,7 +341,10 @@ uint8_t
     auto rc = decode_query_port_characteristics_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_port_characteristics_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         auto speedGbps = (data.nv_port_line_rate_mbps) / 1000;
         portInfoIntf->currentSpeed(speedGbps);
@@ -362,20 +358,8 @@ uint8_t
         portMetricsOem3Intf->rxWidth(width);
 
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_query_port_characteristics_resp");
     }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: decode_query_port_characteristics_resp unsuccessfull. portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-                "NAM", portName, "NUM", portNumber, "RSNCOD", reasonCode, "CC",
-                cc, "RC", rc);
-        }
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPortCharacteristics::updateMetricOnSharedMemory()
@@ -869,24 +853,15 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_get_port_telemetry_counter_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "get_port_telemetry_counter failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateCounterValues(&data);
         updateMetricOnSharedMemory();
-        clearErrorBitMap("get_port_telemetry_counter");
     }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: get_port_telemetry_counter unsuccessfull. deviceType={DT} portName={NAM} portNumber={NUM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-                "DT", typeOfDevice, "NAM", portNumber, "NUM", portNumber,
-                "RSNCOD", reasonCode, "CC", cc, "RC", rc);
-        }
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,

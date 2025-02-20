@@ -185,16 +185,19 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint8_t data[8] = {0};
     uint16_t dataLen = 8;
 
     rc = decode_get_system_guid_resp(readSysGuidResponseMsg.get(),
-                                     readSysGuidResponseLen, &cc, &reason_code,
+                                     readSysGuidResponseLen, &cc, &reasonCode,
                                      data, dataLen);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmGetSysGuid decode_get_system_guid_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         bool sysGuidAllZeros = true;
         for (auto i = 0; i < 8; i++)
@@ -299,13 +302,13 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                 co_return rc;
             }
 
-            uint8_t cc = NSM_ERROR;
-            reason_code = ERR_NULL;
+            uint8_t cc = ERR_NULL;
+            reasonCode = ERR_NULL;
             dataLen = 8;
 
             rc = decode_get_system_guid_resp(reReadSysGuidResponseMsg.get(),
                                              readSysGuidResponseLen, &cc,
-                                             &reason_code, data, dataLen);
+                                             &reasonCode, data, dataLen);
         }
 
         // convert it to a string
@@ -316,16 +319,9 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
                 << static_cast<int>(guidtoken);
         }
         sysguidIntf->sysGUID(oss.str());
-        clearErrorBitMap("NsmGetSysGuid decode_get_system_guid_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("NsmGetSysGuid decode_get_system_guid_resp",
-                             reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    co_return rc;
+    co_return cc ? cc : rc;
 }
 #endif
 
@@ -403,7 +399,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                                       size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     bitfield8_t flags;
     uint16_t dataSize = 0;
     uint16_t reasonCode = ERR_NULL;
@@ -416,18 +412,16 @@ uint8_t NsmMigMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                   : decode_get_MIG_mode_resp(responseMsg, responseLen, &cc,
                                              &dataSize, &reasonCode, &flags);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(flags);
-        clearErrorBitMap(handleFunctionName);
-    }
-    else
-    {
-        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmEccMode::NsmEccMode(std::string& name, std::string& type,
@@ -482,7 +476,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                                       size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     bitfield8_t flags;
     uint16_t dataSize = 0;
     uint16_t reasonCode = ERR_NULL;
@@ -495,18 +489,15 @@ uint8_t NsmEccMode::handleResponseMsg(const struct nsm_msg* responseMsg,
                   : decode_get_ECC_mode_resp(responseMsg, responseLen, &cc,
                                              &dataSize, &reasonCode, &flags);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(flags);
-        clearErrorBitMap(handleFunctionName);
     }
-    else
-    {
-        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
-
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 void NsmEccMode::updateReading(bitfield8_t flags)
@@ -577,26 +568,21 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmEccErrorCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_ECC_error_counts errorCounts;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_ECC_error_counts_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &errorCounts);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &errorCounts);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_ECC_error_counts_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(errorCounts);
-        clearErrorBitMap("decode_get_ECC_error_counts_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_ECC_error_counts_resp", reason_code,
-                             cc, rc);
-
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
@@ -720,28 +706,21 @@ void NsmPciGroup2::updateReading(
 uint8_t NsmPciGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_2 data;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPciGroup2 decode_query_scalar_group_telemetry_v1_group2_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap(
-            "NsmPciGroup2 decode_query_scalar_group_telemetry_v1_group2_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPciGroup2 decode_query_scalar_group_telemetry_v1_group2_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmPciGroup3::NsmPciGroup3(const std::string& name, const std::string& type,
@@ -789,28 +768,22 @@ void NsmPciGroup3::updateReading(
 uint8_t NsmPciGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_3 data;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap(
-            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmPciGroup4::NsmPciGroup4(const std::string& name, const std::string& type,
@@ -895,28 +868,22 @@ void NsmPciGroup4::updateReading(
 uint8_t NsmPciGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_4 data;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap(
-            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmPciGroup5::NsmPciGroup5(
@@ -964,27 +931,22 @@ void NsmPciGroup5::updateReading(
 uint8_t NsmPciGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
                                         size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_5 data;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_query_scalar_group_telemetry_v1_group5_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group5_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group5_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group5_resp", reason_code,
-            cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmEDPpScalingFactor::NsmEDPpScalingFactor(
@@ -1049,26 +1011,22 @@ uint8_t
     NsmEDPpScalingFactor::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_EDPp_scaling_factors scaling_factors;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_programmable_EDPp_scaling_factor_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        responseMsg, responseLen, &cc, &data_size, &reasonCode,
         &scaling_factors);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_programmable_EDPp_scaling_factor_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(scaling_factors);
-        clearErrorBitMap("decode_get_programmable_EDPp_scaling_factor_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_programmable_EDPp_scaling_factor_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
@@ -1133,12 +1091,12 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_programmable_EDPp_scaling_factor_resp(
-        responseMsg.get(), responseLen, &cc, &reason_code, &data_size);
+        responseMsg.get(), responseLen, &cc, &reasonCode, &data_size);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "NsmEDPpScalingFactor::patchSetPoint for EID: {EID} completed",
@@ -1148,7 +1106,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
     {
         lg2::error(
             "NsmEDPpScalingFactor::patchSetPoint decode_set_programmable_EDPp_scaling_factor_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            "EID", eid, "CC", cc, "RC", reasonCode, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
@@ -1194,31 +1152,29 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint8_t value;
     std::vector<uint8_t> data(1, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("NsmMaxEDPpLimit decode_get_inventory_information_resp",
+                  reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         eDPpIntf->allowableMax(value);
-        clearErrorBitMap(
-            "NsmMaxEDPpLimit decode_get_inventory_information_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMaxEDPpLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmMinEDPpLimit::NsmMinEDPpLimit(std::string& name, std::string& type,
@@ -1258,31 +1214,29 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint8_t value;
     std::vector<uint8_t> data(1, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("NsmMinEDPpLimit decode_get_inventory_information_resp",
+                  reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         eDPpIntf->allowableMin(value);
-        clearErrorBitMap(
-            "NsmMinEDPpLimit decode_get_inventory_information_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMinEDPpLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmClockLimitGraphics::NsmClockLimitGraphics(
@@ -1367,26 +1321,21 @@ uint8_t
     NsmClockLimitGraphics::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_clock_limit clockLimit;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
-    auto rc = decode_get_clock_limit_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockLimit);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    auto rc = decode_get_clock_limit_resp(responseMsg, responseLen, &cc,
+                                          &data_size, &reasonCode, &clockLimit);
+    LG2_ERROR_FLT(
+        "decode_get_clock_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(clockLimit);
-        clearErrorBitMap("decode_get_clock_limit_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_clock_limit_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmCurrClockFreq::NsmCurrClockFreq(
@@ -1445,26 +1394,22 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint32_t clockFreq = 1;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_curr_clock_freq_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockFreq);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &clockFreq);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_curr_clock_freq_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(clockFreq);
-        clearErrorBitMap("decode_get_curr_clock_freq_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_curr_clock_freq_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmDefaultBaseClockSpeed::NsmDefaultBaseClockSpeed(
@@ -1509,34 +1454,32 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::baseSpeed(value);
-        clearErrorBitMap(
-            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmDefaultBaseClockSpeed decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmDefaultBoostClockSpeed::NsmDefaultBoostClockSpeed(
@@ -1581,33 +1524,32 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
+                  dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf
             ->CpuOperatingConfigIntf::defaultBoostClockSpeedMHz(value);
-        clearErrorBitMap("decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmCurrentUtilization::NsmCurrentUtilization(
@@ -1683,21 +1625,18 @@ uint8_t
                         responseMsg, responseLen, &cc, &dataSize, &reasonCode,
                         &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         cpuOperatingConfigIntf->utilization(data.gpu_utilization);
         smUtilizationIntf->smUtilization(data.memory_utilization);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(handleFunctionName);
-    }
-    else
-    {
-        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
-
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmProcessorThrottleReason::NsmProcessorThrottleReason(
@@ -1785,7 +1724,7 @@ std::optional<std::vector<uint8_t>>
                                                              requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::debug("encode_get_current_clock_event_reason_code_req failed. "
+        lg2::error("encode_get_current_clock_event_reason_code_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         return std::nullopt;
@@ -1796,25 +1735,21 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmProcessorThrottleReason::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     bitfield32_t data;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_current_clock_event_reason_code_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_current_clock_event_reason_code_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap("decode_get_current_clock_event_reason_code_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_current_clock_event_reason_code_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmAccumGpuUtilTime::NsmAccumGpuUtilTime(
@@ -1886,27 +1821,23 @@ uint8_t
     NsmAccumGpuUtilTime::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint32_t context_util_time;
     uint32_t SM_util_time;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_accum_GPU_util_time_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        responseMsg, responseLen, &cc, &data_size, &reasonCode,
         &context_util_time, &SM_util_time);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_accum_GPU_util_time_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(context_util_time, SM_util_time);
-        clearErrorBitMap("decode_get_accum_GPU_util_time_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_accum_GPU_util_time_resp", reason_code,
-                             cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmTotalMemorySize::NsmTotalMemorySize(
@@ -1950,32 +1881,31 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
+                  dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         persistentMemoryInterface->volatileSizeInKiB(value * 1024);
-        clearErrorBitMap("decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmTotalNvLinks::NsmTotalNvLinks(
@@ -2027,27 +1957,23 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmTotalNvLinks::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint8_t totalNvLinks;
     uint16_t data_size;
-    uint16_t reason_code;
+    uint16_t reasonCode = 0;
 
     auto rc = decode_query_ports_available_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &totalNvLinks);
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &totalNvLinks);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_ports_available_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         totalNvLinkInterface->totalNumberNVLinks(totalNvLinks);
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_query_ports_available_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_query_ports_available_resp", reason_code,
-                             cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmProcessorRevision::NsmProcessorRevision(sdbusplus::bus::bus& bus,
@@ -2102,29 +2028,24 @@ uint8_t
     NsmProcessorRevision::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     std::vector<uint8_t> data(65535, 0);
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         std::string revision(data.begin(), data.end());
         revisionIntf->version(revision);
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_get_inventory_information_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmGpuHealth::NsmGpuHealth(sdbusplus::bus::bus& bus, std::string& name,
@@ -2223,19 +2144,22 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
                                        size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t requested_persistent_limit_in_miliwatts = 0;
     uint32_t requested_oneshot_limit_in_miliwatts = 0;
     uint32_t enforced_limit_in_miliwatts = 0;
 
     auto rc = decode_get_power_limit_resp(
-        responseMsg, responseLen, &cc, &dataSize, &reason_code,
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode,
         &requested_persistent_limit_in_miliwatts,
         &requested_oneshot_limit_in_miliwatts, &enforced_limit_in_miliwatts);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // check if device returned invalid power limit, report invalid
         // value as is on dbus
@@ -2269,16 +2193,8 @@ uint8_t NsmPowerCap::handleResponseMsg(const struct nsm_msg* responseMsg,
                 1000;
             persistencyIntf->oneShotPowerLimit(reading);
         }
-
-        clearErrorBitMap("decode_get_power_limit_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_power_limit_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmMaxPowerCap::NsmMaxPowerCap(std::string& name, std::string& type,
@@ -2344,17 +2260,24 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
+                  dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
@@ -2364,17 +2287,9 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
                                                           : value / 1000;
         updateValue(reading);
-        clearErrorBitMap("decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmMinPowerCap::NsmMinPowerCap(std::string& name, std::string& type,
@@ -2440,17 +2355,24 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
+                  dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
@@ -2460,17 +2382,14 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
                                                           : value / 1000;
         updateValue(reading);
-        clearErrorBitMap("decode_get_inventory_information_resp");
     }
     else
     {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmDefaultPowerCap::NsmDefaultPowerCap(
@@ -2520,17 +2439,24 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("decode_get_inventory_information_resp", reasonCode, cc, rc,
+                  dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
@@ -2540,17 +2466,9 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
                                                           : value / 1000;
         updateValue(reading);
-        clearErrorBitMap("decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_inventory_information_resp",
-                             reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmProcessorThrottleDuration::NsmProcessorThrottleDuration(
@@ -2642,7 +2560,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmProcessorThrottleDuration::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     nsm_violation_duration data;
     uint16_t dataSize = 0;
     uint16_t reasonCode = ERR_NULL;
@@ -2657,17 +2575,15 @@ uint8_t NsmProcessorThrottleDuration::handleResponseMsg(
                                                        &cc, &dataSize,
                                                        &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap(handleFunctionName);
     }
-    else
-    {
-        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmConfidentialCompute::NsmConfidentialCompute(
@@ -2736,28 +2652,24 @@ uint8_t
     NsmConfidentialCompute::handleResponseMsg(const struct nsm_msg* responseMsg,
                                               size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint8_t current_mode;
     uint8_t pending_mode;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_confidential_compute_mode_v1_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &current_mode,
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, &current_mode,
         &pending_mode);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_confidential_compute_mode_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(current_mode, pending_mode);
-        clearErrorBitMap("decode_get_confidential_compute_mode_v1_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_confidential_compute_mode_v1_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 void NsmConfidentialCompute::updateReading(uint8_t current_mode,
@@ -2864,12 +2776,12 @@ requester::Coroutine NsmConfidentialCompute::patchCCMode(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_confidential_compute_mode_v1_resp(
-        responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
+        responseMsg.get(), responseLen, &cc, &data_size, &reasonCode);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "NsmConfidentialCompute :: patchCCMode for EID: {EID} completed",
@@ -2879,7 +2791,7 @@ requester::Coroutine NsmConfidentialCompute::patchCCMode(
     {
         lg2::error(
             "NsmConfidentialCompute :: patchCCMode decode_set_confidential_compute_mode_v1_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            "EID", eid, "CC", cc, "RC", reasonCode, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
 
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -2954,12 +2866,12 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_confidential_compute_mode_v1_resp(
-        responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
+        responseMsg.get(), responseLen, &cc, &data_size, &reasonCode);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "NsmConfidentialCompute :: patchCCDevMode for EID: {EID} completed",
@@ -2969,7 +2881,7 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
     {
         lg2::error(
             "NsmConfidentialCompute :: patchCCDevMode decode_set_confidential_compute_mode_v1_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+            "EID", eid, "CC", cc, "RC", reasonCode, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
 
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -3038,23 +2950,20 @@ uint8_t NsmEgmMode::handleResponseMsg(const struct nsm_msg* responseMsg,
     uint8_t cc = NSM_ERROR;
     bitfield8_t flags;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_EGM_mode_resp(responseMsg, responseLen, &cc,
-                                       &data_size, &reason_code, &flags);
+                                       &data_size, &reasonCode, &flags);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_EGM_mode_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(flags);
-        clearErrorBitMap("decode_get_EGM_mode_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_EGM_mode_resp", reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine createNsmProcessorSensor(SensorManager& manager,

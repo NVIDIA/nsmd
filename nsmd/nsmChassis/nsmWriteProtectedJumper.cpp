@@ -59,17 +59,13 @@ uint8_t NsmWriteProtectedJumper::handleResponseMsg(
     auto rc = decode_get_fpga_diagnostics_settings_wp_jumper_resp(
         responseMsg, responseLen, &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "encode_get_fpga_diagnostics_settings_wp_jumper_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke(pdiMethod(writeProtected), uint8_t(data.presence));
         invoke(pdiMethod(writeProtectedControl), uint8_t(data.presence));
-        clearErrorBitMap("encode_get_fpga_diagnostics_settings_wp_jumper_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "encode_get_fpga_diagnostics_settings_wp_jumper_resp", reasonCode,
-            cc, rc);
     }
 
     return cc ? cc : rc;

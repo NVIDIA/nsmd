@@ -617,7 +617,7 @@ TEST_F(NsmInventoryPropertyTest, badTestResponseSize)
         instanceId, NSM_SUCCESS, ERR_NULL, 0, nullptr, responseMsg);
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
 {
@@ -635,8 +635,8 @@ TEST_F(NsmInventoryPropertyTest, badTestCompletionErrorResponse)
         (struct nsm_get_inventory_information_resp*)responseMsg->payload;
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
-    rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    auto cc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(cc, NSM_ERROR);
 }
 TEST_F(NsmInventoryPropertyTest, badTestNotImplementedResponse)
 {
@@ -757,8 +757,8 @@ TEST_F(NsmPowerSupplyStatusTest, badTestCompletionErrorResponse)
         (struct nsm_get_power_supply_status_resp*)responseMsg->payload;
     resp->hdr.completion_code = NSM_ERROR;
     response.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
-    rc = sensor->handleResponseMsg(responseMsg, response.size());
-    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    auto cc = sensor->handleResponseMsg(responseMsg, response.size());
+    EXPECT_EQ(cc, NSM_ERROR);
 }
 
 struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest

@@ -61,7 +61,7 @@ int NsmFabricManagerStateEvent::handle(eid_t eid, NsmType /*type*/,
             "decode_nsm_get_fabric_manager_state_event failed. rc={RC}, EID={SRC}, Name={NAME}",
             "RC", rc, "SRC", eid, "NAME", getName());
 
-        return NSM_SW_ERROR;
+        return rc;
     }
 
     switch (payload.report_status)

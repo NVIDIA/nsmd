@@ -41,7 +41,7 @@ enum class clockLimitFlag
 NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
     sdbusplus::bus::bus& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
-    clearClockLimAsyncIntf(bus, path),
+    ClearClockLimAsyncIntf(bus, path),
     device(device){};
 
 requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
@@ -49,11 +49,11 @@ requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
 {
     AsyncOperationStatusType status{AsyncOperationStatusType::Success};
 
-    auto rc_ = co_await clearReqClockLimit(&status);
+    auto rc = co_await clearReqClockLimit(&status);
 
     statusInterface->status(status);
     // coverity[missing_return]
-    co_return rc_;
+    co_return rc;
 }
 requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
     AsyncOperationStatusType* status)
@@ -74,21 +74,21 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc_)
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
     {
         lg2::error(
             "clearReqClockLimit SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
@@ -97,21 +97,15 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
     rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
                                      &data_size, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_set_clock_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::info("clearReqClockLimit for EID: {EID} completed", "EID", eid);
-    }
-    else
-    {
-        lg2::error(
-            "clearReqClockLimit decode_set_clock_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 sdbusplus::message::object_path NsmClearClockLimAsyncIntf::clearClockLimit()
@@ -215,22 +209,17 @@ uint8_t
 
     auto rc = decode_get_clock_limit_resp(
         responseMsg, responseLen, &cc, &data_size, &reason_code, &clockLimit);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_clock_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         cpuOperatingConfigIntf->requestedSpeedLimits(
             std::make_tuple((uint32_t)clockLimit.requested_limit_min,
                             (uint32_t)clockLimit.requested_limit_max));
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_get_clock_limit_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_clock_limit_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    return cc;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
@@ -287,45 +276,38 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc_)
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
     {
         lg2::error(
             "NsmChassisClockControl::setRangeClockLimits SendRecvNsmMsgSync failed for while setting requested speed limit "
             "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return rc;
     }
     uint8_t cc = NSM_SUCCESS;
     uint16_t reason_code = ERR_NULL;
     uint16_t data_size = 0;
     rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
                                      &data_size, &reason_code);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+
+    LG2_ERROR_FLT(
+        "decode_set_clock_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::info(
-            "NsmChassisClockControl::setRangeClockLimits for EID: {EID} completed",
-            "EID", eid);
-    }
-    else
-    {
-        lg2::error(
-            "NsmChassisClockControl::setRangeClockLimits decode_set_clock_limit_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 static requester::Coroutine CreateControlGpuClock(SensorManager& manager,

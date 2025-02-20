@@ -17,10 +17,10 @@
 
 #pragma once
 #include "requester/handler.hpp"
+#include "stateChangeLogger.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
-#include <phosphor-logging/lg2.hpp>
 #include <tal.hpp>
 
 static constexpr const uint64_t INIT_TIMESTAMP =
@@ -33,7 +33,7 @@ namespace nsm
 {
 
 class SensorManager;
-class NsmObject
+class NsmObject : virtual public StateChangeLogger
 {
   public:
     NsmObject() = delete;
@@ -54,12 +54,6 @@ class NsmObject
     {
         return deviceIdentifier;
     }
-
-    void setDeviceIdentifier(const std::string deviceType)
-    {
-        deviceIdentifier = deviceType;
-    }
-
     void setLastUpdatedTimeStamp(const uint64_t currentTimestampInUsec)
     {
         lastUpdatedTimeStampInUsec = currentTimestampInUsec;
@@ -70,64 +64,6 @@ class NsmObject
         const uint64_t deltaInUsec = currentTimestampInUsec -
                                      lastUpdatedTimeStampInUsec;
         return (deltaInUsec > refreshLimitInUsec);
-    }
-
-    void logHandleResponseMsg(const std::string funcName,
-                              const uint16_t& reason_code, const int& cc,
-                              const int& rc)
-    {
-        if (!shouldLogError(cc, rc))
-        {
-            return;
-        }
-        lg2::error(
-            "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
-            "with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
-            getName(), "REASONCODE", reason_code, "CC", cc, "RC", rc);
-    }
-
-    bool shouldLogError(const int& cc, const int& rc)
-    {
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-        {
-            return false;
-        }
-        if (cc == NSM_SUCCESS)
-        {
-            rc_map.isAnyBitSet = true;
-            return !rc_map.isBitSet(rc);
-        }
-        cc_map.isAnyBitSet = true;
-        return !cc_map.isBitSet(cc);
-    }
-
-    void clearErrorBitMap(std::string funcName)
-    {
-        if (cc_map.isAnyBitSet)
-        {
-            lg2::error(
-                "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
-                "request SUCCESSFUL | CC Code(s) Cleared : [{CCCLEAREDBITS}]",
-                "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
-                getName(), "CCCLEAREDBITS", cc_map.getSetBits());
-        }
-        if (rc_map.isAnyBitSet)
-        {
-            lg2::error(
-                "handleResponseMsg: {FUNCNAME} | Device={DEVID} sensor={NAME} "
-                "request SUCCESSFUL | RC Code(s) Cleared : [{RCCLEAREDBITS}]",
-                "FUNCNAME", funcName, "DEVID", getDeviceIdentifier(), "NAME",
-                getName(), "RCCLEAREDBITS", rc_map.getSetBits());
-        }
-        // Clear the bitmaps
-        for (int i = 0; i < 8; i++)
-        {
-            cc_map.bitMap.fields[i].byte = 0;
-            rc_map.bitMap.fields[i].byte = 0;
-        }
-        cc_map.isAnyBitSet = false;
-        rc_map.isAnyBitSet = false;
     }
 
     virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
@@ -147,14 +83,13 @@ class NsmObject
     bool isRefreshed = false;
     bool isStatic = false;
 
+  protected:
   private:
+    friend class NsmDevice;
+    std::string deviceIdentifier;
     const std::string name;
     const std::string type;
     uint64_t lastUpdatedTimeStampInUsec = INIT_TIMESTAMP;
     uint64_t refreshLimitInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
-    utils::bitfield256_err_code cc_map;
-    utils::bitfield256_err_code rc_map;
-    std::string deviceIdentifier;
-    // deviceIdentifier = deviceName_deviceInstanceNumber
 };
 } // namespace nsm

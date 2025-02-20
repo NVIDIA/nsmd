@@ -64,16 +64,11 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
     {};
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reasonCode, &erotInfo);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE) failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        clearErrorBitMap(
-            "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE)");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_nsm_query_get_erot_state_parameters_resp(GET_NSM_BUILD_TYPE)",
-            reasonCode, cc, rc);
         return NSM_SW_ERROR_COMMAND_FAIL;
     }
     if (erotInfo.fq_resp_hdr.firmware_slot_count != fwSlotObjects.size())

@@ -51,6 +51,30 @@ int NsmNumericAggregator::updateSensorReading(uint8_t tag, double reading,
     return NSM_SW_SUCCESS;
 }
 
+void NsmNumericAggregator::logFalseValid(uint8_t tag, bool valid)
+{
+    if (valid)
+    {
+        if (tag_map.isAnyBitSet())
+        {
+            lg2::info(
+                "handleResponseMsg: NsmNumericAggregator Aggregator {NAME}"
+                " of type {TYPE} | Bits Invalid Code Cleared for"
+                " Tag(s) : [{TAGCLEAREDBITS}]",
+                "NAME", getName(), "TYPE", getType(), "TAGCLEAREDBITS",
+                tag_map.getSetBits());
+        }
+        // Clear the bitMaps
+        tag_map.clear();
+    }
+    else if (tag_map.setBit(tag))
+    {
+        lg2::debug(
+            "NsmNumericAggregator: False Valid bit in Tag {TAG} for Aggregator {NAME} of type {TYPE}.",
+            "TAG", tag, "NAME", getName(), "TYPE", getType());
+    }
+}
+
 int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
 {
     if (!sensors[tag])
@@ -58,14 +82,7 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
         return NSM_SW_ERROR_DATA;
     }
 
-    if (!valid)
-    {
-        logFalseValid(tag);
-    }
-    else
-    {
-        clearTagBitMap("NsmNumericAggregator");
-    }
+    logFalseValid(tag, valid);
 
     sensors[tag]->updateReading(std::numeric_limits<double>::quiet_NaN());
 

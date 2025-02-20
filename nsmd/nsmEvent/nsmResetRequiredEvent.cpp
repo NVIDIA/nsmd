@@ -73,7 +73,7 @@ int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
             "decode_nsm_reset_required_event failed. rc={RC}, EID={SRC}, Name={NAME}",
             "RC", rc, "SRC", eid, "NAME", getName());
 
-        return NSM_SW_ERROR;
+        return rc;
     }
 
     logEvent("NsmResetRequiredEvent", info.severity, eventData);

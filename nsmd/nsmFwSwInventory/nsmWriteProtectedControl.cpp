@@ -61,16 +61,13 @@ uint8_t
     auto rc = decode_get_fpga_diagnostics_settings_wp_resp(
         responseMsg, responseLen, &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_fpga_diagnostics_settings_wp_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke(pdiMethod(writeProtected),
                NsmSetWriteProtected::getValue(data, dataIndex));
-        clearErrorBitMap("decode_get_fpga_diagnostics_settings_wp_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_fpga_diagnostics_settings_wp_resp",
-                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

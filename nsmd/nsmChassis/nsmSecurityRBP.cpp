@@ -29,9 +29,9 @@ namespace nsm
 
 SecurityConfiguration::SecurityConfiguration(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
-    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor* nsmSensorIn) :
+    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor& nsmSensor) :
     SecurityConfigIntf(bus, objPath.c_str()),
-    uuid(uuidIn), progressIntf(progressIntfIn), nsmSensor(nsmSensorIn)
+    uuid(uuidIn), progressIntf(progressIntfIn), nsmSensor(nsmSensor)
 {}
 
 void SecurityConfiguration::updateState(
@@ -93,30 +93,31 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = 0;
-    uint16_t reason_code = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    uint16_t reasonCode = 0;
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
+                                              responseLen);
 
-    if (sendRc != NSM_SW_SUCCESS)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
             "securityCfgAsyncHandler: SendRecvNsmMsg error : eid={EID} rc={RC}",
-            "EID", eid, "RC", sendRc);
+            "EID", eid, "RC", rc);
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
-        co_return sendRc;
+        co_return rc;
     }
     if (requestType == ENABLE_IRREVERSIBLE_CFG)
     {
         struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
         {};
-        auto sendRc = decode_nsm_firmware_irreversible_config_request_2_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code, &cfg_2_resp);
-        if (sendRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        rc = decode_nsm_firmware_irreversible_config_request_2_resp(
+            responseMsg.get(), responseLen, &cc, &reasonCode, &cfg_2_resp);
+
+        LG2_ERROR_FLT(
+            "decode_nsm_firmware_irreversible_config_request_2_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::error("decode_nsm_firmware_irreversible_config_request_2_resp"
-                       " failed for : eid={EID} rc={RC}",
-                       "EID", eid, "RC", sendRc);
             finishOperation(Progress::OperationStatus::Aborted);
             // coverity[missing_return]
             co_return NSM_SW_ERROR;
@@ -126,28 +127,22 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
     }
     else
     {
-        auto sendRc = decode_nsm_firmware_irreversible_config_request_1_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code);
-        if (sendRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        rc = decode_nsm_firmware_irreversible_config_request_1_resp(
+            responseMsg.get(), responseLen, &cc, &reasonCode);
+        LG2_ERROR_FLT(
+            "decode_nsm_firmware_irreversible_config_request_1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::error("decode_nsm_firmware_irreversible_config_request_1_resp"
-                       " failed for : eid={EID} rc={RC}",
-                       "EID", eid, "RC", sendRc);
             finishOperation(Progress::OperationStatus::Aborted);
             // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
         finishOperation(Progress::OperationStatus::Completed);
     }
-    sendRc = co_await nsmSensor->update(manager, eid);
-    if (sendRc != NSM_SW_SUCCESS)
-    {
-        lg2::error("IrreversibleConfig Method is success."
-                   "But updating IrreversibleConfigState failed rc={RC}",
-                   "RC", sendRc);
-    }
+    rc = co_await nsmSensor.update(manager, eid);
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return rc;
 }
 
 int SecurityConfiguration::startOperation()
@@ -190,7 +185,7 @@ NsmSecurityCfgObject::NsmSecurityCfgObject(
     lg2::info("NsmSecurityCfgObject: create object: {PATH}", "PATH",
               objectPath.c_str());
     securityCfgObject = std::make_unique<SecurityConfiguration>(
-        bus, objectPath, uuid, progressIntfIn, this);
+        bus, objectPath, uuid, progressIntfIn, *this);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -221,29 +216,21 @@ uint8_t NsmSecurityCfgObject::handleResponseMsg(const nsm_msg* responseMsg,
     struct nsm_firmware_irreversible_config_request_0_resp stateInfo;
     auto rc = decode_nsm_firmware_irreversible_config_request_0_resp(
         responseMsg, responseLen, &cc, &reasonCode, &stateInfo);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        logHandleResponseMsg(
-            "decode_nsm_firmware_irreversible_config_request_0_resp",
-            reasonCode, cc, rc);
-        return rc;
-    }
-    else
-    {
-        clearErrorBitMap(
-            "decode_nsm_firmware_irreversible_config_request_0_resp");
-    }
+
+    LG2_ERROR_FLT(
+        "decode_nsm_firmware_irreversible_config_request_0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     securityCfgObject->updateState(stateInfo);
-    return cc;
+    return cc ? cc : rc;
 }
 
 MinSecurityVersion::MinSecurityVersion(
     sdbusplus::bus::bus& bus, const std::string& objPath, const uuid_t& uuidIn,
     uint16_t classificationIn, uint16_t identifierIn, uint8_t indexIn,
-    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor* nsmSensorIn) :
+    std::shared_ptr<ProgressIntf> progressIntfIn, NsmSensor& nsmSensor) :
     MinSecVersionIntf(bus, objPath.c_str()),
     uuid(uuidIn), classification(classificationIn), identifier(identifierIn),
-    index(indexIn), progressIntf(progressIntfIn), nsmSensor(nsmSensorIn)
+    index(indexIn), progressIntf(progressIntfIn), nsmSensor(nsmSensor)
 {
     securityVersionObject =
         std::make_unique<SecurityVersionIntf>(bus, objPath.c_str());
@@ -313,33 +300,33 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = 0;
-    uint16_t reason_code = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    uint16_t reasonCode = 0;
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
+                                              responseLen);
 
-    if (sendRc != NSM_SW_SUCCESS)
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("minSecVersionAsyncHandler: SendRecvNsmMsg error :"
                    " eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
-        errorCode(
-            getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, sendRc));
+                   "EID", eid, "RC", rc);
+        errorCode(getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, rc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
-        co_return sendRc;
+        co_return rc;
     }
 
     struct ::nsm_firmware_update_min_sec_ver_resp sec_resp;
     {};
-    sendRc = decode_nsm_firmware_update_sec_ver_resp(
-        responseMsg.get(), responseLen, &cc, &reason_code, &sec_resp);
-    if (sendRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    rc = decode_nsm_firmware_update_sec_ver_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reasonCode, &sec_resp);
+
+    LG2_ERROR_FLT(
+        "decode_nsm_firmware_update_sec_ver_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error("decode_nsm_firmware_update_sec_ver_resp failed for :"
-                   " eid={EID} rc={RC}, cc={CC}",
-                   "EID", eid, "RC", sendRc, "CC", cc);
         errorCode(getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, cc,
-                               reason_code));
+                               reasonCode));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
@@ -347,15 +334,9 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     bitfield32_t updateMethodBitfield{sec_resp.update_methods};
     updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
-    sendRc = co_await nsmSensor->update(manager, eid);
-    if (sendRc != NSM_SW_SUCCESS)
-    {
-        lg2::error("UpdateMinSecVersion Method is success."
-                   "But updating sec version properties failed rc={RC}",
-                   "RC", sendRc);
-    }
+    rc = co_await nsmSensor.update(manager, eid);
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return rc;
 }
 
 int MinSecurityVersion::startOperation()
@@ -402,7 +383,7 @@ NsmMinSecVersionObject::NsmMinSecVersionObject(
               objectPath.c_str());
     minSecVersion = std::make_unique<MinSecurityVersion>(
         bus, objectPath, uuid, classification, identifier, index,
-        progressIntfIn, this);
+        progressIntfIn, *this);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -436,19 +417,11 @@ uint8_t NsmMinSecVersionObject::handleResponseMsg(const nsm_msg* responseMsg,
     struct ::nsm_firmware_security_version_number_resp sec_info;
     auto rc = decode_nsm_query_firmware_security_version_number_resp(
         responseMsg, responseLen, &cc, &reasonCode, &sec_info);
-    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
-    {
-        logHandleResponseMsg(
-            "decode_nsm_query_firmware_security_version_number_resp",
-            reasonCode, cc, rc);
-        return rc;
-    }
-    else
-    {
-        clearErrorBitMap(
-            "decode_nsm_query_firmware_security_version_number_resp");
-    }
+
+    LG2_ERROR_FLT(
+        "decode_nsm_query_firmware_security_version_number_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     minSecVersion->updateProperties(sec_info);
-    return cc;
+    return cc ? cc : rc;
 }
 } // namespace nsm

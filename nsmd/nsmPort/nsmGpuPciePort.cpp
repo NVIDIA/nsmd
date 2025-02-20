@@ -126,22 +126,15 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
         responseMsg.get(), responseLen, &cc, &dataSize, &reason_code,
         &mask_length, (uint8_t*)availableSource, (uint8_t*)clearableSource);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_available_clearable_scalar_data_sources_v1_respp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(clearableSource);
-        clearErrorBitMap(
-            "decode_query_available_clearable_scalar_data_sources_v1_respp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_query_available_clearable_scalar_data_sources_v1_respp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 void NsmClearPCIeCounters::findAndUpdateCounter(
@@ -260,7 +253,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
     rc = decode_clear_data_source_v1_resp(responseMsg.get(), responseLen, &cc,
                                           &data_size, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         std::shared_ptr<NsmPcieGroup> sensor =
             getClearCounterSensorFromGroup(groupId);

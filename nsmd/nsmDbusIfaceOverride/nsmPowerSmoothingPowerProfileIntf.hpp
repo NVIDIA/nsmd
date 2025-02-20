@@ -18,6 +18,7 @@
 #include "platform-environmental.h"
 
 #include "asyncOperationManager.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <com/nvidia/PowerSmoothing/PowerProfile/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
@@ -31,7 +32,8 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
 class OemPowerProfileIntf :
     public PowerProfileIntf,
-    public AssociationDefinitionsIntf
+    public AssociationDefinitionsIntf,
+    public StateChangeLogger
 {
   private:
     std::shared_ptr<NsmDevice> device;
@@ -99,14 +101,17 @@ class OemPowerProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         nsm_get_all_preset_profile_meta_data data{};
         uint8_t numberOfprofiles = 0;
         rc = decode_get_preset_profile_metadata_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code, &data,
+            responseMsg.get(), responseLen, &cc, &reasonCode, &data,
             &numberOfprofiles);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_get_preset_profile_metadata_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             for (int profileIdInResponse = 0;
                  profileIdInResponse < numberOfprofiles; profileIdInResponse++)
@@ -115,7 +120,7 @@ class OemPowerProfileIntf :
                 {
                     nsm_preset_profile_data profileData{};
                     decode_get_preset_profile_data_from_resp(
-                        responseMsg.get(), responseLen, &cc, &reason_code,
+                        responseMsg.get(), responseLen, &cc, &reasonCode,
                         numberOfprofiles, profileId, &profileData);
                     // fraction to percent
                     if (profileData.tmp_floor_setting_in_percent ==
@@ -146,20 +151,10 @@ class OemPowerProfileIntf :
                     PowerProfileIntf::rampDownHysteresis(
                         utils::convertAndScaleDownUint32ToDouble(
                             profileData.ramp_hysterisis_rate_in_milisec, 1000));
-                    lg2::info(
-                        "getProfileInfo for EID: {EID} completed for profile Id: {ID}",
-                        "EID", eid, "ID", profileId);
                 }
             }
         }
-        else
-        {
-            lg2::error(
-                "getProfileInfo decode_get_preset_profile_metadata_resp/decode_get_preset_profile_data_from_resp. eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            co_return rc;
-        }
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine
@@ -215,11 +210,11 @@ class OemPowerProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_update_preset_profile_param_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code);
+            responseMsg.get(), responseLen, &cc, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // verify setting is applied on the device
             co_await getProfileInfoFromDevice();
@@ -228,7 +223,7 @@ class OemPowerProfileIntf :
         {
             lg2::error(
                 "updateProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                "EID", eid, "CC", cc, "RC", reasonCode, "A", rc, "ID",
                 parameterId, "PROFILEID", profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -282,9 +277,9 @@ class OemPowerProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_update_preset_profile_param_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code);
+            responseMsg.get(), responseLen, &cc, &reasonCode);
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
@@ -295,7 +290,7 @@ class OemPowerProfileIntf :
         {
             lg2::error(
                 "resetProfileInfoOnDevice decode_update_preset_profile_param_resp  failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}). eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}, Reqmsg= {MSG}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                "EID", eid, "CC", cc, "RC", reasonCode, "A", rc, "ID",
                 parameterId, "PROFILEID", profileId, "VALUE", paramValue, "MSG",
                 msg);
             *status = AsyncOperationStatusType::WriteFailure;

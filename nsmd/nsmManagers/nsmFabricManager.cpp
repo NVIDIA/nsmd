@@ -192,13 +192,16 @@ uint8_t
                                              size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataLen = 0;
     struct nsm_fabric_manager_state_data fmStateData;
     auto rc = decode_get_fabric_manager_state_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataLen, &fmStateData);
+        responseMsg, responseLen, &cc, &reasonCode, &dataLen, &fmStateData);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_fabric_manager_state_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         switch (fmStateData.report_status)
@@ -267,12 +270,7 @@ uint8_t
                 break;
         }
         nsmAggregateFabricManagerState->updateAggregateFabricManagerState();
-        clearErrorBitMap("decode_get_fabric_manager_state_resp");
-        return NSM_SW_SUCCESS;
     }
-
-    logHandleResponseMsg("decode_get_fabric_manager_state_resp", reason_code,
-                         cc, rc);
-    return NSM_SW_ERROR_COMMAND_FAIL;
+    return cc ? cc : rc;
 }
 } // namespace nsm

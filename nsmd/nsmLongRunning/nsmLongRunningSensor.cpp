@@ -122,16 +122,11 @@ requester::Coroutine
     // if cc != NSM_SUCCESS proceed for event handling
     if (!initAcceptInstanceId(responseMsg->hdr.instance_id, cc, rc))
     {
-        logHandleResponseMsg(
-            "NsmLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning",
-            reasonCode, cc, rc);
         rc = NSM_SW_ERROR_COMMAND_FAIL;
     }
-    else
-    {
-        clearErrorBitMap(
-            "NsmLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning");
-    }
+    LG2_ERROR_FLT(
+        "NsmLongRunningSensor::updateLongRunningSensor: Failed to accept LongRunning failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
 
     // coverity[missing_return]
     co_return rc;

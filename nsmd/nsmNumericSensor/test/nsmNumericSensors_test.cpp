@@ -138,22 +138,22 @@ TEST(nsmTemp, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERROR;
+    uint8_t cc = NSM_ERROR;
     const uint16_t reason_code = ERR_NOT_SUPPORTED;
     const double reading{3843.348};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_temperature_reading_resp(instance_id, cc, reason_code,
                                              reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERROR);
 }
 
 TEST(nsmPower, GoodGenReq)
@@ -251,22 +251,22 @@ TEST(nsmPower, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERR_NOT_READY;
+    uint8_t cc = NSM_ERR_NOT_READY;
     const uint16_t reason_code = ERR_TIMEOUT;
     const uint32_t reading{34320};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_current_power_draw_resp(instance_id, cc, reason_code,
                                             reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
 TEST(nsmPeakPower, GoodGenReq)
@@ -331,22 +331,22 @@ TEST(nsmPeakPower, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERR_NOT_READY;
+    uint8_t cc = NSM_ERR_NOT_READY;
     const uint16_t reason_code = ERR_TIMEOUT;
     const uint32_t reading{34320};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_max_observed_power_resp(instance_id, cc, reason_code,
                                             reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
 TEST(nsmEnergy, GoodGenReq)
@@ -440,22 +440,22 @@ TEST(nsmEnergy, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERROR;
+    uint8_t cc = NSM_ERROR;
     const uint16_t reason_code = ERR_NOT_SUPPORTED;
     const uint64_t reading{34320907};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_current_energy_count_resp(instance_id, cc, reason_code,
                                               reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERROR);
 }
 
 TEST(nsmVoltage, GoodGenReq)
@@ -526,21 +526,21 @@ TEST(nsmVoltage, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERR_NOT_READY;
+    uint8_t cc = NSM_ERR_NOT_READY;
     const uint16_t reason_code = ERR_TIMEOUT;
     const uint32_t reading{4345787};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_voltage_resp(instance_id, cc, reason_code, reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
 TEST(nsmAltitudePressure, GoodGenReq)
@@ -605,22 +605,22 @@ TEST(nsmAltitudePressure, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERR_NOT_READY;
+    uint8_t cc = NSM_ERR_NOT_READY;
     const uint16_t reason_code = ERR_TIMEOUT;
     const uint32_t reading{9380};
     uint8_t rc = NSM_SW_SUCCESS;
 
     rc = sensor.handleResponseMsg(nullptr, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
     rc = sensor.handleResponseMsg(msg, msg_size - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
     rc = encode_get_altitude_pressure_resp(instance_id, cc, reason_code,
                                            reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }
 
 TEST(nsmThreshold, GoodGenReq)
@@ -678,7 +678,7 @@ TEST(nsmThreshold, BadHandleResp)
     std::array<char, msg_size> request;
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
-    const uint8_t cc = NSM_ERR_NOT_READY;
+    uint8_t cc = NSM_ERR_NOT_READY;
     const uint16_t reason_code = ERR_TIMEOUT;
     const int32_t reading{85};
     uint8_t rc = NSM_SW_SUCCESS;
@@ -692,6 +692,6 @@ TEST(nsmThreshold, BadHandleResp)
     rc = encode_read_thermal_parameter_resp(instance_id, cc, reason_code,
                                             reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    rc = sensor.handleResponseMsg(msg, msg_size);
-    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+    cc = sensor.handleResponseMsg(msg, msg_size);
+    EXPECT_EQ(cc, NSM_ERR_NOT_READY);
 }

@@ -126,7 +126,10 @@ uint8_t
     auto rc = decode_get_reconfiguration_permissions_v1_resp(
         responseMsg, responseLen, &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_reconfiguration_permissions_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         hostConfigIntf->allowOneShotConfig(data.host_oneshot);
         hostConfigIntf->allowPersistentConfig(data.host_persistent);
@@ -134,12 +137,6 @@ uint8_t
         doeConfigIntf->allowOneShotConfig(data.DOE_oneshot);
         doeConfigIntf->allowPersistentConfig(data.DOE_persistent);
         doeConfigIntf->allowFLRPersistentConfig(data.DOE_flr_persistent);
-        clearErrorBitMap("decode_get_reconfiguration_permissions_v1_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_reconfiguration_permissions_v1_resp",
-                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

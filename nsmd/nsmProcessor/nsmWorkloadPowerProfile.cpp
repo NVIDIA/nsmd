@@ -78,7 +78,7 @@ requester::Coroutine
     rc = decode_enable_workload_power_profile_resp(
         responseMsg.get(), responseLen, &cc, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "requestEnablePresetProfile for EID: {EID} completed, msg = {MSG}",
@@ -181,7 +181,7 @@ requester::Coroutine
     rc = decode_disable_workload_power_profile_resp(
         responseMsg.get(), responseLen, &cc, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info(
             "requestDisablePresetProfile for EID: {EID} completed, msg = {MSG}",
@@ -281,18 +281,14 @@ uint8_t NsmWorkLoadProfileStatus::handleResponseMsg(
     auto rc = decode_get_workload_power_profile_status_resp(
         responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_workload_power_profile_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_workload_power_profile_status_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_workload_power_profile_status_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmWorkLoadProfileStatus::updateReading(
@@ -452,7 +448,10 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
         responseMsg, responseLen, &cc, &reason_code, &data, &numberOfprofiles);
     nextIdentifier = data.next_identifier;
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_workload_power_profile_info_metadata_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         uint16_t firstProfileIndex = pageId * numberOfprofiles;
         uint16_t lastProfileIndex = (pageId + 1) * numberOfprofiles;
@@ -495,17 +494,8 @@ uint8_t NsmWorkloadPowerProfilePage::handleResponseMsg(
                 pageCollection->addPage(nextPageId, page);
             }
         }
-        clearErrorBitMap(
-            "decode_get_workload_power_profile_info_metadata_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_get_workload_power_profile_info_metadata_resp", reason_code,
-            cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

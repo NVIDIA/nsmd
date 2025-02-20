@@ -83,30 +83,26 @@ uint8_t NsmProcessorModulePowerControl::handleResponseMsg(
 {
     uint8_t cc = NSM_ERROR;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint32_t requested_persistent_limit;
     uint32_t requested_oneshot_limit;
     uint32_t enforced_limit;
 
     auto rc = decode_get_power_limit_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
+        responseMsg, responseLen, &cc, &data_size, &reasonCode,
         &requested_persistent_limit, &requested_oneshot_limit, &enforced_limit);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_module_power_limit_resp_module failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         uint32_t reading = (enforced_limit == INVALID_POWER_LIMIT)
                                ? INVALID_POWER_LIMIT
                                : enforced_limit / 1000;
         powerCapIntf->powerCap(reading);
-        clearErrorBitMap("decode_get_module_power_limit_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_module_power_limit_resp_module",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine NsmProcessorModulePowerControl::setModulePowerCap(
@@ -147,70 +143,58 @@ requester::Coroutine NsmProcessorModulePowerControl::updatePowerLimitOnModule(
     }
 
     SensorManager& manager = SensorManager::getInstance();
-    if (manager.processorModuleToDeviceMap.find(path) ==
-        manager.processorModuleToDeviceMap.end())
-    {
-        *status = AsyncOperationStatusType::WriteFailure;
-        patchPowerLimitInProgress = false;
-        co_return NSM_SW_ERROR;
-    }
+    uint8_t rc = manager.processorModuleToDeviceMap.find(path) ==
+                         manager.processorModuleToDeviceMap.end()
+                     ? NSM_SW_ERROR
+                     : NSM_SW_SUCCESS;
+    uint8_t cc = NSM_SUCCESS;
     for (auto nsmDevice : manager.processorModuleToDeviceMap[path])
     {
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-        auto rc = encode_set_module_power_limit_req(0, action, true,
-                                                    value * 1000, requestMsg);
+        rc = encode_set_module_power_limit_req(0, action, true, value * 1000,
+                                               requestMsg);
 
         if (rc)
         {
             lg2::error(
                 "updatePowerLimitOnModule encode_set_module_power_limit_req failed. module={MODULE}, rc={RC}",
                 "MODULE", getName(), "RC", rc);
-            *status = AsyncOperationStatusType::WriteFailure;
-            patchPowerLimitInProgress = false;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+            break;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
         auto eid = manager.getEid(nsmDevice);
         lg2::info("update Power Limit On Module for eid = {EID}", "EID", eid);
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
-        if (rc_)
+        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                             responseLen);
+        if (rc)
         {
             lg2::error(
                 "updatePowerLimitOnModule SendRecvNsmMsg failed for while setting power limit for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
-            *status = AsyncOperationStatusType::WriteFailure;
-            patchPowerLimitInProgress = false;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+                "EID", eid, "RC", rc);
+            break;
         }
 
-        uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
-        uint16_t data_size = 0;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataSize = 0;
         rc = decode_set_power_limit_resp(responseMsg.get(), responseLen, &cc,
-                                         &data_size, &reason_code);
+                                         &dataSize, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_set_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::info("update Power Limit On Module for EID: {EID} completed",
-                      "EID", eid);
-            *status = AsyncOperationStatusType::Success;
-        }
-        else
-        {
-            lg2::error(
-                "updatePowerLimitOnModule: decode_set_power_limit_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            *status = AsyncOperationStatusType::WriteFailure;
-            patchPowerLimitInProgress = false;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+            break;
         }
     }
+    *status = (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+                  ? AsyncOperationStatusType::Success
+                  : AsyncOperationStatusType::WriteFailure;
     patchPowerLimitInProgress = false;
-    co_return NSM_SW_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmProcessorModulePowerControl::doClearPowerCapOnModule(
@@ -289,16 +273,24 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog("NsmModulePowerLimit decode_get_inventory_information_resp " +
+                      propertyName,
+                  reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
@@ -314,19 +306,8 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
             default:
                 break;
         }
-        clearErrorBitMap(
-            "NsmModulePowerLimit decode_get_inventory_information_resp " +
-            propertyName);
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmModulePowerLimit decode_get_inventory_information_resp " +
-                propertyName,
-            reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmDefaultModulePowerLimit::NsmDefaultModulePowerLimit(
@@ -369,32 +350,31 @@ requester::Coroutine NsmDefaultModulePowerLimit::update(SensorManager& manager,
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmDefaultModulePowerLimit decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         uint32_t reading = (value == INVALID_POWER_LIMIT) ? INVALID_POWER_LIMIT
                                                           : value / 1000;
         clearPowerCapIntf->defaultPowerCap(reading);
-        clearErrorBitMap(
-            "NsmDefaultModulePowerLimit decode_get_inventory_information_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmDefaultModulePowerLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 static requester::Coroutine
@@ -444,13 +424,6 @@ static requester::Coroutine
     }
 
     auto nsmDevice = manager.getNsmDevice(uuid);
-    if (!nsmDevice)
-    {
-        lg2::error(
-            "The UUID of CreateProcessorModulePowerControl PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        co_return NSM_ERROR;
-    }
 
     std::string processorModuleName =
         chassisPath.substr(chassisPath.rfind('/') + 1, chassisPath.size());

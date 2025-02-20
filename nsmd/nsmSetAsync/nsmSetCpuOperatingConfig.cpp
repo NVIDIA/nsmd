@@ -69,7 +69,7 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
                                                &cc, &reason_code, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         minClockLimit = le32toh(value);
@@ -126,7 +126,7 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
                                                &cc, &reason_code, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         maxClockLimit = le32toh(value);
@@ -238,7 +238,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
     rc = decode_set_clock_limit_resp(responseMsg.get(), responseLen, &cc,
                                      &reason_code, &data_size);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;

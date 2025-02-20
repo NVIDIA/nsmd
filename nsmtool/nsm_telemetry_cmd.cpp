@@ -100,7 +100,7 @@ class GetPortTelemetryCounter : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &dataLen,
             &portTeleData);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             printPortTeleInfo(dataLen, &portTeleData);
         }
@@ -384,7 +384,7 @@ class QueryPortCharacteristics : public CommandInterface
             responsePtr, payloadLength, &cc, &reasonCode, &dataLen,
             &portCharData);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Port Number"] = portNumber;
@@ -461,7 +461,7 @@ class QueryPortStatus : public CommandInterface
                                                 &reasonCode, &dataLen,
                                                 &portState, &portStatus);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Port Number"] = portNumber;
@@ -517,7 +517,7 @@ class QueryPortsAvailable : public CommandInterface
                                                     &cc, &reason_code, &dataLen,
                                                     &number_of_ports);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Number of Ports"] = number_of_ports;
@@ -583,7 +583,7 @@ class SetPortDisableFuture : public CommandInterface
         auto rc = decode_set_port_disable_future_resp(
             responsePtr, payloadLength, &cc, &reason_code);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Completion Code"] = cc;
@@ -636,7 +636,7 @@ class GetFabricManagerState : public CommandInterface
             responsePtr, payloadLength, &cc, &reason_code, &dataLen,
             &fmStateData);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["FM State"] = fmStateData.fm_state;
@@ -689,7 +689,7 @@ class GetPortDisableFuture : public CommandInterface
         auto rc = decode_get_port_disable_future_resp(
             responsePtr, payloadLength, &cc, &reason_code, &portMask[0]);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Completion Code"] = cc;
@@ -742,7 +742,7 @@ class GetPowerMode : public CommandInterface
                                              &reasonCode, &dataLen,
                                              &powerModeData);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Completion Code"] = cc;
@@ -855,7 +855,7 @@ class SetPowerMode : public CommandInterface
         auto rc = decode_set_power_mode_resp(responsePtr, payloadLength, &cc,
                                              &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Completion Code"] = cc;
@@ -912,7 +912,7 @@ class GetSwitchIsolationMode : public CommandInterface
         auto rc = decode_get_switch_isolation_mode_resp(
             responsePtr, payloadLength, &cc, &reasonCode, &isolationMode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             ordered_json result;
             result["Completion Code"] = cc;
@@ -4091,7 +4091,7 @@ class GetClockOutputEnableState : public CommandInterface
         auto rc = decode_get_clock_output_enable_state_resp(
             responsePtr, payloadLength, &cc, &reasonCode, &dataLen, &clkBuf);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             printClockBufferData(clkBuf);
         }
