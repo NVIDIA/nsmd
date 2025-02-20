@@ -26,6 +26,7 @@
 #include "nsmd/globalPollingStateManager.hpp"
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
@@ -222,5 +223,7 @@ class SensorManagerImpl : public SensorManager
     std::coroutine_handle<> interfaceAddedTaskHandle;
     requester::Coroutine interfaceAddedTask();
     GlobalPollingStateManager globalPollingStateManager;
+    std::map<eid_t, StateChangeLogger> stateChangeLoggers;
+    StateChangeLogger uuidLogger;
 };
 } // namespace nsm

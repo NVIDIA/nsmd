@@ -36,6 +36,7 @@ test_src = declare_dependency(
 
 tests = [
     'nsmDevice_test',
+    'stateChangeLogger_test',
 ]
 
 tests_deps = [

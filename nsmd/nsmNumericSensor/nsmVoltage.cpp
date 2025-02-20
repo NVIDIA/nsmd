@@ -65,28 +65,27 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
                                       size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint32_t reading = 0;
 
     auto rc = decode_get_voltage_resp(responseMsg, responseLen, &cc,
-                                      &reason_code, &reading);
+                                      &reasonCode, &reading);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_voltage_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // unit of voltage is microvolts in NSM Command Response and selected
         // unit in SensorValue PDI is Volts. Hence it is converted to Volts.
         sensorValue->updateReading(reading / 1'000'000.0);
-        clearErrorBitMap("decode_get_voltage_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-
-        logHandleResponseMsg("decode_get_voltage_resp", reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 class VoltageSensorFactory : public NumericSensorBuilder

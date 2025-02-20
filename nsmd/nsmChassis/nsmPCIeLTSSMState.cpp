@@ -60,7 +60,10 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group6_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group6_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // Current LTSSM state. The value is encoded as follows:
         // 0x0 – Detect
@@ -88,14 +91,10 @@ uint8_t NsmPCIeLTSSMState::handleResponseMsg(const struct nsm_msg* responseMsg,
             data.ltssm_state == 0xFF ? LTSSMStateIntf::State::IllegalState
                                      : LTSSMStateIntf::State(data.ltssm_state);
         invoke(pdiMethod(ltssmState), state);
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group6_resp");
     }
     else
     {
         invoke(pdiMethod(ltssmState), LTSSMStateIntf::State::NA);
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group6_resp", reasonCode,
-            cc, rc);
     }
 
     return cc ? cc : rc;

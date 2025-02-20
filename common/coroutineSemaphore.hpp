@@ -47,9 +47,7 @@ class CoroutineSemaphore
     CoroutineSemaphore() :
         binarySem(1), event(sdeventplus::Event::get_default()),
         awaiterIdGenerator(0)
-    {
-        lg2::debug("CoroutineSemaphore initialized");
-    }
+    {}
 
     /**
      * @brief An Awaiter object to manage coroutine suspension and resumption.
@@ -71,23 +69,12 @@ class CoroutineSemaphore
         Awaiter(CoroutineSemaphore& semaphoreRef, int eidValue, int id) :
             semaphore(semaphoreRef), handle(nullptr), eid(eidValue),
             awaiterId(id)
-        {
-            lg2::debug(
-                "Awaiter created: {AWAITER_ID}, eid: {EID}, address: {ADDRESS}",
-                "AWAITER_ID", awaiterId, "EID", eid, "ADDRESS",
-                static_cast<void*>(this));
-        }
+        {}
 
         /**
          * @brief Destructor for the Awaiter object.
          */
-        ~Awaiter()
-        {
-            lg2::debug(
-                "Awaiter destroyed: {AWAITER_ID}, eid: {EID}, address: {ADDRESS}",
-                "AWAITER_ID", awaiterId, "EID", eid, "ADDRESS",
-                static_cast<void*>(this));
-        }
+        ~Awaiter() {}
 
         /**
          * @brief Checks if the coroutine can proceed without suspension.
@@ -96,9 +83,6 @@ class CoroutineSemaphore
         bool await_ready() const noexcept
         {
             bool ready = semaphore.binarySem.try_acquire();
-            lg2::debug("Awaiter {AWAITER_ID} await_ready: {READY}, eid: {EID}",
-                       "AWAITER_ID", awaiterId, "READY",
-                       ready ? "true" : "false", "EID", eid);
             return ready;
         }
 
@@ -118,23 +102,12 @@ class CoroutineSemaphore
 
             std::unique_lock<std::mutex> lock(semaphore.mutex);
             semaphore.suspendedQueue.push_back(awaiter);
-            lg2::debug(
-                "Awaiter {AWAITER_ID} suspended. Queue size: {QUEUE_SIZE}, eid: {EID}, address: {ADDRESS}",
-                "AWAITER_ID", awaiterId, "QUEUE_SIZE",
-                semaphore.suspendedQueue.size(), "EID", eid, "ADDRESS",
-                static_cast<void*>(this));
         }
 
         /**
          * @brief Called when the coroutine is resumed.
          */
-        void await_resume() const noexcept
-        {
-            lg2::debug(
-                "Awaiter {AWAITER_ID} resumed execution, eid: {EID}, address: {ADDRESS}",
-                "AWAITER_ID", awaiterId, "EID", eid, "ADDRESS",
-                static_cast<void*>(const_cast<Awaiter*>(this)));
-        }
+        void await_resume() const noexcept {}
     };
 
     /**
@@ -147,9 +120,6 @@ class CoroutineSemaphore
     Awaiter acquire(int eid)
     {
         int awaiterId = ++awaiterIdGenerator;
-        lg2::debug(
-            "Semaphore acquire called for eid: {EID}, Awaiter ID: {AWAITER_ID}",
-            "EID", eid, "AWAITER_ID", awaiterId);
         return Awaiter{*this, eid, awaiterId};
     }
 
@@ -164,39 +134,21 @@ class CoroutineSemaphore
      */
     void release()
     {
-        lg2::debug("Semaphore release called");
-
         std::shared_ptr<Awaiter> nextAwaiter;
 
         {
             // Lock the queue to safely access and modify it.
             std::unique_lock<std::mutex> lock(mutex);
-
-            lg2::debug("Queue size before processing: {QUEUE_SIZE}",
-                       "QUEUE_SIZE", suspendedQueue.size());
-
             if (!suspendedQueue.empty())
             {
                 nextAwaiter = suspendedQueue.front();
                 suspendedQueue.pop_front();
-                lg2::debug(
-                    "Dequeued coroutine for resumption. Remaining queue size: {QUEUE_SIZE}, eid: {EID}, Awaiter ID: {AWAITER_ID}, address: {ADDRESS}",
-                    "QUEUE_SIZE", suspendedQueue.size(), "EID",
-                    nextAwaiter->eid, "AWAITER_ID", nextAwaiter->awaiterId,
-                    "ADDRESS", static_cast<void*>(nextAwaiter.get()));
-            }
-            else
-            {
-                lg2::debug("No suspended coroutines in the queue");
             }
         }
 
         if (nextAwaiter)
         {
             // Schedule the resumption of the next coroutine in the event loop.
-            lg2::debug(
-                "Deferring coroutine resumption for eid: {EID}, Awaiter ID: {AWAITER_ID}",
-                "EID", nextAwaiter->eid, "AWAITER_ID", nextAwaiter->awaiterId);
 
             if (sd_event_add_defer(
                     event.get(), nullptr,
@@ -205,19 +157,9 @@ class CoroutineSemaphore
                     static_cast<std::shared_ptr<Awaiter>*>(userdata);
                 if (!nextAwaiter || !(*nextAwaiter))
                 {
-                    lg2::error(
-                        "Deferred callback userdata is null or invalid!");
                     return -1;
                 }
-                lg2::debug(
-                    "Deferred callback executed for Awaiter {AWAITER_ID}, eid: {EID}",
-                    "AWAITER_ID", (*nextAwaiter)->awaiterId, "EID",
-                    (*nextAwaiter)->eid);
                 (*nextAwaiter)->handle.resume();
-                lg2::debug(
-                    "Awaiter {AWAITER_ID} resumed successfully, eid: {EID}",
-                    "AWAITER_ID", (*nextAwaiter)->awaiterId, "EID",
-                    (*nextAwaiter)->eid);
                 delete nextAwaiter; // Free memory after use
                 return 0;
             },
@@ -233,7 +175,6 @@ class CoroutineSemaphore
         {
             // If no coroutines are waiting, simply release the semaphore.
             binarySem.release();
-            lg2::debug("Semaphore released with no waiting coroutines");
         }
     }
 

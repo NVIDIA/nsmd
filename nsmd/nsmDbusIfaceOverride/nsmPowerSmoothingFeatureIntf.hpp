@@ -16,6 +16,7 @@
  */
 #pragma once
 #include "asyncOperationManager.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <com/nvidia/PowerSmoothing/PowerSmoothing/server.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -24,7 +25,9 @@ namespace nsm
 {
 using PowerSmoothingIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::PowerSmoothing::server::PowerSmoothing>;
-class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
+class OemPowerSmoothingFeatIntf :
+    public PowerSmoothingIntf,
+    public StateChangeLogger
 {
   private:
     std::shared_ptr<NsmDevice> device;
@@ -78,14 +81,16 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         uint16_t dataSize = 0;
         nsm_pwr_smoothing_featureinfo_data data{};
         rc = decode_get_powersmoothing_featinfo_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
-            &data);
+            responseMsg.get(), responseLen, &cc, &reasonCode, &dataSize, &data);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_get_powersmoothing_featinfo_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // For feature Supported : Check if bit0 is set
             bool featSupported = (data.feature_flag & (1u << 0)) != 0 ? true
@@ -119,18 +124,9 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
             // fraction to percent
             PowerSmoothingIntf::minAllowedTmpFloorPercent(
                 NvUFXP4_12ToDouble(data.minTmpFloorSettingInPercent) * 100);
-            lg2::info("getPwrSmoothingControlsFromDevice completed");
-        }
-        else
-        {
-            lg2::error(
-                "getPwrSmoothingControlsFromDevice decode_get_powersmoothing_featinfo_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            // coverity[missing_return]
-            co_return rc;
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine
@@ -172,11 +168,11 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_toggle_feature_state_resp(responseMsg.get(), responseLen,
-                                              &cc, &reason_code);
+                                              &cc, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // verify setting is applied on the device
             co_await getPwrSmoothingControlsFromDevice();
@@ -189,7 +185,7 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
                 "togglePowerSmoothingOnDevice decode_toggle_feature_state_resp "
                 "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
                 "RC = {A} ",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+                "EID", eid, "CC", cc, "RC", reasonCode, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
@@ -255,11 +251,11 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_toggle_immediate_rampdown_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code);
+            responseMsg.get(), responseLen, &cc, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             co_await getPwrSmoothingControlsFromDevice();
             lg2::info(
@@ -272,7 +268,7 @@ class OemPowerSmoothingFeatIntf : public PowerSmoothingIntf
                 "toggleImmediateRampDownOnDevice decode_toggle_immediate_rampdown_resp "
                 "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
                 "RC = {A} ",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+                "EID", eid, "CC", cc, "RC", reasonCode, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }

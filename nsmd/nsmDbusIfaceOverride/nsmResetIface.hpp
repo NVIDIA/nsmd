@@ -5,6 +5,7 @@
 #include "asyncOperationManager.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 #include <xyz/openbmc_project/Common/Device/error.hpp>
@@ -40,7 +41,7 @@ class NsmResetIntf : public ResetIntf
     }
 };
 
-class NsmResetAsyncIntf : public ResetAsyncIntf
+class NsmResetAsyncIntf : public ResetAsyncIntf, public StateChangeLogger
 {
   public:
     NsmResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
@@ -82,28 +83,17 @@ class NsmResetAsyncIntf : public ResetAsyncIntf
         }
 
         uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         uint16_t data_size = 0;
 
         rc = decode_assert_pcie_fundamental_reset_resp(
-            responseMsg.get(), responseLen, &cc, &data_size, &reason_code);
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-        {
-            lg2::info(
-                "assertFundamentalReset for EID: {EID} completed for action {ACTION}",
-                "EID", eid, "ACTION", action);
-            // coverity[missing_return]
-            co_return NSM_SW_SUCCESS;
-        }
-        else
-        {
-            lg2::error(
-                "assertFundamentalReset: decode_assert_pcie_fundamental_reset_resp for action = {ACTION} with reasonCode = {REASONCODE},cc = {CC}and rc={RC}",
-                "ACTION", action, "REASONCODE", reason_code, "CC", cc, "RC",
-                rc);
-        }
+            responseMsg.get(), responseLen, &cc, &data_size, &reasonCode);
+
+        LG2_ERROR_FLT(
+            "decode_assert_pcie_fundamental_reset_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine
@@ -166,7 +156,9 @@ class NsmResetDeviceIntf : public ResetDeviceIntf
     }
 };
 
-class NsmNetworkDeviceResetAsyncIntf : public ResetDeviceAsyncIntf
+class NsmNetworkDeviceResetAsyncIntf :
+    public ResetDeviceAsyncIntf,
+    public StateChangeLogger
 {
   public:
     NsmNetworkDeviceResetAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
@@ -211,25 +203,19 @@ class NsmNetworkDeviceResetAsyncIntf : public ResetDeviceAsyncIntf
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_reset_network_device_resp(responseMsg.get(), responseLen,
-                                              &cc, &reason_code);
+                                              &cc, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_reset_network_device_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::info("resetOnDevice for EID: {EID} completed", "EID", eid);
-        }
-        else
-        {
-            lg2::error(
-                "resetOnDevice decode_reset_network_device_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
-            // coverity[missing_return]
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine

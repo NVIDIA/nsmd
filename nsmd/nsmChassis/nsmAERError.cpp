@@ -70,7 +70,10 @@ uint8_t
     auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group9_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         auto hexFormat = [](const uint32_t value) -> std::string {
             std::string hexStr(sizeof("0x00000000"), '\0');
@@ -82,17 +85,8 @@ uint8_t
             hexFormat(data.aer_uncorrectable_error_status));
         aerErrorStatusIntf->aerCorrectableErrorStatus(
             hexFormat(data.aer_correctable_error_status));
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group9_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group9_resp", reasonCode,
-            cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 requester::Coroutine
@@ -118,24 +112,27 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
-    if (rc_)
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
     {
         lg2::error(
             "clearAERError SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
-            "EID", eid, "RC", rc_);
+            "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
-    uint16_t data_size = 0;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
     rc = decode_clear_data_source_v1_resp(responseMsg.get(), responseLen, &cc,
-                                          &data_size, &reason_code);
+                                          &dataSize, &reasonCode);
 
+    LG2_ERROR_FLT(
+        "decode_clear_data_source_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         if (aerStatusSensor)
@@ -143,19 +140,13 @@ requester::Coroutine
             lg2::info("refresh AER status on dbus for EID = {EID}", "EID", eid);
             co_await aerStatusSensor->update(manager, eid);
         }
-        lg2::info("clearAERError for EID: {EID} completed", "EID", eid);
     }
     else
     {
-        lg2::error(
-            "clearAERError decode_clear_data_source_v1_resp failed.eid ={EID},CC = {CC} reasoncode = {RC},RC = {A} ",
-            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
         *status = AsyncOperationStatusType::WriteFailure;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmAERErrorStatusIntf::doclearAERErrorOnDevice(
@@ -163,11 +154,11 @@ requester::Coroutine NsmAERErrorStatusIntf::doclearAERErrorOnDevice(
 {
     AsyncOperationStatusType status{AsyncOperationStatusType::Success};
 
-    auto rc_ = co_await clearAERError(&status);
+    auto rc = co_await clearAERError(&status);
 
     statusInterface->status(status);
     // coverity[missing_return]
-    co_return rc_;
+    co_return rc;
 };
 
 sdbusplus::message::object_path NsmAERErrorStatusIntf::clearAERStatus()

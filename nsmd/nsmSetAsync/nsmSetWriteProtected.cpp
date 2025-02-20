@@ -162,7 +162,7 @@ requester::Coroutine
 
     rc = decode_enable_disable_wp_resp(responseMsg.get(), responseLen, &cc,
                                        &reasonCode);
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::debug(
             "NsmSetWriteProtected::setWriteProtected decode_enable_disable_wp_resp success - value={VALUE}, dataIndex={DI}",

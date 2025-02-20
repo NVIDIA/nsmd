@@ -62,18 +62,11 @@ uint8_t NsmPCIeFunction::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group0_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-    auto error = rc != NSM_SUCCESS || cc != NSM_SUCCESS;
-    if (error)
-    {
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group0_resp", reasonCode,
-            cc, rc);
-    }
-    else
-    {
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group0_resp");
-    }
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group0_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
 
+    auto error = rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS;
     auto hexFormat = [error](const uint32_t value) -> std::string {
         if (error)
             return "";

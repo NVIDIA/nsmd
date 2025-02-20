@@ -58,9 +58,10 @@ static double getMaxValueForType(uint8_t data_type)
 
 static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
                                           uint16_t num_of_buckets,
-                                          uint8_t bucket_data_type)
+                                          uint8_t bucket_data_type,
+                                          uint32_t& calculated_size)
 {
-    uint32_t calculated_size = 0;
+    calculated_size = 0;
     switch (bucket_data_type)
     {
         case NvU8:
@@ -94,14 +95,7 @@ static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
             calculated_size = 0;
             break;
     }
-    if (calculated_size != total_size)
-    {
-        lg2::error(
-            "checkSizeOfBucketArrayIsValid: number of buckets and actual content received is not aligned. expectedSize = NumOfBucket*DataType = {ESOB} receivedSize = {RSOB}",
-            "ESOB", calculated_size, "RSOB", total_size);
-        return false;
-    }
-    return true;
+    return calculated_size != total_size;
 }
 
 static double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
@@ -271,9 +265,11 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &metaData,
         bucket_offsets.data(), &total_bucket_offset_size);
 
+    LG2_ERROR_FLT(
+        "decode_get_histogram_format_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        clearErrorBitMap("decode_get_histogram_format_resp");
         formatIntf->numOfBuckets(
             static_cast<uint64_t>(metaData.num_of_buckets));
         formatIntf->minSamplingTime(
@@ -299,10 +295,19 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
                 break;
         }
 
-        if (!checkSizeOfBucketArrayIsValid(total_bucket_offset_size,
-                                           metaData.num_of_buckets,
-                                           metaData.bucket_data_type))
+        uint32_t calculatedSize = 0;
+        if (!checkSizeOfBucketArrayIsValid(
+                total_bucket_offset_size, metaData.num_of_buckets,
+                metaData.bucket_data_type, calculatedSize))
         {
+            if (shouldLog("checkSizeOfBucketArrayIsValid",
+                          total_bucket_offset_size != calculatedSize))
+            {
+                LG2_ERROR(
+                    "checkSizeOfBucketArrayIsValid failure, totalSize: {TOTAL}, calculated: {CALCULATED}",
+                    "TOTAL", total_bucket_offset_size, "CALCULATED",
+                    calculatedSize);
+            }
             return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -351,18 +356,7 @@ uint8_t NsmHistogramFormat::handleResponseMsg(const struct nsm_msg* responseMsg,
         }
         associationDefIntf->associations(associationsList);
     }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: decode_get_histogram_format_resp unsuccessfull. {TYPE} - {NAM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-                "TYPE", deviceType, "NAM", histogramName, "RSNCOD", reasonCode,
-                "CC", cc, "RC", rc);
-        }
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 NsmHistogramData::NsmHistogramData(
@@ -416,16 +410,27 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         &dataTypeOfBucket, &number_of_buckets, bucket_data.data(),
         &total_bucket_data_size);
 
+    LG2_ERROR_FLT(
+        "decode_get_histogram_data_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        clearErrorBitMap("decode_get_histogram_data_resp");
-
+        uint32_t calculatedSize = 0;
         if ((formatIntf->numOfBuckets() != number_of_buckets) ||
             (formatIntf->bucketDataType() !=
              getDataTypeEnum(dataTypeOfBucket)) ||
             !checkSizeOfBucketArrayIsValid(total_bucket_data_size,
-                                           number_of_buckets, dataTypeOfBucket))
+                                           number_of_buckets, dataTypeOfBucket,
+                                           calculatedSize))
         {
+            if (shouldLog("checkSizeOfBucketArrayIsValid",
+                          total_bucket_data_size != calculatedSize))
+            {
+                LG2_ERROR(
+                    "checkSizeOfBucketArrayIsValid failure, totalSize: {TOTAL}, calculated: {CALCULATED}",
+                    "TOTAL", total_bucket_data_size, "CALCULATED",
+                    calculatedSize);
+            }
             return NSM_SW_ERROR_COMMAND_FAIL;
         }
         std::vector<std::tuple<uint16_t, std::tuple<double, double, double>>>
@@ -439,18 +444,7 @@ uint8_t NsmHistogramData::handleResponseMsg(const struct nsm_msg* responseMsg,
         }
         bucketInfoIntf->bucketData(bucketData);
     }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error(
-                "responseHandler: decode_get_histogram_data_resp unsuccessfull. {TYPE} - {NAM} reasonCode={RSNCOD} cc={CC} rc={RC}",
-                "TYPE", deviceType, "NAM", histogramName, "RSNCOD", reasonCode,
-                "CC", cc, "RC", rc);
-        }
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

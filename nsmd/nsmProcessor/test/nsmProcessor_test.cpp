@@ -92,10 +92,9 @@ TEST(nsmMigMode, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = migSensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = migSensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmMigMode, GoodUpdateReading)
@@ -197,10 +196,9 @@ TEST(nsmEccErrorCounts, BadHandleResp)
     size_t msg_len = response.size();
 
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmPCIeGroup2, GoodGenReq)
@@ -288,9 +286,9 @@ TEST(NsmPCIeGroup2, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmPCIeGroup3, GoodGenReq)
@@ -371,9 +369,9 @@ TEST(NsmPCIeGroup3, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmPCIeGroup4, GoodGenReq)
@@ -467,9 +465,9 @@ TEST(NsmPCIeGroup4, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmPCIeGroup5, GoodGenReq)
@@ -547,9 +545,9 @@ TEST(NsmPCIeGroup5, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmEDPpScalingFactor, GoodGenReq)
@@ -645,10 +643,9 @@ TEST(nsmEDPpScalingFactor, BadHandleResp)
     size_t msg_len = response.size();
 
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmClockLimitGraphics, GoodGenReq)
@@ -719,9 +716,9 @@ TEST(NsmClockLimitGraphics, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmCurrClockFreq, GoodGenReq)
@@ -785,10 +782,9 @@ TEST(NsmCurrClockFreq, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmProcessorThrottleReason, GoodGenReq)
@@ -855,10 +851,9 @@ TEST(nsmProcessorThrottleReason, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmAccumGpuUtilTime, GoodGenReq)
@@ -925,10 +920,9 @@ TEST(NsmAccumGpuUtilTime, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(responseMsg, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmProcessorRevision, GoodGenReq)
@@ -989,9 +983,9 @@ TEST(nsmProcessorRevision, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmProcessorThrottleDuration, GoodGenReq)
@@ -1084,10 +1078,9 @@ TEST(nsmProcessorThrottleDuration, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmPowerSmoothing, GoodGenReq)
@@ -1148,10 +1141,9 @@ TEST(nsmPowerSmoothing, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = controlSensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = controlSensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmPowerSmoothing, GoodUpdateReading)
@@ -1225,10 +1217,9 @@ TEST(nsmHwCircuitryTelemetry, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = lifetimeCicuitrySensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = lifetimeCicuitrySensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmHwCircuitryTelemetry, GoodUpdateReading)
@@ -1301,10 +1292,9 @@ TEST(nsmPowerSmoothingAdminOverride, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = adminProfileSensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = adminProfileSensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmPowerSmoothingAdminOverride, GoodUpdateReading)
@@ -1396,10 +1386,9 @@ TEST(nsmPowerProfileCollection, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = response.size();
     rc = getAllPowerProfileSensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = getAllPowerProfileSensor.handleResponseMsg(responseMsg, 2);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(nsmCurrentPowerSmoothingProfile, GoodGenReq)
@@ -1490,10 +1479,9 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = currentProfileSensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = currentProfileSensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 struct NsmProcessorTest :
     public testing::Test,
@@ -2020,8 +2008,7 @@ TEST(nsmTotalNvLinks, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
-
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, msg_len - 1);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

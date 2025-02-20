@@ -34,7 +34,9 @@ using namespace sdbusplus::server;
 using AERErrorStatusIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::pc_ie::AERErrorStatus>;
 class NsmPCIeAERErrorStatus; // forward declaration
-class NsmAERErrorStatusIntf : public AERErrorStatusIntf
+class NsmAERErrorStatusIntf :
+    public AERErrorStatusIntf,
+    public StateChangeLogger
 {
   public:
     NsmAERErrorStatusIntf(sdbusplus::bus::bus& bus, const char* path,

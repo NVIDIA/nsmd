@@ -59,17 +59,13 @@ uint8_t
     auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
+    LG2_ERROR_FLT(
+        "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+
     if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
     {
         handleResponse(data);
-        clearErrorBitMap(
-            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeLinkSpeedBase decode_query_scalar_group_telemetry_v1_group1_resp",
-            reasonCode, cc, rc);
     }
     updateMetricOnSharedMemory();
 

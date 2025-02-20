@@ -35,7 +35,9 @@ namespace nsm
 using ResetEdppAsyncIntf = sdbusplus::server::object_t<
     sdbusplus::server::com::nvidia::common::ResetEdppAsync>;
 
-class NsmResetEdppAsyncIntf : public ResetEdppAsyncIntf
+class NsmResetEdppAsyncIntf :
+    public ResetEdppAsyncIntf,
+    public StateChangeLogger
 {
   public:
     NsmResetEdppAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
@@ -80,27 +82,20 @@ class NsmResetEdppAsyncIntf : public ResetEdppAsyncIntf
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
-        uint16_t data_size = 0;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataSize = 0;
         rc = decode_set_programmable_EDPp_scaling_factor_resp(
-            responseMsg.get(), responseLen, &cc, &reason_code, &data_size);
+            responseMsg.get(), responseLen, &cc, &reasonCode, &dataSize);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_set_programmable_EDPp_scaling_factor_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            lg2::info(
-                "NsmResetEdppAsyncIntf::clearSetPoint for EID: {EID} completed",
-                "EID", eid);
-        }
-        else
-        {
-            lg2::error(
-                "NsmResetEdppAsyncIntf::clearSetPoint decode_set_programmable_EDPp_scaling_factor_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     };
 
     requester::Coroutine

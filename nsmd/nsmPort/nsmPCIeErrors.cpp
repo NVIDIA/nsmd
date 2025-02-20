@@ -160,7 +160,7 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
         nsm_query_scalar_group_telemetry_group_##X data{};                     \
         rc = decode_query_scalar_group_telemetry_v1_group##X##_resp(           \
             responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);     \
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)                         \
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)                         \
         {                                                                      \
             handleResponse(data);                                              \
         }                                                                      \
@@ -185,17 +185,12 @@ uint8_t NsmPCIeErrors::handleResponseMsg(const struct nsm_msg* responseMsg,
             break;
     }
 
-    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
-    {
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group" + std::to_string(groupId) + "_resp",
-            reasonCode, cc, rc);
-    }
-    else
-    {
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group" + std::to_string(groupId) + "_resp");
-    }
-
+    auto handlerFuntionName = std::format(
+        "decode_query_scalar_group_telemetry_v1_group{}_resp", groupId);
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handlerFuntionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
     return cc ? cc : rc;
 }
 } // namespace nsm

@@ -36,7 +36,7 @@ namespace nsm
 using PowerCapIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Control::Power::server::Cap>;
 
-class NsmPowerCapIntf : public PowerCapIntf
+class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
 {
   public:
     NsmPowerCapIntf(sdbusplus::bus::bus& bus, const char* path,
@@ -65,51 +65,42 @@ class NsmPowerCapIntf : public PowerCapIntf
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
-        if (rc_)
+        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                             responseLen);
+        if (rc)
         {
             lg2::error("SendRecvNsmMsgSync failed. "
                        "eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc_);
-            // coverity[missing_return]
-            co_return rc_;
-        }
-        uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
-        uint16_t data_size = 0;
-        uint32_t requested_persistent_limit_in_miliwatts;
-        uint32_t requested_oneshot_limit_in_miliwatts;
-        uint32_t enforced_limit_in_miliwatts;
-
-        rc = decode_get_power_limit_resp(
-            responseMsg.get(), responseLen, &cc, &data_size, &reason_code,
-            &requested_persistent_limit_in_miliwatts,
-            &requested_oneshot_limit_in_miliwatts,
-            &enforced_limit_in_miliwatts);
-
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
-        {
-            // check if device returned invalid power limit, report invalid
-            // value as is on dbus
-            uint32_t reading =
-                (enforced_limit_in_miliwatts == INVALID_POWER_LIMIT)
-                    ? INVALID_POWER_LIMIT
-                    : enforced_limit_in_miliwatts / 1000;
-            PowerCapIntf::powerCap(reading);
-            lg2::info("getPowerCapFromDevice for EID: {EID} completed", "EID",
-                      eid);
-        }
-        else
-        {
-            lg2::error(
-                "getPowerCapFromDevice: decode_get_power_limit_resp with reasonCode = {REASONCODE},cc = {CC}and rc = {RC} ",
-                "REASONCODE", reason_code, "CC", cc, "RC", rc);
+                       "EID", eid, "RC", rc);
             // coverity[missing_return]
             co_return rc;
         }
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataSize = 0;
+        uint32_t requestedPersistentLimitInMiliwatts;
+        uint32_t requestedOneshotLimitInMiliwatts;
+        uint32_t enforcedLimitInMiliwatts;
+
+        rc = decode_get_power_limit_resp(
+            responseMsg.get(), responseLen, &cc, &dataSize, &reasonCode,
+            &requestedPersistentLimitInMiliwatts,
+            &requestedOneshotLimitInMiliwatts, &enforcedLimitInMiliwatts);
+
+        LG2_ERROR_FLT(
+            "decode_get_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+        {
+            // check if device returned invalid power limit, report invalid
+            // value as is on dbus
+            uint32_t reading = (enforcedLimitInMiliwatts == INVALID_POWER_LIMIT)
+                                   ? INVALID_POWER_LIMIT
+                                   : enforcedLimitInMiliwatts / 1000;
+            PowerCapIntf::powerCap(reading);
+        }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine setPowerCapOnDevice(uint32_t power_limit,
@@ -118,9 +109,6 @@ class NsmPowerCapIntf : public PowerCapIntf
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        lg2::info(
-            "setPowerCapOnDevice for EID: {EID} with power limit(in watts): {PW}",
-            "EID", eid, "PW", power_limit);
 
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -135,35 +123,40 @@ class NsmPowerCapIntf : public PowerCapIntf
                 "EID", eid, "RC", rc);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+            co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
-        if (rc_)
+        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                             responseLen);
+
+        if (shouldLog("setPowerCapOnDevice SendRecvNsmMsg", nsm_sw_codes(rc)))
         {
-            lg2::error(
-                "setPowerCapOnDevice SendRecvNsmMsg failed for whilesetting power limit for eid = {EID} rc = {RC}",
-                "EID", eid, "RC", rc_);
+            LG2_ERROR(
+                "setPowerCapOnDevice SendRecvNsmMsg failed, eid = {EID}, rc = {RC}",
+                "EID", eid, "RC", rc);
+        }
+        if (rc)
+        {
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
+            co_return rc;
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
-        uint16_t data_size = 0;
+        uint16_t reasonCode = ERR_NULL;
+        uint16_t dataSize = 0;
         rc = decode_set_power_limit_resp(responseMsg.get(), responseLen, &cc,
-                                         &data_size, &reason_code);
+                                         &dataSize, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_set_power_limit_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // verify setting is applied on the device
             co_await getPowerCapFromDevice();
-            lg2::info("setPowerCapOnDevice for EID: {EID} completed", "EID",
-                      eid);
 
             for (auto it = parents.begin(); it != parents.end();)
             {
@@ -190,16 +183,10 @@ class NsmPowerCapIntf : public PowerCapIntf
         }
         else
         {
-            lg2::error("setPowerCapOnDevice decode_set_power_limit_resp "
-                       "failed.eid = {EID}, CC = {CC} reasoncode = {RC}, "
-                       "RC = {A} ",
-                       "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
             *status = AsyncOperationStatusType::WriteFailure;
-            // coverity[missing_return]
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine

@@ -46,13 +46,15 @@ using MinSecVersionIntf = object_t<
     sdbusplus::server::xyz::openbmc_project::software::MinSecVersionConfig>;
 using ProgressIntf = object_t<Common::server::Progress>;
 
-class SecurityConfiguration : public SecurityConfigIntf
+class SecurityConfiguration :
+    public SecurityConfigIntf,
+    public StateChangeLogger
 {
   public:
     SecurityConfiguration(sdbusplus::bus::bus& bus, const std::string& objPath,
                           const uuid_t& uuidIn,
                           std::shared_ptr<ProgressIntf> progressIntfIn,
-                          NsmSensor* nsmSensorIn);
+                          NsmSensor& nsmSensor);
 
     virtual ~SecurityConfiguration() = default;
     void updateState(
@@ -72,7 +74,7 @@ class SecurityConfiguration : public SecurityConfigIntf
     uuid_t uuid;
     std::mutex mutex;
     std::shared_ptr<ProgressIntf> progressIntf = nullptr;
-    NsmSensor* nsmSensor = nullptr;
+    NsmSensor& nsmSensor;
 };
 
 class NsmSecurityCfgObject : public NsmSensor
@@ -100,14 +102,14 @@ class NsmSecurityCfgObject : public NsmSensor
     std::unique_ptr<SecurityConfiguration> securityCfgObject;
 };
 
-class MinSecurityVersion : public MinSecVersionIntf
+class MinSecurityVersion : public MinSecVersionIntf, public StateChangeLogger
 {
   public:
     MinSecurityVersion(sdbusplus::bus::bus& bus, const std::string& objPath,
                        const uuid_t& uuidIn, uint16_t classificationIn,
                        uint16_t identifierIn, uint8_t indexIn,
                        std::shared_ptr<ProgressIntf> progressIntfIn,
-                       NsmSensor* nsmSensorIn);
+                       NsmSensor& nsmSensor);
 
     virtual ~MinSecurityVersion() = default;
     void updateProperties(
@@ -130,7 +132,7 @@ class MinSecurityVersion : public MinSecVersionIntf
     std::unique_ptr<SecurityVersionIntf> securityVersionSettingsObject =
         nullptr;
     std::shared_ptr<ProgressIntf> progressIntf = nullptr;
-    NsmSensor* nsmSensor = nullptr;
+    NsmSensor& nsmSensor;
 };
 
 class NsmMinSecVersionObject : public NsmSensor

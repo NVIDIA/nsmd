@@ -828,21 +828,26 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     uint8_t commandCode = requestMsg->payload[0];
 
     auto uuid = utils::getUUIDFromEID(eidTable, eid);
+    if (stateChangeLoggers[eid].shouldLog("SendRecvNsmMsg getUUIDFromEID",
+                                          uuid == std::nullopt))
+    {
+        LG2_ERROR("No UUID found for EID {EID}", "EID", eid);
+    }
     if (!uuid)
     {
-        lg2::error(
-            "SensorManager::SendRecvNsmMsg  : No UUID found for EID {EID}",
-            "EID", eid);
         // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
     auto nsmDevice = getNsmDevice(*uuid);
+    if (stateChangeLoggers[eid].shouldLog("SendRecvNsmMsg getNsmDevice",
+                                          nsmDevice == nullptr))
+    {
+        LG2_ERROR("No nsmDevice found for eid={EID} , uuid={UUID}", "EID", eid,
+                  "UUID", *uuid);
+    }
     if (!nsmDevice)
     {
-        lg2::error(
-            "SensorManager::SendRecvNsmMsg : No nsmDevice found for eid={EID} , uuid={UUID}",
-            "EID", eid, "UUID", *uuid);
         // coverity[missing_return]
         co_return NSM_ERROR;
     }
@@ -913,7 +918,14 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    return utils::getEidFromUUID(eidTable, nsmDevice->uuid);
+    const auto& uuid = nsmDevice->uuid;
+    auto eid = utils::getEidFromUUID(eidTable, uuid);
+    if (!uuid.empty() &&
+        uuidLogger.shouldLog(uuid, eid == std::numeric_limits<uint8_t>::max()))
+    {
+        LG2_ERROR("EID not Found for UUID={UUID}", "UUID", uuid);
+    }
+    return eid;
 }
 
 } // namespace nsm

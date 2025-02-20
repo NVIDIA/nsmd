@@ -59,12 +59,13 @@ uint8_t NsmSetEccMode::handleResponseMsg(const nsm_msg* responseMsg,
                   : decode_set_ECC_mode_resp(responseMsg, responseLen, &cc,
                                              &dataSize, &reasonCode);
 
-    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
-    {
-        lg2::error(
-            "NsmSetEccMode::handleResponseMsg decode_set_ECC_mode_resp failed. cc={CC}, reasonCode={REASON}, rc={RC}",
-            "CC", cc, "REASON", reasonCode, "RC", rc);
-    }
+    std::string handleFunctionName = isLongRunning
+                                         ? "decode_set_ECC_mode_event_resp"
+                                         : "decode_set_ECC_mode_resp";
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
     return cc ? cc : rc;
 }
 } // namespace nsm
