@@ -20,6 +20,8 @@ dep_src_files = [
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../../nsmFwSwInventory/GPUSWInventory.cpp',
+    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
 
 dep_src_headers = [
@@ -31,6 +33,7 @@ dep_src_headers = [
     '../../../',
     '../../../common',
     '../../../libnsm',
+    '../../nsmDbusIfaceOverride',
 ]
 
 test_src = declare_dependency(sources: dep_src_files, include_directories: dep_src_headers)

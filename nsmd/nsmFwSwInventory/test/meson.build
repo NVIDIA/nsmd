@@ -23,6 +23,7 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../GPUSWInventory.cpp',
 ]
 
 dep_src_headers = [
