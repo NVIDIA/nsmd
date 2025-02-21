@@ -222,245 +222,152 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmSwitchDIPowerMode::setL1HWModeControl(
+requester::Coroutine NsmSwitchDIPowerMode::setL1PowerModePatch(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    const bool* l1HWModeControl = std::get_if<bool>(&value);
-
-    if (!l1HWModeControl)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
     if (asyncPatchInProgress)
     {
-        // do not allow patch if already in process
         lg2::error(
-            "throwing unavailable exception since patch is already in progress");
+            "setL1PowerModePatch: Async patch operation already in progress");
         *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    if (*l1HWModeControl)
-    {
-        l1PowerModeData.l1_hw_mode_control = 1;
-    }
-    else
-    {
-        l1PowerModeData.l1_hw_mode_control = 0;
-    }
+    auto powerModePatchData = getPowerModeData();
 
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1FWThrottlingMode(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const bool* l1FWThrottlingMode = std::get_if<bool>(&value);
-
-    if (!l1FWThrottlingMode)
+    const auto* patchRequestedValues = std::get_if<
+        std::vector<std::tuple<std::string, std::variant<bool, uint32_t>>>>(
+        &value);
+    if (!patchRequestedValues)
     {
+        lg2::error(
+            "setL1PowerModePatch: Failed to get patch values - invalid type");
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    if (asyncPatchInProgress)
+    if (patchRequestedValues->empty())
     {
-        // do not allow patch if already in process
-        lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
-    }
-
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    if (*l1FWThrottlingMode)
-    {
-        l1PowerModeData.l1_fw_throttling_mode = 1;
-    }
-    else
-    {
-        l1PowerModeData.l1_fw_throttling_mode = 0;
-    }
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1PredictionMode(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const bool* l1PredictionMode = std::get_if<bool>(&value);
-
-    if (!l1PredictionMode)
-    {
+        lg2::error("setL1PowerModePatch: Empty patch values list");
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
 
-    if (asyncPatchInProgress)
+    for (const auto& [key, val] : *patchRequestedValues)
     {
-        // do not allow patch if already in process
-        lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
+        if (key == "HWModeControl")
+        {
+            const bool* l1HWModeControl = std::get_if<bool>(&val);
+            if (!l1HWModeControl)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for HWModeControl");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_hw_mode_control = *l1HWModeControl;
+        }
+        else if (key == "FWThrottlingMode")
+        {
+            const bool* l1FWThrottlingMode = std::get_if<bool>(&val);
+            if (!l1FWThrottlingMode)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for FWThrottlingMode");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_fw_throttling_mode = *l1FWThrottlingMode;
+        }
+        else if (key == "PredictionMode")
+        {
+            const bool* l1PredictionMode = std::get_if<bool>(&val);
+            if (!l1PredictionMode)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for PredictionMode");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_prediction_mode = *l1PredictionMode;
+        }
+        else if (key == "HWThreshold")
+        {
+            const uint32_t* l1HWThreshold = std::get_if<uint32_t>(&val);
+            if (!l1HWThreshold)
+            {
+                lg2::error("setL1PowerModePatch: Invalid type for HWThreshold");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_hw_mode_threshold =
+                static_cast<uint64_t>(*l1HWThreshold);
+        }
+        else if (key == "HWActiveTime")
+        {
+            const uint32_t* l1HWActiveTime = std::get_if<uint32_t>(&val);
+            if (!l1HWActiveTime)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for HWActiveTime");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_hw_active_time =
+                static_cast<uint64_t>(*l1HWActiveTime);
+        }
+        else if (key == "HWInactiveTime")
+        {
+            const uint32_t* l1HWInactiveTime = std::get_if<uint32_t>(&val);
+            if (!l1HWInactiveTime)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for HWInactiveTime");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_hw_inactive_time =
+                static_cast<uint64_t>(*l1HWInactiveTime);
+        }
+        else if (key == "HWPredictionInactiveTime")
+        {
+            const uint32_t* l1PredictionInactiveTime =
+                std::get_if<uint32_t>(&val);
+            if (!l1PredictionInactiveTime)
+            {
+                lg2::error(
+                    "setL1PowerModePatch: Invalid type for HWPredictionInactiveTime");
+                throw sdbusplus::error::xyz::openbmc_project::common::
+                    InvalidArgument{};
+            }
+            powerModePatchData.l1_prediction_inactive_time =
+                static_cast<uint64_t>(*l1PredictionInactiveTime);
+        }
+        else
+        {
+            lg2::error("setL1PowerModePatch: Unrecognized property {PROPERTY}",
+                       "PROPERTY", key);
+            throw sdbusplus::error::xyz::openbmc_project::common::
+                InvalidArgument{};
+        }
     }
 
     asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    if (*l1PredictionMode)
+    try
     {
-        l1PowerModeData.l1_prediction_mode = 1;
+        const auto rc = co_await setL1PowerDevice(powerModePatchData, status,
+                                                  device);
+        asyncPatchInProgress = false;
+        co_return rc;
     }
-    else
+    catch (const std::exception& e)
     {
-        l1PowerModeData.l1_prediction_mode = 0;
-    }
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1HWThreshold(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const uint32_t* l1HWThreshold = std::get_if<uint32_t>(&value);
-
-    if (!l1HWThreshold)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    if (asyncPatchInProgress)
-    {
-        // do not allow patch if already in process
         lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
+            "setL1PowerModePatch: Exception during setL1PowerDevice: {ERROR}",
+            "ERROR", e.what());
+        asyncPatchInProgress = false;
+        *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR;
     }
-
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    l1PowerModeData.l1_hw_mode_threshold =
-        static_cast<uint64_t>(*l1HWThreshold);
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1HWActiveTime(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const uint32_t* l1HWActiveTime = std::get_if<uint32_t>(&value);
-
-    if (!l1HWActiveTime)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    if (asyncPatchInProgress)
-    {
-        // do not allow patch if already in process
-        lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
-    }
-
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    l1PowerModeData.l1_hw_active_time = static_cast<uint64_t>(*l1HWActiveTime);
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1HWInactiveTime(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const uint32_t* l1HWInactiveTime = std::get_if<uint32_t>(&value);
-
-    if (!l1HWInactiveTime)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    if (asyncPatchInProgress)
-    {
-        // do not allow patch if already in process
-        lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
-    }
-
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    l1PowerModeData.l1_hw_inactive_time =
-        static_cast<uint64_t>(*l1HWInactiveTime);
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime(
-    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
-    std::shared_ptr<NsmDevice> device)
-{
-    const uint32_t* l1HWPredictionInactiveTime = std::get_if<uint32_t>(&value);
-
-    if (!l1HWPredictionInactiveTime)
-    {
-        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
-    }
-
-    if (asyncPatchInProgress)
-    {
-        // do not allow patch if already in process
-        lg2::error(
-            "throwing unavailable exception since patch is already in progress");
-        *status = AsyncOperationStatusType::Unavailable;
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
-    }
-
-    asyncPatchInProgress = true;
-    auto l1PowerModeData = getPowerModeData();
-    l1PowerModeData.l1_prediction_inactive_time =
-        static_cast<uint64_t>(*l1HWPredictionInactiveTime);
-
-    const auto rc = co_await setL1PowerDevice(l1PowerModeData, status, device);
-    asyncPatchInProgress = false;
-    // coverity[missing_return]
-    co_return rc;
 }
 
 NsmSwitchIsolationMode::NsmSwitchIsolationMode(
@@ -775,81 +682,58 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         device->addSensor(nvSwitchL1PowerMode, priority);
         auto objectPath = nvSwitchL1PowerMode->getInventoryObjectPath();
 
-        nsm::AsyncSetOperationHandler setL1HWModeControlHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1HWModeControl,
+        nsm::AsyncSetOperationHandler setL1PowerModePatchHandler =
+            std::bind(&NsmSwitchDIPowerMode::setL1PowerModePatch,
                       nvSwitchL1PowerMode, std::placeholders::_1,
                       std::placeholders::_2, std::placeholders::_3);
+
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "HWModeControl",
-                AsyncSetOperationInfo{setL1HWModeControlHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1FWThrottlingModeHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1FWThrottlingMode,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "FWThrottlingMode",
-                AsyncSetOperationInfo{setL1FWThrottlingModeHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1PredictionModeHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1PredictionMode,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "PredictionMode",
-                AsyncSetOperationInfo{setL1PredictionModeHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1HWThresholdHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1HWThreshold,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "HWThreshold",
-                AsyncSetOperationInfo{setL1HWThresholdHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1HWActiveTimeHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1HWActiveTime,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "HWActiveTime",
-                AsyncSetOperationInfo{setL1HWActiveTimeHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1HWInactiveTimeHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1HWInactiveTime,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "HWInactiveTime",
-                AsyncSetOperationInfo{setL1HWInactiveTimeHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
 
-        nsm::AsyncSetOperationHandler setL1HWPredictionInactiveTimeHandler =
-            std::bind(&NsmSwitchDIPowerMode::setL1HWPredictionInactiveTime,
-                      nvSwitchL1PowerMode, std::placeholders::_1,
-                      std::placeholders::_2, std::placeholders::_3);
         AsyncOperationManager::getInstance()
             ->getDispatcher(objectPath)
             ->addAsyncSetOperation(
                 "com.nvidia.PowerMode", "HWPredictionInactiveTime",
-                AsyncSetOperationInfo{setL1HWPredictionInactiveTimeHandler,
+                AsyncSetOperationInfo{setL1PowerModePatchHandler,
                                       nvSwitchL1PowerMode, device});
     }
     else if (type == "NSM_Switch")
