@@ -56,6 +56,8 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmSetAsync/nsmSetEgmMode.cpp',
+    '../../nsmFwSwInventory/GPUSWInventory.cpp',
+    '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
 
 dep_src_headers = [

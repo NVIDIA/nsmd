@@ -1,6 +1,7 @@
 #include "GPUSWInventory.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -100,7 +101,17 @@ requester::Coroutine
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         std::string version(driverVersion);
+        // Check if the values have changed
+        bool stateChanged = (this->driverState != driverState);
         updateValue(driverState, version);
+        if (stateChanged)
+        {
+            lg2::info(
+                "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
+                "EID", eid);
+            DeviceManager& deviceManager = DeviceManager::getInstance();
+            co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
+        }
     }
     // coverity[missing_return]
     co_return cc ? cc : rc;
@@ -135,10 +146,10 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
 
     auto sensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
         bus, name, associations, type, manufacturer);
-    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
-
+    nsmDevice->gpudriverSensor = sensor;
     // update sensor
-    nsmDevice->addStaticSensor(sensor);
+    nsmDevice->addSensor(sensor, false);
+    sensor->nsmDeviceFound = nsmDevice;
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

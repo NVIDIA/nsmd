@@ -24,6 +24,7 @@ sources = [
     'nsmNumericSensor/nsmNumericSensorComposite.cpp',
     'eventTypeHandlers.cpp',
     'nsmEvent.cpp',
+    'nsmFwSwInventory/GPUSWInventory.cpp',
 ]
 
 nsmd_headers = [
@@ -32,6 +33,7 @@ nsmd_headers = [
     '../libnsm',
     '../requester',
     '../common',
+    'nsmDbusIfaceOverride',
 ]
 
 subdir('nsmNumericSensor')
