@@ -92,39 +92,9 @@ class NsmSwitchDIPowerMode : public NsmInterfaceProvider<L1PowerModeIntf>
                                           std::shared_ptr<NsmDevice> device);
 
     requester::Coroutine
-        setL1HWModeControl(const AsyncSetOperationValueType& value,
-                           AsyncOperationStatusType* status,
-                           std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1FWThrottlingMode(const AsyncSetOperationValueType& value,
-                              AsyncOperationStatusType* status,
-                              std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1PredictionMode(const AsyncSetOperationValueType& value,
+        setL1PowerModePatch(const AsyncSetOperationValueType& value,
                             AsyncOperationStatusType* status,
                             std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1HWThreshold(const AsyncSetOperationValueType& value,
-                         AsyncOperationStatusType* status,
-                         std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1HWActiveTime(const AsyncSetOperationValueType& value,
-                          AsyncOperationStatusType* status,
-                          std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1HWInactiveTime(const AsyncSetOperationValueType& value,
-                            AsyncOperationStatusType* status,
-                            std::shared_ptr<NsmDevice> device);
-
-    requester::Coroutine
-        setL1HWPredictionInactiveTime(const AsyncSetOperationValueType& value,
-                                      AsyncOperationStatusType* status,
-                                      std::shared_ptr<NsmDevice> device);
 
   private:
     std::string objPath;
