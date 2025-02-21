@@ -330,7 +330,7 @@ requester::Coroutine
                                                       [commandCode] = true;
             ss << int(commandCode) << " ";
         }
-        lg2::info("MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "ROW_NUM",
+        lg2::info("Eid: {EID} - MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "EID", eid, "ROW_NUM",
                   messageType, "ROW_VALUES", ss.str());
     }
 
