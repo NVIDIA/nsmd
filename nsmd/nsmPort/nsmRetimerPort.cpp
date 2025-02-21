@@ -102,14 +102,17 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
     uint8_t cc = NSM_ERROR;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize;
+    uint16_t reasonCode = ERR_NULL;
     struct nsm_query_scalar_group_telemetry_group_1 data;
 
     auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup1 decode_query_scalar_group_telemetry_v1_group1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         portInfoIntf->maxSpeed(convertEncodedSpeedToGbps(data.max_link_speed));
         portInfoIntf->currentSpeed(
@@ -119,17 +122,8 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
         portWidthIntf->activeWidth(
             convertEncodedWidthToActualWidth(data.negotiated_link_width));
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmPCIeECCGroup1 decode_query_scalar_group_telemetry_v1_group1_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup1 decode_query_scalar_group_telemetry_v1_group1_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeECCGroup1::updateMetricOnSharedMemory()
@@ -183,24 +177,18 @@ uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group2_resp(
         responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup2 decode_query_scalar_group_telemetry_v1_group2_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         pcieEccIntf->nonfeCount(data.non_fatal_errors);
         pcieEccIntf->feCount(data.fatal_errors);
         pcieEccIntf->ceCount(data.correctable_errors);
         pcieEccIntf->unsupportedRequestCount(data.unsupported_request_count);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmPCIeECCGroup2 decode_query_scalar_group_telemetry_v1_group2_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup2 decode_query_scalar_group_telemetry_v1_group2_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeECCGroup2::updateMetricOnSharedMemory()
@@ -259,21 +247,15 @@ uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group3_resp(
         responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         pcieEccIntf->l0ToRecoveryCount(data.L0ToRecoveryCount);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup3 decode_query_scalar_group_telemetry_v1_group3_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeECCGroup3::updateMetricOnSharedMemory()
@@ -320,24 +302,18 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group4_resp(
         responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         pcieEccIntf->replayCount(data.replay_cnt);
         pcieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
         pcieEccIntf->nakSentCount(data.NAK_sent_cnt);
         pcieEccIntf->nakReceivedCount(data.NAK_recv_cnt);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp");
     }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmPCIeECCGroup4 decode_query_scalar_group_telemetry_v1_group4_resp",
-            reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
@@ -396,7 +372,10 @@ uint8_t NsmPCIeECCGroup8::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_query_scalar_group_telemetry_v1_group8_resp(
         responseMsg, responseLen, &cc, &size, &reasonCode, &data);
 
-    if (rc == NSM_SUCCESS && cc == NSM_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group8_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         std::vector<uint32_t> error_counts;
 
@@ -407,17 +386,9 @@ uint8_t NsmPCIeECCGroup8::handleResponseMsg(const struct nsm_msg* responseMsg,
 
         laneErrorIntf->rxErrorsPerLane(error_counts);
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_query_scalar_group_telemetry_v1_group8_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "decode_query_scalar_group_telemetry_v1_group8_resp", reasonCode,
-            cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeECCGroup8::updateMetricOnSharedMemory()

@@ -4526,7 +4526,7 @@ int decode_get_powersmoothing_featinfo_resp(
     struct nsm_pwr_smoothing_featureinfo_data *data)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
 	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
@@ -4620,7 +4620,7 @@ int decode_get_hardware_lifetime_cricuitry_resp(
     struct nsm_hardwarecircuitry_data *data)
 {
 	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
 	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);

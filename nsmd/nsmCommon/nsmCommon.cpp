@@ -58,32 +58,29 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmMemoryCapacity::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     std::vector<uint8_t> data(65535, 0);
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     auto rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, data.data());
+        responseMsg, responseLen, &cc, &data_size, &reasonCode, data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_inventory_information_resp for Maximum Memory Capacity failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         uint32_t maximumMemoryCapacityMiB =
             *reinterpret_cast<uint32_t*>(data.data());
         updateReading(maximumMemoryCapacityMiB);
-        clearErrorBitMap(
-            "decode_get_inventory_information_resp for Maximum Memory Capacity");
     }
     else
     {
-        logHandleResponseMsg(
-            "decode_get_inventory_information_resp for Maximum Memory Capacity",
-            reason_code, cc, rc);
         updateReading(std::nullopt);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmTotalMemory::NsmTotalMemory(const std::string& name,
@@ -170,7 +167,7 @@ uint8_t
     NsmMemoryCapacityUtil::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_memory_capacity_utilization data;
     uint16_t dataSize = 0;
     uint16_t reasonCode = ERR_NULL;
@@ -185,18 +182,16 @@ uint8_t
                         responseMsg, responseLen, &cc, &dataSize, &reasonCode,
                         &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", handleFunctionName, "REASONCODE", reasonCode, "CC", cc,
+        "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
-        clearErrorBitMap(handleFunctionName);
-    }
-    else
-    {
-        logHandleResponseMsg(handleFunctionName, reasonCode, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 requester::Coroutine NsmMemoryCapacityUtil::update(SensorManager& manager,
                                                    eid_t eid)
@@ -262,35 +257,33 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->minSpeed(value);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMinGraphicsClockLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 void NsmMinGraphicsClockLimit::updateMetricOnSharedMemory()
@@ -352,35 +345,33 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         cpuOperatingConfigIntf->maxSpeed(value);
         updateMetricOnSharedMemory();
-        clearErrorBitMap(
-            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 void NsmMaxGraphicsClockLimit::updateMetricOnSharedMemory()

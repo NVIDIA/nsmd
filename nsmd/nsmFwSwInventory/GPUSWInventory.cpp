@@ -94,20 +94,16 @@ requester::Coroutine
     rc = decode_get_driver_info_resp(responseMsg.get(), responseLen, &cc,
                                      &reasonCode, &driverState, driverVersion);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_driver_info_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         std::string version(driverVersion);
         updateValue(driverState, version);
-        clearErrorBitMap("decode_get_driver_info_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_driver_info_resp", reasonCode, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 static requester::Coroutine createGPUDriverSensor(SensorManager& manager,

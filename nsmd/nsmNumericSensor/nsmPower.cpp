@@ -81,30 +81,28 @@ uint8_t NsmPower::handleResponseMsg(const struct nsm_msg* responseMsg,
                                     size_t responseLen)
 {
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
 
     uint32_t reading = 0;
 
     auto rc = decode_get_current_power_draw_resp(responseMsg, responseLen, &cc,
-                                                 &reason_code, &reading);
+                                                 &reasonCode, &reading);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_current_power_draw_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // unit of power is milliwatt in NSM Command Response and selected unit
         // in SensorValue PDI is Watts. Hence it is converted to Watts.
         sensorValue->updateReading(reading / 1000.0);
-        clearErrorBitMap("decode_get_current_power_draw_resp");
     }
     else
     {
         sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-
-        logHandleResponseMsg("decode_get_current_power_draw_resp", reason_code,
-                             cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 class PowerSensorFactory : public NumericSensorBuilder

@@ -196,12 +196,6 @@ eid_t getEidFromUUID(
             break;
         }
     }
-
-    if (eid == std::numeric_limits<uint8_t>::max())
-    {
-        lg2::error("EID not Found for UUID={UUID}", "UUID", uuid);
-    }
-
     return eid;
 }
 
@@ -460,33 +454,33 @@ std::vector<uint8_t> indicesToBitmap(const std::vector<uint8_t>& indices,
     return bitmap;
 }
 
-bool bitfield256_err_code::isBitSet(const int& errCode)
+Bitfield256::Bitfield256()
 {
-    if (errCode == NSM_SUCCESS || errCode == NSM_SW_SUCCESS)
-    {
-        return true; // No need to track these error codes
-    }
-
-    uint8_t fieldIndex = errCode / 32;
-    uint8_t bitIndex = errCode % 32;
-    uint32_t& byte = bitMap.fields[fieldIndex].byte;
-
-    if (!(byte & (1 << bitIndex)))
-    {
-        byte |= (1 << bitIndex);
-        return false;
-    }
-
-    return true;
+    clear();
+}
+bool Bitfield256::setBit(const uint8_t& bitNumber)
+{
+    uint8_t fieldIndex = bitNumber / 32;
+    uint8_t bitIndex = bitNumber % 32;
+    uint32_t& byte = fields[fieldIndex].byte;
+    bool wasSet = byte & (1 << bitIndex);
+    byte |= (1 << bitIndex);
+    return !wasSet;
 }
 
-std::string bitfield256_err_code::getSetBits() const
+bool Bitfield256::isAnyBitSet() const
+{
+    return std::any_of(std::begin(fields), std::end(fields),
+                       [](const auto& field) { return field.byte != 0; });
+}
+
+std::string Bitfield256::getSetBits() const
 {
     std::ostringstream oss;
 
     for (size_t i = 0; i < 8; ++i)
     {
-        uint32_t byte = bitMap.fields[i].byte;
+        uint32_t byte = fields[i].byte;
 
         while (byte > 0)
         {
@@ -502,13 +496,16 @@ std::string bitfield256_err_code::getSetBits() const
     std::string result = oss.str();
     if (!result.empty())
     {
-        result.pop_back();
-        result.pop_back();
-        // removed trailing , and whitespace
+        result.erase(result.size() - 2); // Remove trailing ", "
     }
 
-    return result.empty() ? "No err code" : result;
+    return result;
 }
+void Bitfield256::clear()
+{
+    memset(fields, 0, sizeof(fields));
+}
+
 std::vector<sdbusplus::common::xyz::openbmc_project::software::SecurityCommon::
                 UpdateMethods>
     updateMethodsBitfieldToList(bitfield32_t updateMethodBitfield)

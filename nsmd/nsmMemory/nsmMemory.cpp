@@ -170,26 +170,22 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmRowRemapState::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     bitfield8_t flags;
     uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_row_remap_state_resp(responseMsg, responseLen, &cc,
-                                              &data_size, &reason_code, &flags);
+                                              &data_size, &reasonCode, &flags);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_row_remap_state_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(flags);
-        clearErrorBitMap("decode_get_row_remap_state_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_row_remap_state_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmRowRemappingCounts::NsmRowRemappingCounts(
@@ -255,27 +251,23 @@ uint8_t
     NsmRowRemappingCounts::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
-    uint32_t correctable_error;
-    uint32_t uncorrectable_error;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint32_t correctableError;
+    uint32_t uncorrectableError;
+    uint16_t dataSize;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_row_remapping_counts_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code,
-        &correctable_error, &uncorrectable_error);
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode,
+        &correctableError, &uncorrectableError);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_row_remapping_counts_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        updateReading(correctable_error, uncorrectable_error);
-        clearErrorBitMap("decode_get_row_remapping_counts_resp");
+        updateReading(correctableError, uncorrectableError);
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_row_remapping_counts_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmRemappingAvailabilityBankCount::NsmRemappingAvailabilityBankCount(
@@ -322,26 +314,22 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmRemappingAvailabilityBankCount::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_row_remap_availability data;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_row_remap_availability_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_row_remap_availability_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(data);
         updateMetricOnSharedMemory();
-        clearErrorBitMap("decode_get_row_remap_availability_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_row_remap_availability_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
@@ -447,26 +435,21 @@ uint8_t
     NsmEccErrorCountsDram::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     struct nsm_ECC_error_counts errorCounts;
-    uint16_t data_size;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t dataSize;
+    uint16_t reasonCode = ERR_NULL;
     auto rc = decode_get_ECC_error_counts_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &errorCounts);
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &errorCounts);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_ECC_error_counts_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(errorCounts);
-        clearErrorBitMap("decode_get_ECC_error_counts_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_ECC_error_counts_resp", reason_code,
-                             cc, rc);
-
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmMinMemoryClockLimit::NsmMinMemoryClockLimit(
@@ -510,36 +493,34 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmMinMemoryClockLimit decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[0] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
-        clearErrorBitMap(
-            "NsmMinMemoryClockLimit decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMinMemoryClockLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmMaxMemoryClockLimit::NsmMaxMemoryClockLimit(
@@ -583,36 +564,34 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
         co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     uint32_t value;
     std::vector<uint8_t> data(4, 0);
 
     rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
-                                               &cc, &reason_code, &dataSize,
+                                               &cc, &reasonCode, &dataSize,
                                                data.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS && dataSize == sizeof(value))
+    if (shouldLog(
+            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp",
+            reasonCode, cc, rc, dataSize != sizeof(value)))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}, size: {SIZE}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc, "SIZE", dataSize);
+    }
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS && dataSize == sizeof(value))
     {
         memcpy(&value, &data[0], sizeof(value));
         value = le32toh(value);
         std::vector<uint16_t> allowedSpeedMT = dimmIntf->allowedSpeedsMT();
         allowedSpeedMT[1] = static_cast<uint16_t>(value);
         dimmIntf->allowedSpeedsMT(allowedSpeedMT);
-        clearErrorBitMap(
-            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg(
-            "NsmMaxMemoryClockLimit decode_get_inventory_information_resp",
-            reason_code, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmMemCurrClockFreq::NsmMemCurrClockFreq(const std::string& name,
@@ -670,26 +649,22 @@ uint8_t
     NsmMemCurrClockFreq::handleResponseMsg(const struct nsm_msg* responseMsg,
                                            size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint32_t clockFreq = 1;
-    uint16_t data_size;
-    uint16_t reason_code;
+    uint16_t dataSize;
+    uint16_t reasonCode = 0;
 
     auto rc = decode_get_curr_clock_freq_resp(
-        responseMsg, responseLen, &cc, &data_size, &reason_code, &clockFreq);
+        responseMsg, responseLen, &cc, &dataSize, &reasonCode, &clockFreq);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_curr_clock_freq_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(clockFreq);
-        clearErrorBitMap("decode_get_curr_clock_freq_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_curr_clock_freq_resp", reason_code, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return cc;
+    return cc ? cc : rc;
 }
 
 NsmMemCapacity::NsmMemCapacity(const std::string& name, const std::string& type,

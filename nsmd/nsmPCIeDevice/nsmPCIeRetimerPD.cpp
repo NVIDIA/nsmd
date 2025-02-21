@@ -108,7 +108,10 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
     auto rc = decode_query_scalar_group_telemetry_v1_group1_resp(
         responseMsg, responseLen, &cc, &dataSize, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "query_scalar_group_telemetry_v1_group1 failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         pcieDeviceIntf->PCIeDeviceIntf::pcIeType(
@@ -124,15 +127,8 @@ uint8_t NsmPCIeDeviceQueryScalarTelemetry::handleResponseMsg(
         pcieDeviceIntf->PCIeDeviceIntf::maxLanes(
             convertToLaneCount(data.max_link_width));
         updateMetricOnSharedMemory();
-        clearErrorBitMap("query_scalar_group_telemetry_v1_group1");
     }
-    else
-    {
-        logHandleResponseMsg("query_scalar_group_telemetry_v1_group1",
-                             reasonCode, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeDeviceQueryScalarTelemetry::updateMetricOnSharedMemory()
@@ -213,21 +209,17 @@ uint8_t NsmPCIeDeviceGetClockOutput::handleResponseMsg(
     auto rc = decode_get_clock_output_enable_state_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &clkBuf);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "get_clock_output_enable_state failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
         updateMetricOnSharedMemory();
-        clearErrorBitMap("get_clock_output_enable_state");
     }
-    else
-    {
-        logHandleResponseMsg("get_clock_output_enable_state", reasonCode, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPCIeDeviceGetClockOutput::updateMetricOnSharedMemory()

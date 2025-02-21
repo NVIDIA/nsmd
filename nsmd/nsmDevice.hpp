@@ -27,6 +27,7 @@
 #include "nsmInterface.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
+#include "stateChangeLogger.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
@@ -54,7 +55,7 @@ struct ActiveLongRunningHandlerInfo
     std::shared_ptr<NsmLongRunningEvent> sensorInstance;
 };
 
-class NsmDevice
+class NsmDevice : public StateChangeLogger
 {
   public:
     NsmDevice(uuid_t uuid) :

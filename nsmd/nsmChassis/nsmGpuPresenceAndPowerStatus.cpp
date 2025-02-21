@@ -145,15 +145,18 @@ uint8_t NsmGpuPresenceAndPowerStatus::handleResponse(
             break;
     }
 
+    LG2_ERROR_FLT(
+        "{FUNCNAME} failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "FUNCNAME", decodeMethodName, "REASONCODE", reasonCode, "CC", cc, "RC",
+        rc);
+
     if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
     {
-        logHandleResponseMsg(decodeMethodName, reasonCode, cc, rc);
         invoke(pdiMethod(state), OperationalStatusIntf::StateType::Fault);
         invoke(pdiMethod(functional), false);
     }
     else if (state == State::GetPowerStatus)
     {
-        clearErrorBitMap(decodeMethodName);
         // "State": "Enabled" if presence=active, power=active
         // "State": "UnavailableOffline" if presence=active,
         // power=inactive "State": "Absent" if presence=inactive

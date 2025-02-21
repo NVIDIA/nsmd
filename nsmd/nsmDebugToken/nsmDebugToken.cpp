@@ -597,24 +597,16 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     uint8_t deviceId[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE] = {0};
-    auto decodeRc = decode_nsm_query_device_ids_resp(
-        responseMsg.get(), responseLen, &cc, &reasonCode, deviceId);
-    if (decodeRc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    rc = decode_nsm_query_device_ids_resp(responseMsg.get(), responseLen, &cc,
+                                          &reasonCode, deviceId);
+    LG2_ERROR_FLT(
+        "decode_nsm_query_device_ids_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        clearErrorBitMap("decode_nsm_query_device_ids_resp");
-    }
-    else
-    {
-        if (shouldLogError(cc, rc))
-        {
-            lg2::error("DebugToken: decode_nsm_query_device_ids_resp: "
-                       "eid={EID} rc={RC} cc={CC} len={LEN}",
-                       "EID", eid, "RC", decodeRc, "CC", cc, "LEN",
-                       responseLen);
-        }
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
-        co_return decodeRc;
+        co_return cc ? cc : rc;
     }
     std::ostringstream oss;
     oss << "0x";

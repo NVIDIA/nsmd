@@ -19,6 +19,8 @@
 
 #include "nsmLongRunningEvent.hpp"
 
+#include "nsmObject.hpp"
+
 namespace nsm
 {
 
@@ -39,43 +41,42 @@ bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,
 int NsmLongRunningEvent::validateEvent(eid_t eid, const nsm_msg* event,
                                        size_t eventLen)
 {
-    // TODO: Add CC and RC error log tracking to prevent log flooding.
-    // Track issue: "Refactor error handling and logging in NSM components" MR.
-    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
-
     uint8_t instanceId;
     auto rc = decode_long_running_event(event, eventLen, &instanceId, nullptr,
                                         nullptr);
-    if (rc != NSM_SW_SUCCESS)
+
+    if (shouldLog("decode_long_running_event", nsm_sw_codes(rc)))
     {
-        lg2::debug(
-            "NsmLongRunningEvent::validateEvent: Failed to decode long running event, eid: {EID}, rc: {RC}",
-            "EID", eid, "RC", rc);
-        return rc;
+        LG2_ERROR("decode_long_running_event failure, eid: {EID}, rc: {RC}",
+                  "EID", eid, "RC", rc);
     }
-    else if (timer.expired())
+    if (shouldLog("timer.expired()", timer.expired()))
     {
-        lg2::error(
-            "NsmLongRunningEvent::validateEvent: LongRunning timer expired, eid: {EID}",
-            "EID", eid);
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        LG2_ERROR("LongRunning timer expired, eid: {EID}", "EID", eid);
     }
-    else if (acceptInstanceId == 0xFF || !isLongRunning)
+    if (shouldLog("acceptInstanceId == 0xFF || !isLongRunning",
+                  acceptInstanceId == 0xFF || !isLongRunning))
     {
-        lg2::error(
-            "NsmLongRunningEvent::validateEvent: LongRunning not started or not accepted, eid: {EID}",
-            "EID", eid);
-        return NSM_SW_ERROR_COMMAND_FAIL;
+        LG2_ERROR("LongRunning not started or not accepted, eid: {EID}", "EID",
+                  eid);
+    }
+    if (shouldLog("acceptInstanceId != instanceId",
+                  acceptInstanceId != instanceId))
+    {
+        LG2_ERROR(
+            "Instance ID mismatch, eid: {EID}, acceptInstanceId={AID}, instanceId={ID}",
+            "EID", eid, "AID", acceptInstanceId, "ID", instanceId);
+    }
+
+    if (timer.expired() || (acceptInstanceId == 0xFF || !isLongRunning))
+    {
+        rc = NSM_SW_ERROR_COMMAND_FAIL;
     }
     else if (acceptInstanceId != instanceId)
     {
-        lg2::error(
-            "NsmLongRunningEvent::validateEvent: Instance ID mismatch, eid: {EID}, acceptInstanceId: {ACCEPT_INSTANCE_ID}, instanceId: {INSTANCE_ID}",
-            "EID", eid, "ACCEPT_INSTANCE_ID", acceptInstanceId, "INSTANCE_ID",
-            instanceId);
-        return NSM_SW_ERROR_DATA;
+        rc = NSM_SW_ERROR_DATA;
     }
-    return NSM_SW_SUCCESS;
+    return rc;
 }
 
 } // namespace nsm

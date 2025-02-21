@@ -58,32 +58,24 @@ uint8_t NsmPowerSupplyStatus::handleResponse(const struct nsm_msg* responseMsg,
 
     auto rc = decode_get_power_supply_status_resp(responseMsg, responseLen, &cc,
                                                   &reasonCode, &status);
-    if (rc)
-    {
-        lg2::debug(
-            "responseHandler: decode_get_power_supply_status_resp failed with reasonCode={REASONCODE}, cc={CC} and rc={RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-        return rc;
-    }
 
-    if (cc == NSM_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_power_supply_status_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke(pdiMethod(currentPowerState),
                ((status >> gpuInstanceId) & 0x01) != 0
                    ? PowerStateIntf::PowerState::On
                    : PowerStateIntf::PowerState::Off);
-        clearErrorBitMap("decode_get_power_supply_status_resp");
     }
     else
     {
         invoke(pdiMethod(currentPowerState),
                PowerStateIntf::PowerState::Unknown);
-        logHandleResponseMsg("decode_get_power_supply_status_resp", reasonCode,
-                             cc, rc);
-        return rc;
     }
 
-    return cc;
+    return cc ? cc : rc;
 }
 
 } // namespace nsm

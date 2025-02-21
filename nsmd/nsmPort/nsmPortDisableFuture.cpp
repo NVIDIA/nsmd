@@ -62,23 +62,18 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
     rc = decode_get_port_disable_future_resp(responseMsg.get(), responseLen,
                                              &cc, &reasonCode, &mask[0]);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_port_disable_future_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // parse the mask and update the dbus property
         std::vector<uint8_t> maskArray;
         utils::convertBitMaskToVector(maskArray, mask, PORT_MASK_DATA_SIZE);
         invoke(pdiMethod(portDisableFuture), maskArray);
-        clearErrorBitMap("decode_get_port_disable_future_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_port_disable_future_resp", reasonCode,
-                             cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return NSM_SUCCESS;
+    co_return cc ? cc : rc;
 }
 
 requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
@@ -125,7 +120,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
     rc = decode_set_port_disable_future_resp(responseMsg.get(), responseLen,
                                              &cc, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         lg2::info("setDevicePortDisableFuture for EID: {EID} completed", "EID",
                   eid);

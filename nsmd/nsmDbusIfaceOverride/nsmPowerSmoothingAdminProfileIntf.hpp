@@ -33,7 +33,8 @@ using AssociationDefinitionsIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
 class OemAdminProfileIntf :
     public AdminPowerProfileIntf,
-    public AssociationDefinitionsIntf
+    public AssociationDefinitionsIntf,
+    public StateChangeLogger
 {
   private:
     std::shared_ptr<NsmDevice> device;
@@ -98,14 +99,17 @@ class OemAdminProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         uint16_t dataSize = 0;
         nsm_admin_override_data adminProfiledata{};
         rc = decode_query_admin_override_resp(responseMsg.get(), responseLen,
-                                              &cc, &reason_code, &dataSize,
+                                              &cc, &reasonCode, &dataSize,
                                               &adminProfiledata);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_query_admin_override_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             // fraction to percent
             if (adminProfiledata.admin_override_percent_tmp_floor ==
@@ -143,19 +147,9 @@ class OemAdminProfileIntf :
                     .admin_override_rampdown_hysteresis_value_in_milisec,
                 1000);
             AdminPowerProfileIntf::rampDownHysteresis(reading);
-            lg2::info("getAdminProfileFromDevice for EID: {EID} completed ",
-                      "EID", eid);
-        }
-        else
-        {
-            lg2::error(
-                "getAdminProfileFromDevice decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
-            // coverity[missing_return]
-            co_return rc;
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     requester::Coroutine
@@ -212,25 +206,23 @@ class OemAdminProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_setup_admin_override_resp(responseMsg.get(), responseLen,
-                                              &cc, &reason_code);
+                                              &cc, &reasonCode);
 
-        if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+        LG2_ERROR_FLT(
+            "decode_setup_admin_override_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+        if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
         {
             co_await getAdminProfileFromDevice();
         }
         else
         {
-            lg2::error(
-                "overrideAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
-                parameterId, "VAL", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
         // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
+        co_return cc ? cc : rc;
     }
 
     bool resetParam(double reading)
@@ -286,9 +278,9 @@ class OemAdminProfileIntf :
         }
 
         uint8_t cc = NSM_SUCCESS;
-        uint16_t reason_code = ERR_NULL;
+        uint16_t reasonCode = ERR_NULL;
         rc = decode_setup_admin_override_resp(responseMsg.get(), responseLen,
-                                              &cc, &reason_code);
+                                              &cc, &reasonCode);
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
@@ -298,7 +290,7 @@ class OemAdminProfileIntf :
         {
             lg2::error(
                 "resetAdminProfileParam decode_setup_admin_override_resp  failed.eid = {EID}, CC = {CC} reasoncode = {RC}, RC ={A},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
-                "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "ID",
+                "EID", eid, "CC", cc, "RC", reasonCode, "A", rc, "ID",
                 parameterId, "VAL", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;

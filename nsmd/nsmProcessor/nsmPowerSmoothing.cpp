@@ -49,26 +49,22 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmPowerSmoothing::handleResponseMsg(const struct nsm_msg* responseMsg,
                                              size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    uint8_t cc = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     nsm_pwr_smoothing_featureinfo_data data{};
 
     auto rc = decode_get_powersmoothing_featinfo_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_powersmoothing_featinfo_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_powersmoothing_featinfo_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_powersmoothing_featinfo_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPowerSmoothing::updateReading(
@@ -142,7 +138,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
     nsm_hardwarecircuitry_data data{};
@@ -150,18 +146,14 @@ uint8_t NsmHwCircuitryTelemetry::handleResponseMsg(
     auto rc = decode_get_hardware_lifetime_cricuitry_resp(
         responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_hardware_lifetime_cricuitry_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_hardware_lifetime_cricuitry_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_hardware_lifetime_cricuitry_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmHwCircuitryTelemetry::updateReading(
@@ -213,7 +205,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmCurrentPowerSmoothingProfile::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
     nsm_get_current_profile_data data{};
@@ -221,18 +213,14 @@ uint8_t NsmCurrentPowerSmoothingProfile::handleResponseMsg(
     auto rc = decode_get_current_profile_info_resp(
         responseMsg, responseLen, &cc, &reason_code, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_current_profile_info_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_get_current_profile_info_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_current_profile_info_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 std::string NsmCurrentPowerSmoothingProfile::getProfilePath(uint8_t profileId)
 {
@@ -323,7 +311,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmPowerSmoothingAdminOverride::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint16_t reason_code = ERR_NULL;
     uint16_t dataSize = 0;
     nsm_admin_override_data data{};
@@ -331,18 +319,14 @@ uint8_t NsmPowerSmoothingAdminOverride::handleResponseMsg(
     auto rc = decode_query_admin_override_resp(responseMsg, responseLen, &cc,
                                                &reason_code, &dataSize, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_query_admin_override_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         updateReading(&data);
-        clearErrorBitMap("decode_query_admin_override_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_query_admin_override_resp", reason_code,
-                             cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 void NsmPowerSmoothingAdminOverride::updateReading(
@@ -480,7 +464,7 @@ std::optional<std::vector<uint8_t>>
 uint8_t NsmPowerProfileCollection::handleResponseMsg(
     const struct nsm_msg* responseMsg, size_t responseLen)
 {
-    uint8_t cc = NSM_ERROR;
+    uint8_t cc = ERR_NULL;
     uint16_t reason_code = ERR_NULL;
     nsm_get_all_preset_profile_meta_data data{};
     uint8_t numberOfprofiles = 0;
@@ -488,7 +472,10 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
     auto rc = decode_get_preset_profile_metadata_resp(
         responseMsg, responseLen, &cc, &reason_code, &data, &numberOfprofiles);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_preset_profile_metadata_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         for (int profileId = 0; profileId < numberOfprofiles; profileId++)
         {
@@ -549,15 +536,8 @@ uint8_t NsmPowerProfileCollection::handleResponseMsg(
             updateSupportedProfile(getSupportedProfileById(profileId),
                                    &profileData);
         }
-        clearErrorBitMap("decode_get_preset_profile_metadata_resp");
     }
-    else
-    {
-        logHandleResponseMsg("decode_get_preset_profile_metadata_resp",
-                             reason_code, cc, rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 NsmPowerSmoothingAction::NsmPowerSmoothingAction(
@@ -613,7 +593,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
     rc = decode_set_active_preset_profile_resp(responseMsg.get(), responseLen,
                                                &cc, &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // updating current profile after activating a profile
         currentProfile->update(manager, eid);
@@ -701,7 +681,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     rc = decode_apply_admin_override_resp(responseMsg.get(), responseLen, &cc,
                                           &reason_code);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // updating current profile after activating a profile
         currentProfile->update(manager, eid);

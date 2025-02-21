@@ -71,7 +71,7 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
             "decode_nsm_rediscovery_event failed. rc={RC}, EID={SRC}, Name={NAME}",
             "RC", rc, "SRC", eid, "NAME", getName());
 
-        return NSM_SW_ERROR;
+        return rc;
     }
 
     logEvent("NsmRediscoveryEvent", info.severity, eventData);

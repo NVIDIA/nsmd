@@ -47,10 +47,12 @@ using Mode = sdbusplus::server::com::nvidia::ClockMode::Mode;
 using DecoratorAreaIntf = object_t<Inventory::Decorator::server::Area>;
 using CpuOperatingConfigIntf =
     object_t<Inventory::Item::Cpu::server::OperatingConfig>;
-using clearClockLimAsyncIntf =
+using ClearClockLimAsyncIntf =
     object_t<sdbusplus::server::com::nvidia::common::ClearClockLimAsync>;
 
-class NsmClearClockLimAsyncIntf : public clearClockLimAsyncIntf
+class NsmClearClockLimAsyncIntf :
+    public ClearClockLimAsyncIntf,
+    public StateChangeLogger
 {
   public:
     NsmClearClockLimAsyncIntf(sdbusplus::bus::bus& bus, const char* path,

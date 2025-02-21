@@ -58,17 +58,14 @@ uint8_t NsmErrorInjection::handleResponseMsg(const struct nsm_msg* responseMsg,
     auto rc = decode_get_error_injection_mode_v1_resp(responseMsg, responseLen,
                                                       &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_error_injection_mode_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke(pdiMethod(errorInjectionModeEnabled), data.mode);
         invoke(pdiMethod(persistentDataModified),
                uint8_t(data.flags.bits.bit0));
-        clearErrorBitMap("decode_get_error_injection_mode_v1_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_error_injection_mode_v1_resp",
-                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;
@@ -116,18 +113,15 @@ uint8_t NsmErrorInjectionSupported::handleResponseMsg(
     auto rc = decode_get_error_injection_types_v1_resp(responseMsg, responseLen,
                                                        &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_error_injection_types_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke([data](auto& pdi) {
             auto type = pdi.type();
             pdi.supported(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
         });
-        clearErrorBitMap("decode_get_error_injection_types_v1_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_error_injection_types_v1_resp",
-                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;
@@ -161,18 +155,15 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
     auto rc = decode_get_error_injection_types_v1_resp(responseMsg, responseLen,
                                                        &cc, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "decode_get_error_injection_types_v1_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         invoke([data](auto& pdi) {
             auto type = pdi.type();
             pdi.enabled(data.mask[(int)type / 8] & (1 << ((int)type % 8)));
         });
-        clearErrorBitMap("decode_get_error_injection_types_v1_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("decode_get_error_injection_types_v1_resp",
-                             reasonCode, cc, rc);
     }
 
     return cc ? cc : rc;

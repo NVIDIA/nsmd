@@ -79,7 +79,10 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
     rc = decode_query_scalar_group_telemetry_v1_group0_resp(
         responseMsg.get(), responseLen, &cc, &dataSize, &reasonCode, &data);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "query_scalar_group_telemetry_v1_group0 failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         std::stringstream hexaDeviceId;
@@ -91,18 +94,9 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
 
         switchIntf->deviceId(hexaDeviceId.str());
         switchIntf->vendorId(hexaVendorId.str());
-        clearErrorBitMap(
-            "NsmMaxGraphicsClockLimit decode_get_inventory_information_resp");
-    }
-    else
-    {
-        logHandleResponseMsg("query_scalar_group_telemetry_v1_group0",
-                             reasonCode, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 NsmPCIeRetimerSwitchGetClockState::NsmPCIeRetimerSwitchGetClockState(
@@ -151,20 +145,16 @@ uint8_t NsmPCIeRetimerSwitchGetClockState::handleResponseMsg(
     auto rc = decode_get_clock_output_enable_state_resp(
         responseMsg, responseLen, &cc, &reasonCode, &dataSize, &clkBuf);
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    LG2_ERROR_FLT(
+        "get_clock_output_enable_state failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // update values
         pcieRefClockIntf->pcIeReferenceClockEnabled(
             getRetimerClockState(clkBuf));
-        clearErrorBitMap("get_clock_output_enable_state");
     }
-    else
-    {
-        logHandleResponseMsg("get_clock_output_enable_state", reasonCode, cc,
-                             rc);
-        return NSM_SW_ERROR_COMMAND_FAIL;
-    }
-    return NSM_SW_SUCCESS;
+    return cc ? cc : rc;
 }
 
 bool NsmPCIeRetimerSwitchGetClockState::getRetimerClockState(

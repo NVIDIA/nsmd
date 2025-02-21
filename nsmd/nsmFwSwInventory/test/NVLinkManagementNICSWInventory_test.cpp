@@ -93,7 +93,7 @@ TEST(NsmSWInventoryDriverVersionAndStatus, HandleNullResponseMsg)
 
     uint8_t result = sensor.handleResponseMsg(nullptr, 0);
 
-    EXPECT_EQ(result, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(result, NSM_SW_ERROR);
 }
 
 TEST(NsmSWInventoryDriverVersionAndStatus, NonNullTerminatedDriverVersion)
@@ -123,7 +123,7 @@ TEST(NsmSWInventoryDriverVersionAndStatus, NonNullTerminatedDriverVersion)
     uint8_t result = sensor.handleResponseMsg(
         reinterpret_cast<nsm_msg*>(responseMsg.data()), responseMsg.size());
 
-    EXPECT_EQ(result, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(result, NSM_SW_ERROR_LENGTH);
 }
 
 TEST(NsmSWInventoryDriverVersionAndStatus, ExceedinglyLongDriverVersion)
@@ -158,5 +158,5 @@ TEST(NsmSWInventoryDriverVersionAndStatus, ExceedinglyLongDriverVersion)
     uint8_t result = sensor.handleResponseMsg(
         reinterpret_cast<nsm_msg*>(responseMsg.data()), responseMsg.size());
 
-    EXPECT_EQ(result, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(result, NSM_SW_ERROR_LENGTH);
 }

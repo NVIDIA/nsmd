@@ -56,7 +56,7 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
             "decode_nsm_xid_event failed. rc={RC}, EID={SRC}, Name={NAME}",
             "RC", rc, "SRC", eid, "NAME", getName());
 
-        return NSM_SW_ERROR;
+        return rc;
     }
 
     std::string messageText(text, messageTextSize);

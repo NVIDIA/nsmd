@@ -97,7 +97,7 @@ TEST(nsmMemCapacityUtil, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     size_t msg_len = responseMsg.size();
     rc = sensor.handleResponseMsg(NULL, msg_len);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, 0);
-    EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
+    EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

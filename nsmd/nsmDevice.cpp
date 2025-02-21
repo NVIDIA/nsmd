@@ -102,9 +102,6 @@ std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
 
 void NsmDevice::setEventMode(uint8_t mode)
 {
-    // TODO: Add CC and RC error log tracking to prevent log flooding.
-    // Track issue: "Refactor error handling and logging in NSM components" MR.
-    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
     if (mode > GLOBAL_EVENT_GENERATION_ENABLE_PUSH)
     {
         lg2::debug("event generation setting: invalid value={SETTING} provided",
@@ -132,10 +129,8 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
                               bool priority, bool isLongRunning)
 {
-    std::string deviceInstanceName =
+    sensor->deviceIdentifier =
         utils::getDeviceInstanceName(getDeviceType(), getInstanceNumber());
-    sensor->setDeviceIdentifier(deviceInstanceName);
-
     deviceSensors.emplace_back(sensor);
     if (isLongRunning)
     {
@@ -202,9 +197,6 @@ void NsmDevice::registerLongRunningHandler(
     std::shared_ptr<NsmLongRunningEvent> sensorInstance)
 {
     clearLongRunningHandler();
-    lg2::debug(
-        "Registering long-running handler for MessageType={MT}, CommandCode={CC}",
-        "MT", messageType, "CC", commandCode);
 
     longRunningHandler = ActiveLongRunningHandlerInfo{messageType, commandCode,
                                                       sensorInstance};
@@ -216,11 +208,6 @@ void NsmDevice::clearLongRunningHandler()
     {
         return;
     }
-
-    lg2::debug(
-        "Clearing long-running handler for MessageType={MT}, CommandCode={CC}",
-        "MT", longRunningHandler->messageType, "CC",
-        longRunningHandler->commandCode);
 
     longRunningHandler.reset();
 }
@@ -235,14 +222,15 @@ int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
                                         NsmEventId eventId,
                                         const nsm_msg* event, size_t eventLen)
 {
-    // TODO: Add CC and RC error log tracking to prevent log flooding.
-    // Track issue: "Refactor error handling and logging in NSM components" MR.
-    // Link: https://gitlab-master.nvidia.com/dgx/bmc/nsmd/-/merge_requests/527
-    if (!longRunningHandler.has_value())
+    if (shouldLog("NsmDevice::invokeLongRunningHandler",
+                  !longRunningHandler.has_value()))
     {
-        lg2::debug(
+        lg2::error(
             "NsmDevice::invokeLongRunningHandler: No active handler registered for long-running event, EID={EID}",
             "EID", eid);
+    }
+    if (!longRunningHandler.has_value())
+    {
         return NSM_SW_ERROR_DATA;
     }
 
@@ -252,11 +240,14 @@ int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
                                NSM_NVIDIA_GENERAL_EVENT_CLASS, &eventState,
                                &dataSize);
 
-    if (rc != NSM_SW_SUCCESS)
+    if (shouldLog("decode_nsm_event", nsm_sw_codes(rc)))
     {
-        lg2::debug(
+        lg2::error(
             "NsmLongRunningEventHandler : Failed to decode long running event state : EID={EID}",
             "EID", eid);
+    }
+    if (rc != NSM_SW_SUCCESS)
+    {
         return rc;
     }
     nsm_long_running_event_state state{};

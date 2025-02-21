@@ -19,12 +19,14 @@
 
 #include "common/timer.hpp"
 #include "nsmEvent.hpp"
+#include "stateChangeLogger.hpp"
 
 namespace nsm
 {
 class NsmLongRunningEvent :
     public NsmEvent,
-    public std::enable_shared_from_this<NsmLongRunningEvent>
+    public std::enable_shared_from_this<NsmLongRunningEvent>,
+    virtual public StateChangeLogger
 {
   public:
     explicit NsmLongRunningEvent(const std::string& name,
