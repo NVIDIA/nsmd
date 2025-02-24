@@ -72,9 +72,10 @@ TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
 	size_t msg_len = responseMsg.size();
 
 	uint8_t cc = 0;
-	bitfield8_t *event_sources;
+	uint16_t reason_code = 0;
+	bitfield8_t event_sources[EVENT_SOURCES_LENGTH];
 	auto rc = decode_nsm_get_supported_event_source_resp(
-	    response, msg_len, &cc, &event_sources);
+	    response, msg_len, &cc, &reason_code, &event_sources[0]);
 
 	EXPECT_EQ(rc, NSM_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);

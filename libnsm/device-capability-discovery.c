@@ -50,8 +50,8 @@ int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
 }
 
 int decode_nsm_get_supported_event_source_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    bitfield8_t **supported_event_sources)
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc, uint16_t *reason_code,
+    bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH])
 {
 	if (msg == NULL || cc == NULL) {
 		return NSM_ERR_INVALID_DATA;
@@ -65,12 +65,12 @@ int decode_nsm_get_supported_event_source_resp(
 	struct nsm_get_supported_event_source_resp *response =
 	    (struct nsm_get_supported_event_source_resp *)msg->payload;
 
-	*cc = response->hdr.completion_code;
-	if (NSM_SUCCESS != *cc) {
-		return NSM_SUCCESS;
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
 	}
 
-	*supported_event_sources = response->supported_event_sources;
+	memcpy(supported_event_sources, response->supported_event_sources, EVENT_SOURCES_LENGTH);
 
 	return NSM_SUCCESS;
 }

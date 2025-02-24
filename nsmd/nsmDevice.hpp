@@ -37,6 +37,7 @@
 namespace nsm
 {
 
+class NsmGPUSWInventoryDriverVersionAndStatus;
 class SensorManager;
 class NsmNumericAggregator;
 class NsmDevice;
@@ -89,6 +90,7 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor = nullptr; // for GPU driver
 
     EventDispatcher eventDispatcher;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;

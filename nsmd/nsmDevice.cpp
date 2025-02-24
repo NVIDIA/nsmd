@@ -23,6 +23,7 @@
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -181,6 +182,12 @@ void NsmDevice::setOnline()
 void NsmDevice::setOffline()
 {
     isDeviceActive = false;
+    if (gpudriverSensor)
+    {
+        lg2::info("Setting GPU driver state to unknown as eid = {EID} gets offline",
+                  "EID", eid);
+        gpudriverSensor->driverState = 0;
+    }
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
         "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());

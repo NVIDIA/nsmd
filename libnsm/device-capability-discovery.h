@@ -186,8 +186,8 @@ int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
  *  @return nsm_completion_codes
  */
 int decode_nsm_get_supported_event_source_resp(const struct nsm_msg *msg,
-					       size_t msg_len, uint8_t *cc,
-					       bitfield8_t **event_sources);
+					       size_t msg_len, uint8_t *cc,uint16_t *reason_code,
+					       bitfield8_t event_sources[EVENT_SOURCES_LENGTH]);
 
 /** @brief Create a set current event sources request message
  *

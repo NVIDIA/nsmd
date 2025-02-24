@@ -119,7 +119,7 @@ void DeviceRequestTimeOutTracker::emptyQueue()
 
 void DeviceRequestTimeOutTracker::logTimeOutFailure()
 {
-    lg2::error("******logTimeOutFailure: EID={EID}*****", "EID", eid);
+    lg2::error("******Start logTimeOutFailure: EID={EID}*****", "EID", eid);
     if (firstTimeoutMessage.has_value())
     {
         for (const auto& message : messages)
@@ -132,6 +132,6 @@ void DeviceRequestTimeOutTracker::logTimeOutFailure()
             "logTimeOutFailure: EID={EID}, Timeout for NSM request: {REQ}",
             "EID", eid, "REQ", *firstTimeoutMessage);
     }
-    lg2::error("******logTimeOutFailure: EID={EID}*****", "EID", eid);
+    lg2::error("******End logTimeOutFailure: EID={EID}*****", "EID", eid);
 }
 } // namespace nsm
