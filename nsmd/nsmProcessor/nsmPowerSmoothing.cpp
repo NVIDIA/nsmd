@@ -18,6 +18,8 @@
 
 #include "nsmPowerSmoothing.hpp"
 
+#include "sharedMemCommon.hpp"
+
 #include <cstdint>
 
 namespace nsm
@@ -27,7 +29,34 @@ NsmPowerSmoothing::NsmPowerSmoothing(
     std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf) :
     NsmSensor(name, type),
     pwrSmoothingIntf(pwrSmoothingIntf), inventoryObjPath(inventoryObjPath)
-{}
+{
+    updateMetricOnSharedMemory();
+}
+
+void NsmPowerSmoothing::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName =
+        std::string(pwrSmoothingIntf->PowerSmoothingIntf::interface);
+    std::vector<uint8_t> smbusData = {};
+
+    // Define metric updates as a vector of tuples (property name, value)
+    const std::vector<
+        std::pair<std::string, nv::sensor_aggregation::DbusVariantType>>
+        metrics = {
+            {"PowerSmoothingEnabled",
+             pwrSmoothingIntf->PowerSmoothingIntf::powerSmoothingEnabled()},
+            {"ImmediateRampDownEnabled",
+             pwrSmoothingIntf->PowerSmoothingIntf::immediateRampDownEnabled()}};
+
+    // Update all metrics in shared memory
+    for (const auto& [propName, value] : metrics)
+    {
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            inventoryObjPath, ifaceName, propName, smbusData, value);
+    }
+#endif
+}
 
 std::optional<std::vector<uint8_t>>
     NsmPowerSmoothing::genRequestMsg(eid_t eid, uint8_t instanceId)
@@ -107,6 +136,7 @@ void NsmPowerSmoothing::updateReading(
         NvUFXP4_12ToDouble(data->maxTmpFloorSettingInPercent) * 100);
     pwrSmoothingIntf->PowerSmoothingIntf::minAllowedTmpFloorPercent(
         NvUFXP4_12ToDouble(data->minTmpFloorSettingInPercent) * 100);
+    updateMetricOnSharedMemory();
 }
 
 // HW lifetime usage
@@ -115,7 +145,23 @@ NsmHwCircuitryTelemetry::NsmHwCircuitryTelemetry(
     std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf) :
     NsmSensor(name, type),
     pwrSmoothingIntf(pwrSmoothingIntf), inventoryObjPath(inventoryObjPath)
-{}
+{
+    updateMetricOnSharedMemory();
+}
+
+void NsmHwCircuitryTelemetry::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName =
+        std::string(pwrSmoothingIntf->PowerSmoothingIntf::interface);
+    std::vector<uint8_t> smbusData = {};
+    std::string propName = "LifeTimeRemaining";
+    nv::sensor_aggregation::DbusVariantType lifeTimeRemainingVal{
+        pwrSmoothingIntf->PowerSmoothingIntf::lifeTimeRemaining()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, lifeTimeRemainingVal);
+#endif
+}
 
 std::optional<std::vector<uint8_t>>
     NsmHwCircuitryTelemetry::genRequestMsg(eid_t eid, uint8_t instanceId)
@@ -167,6 +213,7 @@ void NsmHwCircuitryTelemetry::updateReading(
     // Update values on iface
     pwrSmoothingIntf->PowerSmoothingIntf::lifeTimeRemaining(
         NvUFXP8_24ToDouble(data->reading));
+    updateMetricOnSharedMemory();
 }
 
 //  Power Smoothing Control: Get Current Profile Information
@@ -182,7 +229,40 @@ NsmCurrentPowerSmoothingProfile::NsmCurrentPowerSmoothingProfile(
         pwrSmoothingSupportedCollectionSensor),
     adminProfileSensor(adminProfileSensor), inventoryObjPath(inventoryObjPath)
 
-{}
+{
+    updateMetricOnSharedMemory();
+}
+
+void NsmCurrentPowerSmoothingProfile::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(
+        pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::interface);
+    std::vector<uint8_t> smbusData = {};
+
+    // Define metric updates as a vector of tuples (property name, value)
+    const std::vector<
+        std::pair<std::string, nv::sensor_aggregation::DbusVariantType>>
+        metrics = {
+            {"TMPFloorPercent",
+             pwrSmoothingCurProfileIntf
+                 ->CurrentPowerProfileIntf::tmpFloorPercent()},
+            {"RampUpRate",
+             pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::rampUpRate()},
+            {"RampDownRate", pwrSmoothingCurProfileIntf
+                                 ->CurrentPowerProfileIntf::rampDownRate()},
+            {"RampDownHysteresis",
+             pwrSmoothingCurProfileIntf
+                 ->CurrentPowerProfileIntf::rampDownHysteresis()}};
+
+    // Update all metrics in shared memory
+    for (const auto& [propName, value] : metrics)
+    {
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            inventoryObjPath, ifaceName, propName, smbusData, value);
+    }
+#endif
+}
 
 std::optional<std::vector<uint8_t>>
     NsmCurrentPowerSmoothingProfile::genRequestMsg(eid_t eid,
@@ -280,6 +360,7 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
 
     pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::appliedProfilePath(
         getProfilePath(data->current_active_profile_id));
+    updateMetricOnSharedMemory();
 }
 
 // Query Admin overrides
