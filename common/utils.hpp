@@ -380,6 +380,13 @@ class DBusHandler : public IDBusHandler
                              const std::string& association) const override;
 };
 
+/** @brief check if the string is met UTF-8 or not based on the dbus spec.
+ *
+ *  @param[in] input - The input string to be checked
+ *  @return - boolean
+ */
+bool isValidDbusString(std::string_view input);
+
 IDBusHandler& DBusHandler();
 
 /** @brief Print the buffer

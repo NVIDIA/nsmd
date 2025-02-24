@@ -65,6 +65,53 @@ TEST(convertHexToString, testBadHexConversionToString)
     EXPECT_STREQ(result.c_str(), "");
 }
 
+TEST(isValidDbusString, testGoodIsValidDbusString)
+{
+    // test 1 byte
+    EXPECT_TRUE(utils::isValidDbusString("\x41\x41\x41"));
+
+    // test 2 bytes
+    EXPECT_TRUE(utils::isValidDbusString("\xC3\xA9\xC3\xA9\xC3\xA9"));
+
+    // test 3 bytes
+    EXPECT_TRUE(
+        utils::isValidDbusString("\xE2\x82\xAC\xE2\x82\xAC\xE2\x82\xAC"));
+
+    // test 4 bytes
+    EXPECT_TRUE(utils::isValidDbusString(
+        "\xF0\x90\x8D\x88\xF0\x90\x8D\x88\xF0\x90\x8D\x88"));
+}
+
+TEST(isValidDbusString, testBadIsValidDbusString)
+{
+    // test 1 byte, it must be <= 0x7f
+    EXPECT_FALSE(utils::isValidDbusString("\x80"));
+
+    // test 2 bytes, the first two bits of the leading byte
+    // should be 11b
+    EXPECT_FALSE(utils::isValidDbusString("\xE3\xA9"));
+
+    // test 2 bytes, the first two bits of the subsequent byte
+    // should be 10b
+    EXPECT_FALSE(utils::isValidDbusString("\xC3\xE9"));
+
+    // test 3 bytes, the first three bits of the leading byte
+    // should be 111b
+    EXPECT_FALSE(utils::isValidDbusString("\xF2\x82\xAC"));
+
+    // test 3 bytes, the first two bits of the subsequent byte
+    // should be 10b
+    EXPECT_FALSE(utils::isValidDbusString("\xE2\xF2\xAC"));
+
+    // test 4 bytes, the first four bits of the leading byte
+    // should be 1111b
+    EXPECT_FALSE(utils::isValidDbusString("\xC0\x90\x8D\x88"));
+
+    // test 4 bytes, the first two bits of the subsequent byte
+    // should be 10b
+    EXPECT_FALSE(utils::isValidDbusString("\xF0\x90\xFD\x88"));
+}
+
 TEST(makeDBusNameValid, Functional)
 {
     const std::vector<std::array<std::string, 2>> data{
