@@ -43,6 +43,7 @@ class NsmPowerSmoothing : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
     void updateReading(struct nsm_pwr_smoothing_featureinfo_data* data);
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf;
@@ -62,6 +63,7 @@ class NsmHwCircuitryTelemetry : public NsmSensor
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
     void updateReading(struct nsm_hardwarecircuitry_data* data);
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<PowerSmoothingIntf> pwrSmoothingIntf;
@@ -169,6 +171,7 @@ class NsmCurrentPowerSmoothingProfile : public NsmSensor
                               size_t responseLen) override;
     void updateReading(struct nsm_get_current_profile_data* data);
     std::string getProfilePath(uint8_t profileId);
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf;
