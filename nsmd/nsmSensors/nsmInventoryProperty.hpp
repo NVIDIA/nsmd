@@ -215,18 +215,19 @@ inline void NsmInventoryProperty<NsmMNNVLinkTopologyIntf>::handleResponse(
             break;
         case CHASSIS_SERIAL_NUMBER:
         {
-            std::string chassisSerialNumber("");
-            try
+            std::string chassisSerialNumber(
+                std::bit_cast<const char*>(data.data()), data.size());
+            auto isValid = utils::isValidDbusString(chassisSerialNumber);
+            // update the value when it's a UTF8 string
+            if (isValid == true)
             {
-                chassisSerialNumber = std::string((char*)data.data(),
-                                                  data.size());
+                pdi().chassisSerialNumber(chassisSerialNumber);
             }
-            catch (const std::exception& e)
+            else
             {
-                chassisSerialNumber = utils::convertHexToString(data,
-                                                                data.size());
+                // set an empty string to the property
+                pdi().chassisSerialNumber("");
             }
-            pdi().chassisSerialNumber(chassisSerialNumber);
             break;
         }
         case TRAY_SLOT_NUMBER:
