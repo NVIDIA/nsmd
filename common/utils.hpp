@@ -20,6 +20,7 @@
 #include "base.h"
 
 #include "coroutine.hpp"
+#include "log.hpp"
 #include "types.hpp"
 
 #include <stdint.h>
@@ -28,7 +29,6 @@
 
 #include <boost/asio.hpp>
 #include <nlohmann/json.hpp>
-#include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/server.hpp>
 #include <xyz/openbmc_project/Software/SecurityCommon/common.hpp>

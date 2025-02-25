@@ -24,6 +24,7 @@
 #include "nsmDevice.hpp"
 #include "requester/handler.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdeventplus/event.hpp>
@@ -131,6 +132,12 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         mapInstanceNumberToInstanceNumber;
     std::map<DeviceType, std::vector<std::string>> mapUuidToInstanceNumber;
     std::map<DeviceType, std::vector<uint64_t>> mapEidToInstanceNumber;
+    std::map<DeviceType, std::map<uint8_t, StateChangeLogger>>
+        mapInstanceNumberToLogger;
+    std::map<DeviceType, std::map<std::string, StateChangeLogger>>
+        mapUuidToLogger;
+    std::map<DeviceType, std::map<uint8_t, StateChangeLogger>> mapEidToLogger;
+    StateChangeLogger getInventoryLogger;
 
   private:
     DeviceManager(
@@ -141,8 +148,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices) :
-        event(event), handler(handler), instanceIdDb(instanceIdDb),
-        objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
+        event(event),
+        handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
+        eidTable(eidTable), nsmDevices(nsmDevices)
     {}
 
     void registerDbusMethods();

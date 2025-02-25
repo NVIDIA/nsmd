@@ -330,8 +330,9 @@ requester::Coroutine
                                                       [commandCode] = true;
             ss << int(commandCode) << " ";
         }
-        lg2::info("Eid: {EID} - MessageType {ROW_NUM}: commandCodes {ROW_VALUES}", "EID", eid, "ROW_NUM",
-                  messageType, "ROW_VALUES", ss.str());
+        lg2::info(
+            "Eid: {EID} - MessageType {ROW_NUM}: commandCodes {ROW_VALUES}",
+            "EID", eid, "ROW_NUM", messageType, "ROW_VALUES", ss.str());
     }
 
     // Update fruDevice interface
@@ -384,19 +385,23 @@ requester::Coroutine DeviceManager::getInventoryInformation(
     }
 
     uint8_t cc = NSM_SUCCESS;
-    uint16_t reason_code = ERR_NULL;
+    uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     std::vector<uint8_t> data(65535, 0);
 
     rc = decode_get_inventory_information_resp(
-        responseMsg, responseLen, &cc, &reason_code, &dataSize, data.data());
+        responseMsg, responseLen, &cc, &reasonCode, &dataSize, data.data());
+    if (getInventoryLogger.shouldLog("decode_get_inventory_information_resp",
+                                     reasonCode, cc, rc))
+    {
+        LG2_ERROR(
+            "decode_get_inventory_information_resp failed, eid={EID}, reasonCode={REASONCODE}, cc={CC}, rc={RC}",
+            "EID", eid, "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    }
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error(
-            "decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={RESONCODE} and rc={RC}",
-            "EID", eid, "CC", cc, "RESONCODE", reason_code, "RC", rc);
         // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
+        co_return cc ? cc : rc;
     }
 
     std::optional<InventoryPropertyData> property;
@@ -672,6 +677,13 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
     {
         auto& table = mapInstanceNumberToInstanceNumber[deviceType];
         auto it = std::find(table.begin(), table.end(), instanceNumber);
+        if (mapInstanceNumberToLogger[deviceType][instanceNumber].shouldLog(
+                "DeviceManager::remapInstanceNumber", it == table.end()))
+        {
+            lg2::warning(
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE}",
+                "INST", instanceNumber, "TYPE", deviceType);
+        }
         if (it != table.end())
         {
             auto distance = std::distance(table.begin(), it);
@@ -680,14 +692,18 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
                 return distance;
             }
         }
-        lg2::info(
-            "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE}",
-            "INST", instanceNumber, "TYPE", deviceType);
     }
     else if (mapUuidToInstanceNumber[deviceType].size() > 0)
     {
         auto& table = mapUuidToInstanceNumber[deviceType];
         auto it = std::find(table.begin(), table.end(), uuid);
+        if (mapUuidToLogger[deviceType][uuid].shouldLog(
+                "DeviceManager::remapInstanceNumber", it == table.end()))
+        {
+            lg2::warning(
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by uuid:{UUID}",
+                "INST", instanceNumber, "TYPE", deviceType, "UUID", uuid);
+        }
         if (it != table.end())
         {
             auto distance = std::distance(table.begin(), it);
@@ -696,14 +712,18 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
                 return distance;
             }
         }
-        lg2::info(
-            "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by uuid:{UUID}",
-            "INST", instanceNumber, "TYPE", deviceType, "UUID", uuid);
     }
     else if (mapEidToInstanceNumber[deviceType].size() > 0)
     {
         auto& table = mapEidToInstanceNumber[deviceType];
         auto it = std::find(table.begin(), table.end(), eid);
+        if (mapEidToLogger[deviceType][eid].shouldLog(
+                "DeviceManager::remapInstanceNumber", it == table.end()))
+        {
+            lg2::warning(
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by eid:{EID}",
+                "INST", instanceNumber, "TYPE", deviceType, "EID", eid);
+        }
         if (it != table.end())
         {
             auto distance = std::distance(table.begin(), it);
@@ -712,9 +732,6 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
                 return distance;
             }
         }
-        lg2::info(
-            "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by eid:{EID}",
-            "INST", instanceNumber, "TYPE", deviceType, "EID", eid);
     }
     return instanceNumber;
 }
