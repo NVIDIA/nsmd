@@ -3486,7 +3486,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             auto doeConfigIntf = std::make_shared<ReconfigSettingsIntf>(
                 bus, doeConfigPdiPath.c_str());
             auto sensor = std::make_shared<NsmReconfigPermissions>(
-                name, featureName, feature, hostConfigIntf, doeConfigIntf);
+                name, featureName, hostConfigPdiPath, doeConfigPdiPath, feature,
+                hostConfigIntf, doeConfigIntf);
             nsmDevice->addSensor(sensor, priority);
             // Patch AllowOneShotConfig for HOST
             nsm::AsyncSetOperationHandler patchHostOneShotConfig =

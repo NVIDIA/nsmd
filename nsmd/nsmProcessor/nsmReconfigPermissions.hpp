@@ -22,6 +22,7 @@
 #include "asyncOperationManager.hpp"
 #include "nsmInterface.hpp"
 #include "sensorManager.hpp"
+#include "sharedMemCommon.hpp"
 
 #include <com/nvidia/InbandReconfigSettings/server.hpp>
 
@@ -37,6 +38,8 @@ class NsmReconfigPermissions : public NsmSensor
     reconfiguration_permissions_v1_index index;
     std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf;
     std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf;
+    std::string hostConfigPath;
+    std::string doeConfigPath;
     requester::Coroutine
         setAllowPermission(reconfiguration_permissions_v1_setting configuration,
                            const uint8_t value,
@@ -45,6 +48,8 @@ class NsmReconfigPermissions : public NsmSensor
 
   public:
     NsmReconfigPermissions(const std::string& name, const std::string& type,
+                           std::string& hostConfigPath,
+                           std::string& doeConfigPath,
                            ReconfigSettingsIntf::FeatureType feature,
                            std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf,
                            std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf);
@@ -54,6 +59,7 @@ class NsmReconfigPermissions : public NsmSensor
                                          uint8_t instanceNumber) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    void updateMetricOnSharedMemory() override;
 
     /**
      * @brief Get the mapped Settings Index for Reconfiguration Permission
