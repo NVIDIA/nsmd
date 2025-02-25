@@ -413,9 +413,8 @@ static requester::Coroutine
         objPath.c_str(), "Priority", interface.c_str());
     auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
-    auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.substr(0, objPath.rfind('/')).c_str(), "InstanceNumber",
-        "xyz.openbmc_project.Inventory.Decorator.Instance");
+    auto index = co_await utils::coGetDbusProperty<uint64_t>(
+        objPath.c_str(), "Index", interface.c_str());
 
     auto associations = co_await utils::coGetDbusProperty<
         std::vector<std::tuple<std::string, std::string, std::string>>>(
@@ -468,7 +467,7 @@ static requester::Coroutine
         manager.processorModuleToDeviceMap[inventoryObjPath].push_back(
             nsmDevice);
     }
-    if (instanceNumber % NUM_GPU_PER_MODULE != 0)
+    if (index != 0)
     {
         co_return NSM_SUCCESS;
     }
