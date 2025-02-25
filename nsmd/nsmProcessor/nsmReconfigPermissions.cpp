@@ -26,17 +26,64 @@ namespace nsm
 
 NsmReconfigPermissions::NsmReconfigPermissions(
     const std::string& name, const std::string& type,
+    std::string& hostConfigPath, std::string& doeConfigPath,
     ReconfigSettingsIntf::FeatureType feature,
     std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf,
     std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf) :
     NsmSensor(name, type),
     feature(feature), hostConfigIntf(hostConfigIntf),
-    doeConfigIntf(doeConfigIntf)
+    doeConfigIntf(doeConfigIntf), hostConfigPath(hostConfigPath),
+    doeConfigPath(doeConfigPath)
 {
     // Validates feature value during object creation
     index = getIndex(feature);
     hostConfigIntf->type(feature);
     doeConfigIntf->type(feature);
+    updateMetricOnSharedMemory();
+}
+
+void NsmReconfigPermissions::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> smbusData = {};
+
+    // Define common property names and their corresponding interface methods
+    const std::vector<std::string> propNames = {"AllowFLRPersistentConfig",
+                                                "AllowOneShotConfig",
+                                                "AllowPersistentConfig"};
+
+    // Update HostConfig metrics
+    {
+        auto ifaceName = std::string(hostConfigIntf->interface);
+        const std::vector<nv::sensor_aggregation::DbusVariantType> hostValues =
+            {hostConfigIntf->allowFLRPersistentConfig(),
+             hostConfigIntf->allowOneShotConfig(),
+             hostConfigIntf->allowPersistentConfig()};
+
+        for (size_t i = 0; i < propNames.size(); i++)
+        {
+            nsm_shmem_utils::updateSharedMemoryOnSuccess(
+                hostConfigPath, ifaceName, propNames[i], smbusData,
+                hostValues[i]);
+        }
+    }
+
+    // Update DOEConfig metrics
+    {
+        auto ifaceName = std::string(doeConfigIntf->interface);
+        const std::vector<nv::sensor_aggregation::DbusVariantType> doeValues = {
+            doeConfigIntf->allowFLRPersistentConfig(),
+            doeConfigIntf->allowOneShotConfig(),
+            doeConfigIntf->allowPersistentConfig()};
+
+        for (size_t i = 0; i < propNames.size(); i++)
+        {
+            nsm_shmem_utils::updateSharedMemoryOnSuccess(
+                doeConfigPath, ifaceName, propNames[i], smbusData,
+                doeValues[i]);
+        }
+    }
+#endif
 }
 
 reconfiguration_permissions_v1_index
@@ -137,6 +184,7 @@ uint8_t
         doeConfigIntf->allowPersistentConfig(data.DOE_persistent);
         doeConfigIntf->allowFLRPersistentConfig(data.DOE_flr_persistent);
         clearErrorBitMap("decode_get_reconfiguration_permissions_v1_resp");
+	updateMetricOnSharedMemory();
     }
     else
     {
