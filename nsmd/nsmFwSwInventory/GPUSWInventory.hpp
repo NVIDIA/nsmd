@@ -1,8 +1,8 @@
 #pragma once
 #include "platform-environmental.h"
 
+#include "../nsmDbusIfaceOverride/nsmAssetIntf.hpp"
 #include "globals.hpp"
-#include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -35,6 +35,9 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
         const std::string& type, const std::string& manufacturer);
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    std::shared_ptr<NsmDevice> nsmDeviceFound = nullptr;
+    enum8 driverState = 0;
+    std::string driverVersion = "";
 
   private:
     void updateValue(enum8 driverState, std::string driverVersion);
@@ -42,9 +45,5 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
     std::unique_ptr<OperationalStatusIntf> operationalStatus = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef = nullptr;
     std::unique_ptr<NsmAssetIntf> asset = nullptr;
-
-    // to be consumed by unit tests
-    enum8 driverState = 0;
-    std::string driverVersion = "";
 };
 } // namespace nsm

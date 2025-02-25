@@ -172,6 +172,123 @@ requester::Coroutine NsmEventConfig::configureEventAcknowledgement(
     co_return cc;
 }
 
+NsmGetEventConfig::NsmGetEventConfig(
+    const std::string& name, const std::string& type, uint8_t messageType,
+    std::vector<uint64_t>& srcEventIds,
+    std::shared_ptr<NsmEventConfig> eventConfig) :
+    NsmObject(name, type),
+    messageType(messageType), srcEventMask(8), eventConfig(eventConfig)
+{
+    // convert id list to bitfield
+    convertIdsToMask(srcEventIds, srcEventMask);
+}
+
+void NsmGetEventConfig::convertIdsToMask(std::vector<uint64_t>& eventIds,
+                                         std::vector<bitfield8_t>& bitfields)
+{
+    for (auto& value : bitfields)
+    {
+        value.byte = 0;
+    }
+
+    for (auto& value : eventIds)
+    {
+        uint8_t index = value / 8;
+        uint8_t offset = value % 8;
+        bitfields[index].byte |= (1 << offset);
+    }
+}
+
+requester::Coroutine NsmGetEventConfig::update(SensorManager& manager,
+                                               eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_get_supported_event_source_req(0, messageType,
+                                                        requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_nsm_get_supported_event_source_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return rc;
+    }
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::debug(
+            "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH];
+    rc = decode_nsm_get_supported_event_source_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code,
+        &supported_event_sources[0]);
+
+    LG2_ERROR_FLT(
+        "encode_nsm_get_supported_event_source_req failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        bool validationPassed = validateEventIds(eid, supported_event_sources);
+        if (!validationPassed)
+        {
+            lg2::error("EID: {EID} validateEventSource Failed", "EID", eid);
+            lg2::info(
+                "EID: {EID} Set Event Source for MessageType = {MSG_TYPE}",
+                "EID", eid, "MSG_TYPE", messageType);
+            co_await eventConfig->update(manager, eid);
+        }
+    }
+    // coverity[missing_return]
+    co_return cc;
+}
+
+bool NsmGetEventConfig::validateEventIds(
+    eid_t eid, bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH])
+{
+    bool validateEventSource = true;
+
+    lg2::debug(
+        "EID: {EID} Configured event sources for message type: {MSG_TYPE}",
+        "EID", eid, "MSG_TYPE", messageType);
+    for (size_t byteIndex = 0; byteIndex < EVENT_SOURCES_LENGTH; byteIndex++)
+    {
+        uint8_t byte = srcEventMask[byteIndex].byte;
+        for (uint8_t bitOffset = 0; bitOffset < 8; bitOffset++)
+        {
+            if (byte & (1 << bitOffset))
+            {
+                uint64_t eventId = (byteIndex * 8) + bitOffset;
+                lg2::debug("  Event ID: {ID}", "ID", eventId);
+
+                // Check if this configured event is supported
+                uint8_t supportedByte = supported_event_sources[byteIndex].byte;
+                if (!(supportedByte & (1 << bitOffset)))
+                {
+                    lg2::error(
+                        "EID: {EID} Configured event ID {ID} for Message Type {MSG_TYPE} is not supported",
+                        "EID", eid, "ID", eventId, "MSG_TYPE", messageType);
+                    validateEventSource = false;
+                }
+            }
+        }
+    }
+
+    return validateEventSource;
+}
+
 static requester::Coroutine createNsmEventConfig(SensorManager& manager,
                                                  const std::string& interface,
                                                  const std::string& objPath)
@@ -206,10 +323,13 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
     std::vector<uint64_t> ackIds{};
     auto sensor = std::make_shared<NsmEventConfig>(name, type, messageType,
                                                    subscribedEventIds, ackIds);
-    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
+    auto getEventSensor = std::make_shared<NsmGetEventConfig>(
+        name, type, messageType, subscribedEventIds, sensor);
 
+    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
     // update sensor
     nsmDevice->addStaticSensor(sensor);
+    nsmDevice->addSensor(getEventSensor, false);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
