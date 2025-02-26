@@ -25,6 +25,13 @@
 
 #define NSM_SPI_PROGRESS_INTERFACE "/xyz/openbmc_project/status/SPI_Operation"
 
+// Constants for reading spi part:
+#define FPGA_CACHE_SIZE 30   // Size of the FPGA cache
+#define BYTES_FIRST_BLOCK 29 // Number of bytes to read from the first block
+#define BYTES_LAST_BLOCK 9   // Number of bytes to read from the last block
+#define BLOCKS_TO_READ                                                         \
+    5 // Number of blocks to read (128 bytes/30 bytes rounded up)
+
 namespace nsm
 {
 
@@ -702,7 +709,9 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        rc = co_await executeSpiTransaction(manager, eid, 0x05, 256);
+        // We read one extra byte as the command byte is returned
+        rc = co_await executeSpiTransaction(manager, eid, 0x05,
+                                            SPI_READ_BLOCK_SIZE + 1);
 
         co_return rc;
     }
@@ -718,7 +727,7 @@ requester::Coroutine
     NsmGraceSpiObject::transferCacheToFile(SensorManager& manager, eid_t eid,
                                            int fileDesc)
 {
-    for (auto i = 0; i <= 8; i++)
+    for (auto i = 0; i <= BLOCKS_TO_READ - 1; i++)
     {
         Request readBlock(sizeof(nsm_msg_hdr) + sizeof(nsm_read_spi_block_req));
 
@@ -758,24 +767,12 @@ requester::Coroutine
         }
 
         uint8_t cc = NSM_ERROR;
-        uint16_t reason_code = ERR_NULL;
-        uint8_t buffer[30];
-        size_t dataRead = 0;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t buffer[FPGA_CACHE_SIZE];
 
-        if (i < 8)
-        {
-            rc = decode_read_spi_block_resp(readBlockResponseMsg.get(),
-                                            readBlockResponseLen, &cc,
-                                            &reason_code, buffer, 30);
-            dataRead = 30;
-        }
-        else
-        {
-            rc = decode_read_spi_last_block_resp(readBlockResponseMsg.get(),
-                                                 readBlockResponseLen, &cc,
-                                                 &reason_code, buffer, 30);
-            dataRead = 16;
-        }
+        rc = decode_read_spi_block_resp(readBlockResponseMsg.get(),
+                                        readBlockResponseLen, &cc, &reasonCode,
+                                        buffer, FPGA_CACHE_SIZE);
 
 #ifdef ENABLE_SPI_OPERATION_RAW_DEBUG_DUMP
         utils::printBuffer(
@@ -788,14 +785,33 @@ requester::Coroutine
 
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            size_t written = write(fileDesc, buffer, dataRead);
+            uint8_t dataRead = 0;
+            size_t written = 0;
+            // The first byte read is the command byte, and
+            // we don't want to write it to the file
+            if (i == 0)
+            {
+                dataRead = BYTES_FIRST_BLOCK;
+                written = write(fileDesc, &buffer[1], dataRead);
+            }
+            // The last block is only 9 bytes to complete the
+            // 128 byte read (minus the command byte)
+            if (i == BLOCKS_TO_READ - 1)
+            {
+                dataRead = BYTES_LAST_BLOCK;
+                written = write(fileDesc, buffer, dataRead);
+            }
+            else
+            {
+                dataRead = FPGA_CACHE_SIZE;
+                written = write(fileDesc, buffer, dataRead);
+            }
 
             if (written != dataRead)
             {
                 lg2::error("NsmSpiRead Failed to write data to file");
                 co_return NSM_SW_ERROR_COMMAND_FAIL;
             }
-            co_return rc;
         }
         else
         {
@@ -804,6 +820,8 @@ requester::Coroutine
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
     }
+
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmGraceSpiObject::initSpi(SensorManager& manager,
