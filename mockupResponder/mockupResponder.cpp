@@ -1008,7 +1008,7 @@ std::optional<std::vector<uint8_t>>
 
     // mock data to send [that is 28 counter data]
     std::vector<uint8_t> data{
-        0xFF, 0xFF, 0xFF, 0x07, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00,
@@ -1029,8 +1029,8 @@ std::optional<std::vector<uint8_t>>
         0x00, 0x00, 0x00, 0x00, 0x1C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x1D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1E, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    }; /*for counter values, 8 bytes each*/
+        0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; /*for counter values, 8
+                                                            bytes each*/
 
     nsm_port_counter_data portTelData = {};
     std::memcpy(&portTelData, data.data(), sizeof(portTelData));
@@ -1038,7 +1038,7 @@ std::optional<std::vector<uint8_t>>
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
                                       sizeof(nsm_common_resp) +
-                                      PORT_COUNTER_TELEMETRY_MAX_DATA_SIZE,
+                                      sizeof(nsm_port_counter_data),
                                   0);
 
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -1077,11 +1077,15 @@ std::optional<std::vector<uint8_t>>
     }
 
     // mock data to send
-    std::vector<uint8_t> data{0x09, 0x00, 0x00, 0x00, 0x67, 0x00, 0x00, 0x00,
-                              0x13, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00};
-
-    auto portCharData =
-        reinterpret_cast<nsm_port_characteristics_data*>(data.data());
+    struct nsm_port_characteristics_data portCharData;
+    portCharData.port_status.link_state = 1;
+    portCharData.port_status.sub_link_state = 6;
+    portCharData.port_status.rx_detect_state = 1;
+    portCharData.port_status.port_down_reason_code =
+        NSM_PORT_DOWN_REASON_CODE_HI_SER_BER;
+    portCharData.nv_port_line_rate_mbps = 2500;
+    portCharData.nv_port_data_rate_kbps = 3000;
+    portCharData.status_lane_info = 225;
     uint16_t reason_code = ERR_NULL;
 
     std::vector<uint8_t> response(
@@ -1091,7 +1095,7 @@ std::optional<std::vector<uint8_t>>
 
     rc = encode_query_port_characteristics_resp(requestMsg->hdr.instance_id,
                                                 NSM_SUCCESS, reason_code,
-                                                portCharData, responseMsg);
+                                                &portCharData, responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {

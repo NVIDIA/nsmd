@@ -1136,7 +1136,13 @@ TEST(queryPortCharacteristics, testGoodDecodeResponseCCSuccess)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(data_size, 0x0010);
-	EXPECT_EQ(port_cha_data.status, le64toh(port_data_orig->status));
+	uint32_t port_status_orig;
+	memcpy(&port_status_orig, &port_data_orig->port_status,
+	       sizeof(struct status));
+	uint32_t port_status_converted;
+	memcpy(&port_status_converted, &port_cha_data.port_status,
+	       sizeof(struct status));
+	EXPECT_EQ(port_status_converted, le32toh(port_status_orig));
 	// just checking some starting data and ending data
 	EXPECT_EQ(port_cha_data.status_lane_info,
 		  le64toh(port_data_orig->status_lane_info));
@@ -1269,7 +1275,13 @@ TEST(queryPortCharacteristics, testGoodhtolePortCharacteristicsData)
 	    0, NSM_SUCCESS, reason_code, data_converted, response);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(data_converted->status, htole64(data_orig->status));
+	uint32_t port_status_orig;
+	memcpy(&port_status_orig, &data_orig->port_status,
+	       sizeof(struct status));
+	uint32_t port_status_converted;
+	memcpy(&port_status_converted, &data_converted->port_status,
+	       sizeof(struct status));
+	EXPECT_EQ(port_status_converted, htole32(port_status_orig));
 	// only checking first and last counters
 	EXPECT_EQ(data_converted->status_lane_info,
 		  htole64(data_orig->status_lane_info));
@@ -1312,7 +1324,13 @@ TEST(queryPortCharacteristics, testGoodletohPortCharacteristicsData)
 	    &port_data_converted);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(port_data_converted.status, le64toh(port_data_orig->status));
+	uint32_t port_status_orig;
+	memcpy(&port_status_orig, &port_data_orig->port_status,
+	       sizeof(struct status));
+	uint32_t port_status_converted;
+	memcpy(&port_status_converted, &port_data_converted.port_status,
+	       sizeof(struct status));
+	EXPECT_EQ(port_status_converted, le32toh(port_status_orig));
 	// only checking first and last counters
 	EXPECT_EQ(port_data_converted.status_lane_info,
 		  le64toh(port_data_orig->status_lane_info));

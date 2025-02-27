@@ -326,6 +326,34 @@ class GetPortTelemetryCounter : public CommandInterface
             countersResult["Effective Error"] =
                 static_cast<uint64_t>(portData->effective_error);
         }
+
+        if (portData->supported_counter.symbol_error)
+        {
+            result[key].push_back(28);
+            countersResult["Symbol Errors"] =
+                static_cast<uint64_t>(portData->symbol_error);
+        }
+
+        if (portData->supported_counter.total_raw_ber)
+        {
+            result[key].push_back(29);
+            countersResult["Total Raw BER"] =
+                static_cast<uint64_t>(portData->total_raw_ber);
+        }
+
+        if (portData->supported_counter.unintentional_link_down_count)
+        {
+            result[key].push_back(31);
+            countersResult["Unintentional Link Down Count"] =
+                static_cast<uint64_t>(portData->unintentional_link_down_count);
+        }
+
+        if (portData->supported_counter.intentional_link_down_count)
+        {
+            result[key].push_back(32);
+            countersResult["Intentional Link Down Count"] =
+                static_cast<uint64_t>(portData->intentional_link_down_count);
+        }
         result["Port Counter Information"] = countersResult;
 
         nsmtool::helper::DisplayInJson(result);
@@ -389,7 +417,14 @@ class QueryPortCharacteristics : public CommandInterface
             ordered_json result;
             result["Port Number"] = portNumber;
             result["Data Length"] = dataLen;
-            result["Status"] = static_cast<uint32_t>(portCharData.status);
+            result["Link State"] =
+                static_cast<uint32_t>(portCharData.port_status.link_state);
+            result["Sub Link State"] =
+                static_cast<uint32_t>(portCharData.port_status.sub_link_state);
+            result["RX Detect State"] =
+                static_cast<uint32_t>(portCharData.port_status.rx_detect_state);
+            result["Link Down Reason Code"] = static_cast<uint32_t>(
+                portCharData.port_status.port_down_reason_code);
             result["NV Port Line Rate Mbps"] =
                 static_cast<uint32_t>(portCharData.nv_port_line_rate_mbps);
             result["NV Port Data Rate Kbps"] =

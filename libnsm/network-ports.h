@@ -108,6 +108,47 @@ enum nsm_fm_report_status {
 	NSM_FM_REPORT_STATUS_TIMEOUT = 0x03
 };
 
+enum port_down_reason_code {
+	NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN = 0x00,
+	NSM_PORT_DOWN_REASON_CODE_UNKNOWN = 0x01,
+	NSM_PORT_DOWN_REASON_CODE_HI_SER_BER = 0x02,
+	NSM_PORT_DOWN_REASON_CODE_BLOCK_LOCK_LOSS = 0x03,
+	NSM_PORT_DOWN_REASON_CODE_ALIGNMENT_LOSS = 0x04,
+	NSM_PORT_DOWN_REASON_CODE_FEC_SYNC_LOSS = 0x05,
+	NSM_PORT_DOWN_REASON_CODE_PLL_LOCK_LOSS = 0x06,
+	NSM_PORT_DOWN_REASON_CODE_FIFO_OVERFLOW = 0x07,
+	NSM_PORT_DOWN_REASON_CODE_FALSE_SKIP_CONDITION = 0x08,
+	NSM_PORT_DOWN_REASON_CODE_MINOR_ERR_THRESHOLD = 0x09,
+	NSM_PORT_DOWN_REASON_CODE_PHY_LAYER_RETRANSMIT_TIMEOUT = 0x0A,
+	NSM_PORT_DOWN_REASON_CODE_HEARTBEAT_ERRORS = 0x0B,
+	NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_CREDIT_MON_WD = 0x0C,
+	NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_INTEGRITY_THRESHOLD = 0x0D,
+	NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_BUFFER_OVERRUN = 0x0E,
+	NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HEALTHY = 0x0F,
+	NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HI_BER = 0x10,
+	NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HEALTHY = 0x11,
+	NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HI_BER = 0x12,
+	NSM_PORT_DOWN_REASON_CODE_DOWN_BY_VERIFICATION_GW = 0x13,
+	NSM_PORT_DOWN_REASON_CODE_RECEIVED_REMOTE_FAULT = 0x14,
+	NSM_PORT_DOWN_REASON_CODE_RECEIEVED_TS1 = 0x15,
+	NSM_PORT_DOWN_REASON_CODE_DOWN_BY_MGMT_CMD = 0x16,
+	NSM_PORT_DOWN_REASON_CODE_CABLE_UNPLUGGED = 0x17,
+	NSM_PORT_DOWN_REASON_CODE_CABLE_ACCESS_ISSUES = 0x18,
+	NSM_PORT_DOWN_REASON_CODE_THERMAL_SHUTDOWN = 0x19,
+	NSM_PORT_DOWN_REASON_CODE_CURRENT_ISSUE = 0x1A,
+	NSM_PORT_DOWN_REASON_CODE_POWER_BUDGET = 0x1B,
+	NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_RAW_BER = 0x1C,
+	NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_EFFECTIVE_BER = 0x1D,
+	NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_SYMBOL_BER = 0x1E,
+	NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_CREDIT_WATCHDOG = 0x1F,
+	NSM_PORT_DOWN_REASON_CODE_PEER_SLEEP = 0x20,
+	NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE = 0x21,
+	NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE_LOCK = 0x22,
+	NSM_PORT_DOWN_REASON_CODE_PEER_THERMAL_EVENT = 0x23,
+	NSM_PORT_DOWN_REASON_CODE_PEER_FORCE_EVENT = 0x24,
+	NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT = 0x25
+};
+
 struct nsm_supported_port_counter {
 	uint8_t port_rcv_pkts : 1;
 	uint8_t port_rcv_data : 1;
@@ -140,7 +181,10 @@ struct nsm_supported_port_counter {
 	uint8_t effective_ber : 1;
 	uint8_t estimated_effective_ber : 1;
 	uint8_t effective_error : 1;
-	uint8_t unused : 4;
+	uint8_t symbol_error : 1;
+	uint8_t total_raw_ber : 1;
+	uint8_t unintentional_link_down_count : 1;
+	uint8_t intentional_link_down_count : 1;
 } __attribute__((packed));
 
 struct nsm_port_counter_data {
@@ -173,14 +217,22 @@ struct nsm_port_counter_data {
 	uint64_t effective_ber;
 	uint64_t estimated_effective_ber;
 	uint64_t effective_error;
-	uint64_t unused_counter_placeholder0;
-	uint64_t unused_counter_placeholder1;
-	uint64_t unused_counter_placeholder2;
-	uint64_t unused_counter_placeholder3;
+	uint64_t symbol_error;
+	uint64_t total_raw_ber;
+	uint64_t unintentional_link_down_count;
+	uint64_t intentional_link_down_count;
+} __attribute__((packed));
+
+struct status {
+	uint32_t link_state : 3;
+	uint32_t sub_link_state : 5;
+	uint32_t rx_detect_state : 2;
+	uint32_t port_down_reason_code : 8;
+	uint32_t unused : 14;
 } __attribute__((packed));
 
 struct nsm_port_characteristics_data {
-	uint32_t status;
+	struct status port_status;
 	uint32_t nv_port_line_rate_mbps;
 	uint32_t nv_port_data_rate_kbps;
 	uint32_t status_lane_info;
