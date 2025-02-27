@@ -69,6 +69,12 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	portData->estimated_effective_ber =
 	    htole64(portData->estimated_effective_ber);
 	portData->effective_error = htole64(portData->effective_error);
+	portData->symbol_error = htole64(portData->symbol_error);
+	portData->total_raw_ber = htole64(portData->total_raw_ber);
+	portData->unintentional_link_down_count =
+	    htole64(portData->unintentional_link_down_count);
+	portData->intentional_link_down_count =
+	    htole64(portData->intentional_link_down_count);
 }
 
 static void letohPortCounterData(struct nsm_port_counter_data *portData)
@@ -119,24 +125,40 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	portData->estimated_effective_ber =
 	    le64toh(portData->estimated_effective_ber);
 	portData->effective_error = le64toh(portData->effective_error);
+	portData->symbol_error = le64toh(portData->symbol_error);
+	portData->total_raw_ber = le64toh(portData->total_raw_ber);
+	portData->unintentional_link_down_count =
+	    le64toh(portData->unintentional_link_down_count);
+	portData->intentional_link_down_count =
+	    le64toh(portData->intentional_link_down_count);
 }
 
 static void
 htolePortCharacteristicsData(struct nsm_port_characteristics_data *data)
 {
-	data->status = htole32(data->status);
+	data->status_lane_info = htole32(data->status_lane_info);
 	data->nv_port_line_rate_mbps = htole32(data->nv_port_line_rate_mbps);
 	data->nv_port_data_rate_kbps = htole32(data->nv_port_data_rate_kbps);
-	data->status_lane_info = htole32(data->status_lane_info);
+	uint32_t htole32_port_status;
+	memcpy(&htole32_port_status, &(data->port_status),
+	       sizeof(struct status));
+	htole32_port_status = htole32(htole32_port_status);
+	memcpy(&(data->port_status), &htole32_port_status,
+	       sizeof(struct status));
 }
 
 static void
 letohPortCharacteristicsData(struct nsm_port_characteristics_data *data)
 {
-	data->status = le32toh(data->status);
+	data->status_lane_info = le32toh(data->status_lane_info);
 	data->nv_port_line_rate_mbps = le32toh(data->nv_port_line_rate_mbps);
 	data->nv_port_data_rate_kbps = le32toh(data->nv_port_data_rate_kbps);
-	data->status_lane_info = le32toh(data->status_lane_info);
+	uint32_t le32toh_port_status;
+	memcpy(&le32toh_port_status, &(data->port_status),
+	       sizeof(struct status));
+	le32toh_port_status = le32toh(le32toh_port_status);
+	memcpy(&(data->port_status), &le32toh_port_status,
+	       sizeof(struct status));
 }
 
 #ifdef ENABLE_SYSTEM_GUID

@@ -44,13 +44,15 @@ TEST(NsmPortMetrics, GoodTest)
     std::string inventoryObjPath =
         "/xyz/openbmc_project/inventory/system/dummy/dummy_device/Ports";
     std::vector<utils::Association> associations;
-
+    std::shared_ptr<IBPortIntf> iBPortIntf =
+        std::make_shared<IBPortIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
-                                associations, parentObjPath, inventoryObjPath);
+                                associations, parentObjPath, inventoryObjPath,
+                                iBPortIntf);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
-    EXPECT_NE(portTel.iBPortIntf, nullptr);
+    EXPECT_EQ(portTel.iBPortIntf, iBPortIntf);
     EXPECT_NE(portTel.portMetricsOem2Intf, nullptr);
     EXPECT_NE(portTel.associationDefinitionsIntf, nullptr);
 
@@ -73,7 +75,10 @@ TEST(NsmPortMetrics, GoodTest)
         0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x1A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x1B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     }; /*for counter values, 8 bytes each*/
     struct nsm_port_counter_data portTelData = {};
     std::memcpy(&portTelData, portData.data(), sizeof(portData));

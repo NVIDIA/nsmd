@@ -302,9 +302,10 @@ NsmPortCharacteristics::NsmPortCharacteristics(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
-    std::string& inventoryObjPath) :
+    std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath) :
     NsmSensor(portName, type),
-    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
+    portName(portName), iBPortIntf(iBPortIntf), portNumber(portNum),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -364,10 +365,162 @@ uint8_t
         uint16_t width = static_cast<uint16_t>(data.status_lane_info & 0x0F);
         portMetricsOem3Intf->txWidth(width);
         portMetricsOem3Intf->rxWidth(width);
-
+        updateLinkDownCode(data.port_status.port_down_reason_code);
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
+}
+
+void NsmPortCharacteristics::updateLinkDownCode(const uint32_t linkDownCode)
+{
+    // Map NSM port down reason codes to D-Bus LinkDownReasonCodes
+    switch (linkDownCode)
+    {
+        case NSM_PORT_DOWN_REASON_CODE_NO_LINK_DOWN:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::NoLinkDown);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_UNKNOWN:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::Unknown);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_HI_SER_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::HighBitErrorRate);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_BLOCK_LOCK_LOSS:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::BlockLockLost);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_ALIGNMENT_LOSS:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::AlignmentLost);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FEC_SYNC_LOSS:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::FECSyncLost);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PLL_LOCK_LOSS:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::PllLockLost);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FIFO_OVERFLOW:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::FIFOOverflow);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FALSE_SKIP_CONDITION:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::FalseSkipDetected);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_MINOR_ERR_THRESHOLD:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::MinorErrorThresholdExceeded);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PHY_LAYER_RETRANSMIT_TIMEOUT:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::PhyRetransmitTimeout);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_HEARTBEAT_ERRORS:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::HeartbeatErrors);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_CREDIT_MON_WD:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::CreditMonitorWatchdogTimeout);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_INTEGRITY_THRESHOLD:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::LinkLayerIntegrityThresholdExceeded);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_LINK_LAYER_BUFFER_OVERRUN:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::LinkLayerBufferOverrun);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HEALTHY:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::OOBCommandLinkHealthy);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_OOB_CMD_LINK_HI_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::OOBCommandLinkHighBER);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HEALTHY:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::InbandCommandLinkHealthy);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_INBAND_CMD_LINK_HI_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::InbandCommandLinkHighBER);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_DOWN_BY_VERIFICATION_GW:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::VerificationGatewayDown);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_RECEIVED_REMOTE_FAULT:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::RemoteFaultReceived);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_RECEIEVED_TS1:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::TrainingSequenceReceived);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_DOWN_BY_MGMT_CMD:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::ManagementCommandDown);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_CABLE_UNPLUGGED:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::CableDisconnected);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_CABLE_ACCESS_ISSUES:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::CableAccessFault);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_THERMAL_SHUTDOWN:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::ThermalShutdown);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_CURRENT_ISSUE:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::CurrentIssue);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_POWER_BUDGET:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::PowerBudgetExceeded);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_RAW_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::FastRawBERRecovery);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_EFFECTIVE_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::FastEffectiveBERRecovery);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_SYMBOL_BER:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::FastSymbolBERRecovery);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_FAST_RECOVERY_CREDIT_WATCHDOG:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::FastCreditWatchdogRecovery);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_SLEEP:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::PeerSleep);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::PeerDisabled);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_DISABLE_LOCK:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::PeerDisableLocked);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_THERMAL_EVENT:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::PeerThermalEvent);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_FORCE_EVENT:
+            iBPortIntf->linkDownReasonCode(
+                LinkDownReasonCodes::PeerForcedEvent);
+            break;
+        case NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::PeerResetEvent);
+            break;
+        default:
+            iBPortIntf->linkDownReasonCode(LinkDownReasonCodes::NoLinkDown);
+            break;
+    }
 }
 
 void NsmPortCharacteristics::updateMetricOnSharedMemory()
@@ -375,6 +528,7 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     auto ifacePortInfoName = std::string(portInfoIntf->interface);
     auto ifacePortOem3Name = std::string(portMetricsOem3Intf->interface);
+    auto iBPortIntfName = std::string(iBPortIntf->interface);
     std::vector<uint8_t> rawSmbpbiData = {};
 
     nv::sensor_aggregation::DbusVariantType variantCS{
@@ -411,6 +565,14 @@ void NsmPortCharacteristics::updateMetricOnSharedMemory()
     propName = "RXWidth";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePortOem3Name, propName, rawSmbpbiData, variantRXW);
+
+    nv::sensor_aggregation::DbusVariantType linkDownReasonCode{
+        xyz::openbmc_project::metrics::IBPort::
+            convertLinkDownReasonCodesToString(
+                iBPortIntf->linkDownReasonCode())};
+    propName = "LinkDownReasonCode";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, iBPortIntfName, propName, rawSmbpbiData, linkDownReasonCode);
 #endif
 }
 
@@ -418,16 +580,16 @@ NsmPortMetrics::NsmPortMetrics(
     sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
     const std::string& type, const uint8_t deviceType,
     const std::vector<utils::Association>& associations,
-    std::string& parentObjPath, std::string& inventoryObjPath) :
+    std::string& parentObjPath, std::string& inventoryObjPath,
+    std::shared_ptr<IBPortIntf> iBPortIntf) :
     NsmSensor(portName, type),
-    portName(portName), portNumber(portNum), typeOfDevice(deviceType),
-    objPath(inventoryObjPath)
+    portName(portName), iBPortIntf(iBPortIntf), portNumber(portNum),
+    typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
         "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
         "NAME", portName.c_str(), "NUM", portNum, "DT", typeOfDevice);
 
-    iBPortIntf = std::make_unique<IBPortIntf>(bus, inventoryObjPath.c_str());
     portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
     portIntf->portNumber(portNum);
 
@@ -619,6 +781,30 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     propName = "EffectiveError";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEER);
+
+    nv::sensor_aggregation::DbusVariantType variantSE{
+        iBPortIntf->symbolErrors()};
+    propName = "SymbolErrors";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
+
+    nv::sensor_aggregation::DbusVariantType variantRBER{
+        iBPortIntf->totalRawBER()};
+    propName = "TotalRawBER";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRBER);
+
+    nv::sensor_aggregation::DbusVariantType variantULD{
+        iBPortIntf->unintentionalLinkDownCount()};
+    propName = "UnintentionalLinkDownCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantULD);
+
+    nv::sensor_aggregation::DbusVariantType variantILD{
+        iBPortIntf->intentionalLinkDownCount()};
+    propName = "IntentionalLinkDownCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantILD);
 #endif
 }
 
@@ -794,6 +980,29 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
             {
                 iBPortIntf->effectiveError(portData->effective_error);
             }
+
+            if (portData->supported_counter.symbol_error)
+            {
+                iBPortIntf->symbolErrors(portData->symbol_error);
+            }
+
+            if (portData->supported_counter.total_raw_ber)
+            {
+                iBPortIntf->totalRawBER(
+                    getBitErrorRate(portData->total_raw_ber));
+            }
+
+            if (portData->supported_counter.unintentional_link_down_count)
+            {
+                iBPortIntf->unintentionalLinkDownCount(
+                    portData->unintentional_link_down_count);
+            }
+
+            if (portData->supported_counter.intentional_link_down_count)
+            {
+                iBPortIntf->intentionalLinkDownCount(
+                    portData->intentional_link_down_count);
+            }
         }
         else
         {
@@ -934,6 +1143,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 "PNUM", logicalPortNum, "OBJP", objPath);
         }
 
+        auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
+
         if (deviceType == NSM_DEV_ID_GPU)
         {
             std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf =
@@ -955,7 +1166,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             auto portCharacteristicsSensor =
                 std::make_shared<NsmPortCharacteristics>(
                     bus, portName, logicalPortNum, type, portMetricsOem3Intf,
-                    objPath);
+                    iBPortIntf, objPath);
             if (!portCharacteristicsSensor)
             {
                 lg2::error(
@@ -982,7 +1193,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
-            parentObjPath, objPath);
+            parentObjPath, objPath, iBPortIntf);
         if (!portMetricsSensor)
         {
             lg2::error(
