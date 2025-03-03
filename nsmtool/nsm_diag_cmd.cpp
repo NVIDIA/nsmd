@@ -47,6 +47,69 @@ std::vector<std::unique_ptr<CommandInterface>> commands;
 
 } // namespace
 
+class GetDeviceDiagnostics : public CommandInterface
+{
+  public:
+    GetDeviceDiagnostics() = delete;
+    GetDeviceDiagnostics(const GetDeviceDiagnostics&) = delete;
+    GetDeviceDiagnostics(GetDeviceDiagnostics&&) = default;
+    GetDeviceDiagnostics& operator=(const GetDeviceDiagnostics&) = delete;
+    GetDeviceDiagnostics& operator=(GetDeviceDiagnostics&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetDeviceDiagnostics(const char* type, const char* name,
+                                  CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-s, --segmentId", segment_id, "Segment Id")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_device_diagnostics_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_diagnostics_req(instanceId, segment_id,
+                                                    request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        std::vector<uint8_t> seg_data(65535, 0);
+        uint16_t seg_data_size;
+        uint8_t next_segment_id;
+        uint16_t reason_code;
+
+        auto rc = decode_get_device_diagnostics_resp(
+            responsePtr, payloadLength, &cc, &reason_code, seg_data.data(),
+            &seg_data_size, &next_segment_id);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_device_diagnostics_resp));
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Segment Data Size"] = seg_data_size;
+        result["Next Segment Id"] = next_segment_id;
+        result["Segment Data"] = std::string(
+            std::bit_cast<const char*>(seg_data.data()), seg_data_size);
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t segment_id;
+};
+
 class QueryTokenParameters : public CommandInterface
 {
   public:
@@ -1151,6 +1214,11 @@ void registerCommand(CLI::App& app)
                                                  "Get Reset MEtrics Info");
     commands.push_back(std::make_unique<QueryResetStatistics>(
         "diag", "GetResetMetrcs", resetMetricsInfo));
+
+    auto getDeviceDiagnostics = diag->add_subcommand("GetDeviceDiagnostics",
+                                                     "Get Device Diagnostics");
+    commands.push_back(std::make_unique<GetDeviceDiagnostics>(
+        "diag", "GetDeviceDiagnostics", getDeviceDiagnostics));
 }
 
 } // namespace diag

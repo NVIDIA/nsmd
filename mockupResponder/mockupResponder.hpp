@@ -310,6 +310,9 @@ class MockupResponder
         enableDisableWriteProtectedHandler(const nsm_msg* requestMsg,
                                            size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getDeviceDiagnosticsHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
     std::optional<std::vector<uint8_t>>

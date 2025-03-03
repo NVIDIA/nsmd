@@ -28,6 +28,7 @@ typedef uint8_t enum8;
 
 enum diagnostics_command {
 	NSM_GET_DEVICE_RESET_STATISTICS = 0x00,
+	NSM_GET_DEVICE_DIAGNOSTICS = 0x40,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
 	NSM_GET_NETWORK_DEVICE_LOG_INFO = 0x52,
@@ -91,6 +92,25 @@ enum nsm_debug_information_type {
 };
 
 enum nsm_erase_information_type { INFO_TYPE_FW_SAVED_DUMP_INFO = 0 };
+
+/** @struct nsm_get_device_diagnostics_req
+ *
+ *  Structure representing NSM get device diagnostics request.
+ */
+struct nsm_get_device_diagnostics_req {
+	struct nsm_common_req hdr;
+	uint8_t segment_id;
+} __attribute__((packed));
+
+/** @struct nsm_get_device_diagnostics_resp
+ *
+ *  Structure representing NSM get device diagnostics response.
+ */
+struct nsm_get_device_diagnostics_resp {
+	struct nsm_common_resp hdr;
+	uint8_t next_segment_id;
+	uint8_t segment_data[1];
+} __attribute__((packed));
 
 enum nsm_erase_trace_status {
 	ERASE_TRACE_NO_DATA_ERASED = 0,
@@ -238,6 +258,58 @@ struct nsm_erase_debug_info_resp {
 	uint8_t result_status;
 	uint8_t reserved;
 } __attribute__((packed));
+
+/** @brief Encode a Get device diagnostics request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] segment_id - segment ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_diagnostics_req(uint8_t instance_id, uint8_t segment_id,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a Get device diagnostics request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] segment_id - segment ID
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_diagnostics_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *segment_id);
+
+/** @brief Encode a Get device diagnostics response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_diagnostics_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       const uint8_t *seg_data,
+				       const uint16_t seg_data_size,
+				       const uint8_t next_segment_id,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Get device diagnostics response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @param[out] seg_data - segment data
+ *  @param[out] seg_data_size - segment data size
+ *  @param[out] next_segment_id - next segment ID
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_diagnostics_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code, uint8_t *seg_data,
+				       uint16_t *seg_data_size,
+				       uint8_t *next_segment_id);
 
 /**
  * @brief Encode a request message for the Get Device Reset Statistics command.

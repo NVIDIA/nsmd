@@ -20,6 +20,133 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_get_device_diagnostics_req(uint8_t instance_id, uint8_t segment_id,
+				      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_diagnostics_req *request =
+	    (struct nsm_get_device_diagnostics_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_DEVICE_DIAGNOSTICS;
+	request->hdr.data_size = sizeof(struct nsm_get_device_diagnostics_req) -
+				 sizeof(struct nsm_common_req);
+	request->segment_id = segment_id;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_diagnostics_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *segment_id)
+{
+	if (msg == NULL || segment_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_get_device_diagnostics_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_diagnostics_req *request =
+	    (struct nsm_get_device_diagnostics_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_get_device_diagnostics_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*segment_id = request->segment_id;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_diagnostics_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       const uint8_t *seg_data,
+				       const uint16_t seg_data_size,
+				       const uint8_t next_segment_id,
+				       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_DIAGNOSTICS, msg);
+	}
+
+	struct nsm_get_device_diagnostics_resp *response =
+	    (struct nsm_get_device_diagnostics_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_DEVICE_DIAGNOSTICS;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size =
+	    htole16(seg_data_size + sizeof(next_segment_id));
+	response->next_segment_id = next_segment_id;
+	memcpy(response->segment_data, seg_data, seg_data_size);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_diagnostics_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code, uint8_t *seg_data,
+				       uint16_t *seg_data_size,
+				       uint8_t *next_segment_id)
+{
+	if (seg_data == NULL || seg_data_size == NULL ||
+	    next_segment_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_common_resp) +
+			  sizeof(*next_segment_id)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_diagnostics_resp *response =
+	    (struct nsm_get_device_diagnostics_resp *)msg->payload;
+
+	if (response->hdr.data_size < sizeof(*next_segment_id)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*seg_data_size =
+	    response->hdr.data_size - sizeof(response->next_segment_id);
+	*next_segment_id = response->next_segment_id;
+	memcpy(seg_data, response->segment_data, *seg_data_size);
+	return NSM_SW_SUCCESS;
+}
+
 int encode_reset_enum_data(uint8_t resetType, uint8_t *data, size_t *data_len)
 {
 	if (data == NULL || data_len == NULL) {
