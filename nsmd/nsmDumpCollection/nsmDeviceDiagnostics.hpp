@@ -18,6 +18,7 @@
 #pragma once
 
 #include "nsmObjectFactory.hpp"
+#include "sensorManager.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/Dump/DebugInfo/server.hpp>
@@ -30,36 +31,46 @@ namespace nsm
 using namespace sdbusplus::com::nvidia;
 using namespace sdbusplus::server;
 
-using DebugInfoIntf = object_t<sdbusplus::com::nvidia::Dump::server::DebugInfo>;
+using DiagnosticsIntf =
+    object_t<sdbusplus::com::nvidia::Dump::server::DebugInfo>;
 
-using DebugInformationType =
+using DiagnosticsInformationType =
     sdbusplus::common::com::nvidia::dump::DebugInfo::DebugInformationType;
 
-using OperationStatus =
+using GetDiagnosticsStatus =
     sdbusplus::common::com::nvidia::dump::DebugInfo::OperationStatus;
 
-using DebugDumpType = sdbusplus::common::com::nvidia::dump::DebugInfo::DumpType;
+using DumpType = sdbusplus::common::com::nvidia::dump::DebugInfo::DumpType;
 
-class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
+class NsmDeviceDiagnostics : public NsmObject, public DiagnosticsIntf
 {
   public:
-    NsmDebugInfoObject(sdbusplus::bus::bus& bus, const std::string& name,
-                       const std::string& inventoryPath,
-                       const std::string& type, const uuid_t& uuid);
+    NsmDeviceDiagnostics(sdbusplus::bus::bus& bus, const std::string& name,
+                         const std::string& inventoryPath,
+                         const std::string& type, const uuid_t& uuid);
 
-    void getDebugInfo(DebugInformationType debugInfoType,
+    /** @brief Retrieve diagnostic information from the device
+     *  @param[in] segmentId - Segment ID to identify this diagnostic request
+     *
+     *  @return void
+     *
+     *  Method will trigger the collection of diagnostic information from the
+     *  device. The status of the operation will be updated through the
+     *  OperationStatus property. The diagnostic data will be stored in a file
+     *  and the path will be updated in the DiagnosticDataFilePath property
+     *  upon successful completion.
+     */
+    void getDebugInfo(DiagnosticsInformationType debugInfoType,
                       uint64_t recHandle) override;
 
   private:
-    uint8_t startDebugInfoCmd();
-    void finishDebugInfoCmd(OperationStatus opStatus);
+    uint8_t startDiagnosticsCmd();
+    void finishDiagnosticsCmd(GetDiagnosticsStatus opStatus);
     requester::Coroutine
-        getDebugInfoAsyncHandler(std::shared_ptr<Request> request);
+        getDiagnosticsAsyncHandler(std::shared_ptr<Request> request);
 
-    std::string objPath;
     std::string fdName;
     uuid_t uuid;
     bool cmdInProgress{false};
 };
-
 } // namespace nsm

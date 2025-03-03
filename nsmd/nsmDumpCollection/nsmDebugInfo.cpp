@@ -51,6 +51,7 @@ NsmDebugInfoObject::NsmDebugInfoObject(sdbusplus::bus::bus& bus,
     fdName = name + "_debug_info";
     sdbusplus::message::unix_fd unixFd(0);
     fd(unixFd, true);
+    supportedDumpType(DebugDumpType::Network);
 }
 
 uint8_t NsmDebugInfoObject::startDebugInfoCmd()
@@ -61,7 +62,6 @@ uint8_t NsmDebugInfoObject::startDebugInfoCmd()
     }
     cmdInProgress = true;
     status(OperationStatus::InProgress);
-
     return NSM_SW_SUCCESS;
 }
 
