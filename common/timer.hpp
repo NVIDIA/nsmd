@@ -166,7 +166,7 @@ class TimerAwaiter
         {
             isRunning = false;
             isExpired = now >= (startTime + durationInUsec);
-            rc = NSM_SW_SUCCESS;
+            rc = isExpired ? NSM_SW_ERROR_TIMEOUT : NSM_SW_SUCCESS;
             sd_event_source_unref(eventSource);
             handle.resume(); // Resume the coroutine
         }
