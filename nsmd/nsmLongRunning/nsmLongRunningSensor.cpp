@@ -53,19 +53,9 @@ requester::Coroutine NsmLongRunningSensor::update(SensorManager& manager,
     {
         // if(isLongRunning) means event will be there as second response
         rc = co_await timer;
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::error(
-                "NsmLongRunningSensor::update: LongRunning timer start failed, name={NAME}, eid={EID}",
-                "NAME", NsmSensor::getName(), "EID", eid);
-        }
-        else if (timer.expired())
-        {
-            lg2::error(
-                "NsmLongRunningSensor::update: LongRunning sensor timeout, name={NAME}, eid={EID}",
-                "NAME", NsmSensor::getName(), "EID", eid);
-            rc = NSM_SW_ERROR;
-        }
+        LG2_ERROR_FLT(
+            "NsmLongRunningSensor::update: LongRunning timer failed, rc={RC}, name={NAME}, eid={EID}",
+            "RC", nsm_sw_codes(rc), "NAME", NsmSensor::getName(), "EID", eid);
     }
 
     // Unregister the active handler in the device
