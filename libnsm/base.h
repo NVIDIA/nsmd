@@ -351,12 +351,18 @@ typedef enum {
 	NvS24_8 = 8,
 } BucketFormat;
 
-// Enum for HistogramID (Ids for Histogram type)
+// Enum for Network HistogramID (Ids for Histogram type)
 typedef enum {
-	NSM_HISTOGRAM_ID_POWERCONSUMPTION = 0,
-	NSM_HISTOGRAM_ID_LINKSPEEDCAPPING = 1,
-	NSM_HISTOGRAM_ID_FEC = 2
-} HISTOGRAMID;
+	NSM_HISTOGRAM_ID_LINK_SPEED_CAPPING = 0
+} NSM_NETWORK_HISTOGRAM_ID;
+
+// Enum for ERROR HistogramID (Ids for Histogram type)
+typedef enum { NSM_HISTOGRAM_ID_FEC = 0 } NSM_ERROR_HISTOGRAM_ID;
+
+// Enum for Power HistogramID (Ids for Histogram type)
+typedef enum { NSM_HISTOGRAM_ID_POWER_CONSUMPTION = 0 } NSM_POWER_HISTOGRAM_ID;
+
+typedef enum { NSM_HISTOGRAM_REVISION_ID_0 = 0 } NSM_HISTOGRAM_REVISION_ID;
 
 // Enum for Histogram Namespace ID
 typedef enum {
@@ -365,7 +371,7 @@ typedef enum {
 	NSM_HISTOGRAM_NAMESPACE_ID_POWER = 0x02,
 	NSM_HISTOGRAM_NAMESPACE_ID_ERROR = 0x03,
 	NSM_HISTOGRAM_NAMESPACE_ID_RESERVED = 0xFF
-} HISTOGRAMNAMESPACEID;
+} NSM_HISTOGRAM_NAMESPACE_ID;
 
 // Enum for BucketUnit (unit for bucket info)
 typedef enum {

@@ -1226,7 +1226,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             fecHistogramID =
                 (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_ERROR)
                  << SHIFT_BITS_24) |
-                (static_cast<uint32_t>(0) << SHIFT_BITS_16) |
+                (static_cast<uint32_t>(NSM_HISTOGRAM_REVISION_ID_0)
+                 << SHIFT_BITS_16) |
                 (static_cast<uint32_t>(NSM_HISTOGRAM_ID_FEC));
 
             auto fecHistoFormatIntf =
