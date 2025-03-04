@@ -617,8 +617,9 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         powerHistogramID =
             (static_cast<uint32_t>(NSM_HISTOGRAM_NAMESPACE_ID_POWER)
              << SHIFT_BITS_24) |
-            (static_cast<uint32_t>(0) << SHIFT_BITS_16) |
-            (static_cast<uint32_t>(NSM_HISTOGRAM_ID_POWERCONSUMPTION));
+            (static_cast<uint32_t>(NSM_HISTOGRAM_REVISION_ID_0)
+             << SHIFT_BITS_16) |
+            (static_cast<uint32_t>(NSM_HISTOGRAM_ID_POWER_CONSUMPTION));
 
         auto powerHistoFormatIntf =
             std::make_shared<FormatIntf>(bus, histoDbusObjPath.c_str());
