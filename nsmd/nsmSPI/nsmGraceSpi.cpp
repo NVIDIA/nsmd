@@ -663,7 +663,7 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
     {
         // We read one extra byte as the command byte is returned
         rc = co_await executeSpiTransaction(manager, eid, 0x05,
-                                            SPI_READ_BLOCK_SIZE + 1);
+                                            SPI_READ_BLOCK_SIZE);
 
         co_return rc;
     }
@@ -740,6 +740,7 @@ requester::Coroutine
         {
             uint8_t dataRead = 0;
             size_t written = 0;
+
             // The first byte read is the command byte, and
             // we don't want to write it to the file
             if (i == 0)
@@ -749,7 +750,7 @@ requester::Coroutine
             }
             // The last block is only 9 bytes to complete the
             // 128 byte read (minus the command byte)
-            if (i == BLOCKS_TO_READ - 1)
+            else if (i == (BLOCKS_TO_READ - 1))
             {
                 dataRead = BYTES_LAST_BLOCK;
                 written = write(fileDesc, buffer, dataRead);
