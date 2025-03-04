@@ -95,7 +95,7 @@ static bool checkSizeOfBucketArrayIsValid(uint32_t total_size,
             calculated_size = 0;
             break;
     }
-    return calculated_size != total_size;
+    return (calculated_size == total_size);
 }
 
 static double getValueFromBucketArray(uint8_t* data, BucketDataTypes data_type,
