@@ -77,6 +77,8 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             {RP_EDPP_SCALING_FACTOR, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1, {}},
             {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2, {}},
+            {RP_EGM_MODE, {}},
+            {RP_INFOROM_RECREATE_ALLOW_INB, {}},
         },     // prcKnobs
         {
             0, // mode
@@ -5347,7 +5349,7 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
-    if (settingsIndex > RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2)
+    if (settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB)
     {
         lg2::error(
             "getReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -5396,7 +5398,7 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
-    if (settingsIndex > RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2)
+    if (settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB)
     {
         lg2::error(
             "setReconfigurationPermissionsV1Handler: Invalid Settings Index");

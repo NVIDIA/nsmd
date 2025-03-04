@@ -716,6 +716,7 @@ const std::map<reconfiguration_permissions_v1_index, std::string>
         {RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2,
          "Power Smoothing Privilege Level 2"},
         {RP_EGM_MODE, "Extend GPU Memory Mode"},
+        {RP_INFOROM_RECREATE_ALLOW_INB, "InfoROM filesystem recreate"},
     }};
 class GetReconfigurationPermissionsV1 : public CommandInterface
 {
