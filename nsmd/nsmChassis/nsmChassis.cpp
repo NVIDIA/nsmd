@@ -68,9 +68,6 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 
     if (type == "NSM_Chassis")
     {
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
         auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
             objPath.c_str(), "DEVICE_UUID", interface.c_str());
@@ -93,12 +90,18 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
             device->addStaticSensor(associationsObject);
         }
 
+#ifdef NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT
+        auto deviceType =
+            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
+
         if (deviceType == NSM_DEV_ID_BASEBOARD)
         {
             auto pCIeRefClock =
                 std::make_shared<NsmChassis<PCIeRefClockIntf>>(name);
             device->addStaticSensor(pCIeRefClock);
         }
+#endif
     }
     else if (type == "NSM_FPGA_Asset")
     {
