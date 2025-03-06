@@ -1106,7 +1106,7 @@ void testGetReconfigurationPermissionsV1EncodeResponse(
 TEST(getReconfigurationPermissionsV1, testRequests)
 {
 	for (auto di = (uint8_t)RP_IN_SYSTEM_TEST;
-	     di <= (uint8_t)RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2; di++) {
+	     di <= (uint8_t)RP_INFOROM_RECREATE_ALLOW_INB; di++) {
 		auto settingIndex = reconfiguration_permissions_v1_index(di);
 		testGetReconfigurationPermissionsV1EncodeRequest(settingIndex);
 		testGetReconfigurationPermissionsV1EncodeResponse(settingIndex);
@@ -1255,7 +1255,7 @@ void testSetReconfigurationPermissionsV1EncodeRequest(
 
 TEST(setReconfigurationPermissionsV1, testGoodEncodeRequest)
 {
-	for (auto si = 0; si <= int(RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2);
+	for (auto si = 0; si <= int(RP_INFOROM_RECREATE_ALLOW_INB);
 	     si++) {
 		for (auto ci = 0; ci < int(RP_ONESHOT_FLR); ci++) {
 			auto settingIndex =

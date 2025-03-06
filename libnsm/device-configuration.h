@@ -89,6 +89,7 @@ enum reconfiguration_permissions_v1_index {
 	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_1 = 20,
 	RP_POWER_SMOOTHING_PRIVILEGE_LEVEL_2 = 21,
 	RP_EGM_MODE = 22,
+	RP_INFOROM_RECREATE_ALLOW_INB = 23,
 };
 
 enum reconfiguration_permissions_v1_setting {
