@@ -153,6 +153,10 @@ if get_option('fixup-missing-event-notification').enabled()
     conf_data.set('FIXUP_MISSING_EVENT_NOTIFICATION', 1)
 endif
 
+if get_option('nvidia-fpga-pcie-reference-clock-count').enabled()
+    add_project_arguments('-DNVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT', language: ['cpp', 'c'])
+endif
+
 configure_file(output: 'config.h', configuration: conf_data)
 
 dynamic_linker = []

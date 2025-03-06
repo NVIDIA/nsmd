@@ -200,3 +200,10 @@ option(
     description: 'Enable histogram feature on devices',
     value: 'enabled',
 )
+
+option(
+    'nvidia-fpga-pcie-reference-clock-count',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Enable PCIE reference clock count',
+)
