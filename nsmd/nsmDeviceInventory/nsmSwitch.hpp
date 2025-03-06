@@ -10,6 +10,7 @@
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmInterface.hpp"
 #include "utils.hpp"
+#include "nsmd/nsmCommon/nsmCommon.hpp"
 
 #include <com/nvidia/PowerMode/server.hpp>
 #include <com/nvidia/SwitchIsolation/server.hpp>

@@ -11,6 +11,8 @@ dep_src_files = [
     '../nsmWriteProtectedJumper.cpp',
     '../nsmAERError.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
+    '../../nsmCommon/nsmCommon.cpp',
+    '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',

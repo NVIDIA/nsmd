@@ -128,19 +128,16 @@ void NsmUuidIntf::updateMetricOnSharedMemory()
 requester::Coroutine NsmUuidIntf::update(SensorManager& manager, eid_t eid)
 {
     DeviceManager& deviceManager = DeviceManager::getInstance();
-    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
-    if (uuid)
+    uuid_t deviceUuid;
+    auto rc = co_await getDeviceUUID(manager, eid, deviceManager,
+                                     deviceUuid);
+    if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
     {
-        auto nsmDevice = manager.getNsmDevice(*uuid);
-        if (nsmDevice)
-        {
-            uuidIntf->uuid(nsmDevice->deviceUuid);
-            updateMetricOnSharedMemory();
-        }
+        uuidIntf->uuid(deviceUuid);
+        updateMetricOnSharedMemory();
+        co_return NSM_SUCCESS;
     }
-
-    // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return NSM_ERROR;
 }
 
 #ifdef ENABLE_SYSTEM_GUID
