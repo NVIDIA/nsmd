@@ -85,6 +85,17 @@ sdbusplus::message::object_path NsmGraceSpiObject::readSpi()
 uint8_t NsmGraceSpiObject::startSpiOperation()
 {
     lg2::debug("NsmGraceSpiObject: Starting SPI Operation");
+    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
+
+    getChassisPowerState(powerState);
+    if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
+    {
+        lg2::info(
+            "NsmGraceSpiObject startSpiOperation: host not off. current power state:{STATE}",
+            "STATE", powerState);
+        return NSM_SW_ERROR;
+    }
+
     if (cmdInProgress)
     {
         lg2::error("NsmGraceSpiObject: A command is already in progress");
@@ -122,6 +133,31 @@ void NsmGraceSpiObject::finishSpiOperation(
             std::chrono::system_clock::now().time_since_epoch())
             .count());
     cmdInProgress = false;
+}
+
+void NsmGraceSpiObject::getChassisPowerState(std::string& powerState)
+{
+    auto& asioConnection = utils::DBusHandler::getAsioConnection();
+    asioConnection->async_method_call(
+        [&powerState](boost::system::error_code ec, PropertyValue value) {
+        if (ec)
+        {
+            lg2::error("Error when get chassis current power state. ec:{EC}",
+                       "EC", ec.message());
+        }
+        else
+        {
+            if (const auto* propertyStringPtr =
+                    std::get_if<std::string>(&value))
+            {
+                powerState = *propertyStringPtr;
+            }
+        }
+    },
+        "xyz.openbmc_project.State.Chassis",
+        "/xyz/openbmc_project/state/chassis0",
+        "org.freedesktop.DBus.Properties", "Get",
+        "xyz.openbmc_project.State.Chassis", "CurrentPowerState");
 }
 
 requester::Coroutine
@@ -795,6 +831,7 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
+    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
 
     auto rc = co_await initSpi(manager, eid);
 
@@ -806,6 +843,15 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SECTORS; i++)
     {
+        getChassisPowerState(powerState);
+        if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
+        {
+            lg2::info(
+                "NsmGraceSpiObject EraseSpi: host not off. current power state:{STATE}",
+                "STATE", powerState);
+            finishSpiOperation(SpiProgress::OperationStatus::Failed);
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
         rc = co_await setSpiWriteEnable(manager, eid);
 
         if (rc != NSM_SW_SUCCESS)
@@ -844,6 +890,7 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
+    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
 
     auto rc = co_await initSpi(manager, eid);
 
@@ -865,6 +912,15 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SIZE_BYTES; i += SPI_READ_BLOCK_SIZE)
     {
+        getChassisPowerState(powerState);
+        if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
+        {
+            lg2::info(
+                "NsmGraceSpiObject ReadSpi: host not off. current power state:{STATE}",
+                "STATE", powerState);
+            finishSpiOperation(SpiProgress::OperationStatus::Failed);
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
         rc = co_await readToCache(manager, eid, i);
 
         if (rc != NSM_SW_SUCCESS)
