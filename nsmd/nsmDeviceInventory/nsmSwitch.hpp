@@ -9,6 +9,7 @@
 #include "nsmAssetIntf.hpp"
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmInterface.hpp"
+#include "nsmd/nsmCommon/nsmCommon.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/PowerMode/server.hpp>

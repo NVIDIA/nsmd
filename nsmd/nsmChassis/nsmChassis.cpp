@@ -18,36 +18,36 @@
 #include "nsmChassis.hpp"
 
 #include "deviceManager.hpp"
+#include "nsmCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
 #include "nsmWriteProtectedJumper.hpp"
-#include "utils.hpp"
 
 namespace nsm
 {
 
 template <typename IntfType>
-requester::Coroutine
-    NsmChassis<IntfType>::update([[maybe_unused]] SensorManager& manager,
-                                 [[maybe_unused]] eid_t eid)
+requester::Coroutine NsmChassis<IntfType>::update(SensorManager& manager,
+                                                  eid_t eid)
 {
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    auto uuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
-    if (uuid)
+    if constexpr (std::is_same_v<IntfType, UuidIntf>)
     {
-        if constexpr (std::is_same_v<IntfType, UuidIntf>)
+        // For UuidIntf, we need to get the device UUID from the device manager.
+        DeviceManager& deviceManager = DeviceManager::getInstance();
+        uuid_t deviceUuid;
+        auto rc = co_await getDeviceUUID(manager, eid, deviceManager,
+                                         deviceUuid);
+        if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
-            auto nsmDevice = manager.getNsmDevice(*uuid);
-            if (nsmDevice)
-            {
-                this->invoke(pdiMethod(uuid), nsmDevice->deviceUuid);
-            }
+            this->invoke(pdiMethod(uuid), deviceUuid);
+            co_return NSM_SUCCESS;
         }
+        co_return NSM_ERROR;
     }
-
+    // For other interfaces, we don't need to update anything.
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

@@ -20,10 +20,12 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
+#include "deviceManager.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmInterface.hpp"
 #include "nsmLongRunningSensor.hpp"
 #include "nsmSensor.hpp"
+#include "sensorManager.hpp"
 
 #include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
@@ -123,5 +125,25 @@ class NsmMaxGraphicsClockLimit : public NsmObject
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
     std::string inventoryObjPath;
 };
+
+class SensorManager;
+class DeviceManager;
+/**
+ * @brief Gets the device UUID from a device at the specified EID
+ *
+ * This function queries the device for its UUID using the device manager and
+ * sensor manager. It first checks if the device has a cached UUID, and if not,
+ * retrieves it from the device.
+ *
+ * @param manager Reference to the SensorManager instance
+ * @param eid The endpoint ID of the device to query
+ * @param deviceManager Reference to the DeviceManager instance
+ * @param[out] uuid The UUID string to be populated. Empty string on error.
+ * @return Coroutine that resolves to NSM_SW_SUCCESS on success, error code
+ * otherwise
+ */
+requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
+                                   DeviceManager& deviceManager,
+                                   std::string& uuid);
 
 } // namespace nsm
