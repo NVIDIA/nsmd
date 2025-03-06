@@ -90,7 +90,25 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
             device->addStaticSensor(associationsObject);
         }
 
+        // NOTE:
+        // - gb200nvl does NOT support PCIeReferenceClockCount.
+        //
+        // Behavior of NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT macro:
+        //   - If 'nvidia-fpga-pcie-reference-clock-count' is enabled:
+        //       #define NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT true
+        //   - If 'nvidia-fpga-pcie-reference-clock-count' is disabled:
+        //       #define NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT false
+        //
+        // Please check this macro before using any logic
+        // related to PCIe reference clock count to avoid unsupported cases on
+        // gb200nvl.
+        //
+        // The following code block logs the macro status and controls
+        // whether to create the PCIeRefClock sensor.
+
 #ifdef NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT
+        lg2::info("PCIeReferenceClockCount is supported. "
+                  "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is enabled.");
         auto deviceType =
             (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
                 uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
@@ -101,6 +119,9 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
                 std::make_shared<NsmChassis<PCIeRefClockIntf>>(name);
             device->addStaticSensor(pCIeRefClock);
         }
+#else
+        lg2::info("PCIeReferenceClockCount is not supported. "
+                  "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is disabled.");
 #endif
     }
     else if (type == "NSM_FPGA_Asset")
