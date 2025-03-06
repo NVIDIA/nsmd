@@ -54,6 +54,7 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
   private:
     uint8_t startSpiOperation();
     void finishSpiOperation(SpiProgress::OperationStatus opProgress);
+    void getChassisPowerState(std::string& powerState);
 
     requester::Coroutine checkSpiStatus(SensorManager& manager, eid_t eid,
                                         enum nsm_spi_status* status);
