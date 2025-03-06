@@ -608,8 +608,6 @@ requester::Coroutine
     if (mctpUuid.has_value())
     {
         nsmDevice->uuid = *mctpUuid;
-        // set deviceUuid to mctp uuid as default value
-        nsmDevice->deviceUuid = nsmDevice->uuid;
     }
 
     if (properties.find(DEVICE_GUID) != properties.end())

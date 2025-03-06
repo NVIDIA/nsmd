@@ -20,6 +20,7 @@
 #include "globals.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
+#include "nsmd/nsmCommon/nsmCommon.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
