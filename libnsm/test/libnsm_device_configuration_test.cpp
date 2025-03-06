@@ -1255,8 +1255,7 @@ void testSetReconfigurationPermissionsV1EncodeRequest(
 
 TEST(setReconfigurationPermissionsV1, testGoodEncodeRequest)
 {
-	for (auto si = 0; si <= int(RP_INFOROM_RECREATE_ALLOW_INB);
-	     si++) {
+	for (auto si = 0; si <= int(RP_INFOROM_RECREATE_ALLOW_INB); si++) {
 		for (auto ci = 0; ci < int(RP_ONESHOT_FLR); ci++) {
 			auto settingIndex =
 			    reconfiguration_permissions_v1_index(si);
