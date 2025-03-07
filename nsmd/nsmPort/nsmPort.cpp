@@ -162,6 +162,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
         switch (portState)
         {
             case NSM_PORTSTATE_DOWN:
+            case NSM_PORTSTATE_SLEEP:
                 portStateIntf->linkStatus(PortLinkStatus::LinkDown);
                 break;
             case NSM_PORTSTATE_DOWN_LOCK:
@@ -169,20 +170,27 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                 co_await checkPortCharactersticRCAndPopulateRuntimeErr(manager,
                                                                        eid);
                 break;
-            case NSM_PORTSTATE_SLEEP:
-                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
-                break;
             case NSM_PORTSTATE_UP:
-            case NSM_PORTSTATE_POLLING:
-            case NSM_PORTSTATE_RESERVED:
                 portStateIntf->linkStatus(PortLinkStatus::LinkUp);
+                break;
+            case NSM_PORTSTATE_POLLING:
+                portStateIntf->linkStatus(PortLinkStatus::Starting);
+                break;
+            case NSM_PORTSTATE_RESERVED:
+                portStateIntf->linkStatus(PortLinkStatus::NoLink);
                 break;
             case NSM_PORTSTATE_TRAINING:
                 portStateIntf->linkStatus(PortLinkStatus::Training);
                 break;
             case NSM_PORTSTATE_TRAINING_FAILURE:
-                portStateIntf->linkStatus(PortLinkStatus::Training);
+                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
                 portMetricsOem3Intf->trainingError(true);
+                break;
+            case NSM_PORTSTATE_TRAINING_FAILURE_LOCKED:
+                portStateIntf->linkStatus(PortLinkStatus::LinkDown);
+                break;
+            case NSM_PORTSTATE_PHYSICAL_UP:
+                portStateIntf->linkStatus(PortLinkStatus::Training);
                 break;
             default:
                 portStateIntf->linkStatus(PortLinkStatus::NoLink);
