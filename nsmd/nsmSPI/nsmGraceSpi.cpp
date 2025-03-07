@@ -817,7 +817,7 @@ requester::Coroutine
         else
         {
             logHandleResponseMsg("NsmSpiRead decode_send_spi_operation_resp",
-                                 reason_code, cc, rc);
+                                 reasonCode, cc, rc);
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
     }
