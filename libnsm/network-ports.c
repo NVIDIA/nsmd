@@ -1668,3 +1668,93 @@ int decode_nsm_get_fabric_manager_state_event(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
+					      uint8_t port_number,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_port_telemetry_counter_req *request =
+	    (nsm_get_port_telemetry_counter_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_ETH_PORT_TELEMETRY_COUNTER;
+	request->hdr.data_size = sizeof(port_number);
+	request->port_number = port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_eth_port_telemetry_counter_req(const struct nsm_msg *msg,
+					      size_t msg_len,
+					      uint8_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_port_telemetry_counter_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_port_telemetry_counter_req *request =
+	    (nsm_get_port_telemetry_counter_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->port_number)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_eth_port_telemetry_data(const uint8_t *data,
+					     size_t *data_len,
+					     uint32_t *counter_reading)
+{
+	if (data == NULL || data_len == NULL || counter_reading == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (*data_len != sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t le_reading;
+	memcpy(&le_reading, data, sizeof(uint32_t));
+	*counter_reading = le32toh(le_reading);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_eth_port_telemetry_data(uint32_t *counter_reading,
+					     uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL || counter_reading == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (*data_len < sizeof(uint32_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint32_t le_reading = htole32(*counter_reading);
+	memcpy(data, &le_reading, sizeof(uint32_t));
+	*data_len = sizeof(uint32_t);
+
+	return NSM_SW_SUCCESS;
+}
