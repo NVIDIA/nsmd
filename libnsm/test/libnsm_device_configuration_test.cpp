@@ -1816,3 +1816,373 @@ TEST(getEGMMode, testGoodDecodeResponse)
 	EXPECT_EQ(1, data_size);
 	EXPECT_EQ(1, flags.byte);
 }
+
+TEST(getDeviceModeSettings, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_req), 0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_get_device_mode_setting_req(0, 0, request);
+
+	struct nsm_get_device_mode_setting_req *req =
+	    reinterpret_cast<struct nsm_get_device_mode_setting_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_DEVICE_MODE_SETTING, req->hdr.command);
+	EXPECT_EQ(sizeof(uint8_t), req->hdr.data_size);
+	EXPECT_EQ(0, req->device_mode_index);
+}
+
+TEST(getDeviceModeSettings, testBadEncodeRequest)
+{
+	auto rc = encode_get_device_mode_setting_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDeviceModeSettings, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{0x10,
+					0xDE,
+					0x80,
+					0x89,
+					NSM_TYPE_DEVICE_CONFIGURATION,
+					NSM_GET_DEVICE_MODE_SETTING,
+					1,
+					0};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t device_mode_index = 0;
+
+	auto rc = decode_get_device_mode_setting_req(request, msg_len,
+						     &device_mode_index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(device_mode_index, 0);
+}
+
+TEST(getDeviceModeSettings, testBadDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{0x10,
+					0xDE,
+					0x80,
+					0x89,
+					NSM_TYPE_DEVICE_CONFIGURATION,
+					NSM_GET_DEVICE_MODE_SETTING,
+					0,
+					0};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t device_mode_index = 0;
+	size_t msg_len =
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_req);
+
+	auto rc =
+	    decode_get_device_mode_setting_req(nullptr, 0, &device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_setting_req(request, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_setting_req(request, msg_len - 1,
+						&device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_device_mode_setting_req(request, msg_len,
+						&device_mode_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getDeviceModeSettings, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t device_mode = 1;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_device_mode_settings_resp(
+	    0, NSM_SUCCESS, reason_code, device_mode, response);
+
+	struct nsm_get_device_mode_setting_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_mode_setting_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(response->hdr.nvidia_msg_type, NSM_TYPE_DEVICE_CONFIGURATION);
+	EXPECT_EQ(resp->hdr.command, NSM_GET_DEVICE_MODE_SETTING);
+	EXPECT_EQ(resp->device_mode, device_mode);
+}
+
+TEST(getDeviceModeSettings, testBadEncodeResponse)
+{
+	uint8_t device_mode = 1;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_get_device_mode_settings_resp(
+	    0, NSM_SUCCESS, reason_code, device_mode, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getDeviceModeSettings, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_MODE_SETTING,   // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    1,
+	    0, // data size
+	    1  // Device mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	enum nsm_l1_prediction_mode_config device_mode =
+	    nsm_l1_prediction_mode_config::DISABLED;
+
+	auto rc = decode_get_device_mode_setting_resp(
+	    response, msg_len, &cc, &reason_code, &device_mode);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(device_mode, nsm_l1_prediction_mode_config::ENABLED);
+}
+
+TEST(getDeviceModeSettings, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_MODE_SETTING,   // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    1,
+	    0, // data size
+	    0  // Device mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len =
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_resp);
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	enum nsm_l1_prediction_mode_config device_mode =
+	    nsm_l1_prediction_mode_config::DISABLED;
+
+	auto rc = decode_get_device_mode_setting_resp(
+	    nullptr, 0, &cc, &reason_code, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_setting_resp(response, 0, nullptr,
+						 &reason_code, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_device_mode_setting_resp(response, msg_len - 1, &cc,
+						 &reason_code, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(setDeviceModeSettings, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_setting_req), 0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t device_mode_index = 0;
+	enum nsm_l1_prediction_mode_config device_mode =
+	    nsm_l1_prediction_mode_config::ENABLED;
+
+	auto rc = encode_set_device_mode_setting_req(0, device_mode_index,
+						     device_mode, request);
+	struct nsm_set_device_mode_setting_req *req =
+	    reinterpret_cast<struct nsm_set_device_mode_setting_req *>(
+		request->payload);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_SET_DEVICE_MODE_SETTING, req->hdr.command);
+	EXPECT_EQ(sizeof(uint16_t), req->hdr.data_size);
+	EXPECT_EQ(0, req->device_mode_index);
+	EXPECT_EQ(nsm_l1_prediction_mode_config::ENABLED, req->device_mode);
+}
+
+TEST(setDeviceModeSettings, testBadEncodeRequest)
+{
+	auto rc = encode_set_device_mode_setting_req(
+	    0, 0, nsm_l1_prediction_mode_config::ENABLED, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setDeviceModeSettings, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTING,   // command
+	    2,				   // data size
+	    0,				   // device mode index
+	    1,				   // device mode
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+	uint8_t device_mode_index = 0;
+	enum nsm_l1_prediction_mode_config device_mode =
+	    nsm_l1_prediction_mode_config::DISABLED;
+
+	auto rc = decode_set_device_mode_settings_req(
+	    request, msg_len, &device_mode_index, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(device_mode_index, 0);
+	EXPECT_EQ(device_mode, nsm_l1_prediction_mode_config::ENABLED);
+}
+
+TEST(setDeviceModeSettings, testBadDecodeRequest)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTING,   // command
+	    2,				   // data size
+	    0,				   // device mode index
+	    0,				   // device mode
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t device_mode_index = 0;
+	enum nsm_l1_prediction_mode_config device_mode =
+	    nsm_l1_prediction_mode_config::DISABLED;
+	size_t msg_len = responseMsg.size();
+
+	auto rc = decode_set_device_mode_settings_req(
+	    nullptr, 0, &device_mode_index, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_req(response, 0, nullptr,
+						 &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_settings_req(
+	    response, msg_len - 1, &device_mode_index, &device_mode);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(setDeviceModeSettings, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = encode_set_device_mode_settings_resp(0, NSM_SUCCESS,
+						       reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_DEVICE_MODE_SETTING, resp->command);
+}
+
+TEST(setDeviceModeSettings, testBadEncodeResponse)
+{
+	auto rc = encode_set_device_mode_settings_resp(0, NSM_SUCCESS, ERR_NULL,
+						       nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setDeviceModeSettings, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTING,   // command
+	    0,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_set_device_mode_setting_resp(response, msg_len, &cc,
+						      &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+}
+
+TEST(setDeviceModeSettings, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,			   // PCI VID: NVIDIA 0x10DE
+	    0x00,			   // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			   // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CONFIGURATION, // NVIDIA_MSG_TYPE
+	    NSM_SET_DEVICE_MODE_SETTING,   // command
+	    1,				   // completion code
+	    0,				   // reserved
+	    0,				   // reserved
+	    0,
+	    0 // data size
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	size_t msg_len = responseMsg.size();
+
+	auto rc =
+	    decode_set_device_mode_setting_resp(nullptr, 0, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_setting_resp(response, 0, nullptr,
+						 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_device_mode_setting_resp(response, msg_len - 1, &cc,
+						 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_set_device_mode_setting_resp(response, msg_len, &cc,
+						 &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}

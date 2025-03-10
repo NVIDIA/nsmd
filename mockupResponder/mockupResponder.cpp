@@ -84,6 +84,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             0, // mode
             0, // persistent
         },     // errorInjectionMode
+        0,
         {
             {NSM_DEV_ID_GPU,
              {
@@ -648,6 +649,10 @@ std::optional<Response>
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
                     return getFpgaDiagnosticsSettingsHandler(request,
                                                              requestLen);
+                case NSM_GET_DEVICE_MODE_SETTING:
+                    return getDevicemodeSettingsHandler(request, requestLen);
+                case NSM_SET_DEVICE_MODE_SETTING:
+                    return setDevicemodeSettingsHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -806,7 +811,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_QUERY_TOKEN_PARAMETERS, NSM_ERASE_DEBUG_INFO,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {3, 4, 5, 6, 7}},
+                 {5, {3, 4, 5, 6, 7, 128, 129}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
@@ -819,7 +824,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {3, 4, 5, 6, 7}},
+                 {5, {3, 4, 5, 6, 7, 128, 129}},
              }},
             {NSM_DEV_ID_GPU,
              {
@@ -6051,4 +6056,84 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDevicemodeSettingsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t data_index = 0;
+    auto rc = decode_get_device_mode_setting_req(requestMsg, requestLen,
+                                                 &data_index);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_mode_setting_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint8_t device_mode = state.l1_prediction_mode; // Mock device mode
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_device_mode_settings_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              device_mode, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_mode_settings_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDevicemodeSettingsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t device_mode_index = 0;
+    enum nsm_l1_prediction_mode_config device_mode =
+        nsm_l1_prediction_mode_config::ENABLED;
+
+    auto rc = decode_set_device_mode_settings_req(
+        requestMsg, requestLen, &device_mode_index, &device_mode);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_mode_settings_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    state.l1_prediction_mode = static_cast<uint8_t>(device_mode);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_device_mode_settings_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_device_mode_settings_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
 } // namespace MockupResponder

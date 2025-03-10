@@ -456,6 +456,14 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setEgmModeHandler(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+
   private:
     sdeventplus::Event& event;
     bool verbose;
@@ -476,6 +484,7 @@ class MockupResponder
                  nsm_reconfiguration_permissions_v1>
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
+        uint8_t l1_prediction_mode;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;

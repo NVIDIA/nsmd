@@ -38,6 +38,8 @@ enum device_configuration_command {
 	NSM_GET_FPGA_DIAGNOSTICS_SETTINGS = 0x64,
 	NSM_SET_EGM_MODE = 0x42,
 	NSM_GET_EGM_MODE = 0x43,
+	NSM_SET_DEVICE_MODE_SETTING = 0x80,
+	NSM_GET_DEVICE_MODE_SETTING = 0x81,
 };
 
 enum error_injection_type {
@@ -422,6 +424,79 @@ struct nsm_set_EGM_mode_req {
 	struct nsm_common_req hdr;
 	uint8_t requested_mode;
 } __attribute__((packed));
+
+enum nsm_l1_prediction_mode_config { DISABLED = 0, ENABLED = 1 };
+
+/** @struct nsm_get_device_mode_setting_req
+ *
+ *  Structure representing Get Device Mode Setting request.
+ */
+struct nsm_get_device_mode_setting_req {
+	struct nsm_common_req hdr;
+	uint8_t device_mode_index;
+} __attribute__((packed));
+
+/** @struct nsm_get_device_mode_setting_resp
+ *
+ *  Structure representing Get network interface mode response.
+ */
+struct nsm_get_device_mode_setting_resp {
+	struct nsm_common_resp hdr;
+	uint8_t device_mode;
+} __attribute__((packed));
+
+/** @struct nsm_set_network_interface_mode_req
+ *
+ *  Structure representing Set network interface mode request.
+ */
+struct nsm_set_device_mode_setting_req {
+	struct nsm_common_req hdr;
+	uint8_t device_mode_index;
+	uint8_t device_mode;
+} __attribute__((packed));
+
+/** @brief Encode a Set Device Mode Settings request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] mode - Network interface mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_mode_setting_req(
+    uint8_t instance_id, uint8_t device_mode_index,
+    enum nsm_l1_prediction_mode_config device_mode, struct nsm_msg *msg);
+
+/** @brief Decode a Set Device Mode Settings request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_mode_settings_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *device_mode_index,
+    enum nsm_l1_prediction_mode_config *device_mode);
+
+/** @brief Encode a Set Device Mode Settings response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_mode_settings_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Set Device Mode Settings response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_mode_setting_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code);
 
 /** @brief Encode a Set Error Injection Mode v1 request message
  *
@@ -1172,6 +1247,55 @@ int encode_set_EGM_mode_resp(uint8_t instance_id, uint8_t cc,
 int decode_set_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 			     uint8_t *cc, uint16_t *data_size,
 			     uint16_t *reason_code);
+
+/** @brief Encode a Get Device Mode Setting request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] device_mode_index - Device mode index
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_mode_setting_req(uint8_t instance_id,
+				       uint8_t device_mode_index,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Mode Setting request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] device_mode_index - Device mode index
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_mode_setting_req(const struct nsm_msg *msg,
+				       size_t msg_len,
+				       uint8_t *device_mode_index);
+
+/** @brief Encode a Get Device Mode Settings response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] device_mode - Device mode
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_mode_settings_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint8_t device_mode,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Mode Settings response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to NSM reason code
+ *  @param[out] device_mode - pointer to device mode
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_mode_setting_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, enum nsm_l1_prediction_mode_config *device_mode);
 
 #ifdef __cplusplus
 }

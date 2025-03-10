@@ -2,6 +2,7 @@
 
 #include "config.h"
 
+#include "libnsm/device-configuration.h"
 #include "libnsm/diagnostics.h"
 #include "libnsm/network-ports.h"
 
@@ -9,8 +10,8 @@
 #include "nsmAssetIntf.hpp"
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
 #include "nsmInterface.hpp"
-#include "utils.hpp"
 #include "nsmd/nsmCommon/nsmCommon.hpp"
+#include "utils.hpp"
 
 #include <com/nvidia/PowerMode/server.hpp>
 #include <com/nvidia/SwitchIsolation/server.hpp>
@@ -22,6 +23,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/NvSwitch/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Switch/server.hpp>
+#include <xyz/openbmc_project/Object/Enable/server.hpp>
 
 namespace nsm
 {
@@ -38,6 +40,8 @@ using ResetDeviceIntf = sdbusplus::server::object_t<
 using L1PowerModeIntf = object_t<sdbusplus::com::nvidia::server::PowerMode>;
 using SwitchIsolationIntf =
     object_t<sdbusplus::server::com::nvidia::SwitchIsolation>;
+using EnableIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::object::Enable>;
 
 template <typename IntfType>
 class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
@@ -126,4 +130,30 @@ class NsmSwitchIsolationMode : public NsmSensor
     std::shared_ptr<SwitchIsolationIntf> switchIsolationIntf;
 };
 
+class NsmSwitchL1PredictionMode : public NsmSensor
+{
+  public:
+    NsmSwitchL1PredictionMode(
+        const std::string& name, const std::string& type,
+        std::shared_ptr<EnableIntf> enableIntf,
+        std::shared_ptr<AssociationDefinitionsInft> associationDefIntf) :
+        NsmSensor(name, type),
+        enableIntf(enableIntf), associationDefIntf(associationDefIntf)
+    {}
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+    requester::Coroutine
+        setL1PredictionMode(const AsyncSetOperationValueType& value,
+                            [[maybe_unused]] AsyncOperationStatusType* status,
+                            std::shared_ptr<NsmDevice> device);
+
+  private:
+    std::shared_ptr<EnableIntf> enableIntf;
+    std::shared_ptr<AssociationDefinitionsInft> associationDefIntf;
+    bool asyncPatchInProgress{false};
+};
 } // namespace nsm

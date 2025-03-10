@@ -1021,6 +1021,137 @@ class SetConfidentialComputeModeV1 : public CommandInterface
     uint8_t mode;
 };
 
+class SetDevicemodeSettings : public CommandInterface
+{
+  public:
+    ~SetDevicemodeSettings() = default;
+    SetDevicemodeSettings() = delete;
+    SetDevicemodeSettings(const SetDevicemodeSettings&) = delete;
+    SetDevicemodeSettings(SetDevicemodeSettings&&) = default;
+    SetDevicemodeSettings& operator=(const SetDevicemodeSettings&) = delete;
+    SetDevicemodeSettings& operator=(SetDevicemodeSettings&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetDevicemodeSettings(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app), device_mode_index(0),
+        l1_prediction_mode(nsm_l1_prediction_mode_config::ENABLED)
+    {
+        auto setNetworkInterfaceMode =
+            app->add_option_group("Required", "Set Network Interface Mode");
+        setNetworkInterfaceMode->add_option("-i, --index", device_mode_index,
+                                            "device_mode_index");
+        setNetworkInterfaceMode->add_option("-M, --mode", l1_prediction_mode,
+                                            "l1_prediction_mode\n"
+                                            "0 - Enable\n"
+                                            "1 - Disable");
+        setNetworkInterfaceMode->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_mode_setting_req), 0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_device_mode_setting_req(
+            instanceId, device_mode_index, l1_prediction_mode, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_set_device_mode_setting_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp));
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Reason Code"] = reason_code;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t device_mode_index;
+    enum nsm_l1_prediction_mode_config l1_prediction_mode;
+};
+
+class GetDevicemodeSettings : public CommandInterface
+{
+  public:
+    ~GetDevicemodeSettings() = default;
+    GetDevicemodeSettings() = delete;
+    GetDevicemodeSettings(const GetDevicemodeSettings&) = delete;
+    GetDevicemodeSettings(GetDevicemodeSettings&&) = default;
+    GetDevicemodeSettings& operator=(const GetDevicemodeSettings&) = delete;
+    GetDevicemodeSettings& operator=(GetDevicemodeSettings&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetDevicemodeSettings(const char* type, const char* name,
+                                   CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        mode_index = 0;
+        auto getNetworkInterfaceMode =
+            app->add_option_group("Required", "Get Network Interface Mode");
+        getNetworkInterfaceMode->add_option("-r, --mode_index", mode_index,
+                                            "mode_index");
+        getNetworkInterfaceMode->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_req), 0);
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_mode_setting_req(instanceId, mode_index,
+                                                     request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        enum nsm_l1_prediction_mode_config device_mode;
+
+        auto rc = decode_get_device_mode_setting_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &device_mode);
+
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << static_cast<int>(cc)
+                      << ", reasonCode=" << static_cast<int>(reason_code)
+                      << "\n"
+                      << payloadLength << "...."
+                      << (sizeof(struct nsm_msg_hdr) +
+                          sizeof(struct nsm_get_device_mode_setting_resp));
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Device Mode"] = static_cast<int>(device_mode);
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t mode_index;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto config = app.add_subcommand("config",
@@ -1095,6 +1226,16 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<SetConfidentialComputeModeV1>(
         "config", "SetConfidentialComputeModeV1",
         setConfidentialComputeModeV1));
+
+    auto getDeviceModeSettings = config->add_subcommand(
+        "GetDevicemodeSettings", "Get device mode settings");
+    commands.push_back(std::make_unique<GetDevicemodeSettings>(
+        "config", "GetDevicemodeSettings", getDeviceModeSettings));
+
+    auto setDeviceModeSettings = config->add_subcommand(
+        "SetDevicemodeSettings", "Set device mode settings");
+    commands.push_back(std::make_unique<SetDevicemodeSettings>(
+        "config", "SetDevicemodeSettings", setDeviceModeSettings));
 }
 
 } // namespace config
