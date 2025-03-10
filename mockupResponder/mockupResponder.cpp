@@ -432,6 +432,9 @@ std::optional<Response>
                     return getSwitchIsolationMode(request, requestLen);
                 case NSM_SET_SWITCH_ISOLATION_MODE:
                     return setSwitchIsolationMode(request, requestLen);
+                case NSM_GET_ETH_PORT_TELEMETRY_COUNTER:
+                    return getEthPortTelemetryCounterHandler(request,
+                                                             requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -6269,6 +6272,79 @@ std::optional<Response>
                    "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getEthPortTelemetryCounterHandler(
+        const nsm_msg* requestMsg, size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getEthPortTelemetryCounterHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint8_t portNumber = 0;
+    auto rc = decode_get_eth_port_telemetry_counter_req(requestMsg, requestLen,
+                                                        &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_eth_port_telemetry_counter_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount = 0;
+    for (uint8_t tag = 0; tag < ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT; ++tag)
+    {
+        ++samplesCount;
+
+        uint32_t mockValue = tag * 10; // Mock value for each counter
+        uint8_t reading[sizeof(uint32_t)] = {};
+        size_t sample_len = sizeof(reading);
+
+        rc = encode_aggregate_eth_port_telemetry_data(&mockValue, reading,
+                                                      &sample_len);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "encode_aggregate_eth_port_telemetry_data failed: rc={RC}",
+                "RC", rc);
+            return std::nullopt;
+        }
+
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: rc={RC}", "RC",
+                       rc);
+            return std::nullopt;
+        }
+
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               NSM_GET_ETH_PORT_TELEMETRY_COUNTER, NSM_SUCCESS,
+                               samplesCount, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_aggregate_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 
