@@ -524,6 +524,165 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
     co_return NSM_SW_SUCCESS;
 }
 
+std::optional<std::vector<uint8_t>>
+    NsmSwitchL1PredictionMode::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_device_mode_setting_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_device_mode_setting_req(instanceId, 0, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_get_device_mode_setting_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+uint8_t NsmSwitchL1PredictionMode::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    nsm_l1_prediction_mode_config predictionMode;
+
+    auto rc = decode_get_device_mode_setting_resp(
+        responseMsg, responseLen, &cc, &reason_code, &predictionMode);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        if (predictionMode == nsm_l1_prediction_mode_config::ENABLED)
+        {
+            enableIntf->enabled(true);
+        }
+        else
+        {
+            enableIntf->enabled(false);
+        }
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmSwitchL1PredictionMode::setL1PredictionMode(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    const bool* l1PredictionMode = std::get_if<bool>(&value);
+    if (!l1PredictionMode)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    auto eid = device->getEid();
+    lg2::info("set L1 Prediction Mode On Device for EID: {EID}", "EID", eid);
+
+    nsm_l1_prediction_mode_config predictionMode;
+    if (*l1PredictionMode)
+    {
+        predictionMode = nsm_l1_prediction_mode_config::ENABLED;
+    }
+    else
+    {
+        predictionMode = nsm_l1_prediction_mode_config::DISABLED;
+    }
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_device_mode_setting_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    auto rc = encode_set_device_mode_setting_req(0, 0, predictionMode,
+                                                 requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmSwitchL1PredictionMode::setL1PredictionMode encode_set_device_mode_setting_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (rc_)
+    {
+        lg2::error(
+            "NsmSwitchL1PredictionMode::setL1PredictionMode postPatchIO failed for"
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc_);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_device_mode_setting_resp(responseMsg.get(), responseLen,
+                                             &cc, &reason_code);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        lg2::info(
+            "NsmSwitchL1PredictionMode::setL1PredictionMode for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        lg2::error(
+            "NsmSwitchL1PredictionMode::setL1PredictionMode decode_set_device_mode_setting_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc);
+        *status = AsyncOperationStatusType::WriteFailure;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createNsmSwitchL1PredictionMode(std::shared_ptr<NsmDevice> device,
+                                            sdbusplus::bus::bus& bus,
+                                            const std::string& objPath,
+                                            const std::string& type,
+                                            const std::string& name)
+{
+    auto dbusObjPath = objPath + name +
+                       "/Oem/Nvidia/PowerMode/L1PredictionMode";
+    //  Add associations between switch and l1prediction_mode
+    std::vector<utils::Association> associations{
+        {"parent_switch", "l1_prediction_mode", objPath + name}};
+    auto l1predictionModeAssociationIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, dbusObjPath.c_str());
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    l1predictionModeAssociationIntf->associations(associationsList);
+
+    // Add enable interface to the object
+    auto enableIntf = std::make_shared<EnableIntf>(bus, dbusObjPath.c_str());
+    auto nvSwitchL1PredictionMode = std::make_shared<NsmSwitchL1PredictionMode>(
+        name, type, enableIntf, std::move(l1predictionModeAssociationIntf));
+    device->addSensor(nvSwitchL1PredictionMode, false);
+
+    // Add async set operation to the object
+    nsm::AsyncSetOperationHandler setL1PredictionModeHandler =
+        std::bind(&NsmSwitchL1PredictionMode::setL1PredictionMode,
+                  nvSwitchL1PredictionMode, std::placeholders::_1,
+                  std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation("xyz.openbmc_project.Object.Enable", "Enabled",
+                               AsyncSetOperationInfo{setL1PredictionModeHandler,
+                                                     nvSwitchL1PredictionMode,
+                                                     device});
+}
+
 requester::Coroutine createNsmSwitchDI(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
@@ -594,6 +753,14 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         device->getDeviceSensors().emplace_back(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
+
+        auto SupportL1PredictionMode = co_await utils::coGetDbusProperty<bool>(
+            objPath.c_str(), "SupportL1PredictionMode", baseInterface.c_str());
+        if (SupportL1PredictionMode)
+        {
+            createNsmSwitchL1PredictionMode(device, bus, inventoryObjPath, type,
+                                            name);
+        }
 
 #if defined(ENABLE_DEBUG_TOKEN)
         auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(

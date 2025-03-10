@@ -471,7 +471,9 @@ class MockupResponder
     std::optional<Request>
         getListAvailablePciePortsHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getEthPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
@@ -480,6 +482,9 @@ class MockupResponder
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getPortEccCountersHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
 
   private:
     std::optional<Request>
@@ -505,6 +510,7 @@ class MockupResponder
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
         nsm_error_injection_payload errorInjectionPayload;
+        uint8_t l1_prediction_mode;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;
