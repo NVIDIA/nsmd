@@ -32,6 +32,7 @@ extern "C" {
 #define PORT_MASK_DATA_SIZE 32
 // defined in MBps
 #define MAXLINKBANDWIDTH 50000
+#define ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT 21
 
 /** @brief NSM Type1 network port telemetry commands
  */
@@ -57,6 +58,8 @@ enum nsm_network_port_commands {
 	NSM_QUERY_PORT_STATUS = 0x43,
 	NSM_SET_PORT_DISABLE_FUTURE = 0x44,
 	NSM_GET_PORT_DISABLE_FUTURE = 0x45,
+	NSM_GET_ETH_PORT_TELEMETRY_COUNTER =
+	    0x50 // placeholder until spec is defined,
 	NSM_GET_NVLINK_LED_STATUS = 0x60
 };
 
@@ -1159,6 +1162,49 @@ int encode_nsm_get_fabric_manager_state_event(
 int decode_nsm_get_fabric_manager_state_event(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
     uint16_t *event_state, nsm_get_fabric_manager_state_event_payload *payload);
+
+/** @brief Encode a get Ethernet port telemetry counter request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - Port number
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
+					      uint8_t port_number,
+					      struct nsm_msg *msg);
+
+/** @brief Decode a get Ethernet port telemetry counter request message
+ *
+ *  @param[in] msg - Request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - Port number
+ *  @return nsm_completion_codes
+ */
+int decode_get_eth_port_telemetry_counter_req(const struct nsm_msg *msg,
+					      size_t msg_len,
+					      uint8_t *port_number);
+
+/** @brief Decode aggregate Ethernet port telemetry data
+ *
+ *  @param[in] data - Data buffer
+ *  @param[in] data_len - Length of data buffer
+ *  @param[out] counter_reading - Decoded counter_reading
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_eth_port_telemetry_data(const uint8_t *data,
+					     size_t *data_len,
+					     uint32_t *counter_reading);
+
+/** @brief Encode aggregate Ethernet port telemetry data
+ *
+ *  @param[in] counter_reading - counter_reading to encode
+ *  @param[out] data - Data buffer
+ *  @param[out] data_len - Length of data buffer
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_eth_port_telemetry_data(uint32_t *counter_reading,
+					     uint8_t *data, size_t *data_len);
 
 #ifdef __cplusplus
 }

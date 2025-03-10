@@ -4756,6 +4756,97 @@ class GetListAvailablePciePorts : public CommandInterface
     }
 };
 
+class GetEthPortTelemetryCounter : public CommandInterface
+{
+  public:
+    ~GetEthPortTelemetryCounter() = default;
+    GetEthPortTelemetryCounter() = delete;
+    GetEthPortTelemetryCounter(const GetEthPortTelemetryCounter&) = delete;
+    GetEthPortTelemetryCounter(GetEthPortTelemetryCounter&&) = default;
+    GetEthPortTelemetryCounter&
+        operator=(const GetEthPortTelemetryCounter&) = delete;
+    GetEthPortTelemetryCounter&
+        operator=(GetEthPortTelemetryCounter&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetEthPortTelemetryCounter(const char* type, const char* name,
+                                        CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which network addresses are to be retrieved.");
+
+        portNumber = 0;
+        portOptionGroup->add_option(
+            "-p, --portNum", portNumber,
+            "Retrieve network addresses for Port number");
+        portOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_eth_port_telemetry_counter_req(
+            instanceId, portNumber, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetEthPortTelemetryCounterAggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    class GetEthPortTelemetryCounterAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint32_t counter_reading;
+            int rc = decode_aggregate_eth_port_telemetry_data(data, &data_len,
+                                                              &counter_reading);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+            sample_json[ethPortTelemetryCounterList[tag]] = counter_reading;
+            return NSM_SW_SUCCESS;
+        }
+    };
+
+    uint8_t portNumber;
+    static constexpr const char* ethPortTelemetryCounterList[21] = {
+        "RXBytes",                   // 0
+        "TXBytes",                   // 1
+        "RXUnicastBytes",            // 2
+        "RXMulticastBytes",          // 3
+        "RXBroadcastBytes",          // 4
+        "TXUnicastBytes",            // 5
+        "TXMulticastBytes",          // 6
+        "TXBroadcastBytes",          // 7
+        "RXFCSErrors",               // 8
+        "RXAlignmentErrors",         // 9
+        "RXFalseCarrierDetections",  // 10
+        "RXRuntBytes",               // 11
+        "RXJabberBytes",             // 12
+        "RXXONFrames",               // 13
+        "RXXOFFFrames",              // 14
+        "TXXONFrames",               // 15
+        "TXXOFFFrames",              // 16
+        "TXSingleCollisionFrames",   // 17
+        "TXMultipleCollisionFrames", // 18
+        "TXLateCollisionFrames",     // 19
+        "TXExcessCollisionFrames"    // 20
+    };
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -5007,6 +5098,11 @@ void registerCommand(CLI::App& app)
     commands.push_back(std::make_unique<QueryMultiportScalarGroupTelemetry>(
         "telemetry", "QueryMultiportScalarGroupTelemetry",
         queryMultiportScalarGroupTelemetry));
+
+    auto getEthPortTelemetryCounter = telemetry->add_subcommand(
+        "GetEthPortTelemetryCounter", "get ethernet port telemetry counter");
+    commands.push_back(std::make_unique<GetEthPortTelemetryCounter>(
+        "telemetry", "GetEthPortTelemetryCounter", getEthPortTelemetryCounter));
 }
 
 } // namespace telemetry
