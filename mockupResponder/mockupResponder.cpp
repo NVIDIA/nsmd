@@ -594,6 +594,8 @@ std::optional<Response>
                 case NSM_ENABLE_DISABLE_WP:
                     return enableDisableWriteProtectedHandler(request,
                                                               requestLen);
+                case NSM_GET_DEVICE_DIAGNOSTICS:
+                    return getDeviceDiagnosticsHandler(request, requestLen);
                 case NSM_GET_NETWORK_DEVICE_DEBUG_INFO:
                     return getNetworkDeviceDebugInfoHandler(request,
                                                             requestLen);
@@ -829,7 +831,8 @@ std::optional<std::vector<uint8_t>>
                       97,  118, 113, 114, 115, 116, 117, 119, 120, 121, 122,
                       123, 124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
                  {4,
-                  {0, NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
+                  {0, NSM_GET_DEVICE_DIAGNOSTICS,
+                   NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
                  {6, {1, 2, 3, 4, 5, 6}},
@@ -4840,6 +4843,61 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceDiagnosticsHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDeviceDiagnosticsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t segment_id = 0;
+    auto rc = decode_get_device_diagnostics_req(requestMsg, requestLen,
+                                                &segment_id);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_diagnostics_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    std::vector<uint8_t> segment_data{
+        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C,
+        0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64, 0x65, 0x76,
+        0x69, 0x63, 0x65, 0x20, 0x64, 0x69, 0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74,
+        0x69, 0x63, 0x73, 0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C,
+        0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68,
+        0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65,
+        0x20, 0x64, 0x69, 0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74, 0x69, 0x63, 0x73,
+        0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20,
+        0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20,
+        0x69, 0x73, 0x20, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x69,
+        0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74, 0x69, 0x63, 0x73, 0x20, 0x69, 0x6E,
+        0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72,
+        0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
+        0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x69, 0x61, 0x67, 0x6E,
+        0x6F, 0x73, 0x74, 0x69, 0x63, 0x73, 0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00};
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      sizeof(nsm_get_device_diagnostics_resp) +
+                                      segment_data.size() - 1,
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    uint8_t next_segment_id = segment_id + 1;
+    rc = encode_get_device_diagnostics_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
+        (uint8_t*)segment_data.data(), segment_data.size(), next_segment_id,
+        responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_diagnostics_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
 std::optional<std::vector<uint8_t>>
     MockupResponder::getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
