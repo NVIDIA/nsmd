@@ -126,6 +126,16 @@ std::pair<std::string, std::shared_ptr<AsyncStatusIntf>>
     return {objPath, statusIntf};
 }
 
+void AsyncOperationManager::clearValueInterface(
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    if (std::holds_alternative<sdbusplus::message::unix_fd>(valueIntf->value()))
+    {
+        close(std::get<sdbusplus::message::unix_fd>(valueIntf->value()));
+    }
+    valueIntf->value({});
+}
+
 std::tuple<std::string, std::shared_ptr<AsyncStatusIntf>,
            std::shared_ptr<AsyncValueIntf>>
     AsyncOperationManager::getNewStatusValueInterface()
@@ -145,7 +155,7 @@ std::tuple<std::string, std::shared_ptr<AsyncStatusIntf>,
     std::shared_ptr<AsyncStatusIntf> statusIntf =
         statusInterfaces[currentCount];
 
-    valueIntf->value({});
+    clearValueInterface(valueIntf);
     statusIntf->status(AsyncOperationStatusType::InProgress, false);
 
     return {objPath, statusIntf, valueIntf};

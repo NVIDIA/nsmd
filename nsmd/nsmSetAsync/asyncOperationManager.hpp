@@ -85,6 +85,14 @@ class AsyncOperationManager
 
     std::pair<bool, size_t> getCurrentObjectCount();
 
+    /**
+     * @brief Clear the value stored in the value interface, special attention
+     *        should be given to any type that needs specific cleanup.
+     *
+     * @param valueIntf - pointer to the value interface instance
+     */
+    void clearValueInterface(std::shared_ptr<AsyncValueIntf> valueIntf);
+
     size_t currentObjectCount{};
     const size_t maxObjectCount;
     const std::string asyncOperationResultObjPath;
