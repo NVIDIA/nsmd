@@ -69,46 +69,12 @@ NsmDebugTokenObject::NsmDebugTokenObject(
 {
     std::string objectPath{getName(associations, name)};
     lg2::info("DebugToken: create object: {PATH}", "PATH", objectPath.c_str());
-
-    progressIntf = std::make_unique<ProgressIntf>(bus, objectPath.c_str());
-
-    sdbusplus::message::unix_fd unixFd(0);
-    requestFd(unixFd, true);
-}
-
-int NsmDebugTokenObject::startOperation()
-{
-    if (opInProgress)
-    {
-        return NSM_SW_ERROR;
-    }
-    opInProgress = true;
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    unsigned long micros = 1000000 * tv.tv_sec + tv.tv_usec;
-    progressIntf->startTime(micros, true);
-    progressIntf->completedTime(0, true);
-    progressIntf->progress(0, true);
-    progressIntf->status(Progress::OperationStatus::InProgress, true);
-    return NSM_SW_SUCCESS;
-}
-
-void NsmDebugTokenObject::finishOperation(Progress::OperationStatus status)
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    unsigned long micros = 1000000 * tv.tv_sec + tv.tv_usec;
-    progressIntf->completedTime(micros, true);
-    if (status == Progress::OperationStatus::Completed)
-    {
-        progressIntf->progress(100, true);
-    }
-    progressIntf->status(status);
-    opInProgress = false;
 }
 
 requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
-    std::shared_ptr<Request> request)
+    std::shared_ptr<Request> request,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
@@ -124,10 +90,15 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
-            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
-                                      "Unsupported Command"));
+            auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
+                                         "Unsupported command");
+            valueIntf->value(error);
+            statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
-        finishOperation(Progress::OperationStatus::Aborted);
+        else
+        {
+            statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        }
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -140,24 +111,31 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
         lg2::error("DebugToken: decode_nsm_disable_tokens_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
-        finishOperation(Progress::OperationStatus::Aborted);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
         // coverity[missing_return]
         co_return decodeRc;
     }
-    if (reasonCode == 0)
+    if (reasonCode == successReasonCode)
     {
-        finishOperation(Progress::OperationStatus::Completed);
+        valueIntf->value(std::make_tuple(static_cast<uint16_t>(0), "Success"));
+        statusIntf->status(AsyncOperationStatusType::Success);
     }
     else
     {
-        finishOperation(Progress::OperationStatus::Failed);
+        auto error = std::make_tuple(reasonCode, "Operation failed");
+        lg2::error("DebugToken: disableTokens: eid={EID} rc={RC}", "EID", eid,
+                   "RC", reasonCode);
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
-    std::shared_ptr<Request> request)
+    std::shared_ptr<Request> request,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
@@ -173,10 +151,15 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
-            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
-                                      "Unsupported Command"));
+            auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
+                                         "Unsupported command");
+            valueIntf->value(error);
+            statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
-        finishOperation(Progress::OperationStatus::Aborted);
+        else
+        {
+            statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        }
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -190,16 +173,26 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
         lg2::error("DebugToken: decode_nsm_query_token_parameters_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
-        finishOperation(Progress::OperationStatus::Aborted);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return decodeRc;
+    }
+    if (reasonCode == tokenAlreadyActiveReasonCode)
+    {
+        lg2::info("DebugToken: token already active: eid={EID} rc={RC}", "EID",
+                  eid, "RC", reasonCode);
+        auto error = std::make_tuple(reasonCode, "Token already active");
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
     }
     int fd = memfd_create("token-request", 0);
     if (fd == -1)
     {
         lg2::error("DebugToken: memfd_create: eid={EID} error={ERROR}", "EID",
                    eid, "ERROR", strerror(errno));
-        finishOperation(Progress::OperationStatus::Aborted);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
@@ -214,7 +207,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
             lg2::error("DebugToken: write: eid={EID} error={ERROR}", "EID", eid,
                        "ERROR", strerror(errno));
             close(fd);
-            finishOperation(Progress::OperationStatus::Aborted);
+            statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR;
         }
@@ -223,14 +216,16 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
     }
     (void)lseek(fd, 0, SEEK_SET);
     sdbusplus::message::unix_fd unixFd(fd);
-    requestFd(unixFd, true);
-    finishOperation(Progress::OperationStatus::Completed);
+    valueIntf->value(unixFd);
+    statusIntf->status(AsyncOperationStatusType::Success);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    NsmDebugTokenObject::getStatusAsyncHandler(std::shared_ptr<Request> request)
+requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
+    std::shared_ptr<Request> request,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
@@ -246,10 +241,15 @@ requester::Coroutine
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
-            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
-                                      "Unsupported Command"));
+            auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
+                                         "Unsupported command");
+            valueIntf->value(error);
+            statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
-        finishOperation(Progress::OperationStatus::Aborted);
+        else
+        {
+            statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        }
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -267,7 +267,7 @@ requester::Coroutine
         lg2::error("DebugToken: decode_nsm_query_token_status_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
-        finishOperation(Progress::OperationStatus::Aborted);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return decodeRc;
     }
@@ -290,7 +290,7 @@ requester::Coroutine
             lg2::error("DebugToken: invalid token type received: "
                        "eid={EID} type={TYPE}",
                        "TYPE", tokenType);
-            finishOperation(Progress::OperationStatus::Aborted);
+            statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
@@ -322,7 +322,7 @@ requester::Coroutine
             lg2::error("DebugToken: invalid token status received: "
                        "eid={EID} status={STAT}",
                        "EID", eid, "STAT", status);
-            finishOperation(Progress::OperationStatus::Aborted);
+            statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
@@ -353,21 +353,22 @@ requester::Coroutine
             lg2::error("DebugToken: invalid additional info received: "
                        "eid={EID} info={INFO}",
                        "EID", eid, "INFO", additionalInfo);
-            finishOperation(Progress::OperationStatus::Aborted);
+            statusIntf->status(AsyncOperationStatusType::InternalFailure);
             // coverity[missing_return]
             co_return NSM_SW_ERROR_DATA;
     }
 
-    tokenStatus(std::make_tuple(dbusTokenType, dbusStatus, dbusAdditionalInfo,
-                                timeLeft),
-                true);
-    finishOperation(Progress::OperationStatus::Completed);
+    valueIntf->value(std::make_tuple(dbusTokenType, dbusStatus,
+                                     dbusAdditionalInfo, timeLeft));
+    statusIntf->status(AsyncOperationStatusType::Success);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
-    std::shared_ptr<Request> request)
+    std::shared_ptr<Request> request,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
@@ -383,10 +384,15 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
-            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
-                                      "Unsupported Command"));
+            auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
+                                         "Unsupported command");
+            valueIntf->value(error);
+            statusIntf->status(AsyncOperationStatusType::UnsupportedRequest);
         }
-        finishOperation(Progress::OperationStatus::Aborted);
+        else
+        {
+            statusIntf->status(AsyncOperationStatusType::WriteFailure);
+        }
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -399,7 +405,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
         lg2::error("DebugToken: decode_nsm_provide_token_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
-        finishOperation(Progress::OperationStatus::Aborted);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
         // coverity[missing_return]
         co_return decodeRc;
     }
@@ -407,45 +413,63 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
     {
         lg2::info("DebugToken: token not accepted: eid={EID} cc={CC}", "EID",
                   eid, "CC", cc);
-        finishOperation(Progress::OperationStatus::Aborted);
+        auto error = std::make_tuple(static_cast<uint16_t>(cc),
+                                     "Token not accepted");
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::InvalidArgument);
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
-    if (reasonCode == 0)
+    if (reasonCode == successReasonCode)
     {
-        finishOperation(Progress::OperationStatus::Completed);
+        valueIntf->value(std::make_tuple(static_cast<uint16_t>(0), "Success"));
+        statusIntf->status(AsyncOperationStatusType::Success);
     }
-    else
+    else if (reasonCode == tokenAlreadyActiveReasonCode)
     {
         lg2::info("DebugToken: token already active: eid={EID} rc={RC}", "EID",
                   eid, "RC", reasonCode);
-        finishOperation(Progress::OperationStatus::Failed);
+        auto error = std::make_tuple(reasonCode, "Token already active");
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::WriteFailure);
+    }
+    else
+    {
+        auto error = std::make_tuple(reasonCode, "Operation failed");
+        lg2::error("DebugToken: installToken: eid={EID} rc={RC}", "EID", eid,
+                   "RC", reasonCode);
+        valueIntf->value(error);
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
-void NsmDebugTokenObject::disableTokens()
+sdbusplus::message::object_path NsmDebugTokenObject::disableTokens()
 {
-    if (startOperation() != NSM_SW_SUCCESS)
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
     {
         throw Common::Error::Unavailable();
     }
+
     auto request = std::make_shared<Request>(sizeof(nsm_msg_hdr) +
                                              sizeof(nsm_disable_tokens_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
     auto rc = encode_nsm_disable_tokens_req(0, requestMsg);
     if (rc == NSM_SW_SUCCESS)
     {
-        disableTokensAsyncHandler(request).detach();
-        return;
+        disableTokensAsyncHandler(request, statusIntf, valueIntf).detach();
+        return objPath;
     }
     lg2::error("DebugToken: encode_nsm_disable_tokens_req: rc={RC}", "RC", rc);
-    finishOperation(Progress::OperationStatus::Aborted);
+    statusIntf->status(AsyncOperationStatusType::InternalFailure);
     throw Common::Error::InternalFailure();
 }
 
-void NsmDebugTokenObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
+sdbusplus::message::object_path
+    NsmDebugTokenObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
 {
     nsm_debug_token_opcode opcode;
     switch (tokenOpcode)
@@ -461,28 +485,26 @@ void NsmDebugTokenObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
                        tokenOpcode);
             throw Common::Error::InvalidArgument();
     }
-    if (startOperation() != NSM_SW_SUCCESS)
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
     {
         throw Common::Error::Unavailable();
     }
-    if (requestFd() != 0)
-    {
-        close(requestFd());
-        sdbusplus::message::unix_fd unixFd(0);
-        requestFd(unixFd, true);
-    }
+
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_query_token_parameters_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
     auto rc = encode_nsm_query_token_parameters_req(0, opcode, requestMsg);
     if (rc == NSM_SW_SUCCESS)
     {
-        getRequestAsyncHandler(request).detach();
-        return;
+        getRequestAsyncHandler(request, statusIntf, valueIntf).detach();
+        return objPath;
     }
     lg2::error("DebugToken: encode_nsm_query_token_parameters_req: rc={RC}",
                "RC", rc);
-    finishOperation(Progress::OperationStatus::Aborted);
+    statusIntf->status(AsyncOperationStatusType::InternalFailure);
     if (rc == NSM_ERR_INVALID_DATA)
     {
         throw Common::Error::InvalidArgument();
@@ -490,7 +512,8 @@ void NsmDebugTokenObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
     throw Common::Error::InternalFailure();
 }
 
-void NsmDebugTokenObject::getStatus(DebugToken::TokenTypes tokenType)
+sdbusplus::message::object_path
+    NsmDebugTokenObject::getStatus(DebugToken::TokenTypes tokenType)
 {
     nsm_debug_token_type type;
     switch (tokenType)
@@ -512,22 +535,26 @@ void NsmDebugTokenObject::getStatus(DebugToken::TokenTypes tokenType)
                        "TYPE", tokenType);
             throw Common::Error::InvalidArgument();
     }
-    if (startOperation() != NSM_SW_SUCCESS)
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
     {
         throw Common::Error::Unavailable();
     }
+
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_query_token_status_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
     auto rc = encode_nsm_query_token_status_req(0, type, requestMsg);
     if (rc == NSM_SW_SUCCESS)
     {
-        getStatusAsyncHandler(request).detach();
-        return;
+        getStatusAsyncHandler(request, statusIntf, valueIntf).detach();
+        return objPath;
     }
     lg2::error("DebugToken: encode_nsm_query_token_status_req: rc={RC}", "RC",
                rc);
-    finishOperation(Progress::OperationStatus::Aborted);
+    statusIntf->status(AsyncOperationStatusType::InternalFailure);
     if (rc == NSM_ERR_INVALID_DATA)
     {
         throw Common::Error::InvalidArgument();
@@ -535,17 +562,22 @@ void NsmDebugTokenObject::getStatus(DebugToken::TokenTypes tokenType)
     throw Common::Error::InternalFailure();
 }
 
-void NsmDebugTokenObject::installToken(std::vector<uint8_t> tokenData)
+sdbusplus::message::object_path
+    NsmDebugTokenObject::installToken(std::vector<uint8_t> tokenData)
 {
     if (tokenData.size() == 0 ||
         tokenData.size() > NSM_DEBUG_TOKEN_DATA_MAX_SIZE)
     {
         throw Common::Error::InvalidArgument();
     }
-    if (startOperation() != NSM_SW_SUCCESS)
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
     {
         throw Common::Error::Unavailable();
     }
+
     auto request = std::make_shared<Request>(
         sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2) + tokenData.size());
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
@@ -553,11 +585,11 @@ void NsmDebugTokenObject::installToken(std::vector<uint8_t> tokenData)
                                            tokenData.size(), requestMsg);
     if (rc == NSM_SW_SUCCESS)
     {
-        installTokenAsyncHandler(request).detach();
-        return;
+        installTokenAsyncHandler(request, statusIntf, valueIntf).detach();
+        return objPath;
     }
     lg2::error("DebugToken: encode_nsm_provide_token_req: rc={RC}", "RC", rc);
-    finishOperation(Progress::OperationStatus::Aborted);
+    statusIntf->status(AsyncOperationStatusType::InternalFailure);
     throw Common::Error::InternalFailure();
 }
 
@@ -585,12 +617,6 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
         lg2::debug("DebugToken: queryDeviceId SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
-        if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
-        {
-            errorCode(std::make_tuple(static_cast<uint16_t>(sendRc),
-                                      "Unsupported Command"));
-        }
-        finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return sendRc;
     }
@@ -604,7 +630,6 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
         co_return cc ? cc : rc;
     }

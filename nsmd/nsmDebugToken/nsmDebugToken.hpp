@@ -17,12 +17,12 @@
 
 #pragma once
 
+#include "asyncOperationManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/DebugToken/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
-#include <xyz/openbmc_project/Common/Progress/server.hpp>
 
 #include <memory>
 
@@ -33,7 +33,9 @@ using namespace sdbusplus::common::xyz::openbmc_project::common;
 using namespace sdbusplus::server;
 
 using DebugTokenIntf = object_t<server::DebugToken>;
-using ProgressIntf = object_t<Common::server::Progress>;
+
+constexpr const auto successReasonCode = 0;
+constexpr const auto tokenAlreadyActiveReasonCode = 1;
 
 class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
 {
@@ -42,10 +44,12 @@ class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
                         const std::vector<utils::Association>& associations,
                         const std::string& type, const uuid_t& uuid);
 
-    void disableTokens();
-    void getRequest(DebugToken::TokenOpcodes tokenOpcode);
-    void getStatus(DebugToken::TokenTypes tokenType);
-    void installToken(std::vector<uint8_t> tokenData);
+    sdbusplus::message::object_path disableTokens();
+    sdbusplus::message::object_path
+        getRequest(DebugToken::TokenOpcodes tokenOpcode);
+    sdbusplus::message::object_path getStatus(DebugToken::TokenTypes tokenType);
+    sdbusplus::message::object_path
+        installToken(std::vector<uint8_t> tokenData);
 
   private:
     static std::string getParentChassisPath(
@@ -54,22 +58,24 @@ class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
         getName(const std::vector<utils::Association>& associations,
                 const std::string& name);
 
-    int startOperation();
-    void finishOperation(Progress::OperationStatus status);
     requester::Coroutine
-        disableTokensAsyncHandler(std::shared_ptr<Request> request);
+        disableTokensAsyncHandler(std::shared_ptr<Request> request,
+                                  std::shared_ptr<AsyncStatusIntf> statusIntf,
+                                  std::shared_ptr<AsyncValueIntf> valueIntf);
     requester::Coroutine
-        getRequestAsyncHandler(std::shared_ptr<Request> request);
+        getRequestAsyncHandler(std::shared_ptr<Request> request,
+                               std::shared_ptr<AsyncStatusIntf> statusIntf,
+                               std::shared_ptr<AsyncValueIntf> valueIntf);
     requester::Coroutine
-        getStatusAsyncHandler(std::shared_ptr<Request> request);
+        getStatusAsyncHandler(std::shared_ptr<Request> request,
+                              std::shared_ptr<AsyncStatusIntf> statusIntf,
+                              std::shared_ptr<AsyncValueIntf> valueIntf);
     requester::Coroutine
-        installTokenAsyncHandler(std::shared_ptr<Request> request);
+        installTokenAsyncHandler(std::shared_ptr<Request> request,
+                                 std::shared_ptr<AsyncStatusIntf> statusIntf,
+                                 std::shared_ptr<AsyncValueIntf> valueIntf);
     requester::Coroutine update(SensorManager& manager, eid_t eid);
 
-    std::unique_ptr<ProgressIntf> progressIntf = nullptr;
-
     uuid_t uuid;
-
-    bool opInProgress{false};
 };
 } // namespace nsm
