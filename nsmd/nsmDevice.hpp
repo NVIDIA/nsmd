@@ -33,6 +33,7 @@
 
 #include <coroutine>
 #include <deque>
+#include <map>
 
 namespace nsm
 {
@@ -155,6 +156,15 @@ class NsmDevice
     {
         devicePollingState = s;
     }
+
+    // Track if NSM message types were successfully retrieved
+    bool areMessageTypesRetrieved{false};
+
+    // Store the retrieved NSM message types
+    std::vector<uint8_t> retrievedMessageTypes;
+
+    // Track success status for each message type's command codes
+    std::map<uint8_t, bool> commandCodesRetrieved;
 
   public:
     /**
