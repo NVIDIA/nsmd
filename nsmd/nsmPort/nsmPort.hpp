@@ -47,6 +47,9 @@ using PortLinkStates = sdbusplus::server::xyz::openbmc_project::inventory::
 using PortLinkStatus = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortState::LinkStatusType;
 
+using LinkDownReasonCodes =
+    xyz::openbmc_project::metrics::IBPort::LinkDownReasonCodes;
+
 class NsmPortStatus : public NsmObject
 {
   public:
@@ -77,7 +80,7 @@ class NsmPortCharacteristics : public NsmSensor
         sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
         const std::string& type,
         std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Intf,
-        std::string& inventoryObjPath);
+        std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath);
     NsmPortCharacteristics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -90,8 +93,10 @@ class NsmPortCharacteristics : public NsmSensor
   private:
     std::unique_ptr<PortInfoIntf> portInfoIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
+    std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     uint8_t portNumber;
     std::string objPath;
+    void updateLinkDownCode(const uint32_t linkDownCode);
 };
 
 class NsmPortMetrics : public NsmSensor
@@ -101,7 +106,8 @@ class NsmPortMetrics : public NsmSensor
                    uint8_t portNum, const std::string& type,
                    const uint8_t deviceType,
                    const std::vector<utils::Association>& associations,
-                   std::string& parentObjPath, std::string& inventoryObjPath);
+                   std::string& parentObjPath, std::string& inventoryObjPath,
+                   std::shared_ptr<IBPortIntf> iBPortIntf);
     NsmPortMetrics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -115,7 +121,7 @@ class NsmPortMetrics : public NsmSensor
     void updateCounterValues(struct nsm_port_counter_data* portData);
     double getBitErrorRate(uint64_t value);
 
-    std::unique_ptr<IBPortIntf> iBPortIntf = nullptr;
+    std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::unique_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
     std::unique_ptr<PortIntf> portIntf = nullptr;
