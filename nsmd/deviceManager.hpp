@@ -137,6 +137,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     std::map<DeviceType, std::map<uint8_t, StateChangeLogger>> mapEidToLogger;
     StateChangeLogger getInventoryLogger;
 
+    requester::Coroutine
+        refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
+
   private:
     DeviceManager(
         sdeventplus::Event& event,

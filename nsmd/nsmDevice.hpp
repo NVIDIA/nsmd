@@ -36,6 +36,7 @@
 
 #include <coroutine>
 #include <deque>
+#include <map>
 #include <ranges> // For ranges::find_if
 
 namespace nsm
@@ -276,6 +277,15 @@ class NsmDevice : public StateChangeLogger
     {
         devicePollingState = s;
     }
+
+    // Track if NSM message types were successfully retrieved
+    bool areMessageTypesRetrieved{false};
+
+    // Store the retrieved NSM message types
+    std::vector<uint8_t> retrievedMessageTypes;
+
+    // Track success status for each message type's command codes
+    std::map<uint8_t, bool> commandCodesRetrieved;
 
   public:
     /**

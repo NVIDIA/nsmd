@@ -694,6 +694,14 @@ requester::Coroutine
             co_await pollEvents(eid);
         }
 #endif
+        DeviceManager& deviceManager = DeviceManager::getInstance();
+        // Refresh command matrix
+        auto rc = co_await deviceManager.refreshCommandMatrix(nsmDevice, eid);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("Failed to refresh command matrix, rc={RC}, eid={EID}",
+                       "RC", rc, "EID", eid);
+        }
         // update all priority sensors
         nsmDevice->setPollingState(POLL_PRIORITY);
 

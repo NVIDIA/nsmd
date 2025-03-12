@@ -241,6 +241,67 @@ requester::Coroutine DeviceManager::getSupportedCommandCodes(
     co_return NSM_SW_SUCCESS;
 }
 
+requester::Coroutine
+    DeviceManager::refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice,
+                                        uint8_t eid)
+{
+    // Check if message types have already been retrieved
+    if (!nsmDevice->areMessageTypesRetrieved)
+    {
+        // Retrieve supported message types
+        std::vector<uint8_t> supportedMessageTypes;
+        auto rc = co_await getSupportedNvidiaMessageType(eid,
+                                                         supportedMessageTypes);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "Failed to get supported message types, rc={RC}, eid={EID}",
+                "RC", rc, "EID", eid);
+            co_return rc;
+        }
+
+        nsmDevice->areMessageTypesRetrieved = true;
+        nsmDevice->retrievedMessageTypes = supportedMessageTypes;
+    }
+
+    // Retrieve supported command codes for each message type
+    for (uint8_t messageType : nsmDevice->retrievedMessageTypes)
+    {
+        if (!nsmDevice->commandCodesRetrieved[messageType])
+        {
+            std::vector<uint8_t> supportedCommands;
+            auto rc = co_await getSupportedCommandCodes(eid, messageType,
+                                                        supportedCommands);
+            if (rc == NSM_SW_SUCCESS)
+            {
+                nsmDevice->commandCodesRetrieved[messageType] = true;
+
+                std::vector<uint8_t> supportedCommandCodes;
+                utils::convertBitMaskToVector(
+                    supportedCommandCodes,
+                    reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
+                    SUPPORTED_COMMAND_CODE_DATA_SIZE);
+
+                for (uint8_t commandCode : supportedCommandCodes)
+                {
+                    nsmDevice->messageTypesToCommandCodeMatrix[messageType]
+                                                              [commandCode] =
+                        true;
+                }
+            }
+            else
+            {
+                lg2::error(
+                    "Failed to get supported commands for message type={MT}, rc={RC}, eid={EID}",
+                    "MT", messageType, "RC", rc, "EID", eid);
+                nsmDevice->commandCodesRetrieved[messageType] = false;
+            }
+        }
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine DeviceManager::getFRU(eid_t eid,
                                            nsm::InventoryProperties& properties,
                                            const uint8_t& deviceType)
@@ -304,6 +365,10 @@ requester::Coroutine
         co_return rc;
     }
 
+    // Update the NsmDevice object with the retrieved message types
+    nsmDevice->areMessageTypesRetrieved = true;
+    nsmDevice->retrievedMessageTypes = supportedMessageTypes;
+
     // Loop through supported message types
     for (uint8_t messageType : supportedMessageTypes)
     {
@@ -315,8 +380,12 @@ requester::Coroutine
             lg2::error(
                 "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
                 "MT", messageType, "RC", rc, "EID", eid);
+            nsmDevice->commandCodesRetrieved[messageType] = false;
             continue;
         }
+
+        // Update the NsmDevice object with the retrieved command codes
+        nsmDevice->commandCodesRetrieved[messageType] = true;
 
         std::vector<uint8_t> supportedCommandCodes;
         utils::convertBitMaskToVector(
