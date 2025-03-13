@@ -342,14 +342,14 @@ NsmGPMAggregated::NsmGPMAggregated(
             gpmIntf.get(), &GPMMetricsIntf::fP16ActivityPercent, objPath}}};
 
     metricsTable[8] = {
-        "PCIeRawRxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::pcIeRawRxBandwidthGbps, objPath}}};
-
-    metricsTable[9] = {
         "PCIeRawTxBandwidthGbps", decodeBandwidth,
         std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
             gpmIntf.get(), &GPMMetricsIntf::pcIeRawTxBandwidthGbps, objPath}}};
+
+    metricsTable[9] = {
+        "PCIeRawRxBandwidthGbps", decodeBandwidth,
+        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
+            gpmIntf.get(), &GPMMetricsIntf::pcIeRawRxBandwidthGbps, objPath}}};
 
     metricsTable[10] = {
         "NVLinkRawTxBandwidthGbps", decodeBandwidth,
