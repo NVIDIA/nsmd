@@ -260,9 +260,6 @@ bool NsmGetEventConfig::validateEventIds(
 {
     bool validateEventSource = true;
 
-    lg2::debug(
-        "EID: {EID} Configured event sources for message type: {MSG_TYPE}",
-        "EID", eid, "MSG_TYPE", messageType);
     for (size_t byteIndex = 0; byteIndex < EVENT_SOURCES_LENGTH; byteIndex++)
     {
         uint8_t byte = srcEventMask[byteIndex].byte;
@@ -271,7 +268,6 @@ bool NsmGetEventConfig::validateEventIds(
             if (byte & (1 << bitOffset))
             {
                 uint64_t eventId = (byteIndex * 8) + bitOffset;
-                lg2::debug("  Event ID: {ID}", "ID", eventId);
 
                 // Check if this configured event is supported
                 uint8_t supportedByte = supported_event_sources[byteIndex].byte;
