@@ -109,7 +109,7 @@ TEST(nsmGPMAggregated, GoodHandleResp)
 
     updator = std::make_unique<MockMetricUpdator>();
     auto bandwidth_updator = updator.get();
-    gpm.metricsTable[9] = {"PCIeRawTxBandwidthGbps", nsm::decodeBandwidth,
+    gpm.metricsTable[8] = {"PCIeRawTxBandwidthGbps", nsm::decodeBandwidth,
                            std::move(updator)};
 
     const double percentage{34.5633};
@@ -139,7 +139,7 @@ TEST(nsmGPMAggregated, GoodHandleResp)
 
     rc = gpm.handleSamples({{3, static_cast<uint8_t>(percentage_data_len),
                              percentage_data.data(), true},
-                            {9, static_cast<uint8_t>(bandwidth_data_len),
+                            {8, static_cast<uint8_t>(bandwidth_data_len),
                              bandwidth_data.data(), true}});
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

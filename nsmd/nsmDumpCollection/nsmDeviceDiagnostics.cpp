@@ -78,8 +78,9 @@ void NsmDeviceDiagnostics::getDebugInfo(
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
     recordHandle(recHandle);
 
-    auto rc = encode_get_device_diagnostics_req(static_cast<uint8_t>(recHandle),
-                                                0, requestMsg);
+    auto rc = encode_get_device_diagnostics_req(
+        0, static_cast<uint8_t>(recHandle), requestMsg);
+
     if (rc == NSM_SW_SUCCESS)
     {
         getDiagnosticsAsyncHandler(request).detach();
@@ -121,7 +122,7 @@ requester::Coroutine NsmDeviceDiagnostics::getDiagnosticsAsyncHandler(
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     uint16_t segDataSize = 0;
-    uint8_t nextRecHandle;
+    uint8_t nextRecHandle = 0;
 
     auto rc = decode_get_device_diagnostics_resp(
         responseMsg.get(), responseLen, &cc, &reasonCode, segData.data(),
