@@ -43,6 +43,7 @@ using RequesterHandler = requester::Handler<requester::Request>;
 
 using Active = bool;
 using DeviceType = uint8_t;
+using DeviceRole = uint8_t;
 using InstanceNumber = uint8_t;
 using DiscoveredEIDs =
     std::map<mctp_eid_t,
@@ -124,17 +125,17 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         updateFruDeviceIntf(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
 
     std::optional<mctp_eid_t> searchEID(uint8_t deviceType,
-                                        uint8_t instanceNumber);
+                                        uint8_t instanceNumber,
+                                        uint8_t deviceRole);
 
-    std::map<DeviceType, std::vector<uint64_t>>
-        mapInstanceNumberToInstanceNumber;
-    std::map<DeviceType, std::vector<std::string>> mapUuidToInstanceNumber;
-    std::map<DeviceType, std::vector<uint64_t>> mapEidToInstanceNumber;
-    std::map<DeviceType, std::map<uint8_t, StateChangeLogger>>
+    std::map<uint16_t, std::vector<uint64_t>> mapInstanceNumberToInstanceNumber;
+    std::map<uint16_t, std::vector<std::string>> mapUuidToInstanceNumber;
+    std::map<uint16_t, std::vector<uint64_t>> mapEidToInstanceNumber;
+    std::map<uint16_t, std::map<uint8_t, StateChangeLogger>>
         mapInstanceNumberToLogger;
-    std::map<DeviceType, std::map<std::string, StateChangeLogger>>
+    std::map<uint16_t, std::map<std::string, StateChangeLogger>>
         mapUuidToLogger;
-    std::map<DeviceType, std::map<uint8_t, StateChangeLogger>> mapEidToLogger;
+    std::map<uint16_t, std::map<uint8_t, StateChangeLogger>> mapEidToLogger;
     StateChangeLogger getInventoryLogger;
 
     requester::Coroutine
@@ -177,7 +178,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
                                      uint8_t& deviceInstance);
 
     uint8_t remapInstanceNumber(uint8_t instanceNumber, uint8_t deviceType,
-                                uuid_t& uuid, mctp_eid_t eid);
+                                uint8_t deviceRole, uuid_t& uuid,
+                                mctp_eid_t eid);
 
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;

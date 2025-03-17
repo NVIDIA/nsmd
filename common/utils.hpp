@@ -656,4 +656,27 @@ std::string typeName()
     std::free(demangled);
     return type;
 }
+
+/**
+ * @brief Combines device type and role into a single identifier
+ * High byte (bits 15-8): Device Role
+ * Low byte (bits 7-0): Device Type
+ *
+ * @param deviceType The NSM device type (NsmDeviceIdentification)
+ * @param deviceRole The role specific to the device type
+ * @return uint16_t Combined device type and role
+ */
+uint16_t combineDeviceTypeAndRole(uint8_t deviceType, uint8_t deviceRole);
+
+/**
+ * @brief Extracts device type and role from combined identifier
+ * High byte (bits 15-8): Device Role
+ * Low byte (bits 7-0): Device Type
+ *
+ * @param combined The combined device type and role value
+ * @param deviceType Pointer to store the extracted device type (low byte)
+ * @param deviceRole Pointer to store the extracted device role (high byte)
+ */
+void getDeviceTypeAndRole(uint16_t combined, uint8_t* deviceType,
+                          uint8_t* deviceRole);
 } // namespace utils

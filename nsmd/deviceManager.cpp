@@ -322,6 +322,7 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
                              {NSM_DEV_ID_EROT,
                               {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
                                MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_MCTP_BRIDGE, {SERIAL_NUMBER}},
                              {NSM_DEV_ID_UNKNOWN, {}}};
 
     // Fetch property IDs based on deviceType; fallback to an empty list if not
@@ -628,16 +629,15 @@ requester::Coroutine
 {
     // get inventory information from device
     InventoryProperties properties{};
+    uint8_t rc = NSM_SW_SUCCESS;
     if (nsmDevice->isCommandSupported(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                                       NSM_GET_INVENTORY_INFORMATION))
     {
-        auto rc = co_await getFRU(eid, properties, nsmDevice->getDeviceType());
+        rc = co_await getFRU(eid, properties, nsmDevice->getDeviceType());
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc,
                        "EID", eid);
-            // coverity[missing_return]
-            co_return rc;
         }
     }
 
@@ -695,24 +695,28 @@ requester::Coroutine
     nsmDevice->fruDeviceIntf->initialize();
 
     // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
+    co_return rc;
 }
 
 uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
-                                           uint8_t deviceType, uuid_t& uuid,
+                                           uint8_t deviceType,
+                                           uint8_t deviceRole, uuid_t& uuid,
                                            mctp_eid_t eid)
 {
+    uint16_t deviceTypeAndRole = utils::combineDeviceTypeAndRole(deviceType,
+                                                                 deviceRole);
     // remapping instanceNumber if needed.
-    if (mapInstanceNumberToInstanceNumber[deviceType].size() > 0)
+    if (mapInstanceNumberToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
-        auto& table = mapInstanceNumberToInstanceNumber[deviceType];
+        auto& table = mapInstanceNumberToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), instanceNumber);
-        if (mapInstanceNumberToLogger[deviceType][instanceNumber].shouldLog(
-                "DeviceManager::remapInstanceNumber", it == table.end()))
+        if (mapInstanceNumberToLogger[deviceTypeAndRole][instanceNumber]
+                .shouldLog("DeviceManager::remapInstanceNumber",
+                           it == table.end()))
         {
             lg2::warning(
-                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE}",
-                "INST", instanceNumber, "TYPE", deviceType);
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} and DeviceRole:{ROLE}",
+                "INST", instanceNumber, "TYPE", deviceType, "ROLE", deviceRole);
         }
         if (it != table.end())
         {
@@ -723,16 +727,17 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
             }
         }
     }
-    else if (mapUuidToInstanceNumber[deviceType].size() > 0)
+    else if (mapUuidToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
-        auto& table = mapUuidToInstanceNumber[deviceType];
+        auto& table = mapUuidToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), uuid);
-        if (mapUuidToLogger[deviceType][uuid].shouldLog(
+        if (mapUuidToLogger[deviceTypeAndRole][uuid].shouldLog(
                 "DeviceManager::remapInstanceNumber", it == table.end()))
         {
             lg2::warning(
-                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by uuid:{UUID}",
-                "INST", instanceNumber, "TYPE", deviceType, "UUID", uuid);
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} and DeviceRole:{ROLE} by uuid:{UUID}",
+                "INST", instanceNumber, "TYPE", deviceType, "ROLE", deviceRole,
+                "UUID", uuid);
         }
         if (it != table.end())
         {
@@ -743,16 +748,17 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
             }
         }
     }
-    else if (mapEidToInstanceNumber[deviceType].size() > 0)
+    else if (mapEidToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
-        auto& table = mapEidToInstanceNumber[deviceType];
+        auto& table = mapEidToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), eid);
-        if (mapEidToLogger[deviceType][eid].shouldLog(
+        if (mapEidToLogger[deviceTypeAndRole][eid].shouldLog(
                 "DeviceManager::remapInstanceNumber", it == table.end()))
         {
             lg2::warning(
-                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} by eid:{EID}",
-                "INST", instanceNumber, "TYPE", deviceType, "EID", eid);
+                "remapInstanceNumber: failed to remap instanceID:{INST} for DeviceType:{TYPE} and DeviceRole:{ROLE} by eid:{EID}",
+                "INST", instanceNumber, "TYPE", deviceType, "ROLE", deviceRole,
+                "EID", eid);
         }
         if (it != table.end())
         {
@@ -768,7 +774,8 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
 
 std::optional<mctp_eid_t>
     DeviceManager::searchEID(uint8_t nsmDeviceType,
-                             uint8_t nsmDeviceIntanceNumber)
+                             uint8_t nsmDeviceIntanceNumber,
+                             uint8_t nsmDeviceRole)
 {
     int matchedCnt = 0;
     mctp_eid_t matchedEid = 0;
@@ -777,8 +784,8 @@ std::optional<mctp_eid_t>
     for (auto& [eid, value] : discoveredEIDs)
     {
         auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active] = value;
-        auto instanceNumber = remapInstanceNumber(mctpDeviceInstanceNumber,
-                                                  nsmDeviceType, uuid, eid);
+        auto instanceNumber = remapInstanceNumber(
+            mctpDeviceInstanceNumber, nsmDeviceType, nsmDeviceRole, uuid, eid);
 
         if (nsmDeviceType == mctpDeviceType &&
             nsmDeviceIntanceNumber == instanceNumber && matchedUuid != uuid)

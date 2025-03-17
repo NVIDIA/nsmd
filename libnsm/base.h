@@ -335,8 +335,24 @@ typedef enum {
 	NSM_DEV_ID_PCIE_BRIDGE = 2,
 	NSM_DEV_ID_BASEBOARD = 3,
 	NSM_DEV_ID_EROT = 4,
+	NSM_DEV_ID_MCTP_BRIDGE = 5,
 	NSM_DEV_ID_UNKNOWN = 0xff,
 } NsmDeviceIdentification;
+
+// Define the device roles
+#define NSM_DEV_ROLE_RESERVED 0x00
+
+typedef enum {
+	NSM_PCIE_BRIDGE_DEV_ROLE_CX7 = 1,
+	NSM_PCIE_BRIDGE_DEV_ROLE_CX8 = 2,
+	NSM_PCIE_BRIDGE_DEV_ROLE_UNKNOWN = 0xff,
+} NsmPCIEBridgeDeviceRole;
+
+typedef enum {
+	NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA = 1,
+	NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA = 2,
+	NSM_MCTP_BRIDGE_DEV_ROLE_UNKNOWN = 0xff,
+} NsmMCTPBridgeDeviceRole;
 
 // Enum for Data Format (data type for bucket info)
 typedef enum {

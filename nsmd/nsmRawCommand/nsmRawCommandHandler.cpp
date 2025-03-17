@@ -309,7 +309,7 @@ sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
     uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
     uint8_t messageType, uint8_t commandCode, sdbusplus::message::unix_fd fd)
 {
-    if (deviceType > NSM_DEV_ID_EROT || messageType > NSM_TYPE_FIRMWARE)
+    if (deviceType > NSM_DEV_ID_MCTP_BRIDGE || messageType > NSM_TYPE_FIRMWARE)
     {
         throw sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument();
     }

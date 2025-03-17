@@ -375,6 +375,8 @@ std::string getDeviceNameFromDeviceType(const uint8_t deviceType)
             return "BASEBOARD";
         case 4:
             return "EROT";
+        case 5:
+            return "MCTPBRIDGE";
         default:
             return "NSM_DEV_ID_UNKNOWN";
     }
@@ -783,5 +785,18 @@ double int64ToDoubleSafeConvert(int64_t value)
     }
 
     return static_cast<double>(value);
+}
+
+uint16_t combineDeviceTypeAndRole(uint8_t deviceType, uint8_t deviceRole)
+{
+    return (uint16_t)((deviceRole << 8) |
+                      deviceType); // Role in high byte, Type in low byte
+}
+
+void getDeviceTypeAndRole(uint16_t combined, uint8_t* deviceType,
+                          uint8_t* deviceRole)
+{
+    *deviceType = (uint8_t)(combined & 0xFF); // Type is in low byte
+    *deviceRole = (uint8_t)(combined >> 8);   // Role is in high byte
 }
 } // namespace utils

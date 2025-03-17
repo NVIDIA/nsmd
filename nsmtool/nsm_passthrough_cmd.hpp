@@ -23,6 +23,7 @@ enum NSMDevID
     NSM_DEV_ID_SWITCH = 1,
     NSM_DEV_ID_PCIE_BRIDGE = 2,
     NSM_DEV_ID_BASEBOARD = 3,
+    NSM_DEV_ID_MCTP_BRIDGE = 5,
 };
 
 class SendNSMCommand
