@@ -848,6 +848,15 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
                    NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER}},
              }},
+            {NSM_DEV_ID_MCTP_BRIDGE,
+             {
+                 {0, {0, 1, 2, 9, 10}},
+                 {1, {}},
+                 {2, {}},
+                 {3, {}},
+                 {4, {}},
+                 {5, {}},
+             }},
         };
 
     bitfield8_t commandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE] = {0};

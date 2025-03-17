@@ -37,6 +37,7 @@ requester::Coroutine
     DeviceManager& deviceManager = DeviceManager::getInstance();
 
     uint8_t deviceType = NSM_DEV_ID_UNKNOWN;
+    uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
     if (name == "GPUMapping")
     {
         deviceType = NSM_DEV_ID_GPU;
@@ -57,6 +58,30 @@ requester::Coroutine
     {
         deviceType = NSM_DEV_ID_EROT;
     }
+    else if (name == "SMAMapping")
+    {
+        deviceType = NSM_DEV_ID_MCTP_BRIDGE;
+    }
+    else if (name == "SXMSMAMapping")
+    {
+        deviceType = NSM_DEV_ID_MCTP_BRIDGE;
+        deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_SXM_SMA;
+    }
+    else if (name == "CXMSMAMapping")
+    {
+        deviceType = NSM_DEV_ID_MCTP_BRIDGE;
+        deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA;
+    }
+    else if (name == "CX7PCIEBridgeMapping")
+    {
+        deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+        deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX7;
+    }
+    else if (name == "CX8PCIEBridgeMapping")
+    {
+        deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+        deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX8;
+    }
     if (deviceType == NSM_DEV_ID_UNKNOWN)
     {
         lg2::error(
@@ -65,6 +90,9 @@ requester::Coroutine
         co_return NSM_ERROR;
     }
 
+    uint16_t deviceTypeAndRole = utils::combineDeviceTypeAndRole(deviceType,
+                                                                 deviceRole);
+
     if (type == "NSM_GetInstanceIDByDeviceInstanceID")
     {
         auto mappingArray =
@@ -72,7 +100,7 @@ requester::Coroutine
                 objPath.c_str(), "MappingArray", interface.c_str());
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapInstanceNumberToInstanceNumber[deviceType] =
+            deviceManager.mapInstanceNumberToInstanceNumber[deviceTypeAndRole] =
                 mappingArray;
         }
     }
@@ -83,7 +111,8 @@ requester::Coroutine
                 objPath.c_str(), "MappingArray", interface.c_str());
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapUuidToInstanceNumber[deviceType] = mappingArray;
+            deviceManager.mapUuidToInstanceNumber[deviceTypeAndRole] =
+                mappingArray;
         }
     }
     else if (type == "NSM_GetInstanceIDByDeviceEID")
@@ -93,7 +122,8 @@ requester::Coroutine
                 objPath.c_str(), "MappingArray", interface.c_str());
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapEidToInstanceNumber[deviceType] = mappingArray;
+            deviceManager.mapEidToInstanceNumber[deviceTypeAndRole] =
+                mappingArray;
         }
     }
     co_return NSM_SUCCESS;

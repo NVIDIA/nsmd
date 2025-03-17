@@ -229,6 +229,8 @@ void SendNSMCommand::getDeviceType(
             targetTypeId = NSM_DEV_ID_PCIE_BRIDGE;
         else if (targetType == "Baseboard")
             targetTypeId = NSM_DEV_ID_BASEBOARD;
+        else if (targetType == "MCTPBridge")
+            targetTypeId = NSM_DEV_ID_MCTP_BRIDGE;
         else
         {
             return;

@@ -252,6 +252,9 @@ class QueryDeviceIdentification : public CommandInterface
             case NSM_DEV_ID_EROT:
                 result["Device Identification"] = "ERoT";
                 break;
+            case NSM_DEV_ID_MCTP_BRIDGE:
+                result["Device Identification"] = "MCTP Bridge";
+                break;
             case NSM_DEV_ID_UNKNOWN:
                 result["Device Identification"] = "Unknown";
                 break;

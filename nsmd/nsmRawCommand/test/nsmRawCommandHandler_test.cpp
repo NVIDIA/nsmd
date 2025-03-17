@@ -81,7 +81,7 @@ TEST_F(NsmRawCommandHandlerTest, BadTestSendRequest)
 {
     EXPECT_THROW(
         NsmRawCommandHandler::getInstance().sendRequest(
-            NSM_DEV_ID_EROT + 1, 0, false, 0, 0, unix_fd(fd)),
+            NSM_DEV_ID_MCTP_BRIDGE + 1, 0, false, 0, 0, unix_fd(fd)),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
     EXPECT_THROW(
         NsmRawCommandHandler::getInstance().sendRequest(

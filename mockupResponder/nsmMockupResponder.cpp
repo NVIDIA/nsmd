@@ -41,7 +41,7 @@ void optionUsage(void)
         << " [--verbose] - would enable verbosity\n"
         << " [--eid <EID>] - assign EID to mockup responder\n"
         << " [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]\n"
-        << " [--device <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge and Baseboard]\n";
+        << " [--device <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge, Baseboard, EROT and MCTPBridge]\n";
 }
 
 int main(int argc, char** argv)
@@ -101,6 +101,10 @@ int main(int argc, char** argv)
                 else if (boost::iequals(device, "EROT"))
                 {
                     deviceType = NSM_DEV_ID_EROT;
+                }
+                else if (boost::iequals(device, "MCTPBridge"))
+                {
+                    deviceType = NSM_DEV_ID_MCTP_BRIDGE;
                 }
                 else
                 {

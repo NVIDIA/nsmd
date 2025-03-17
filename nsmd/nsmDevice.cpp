@@ -46,14 +46,15 @@ std::shared_ptr<NsmNumericAggregator>
     return aggregator;
 }
 
-int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber)
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
+                    uint8_t& deviceRole)
 {
     int n1 = -1;
     int n2 = -1;
 
     std::sscanf(uuid.c_str(), "STATIC:%d:%d", &n1, &n2);
 
-    if (n1 < 0 || n1 > 0xff)
+    if (n1 < 0 || n1 > 0xffff)
     {
         return -1;
     }
@@ -62,21 +63,23 @@ int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber)
         return -2;
     }
 
-    deviceType = n1;
+    utils::getDeviceTypeAndRole(n1, &deviceType, &deviceRole);
     instanceNumber = n2;
     return 0;
 }
 
 std::shared_ptr<NsmDevice>
     findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
-                                  uint8_t deviceType, uint8_t instanceNumber)
+                                  uint8_t deviceType, uint8_t instanceNumber,
+                                  uint8_t deviceRole)
 {
     std::shared_ptr<NsmDevice> ret{};
 
     for (auto nsmDevice : nsmDevices)
     {
         if (nsmDevice->getDeviceType() == deviceType &&
-            nsmDevice->getInstanceNumber() == instanceNumber)
+            nsmDevice->getInstanceNumber() == instanceNumber &&
+            nsmDevice->getDeviceRole() == deviceRole)
         {
             ret = nsmDevice;
             break;

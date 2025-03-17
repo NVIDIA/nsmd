@@ -37,7 +37,7 @@ Options:
  [--verbose] - would enable verbosity
  [--eid <EID>] - assign EID to mockup responder
  [--instanceId <InstanceID>] - assign instanceId to mockup responder [default - 0]
- [--deviceType <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge and Baseboard]
+ [--deviceType <DeviceType>] - assign DeviceType to mockup responder [GPU, Switch, PCIeBridge, Baseboard, ERot and MCTPBridge]
 root@umbriel:~# 
 
 ```

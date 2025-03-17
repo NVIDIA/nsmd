@@ -68,13 +68,14 @@ class NsmDevice : public StateChangeLogger
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
     {}
 
-    NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
+    NsmDevice(uint8_t deviceType, uint8_t instanceNumber,
+              uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
         isDeviceActive(false),
         longRunningEventHandler(registerLongRunningEventHandler()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
-        instanceNumber(instanceNumber)
+        instanceNumber(instanceNumber), deviceRole(deviceRole)
     {}
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
@@ -256,6 +257,12 @@ class NsmDevice : public StateChangeLogger
         return deviceType;
     }
 
+    /** @brief getter of deviceRole */
+    uint8_t getDeviceRole()
+    {
+        return deviceRole;
+    }
+
     /** @brief getter of instanceNumber */
     uint8_t getInstanceNumber()
     {
@@ -323,6 +330,7 @@ class NsmDevice : public StateChangeLogger
     uint8_t eventMode;
     uint8_t deviceType = 0;
     uint8_t instanceNumber = 0;
+    uint8_t deviceRole = 0;
     NsmLongRunningEventHandler& registerLongRunningEventHandler();
     common::CoroutineSemaphore
         longRunningSemaphore; // Semaphore for synchronizing long running
@@ -347,8 +355,10 @@ std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
 
 std::shared_ptr<NsmDevice>
     findNsmDeviceByIdentification(NsmDeviceTable& nsmDevices,
-                                  uint8_t deviceType, uint8_t instanceNumber);
+                                  uint8_t deviceType, uint8_t instanceNumber,
+                                  uint8_t deviceRole);
 
-int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber);
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
+                    uint8_t& deviceRole);
 
 } // namespace nsm

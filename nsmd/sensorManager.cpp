@@ -657,7 +657,8 @@ requester::Coroutine
             // search EID
             DeviceManager& deviceManager = DeviceManager::getInstance();
             auto foundEID = deviceManager.searchEID(
-                nsmDevice->getDeviceType(), nsmDevice->getInstanceNumber());
+                nsmDevice->getDeviceType(), nsmDevice->getInstanceNumber(),
+                nsmDevice->getDeviceRole());
             if (foundEID.has_value())
             {
                 lg2::error(
@@ -908,8 +909,8 @@ requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uint8_t deviceType,
                                                        uint8_t instanceNumber)
 {
-    return findNsmDeviceByIdentification(nsmDevices, deviceType,
-                                         instanceNumber);
+    return findNsmDeviceByIdentification(nsmDevices, deviceType, instanceNumber,
+                                         NSM_DEV_ROLE_RESERVED);
 }
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 {
@@ -919,7 +920,8 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
         // check if the uuid is in static inventory format.
         uint8_t deviceType = 0xff;
         uint8_t instanceNumber = 0xff;
-        if (parseStaticUuid(uuid, deviceType, instanceNumber) < 0)
+        uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
+        if (parseStaticUuid(uuid, deviceType, instanceNumber, deviceRole) < 0)
         {
             throw std::runtime_error(
                 "SensorManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d), UUID=" +
@@ -927,11 +929,12 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
         }
 
         nsmDevice = findNsmDeviceByIdentification(nsmDevices, deviceType,
-                                                  instanceNumber);
+                                                  instanceNumber, deviceRole);
         if (!nsmDevice)
         {
             // create nsmDevice
-            nsmDevice = std::make_shared<NsmDevice>(deviceType, instanceNumber);
+            nsmDevice = std::make_shared<NsmDevice>(deviceType, instanceNumber,
+                                                    deviceRole);
             nsmDevices.emplace_back(nsmDevice);
             nsmDevice->isDeviceActive = false;
         }
