@@ -35,21 +35,20 @@
 namespace nsm
 {
 
+// Initialize static counter
+std::atomic<uint32_t> NsmGraceSpiObject::interfaceCounter{0};
+
 NsmGraceSpiObject::NsmGraceSpiObject(sdbusplus::bus::bus& bus,
                                      const std::string& name,
                                      const std::string& inventoryPath,
                                      const std::string& type,
                                      const uuid_t& uuid) :
     NsmObject(name, type),
-    SpiIntf(bus, (inventoryPath + name).c_str()), uuid(uuid), opProgress(NULL)
+    SpiIntf(bus, (inventoryPath + name).c_str()), uuid(uuid)
 {
     lg2::debug("NsmGraceSpiObject: {NAME}", "NAME", name.c_str());
-
     objPath = inventoryPath + name;
-
     fdName = name + "_read_contents";
-    sdbusplus::message::unix_fd unixFd(0);
-    spiReadFd(unixFd, true);
 }
 
 sdbusplus::message::object_path NsmGraceSpiObject::eraseSpi()
@@ -64,7 +63,9 @@ sdbusplus::message::object_path NsmGraceSpiObject::eraseSpi()
 
     eraseSpiAsyncHandler().detach();
 
-    return sdbusplus::message::object_path(NSM_SPI_PROGRESS_INTERFACE);
+    return sdbusplus::message::object_path(
+        std::string(NSM_SPI_PROGRESS_INTERFACE) + "_" +
+        std::to_string(interfaceCounter - 1));
 }
 
 sdbusplus::message::object_path NsmGraceSpiObject::readSpi()
@@ -77,32 +78,36 @@ sdbusplus::message::object_path NsmGraceSpiObject::readSpi()
         throw Common::Error::Unavailable();
     }
 
-    if (spiReadFd() != 0)
+    // Close any existing file descriptor before starting new operation
+    if (auto currentProgress = getCurrentProgress())
     {
-        close(spiReadFd());
-        sdbusplus::message::unix_fd unixFd(0);
-        spiReadFd(unixFd, true);
+        try
+        {
+            auto currentFd = currentProgress->spiReadFd();
+            if (currentFd.fd >= 0)
+            {
+                close(currentFd.fd);
+            }
+            // Reset the file descriptor
+            currentProgress->spiReadFd(sdbusplus::message::unix_fd(-1));
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error("Failed to clean up previous file descriptor: {ERROR}",
+                       "ERROR", e.what());
+        }
     }
 
     readSpiAsyncHandler().detach();
 
-    return sdbusplus::message::object_path(NSM_SPI_PROGRESS_INTERFACE);
+    return sdbusplus::message::object_path(
+        std::string(NSM_SPI_PROGRESS_INTERFACE) + "_" +
+        std::to_string(interfaceCounter - 1));
 }
 
 uint8_t NsmGraceSpiObject::startSpiOperation()
 {
     lg2::debug("NsmGraceSpiObject: Starting SPI Operation");
-    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
-
-    getChassisPowerState(powerState);
-    if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
-    {
-        lg2::info(
-            "NsmGraceSpiObject startSpiOperation: host not off. current power state:{STATE}",
-            "STATE", powerState);
-        return NSM_SW_ERROR;
-    }
-
     if (cmdInProgress)
     {
         lg2::error("NsmGraceSpiObject: A command is already in progress");
@@ -110,20 +115,38 @@ uint8_t NsmGraceSpiObject::startSpiOperation()
     }
     cmdInProgress = true;
 
-    if (opProgress != NULL)
-    {
-        lg2::debug("NsmGraceSpiObject: Clearing prior operation status");
-        delete opProgress;
-        opProgress = NULL;
-    }
-    opProgress = new SpiProgress(get_bus(), NSM_SPI_PROGRESS_INTERFACE);
+    // Create unique interface path with incrementing counter.
+    // Counter lifecycle:
+    // 1. Counter value N is used to create interface
+    // "/xyz/openbmc_project/status/SPI_Operation_<N>"
+    // 2. Counter is incremented to N+1 via post-increment (counter++)
+    // 3. When referencing this interface in eraseSpi()/readSpi(), we use
+    // (counter-1)
+    //    to get back to value N that was used here
+    std::string progressInterface = std::string(NSM_SPI_PROGRESS_INTERFACE) +
+                                    "_" + std::to_string(interfaceCounter++);
 
-    opProgress->startTime(
+    // Create new progress object and add to history
+    auto newProgress = std::make_unique<SpiProgress>(get_bus(),
+                                                     progressInterface.c_str());
+
+    // Remove oldest entry if we've reached max size
+    if (progressHistory.size() >= MAX_PROGRESS_HISTORY)
+    {
+        progressHistory.pop_front();
+    }
+
+    // Initialize the new progress object
+    newProgress->startTime(
         std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch())
             .count());
-    opProgress->status(SpiProgress::OperationStatus::InProgress);
-    opProgress->progress(0);
+    newProgress->status(SpiProgress::OperationStatus::InProgress);
+    newProgress->progress(0);
+    newProgress->spiReadFd(sdbusplus::message::unix_fd(-1));
+
+    // Add to history
+    progressHistory.push_back(std::move(newProgress));
 
     return NSM_SW_SUCCESS;
 }
@@ -133,38 +156,16 @@ void NsmGraceSpiObject::finishSpiOperation(
 {
     lg2::debug("NsmGraceSpiObject: Finishing SPI Operation");
 
-    opProgress->status(opStatus);
-    opProgress->progress(100);
-    opProgress->completedTime(
-        std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now().time_since_epoch())
-            .count());
+    if (auto currentProgress = getCurrentProgress())
+    {
+        currentProgress->status(opStatus);
+        currentProgress->progress(100);
+        currentProgress->completedTime(
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
+    }
     cmdInProgress = false;
-}
-
-void NsmGraceSpiObject::getChassisPowerState(std::string& powerState)
-{
-    auto& asioConnection = utils::DBusHandler::getAsioConnection();
-    asioConnection->async_method_call(
-        [&powerState](boost::system::error_code ec, PropertyValue value) {
-        if (ec)
-        {
-            lg2::error("Error when get chassis current power state. ec:{EC}",
-                       "EC", ec.message());
-        }
-        else
-        {
-            if (const auto* propertyStringPtr =
-                    std::get_if<std::string>(&value))
-            {
-                powerState = *propertyStringPtr;
-            }
-        }
-    },
-        "xyz.openbmc_project.State.Chassis",
-        "/xyz/openbmc_project/state/chassis0",
-        "org.freedesktop.DBus.Properties", "Get",
-        "xyz.openbmc_project.State.Chassis", "CurrentPowerState");
 }
 
 requester::Coroutine
@@ -850,7 +851,6 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
-    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
 
     auto rc = co_await initSpi(manager, eid);
 
@@ -862,15 +862,6 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SECTORS; i++)
     {
-        getChassisPowerState(powerState);
-        if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
-        {
-            lg2::info(
-                "NsmGraceSpiObject EraseSpi: host not off. current power state:{STATE}",
-                "STATE", powerState);
-            finishSpiOperation(SpiProgress::OperationStatus::Failed);
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
-        }
         rc = co_await setSpiWriteEnable(manager, eid);
 
         if (rc != NSM_SW_SUCCESS)
@@ -889,14 +880,14 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 
         // Update progress
         uint8_t percentComplete =
-            (uint8_t)(((float)i / (float)SPI_SECTORS) * 100);
+            (uint8_t)(((float)i / ((float)SPI_SECTORS)) * 100);
 
         lg2::info("NsmGraceSpiObject Erase percent complete: {COMP}", "COMP",
                   percentComplete);
 
-        if (opProgress != NULL)
+        if (auto currentProgress = getCurrentProgress())
         {
-            opProgress->progress(percentComplete);
+            currentProgress->progress(percentComplete);
         }
     }
 
@@ -909,7 +900,6 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
     SensorManager& manager = SensorManager::getInstance();
     auto device = manager.getNsmDevice(uuid);
     auto eid = manager.getEid(device);
-    std::string powerState = "xyz.openbmc_project.State.Chassis.PowerState.Off";
 
     auto rc = co_await initSpi(manager, eid);
 
@@ -931,15 +921,6 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SIZE_BYTES; i += SPI_READ_BLOCK_SIZE)
     {
-        getChassisPowerState(powerState);
-        if (powerState != "xyz.openbmc_project.State.Chassis.PowerState.Off")
-        {
-            lg2::info(
-                "NsmGraceSpiObject ReadSpi: host not off. current power state:{STATE}",
-                "STATE", powerState);
-            finishSpiOperation(SpiProgress::OperationStatus::Failed);
-            co_return NSM_SW_ERROR_COMMAND_FAIL;
-        }
         rc = co_await readToCache(manager, eid, i);
 
         if (rc != NSM_SW_SUCCESS)
@@ -958,19 +939,23 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
 
         // Update progress
         uint8_t percentComplete =
-            (uint8_t)(((float)i / (float)SPI_SIZE_BYTES) * 100);
+            (uint8_t)(((float)i / ((float)SPI_SIZE_BYTES)) * 100);
 
         lg2::info("NsmGraceSpiObject Read percent complete: {COMP}", "COMP",
                   percentComplete);
 
-        if (opProgress != NULL)
+        if (auto currentProgress = getCurrentProgress())
         {
-            opProgress->progress(percentComplete);
+            currentProgress->progress(percentComplete);
         }
     }
 
-    sdbusplus::message::unix_fd unixFd(fileDesc);
-    spiReadFd(unixFd, true);
+    // Update the file descriptor in current progress
+    if (auto currentProgress = getCurrentProgress())
+    {
+        sdbusplus::message::unix_fd unixFd(fileDesc);
+        currentProgress->spiReadFd(unixFd);
+    }
 
     finishSpiOperation(SpiProgress::OperationStatus::Completed);
     co_return NSM_SW_SUCCESS;

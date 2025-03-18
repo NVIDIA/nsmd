@@ -29,7 +29,8 @@
 
 #include "nsmObjectFactory.hpp"
 
-#include <com/nvidia/SPI/SPI/server.hpp>
+#include <com/nvidia/GraceSPI/server.hpp>
+#include <com/nvidia/GraceSPIData/server.hpp>
 #include <xyz/openbmc_project/Common/Progress/server.hpp>
 
 namespace nsm
@@ -37,9 +38,11 @@ namespace nsm
 using namespace sdbusplus::com::nvidia;
 using namespace sdbusplus::server;
 
-using SpiIntf = object_t<sdbusplus::com::nvidia::SPI::server::SPI>;
+using SpiIntf = object_t<sdbusplus::com::nvidia::server::GraceSPI>;
 
-using SpiProgress = sdbusplus::server::xyz::openbmc_project::common::Progress;
+using SpiProgress =
+    object_t<sdbusplus::server::xyz::openbmc_project::common::Progress,
+             sdbusplus::com::nvidia::server::GraceSPIData>;
 
 class NsmGraceSpiObject : public NsmObject, public SpiIntf
 {
@@ -54,7 +57,6 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
   private:
     uint8_t startSpiOperation();
     void finishSpiOperation(SpiProgress::OperationStatus opProgress);
-    void getChassisPowerState(std::string& powerState);
 
     requester::Coroutine checkSpiStatus(SensorManager& manager, eid_t eid,
                                         enum nsm_spi_status* status);
@@ -91,7 +93,19 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
     uuid_t uuid;
 
     bool cmdInProgress{false};
-    SpiProgress* opProgress;
+
+    // Fixed-size deque for FIFO behavior of progress objects
+    static const size_t MAX_PROGRESS_HISTORY = 3;
+    std::deque<std::unique_ptr<SpiProgress>> progressHistory;
+
+    // Static counter for unique interface paths
+    static std::atomic<uint32_t> interfaceCounter;
+
+    // Helper to get the current progress object (most recent)
+    SpiProgress* getCurrentProgress()
+    {
+        return progressHistory.empty() ? nullptr : progressHistory.back().get();
+    }
 
     std::string fdName;
 };
