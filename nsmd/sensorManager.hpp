@@ -69,7 +69,8 @@ class SensorManager
     virtual requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen) = 0;
+                       size_t& responseLen,
+                       bool bypassCommandCheck = false) = 0;
 
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual void startPolling(uuid_t uuid) = 0;
@@ -183,7 +184,8 @@ class SensorManagerImpl : public SensorManager
     requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen) override;
+                       size_t& responseLen,
+                       bool bypassCommandCheck = false) override;
     requester::Coroutine
         doPollingTaskLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
     void scanInventory();
