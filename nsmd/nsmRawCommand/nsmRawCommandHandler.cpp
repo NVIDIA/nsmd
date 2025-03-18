@@ -113,8 +113,9 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
+        const bool bypassCommandSupportCheck = true;
         rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+                                             responseLen, bypassCommandSupportCheck);
         uint8_t cc;
         uint16_t reasonCode = 0;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -245,8 +246,9 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
+        const bool bypassCommandSupportCheck = true;
         rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+                                             responseLen, bypassCommandSupportCheck);
 
         uint8_t cc;
         uint16_t reasonCode = 0;

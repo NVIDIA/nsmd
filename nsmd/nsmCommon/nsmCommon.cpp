@@ -22,9 +22,7 @@
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
-#include "log.hpp"
-
-#include <phosphor-logging/lg2.hpp>
+#include "stateChangeLogger.hpp"
 
 #include <optional>
 #include <vector>
@@ -409,17 +407,19 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
     auto localUuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
     if (localUuid)
     {
+        static std::map<eid_t, StateChangeLogger> loggers;
         auto nsmDevice = manager.getNsmDevice(*localUuid);
         if (nsmDevice)
         {
             // Scenario 1:
-            // Handle special case for baseboard/FPGA, where we do not event want to
-            // send command to device 
-            // ref bug Invalid NSM data detected by FPGA in MCTP bridge(4790483)
+            // Handle special case for baseboard/FPGA, where we do not event
+            // want to send command to device ref bug Invalid NSM data detected
+            // by FPGA in MCTP bridge(4790483)
             if (nsmDevice->getDeviceType() == NSM_DEV_ID_BASEBOARD)
             {
-                lg2::info("getDeviceUUID::baseboard/FPGA, using mctp uuid eid={EID}",
-                          "EID", eid);
+                lg2::info(
+                    "getDeviceUUID::baseboard/FPGA, using mctp uuid eid={EID}",
+                    "EID", eid);
                 uuid = nsmDevice->uuid;
                 nsmDevice->deviceUuid = uuid;
                 co_return NSM_SW_SUCCESS;
@@ -435,7 +435,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                 DEFAULT_INSTANCE_ID, DEVICE_GUID, requestPtr);
             if (rc != NSM_SW_SUCCESS)
             {
-                lg2::error(
+                lg2::debug(
                     "getDeviceUUID::encode_get_inventory_information_req failed. eid={EID} rc={RC}",
                     "EID", eid, "RC", rc);
                 co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -448,7 +448,8 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                                                  responseLen);
             if (rc)
             {
-                // Scenario 2: MessageType 3 or Get Inventory is itself not supported e.g. ERot
+                // Scenario 2: MessageType 3 or Get Inventory is itself not
+                // supported e.g. ERot
                 if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
                 {
                     // inside this block means Get Inventory is not supported
@@ -456,8 +457,8 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                     uuid = nsmDevice->uuid;
                     nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
                     lg2::info(
-                    "getDeviceUUID::SendRecvNsmMsg failed with rc not supported, assinging mctp uuid eid={EID} rc={RC}",
-                    "EID", eid, "RC", rc);
+                        "getDeviceUUID::SendRecvNsmMsg failed with rc not supported, assinging mctp uuid eid={EID} rc={RC}",
+                        "EID", eid, "RC", rc);
                     co_return NSM_SW_SUCCESS;
                 }
                 lg2::error(
@@ -476,7 +477,9 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                 responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
                 data.data());
 
-            if (rc != NSM_SW_SUCCESS)
+            if (loggers[eid].shouldLog(
+                    "getDeviceUUID::decode_get_inventory_information_resp",
+                    reason_code, cc, rc))
             {
                 lg2::error(
                     "getDeviceUUID::decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
@@ -496,7 +499,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                 }
                 memcpy(nvu8ArrVal.data(), data.data(), dataSize);
                 uuid = utils::convertUUIDToString(nvu8ArrVal);
-                 if (uuid.empty())
+                if (uuid.empty())
                 {
                     lg2::error(
                         "getDeviceUUID::getInventoryInformation received incorrect GUID for property={PROP} for eid={EID}",
@@ -510,14 +513,17 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                     "EID", eid, "RC", rc);
                 co_return NSM_SW_SUCCESS;
             }
-            // Case 3: Type 3 Get Inventory information is supported but specific arg (DEVICE_GUID) command is not supported
-            // for devices like cx7 which do not support DEVICE_GUID identifier will return NSM_ERR_INVALID_DATA.
+            // Case 3: Type 3 Get Inventory information is supported but
+            // specific arg (DEVICE_GUID) command is not supported for devices
+            // like cx7 which do not support DEVICE_GUID identifier will return
+            // NSM_ERR_INVALID_DATA.
             else if (cc == NSM_ERR_INVALID_DATA)
             {
                 // inside this block means DEVICE_GUID is not supported
                 // so fallback to mctp uuid
-                lg2::info("getDeviceUUID::Got CC value as invalid data, assinging mctp uuid eid={EID} rc={RC}",
-                          "EID", eid, "RC", rc);
+                lg2::info(
+                    "getDeviceUUID::Got CC value as invalid data, assinging mctp uuid eid={EID} rc={RC}",
+                    "EID", eid, "RC", rc);
                 uuid = nsmDevice->uuid;
                 nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
                 co_return NSM_SW_SUCCESS;
