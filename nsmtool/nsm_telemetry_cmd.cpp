@@ -2793,8 +2793,8 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                result["PCIeTXBytes"] = (int)data.PCIeTXBytes;
-                result["PCIeRXBytes"] = (int)data.PCIeRXBytes;
+                result["PCIeTXDwords"] = (uint32_t)data.PCIeTXDwords;
+                result["PCIeRXDwords"] = (uint32_t)data.PCIeRXDwords;
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }

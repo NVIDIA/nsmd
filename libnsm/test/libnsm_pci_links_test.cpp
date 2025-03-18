@@ -748,8 +748,8 @@ TEST(queryScalarGroupTelemetryV1Group5, testGoodEncodeResponse)
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	uint16_t reason_code = ERR_NULL;
 	struct nsm_query_scalar_group_telemetry_group_5 data;
-	data.PCIeTXBytes = 8769000;
-	data.PCIeRXBytes = 876654;
+	data.PCIeTXDwords = 8769000;
+	data.PCIeRXDwords = 876654;
 
 	struct nsm_query_scalar_group_telemetry_group_5 data_test = data;
 	auto rc = encode_query_scalar_group_telemetry_v1_group5_resp(
@@ -769,7 +769,7 @@ TEST(queryScalarGroupTelemetryV1Group5, testGoodEncodeResponse)
 	EXPECT_EQ(NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, resp->hdr.command);
 	EXPECT_EQ(sizeof(nsm_query_scalar_group_telemetry_group_5),
 		  le16toh(resp->hdr.data_size));
-	EXPECT_EQ(data_test.PCIeTXBytes, le32toh(data.PCIeTXBytes));
+	EXPECT_EQ(data_test.PCIeTXDwords, le32toh(data.PCIeTXDwords));
 }
 
 TEST(queryScalarGroupTelemetryV1Group5, testGoodDecodeResponse)
@@ -809,7 +809,7 @@ TEST(queryScalarGroupTelemetryV1Group5, testGoodDecodeResponse)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(cc, NSM_SUCCESS);
 	EXPECT_EQ(data_size, 8);
-	EXPECT_EQ(le32toh(data_test->PCIeRXBytes), data->PCIeRXBytes);
+	EXPECT_EQ(le32toh(data_test->PCIeRXDwords), data->PCIeRXDwords);
 }
 
 TEST(queryScalarGroupTelemetryV1Group5, testBadDecodeResponse)

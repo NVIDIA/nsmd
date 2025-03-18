@@ -33,6 +33,7 @@ extern "C" {
 #define DS_ID_6 6
 
 #define MAX_SUPPORTED_DATA_MASK_LENGTH 1
+#define BYTES_PER_DWORD 4
 
 enum pci_links_command {
 	NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04,
@@ -163,8 +164,8 @@ struct nsm_query_scalar_group_telemetry_v1_group_4_resp {
  *  Structure representing Scalar Group Telemetry Data for Group 5.
  */
 struct nsm_query_scalar_group_telemetry_group_5 {
-	uint32_t PCIeTXBytes;
-	uint32_t PCIeRXBytes;
+	uint32_t PCIeTXDwords;
+	uint32_t PCIeRXDwords;
 } __attribute__((packed));
 
 /** @struct nsm_query_scalar_group_telemetry_v1_group_5_resp

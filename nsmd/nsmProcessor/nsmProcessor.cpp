@@ -953,8 +953,13 @@ void NsmPciGroup5::updateMetricOnSharedMemory()
 void NsmPciGroup5::updateReading(
     const nsm_query_scalar_group_telemetry_group_5& data)
 {
-    processorPerformanceIntf->pcIeRXBytes(data.PCIeRXBytes);
-    processorPerformanceIntf->pcIeTXBytes(data.PCIeTXBytes);
+    uint64_t pcIeRXBytes = static_cast<uint64_t>(data.PCIeRXDwords) *
+                           BYTES_PER_DWORD;
+    uint64_t pcIeTXBytes = static_cast<uint64_t>(data.PCIeTXDwords) *
+                           BYTES_PER_DWORD;
+
+    processorPerformanceIntf->pcIeRXBytes(pcIeRXBytes);
+    processorPerformanceIntf->pcIeTXBytes(pcIeTXBytes);
     updateMetricOnSharedMemory();
 }
 
