@@ -840,7 +840,7 @@ requester::Coroutine
 
 requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen)
+    size_t& responseLen, bool bypassCommandCheck)
 {
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
@@ -872,8 +872,11 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
         co_return NSM_ERROR;
     }
 
-    if (!nsmDevice->isDeviceActive ||
-        !nsmDevice->isCommandSupported(messageType, commandCode))
+    // bypassCommandCheck will be true for raw command only, by default it is
+    // false
+    if (!bypassCommandCheck &&
+        (!nsmDevice->isDeviceActive ||
+         !nsmDevice->isCommandSupported(messageType, commandCode)))
     {
         // coverity[missing_return]
         co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;

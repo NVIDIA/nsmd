@@ -23,6 +23,7 @@
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
+#include "stateChangeLogger.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -400,6 +401,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
     auto localUuid = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
     if (localUuid)
     {
+        static std::map<eid_t, StateChangeLogger> loggers;
         auto nsmDevice = manager.getNsmDevice(*localUuid);
         if (nsmDevice)
         {
@@ -427,7 +429,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                 DEFAULT_INSTANCE_ID, DEVICE_GUID, requestPtr);
             if (rc != NSM_SW_SUCCESS)
             {
-                lg2::error(
+                lg2::debug(
                     "getDeviceUUID::encode_get_inventory_information_req failed. eid={EID} rc={RC}",
                     "EID", eid, "RC", rc);
                 co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -469,7 +471,9 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
                 responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
                 data.data());
 
-            if (rc != NSM_SW_SUCCESS)
+            if (loggers[eid].shouldLog(
+                    "getDeviceUUID::decode_get_inventory_information_resp",
+                    reason_code, cc, rc))
             {
                 lg2::error(
                     "getDeviceUUID::decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
