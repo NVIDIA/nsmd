@@ -940,13 +940,20 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
         }
     }
 
+    int r = lseek(fileDesc, 0, SEEK_SET);
+    if (r < 0)
+    {
+        lg2::error("Seeking file failed {RETURNCODE}", "RETURNCODE", r);
+        finishSpiOperation(SpiProgress::OperationStatus::Failed);
+        co_return rc;
+    }
+
     // Update the file descriptor in current progress
     if (auto currentProgress = getCurrentProgress())
     {
         sdbusplus::message::unix_fd unixFd(fileDesc);
         currentProgress->spiReadFd(unixFd);
     }
-
     finishSpiOperation(SpiProgress::OperationStatus::Completed);
     co_return NSM_SW_SUCCESS;
 }
