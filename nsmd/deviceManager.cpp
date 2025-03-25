@@ -344,6 +344,11 @@ requester::Coroutine
     DeviceManager::updateNsmDevice(std::shared_ptr<NsmDevice> nsmDevice,
                                    uint8_t eid)
 {
+    auto mctpUuid = utils::getUUIDFromEID(eidTable, eid);
+    if (mctpUuid.has_value())
+    {
+        nsmDevice->uuid = *mctpUuid;
+    }
     // Reset messageTypesToCommandCodeMatrix to all false entries
     nsmDevice->messageTypesToCommandCodeMatrix.assign(
         NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false));
