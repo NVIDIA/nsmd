@@ -470,13 +470,6 @@ void SensorManagerImpl::checkAllDevicesReady()
          Second when a particular device is not responding from starting or not
          present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not
          presnt*/
-        
-        lg2::info("Device:: type- {DT} instance- {INST} :: Active: {ACTIVE}, Ready: {READY}, Readiness Check: {CHECK}", 
-                  "DT", nsmDevice->getDeviceType(), 
-                  "INST", nsmDevice->getInstanceNumber(), 
-                  "ACTIVE", nsmDevice->isDeviceActive, 
-                  "READY", nsmDevice->isDeviceReady, 
-                  "CHECK", isReadyForReadinessCheck);
         if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady &&
             isReadyForReadinessCheck)
         {
@@ -935,7 +928,14 @@ std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    return nsmDevice->eid;
+    const auto& uuid = nsmDevice->uuid;
+    auto eid = utils::getEidFromUUID(eidTable, uuid);
+    if (!uuid.empty() &&
+        uuidLogger.shouldLog(uuid, eid == std::numeric_limits<uint8_t>::max()))
+    {
+        LG2_ERROR("EID not Found for UUID={UUID}", "UUID", uuid);
+    }
+    return eid;
 }
 
 } // namespace nsm
