@@ -85,6 +85,11 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             0, // persistent
         },     // errorInjectionMode
         {
+            0, // offset
+            0, // error_injection_id
+            0, // fault_reason_bit_map
+        },     // errorInjectionPayload
+        {
             {NSM_DEV_ID_GPU,
              {
                  {EI_MEMORY_ERRORS, false},
@@ -98,6 +103,10 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
              {
                  {EI_PCI_ERRORS, false},
                  {EI_NVLINK_ERRORS, false},
+             }},
+            {NSM_DEV_ID_MCTP_BRIDGE,
+             {
+                 {EI_FATAL_ERRORS, false},
              }},
         }, // errorInjection
         0, // migMode
@@ -637,6 +646,12 @@ std::optional<Response>
                 case NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1:
                     return getCurrentErrorInjectionTypesV1Handler(request,
                                                                   requestLen);
+                case NSM_GET_ERROR_INJECTION_PAYLOAD:
+                    return getErrorInjectionPayloadHandler(request, requestLen);
+                case NSM_SET_ERROR_INJECTION_PAYLOAD:
+                    return setErrorInjectionPayloadHandler(request, requestLen);
+                case NSM_ACTIVATE_ERROR_INJECTION:
+                    return activateErrorInjectionHandler(request, requestLen);
                 case NSM_GET_RECONFIGURATION_PERMISSIONS_V1:
                     return getReconfigurationPermissionsV1Handler(request,
                                                                   requestLen);
@@ -5692,6 +5707,81 @@ std::optional<std::vector<uint8_t>>
     rc = encode_get_current_error_injection_types_v1_resp(
         requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, &enabledTypes,
         responseMsg);
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getErrorInjectionPayloadHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getErrorInjectionPayloadHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+    uint32_t error_injection_id = 0;
+    auto rc = decode_get_error_injection_payload_req(requestMsg, requestLen,
+                                                     &error_injection_id);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "getErrorInjectionPayloadHandler: decode_get_error_injection_payload_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_error_injection_payload_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_error_injection_payload_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        &state.errorInjectionPayload, responseMsg);
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setErrorInjectionPayloadHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setErrorInjectionPayloadHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+    nsm_error_injection_payload data;
+    auto rc = decode_set_error_injection_payload_req(requestMsg, requestLen,
+                                                     &data);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "setErrorInjectionPayloadHandler: decode_set_error_injection_payload_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    state.errorInjectionPayload = data;
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_set_error_injection_payload_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, responseMsg);
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::activateErrorInjectionHandler(const nsm_msg* requestMsg,
+                                                   size_t requestLen)
+{
+    auto rc = decode_activate_error_injection_payload_req(requestMsg,
+                                                          requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "activateErrorInjectionHandler: decode_activate_error_injection_payload_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_activate_error_injection_payload_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL, responseMsg);
     return response;
 }
 
