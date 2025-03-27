@@ -406,7 +406,15 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getCurrentErrorInjectionTypesV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getErrorInjectionPayloadHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setErrorInjectionPayloadHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        activateErrorInjectionHandler(const nsm_msg* requestMsg,
+                                      size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryTokenParametersHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
@@ -485,6 +493,7 @@ class MockupResponder
                  nsm_reconfiguration_permissions_v1>
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
+        nsm_error_injection_payload errorInjectionPayload;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;

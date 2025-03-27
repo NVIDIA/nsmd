@@ -182,6 +182,132 @@ TEST(getCurrentErrorInjection, testResponse)
 	}
 }
 
+TEST(setErrorInjectionPayload, testEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_error_injection_payload_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	const nsm_error_injection_payload expectedPayload = {0x00, 0x04, 0x01};
+	// good test
+	auto rc = encode_set_error_injection_payload_req(0, &expectedPayload,
+							 request);
+	struct nsm_set_error_injection_payload_req *req =
+	    reinterpret_cast<struct nsm_set_error_injection_payload_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CONFIGURATION, request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_SET_ERROR_INJECTION_PAYLOAD, req->hdr.command);
+	EXPECT_EQ(sizeof(struct nsm_error_injection_payload),
+		  req->hdr.data_size);
+	EXPECT_EQ(expectedPayload.offset, req->data.offset);
+	EXPECT_EQ(expectedPayload.error_injection_id,
+		  req->data.error_injection_id);
+	EXPECT_EQ(expectedPayload.fault_reason_bit_map,
+		  req->data.fault_reason_bit_map);
+	// Bad tests
+	auto rec = encode_set_error_injection_payload_req(0, nullptr, request);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rec);
+	rec = encode_set_error_injection_payload_req(0, &expectedPayload,
+						     nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rec);
+	rec = encode_set_error_injection_payload_req(NSM_INSTANCE_MAX + 1,
+						     &expectedPayload, request);
+	EXPECT_EQ(NSM_SW_ERROR_DATA, rec);
+
+	nsm_set_error_injection_payload_req req_test;
+	testDecodeRequest<nsm_error_injection_payload>(
+	    &decode_set_error_injection_payload_req,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_SET_ERROR_INJECTION_PAYLOAD,
+	    expectedPayload, req_test.data);
+	EXPECT_EQ(expectedPayload.offset, req_test.data.offset);
+	EXPECT_EQ(expectedPayload.error_injection_id,
+		  req_test.data.error_injection_id);
+	EXPECT_EQ(expectedPayload.fault_reason_bit_map,
+		  req_test.data.fault_reason_bit_map);
+}
+
+TEST(setErrorInjectionPayload, testResponse)
+{
+	testEncodeCommonResponse(encode_set_error_injection_payload_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_PAYLOAD);
+
+	testDecodeCommonResponse(&decode_set_error_injection_payload_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_SET_ERROR_INJECTION_PAYLOAD);
+}
+
+TEST(activateErrorInjectionPayload, testRequestResponse)
+{
+	testEncodeCommonRequest(&encode_activate_error_injection_payload_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_ACTIVATE_ERROR_INJECTION);
+	testDecodeCommonRequest(&decode_activate_error_injection_payload_req,
+				NSM_TYPE_DEVICE_CONFIGURATION,
+				NSM_ACTIVATE_ERROR_INJECTION);
+
+	testEncodeCommonResponse(&encode_activate_error_injection_payload_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_ACTIVATE_ERROR_INJECTION);
+	testDecodeCommonResponse(&decode_activate_error_injection_payload_resp,
+				 NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_ACTIVATE_ERROR_INJECTION);
+}
+
+TEST(getErrorInjectionPayload, testRequest)
+{
+	const uint32_t error_injection_id = 0x04;
+	uint32_t temp_id = 0;
+
+	auto encodeGetErrorInjectionPayloadReq =
+	    [&error_injection_id](uint8_t instanceId, const uint32_t *data,
+				  nsm_msg *msg) {
+		    if (data == nullptr) {
+			    return (int)NSM_SW_ERROR_NULL;
+		    }
+		    return encode_get_error_injection_payload_req(instanceId,
+								  *data, msg);
+	    };
+	testEncodeRequest<uint32_t>(
+	    encodeGetErrorInjectionPayloadReq, NSM_TYPE_DEVICE_CONFIGURATION,
+	    NSM_GET_ERROR_INJECTION_PAYLOAD, error_injection_id, temp_id);
+	EXPECT_EQ(error_injection_id, temp_id);
+
+	testDecodeRequest<uint32_t>(&decode_get_error_injection_payload_req,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_ERROR_INJECTION_PAYLOAD,
+				    error_injection_id, temp_id);
+	EXPECT_EQ(error_injection_id, temp_id);
+}
+
+TEST(getErrorInjectionPayload, testResponse)
+{
+	const nsm_error_injection_payload data = {0x00, 0x04, 0x01};
+	nsm_get_error_injection_payload_resp resp;
+	testEncodeResponse<nsm_error_injection_payload>(
+	    &encode_get_error_injection_payload_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_PAYLOAD,
+	    data, resp.data);
+	EXPECT_EQ(data.offset, resp.data.offset);
+	EXPECT_EQ(data.error_injection_id, resp.data.error_injection_id);
+	EXPECT_EQ(data.fault_reason_bit_map, resp.data.fault_reason_bit_map);
+
+	testDecodeResponse<nsm_error_injection_payload>(
+	    &decode_get_error_injection_payload_resp,
+	    NSM_TYPE_DEVICE_CONFIGURATION, NSM_GET_ERROR_INJECTION_PAYLOAD,
+	    data, resp.data);
+	EXPECT_EQ(data.offset, resp.data.offset);
+	EXPECT_EQ(data.error_injection_id, resp.data.error_injection_id);
+	EXPECT_EQ(data.fault_reason_bit_map, resp.data.fault_reason_bit_map);
+}
+
 void testGetFpgaDiagnosticSettingsEncodeRequest(
     fpga_diagnostics_settings_data_index dataIndex)
 {

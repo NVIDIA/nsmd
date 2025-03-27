@@ -21,6 +21,206 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_set_error_injection_payload_req(
+    uint8_t instance_id, const struct nsm_error_injection_payload *data,
+    struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_ERROR_INJECTION_PAYLOAD, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_set_error_injection_payload_req *req =
+		    (struct nsm_set_error_injection_payload_req *)msg->payload;
+		req->hdr.data_size = sizeof(struct nsm_error_injection_payload);
+		req->data.error_injection_id =
+		    htole32(data->error_injection_id);
+		req->data.offset = htole32(data->offset);
+		req->data.fault_reason_bit_map =
+		    htole32(data->fault_reason_bit_map);
+	}
+	return rc;
+}
+
+int decode_set_error_injection_payload_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_error_injection_payload *data)
+{
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_set_error_injection_payload_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_set_error_injection_payload_req *req =
+		    (struct nsm_set_error_injection_payload_req *)msg->payload;
+
+		if (req->hdr.data_size !=
+		    sizeof(struct nsm_error_injection_payload)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		data->error_injection_id =
+		    le32toh(req->data.error_injection_id);
+		data->offset = le32toh(req->data.offset);
+		data->fault_reason_bit_map =
+		    le32toh(req->data.fault_reason_bit_map);
+	}
+	return rc;
+}
+
+int encode_set_error_injection_payload_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_ERROR_INJECTION_PAYLOAD, msg);
+}
+
+int decode_set_error_injection_payload_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
+
+int encode_get_error_injection_payload_req(uint8_t instance_id,
+					   uint32_t error_injection_id,
+					   struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_GET_ERROR_INJECTION_PAYLOAD, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		struct nsm_get_error_injection_payload_req *req =
+		    (struct nsm_get_error_injection_payload_req *)msg->payload;
+		req->hdr.data_size = sizeof(uint32_t);
+		req->error_injection_id = htole32(error_injection_id);
+	}
+	return rc;
+}
+
+int decode_get_error_injection_payload_req(const struct nsm_msg *msg,
+					   size_t msg_len,
+					   uint32_t *error_injection_id)
+{
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (error_injection_id == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_error_injection_payload_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_payload_req *req =
+		    (struct nsm_get_error_injection_payload_req *)msg->payload;
+		if (req->hdr.data_size != sizeof(uint32_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		*error_injection_id = le32toh(req->error_injection_id);
+	}
+	return rc;
+}
+
+int encode_get_error_injection_payload_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_error_injection_payload *data, struct nsm_msg *msg)
+{
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_ERROR_INJECTION_PAYLOAD, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		struct nsm_get_error_injection_payload_resp *resp =
+		    (struct nsm_get_error_injection_payload_resp *)msg->payload;
+		resp->hdr.data_size =
+		    htole16(sizeof(struct nsm_error_injection_payload));
+		resp->data.error_injection_id =
+		    htole32(data->error_injection_id);
+		resp->data.offset = htole32(data->offset);
+		resp->data.fault_reason_bit_map =
+		    htole32(data->fault_reason_bit_map);
+	}
+	return rc;
+}
+
+int decode_get_error_injection_payload_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_error_injection_payload *data)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (data == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_error_injection_payload_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size != sizeof(struct nsm_error_injection_payload)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_error_injection_payload_resp *resp =
+		    (struct nsm_get_error_injection_payload_resp *)msg->payload;
+		data->error_injection_id =
+		    le32toh(resp->data.error_injection_id);
+		data->offset = le32toh(resp->data.offset);
+		data->fault_reason_bit_map =
+		    le32toh(resp->data.fault_reason_bit_map);
+	}
+	return rc;
+}
+
+int encode_activate_error_injection_payload_req(uint8_t instance_id,
+						struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_ACTIVATE_ERROR_INJECTION, msg);
+}
+
+int decode_activate_error_injection_payload_req(const struct nsm_msg *msg,
+						size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_activate_error_injection_payload_resp(uint8_t instance_id,
+						 uint8_t cc,
+						 uint16_t reason_code,
+						 struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_ACTIVATE_ERROR_INJECTION, msg);
+}
+
+int decode_activate_error_injection_payload_resp(const struct nsm_msg *msg,
+						 size_t msg_len, uint8_t *cc,
+						 uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
+
 int encode_set_error_injection_mode_v1_req(uint8_t instance_id,
 					   const uint8_t mode,
 					   struct nsm_msg *msg)
