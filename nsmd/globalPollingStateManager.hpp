@@ -38,7 +38,10 @@ class GlobalPollingStateManager
     {
         for (const auto& device : nsmDevices)
         {
-            if (device->getPollingState() == POLL_PRIORITY)
+            // only active devices are considered for priority polling
+            // if inactive devices are stuck with priority polling state
+            // then it will impact round robin sensor refresh
+            if (device->isDeviceActive && device->getPollingState() == POLL_PRIORITY)
             {
                 return POLL_PRIORITY;
             }

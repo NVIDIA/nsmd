@@ -207,7 +207,9 @@ class NsmDevice
         longRunningSemaphore; // Semaphore for synchronizing long running
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
-    PollingState devicePollingState;
+
+    // init to a known value
+    PollingState devicePollingState = POLL_NON_PRIORITY;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
