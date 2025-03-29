@@ -336,7 +336,7 @@ class NsmDevice : public StateChangeLogger
         longRunningSemaphore; // Semaphore for synchronizing long running
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
-    PollingState devicePollingState;
+    PollingState devicePollingState = POLL_NON_PRIORITY;
 
     /**
      * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority'
