@@ -850,12 +850,22 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {
-                 {0, {0, 1, 2, 9, 10}},
-                 {1, {}},
-                 {2, {}},
-                 {3, {}},
-                 {4, {}},
-                 {5, {}},
+                 {NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                  {
+                      NSM_PING,
+                      NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,
+                      NSM_SUPPORTED_COMMAND_CODES,
+                      NSM_SUPPORTED_EVENT_SOURCES,
+                      NSM_QUERY_DEVICE_IDENTIFICATION,
+                      NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT,
+                  }},
+                 {NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                  {
+                      NSM_GET_TEMPERATURE_READING,
+                      NSM_READ_THERMAL_PARAMETER,
+                      NSM_GET_POWER,
+                      NSM_GET_INVENTORY_INFORMATION,
+                  }},
              }},
         };
 

@@ -668,10 +668,11 @@ requester::Coroutine
                 nsmDevice->getDeviceRole());
             if (foundEID.has_value())
             {
-                lg2::error(
-                    "doPollingTask: found EID:{EID} by searchEID for nsmDevice({DT},{INST})",
+                lg2::info(
+                    "doPollingTask: found EID:{EID} by searchEID for nsmDevice({DT},{INST},{ROLE})",
                     "EID", *foundEID, "DT", nsmDevice->getDeviceType(), "INST",
-                    nsmDevice->getInstanceNumber());
+                    nsmDevice->getInstanceNumber(), "ROLE",
+                    nsmDevice->getDeviceRole());
 
                 nsmDevice->eid = *foundEID;
                 co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
@@ -683,9 +684,10 @@ requester::Coroutine
                 if (!hasFailedToSearchEID)
                 {
                     lg2::error(
-                        "doPollingTask: failed to searchEID for nsmDevice({DT},{INST})",
+                        "doPollingTask: failed to searchEID for nsmDevice({DT},{INST},{ROLE})",
                         "DT", nsmDevice->getDeviceType(), "INST",
-                        nsmDevice->getInstanceNumber());
+                        nsmDevice->getInstanceNumber(), "ROLE",
+                        nsmDevice->getDeviceRole());
                     hasFailedToSearchEID = true;
                 }
             }
