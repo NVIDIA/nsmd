@@ -19,4 +19,3 @@
 #define LTTNG_UST_TRACEPOINT_DEFINE
 
 #include "nsmd-tp.h"
-
