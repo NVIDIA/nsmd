@@ -24,6 +24,8 @@
 #if !defined(_NSM_TP_H) || defined(LTTNG_UST_TRACEPOINT_HEADER_MULTI_READ)
 #define _NSM_TP_H
 
+// clang-format off
+
 #include <lttng/tracepoint.h>
 #include "libnsm/base.h"
 
@@ -120,3 +122,5 @@ LTTNG_UST_TRACEPOINT_EVENT(
 #endif /* _NSM_TP_H */
 
 #include <lttng/tracepoint-event.h>
+
+// clang-format on
