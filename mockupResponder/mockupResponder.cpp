@@ -866,6 +866,10 @@ std::optional<std::vector<uint8_t>>
                       NSM_GET_POWER,
                       NSM_GET_INVENTORY_INFORMATION,
                   }},
+                 {NSM_TYPE_DIAGNOSTIC,
+                  {
+                      NSM_GET_DEVICE_DIAGNOSTICS,
+                  }},
              }},
         };
 
@@ -4857,48 +4861,34 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getDeviceDiagnosticsHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
-    if (verbose)
-    {
-        lg2::info("getDeviceDiagnosticsHandler: request length={LEN}", "LEN",
-                  requestLen);
-    }
-
-    uint8_t segment_id = 0;
+    uint8_t handle = 0;
     auto rc = decode_get_device_diagnostics_req(requestMsg, requestLen,
-                                                &segment_id);
+                                                &handle);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_device_diagnostics_req failed: rc={RC}", "RC",
                    rc);
         return std::nullopt;
     }
-    std::vector<uint8_t> segment_data{
-        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C,
-        0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64, 0x65, 0x76,
-        0x69, 0x63, 0x65, 0x20, 0x64, 0x69, 0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74,
-        0x69, 0x63, 0x73, 0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C,
-        0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68,
-        0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65,
-        0x20, 0x64, 0x69, 0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74, 0x69, 0x63, 0x73,
-        0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20,
-        0x57, 0x6F, 0x72, 0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20,
-        0x69, 0x73, 0x20, 0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x69,
-        0x61, 0x67, 0x6E, 0x6F, 0x73, 0x74, 0x69, 0x63, 0x73, 0x20, 0x69, 0x6E,
-        0x66, 0x6F, 0x00, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72,
-        0x6C, 0x64, 0x2C, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20,
-        0x64, 0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x69, 0x61, 0x67, 0x6E,
-        0x6F, 0x73, 0x74, 0x69, 0x63, 0x73, 0x20, 0x69, 0x6E, 0x66, 0x6F, 0x00};
+    if (verbose)
+    {
+        lg2::info("getDeviceDiagnosticsHandler: request length={LEN}, "
+                  "handle={HANDLE}",
+                  "LEN", requestLen, "HANDLE", handle);
+    }
+    std::string segmentData = "Hello World, this is device diagnostics info";
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
-                                      sizeof(nsm_get_device_diagnostics_resp) +
-                                      segment_data.size() - 1,
-                                  0);
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_device_diagnostics_resp) - 1 +
+                          segmentData.size(),
+                      0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    uint8_t next_segment_id = segment_id + 1;
+    uint16_t reasonCode = ERR_NULL;
+    uint8_t nextHandle =
+        handle == 0 ? 1 : 0xFF; // mockup responder will send only 2 segments
     rc = encode_get_device_diagnostics_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-        (uint8_t*)segment_data.data(), segment_data.size(), next_segment_id,
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
+        (uint8_t*)segmentData.data(), segmentData.size(), nextHandle,
         responseMsg);
     if (rc != NSM_SW_SUCCESS)
     {
@@ -4912,42 +4902,37 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getNetworkDeviceDebugInfoHandler(const nsm_msg* requestMsg,
                                                       size_t requestLen)
 {
-    if (verbose)
-    {
-        lg2::info("getNetworkDeviceDebugInfoHandler: request length={LEN}",
-                  "LEN", requestLen);
-    }
-
-    uint8_t debug_type = 0;
+    uint8_t debugType = 0;
     uint32_t handle = 0;
     auto rc = decode_get_network_device_debug_info_req(requestMsg, requestLen,
-                                                       &debug_type, &handle);
+                                                       &debugType, &handle);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("decode_get_network_device_debug_info_req failed: rc={RC}",
                    "RC", rc);
         return std::nullopt;
     }
+    if (verbose)
+    {
+        lg2::info("getNetworkDeviceDebugInfoHandler: request length={LEN}, "
+                  "debugType={DEBUG_TYPE}, handle={HANDLE}",
+                  "LEN", requestLen, "DEBUG_TYPE", debugType, "HANDLE", handle);
+    }
 
-    // this is some dummy data segment with random size
-    // It says Hello World, this is device debug info data.
-    std::vector<uint8_t> segment_data{
-        0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64,
-        0x2c, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64,
-        0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x64, 0x65, 0x62, 0x75, 0x67,
-        0x20, 0x69, 0x6e, 0x66, 0x6f, 0x20, 0x64, 0x61, 0x74, 0x61, 0x2e};
-    uint16_t reason_code = ERR_NULL;
-    uint32_t nxt_handle = 01;
+    std::string segmentData = "Hello World, this is device debug info data.";
+    uint16_t reasonCode = ERR_NULL;
+    uint32_t nextHandle =
+        handle == 0 ? 1 : 0; // mockup responder will send only 2 segments
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
-                                      NSM_RESPONSE_CONVENTION_LEN +
-                                      segment_data.size() + sizeof(nxt_handle),
-                                  0);
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_network_device_debug_info_resp) - 1 +
+                          segmentData.size(),
+                      0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     rc = encode_get_network_device_debug_info_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
-        (uint8_t*)segment_data.data(), segment_data.size(), nxt_handle,
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode,
+        (uint8_t*)segmentData.data(), segmentData.size(), nextHandle,
         responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
@@ -4996,12 +4981,6 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::getNetworkDeviceLogInfoHandler(const nsm_msg* requestMsg,
                                                     size_t requestLen)
 {
-    if (verbose)
-    {
-        lg2::info("getNetworkDeviceLogInfoHandler: request length={LEN}", "LEN",
-                  requestLen);
-    }
-
     uint32_t handle = 0;
     auto rc = decode_get_network_device_log_info_req(requestMsg, requestLen,
                                                      &handle);
@@ -5011,37 +4990,39 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+    if (verbose)
+    {
+        lg2::info("getNetworkDeviceLogInfoHandler: request length={LEN}, "
+                  "handle={HANDLE}",
+                  "LEN", requestLen, "HANDLE", handle);
+    }
 
     // this is some dummy data segment with random size
     // It says "Hello World, this is device log info data."
-    std::vector<uint8_t> log_data{
-        0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c, 0x64,
-        0x2c, 0x20, 0x74, 0x68, 0x69, 0x73, 0x20, 0x69, 0x73, 0x20, 0x64,
-        0x65, 0x76, 0x69, 0x63, 0x65, 0x20, 0x6c, 0x6f, 0x67, 0x20, 0x69,
-        0x6e, 0x66, 0x6f, 0x20, 0x64, 0x61, 0x74, 0x61, 0x2e};
-    uint16_t reason_code = ERR_NULL;
-    uint32_t nxt_handle = 01;
-    struct nsm_device_log_info_breakdown log_info;
-    log_info.lost_events = 02;
-    log_info.unused = 00;
-    log_info.synced_time = 00;
-    log_info.reserved1 = 00;
-    log_info.reserved2 = 00;
-    log_info.time_high = 100;
-    log_info.time_low = 200;
-    log_info.entry_prefix = 33;
-    log_info.length = (log_data.size() / 4);
-    log_info.entry_suffix = 444;
+    std::string logData = "Hello World, this is device log info data.";
+    uint16_t reasonCode = ERR_NULL;
+    uint32_t nextHandle = 0; // mockup responder will send only 1 log info
+    nsm_device_log_info_breakdown logInfo;
+    logInfo.lost_events = 02;
+    logInfo.unused = 00;
+    logInfo.synced_time = 00;
+    logInfo.reserved1 = 00;
+    logInfo.reserved2 = 00;
+    logInfo.time_high = 100;
+    logInfo.time_low = 200;
+    logInfo.entry_prefix = 33;
+    logInfo.length = (logData.size() / 4);
+    logInfo.entry_suffix = 444;
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
-                                      sizeof(nsm_device_log_info) +
-                                      log_data.size() + sizeof(nxt_handle),
-                                  0);
+    Response response(sizeof(nsm_msg_hdr) +
+                          sizeof(nsm_get_network_device_log_info_resp) - 1 +
+                          logData.size(),
+                      0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     rc = encode_get_network_device_log_info_resp(
-        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, nxt_handle,
-        log_info, (uint8_t*)log_data.data(), log_data.size(), responseMsg);
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reasonCode, nextHandle,
+        logInfo, (uint8_t*)logData.data(), logData.size(), responseMsg);
 
     if (rc != NSM_SW_SUCCESS)
     {
