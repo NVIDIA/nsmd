@@ -20,6 +20,7 @@
 #include "deviceManager.hpp"
 #include "nsmCommon.hpp"
 #include "nsmDevice.hpp"
+#include "nsmDeviceDiagnostics.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -123,6 +124,12 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         lg2::info("PCIeReferenceClockCount is not supported. "
                   "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is disabled.");
 #endif
+        if (device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE)
+        {
+            device->addStaticSensor(std::make_shared<NsmDeviceDiagnostics>(
+                utils::DBusHandler::getBus(), name,
+                chassisInventoryBasePath.string() + "/", type, uuid));
+        }
     }
     else if (type == "NSM_FPGA_Asset")
     {
