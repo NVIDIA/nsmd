@@ -583,20 +583,18 @@ NsmPortMetrics::NsmPortMetrics(
     const std::string& type, const uint8_t deviceType,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath,
-    std::shared_ptr<IBPortIntf> iBPortIntf) :
+    std::shared_ptr<IBPortIntf> iBPortIntf, std::shared_ptr<PortIntf> portIntf,
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf) :
     NsmSensor(portName, type),
-    portName(portName), iBPortIntf(iBPortIntf), portNumber(portNum),
-    typeOfDevice(deviceType), objPath(inventoryObjPath)
+    portName(portName), iBPortIntf(iBPortIntf),
+    portMetricsOem2Intf(portMetricsOem2Intf), portIntf(portIntf),
+    portNumber(portNum), typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
         "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
         "NAME", portName.c_str(), "NUM", portNum, "DT", typeOfDevice);
 
-    portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
     portIntf->portNumber(portNum);
-
-    portMetricsOem2Intf =
-        std::make_unique<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
 
     associationDefinitionsIntf =
         std::make_unique<AssociationDefInft>(bus, inventoryObjPath.c_str());
@@ -1088,6 +1086,324 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
     return cc ? cc : rc;
 }
 
+EthPortTelemetryAggregator::EthPortTelemetryAggregator(
+    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+    const std::string& type, std::string& inventoryObjPath,
+    std::shared_ptr<IBPortIntf> iBPortIntf,
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf) :
+    NsmSensorAggregator(portName, type),
+    portName(portName), portNumber(portNum), objPath(inventoryObjPath),
+    iBPortIntf(iBPortIntf), portMetricsOem2Intf(portMetricsOem2Intf),
+    tagToPropertyMap(initTagToPropertyMap())
+{
+    lg2::debug("EthPortTelemetryAggregator: {NAME} with port number {NUM}",
+               "NAME", portName.c_str(), "NUM", portNum);
+
+    ethPortIntf = std::make_unique<EthPortIntf>(bus, inventoryObjPath.c_str());
+
+    updateMetricOnSharedMemory();
+}
+
+std::optional<std::vector<uint8_t>>
+    EthPortTelemetryAggregator::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_port_telemetry_counter_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+
+    // Use the eth port telemetry counter command
+    auto rc = encode_get_eth_port_telemetry_counter_req(instanceId, portNumber,
+                                                        requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug(
+            "encode_get_eth_port_telemetry_counter_req failed. eid={EID} rc={RC} port={PORT}",
+            "EID", eid, "RC", rc, "PORT", portNumber);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+int EthPortTelemetryAggregator::handleSamples(
+    const std::vector<TelemetrySample>& samples)
+{
+    bool result = NSM_SW_SUCCESS;
+
+    for (const auto& sample : samples)
+    {
+        if (!sample.valid)
+        {
+            // lg2::debug("Ignoring invalid sample tag={TAG}", "TAG",
+            // sample.tag);
+            continue;
+        }
+
+        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            continue;
+        }
+
+        uint32_t counterValue = 0;
+        size_t dataLen = sample.data_len;
+
+        int rc = decode_aggregate_eth_port_telemetry_data(sample.data, &dataLen,
+                                                          &counterValue);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            // lg2::error(
+            //     "Failed to decode Ethernet port telemetry data for tag {TAG}:
+            //     {RC}", "TAG", sample.tag, "RC", rc);
+            result = false;
+            continue;
+        }
+
+        // Update counter value based on this sample's tag
+        updateCounterValues(sample.tag, counterValue);
+    }
+
+    updateMetricOnSharedMemory();
+
+    return result;
+}
+
+void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
+                                                     uint32_t counterValue)
+{
+    auto it = tagToPropertyMap.find(tag);
+    if (it != tagToPropertyMap.end())
+    {
+        const std::string& propName = it->second;
+
+        // Use the property name to update the corresponding property
+        try
+        {
+            if (propName == "RXBytes")
+                portMetricsOem2Intf->rxBytes(counterValue);
+            else if (propName == "TXBytes")
+                portMetricsOem2Intf->txBytes(counterValue);
+            else if (propName == "RXUnicastPkts")
+                portMetricsOem2Intf->rxUnicastPkts(counterValue);
+            else if (propName == "RXMulticastPkts")
+                portMetricsOem2Intf->rxMulticastPkts(counterValue);
+            else if (propName == "RXBroadcastPkts")
+                portMetricsOem2Intf->rxBroadcastPkts(counterValue);
+            else if (propName == "TXUnicastPkts")
+                portMetricsOem2Intf->txUnicastPkts(counterValue);
+            else if (propName == "TXMulticastPkts")
+                portMetricsOem2Intf->txMulticastPkts(counterValue);
+            else if (propName == "TXBroadcastPkts")
+                portMetricsOem2Intf->txBroadcastPkts(counterValue);
+            else if (propName == "RXFCSErrors")
+                ethPortIntf->rxfcsErrors(counterValue);
+            else if (propName == "RXAlignmentErrors")
+                ethPortIntf->rxAlignmentErrors(counterValue);
+            else if (propName == "RXFalseCarrierDetections")
+                ethPortIntf->rxFalseCarrierDetections(counterValue);
+            else if (propName == "RXRuntPkts")
+                ethPortIntf->rxRuntPkts(counterValue);
+            else if (propName == "RXJabberPkts")
+                ethPortIntf->rxJabberPkts(counterValue);
+            else if (propName == "RXXONFrames")
+                ethPortIntf->rxxonFrames(counterValue);
+            else if (propName == "RXXOFFFrames")
+                ethPortIntf->rxxoffFrames(counterValue);
+            else if (propName == "TXXONFrames")
+                ethPortIntf->txxonFrames(counterValue);
+            else if (propName == "TXXOFFFrames")
+                ethPortIntf->txxoffFrames(counterValue);
+            else if (propName == "TXSingleCollisionFrames")
+                ethPortIntf->txSingleCollisionFrames(counterValue);
+            else if (propName == "TXMultipleCollisionFrames")
+                ethPortIntf->txMultipleCollisionFrames(counterValue);
+            else if (propName == "TXLateCollisionFrames")
+                ethPortIntf->txLateCollisionFrames(counterValue);
+            else if (propName == "TXExcessiveCollisionFrames")
+                ethPortIntf->txExcessCollisionFrames(counterValue);
+        }
+        catch (const std::exception& e)
+        {
+            return;
+            // lg2::error(
+            //     "EthPortTelemetryAggregator::updateCounterValues Failed to
+            //     set property {PROP} for tag {TAG}: {ERR}", "PROP", propName,
+            //     "TAG", tag, "ERR", e.what());
+        }
+    }
+}
+
+void EthPortTelemetryAggregator::getCounterValue(const std::string propName,
+                                                 uint32_t& value,
+                                                 std::string& ifaceName)
+{
+    try
+    {
+        if (propName == "RXBytes")
+        {
+            value = portMetricsOem2Intf->rxBytes();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "TXBytes")
+        {
+            value = portMetricsOem2Intf->txBytes();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "RXUnicastPkts")
+        {
+            value = portMetricsOem2Intf->rxUnicastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "RXMulticastPkts")
+        {
+            value = portMetricsOem2Intf->rxMulticastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "RXBroadcastPkts")
+        {
+            value = portMetricsOem2Intf->rxBroadcastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "TXUnicastPkts")
+        {
+            value = portMetricsOem2Intf->txUnicastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "TXMulticastPkts")
+        {
+            value = portMetricsOem2Intf->txMulticastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "TXBroadcastPkts")
+        {
+            value = portMetricsOem2Intf->txBroadcastPkts();
+            ifaceName = std::string(portMetricsOem2Intf->interface);
+        }
+        else if (propName == "RXFCSErrors")
+        {
+            value = ethPortIntf->rxfcsErrors();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXAlignmentErrors")
+        {
+            value = ethPortIntf->rxAlignmentErrors();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXFalseCarrierDetections")
+        {
+            value = ethPortIntf->rxFalseCarrierDetections();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXRuntPkts")
+        {
+            value = ethPortIntf->rxRuntPkts();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXJabberPkts")
+        {
+            value = ethPortIntf->rxJabberPkts();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXXONFrames")
+        {
+            value = ethPortIntf->rxxonFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "RXXOFFFrames")
+        {
+            value = ethPortIntf->rxxoffFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXXONFrames")
+        {
+            value = ethPortIntf->txxonFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXXOFFFrames")
+        {
+            value = ethPortIntf->txxoffFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXSingleCollisionFrames")
+        {
+            value = ethPortIntf->txSingleCollisionFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXMultipleCollisionFrames")
+        {
+            value = ethPortIntf->txMultipleCollisionFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXLateCollisionFrames")
+        {
+            value = ethPortIntf->txLateCollisionFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+        else if (propName == "TXExcessiveCollisionFrames")
+        {
+            value = ethPortIntf->txExcessCollisionFrames();
+            ifaceName = std::string(ethPortIntf->interface);
+        }
+    }
+    catch (const std::exception& e)
+    {
+        return;
+        // lg2::error("Failed to update shared memory for property {PROP}:
+        // {ERR}",
+        //            "PROP", propName, "ERR", e.what());
+    }
+}
+
+void EthPortTelemetryAggregator::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> smbusData = {};
+
+    for (const auto& [tag, propName] : tagToPropertyMap)
+    {
+        uint32_t value = 0;
+        std::string ifaceName = std::string(ethPortIntf->interface);
+
+        getCounterValue(propName, value, ifaceName);
+
+        nv::sensor_aggregation::DbusVariantType dbusValue{value};
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            objPath, ifaceName, propName, smbusData, dbusValue);
+    }
+#endif
+}
+
+std::unordered_map<uint8_t, std::string>
+    EthPortTelemetryAggregator::initTagToPropertyMap()
+{
+    std::unordered_map<uint8_t, std::string> map;
+
+    // Map each tag to its corresponding property name
+    map[0] = "RXBytes";                   // Total Bytes Received
+    map[1] = "TXBytes";                   // Total Bytes Transmitted
+    map[2] = "RXUnicastPkts";             // Total Unicast Packets Received
+    map[3] = "RXMulticastPkts";           // Total Multicast Packets Received
+    map[4] = "RXBroadcastPkts";           // Total Broadcast Packets Received
+    map[5] = "TXUnicastPkts";             // Total Unicast Packets Transmitted
+    map[6] = "TXMulticastPkts";           // Total Multicast Packets Transmitted
+    map[7] = "TXBroadcastPkts";           // Total Broadcast Packets Transmitted
+    map[8] = "RXFCSErrors";               // FCS Receive Errors
+    map[9] = "RXAlignmentErrors";         // Alignment Errors
+    map[10] = "RXFalseCarrierDetections"; // False Carrier Detections
+    map[11] = "RXRuntPkts";               // Runt Packets Received
+    map[12] = "RXJabberPkts";             // Jabber Packets Received
+    map[13] = "RXXONFrames";              // Pause XON Frames Received
+    map[14] = "RXXOFFFrames";             // Pause XOFF Frames Received
+    map[15] = "TXXONFrames";              // Pause XON Frames Transmitted
+    map[16] = "TXXOFFFrames";             // Pause XOFF Frames Transmitted
+    map[17] = "TXSingleCollisionFrames";  // Single Collision Transmit Frames
+    map[18] = "TXMultipleCollisionFrames"; // Multiple Collision Transmit Frames
+    map[19] = "TXLateCollisionFrames";     // Late Collision Frames
+    map[20] = "TXExcessiveCollisionFrames"; // Excessive Collision Frames
+
+    return map;
+}
+
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                                 const std::string& interface,
                                                 const std::string& objPath)
@@ -1151,6 +1467,9 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         }
 
         auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
+        auto portIntf = std::make_shared<PortIntf>(bus, objPath.c_str());
+        auto portMetricsOem2Intf =
+            std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
 
         if (deviceType == NSM_DEV_ID_GPU)
         {
@@ -1200,7 +1519,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
-            parentObjPath, objPath, iBPortIntf);
+            parentObjPath, objPath, iBPortIntf, portIntf, portMetricsOem2Intf);
         if (!portMetricsSensor)
         {
             lg2::error(
@@ -1220,6 +1539,32 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 nsmDevice->roundRobinSensors.emplace_back(portMetricsSensor);
             }
         }
+
+        auto ethPortMetricsSensor =
+            std::make_shared<EthPortTelemetryAggregator>(
+                bus, portName, logicalPortNum, type, objPath, iBPortIntf,
+                portMetricsOem2Intf);
+        if (!ethPortMetricsSensor)
+        {
+            lg2::error(
+                "Failed to create NSM Ethernet Port Metric sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                objPath);
+        }
+        else
+        {
+            nsmDevice->deviceSensors.emplace_back(ethPortMetricsSensor);
+            if (priority)
+            {
+                nsmDevice->prioritySensors.emplace_back(ethPortMetricsSensor);
+            }
+            else
+            {
+                nsmDevice->roundRobinSensors.emplace_back(ethPortMetricsSensor);
+            }
+        }
+
+        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
 
 #ifdef NVIDIA_HISTOGRAM
         if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
@@ -1257,8 +1602,6 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             nsmDevice->addSensor(getFECHistoDataObject, false);
         }
 #endif
-
-        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
