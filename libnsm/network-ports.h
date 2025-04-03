@@ -59,7 +59,7 @@ enum nsm_network_port_commands {
 	NSM_SET_PORT_DISABLE_FUTURE = 0x44,
 	NSM_GET_PORT_DISABLE_FUTURE = 0x45,
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER =
-	    0x50 // placeholder until spec is defined,
+	    0x50, // placeholder until spec is defined
 	NSM_GET_NVLINK_LED_STATUS = 0x60
 };
 

@@ -46,9 +46,13 @@ TEST(NsmPortMetrics, GoodTest)
     std::vector<utils::Association> associations;
     std::shared_ptr<IBPortIntf> iBPortIntf =
         std::make_shared<IBPortIntf>(bus, inventoryObjPath.c_str());
+    std::shared_ptr<PortIntf> portIntf =
+        std::make_shared<PortIntf>(bus, inventoryObjPath.c_str());
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf =
+        std::make_shared<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
     nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
                                 associations, parentObjPath, inventoryObjPath,
-                                iBPortIntf);
+                                iBPortIntf, portIntf, portMetricsOem2Intf);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
