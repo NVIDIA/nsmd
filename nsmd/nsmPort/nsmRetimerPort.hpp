@@ -18,6 +18,7 @@
 #include <xyz/openbmc_project/Metrics/LanError/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem1/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
+#include <xyz/openbmc_project/PCIe/PCIeTransactionCounter/server.hpp>
 
 namespace nsm
 {
@@ -31,6 +32,8 @@ using PortIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::inventory::item::Port>;
 using PCIeEccIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::PCIe::server::PCIeECC>;
+using PCIeTransactionCounterIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::PCIe::server::PCIeTransactionCounter>;
 
 using LaneErrorIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::LanError>;
@@ -63,6 +66,13 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
                      std::shared_ptr<PortInfoIntf> portInfoIntf,
                      std::shared_ptr<PortWidthIntf> portWidthIntf,
                      uint8_t deviceIndex);
+    NsmPCIeECCGroup1(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<PortInfoIntf> portInfoIntf,
+                     std::shared_ptr<PortWidthIntf> portWidthIntf,
+                     uint8_t deviceIndex, uint8_t multiPortType,
+                     uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup1() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -84,6 +94,12 @@ class NsmPCIeECCGroup2 : public NsmPcieGroup
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
+    NsmPCIeECCGroup2(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                     uint8_t deviceIndex, uint8_t multiPortType,
+                     uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup2() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -102,6 +118,12 @@ class NsmPCIeECCGroup3 : public NsmPcieGroup
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
+    NsmPCIeECCGroup3(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                     uint8_t deviceIndex, uint8_t multiPortType,
+                     uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup3() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -120,6 +142,12 @@ class NsmPCIeECCGroup4 : public NsmPcieGroup
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                      uint8_t deviceIndex);
+    NsmPCIeECCGroup4(const std::string& name, const std::string& type,
+                     const std::string& inventoryPath,
+                     std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                     uint8_t deviceIndex, uint8_t multiPortType,
+                     uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup4() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -137,6 +165,11 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
     NsmPCIeECCGroup8(const std::string& name, const std::string& type,
                      std::shared_ptr<LaneErrorIntf> laneErrorIntf,
                      uint8_t deviceIndex, const std::string& inventoryObjPath);
+    NsmPCIeECCGroup8(const std::string& name, const std::string& type,
+                     std::shared_ptr<LaneErrorIntf> laneErrorIntf,
+                     uint8_t deviceIndex, const std::string& inventoryObjPath,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup8() = default;
 
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
@@ -146,6 +179,27 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
     std::shared_ptr<LaneErrorIntf> laneErrorIntf;
     const std::string inventoryObjPath;
     void updateMetricOnSharedMemory();
+};
+
+class NsmPCIeECCGroup10 : public NsmPcieGroup
+{
+  public:
+    NsmPCIeECCGroup10(sdbusplus::bus::bus& bus, const std::string& name,
+                      const std::string& type,
+                      const std::string& inventoryObjPath, uint8_t deviceIndex);
+    NsmPCIeECCGroup10(sdbusplus::bus::bus& bus, const std::string& name,
+                      const std::string& type,
+                      const std::string& inventoryObjPath, uint8_t deviceIndex,
+                      uint8_t multiPortType, uint8_t multiPortIndex,
+                      uint8_t multiPortUpstreamPortNumber);
+    NsmPCIeECCGroup10() = default;
+
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    std::unique_ptr<PCIeTransactionCounterIntf> pcieTransactionCounterIntf;
+    const std::string inventoryObjPath;
 };
 
 } // namespace nsm

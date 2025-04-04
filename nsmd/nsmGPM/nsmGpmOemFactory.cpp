@@ -33,27 +33,6 @@ enum class GPMMetricId : uint8_t
     NVLinkDataRxBandwidth = 13
 };
 
-template <typename T>
-std::optional<T>
-    getPropertyFromCollection(const PropertyValuesCollection& collection,
-                              const std::string& name)
-{
-    auto fit = std::lower_bound(collection.cbegin(), collection.cend(), name,
-                                [&](const auto& elem, const std::string& name) {
-        return elem.first < name;
-    });
-
-    if (fit == collection.cend() || fit->first != name)
-    {
-        lg2::error("getPropertyFromCollection : Property {PROP} not found.",
-                   "PROP", name);
-
-        return std::nullopt;
-    }
-
-    return std::get<T>(fit->second);
-}
-
 std::vector<uint8_t> convertToBytes(const std::vector<uint64_t>& data)
 {
     std::vector<uint8_t> result(data.size());
@@ -105,28 +84,34 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
                                                              interface.c_str());
     std::sort(properties.begin(), properties.end());
 
-    std::string name =
-        getPropertyFromCollection<std::string>(properties, "Name").value();
+    std::string name = utils::getPropertyFromCollection<std::string>(properties,
+                                                                     "Name")
+                           .value();
     name = utils::makeDBusNameValid(name);
-    std::string type =
-        getPropertyFromCollection<std::string>(properties, "Type").value();
+    std::string type = utils::getPropertyFromCollection<std::string>(properties,
+                                                                     "Type")
+                           .value();
     type = utils::makeDBusNameValid(type);
     const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
-    const uint8_t retrievalSource =
-        getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
-            .value();
+        utils::getPropertyFromCollection<bool>(properties, "Priority").value();
+    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "RetrievalSource")
+                                        .value();
     const uint8_t gpuInstance =
-        getPropertyFromCollection<uint64_t>(properties, "GpuInstance").value();
-    const uint8_t computeInstance =
-        getPropertyFromCollection<uint64_t>(properties, "ComputeInstance")
+        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
             .value();
+    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "ComputeInstance")
+                                        .value();
     const std::string metric =
-        getPropertyFromCollection<std::string>(properties, "Metric").value();
+        utils::getPropertyFromCollection<std::string>(properties, "Metric")
+            .value();
     const uint8_t metricId =
-        getPropertyFromCollection<uint64_t>(properties, "MetricId").value();
+        utils::getPropertyFromCollection<uint64_t>(properties, "MetricId")
+            .value();
     const uint32_t instanceBitfield =
-        getPropertyFromCollection<uint64_t>(properties, "InstanceBitfield")
+        utils::getPropertyFromCollection<uint64_t>(properties,
+                                                   "InstanceBitfield")
             .value();
 
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator{};
@@ -183,28 +168,32 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
                                                              interface.c_str());
     std::sort(properties.begin(), properties.end());
 
-    std::string name =
-        getPropertyFromCollection<std::string>(properties, "Name").value();
+    std::string name = utils::getPropertyFromCollection<std::string>(properties,
+                                                                     "Name")
+                           .value();
     name = utils::makeDBusNameValid(name);
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
     const std::string uuid =
-        getPropertyFromCollection<std::string>(properties, "UUID").value();
+        utils::getPropertyFromCollection<std::string>(properties, "UUID")
+            .value();
     const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
-    const uint8_t retrievalSource =
-        getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
-            .value();
+        utils::getPropertyFromCollection<bool>(properties, "Priority").value();
+    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "RetrievalSource")
+                                        .value();
     const uint8_t gpuInstance =
-        getPropertyFromCollection<uint64_t>(properties, "GpuInstance").value();
-    const uint8_t computeInstance =
-        getPropertyFromCollection<uint64_t>(properties, "ComputeInstance")
+        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
             .value();
-    const std::vector<uint8_t> metricsBitfield = convertToBytes(
-        getPropertyFromCollection<std::vector<uint64_t>>(properties,
-                                                         "MetricsBitfield")
-            .value());
+    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "ComputeInstance")
+                                        .value();
+    const std::vector<uint8_t> metricsBitfield =
+        convertToBytes(utils::getPropertyFromCollection<std::vector<uint64_t>>(
+                           properties, "MetricsBitfield")
+                           .value());
     std::string inventoryObjPath =
-        getPropertyFromCollection<std::string>(properties, "InventoryObjPath")
+        utils::getPropertyFromCollection<std::string>(properties,
+                                                      "InventoryObjPath")
             .value();
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
@@ -212,9 +201,9 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
 
     try
     {
-        populateMemoryBandwidth =
-            getPropertyFromCollection<bool>(properties, "MemoryBandwidth")
-                .value();
+        populateMemoryBandwidth = utils::getPropertyFromCollection<bool>(
+                                      properties, "MemoryBandwidth")
+                                      .value();
     }
     catch (const std::exception& e)
     {}
@@ -243,8 +232,8 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     if (populateMemoryBandwidth)
     {
         std::string memoryInventoryObjPath =
-            getPropertyFromCollection<std::string>(properties,
-                                                   "MemoryInventoryObjPath")
+            utils::getPropertyFromCollection<std::string>(
+                properties, "MemoryInventoryObjPath")
                 .value();
         memoryInventoryObjPath =
             utils::makeDBusNameValid(memoryInventoryObjPath);
@@ -297,34 +286,40 @@ static requester::Coroutine
                                                              interface.c_str());
     std::sort(properties.begin(), properties.end());
 
-    std::string name =
-        getPropertyFromCollection<std::string>(properties, "Name").value();
+    std::string name = utils::getPropertyFromCollection<std::string>(properties,
+                                                                     "Name")
+                           .value();
     name = utils::makeDBusNameValid(name);
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
     const std::string uuid =
-        getPropertyFromCollection<std::string>(properties, "UUID").value();
+        utils::getPropertyFromCollection<std::string>(properties, "UUID")
+            .value();
     const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
-    const uint8_t retrievalSource =
-        getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
-            .value();
+        utils::getPropertyFromCollection<bool>(properties, "Priority").value();
+    const uint8_t retrievalSource = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "RetrievalSource")
+                                        .value();
     const uint8_t gpuInstance =
-        getPropertyFromCollection<uint64_t>(properties, "GpuInstance").value();
-    const uint8_t computeInstance =
-        getPropertyFromCollection<uint64_t>(properties, "ComputeInstance")
+        utils::getPropertyFromCollection<uint64_t>(properties, "GpuInstance")
             .value();
+    const uint8_t computeInstance = utils::getPropertyFromCollection<uint64_t>(
+                                        properties, "ComputeInstance")
+                                        .value();
     const std::vector<std::string> metrics =
-        getPropertyFromCollection<std::vector<std::string>>(properties,
-                                                            "Metrics")
+        utils::getPropertyFromCollection<std::vector<std::string>>(properties,
+                                                                   "Metrics")
             .value();
     std::vector<uint64_t> ports =
-        getPropertyFromCollection<std::vector<uint64_t>>(properties, "Ports")
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(properties,
+                                                                "Ports")
             .value();
     const uint32_t instanceBitfield =
-        getPropertyFromCollection<uint64_t>(properties, "InstanceBitfield")
+        utils::getPropertyFromCollection<uint64_t>(properties,
+                                                   "InstanceBitfield")
             .value();
     std::string inventoryObjPath =
-        getPropertyFromCollection<std::string>(properties, "InventoryObjPath")
+        utils::getPropertyFromCollection<std::string>(properties,
+                                                      "InventoryObjPath")
             .value();
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 

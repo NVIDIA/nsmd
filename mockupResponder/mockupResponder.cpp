@@ -580,7 +580,7 @@ std::optional<Response>
                 case NSM_LIST_AVAILABLE_PCIE_PORTS:
                     return getListAvailablePciePortsHandler(request,
                                                             requestLen);
-                case NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1:
+                case NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2:
                     return queryMultiportScalarGroupTelemetryHandler(
                         request, requestLen);
                 default:
@@ -847,7 +847,7 @@ std::optional<std::vector<uint8_t>>
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
                       NSM_LIST_AVAILABLE_PCIE_PORTS,
-                      NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1,
+                      NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2,
                   }},
                  {3, {12, 14, 97}},
                  {4,
@@ -3678,7 +3678,7 @@ std::optional<Response>
     MockupResponder::queryMultiportScalarGroupTelemetryHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
-    nsm_multiport_query_scalar_group_telemetry_v1_req_data data;
+    nsm_multiport_query_scalar_group_telemetry_v2_req_data data;
     auto rc = decode_multiport_query_scalar_group_telemetry_v1_req(
         requestMsg, requestLen, &data);
     if (rc != NSM_SW_SUCCESS)
@@ -3705,11 +3705,11 @@ std::optional<Response>
         // Encoded responses functions in
         // `MockupResponder::getQueryScalarGroupTelemetryResponse` uses
         // hardcoded command value `NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1` We need
-        // to set the command to `NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1`
+        // to set the command to `NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2`
         // for multiport query unit test coverage
         auto resp = reinterpret_cast<nsm_query_scalar_group_telemetry_v1_resp*>(
             responseMsg->payload);
-        resp->hdr.command = NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1;
+        resp->hdr.command = NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2;
     }
     return response;
 }

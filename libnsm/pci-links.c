@@ -862,7 +862,7 @@ int decode_list_available_pcie_ports_resp(
 
 int encode_multiport_query_scalar_group_telemetry_v1_req(
     uint8_t instance_id,
-    const struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data,
+    const struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data,
     struct nsm_msg *msg)
 {
 	if (msg == NULL || data == NULL) {
@@ -876,13 +876,13 @@ int encode_multiport_query_scalar_group_telemetry_v1_req(
 		return rc;
 	}
 
-	struct nsm_multiport_query_scalar_group_telemetry_v1_req *request =
-	    (struct nsm_multiport_query_scalar_group_telemetry_v1_req *)
+	struct nsm_multiport_query_scalar_group_telemetry_v2_req *request =
+	    (struct nsm_multiport_query_scalar_group_telemetry_v2_req *)
 		msg->payload;
 
-	request->hdr.command = NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1;
+	request->hdr.command = NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2;
 	request->hdr.data_size = sizeof(
-	    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data);
+	    struct nsm_multiport_query_scalar_group_telemetry_v2_req_data);
 	request->data = *data;
 
 	return NSM_SW_SUCCESS;
@@ -890,7 +890,7 @@ int encode_multiport_query_scalar_group_telemetry_v1_req(
 
 int decode_multiport_query_scalar_group_telemetry_v1_req(
     const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data)
+    struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data)
 {
 	if (msg == NULL || data == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -905,17 +905,17 @@ int decode_multiport_query_scalar_group_telemetry_v1_req(
 	if (msg_len !=
 	    sizeof(struct nsm_msg_hdr) +
 		sizeof(
-		    struct nsm_multiport_query_scalar_group_telemetry_v1_req)) {
+		    struct nsm_multiport_query_scalar_group_telemetry_v2_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_multiport_query_scalar_group_telemetry_v1_req *request =
-	    (struct nsm_multiport_query_scalar_group_telemetry_v1_req *)
+	struct nsm_multiport_query_scalar_group_telemetry_v2_req *request =
+	    (struct nsm_multiport_query_scalar_group_telemetry_v2_req *)
 		msg->payload;
 
 	if (request->hdr.data_size !=
 	    sizeof(struct
-		   nsm_multiport_query_scalar_group_telemetry_v1_req_data)) {
+		   nsm_multiport_query_scalar_group_telemetry_v2_req_data)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 

@@ -295,10 +295,22 @@ class NsmPcieGroup : public NsmSensor
   public:
     NsmPcieGroup(const std::string& name, const std::string& type,
                  uint8_t deviceId, uint8_t groupId);
+    NsmPcieGroup(const std::string& name, const std::string& type,
+                 uint8_t deviceId, uint8_t groupId, uint8_t multiPortType,
+                 uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber);
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
   private:
+    std::optional<std::vector<uint8_t>>
+        genSinglePortRequestMsg(eid_t eid, uint8_t instanceId);
+    std::optional<std::vector<uint8_t>>
+        genMultiPortRequestMsg(eid_t eid, uint8_t instanceId);
+
+    bool isMultiPciePortEnabled = false;
+    uint8_t multiPortType;
+    uint8_t multiPortIndex;
+    uint8_t multiPortUpstreamPortNumber;
     uint8_t deviceId;
     uint8_t groupId;
 };

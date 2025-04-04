@@ -658,6 +658,27 @@ std::string typeName()
     return type;
 }
 
+template <typename T>
+std::optional<T>
+    getPropertyFromCollection(const PropertyValuesCollection& collection,
+                              const std::string& name)
+{
+    auto fit = std::lower_bound(collection.cbegin(), collection.cend(), name,
+                                [&](const auto& elem, const std::string& name) {
+        return elem.first < name;
+    });
+
+    if (fit == collection.cend() || fit->first != name)
+    {
+        lg2::error("getPropertyFromCollection : Property {PROP} not found.",
+                   "PROP", name);
+
+        return std::nullopt;
+    }
+
+    return std::get<T>(fit->second);
+}
+
 /**
  * @brief Combines device type and role into a single identifier
  * High byte (bits 15-8): Device Role

@@ -3008,9 +3008,9 @@ class QueryMultiportScalarGroupTelemetry : public QueryScalarGroupTelemetry
     {
         Request requestMsg(
             sizeof(nsm_msg_hdr) +
-            sizeof(nsm_multiport_query_scalar_group_telemetry_v1_req));
+            sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
-        const nsm_multiport_query_scalar_group_telemetry_v1_req_data data{
+        const nsm_multiport_query_scalar_group_telemetry_v2_req_data data{
             .type = type,
             .upstream_port_index = upstreamPortIndex,
             .index = index,
