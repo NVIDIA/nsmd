@@ -3511,8 +3511,8 @@ void getScalarTelemetryGroup4Data(
 void getScalarTelemetryGroup5Data(
     struct nsm_query_scalar_group_telemetry_group_5* data)
 {
-    data->PCIeTXBytes = 8769000;
-    data->PCIeRXBytes = 876654;
+    data->PCIeTXDwords = 8769000;
+    data->PCIeRXDwords = 876654;
 }
 void getScalarTelemetryGroup6Data(
     struct nsm_query_scalar_group_telemetry_group_6* data)
