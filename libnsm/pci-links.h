@@ -46,7 +46,7 @@ enum pci_links_command {
 	NSM_CLEAR_DATA_SOURCE_V1 = 0x05,
 	NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60,
 	NSM_LIST_AVAILABLE_PCIE_PORTS = 0x07,
-	NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x24,
+	NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2 = 0x24,
 };
 
 /** @struct nsm_query_scalar_group_telemetry_v1_req
@@ -333,12 +333,12 @@ enum nsm_port_type {
 	NSM_PORT_TYPE_DOWNSTREAM = 1,
 };
 
-/** @struct nsm_multiport_query_scalar_group_telemetry_v1_req_data
+/** @struct nsm_multiport_query_scalar_group_telemetry_v2_req_data
  *
  *  Structure representing Multiport Query Scalar Group Telemetry v1 request
  * data.
  */
-struct nsm_multiport_query_scalar_group_telemetry_v1_req_data {
+struct nsm_multiport_query_scalar_group_telemetry_v2_req_data {
 	uint8_t type : 1; // 0 - upstream port, 1 - downstream port
 	uint8_t upstream_port_index : 7; // number of upstream port
 	uint8_t index;	      // index of the upstream/downstream port
@@ -346,13 +346,13 @@ struct nsm_multiport_query_scalar_group_telemetry_v1_req_data {
 	uint8_t group_index;  // group index
 } __attribute__((packed));
 
-/** @struct nsm_multiport_query_scalar_group_telemetry_v1_req
+/** @struct nsm_multiport_query_scalar_group_telemetry_v2_req
  *
  *  Structure representing Multiport Query Scalar Group Telemetry v1 request.
  */
-struct nsm_multiport_query_scalar_group_telemetry_v1_req {
+struct nsm_multiport_query_scalar_group_telemetry_v2_req {
 	struct nsm_common_req hdr;
-	struct nsm_multiport_query_scalar_group_telemetry_v1_req_data data;
+	struct nsm_multiport_query_scalar_group_telemetry_v2_req_data data;
 } __attribute__((packed));
 
 /** @brief Encode a Query Scalar Group Telemetry v1 request message
@@ -960,7 +960,7 @@ int decode_list_available_pcie_ports_resp(
  */
 int encode_multiport_query_scalar_group_telemetry_v1_req(
     uint8_t instance_id,
-    const struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data,
+    const struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data,
     struct nsm_msg *msg);
 
 /** @brief Decode a Multiport Query Scalar Group Telemetry v1 request message
@@ -972,7 +972,7 @@ int encode_multiport_query_scalar_group_telemetry_v1_req(
  */
 int decode_multiport_query_scalar_group_telemetry_v1_req(
     const struct nsm_msg *msg, size_t msg_len,
-    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data);
+    struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data);
 
 #ifdef __cplusplus
 }

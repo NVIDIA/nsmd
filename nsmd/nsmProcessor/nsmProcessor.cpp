@@ -591,14 +591,39 @@ NsmPciePortIntf::NsmPciePortIntf(sdbusplus::bus::bus& bus,
     pciePortIntf = std::make_shared<PciePortIntf>(bus,
                                                   inventoryObjPath.c_str());
 }
+
 NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
                            uint8_t deviceId, uint8_t groupId) :
     NsmSensor(name, type),
+    isMultiPciePortEnabled(false), deviceId(deviceId), groupId(groupId)
+{}
+
+NsmPcieGroup::NsmPcieGroup(const std::string& name, const std::string& type,
+                           uint8_t deviceId, uint8_t groupId,
+                           uint8_t multiPortType, uint8_t multiPortIndex,
+                           uint8_t multiPortUpstreamPortNumber) :
+    NsmSensor(name, type),
+    isMultiPciePortEnabled(true), multiPortType(multiPortType),
+    multiPortIndex(multiPortIndex),
+    multiPortUpstreamPortNumber(multiPortUpstreamPortNumber),
     deviceId(deviceId), groupId(groupId)
 {}
 
 std::optional<std::vector<uint8_t>>
     NsmPcieGroup::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    if (isMultiPciePortEnabled)
+    {
+        return genMultiPortRequestMsg(eid, instanceId);
+    }
+    else
+    {
+        return genSinglePortRequestMsg(eid, instanceId);
+    }
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPcieGroup::genSinglePortRequestMsg(eid_t eid, uint8_t instanceId)
 {
     std::vector<uint8_t> request(
         sizeof(nsm_msg_hdr) + sizeof(nsm_query_scalar_group_telemetry_v1_req));
@@ -609,6 +634,34 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::debug(
             "NsmPciGroup :: encode_query_scalar_group_telemetry_v1_req failed for"
+            "group = {GROUPID} eid={EID} rc={RC}",
+            "GROUPID", groupId, "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmPcieGroup::genMultiPortRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    const nsm_multiport_query_scalar_group_telemetry_v2_req_data data{
+        .type = multiPortType,
+        .upstream_port_index = multiPortUpstreamPortNumber,
+        .index = multiPortIndex,
+        .device_index = deviceId,
+        .group_index = groupId};
+
+    auto rc = encode_multiport_query_scalar_group_telemetry_v1_req(
+        instanceId, &data, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug(
+            "NsmPciGroup :: encode_multiport_query_scalar_group_telemetry_v1_req failed for"
             "group = {GROUPID} eid={EID} rc={RC}",
             "GROUPID", groupId, "EID", eid, "RC", rc);
         return std::nullopt;

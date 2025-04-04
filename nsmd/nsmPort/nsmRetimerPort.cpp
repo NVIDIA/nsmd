@@ -42,11 +42,34 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
                                    std::shared_ptr<PortInfoIntf> portInfoIntf,
                                    std::shared_ptr<PortWidthIntf> portWidthIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, 1),
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1),
     objPath(inventoryPath), portInfoIntf(portInfoIntf),
     portWidthIntf(portWidthIntf)
 {
     lg2::info("NsmPCIeECCGroup1: {NAME}", "NAME", name.c_str());
+
+    portInfoIntf->maxSpeed(0);
+    portInfoIntf->currentSpeed(0);
+    portWidthIntf->width(0);
+    portWidthIntf->activeWidth(0);
+
+    updateMetricOnSharedMemory();
+}
+
+NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PortInfoIntf> portInfoIntf,
+                                   std::shared_ptr<PortWidthIntf> portWidthIntf,
+                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    objPath(inventoryPath), portInfoIntf(portInfoIntf),
+    portWidthIntf(portWidthIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup1: {NAME}", "NAME", name.c_str());
 
     portInfoIntf->maxSpeed(0);
     portInfoIntf->currentSpeed(0);
@@ -166,6 +189,27 @@ NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
+NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup2: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->nonfeCount(0);
+    pcieEccIntf->feCount(0);
+    pcieEccIntf->ceCount(0);
+    pcieEccIntf->unsupportedRequestCount(0);
+
+    updateMetricOnSharedMemory();
+}
+
 uint8_t NsmPCIeECCGroup2::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
@@ -236,6 +280,23 @@ NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
+NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup3: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->l0ToRecoveryCount(0);
+    updateMetricOnSharedMemory();
+}
+
 uint8_t NsmPCIeECCGroup3::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
@@ -282,6 +343,27 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
     objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup4: {NAME}", "NAME", name.c_str());
+
+    pcieEccIntf->replayCount(0);
+    pcieEccIntf->replayRolloverCount(0);
+    pcieEccIntf->nakSentCount(0);
+    pcieEccIntf->nakReceivedCount(0);
+
+    updateMetricOnSharedMemory();
+}
+
+NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
+                                   const std::string& type,
+                                   const std::string& inventoryPath,
+                                   std::shared_ptr<PCIeEccIntf> pcieEccIntf,
+                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup4: {NAME}", "NAME", name.c_str());
 
     pcieEccIntf->replayCount(0);
     pcieEccIntf->replayRolloverCount(0);
@@ -361,6 +443,20 @@ NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
+NsmPCIeECCGroup8::NsmPCIeECCGroup8(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<LaneErrorIntf> laneErrorIntf, uint8_t deviceIndex,
+    const std::string& inventoryObjPath, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_8, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    laneErrorIntf(laneErrorIntf), inventoryObjPath(inventoryObjPath)
+{
+    lg2::info("NsmMultiPCIeECCGroup8: create sensor:{NAME}", "NAME",
+              name.c_str());
+    updateMetricOnSharedMemory();
+}
+
 uint8_t NsmPCIeECCGroup8::handleResponseMsg(const struct nsm_msg* responseMsg,
                                             size_t responseLen)
 {
@@ -402,6 +498,97 @@ void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
+}
+
+NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
+                                     const std::string& name,
+                                     const std::string& type,
+                                     const std::string& inventoryObjPath,
+                                     uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_10),
+    inventoryObjPath(inventoryObjPath)
+{
+    lg2::info("NsmPCIeECCGroup10: create sensor:{NAME}", "NAME", name.c_str());
+    pcieTransactionCounterIntf = std::make_unique<PCIeTransactionCounterIntf>(
+        bus, inventoryObjPath.c_str());
+
+    updateMetricOnSharedMemory();
+}
+
+NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
+                                     const std::string& name,
+                                     const std::string& type,
+                                     const std::string& inventoryObjPath,
+                                     uint8_t deviceIndex, uint8_t multiPortType,
+                                     uint8_t multiPortIndex,
+                                     uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_10, multiPortType,
+                 multiPortIndex, multiPortUpstreamPortNumber),
+    inventoryObjPath(inventoryObjPath)
+{
+    lg2::info("NsmMultiPCIeECCGroup10: create sensor:{NAME}", "NAME",
+              name.c_str());
+    pcieTransactionCounterIntf = std::make_unique<PCIeTransactionCounterIntf>(
+        bus, inventoryObjPath.c_str());
+
+    updateMetricOnSharedMemory();
+}
+
+uint8_t NsmPCIeECCGroup10::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                             size_t responseLen)
+{
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    nsm_query_scalar_group_telemetry_group_10 data = {};
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+        responseMsg, responseLen, &cc, &reasonCode, &data);
+
+    LG2_ERROR_FLT(
+        "decode_query_scalar_group_telemetry_v1_group10_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        pcieTransactionCounterIntf->outboundReadPktCount(
+            static_cast<uint64_t>(data.outbound_read_tlp_count));
+        pcieTransactionCounterIntf->outboundWritePktCount(
+            static_cast<uint64_t>(data.outbound_write_tlp_count));
+        pcieTransactionCounterIntf->outboundTLPCount(
+            static_cast<uint64_t>(data.outbound_completion_tlp_count));
+
+        uint64_t outboundReadTransfer =
+            (static_cast<uint64_t>(
+                 data.dwords_transferred_in_outbound_read_tlp_high)
+             << 32) |
+            data.dwords_transferred_in_outbound_read_tlp_low;
+        uint64_t outboundWriteTransfer =
+            (static_cast<uint64_t>(
+                 data.dwords_transferred_in_outbound_write_tlp_high)
+             << 32) |
+            data.dwords_transferred_in_outbound_write_tlp_low;
+        // convert dwords to bytes and update dwords
+        pcieTransactionCounterIntf->outboundReadTransfer(outboundReadTransfer *
+                                                         4);
+        pcieTransactionCounterIntf->outboundWriteTransfer(
+            outboundWriteTransfer * 4);
+        pcieTransactionCounterIntf->outboundTLPsTransfer(
+            static_cast<uint64_t>(
+                data.dwords_transferred_in_outbound_completion) *
+            4);
+
+        pcieTransactionCounterIntf->reqDroppedTag(
+            static_cast<uint64_t>(data.read_requests_dropped_tag_unavailable));
+        pcieTransactionCounterIntf->reqDroppedCreditCompletion(
+            static_cast<uint64_t>(
+                data.read_requests_dropped_credit_exhaustion));
+        pcieTransactionCounterIntf->reqDroppedNonPostCredit(
+            static_cast<uint64_t>(
+                data.read_requests_dropped_credit_not_posted));
+
+        updateMetricOnSharedMemory();
+    }
+
+    return cc ? cc : rc;
 }
 
 static requester::Coroutine
@@ -489,8 +676,148 @@ static requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
+static requester::Coroutine
+    createNsmMultiPCIeRetimerPorts(SensorManager& manager,
+                                   const std::string& interface,
+                                   const std::string& objPath)
+{
+    auto& bus = utils::DBusHandler::getBus();
+    auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
+                                                             interface.c_str());
+    std::sort(properties.begin(), properties.end());
+
+    std::string name = utils::getPropertyFromCollection<std::string>(properties,
+                                                                     "Name")
+                           .value();
+    name = utils::makeDBusNameValid(name);
+    const bool priority =
+        utils::getPropertyFromCollection<bool>(properties, "Priority").value();
+    const uint64_t count =
+        utils::getPropertyFromCollection<uint64_t>(properties, "Count").value();
+    const uint64_t deviceInstance =
+        utils::getPropertyFromCollection<uint64_t>(properties, "DeviceInstance")
+            .value();
+    std::string inventoryObjPath =
+        utils::getPropertyFromCollection<std::string>(properties,
+                                                      "InventoryObjPath")
+            .value();
+    std::string uuid =
+        utils::getPropertyFromCollection<uuid_t>(properties, "UUID").value();
+    std::string portProtocol = utils::getPropertyFromCollection<std::string>(
+                                   properties, "PortProtocol")
+                                   .value();
+    std::string portType =
+        utils::getPropertyFromCollection<std::string>(properties, "PortType")
+            .value();
+    const uint64_t upstreamPortNumber =
+        utils::getPropertyFromCollection<uint64_t>(properties,
+                                                   "UpstreamPortNumber")
+            .value();
+
+    std::vector<utils::Association> associations{};
+    co_await utils::coGetAssociations(objPath, interface + ".Associations",
+                                      associations);
+
+    auto type = interface.substr(interface.find_last_of('.') + 1);
+
+    // device_index are between [1 to 8] for retimers, which is
+    // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
+    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
+                          PCIE_RETIMER_DEVICE_INDEX_START;
+
+    uint8_t portTypeVal = 0;
+    if (portType ==
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort")
+    {
+        portTypeVal = 0;
+    }
+    else if (
+        portType ==
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.DownstreamPort")
+    {
+        portTypeVal = 1;
+    }
+    else
+    {
+        lg2::error(
+            "Invalid port type expected upstream/downstream, received {TYPE}",
+            "TYPE", portType);
+        co_return NSM_ERROR;
+    }
+
+    auto nsmDevice = manager.getNsmDevice(uuid);
+    if (!nsmDevice)
+    {
+        // cannot find a nsmDevice for the sensor
+        lg2::error(
+            "The UUID of NSM_PCIeRetimer_MultiPCIeLink PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
+            "UUID", uuid, "NAME", name, "TYPE", type);
+        co_return NSM_ERROR;
+    }
+
+    // create pcie link [as per count]
+    for (uint64_t i = 0; i < count; i++)
+    {
+        std::string portName = name + '_' + std::to_string(i);
+        std::string objPath = inventoryObjPath + portName;
+
+        auto pciePortIntfSensor = std::make_shared<NsmPort>(
+            bus, portName, type, associations, objPath);
+        nsmDevice->addStaticSensor(pciePortIntfSensor);
+
+        auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
+        auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
+                                                           objPath.c_str());
+        auto portWidthIntf = std::make_shared<PortWidthIntf>(bus,
+                                                             objPath.c_str());
+
+        portInfoIntf->protocol(
+            PortInfoIntf::convertPortProtocolFromString(portProtocol));
+        portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
+
+        auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
+            portName, type, objPath, portInfoIntf, portWidthIntf, deviceIndex,
+            portTypeVal, i, static_cast<uint8_t>(upstreamPortNumber));
+        auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
+            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            static_cast<uint8_t>(upstreamPortNumber));
+        auto multipcieSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
+            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            static_cast<uint8_t>(upstreamPortNumber));
+        auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
+            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            static_cast<uint8_t>(upstreamPortNumber));
+        auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
+            bus, portName, type, objPath, deviceIndex, portTypeVal, i,
+            static_cast<uint8_t>(upstreamPortNumber));
+
+        if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||
+            !multipcieSensorGroup3 || !multipcieSensorGroup4 ||
+            !multipcieSensorGroup10)
+        {
+            lg2::error(
+                "Failed to create NSM Multi PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                objPath);
+            co_return NSM_ERROR;
+        }
+
+        nsmDevice->addSensor(multipcieSensorGroup1, priority);
+        nsmDevice->addSensor(multipcieSensorGroup2, priority);
+        nsmDevice->addSensor(multipcieSensorGroup3, priority);
+        nsmDevice->addSensor(multipcieSensorGroup4, priority);
+        nsmDevice->addSensor(multipcieSensorGroup10, priority);
+    }
+
+    co_return NSM_SUCCESS;
+}
+
 REGISTER_NSM_CREATION_FUNCTION(
     createNsmPCIeRetimerPorts,
     "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_PCIeLink")
+
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmMultiPCIeRetimerPorts,
+    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_MultiPCIeLink")
 
 } // namespace nsm
