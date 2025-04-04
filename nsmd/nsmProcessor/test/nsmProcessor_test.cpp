@@ -503,8 +503,8 @@ TEST(NsmPCIeGroup5, GoodHandleResp)
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_5 data;
-    data.PCIeRXBytes = 100;
-    data.PCIeTXBytes = 200;
+    data.PCIeRXDwords = 100;
+    data.PCIeTXDwords = 200;
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
@@ -530,8 +530,8 @@ TEST(NsmPCIeGroup5, BadHandleResp)
                              deviceId, inventoryObjPath);
 
     struct nsm_query_scalar_group_telemetry_group_5 data;
-    data.PCIeRXBytes = 100;
-    data.PCIeTXBytes = 200;
+    data.PCIeRXDwords = 100;
+    data.PCIeTXDwords = 200;
 
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
