@@ -360,8 +360,10 @@ uint8_t
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         auto speedGbps = (data.nv_port_line_rate_mbps) / 1000;
-        portInfoIntf->currentSpeed(speedGbps);
         portInfoIntf->maxSpeed(speedGbps);
+
+        auto currSpeedGbps = (data.nv_port_data_rate_kbps) * 1e-6;
+        portInfoIntf->currentSpeed(currSpeedGbps);
 
         portMetricsOem3Intf->txNoProtocolBytes(data.nv_port_data_rate_kbps);
         portMetricsOem3Intf->rxNoProtocolBytes(data.nv_port_data_rate_kbps);
