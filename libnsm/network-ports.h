@@ -56,7 +56,19 @@ enum nsm_network_port_commands {
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
 	NSM_QUERY_PORT_STATUS = 0x43,
 	NSM_SET_PORT_DISABLE_FUTURE = 0x44,
-	NSM_GET_PORT_DISABLE_FUTURE = 0x45
+	NSM_GET_PORT_DISABLE_FUTURE = 0x45,
+	NSM_GET_NVLINK_LED_STATUS = 0x60
+};
+
+/** @brief NVLink LED status
+ */
+enum nsm_nvlink_led_state {
+	NSM_NVLINK_LED_OFF = 0x01,
+	NSM_NVLINK_LED_GREEN = 0x02,
+	NSM_NVLINK_LED_GREEN_BLINK = 0x03,
+	NSM_NVLINK_LED_AMBER = 0x04,
+	NSM_NVLINK_LED_AMBER_BLINK = 0x05,
+	NSM_NVLINK_LED_ERROR = 0x06
 };
 
 /** @brief Port state
@@ -305,6 +317,31 @@ struct nsm_get_system_guid_resp {
 } __attribute__((packed));
 #endif
 
+/** @struct nsm_get_nvlink_agg_led_status_req
+ *
+ *  Structure representing NSM get system guid request.
+ */
+struct nsm_get_nvlink_agg_led_status_req {
+	struct nsm_common_req hdr;
+} __attribute__((packed));
+
+/** @struct nsm_get_nvlink_agg_led_status_resp
+ *
+ *  Structure representing NSM get system guid response.
+ */
+struct nsm_get_nvlink_agg_led_status_resp {
+	struct nsm_common_resp hdr;
+	uint8_t LED_State_Aggregate;
+	uint8_t LED_State_GPU_0;
+	uint8_t LED_State_GPU_1;
+	uint8_t LED_State_GPU_2;
+	uint8_t LED_State_GPU_3;
+	uint8_t LED_State_GPU_4;
+	uint8_t LED_State_GPU_5;
+	uint8_t LED_State_GPU_6;
+	uint8_t LED_State_GPU_7;
+} __attribute__((packed));
+
 /** @struct nsm_common_port_req
  *
  *  Structure representing NSM common port request.
@@ -525,8 +562,8 @@ int decode_set_system_guid_resp(const struct nsm_msg *msg, size_t msg_len);
 
 /** @brief Encode a Get System GUID request message
  *
- *  @param[in] instance_id - NSM instance ID
- *  @param[out] msg - Message will be written to this
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
  *  @return nsm_completion_codes
  */
 int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg);
@@ -544,7 +581,30 @@ int encode_get_system_guid_req(uint8_t instance_id, struct nsm_msg *msg);
 int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
 				uint8_t *cc, uint16_t *reason_code,
 				uint8_t *sys_guid, size_t sys_guid_len);
+
 #endif
+
+/** @brief Encode a Get NVLink LED status request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+
+int encode_get_nvlink_agg_led_status_req(uint8_t instance_id,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Get NVLink LED status response message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] nvlink_agg_led_status - NVLink LED status byte will be written
+ * to this
+ *  @return nsm_completion_codes
+ */
+int decode_get_nvlink_agg_led_status_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, enum nsm_nvlink_led_state *nvlink_agg_led_status);
 
 /** @brief Encode a Get port telemetry counter request message
  *
