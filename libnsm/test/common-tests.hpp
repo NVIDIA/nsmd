@@ -164,6 +164,7 @@ void testEncodeCommonResponse(
  * @param[in] command expected command
  * @param[in] expectedPayload Palyoad used in encode response function
  * @param[out] payload Encoded payload
+ * @param[in] payloadSize Palyoad size used in encode response function
  */
 template <typename ResponsePayload>
 void testEncodeResponse(std::function<int(uint8_t, uint8_t, uint16_t,
@@ -171,7 +172,8 @@ void testEncodeResponse(std::function<int(uint8_t, uint8_t, uint16_t,
 			    function,
 			uint8_t nvidiaMsgType, uint8_t command,
 			const ResponsePayload &expectedPayload,
-			ResponsePayload &payload)
+			ResponsePayload &payload,
+			size_t payloadSize = sizeof(ResponsePayload))
 {
 	testEncodeResponse(
 	    [function](uint8_t instanceId, uint8_t cc, uint16_t reasonCode,
@@ -180,7 +182,7 @@ void testEncodeResponse(std::function<int(uint8_t, uint8_t, uint16_t,
 			instanceId, cc, reasonCode,
 			reinterpret_cast<const ResponsePayload *>(data), msg);
 	    },
-	    nvidiaMsgType, command, sizeof(ResponsePayload),
+	    nvidiaMsgType, command, payloadSize,
 	    reinterpret_cast<const uint8_t *>(&expectedPayload),
 	    reinterpret_cast<uint8_t *>(&payload));
 }
@@ -223,6 +225,7 @@ void testDecodeCommonResponse(
  * @param[in] command Expected command
  * @param[in] expectedPayload Palyoad used in decode response function
  * @param[out] payload Decoded payload
+ * @param[in] payloadSize Palyoad size decoded from response function
  */
 template <typename ResponsePayload>
 void testDecodeResponse(std::function<int(const nsm_msg *, size_t, uint8_t *,
@@ -230,7 +233,8 @@ void testDecodeResponse(std::function<int(const nsm_msg *, size_t, uint8_t *,
 			    function,
 			uint8_t nvidiaMsgType, uint8_t command,
 			const ResponsePayload &expectedPayload,
-			ResponsePayload &payload)
+			ResponsePayload &payload,
+			size_t payloadSize = sizeof(ResponsePayload))
 {
 	testDecodeResponse(
 	    [function](const nsm_msg *msg, size_t len, uint8_t *cc,
@@ -238,7 +242,7 @@ void testDecodeResponse(std::function<int(const nsm_msg *, size_t, uint8_t *,
 		    return function(msg, len, cc, reasonCode,
 				    reinterpret_cast<ResponsePayload *>(data));
 	    },
-	    nvidiaMsgType, command, sizeof(ResponsePayload),
+	    nvidiaMsgType, command, payloadSize,
 	    reinterpret_cast<const uint8_t *>(&expectedPayload),
 	    reinterpret_cast<uint8_t *>(&payload));
 }

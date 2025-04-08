@@ -22,6 +22,7 @@ extern "C" {
 #define GROUP_ID_7 7
 #define GROUP_ID_8 8
 #define GROUP_ID_9 9
+#define GROUP_ID_10 10
 #define TOTAL_PCIE_LANE_COUNT 16
 
 #define DS_ID_0 0
@@ -31,6 +32,10 @@ extern "C" {
 #define DS_ID_4 4
 #define DS_ID_5 5
 #define DS_ID_6 6
+#define DS_ID_7 7
+#define DS_ID_8 8
+#define DS_ID_9 9
+#define DS_ID_10 10
 
 #define MAX_SUPPORTED_DATA_MASK_LENGTH 1
 
@@ -38,7 +43,9 @@ enum pci_links_command {
 	NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x04,
 	NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES = 0x02,
 	NSM_CLEAR_DATA_SOURCE_V1 = 0x05,
-	NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60
+	NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60,
+	NSM_LIST_AVAILABLE_PCIE_PORTS = 0x07,
+	NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1 = 0x24,
 };
 
 /** @struct nsm_query_scalar_group_telemetry_v1_req
@@ -255,6 +262,96 @@ struct nsm_query_scalar_group_telemetry_group_9 {
 struct nsm_query_scalar_group_telemetry_v1_group_9_resp {
 	struct nsm_common_resp hdr;
 	struct nsm_query_scalar_group_telemetry_group_9 data;
+} __attribute__((packed));
+
+/** @struct nsm_query_scalar_group_telemetry_group_10
+ *
+ *  Structure representing Scalar Group Telemetry Data for Group 10.
+ */
+struct nsm_query_scalar_group_telemetry_group_10 {
+	uint32_t outbound_read_tlp_count;
+	uint32_t dwords_transferred_in_outbound_read_tlp_high;
+	uint32_t dwords_transferred_in_outbound_read_tlp_low;
+	uint32_t outbound_write_tlp_count;
+	uint32_t dwords_transferred_in_outbound_write_tlp_high;
+	uint32_t dwords_transferred_in_outbound_write_tlp_low;
+	uint32_t outbound_completion_tlp_count;
+	uint32_t dwords_transferred_in_outbound_completion;
+	uint32_t read_requests_dropped_tag_unavailable;
+	uint32_t read_requests_dropped_credit_exhaustion;
+	uint32_t read_requests_dropped_credit_not_posted;
+} __attribute__((packed));
+
+/** @struct nsm_query_scalar_group_telemetry_v1_group_10_resp
+ *
+ *  Structure representing Query Scalar Group Telemetry v1 response for
+ * group 10.
+ */
+struct nsm_query_scalar_group_telemetry_v1_group_10_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_query_scalar_group_telemetry_group_10 data;
+} __attribute__((packed));
+
+/** @struct nsm_pcie_upstream_port_info
+ *
+ *  Structure representing Upstream Port Info.
+ */
+struct nsm_pcie_upstream_port_info {
+	uint8_t type; // 0 - external, 1 - internal
+	uint8_t downstream_ports_count;
+} __attribute__((packed));
+
+/** @struct nsm_list_available_pcie_ports_info
+ *
+ *  Structure representing List Available PCIe Ports Port Info.
+ */
+struct nsm_list_available_pcie_ports_info {
+	uint16_t ports_count;
+	struct nsm_pcie_upstream_port_info ports[1];
+} __attribute__((packed));
+
+/** @struct nsm_list_available_pcie_ports_resp
+ *
+ *  Structure representing List Available PCIe Ports response.
+ */
+struct nsm_list_available_pcie_ports_resp {
+	struct nsm_common_resp hdr;
+	struct nsm_list_available_pcie_ports_info port_info;
+} __attribute__((packed));
+
+#define NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN                         \
+	(sizeof(struct nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN +            \
+	 sizeof(uint16_t) + sizeof(struct nsm_pcie_upstream_port_info))
+
+/** @enum nsm_port_type
+ *
+ *  Enum representing port type.
+ */
+enum nsm_port_type {
+	NSM_PORT_TYPE_UPSTREAM = 0,
+	NSM_PORT_TYPE_DOWNSTREAM = 1,
+};
+
+/** @struct nsm_multiport_query_scalar_group_telemetry_v1_req_data
+ *
+ *  Structure representing Multiport Query Scalar Group Telemetry v1 request
+ * data.
+ */
+struct nsm_multiport_query_scalar_group_telemetry_v1_req_data {
+	uint8_t type : 1; // 0 - upstream port, 1 - downstream port
+	uint8_t upstream_port_index : 7; // number of upstream port
+	uint8_t index;	      // index of the upstream/downstream port
+	uint8_t device_index; // device index
+	uint8_t group_index;  // group index
+} __attribute__((packed));
+
+/** @struct nsm_multiport_query_scalar_group_telemetry_v1_req
+ *
+ *  Structure representing Multiport Query Scalar Group Telemetry v1 request.
+ */
+struct nsm_multiport_query_scalar_group_telemetry_v1_req {
+	struct nsm_common_req hdr;
+	struct nsm_multiport_query_scalar_group_telemetry_v1_req_data data;
 } __attribute__((packed));
 
 /** @brief Encode a Query Scalar Group Telemetry v1 request message
@@ -576,6 +673,35 @@ int decode_query_scalar_group_telemetry_v1_group9_resp(
     uint16_t *reason_code,
     struct nsm_query_scalar_group_telemetry_group_9 *data);
 
+/** @brief Encode a Query Scalar Group Telemetry v1 response msg of GroupID 10
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data - struct pointer group 10 data source
+ *  @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_query_scalar_group_telemetry_v1_group10_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_query_scalar_group_telemetry_group_10 *data,
+    struct nsm_msg *msg);
+
+/**  @brief Decode a Query Scalar Group Telemetry v1 response msg of GroupID 10
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] data  - struct pointer group 10 data source
+ * @return nsm_completion_codes
+ */
+
+int decode_query_scalar_group_telemetry_v1_group10_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_10 *data);
+
 /** @struct nsm_assert_pcie_fundamental_reset_req
  *
  *  Structure representing NSM Assert PCIe Fundamental Reset Request.
@@ -781,6 +907,71 @@ int encode_clear_data_source_v1_resp(uint8_t instance_id, uint8_t cc,
 int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
 				     uint8_t *cc, uint16_t *data_size,
 				     uint16_t *reason_code);
+
+/** @brief Encode a List Available PCIe Ports Request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_sw_codes
+ */
+int encode_list_available_pcie_ports_req(uint8_t instance_id,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a List Available PCIe Ports Request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_sw_codes
+ */
+int decode_list_available_pcie_ports_req(const struct nsm_msg *msg,
+					 size_t msg_len);
+
+/** @brief Encode a List Available PCIe Ports Response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_sw_codes
+ */
+int encode_list_available_pcie_ports_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_list_available_pcie_ports_info *info, struct nsm_msg *msg);
+
+/** @brief Decode a List Available PCIe Ports Response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @return nsm_sw_codes
+ */
+int decode_list_available_pcie_ports_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_list_available_pcie_ports_info *info);
+
+/** @brief Encode a Multiport Query Scalar Group Telemetry v1 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] data - data to be encoded
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_sw_codes
+ */
+int encode_multiport_query_scalar_group_telemetry_v1_req(
+    uint8_t instance_id,
+    const struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data,
+    struct nsm_msg *msg);
+
+/** @brief Decode a Multiport Query Scalar Group Telemetry v1 request message
+ *
+ *  @param[in] msg - Decoded request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] data - data to be decoded
+ *  @return nsm_sw_codes
+ */
+int decode_multiport_query_scalar_group_telemetry_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data);
 
 #ifdef __cplusplus
 }

@@ -43,6 +43,12 @@ int decode_query_scalar_group_telemetry_v1_req(const struct nsm_msg *msg,
 		return NSM_SW_ERROR_NULL;
 	}
 
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
 	if (msg_len <
 	    sizeof(struct nsm_msg_hdr) +
 		sizeof(struct nsm_query_scalar_group_telemetry_v1_req)) {
@@ -73,11 +79,8 @@ int encode_query_scalar_group_telemetry_v1_resp(uint8_t instance_id, uint8_t cc,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_RESPONSE;
-	header.instance_id = instance_id & 0x1f;
-	header.nvidia_msg_type = NSM_TYPE_PCI_LINK;
-
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 NSM_TYPE_PCI_LINK};
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
 	if (rc != NSM_SW_SUCCESS) {
 		return rc;
@@ -363,6 +366,39 @@ int decode_query_scalar_group_telemetry_v1_group9_resp(
 		return ret;
 	if (*data_size !=
 	    sizeof(struct nsm_query_scalar_group_telemetry_group_9))
+		ret = NSM_SW_ERROR_LENGTH;
+	return ret;
+}
+
+int encode_query_scalar_group_telemetry_v1_group10_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_query_scalar_group_telemetry_group_10 *data,
+    struct nsm_msg *msg)
+{
+	return encode_query_scalar_group_telemetry_v1_resp(
+	    instance_id, cc, reason_code,
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_10),
+	    (uint8_t *)data, msg);
+}
+
+int decode_query_scalar_group_telemetry_v1_group10_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_query_scalar_group_telemetry_group_10 *data)
+{
+	uint16_t data_size = 0;
+	int ret = decode_query_scalar_group_telemetry_v1_resp(
+	    msg, msg_len, cc, &data_size, reason_code, (uint8_t *)data);
+	if (ret != NSM_SW_SUCCESS || *cc != NSM_SUCCESS)
+		return ret;
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct nsm_query_scalar_group_telemetry_v1_group_10_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	if (data_size !=
+	    sizeof(struct nsm_query_scalar_group_telemetry_group_10))
 		ret = NSM_SW_ERROR_LENGTH;
 	return ret;
 }
@@ -730,4 +766,159 @@ int decode_clear_data_source_v1_resp(const struct nsm_msg *msg, size_t msg_len,
 				     uint16_t *reason_code)
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
+}
+
+int encode_list_available_pcie_ports_req(uint8_t instance_id,
+					 struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_PCI_LINK,
+				 NSM_LIST_AVAILABLE_PCIE_PORTS, msg);
+}
+
+int decode_list_available_pcie_ports_req(const struct nsm_msg *msg,
+					 size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_list_available_pcie_ports_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const struct nsm_list_available_pcie_ports_info *info, struct nsm_msg *msg)
+{
+	if (msg == NULL || info == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 NSM_TYPE_PCI_LINK};
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_LIST_AVAILABLE_PCIE_PORTS, msg);
+	}
+
+	struct nsm_list_available_pcie_ports_resp *resp =
+	    (struct nsm_list_available_pcie_ports_resp *)msg->payload;
+
+	resp->hdr.command = NSM_LIST_AVAILABLE_PCIE_PORTS;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    sizeof(uint16_t) +
+	    info->ports_count * sizeof(struct nsm_pcie_upstream_port_info);
+	resp->hdr.data_size = htole16(resp->hdr.data_size);
+	resp->port_info.ports_count = htole16(info->ports_count);
+	memcpy(resp->port_info.ports, info->ports,
+	       info->ports_count * sizeof(struct nsm_pcie_upstream_port_info));
+	return rc;
+}
+
+int decode_list_available_pcie_ports_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_list_available_pcie_ports_info *info)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL || info == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_list_available_pcie_ports_resp *resp =
+	    (struct nsm_list_available_pcie_ports_resp *)msg->payload;
+
+	info->ports_count = le16toh(resp->port_info.ports_count);
+
+	uint16_t data_size = le16toh(resp->hdr.data_size);
+	uint16_t expected_data_size =
+	    (sizeof(uint16_t) +
+	     info->ports_count * sizeof(struct nsm_pcie_upstream_port_info));
+	if (msg_len < (sizeof(struct nsm_msg_hdr) +
+		       sizeof(struct nsm_common_resp) + expected_data_size) ||
+	    data_size != expected_data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	memcpy(info->ports, resp->port_info.ports,
+	       info->ports_count * sizeof(struct nsm_pcie_upstream_port_info));
+
+	for (int i = 0; i < info->ports_count; i++) {
+		if (info->ports[i].type > NSM_PORT_TYPE_DOWNSTREAM) {
+			return NSM_SW_ERROR_DATA;
+		}
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_multiport_query_scalar_group_telemetry_v1_req(
+    uint8_t instance_id,
+    const struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_PCI_LINK};
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_multiport_query_scalar_group_telemetry_v1_req *request =
+	    (struct nsm_multiport_query_scalar_group_telemetry_v1_req *)
+		msg->payload;
+
+	request->hdr.command = NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1;
+	request->hdr.data_size = sizeof(
+	    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data);
+	request->data = *data;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_multiport_query_scalar_group_telemetry_v1_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_multiport_query_scalar_group_telemetry_v1_req_data *data)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len !=
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct nsm_multiport_query_scalar_group_telemetry_v1_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_multiport_query_scalar_group_telemetry_v1_req *request =
+	    (struct nsm_multiport_query_scalar_group_telemetry_v1_req *)
+		msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct
+		   nsm_multiport_query_scalar_group_telemetry_v1_req_data)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*data = request->data;
+	return NSM_SW_SUCCESS;
 }
