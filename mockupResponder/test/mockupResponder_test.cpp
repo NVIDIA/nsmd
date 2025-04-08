@@ -18,6 +18,7 @@
 #include "base.h"
 #include "device-configuration.h"
 #include "diagnostics.h"
+#include "pci-links.h"
 #include "platform-environmental.h"
 
 #include "utils.hpp"
@@ -157,15 +158,18 @@ class MockupResponderTest : public Test
 
     template <typename RequestPayload, typename ResponseStruct,
               typename MockupFunction>
-    void test(std::function<int(uint8_t, RequestPayload, nsm_msg*)>
+    void test(std::function<int(uint8_t, const RequestPayload*, nsm_msg*)>
                   encodeRequestFunction,
-              RequestPayload requestPayload, MockupFunction handlerFunction,
+              RequestPayload& requestPayload, MockupFunction handlerFunction,
               uint8_t command, ResponseStruct& response)
     {
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
-                        sizeof(RequestPayload));
+                            sizeof(RequestPayload),
+                        0);
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-        auto rc = encodeRequestFunction(instanceId, requestPayload, requestMsg);
+        auto rc = encodeRequestFunction(
+            instanceId, const_cast<const RequestPayload*>(&requestPayload),
+            requestMsg);
         EXPECT_EQ(rc, NSM_SW_SUCCESS);
         auto handler = std::bind_front(handlerFunction, mockupResponder.get());
         test(requestMsg, request.size(), handler, command, response);
@@ -391,17 +395,17 @@ TEST_F(MockupResponderTest, testGetSupportedErrorInjectionTypesHandler)
 TEST_F(MockupResponderTest, testSetCurrentErrorInjectionTypesHandler)
 {
     nsm_error_injection_types_mask data = {0, 0, 0, 0, 0, 0, 0, 0};
+    nsm_common_resp response;
     for (const auto& [type, _] :
          mockupResponder->state.errorInjection[NSM_DEV_ID_GPU])
     {
         data.mask[type / 8] |= (1 << (type % 8));
     }
-    test<const nsm_error_injection_types_mask*>(
-        &encode_set_current_error_injection_types_v1_req,
-        const_cast<const nsm_error_injection_types_mask*>(&data),
+    test<nsm_error_injection_types_mask>(
+        &encode_set_current_error_injection_types_v1_req, data,
         &MockupResponder::MockupResponder::
             setCurrentErrorInjectionTypesV1Handler,
-        NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1);
+        NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1, response);
 }
 TEST_F(MockupResponderTest, testGetCurrentErrorInjectionTypesHandler)
 {
@@ -473,4 +477,49 @@ TEST_F(MockupResponderTest, testGetViolationDurationHandler)
     test(&encode_get_violation_duration_req,
          &MockupResponder::MockupResponder::getViolationDurationHandler,
          NSM_GET_VIOLATION_DURATION, response);
+}
+
+TEST_F(MockupResponderTest, testListAvailablePciePortsHandler)
+{
+    nsm_list_available_pcie_ports_resp response;
+    test(&encode_list_available_pcie_ports_req,
+         &MockupResponder::MockupResponder::getListAvailablePciePortsHandler,
+         NSM_LIST_AVAILABLE_PCIE_PORTS, response);
+}
+
+struct QueryScalarGroupTelemetryV1GroupReqData
+{
+    uint8_t deviceId;
+    uint8_t groupId;
+} __attribute__((packed));
+
+auto encodeQueryScalarGroupTelemetryV1Req()
+{
+    return
+        [&](uint8_t instanceId,
+            const QueryScalarGroupTelemetryV1GroupReqData* data, nsm_msg* msg) {
+        return encode_query_scalar_group_telemetry_v1_req(
+            instanceId, data->deviceId, data->groupId, msg);
+    };
+}
+
+TEST_F(MockupResponderTest, testQueryScalarGroup10TelemetryHandler)
+{
+    QueryScalarGroupTelemetryV1GroupReqData data = {0, GROUP_ID_10};
+    nsm_query_scalar_group_telemetry_v1_group_10_resp response;
+    test<QueryScalarGroupTelemetryV1GroupReqData>(
+        encodeQueryScalarGroupTelemetryV1Req(), data,
+        &MockupResponder::MockupResponder::queryScalarGroupTelemetryHandler,
+        NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, response);
+}
+TEST_F(MockupResponderTest, testMultiportQueryScalarGroup10TelemetryHandler)
+{
+    nsm_multiport_query_scalar_group_telemetry_v1_req_data data = {
+        NSM_PORT_TYPE_UPSTREAM, 0, 0, 0, GROUP_ID_10};
+    nsm_query_scalar_group_telemetry_v1_group_10_resp response;
+    test<nsm_multiport_query_scalar_group_telemetry_v1_req_data>(
+        &encode_multiport_query_scalar_group_telemetry_v1_req, data,
+        &MockupResponder::MockupResponder::
+            queryMultiportScalarGroupTelemetryHandler,
+        NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1, response);
 }

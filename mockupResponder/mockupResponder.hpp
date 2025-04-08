@@ -259,9 +259,12 @@ class MockupResponder
                                      uint8_t status, uint64_t last_restart_time,
                                      uint64_t last_restart_duration);
 
-    std::optional<std::vector<uint8_t>>
+    std::optional<Response>
         queryScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
+    std::optional<Response>
+        queryMultiportScalarGroupTelemetryHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen);
     std::optional<std::vector<uint8_t>>
         queryAvailableAndClearableScalarGroupHandler(const nsm_msg* requestMsg,
                                                      size_t requestLen);
@@ -453,8 +456,14 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         setEgmModeHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<Request>
+        getListAvailablePciePortsHandler(const nsm_msg* requestMsg,
+                                         size_t requestLen);
 
   private:
+    std::optional<Request>
+        getQueryScalarGroupTelemetryResponse(uint8_t requestInstanceId,
+                                             uint32_t groupId);
     sdeventplus::Event& event;
     bool verbose;
     uint8_t mockEid;

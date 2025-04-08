@@ -1,7 +1,26 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2024 NVIDIA CORPORATION &
+ * AFFILIATES. All rights reserved. SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "base.h"
 #include "pci-links.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+
+#include "common-tests.hpp"
 
 TEST(queryScalarGroupTelemetryV1, testGoodEncodeRequest)
 {
@@ -1781,4 +1800,126 @@ TEST(QueryAvailableAndClearableScalarDataSource, testBadDecodeResponse)
 	    response, msg_len, &cc, &data_size, &reason_code, &mask_length,
 	    (uint8_t *)available_source, (uint8_t *)clearable_source);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(ListAvailablePciePorts, testRequest)
+{
+	testEncodeCommonRequest(&encode_list_available_pcie_ports_req,
+				NSM_TYPE_PCI_LINK,
+				NSM_LIST_AVAILABLE_PCIE_PORTS);
+	testDecodeCommonRequest(&decode_list_available_pcie_ports_req,
+				NSM_TYPE_PCI_LINK,
+				NSM_LIST_AVAILABLE_PCIE_PORTS);
+}
+
+TEST(ListAvailablePciePorts, testResponse)
+{
+	const size_t payloadSize =
+	    sizeof(uint16_t) + sizeof(nsm_pcie_upstream_port_info) * 2;
+	Response responseMsg(sizeof(nsm_common_resp) + payloadSize);
+	auto &resp = *reinterpret_cast<nsm_list_available_pcie_ports_resp *>(
+	    responseMsg.data());
+	Response expectedResponseMsg(sizeof(nsm_common_resp) + payloadSize);
+	auto &info = reinterpret_cast<nsm_list_available_pcie_ports_resp *>(
+			 expectedResponseMsg.data())
+			 ->port_info;
+	nsm_pcie_upstream_port_info ports[2] = {
+	    {.type = 1, .downstream_ports_count = 2},
+	    {.type = 0, .downstream_ports_count = 2}};
+	info.ports_count = 2;
+	memcpy(info.ports, ports,
+	       info.ports_count * sizeof(nsm_pcie_upstream_port_info));
+
+	testEncodeResponse<nsm_list_available_pcie_ports_info>(
+	    &encode_list_available_pcie_ports_resp, NSM_TYPE_PCI_LINK,
+	    NSM_LIST_AVAILABLE_PCIE_PORTS, info, resp.port_info, payloadSize);
+	EXPECT_EQ(resp.port_info.ports_count, info.ports_count);
+	EXPECT_EQ(resp.port_info.ports[0].type, info.ports[0].type);
+	EXPECT_EQ(resp.port_info.ports[0].downstream_ports_count,
+		  info.ports[0].downstream_ports_count);
+
+	testDecodeResponse<nsm_list_available_pcie_ports_info>(
+	    &decode_list_available_pcie_ports_resp, NSM_TYPE_PCI_LINK,
+	    NSM_LIST_AVAILABLE_PCIE_PORTS, info, resp.port_info, payloadSize);
+	EXPECT_EQ(resp.port_info.ports_count, info.ports_count);
+	EXPECT_EQ(resp.port_info.ports[0].type, info.ports[0].type);
+	EXPECT_EQ(resp.port_info.ports[0].downstream_ports_count,
+		  info.ports[0].downstream_ports_count);
+}
+
+TEST(ListAvailablePciePorts, testBadDataResponse)
+{
+	Response responseMsg(NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN);
+	auto resp = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reasonCode = ERR_NULL;
+	nsm_list_available_pcie_ports_info info{1, {{2, 2}}};
+
+	auto rc = encode_list_available_pcie_ports_resp(
+	    0, NSM_SUCCESS, reasonCode, &info, resp);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_list_available_pcie_ports_resp(resp, responseMsg.size(),
+						   &cc, &reasonCode, &info);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(MultiportQueryScalarGroupTelemetry, testRequest)
+{
+	const nsm_multiport_query_scalar_group_telemetry_v1_req_data data = {
+	    NSM_PORT_TYPE_DOWNSTREAM, 1, 0, 1, GROUP_ID_10};
+	nsm_multiport_query_scalar_group_telemetry_v1_req req;
+
+	testEncodeRequest<
+	    nsm_multiport_query_scalar_group_telemetry_v1_req_data>(
+	    &encode_multiport_query_scalar_group_telemetry_v1_req,
+	    NSM_TYPE_PCI_LINK, NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1,
+	    data, req.data);
+
+	testDecodeRequest<
+	    nsm_multiport_query_scalar_group_telemetry_v1_req_data>(
+	    &decode_multiport_query_scalar_group_telemetry_v1_req,
+	    NSM_TYPE_PCI_LINK, NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V1,
+	    data, req.data);
+
+	EXPECT_EQ(NSM_PORT_TYPE_DOWNSTREAM, req.data.type);
+	EXPECT_EQ(1, req.data.upstream_port_index);
+	EXPECT_EQ(0, req.data.index);
+	EXPECT_EQ(1, req.data.device_index);
+	EXPECT_EQ(GROUP_ID_10, req.data.group_index);
+}
+
+TEST(QueryScalarGroupTelemetryGroup10, testResponse)
+{
+	const nsm_query_scalar_group_telemetry_group_10 data = {
+	    DS_ID_0, DS_ID_1, DS_ID_2, DS_ID_3, DS_ID_4,  DS_ID_5,
+	    DS_ID_6, DS_ID_7, DS_ID_8, DS_ID_9, DS_ID_10,
+	};
+	nsm_query_scalar_group_telemetry_v1_group_10_resp resp;
+
+	testEncodeResponse<nsm_query_scalar_group_telemetry_group_10>(
+	    &encode_query_scalar_group_telemetry_v1_group10_resp,
+	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
+	    resp.data);
+
+	testDecodeResponse<nsm_query_scalar_group_telemetry_group_10>(
+	    &decode_query_scalar_group_telemetry_v1_group10_resp,
+	    NSM_TYPE_PCI_LINK, NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1, data,
+	    resp.data);
+
+	EXPECT_EQ(DS_ID_0, resp.data.outbound_read_tlp_count);
+	EXPECT_EQ(DS_ID_1,
+		  resp.data.dwords_transferred_in_outbound_read_tlp_high);
+	EXPECT_EQ(DS_ID_2,
+		  resp.data.dwords_transferred_in_outbound_read_tlp_low);
+	EXPECT_EQ(DS_ID_3, resp.data.outbound_write_tlp_count);
+	EXPECT_EQ(DS_ID_4,
+		  resp.data.dwords_transferred_in_outbound_write_tlp_high);
+	EXPECT_EQ(DS_ID_5,
+		  resp.data.dwords_transferred_in_outbound_write_tlp_low);
+	EXPECT_EQ(DS_ID_6, resp.data.outbound_completion_tlp_count);
+	EXPECT_EQ(DS_ID_7, resp.data.dwords_transferred_in_outbound_completion);
+	EXPECT_EQ(DS_ID_8, resp.data.read_requests_dropped_tag_unavailable);
+	EXPECT_EQ(DS_ID_9, resp.data.read_requests_dropped_credit_exhaustion);
+	EXPECT_EQ(DS_ID_10, resp.data.read_requests_dropped_credit_not_posted);
 }

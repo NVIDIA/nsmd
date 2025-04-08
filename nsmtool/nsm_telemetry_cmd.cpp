@@ -2580,7 +2580,6 @@ class QueryScalarGroupTelemetry : public CommandInterface
         auto scalarTelemetryOptionGroup = app->add_option_group(
             "Required", "Group Id for which data source is to be retrieved.");
 
-        groupId = 9;
         scalarTelemetryOptionGroup->add_option("-d, --deviceIndex", deviceIndex,
                                                "retrieve deviceIndex");
         scalarTelemetryOptionGroup->add_option(
@@ -2588,7 +2587,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
         scalarTelemetryOptionGroup->require_option(2);
     }
 
-    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    virtual std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(
             sizeof(nsm_msg_hdr) +
@@ -2900,6 +2899,65 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 break;
             }
 
+            case GROUP_ID_10:
+            {
+                nsm_query_scalar_group_telemetry_group_10 data;
+                uint16_t reasonCode = ERR_NULL;
+
+                auto rc = decode_query_scalar_group_telemetry_v1_group10_resp(
+                    responsePtr, payloadLength, &cc, &reasonCode, &data);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr
+                        << "Response message error: "
+                        << "rc=" << rc << ", cc=" << (int)cc
+                        << ", reasonCode=" << (int)reasonCode << "\n"
+                        << payloadLength << "...."
+                        << (sizeof(struct nsm_msg_hdr) +
+                            sizeof(
+                                struct
+                                nsm_query_scalar_group_telemetry_v1_group_10_resp));
+
+                    return;
+                }
+
+                uint64_t dwordsTransferredInOutboundReadTlp =
+                    (uint64_t(data.dwords_transferred_in_outbound_read_tlp_high)
+                     << 32) |
+                    (uint64_t(
+                        data.dwords_transferred_in_outbound_read_tlp_low));
+
+                uint64_t dwordsTransferredInOutboundWriteTlp =
+                    (uint64_t(
+                         data.dwords_transferred_in_outbound_write_tlp_high)
+                     << 32) |
+                    (uint64_t(
+                        data.dwords_transferred_in_outbound_write_tlp_low));
+
+                ordered_json result;
+                result["Completion Code"] = cc;
+                result["Outbound Read TLP Count"] =
+                    uint32_t(data.outbound_read_tlp_count);
+                result["DWORDs Transferred in Outbound Read TLP"] =
+                    dwordsTransferredInOutboundReadTlp;
+                result["Outbound Write TLP Count"] =
+                    uint32_t(data.outbound_write_tlp_count);
+                result["DWORDs Transferred in Outbound Write TLP"] =
+                    dwordsTransferredInOutboundWriteTlp;
+                result["Outbound Completion TLP Count"] =
+                    uint32_t(data.outbound_completion_tlp_count);
+                result["DWORDs Transferred in Outbound Completion"] =
+                    uint32_t(data.dwords_transferred_in_outbound_completion);
+                result["Read Requests Dropped (Tag Unavailable)"] =
+                    uint32_t(data.read_requests_dropped_tag_unavailable);
+                result["Read Requests Dropped (Credit Exhaustion)"] =
+                    uint32_t(data.read_requests_dropped_credit_exhaustion);
+                result["Read Requests Dropped (Credit Not Posted)"] =
+                    uint32_t(data.read_requests_dropped_credit_not_posted);
+                nsmtool::helper::DisplayInJson(result);
+                break;
+            }
+
             default:
             {
                 std::cerr << "Invalid Group Id \n";
@@ -2908,9 +2966,65 @@ class QueryScalarGroupTelemetry : public CommandInterface
         }
     }
 
-  private:
+  protected:
     uint8_t deviceIndex;
     uint8_t groupId;
+};
+
+class QueryMultiportScalarGroupTelemetry : public QueryScalarGroupTelemetry
+{
+  public:
+    ~QueryMultiportScalarGroupTelemetry() = default;
+    QueryMultiportScalarGroupTelemetry() = delete;
+    QueryMultiportScalarGroupTelemetry(
+        const QueryMultiportScalarGroupTelemetry&) = delete;
+    QueryMultiportScalarGroupTelemetry(QueryMultiportScalarGroupTelemetry&&) =
+        default;
+    QueryMultiportScalarGroupTelemetry&
+        operator=(const QueryMultiportScalarGroupTelemetry&) = delete;
+    QueryMultiportScalarGroupTelemetry&
+        operator=(QueryMultiportScalarGroupTelemetry&&) = default;
+
+    explicit QueryMultiportScalarGroupTelemetry(const char* type,
+                                                const char* name,
+                                                CLI::App* app) :
+        QueryScalarGroupTelemetry(type, name, app)
+    {
+        auto multiportOptionGroup =
+            app->add_option_group("Required", "Multi PCI Port Identification.");
+
+        multiportOptionGroup->add_option(
+            "-t, --Type", this->type,
+            "Port Type (0 - Upstream, 1 - Downstream)");
+        multiportOptionGroup->add_option("-u, --UpstreamPortIndex",
+                                         this->upstreamPortIndex,
+                                         "Upstream Port Index");
+        multiportOptionGroup->add_option("-i, --Index", this->index,
+                                         "Port Index");
+        multiportOptionGroup->require_option(3);
+    }
+
+    std::pair<int, Request> createRequestMsg() override
+    {
+        Request requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_multiport_query_scalar_group_telemetry_v1_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        const nsm_multiport_query_scalar_group_telemetry_v1_req_data data{
+            .type = type,
+            .upstream_port_index = upstreamPortIndex,
+            .index = index,
+            .device_index = deviceIndex,
+            .group_index = groupId};
+        auto rc = encode_multiport_query_scalar_group_telemetry_v1_req(
+            instanceId, &data, request);
+        return {rc, requestMsg};
+    }
+
+  private:
+    uint8_t type;
+    uint8_t upstreamPortIndex;
+    uint8_t index;
 };
 
 class QueryAvailableAndClearableScalarGroup : public CommandInterface
@@ -4589,6 +4703,59 @@ class GetViolationDuration : public CommandInterface
     }
 };
 
+class GetListAvailablePciePorts : public CommandInterface
+{
+  public:
+    GetListAvailablePciePorts() = delete;
+    GetListAvailablePciePorts(const GetListAvailablePciePorts&) = delete;
+    GetListAvailablePciePorts(GetListAvailablePciePorts&&) = default;
+    GetListAvailablePciePorts&
+        operator=(const GetListAvailablePciePorts&) = delete;
+    GetListAvailablePciePorts& operator=(GetListAvailablePciePorts&&) = delete;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_list_available_pcie_ports_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        struct nsm_list_available_pcie_ports_info info;
+        auto rc = decode_list_available_pcie_ports_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &info);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n"
+                      << payloadLength << "...."
+                      << NSM_LIST_AVAILABLE_PCIE_PORTS_RESPONSE_MIN_LEN;
+
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Upstream Ports Count"] = uint16_t(info.ports_count);
+        for (uint16_t i = 0; i < info.ports_count; i++)
+        {
+            result["Ports"][i]["Type"] = info.ports[i].type == 0 ? "External"
+                                                                 : "Internal";
+            result["Ports"][i]["Downstream Ports Count"] =
+                uint16_t(info.ports[i].downstream_ports_count);
+        }
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -4828,6 +4995,18 @@ void registerCommand(CLI::App& app)
         "GetViolationDuration", "get processor throttle duration");
     commands.push_back(std::make_unique<GetViolationDuration>(
         "telemetry", "GetViolationDuration", getViolationDuration));
+
+    auto getListAvailablePciePorts = telemetry->add_subcommand(
+        "GetListAvailablePciePorts", "get list of available PCIe ports");
+    commands.push_back(std::make_unique<GetListAvailablePciePorts>(
+        "telemetry", "GetListAvailablePciePorts", getListAvailablePciePorts));
+
+    auto queryMultiportScalarGroupTelemetry = telemetry->add_subcommand(
+        "QueryMultiportScalarGroupTelemetry",
+        "Get Multiport Scalar Data Telemetry for groupId");
+    commands.push_back(std::make_unique<QueryMultiportScalarGroupTelemetry>(
+        "telemetry", "QueryMultiportScalarGroupTelemetry",
+        queryMultiportScalarGroupTelemetry));
 }
 
 } // namespace telemetry
