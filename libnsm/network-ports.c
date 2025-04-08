@@ -284,6 +284,99 @@ int decode_get_system_guid_resp(const struct nsm_msg *msg, size_t msg_len,
 }
 #endif
 
+int encode_get_nvlink_agg_led_status_req(uint8_t instance_id,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_nvlink_agg_led_status_req *request =
+	    (struct nsm_get_nvlink_agg_led_status_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_NVLINK_LED_STATUS;
+	request->hdr.data_size = 0x00;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_nvlink_agg_led_status_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code,
+					  enum nsm_nvlink_led_state *led_state)
+{
+	// NOTE: Decode reason code function checks pointers passed in
+	// (msg, msg_len, cc, and reason_code)
+	// so they are not checked here before use
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (led_state == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_nvlink_agg_led_status_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_nvlink_agg_led_status_resp *response =
+	    (struct nsm_get_nvlink_agg_led_status_resp *)msg->payload;
+
+	if (response->hdr.data_size < 9) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	uint8_t led_status_byte = response->LED_State_Aggregate;
+
+	// The top bit of the led state byte indicates an invalid state
+	// so we will check it before reading the value
+	if ((led_status_byte >> 7) == 1) {
+		// First 3 bits provide LED state, so we will mask them off
+		switch (led_status_byte & 0x07) {
+		case 0:
+			*led_state = NSM_NVLINK_LED_GREEN;
+			break;
+		case 1: // Blinking at 0.5 Hz
+		case 2: // Blinking at 1 Hz
+		case 3: // Blinking at 2 Hz
+		case 4: // Blinking at 4 Hz
+			*led_state = NSM_NVLINK_LED_GREEN_BLINK;
+			break;
+		case 5:
+			*led_state = NSM_NVLINK_LED_AMBER;
+			break;
+		case 6:
+			*led_state = NSM_NVLINK_LED_OFF;
+			break;
+		case 7: // Blinking at 1 Hz
+			*led_state = NSM_NVLINK_LED_AMBER_BLINK;
+			break;
+		default:
+			*led_state = NSM_NVLINK_LED_ERROR;
+			break;
+		}
+	} else {
+		*led_state = NSM_NVLINK_LED_ERROR;
+
+		return NSM_ERR_INVALID_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_get_port_telemetry_counter_req(uint8_t instance_id,
 					  uint8_t port_number,
 					  struct nsm_msg *msg)

@@ -3,6 +3,7 @@ sources += [
     'nsmChassis/nsmNVSwitchAndNVMgmtNICChassisAssembly.cpp',
     'nsmChassis/nsmPCIeRetimer.cpp',
     'nsmChassis/nsmChassis.cpp',
+    'nsmChassis/nsmChassisLED.cpp',
     'nsmChassis/nsmChassisAssembly.cpp',
     'nsmChassis/nsmChassisPCIeDevice.cpp',
     'nsmChassis/nsmChassisPCIeSlot.cpp',

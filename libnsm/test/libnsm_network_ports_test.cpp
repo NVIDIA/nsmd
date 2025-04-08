@@ -20,6 +20,158 @@
 #include <cstring>
 #include <gtest/gtest.h>
 
+TEST(queryNvlinkLED, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_nvlink_agg_led_status_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	auto rc = encode_get_nvlink_agg_led_status_req(0, request);
+
+	nsm_get_nvlink_agg_led_status_req *req =
+	    reinterpret_cast<nsm_get_nvlink_agg_led_status_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_NVLINK_LED_STATUS, req->hdr.command);
+	EXPECT_EQ(0, req->hdr.data_size);
+}
+
+TEST(queryNvlinkLED, testBadEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_nvlink_agg_led_status_req));
+
+	auto rc = encode_get_nvlink_agg_led_status_req(0, nullptr);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(queryNvlinkLED, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		       // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_NVLINK_LED_STATUS, // command
+	    0x00,
+	    0x00,
+	    0x00,
+	    9, // data size
+	    0x00,
+	    0x87, // Aggregate LED status
+	    0x00, // GPU_0
+	    0x00, // GPU_1
+	    0x00, // GPU_2
+	    0x00, // GPU_3
+	    0x00, // GPU_4
+	    0x00, // GPU_5
+	    0x00, // GPU_6
+	    0x00  // GPU_7
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+	uint8_t cc;
+	uint16_t reason_code;
+
+	nsm_nvlink_led_state ledStatus = NSM_NVLINK_LED_ERROR;
+	auto rc = decode_get_nvlink_agg_led_status_resp(
+	    request, msg_len, &cc, &reason_code, &ledStatus);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_NVLINK_LED_AMBER_BLINK, ledStatus);
+}
+
+TEST(queryNvlinkLED, testBadDecodeResponse)
+{
+
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x80,		       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		       // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_NVLINK_LED_STATUS, // command
+	    0x00,
+	    0x00,
+	    0x00,
+	    8, // data size, should be 9
+	    0x00,
+	    0x87, // Aggregate LED status
+	    0x00, // GPU_0
+	    0x00, // GPU_1
+	    0x00, // GPU_2
+	    0x00, // GPU_3
+	    0x00, // GPU_4
+	    0x00, // GPU_5
+	    0x00, // GPU_6
+	    0x00  // GPU_7
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	nsm_nvlink_led_state ledStatus = NSM_NVLINK_LED_ERROR;
+
+	size_t msg_len = sizeof(struct nsm_msg_hdr) +
+			 sizeof(nsm_get_nvlink_agg_led_status_resp);
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	auto rc = decode_get_nvlink_agg_led_status_resp(
+	    nullptr, 0, &cc, &reason_code, &ledStatus);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_nvlink_agg_led_status_resp(request, 0, &cc,
+						   &reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_nvlink_agg_led_status_resp(request, 0, &cc,
+						   &reason_code, &ledStatus);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_nvlink_agg_led_status_resp(request, msg_len, &cc,
+						   &reason_code, &ledStatus);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+
+	std::vector<uint8_t> request_msg_2{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x80,		       // RQ=1, D=0, RSVD=0,
+	    0x89,		       // OCP_TYPE=1, OCP_VER=1,
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_NVLINK_LED_STATUS, // command
+	    0x00,
+	    0x00,
+	    0x00,
+	    9, // data size
+	    0x00,
+	    0x07, // Aggregate LED status: Invalid status
+	    0x00, // GPU_0
+	    0x00, // GPU_1
+	    0x00, // GPU_2
+	    0x00, // GPU_3
+	    0x00, // GPU_4
+	    0x00, // GPU_5
+	    0x00, // GPU_6
+	    0x00  // GPU_7
+	};
+	request = reinterpret_cast<nsm_msg *>(request_msg_2.data());
+
+	rc = decode_get_nvlink_agg_led_status_resp(request, msg_len, &cc,
+						   &reason_code, &ledStatus);
+	EXPECT_EQ(rc, NSM_ERR_INVALID_DATA);
+}
+
 TEST(getPortTelemetryCounter, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> request_msg(
