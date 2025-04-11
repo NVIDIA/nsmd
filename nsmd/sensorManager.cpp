@@ -662,6 +662,7 @@ requester::Coroutine
                     nsmDevice->getInstanceNumber());
 
                 nsmDevice->eid = *foundEID;
+                nsmDevice->isDeviceActive = true;
                 co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
                 nsmDevice->setOnline();
                 continue;

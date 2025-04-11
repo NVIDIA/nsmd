@@ -18,6 +18,7 @@
 #include "base.h"
 #include "device-capability-discovery.h"
 #include <gtest/gtest.h>
+#include "common-tests.hpp"
 
 TEST(encode_nsm_get_supported_event_source_req, testGoodEncodeRequest)
 {
@@ -88,6 +89,35 @@ TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
 	EXPECT_EQ(event_sources[5].byte, 6);
 	EXPECT_EQ(event_sources[6].byte, 7);
 	EXPECT_EQ(event_sources[7].byte, 8);
+}
+
+TEST(nsm_get_event_subscription, testRequest)
+{
+	testEncodeCommonRequest(encode_nsm_get_event_subscription_req,
+			  NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+			  NSM_GET_EVENT_SUBSCRIPTION);
+	testDecodeCommonRequest(decode_nsm_get_event_subscription_req,
+				NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				NSM_GET_EVENT_SUBSCRIPTION);
+}
+
+TEST(nsm_get_event_subscription, testResponse)
+{
+	auto encodeNsmGetEventSubscriptionResp = [](uint8_t instanceId, uint8_t cc, uint16_t reasonCode, const uint8_t *data, nsm_msg *msg) {
+        if(data == nullptr) {
+            return (int)NSM_SW_ERROR_NULL;
+        }
+		return encode_nsm_get_event_subscription_resp(instanceId, cc, reasonCode, *data, msg);
+	};
+    uint8_t receiverEid = 8;
+    uint8_t expectedReceiverEid = 8;
+
+    testEncodeResponse<uint8_t>(encodeNsmGetEventSubscriptionResp,
+			  NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+			  NSM_GET_EVENT_SUBSCRIPTION, expectedReceiverEid, receiverEid);
+	testDecodeResponse<uint8_t>(&decode_nsm_get_event_subscription_resp,
+				NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				NSM_GET_EVENT_SUBSCRIPTION, expectedReceiverEid, receiverEid);
 }
 
 TEST(encode_nsm_set_event_subscription_req, testGoodEncodeRequest)

@@ -110,6 +110,15 @@ struct nsm_set_event_subscription_req {
 	uint8_t receiver_endpoint_id;
 } __attribute__((packed));
 
+/** @struct nsm_get_event_subscription_resp
+ *
+ *  Structure representing NSM get event subscription response
+ */
+struct nsm_get_event_subscription_resp {
+	struct nsm_common_resp hdr;
+	uint8_t receiver_endpoint_id;
+} __attribute__((packed));
+
 /** @struct nsm_set_event_subscription_resp
  *
  *  Structure representing NSM set event subscription respones
@@ -226,6 +235,52 @@ int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
  */
 int decode_nsm_set_current_event_sources_resp(const struct nsm_msg *msg,
 					      size_t msg_len, uint8_t *cc);
+
+/** @brief Create a get event subscription request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_sw_codes
+ */
+int encode_nsm_get_event_subscription_req(uint8_t instance_id,
+					  struct nsm_msg *msg);
+
+/** @brief Decode a get event subscription request message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @return nsm_sw_codes
+ */
+int decode_nsm_get_event_subscription_req(const struct nsm_msg *msg,
+					  size_t msg_len);
+
+/** @brief Create a get event subscription response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[in] receiver_eid - Receiver endpoint ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_sw_codes
+ */
+int encode_nsm_get_event_subscription_resp(uint8_t instance_id, uint8_t cc,
+					   uint16_t reason_code,
+					   uint8_t receiver_eid,
+					   struct nsm_msg *msg);
+
+/** @brief Decode a get event subscription response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - Reason code
+ *  @param[out] receiver_eid - Receiver endpoint ID
+ *  @return nsm_sw_codes
+ */
+int decode_nsm_get_event_subscription_resp(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *cc,
+					   uint16_t *reason_code,
+					   uint8_t *receiver_eid);
 
 /** @brief Create a set event subscription request message
  *

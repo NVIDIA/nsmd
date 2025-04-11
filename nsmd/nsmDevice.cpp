@@ -24,6 +24,7 @@
 #include "sensorManager.hpp"
 #include "utils.hpp"
 #include "nsmFwSwInventory/GPUSWInventory.hpp"
+#include "nsmMsgTypesSensor.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -296,6 +297,13 @@ int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,
 
     // Call the `handle` method directly on the instance
     return sensorInstance->handle(eid, type, eventId, event, eventLen);
+}
+
+void NsmDevice::initMsgTypesSensor()
+{
+    msgTypesSensor = std::make_shared<NsmMsgTypes>(
+            "Supported Message Types", "NSM_NVIDIA_MESSAGE_TYPE", *this);
+    addSensor(msgTypesSensor, false);
 }
 
 } // namespace nsm

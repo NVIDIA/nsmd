@@ -62,7 +62,11 @@ class NsmDevice
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
-    {}
+    {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        initMsgTypesSensor();
+#endif
+    }
 
     NsmDevice(uint8_t deviceType, uint8_t instanceNumber) :
         isDeviceActive(false),
@@ -71,7 +75,11 @@ class NsmDevice
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
         instanceNumber(instanceNumber)
-    {}
+    {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        initMsgTypesSensor();
+#endif
+    }
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
     std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
@@ -91,7 +99,9 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
-    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor = nullptr; // for GPU driver
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor =
+        nullptr; // for GPU driver
+    std::shared_ptr<NsmObject> msgTypesSensor = nullptr;
 
     EventDispatcher eventDispatcher;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
@@ -210,6 +220,8 @@ class NsmDevice
 
     // init to a known value
     PollingState devicePollingState = POLL_NON_PRIORITY;
+
+    void initMsgTypesSensor();
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

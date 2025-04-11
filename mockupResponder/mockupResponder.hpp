@@ -119,6 +119,8 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setSwitchIsolationMode(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
