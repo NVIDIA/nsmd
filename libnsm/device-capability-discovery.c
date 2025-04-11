@@ -77,6 +77,90 @@ int decode_nsm_get_supported_event_source_resp(
 	return NSM_SUCCESS;
 }
 
+int encode_nsm_get_event_subscription_req(uint8_t instance_id,
+					  struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id,
+				 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				 NSM_GET_EVENT_SUBSCRIPTION, msg);
+}
+
+int decode_nsm_get_event_subscription_req(const struct nsm_msg *msg,
+					  size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_nsm_get_event_subscription_resp(uint8_t instance_id, uint8_t cc,
+					   uint16_t reason_code,
+					   uint8_t receiver_eid,
+					   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY};
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_EVENT_SUBSCRIPTION, msg);
+	}
+
+	struct nsm_get_event_subscription_resp *response =
+	    (struct nsm_get_event_subscription_resp *)msg->payload;
+
+	response->hdr.command = NSM_GET_EVENT_SUBSCRIPTION;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = htole16(1);
+	response->receiver_endpoint_id = receiver_eid;
+
+	return NSM_SUCCESS;
+}
+
+int decode_nsm_get_event_subscription_resp(const struct nsm_msg *msg,
+					   size_t msg_len, uint8_t *cc,
+					   uint16_t *reason_code,
+					   uint8_t *receiver_eid)
+{
+	if (msg == NULL || receiver_eid == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_get_event_subscription_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_event_subscription_resp *response =
+	    (struct nsm_get_event_subscription_resp *)msg->payload;
+
+	response->hdr.data_size = le16toh(response->hdr.data_size);
+	if (response->hdr.data_size != 1) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*receiver_eid = response->receiver_endpoint_id;
+
+	return NSM_SUCCESS;
+}
+
 int encode_nsm_set_event_subscription_req(uint8_t instance_id,
 					  uint8_t global_setting,
 					  uint8_t receiver_eid,

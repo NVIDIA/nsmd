@@ -40,9 +40,7 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
 requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    auto localEid = manager.getLocalEid();
-    rc = co_await setEventSubscription(manager, eid, eventGenerationSetting,
-                                       localEid);
+    rc = co_await setEventSubscription(manager, eid);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -57,15 +55,14 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 }
 
 requester::Coroutine
-    NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid,
-                                          uint8_t globalSettting,
-                                          eid_t receiverEid)
+    NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_event_subscription_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto rc = encode_nsm_set_event_subscription_req(0, globalSettting,
-                                                    receiverEid, requestMsg);
+    auto localEid = manager.getLocalEid();
+    auto rc = encode_nsm_set_event_subscription_req(0, eventGenerationSetting,
+                                                    localEid, requestMsg);
 
     if (rc)
     {
@@ -96,7 +93,68 @@ requester::Coroutine
             "EID", eid, "RC", rc);
     }
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
+}
+
+NsmGetEventSetting::NsmGetEventSetting(
+    const std::string& name, const std::string& type,
+    std::shared_ptr<NsmEventSetting> eventSetting) :
+    NsmObject(name, type),
+    eventSetting(eventSetting)
+{}
+
+requester::Coroutine NsmGetEventSetting::update(SensorManager& manager,
+                                                eid_t eid)
+{
+    Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_nsm_get_event_subscription_req(0, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug("encode_nsm_get_event_subscription_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return rc;
+    }
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::debug(
+            "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", eid);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    auto localEid = manager.getLocalEid();
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t receiver_eid = 0;
+    rc = decode_nsm_get_event_subscription_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code, &receiver_eid);
+
+    // if the response is not successful or receiver_eid is not equal to
+    // localEid, we need to call setEventSubscription
+    if ((cc != NSM_SUCCESS && rc == NSM_SW_SUCCESS) || receiver_eid != localEid)
+    {
+        lg2::error(
+            "NsmGetEventSetting update failed, cc={CC}, rc={RC}, receiver_eid={RECEIVER_EID}, localEid={LOCAL_EID}",
+            "CC", cc, "RC", rc, "RECEIVER_EID", receiver_eid, "LOCAL_EID",
+            localEid);
+        rc = co_await eventSetting->setEventSubscription(manager, eid);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
+                       eid, "RC", rc);
+        }
+    }
+
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
 }
 
 static requester::Coroutine createNsmEventSetting(SensorManager& manager,
@@ -135,10 +193,13 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
 
     auto sensor = std::make_shared<NsmEventSetting>(
         name, type, eventGenerationSetting, nsmDevice);
+    auto getEventSensor = std::make_shared<NsmGetEventSetting>(name, type,
+                                                               sensor);
     nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);
+    nsmDevice->addSensor(getEventSensor, false);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
