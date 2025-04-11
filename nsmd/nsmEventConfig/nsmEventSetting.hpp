@@ -30,13 +30,37 @@ class NsmEventSetting : public NsmObject
                     std::shared_ptr<NsmDevice> nsmDevice);
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine setEventSubscription(SensorManager& manager,
+                                              eid_t eid);
 
   private:
-    requester::Coroutine setEventSubscription(SensorManager& manager, eid_t eid,
-                                              uint8_t globalSettting,
-                                              eid_t receiverEid);
     uint8_t eventGenerationSetting;
     std::shared_ptr<NsmDevice> nsmDevice;
+};
+
+/**
+ * @brief Class for retrieving and validating NSM event settings
+ *
+ * This class handles querying and validating event settings from NSM
+ * devices. It works in conjunction with NsmEventSetting to ensure proper event
+ * setup.
+ */
+class NsmGetEventSetting : public NsmObject
+{
+  public:
+    /**
+     * @brief Constructs a new NsmGetEventSetting object
+     *
+     * @param name The name identifier for this settings
+     * @param type The type identifier for this settings
+     * @param eventSetting Associated NsmEventSetting instance
+     */
+    NsmGetEventSetting(const std::string& name, const std::string& type,
+                       std::shared_ptr<NsmEventSetting> eventSetting);
+    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+
+  private:
+    std::shared_ptr<NsmEventSetting> eventSetting;
 };
 
 } // namespace nsm

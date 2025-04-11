@@ -66,7 +66,11 @@ class NsmDevice : public StateChangeLogger
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
-    {}
+    {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        initMsgTypesSensor();
+#endif
+    }
 
     NsmDevice(uint8_t deviceType, uint8_t instanceNumber,
               uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
@@ -76,7 +80,11 @@ class NsmDevice : public StateChangeLogger
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
         instanceNumber(instanceNumber), deviceRole(deviceRole)
-    {}
+    {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        initMsgTypesSensor();
+#endif
+    }
 
     std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
     std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
@@ -97,7 +105,9 @@ class NsmDevice : public StateChangeLogger
     std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
     std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
     std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor =
+
         nullptr; // for GPU driver
+    std::shared_ptr<NsmObject> msgTypesSensor = nullptr;
 
     EventDispatcher eventDispatcher;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
@@ -337,6 +347,8 @@ class NsmDevice : public StateChangeLogger
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
     PollingState devicePollingState = POLL_NON_PRIORITY;
+
+    void initMsgTypesSensor();
 
     /**
      * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority'

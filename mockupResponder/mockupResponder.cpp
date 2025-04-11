@@ -377,6 +377,8 @@ std::optional<Response>
                 case NSM_QUERY_DEVICE_IDENTIFICATION:
                     return queryDeviceIdentificationHandler(request,
                                                             requestLen);
+                case NSM_GET_EVENT_SUBSCRIPTION:
+                    return getEventSubscription(request, requestLen);
                 case NSM_SET_EVENT_SUBSCRIPTION:
                     return setEventSubscription(request, requestLen);
                 case NSM_SET_CURRENT_EVENT_SOURCES:
@@ -799,7 +801,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
                  {1, {1, 8, 9, 10, 11, 14, 68, 69}},
                  {2, {4}},
@@ -814,7 +816,7 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
-                 {0, {0, 1, 2, 5, 6, 9, 10}},
+                 {0, {0, 1, 2, 5, 6, 7, 9, 10}},
                  {1, {1}},
                  {NSM_TYPE_PCI_LINK,
                   {
@@ -833,7 +835,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_GPU,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
@@ -2149,6 +2151,35 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getEventSubscription(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getEventSubscription: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    auto rc = decode_nsm_get_event_subscription_req(requestMsg, requestLen);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_subscription_req failed RC={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    Response response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_subscription_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_get_event_subscription_resp(
+        requestMsg->hdr.instance_id,
+        eventReceiverEid == 0 ? NSM_ERROR : NSM_SUCCESS, ERR_NULL,
+        eventReceiverEid, responseMsg);
+    assert(rc == NSM_SUCCESS);
+
     return response;
 }
 
