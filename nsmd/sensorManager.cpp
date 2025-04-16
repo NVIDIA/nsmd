@@ -917,10 +917,11 @@ requester::Coroutine SensorManagerImpl::pollEvents([[maybe_unused]] eid_t eid)
 }
 
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uint8_t deviceType,
-                                                       uint8_t instanceNumber)
+                                                       uint8_t instanceNumber,
+                                                       uint8_t deviceRole)
 {
     return findNsmDeviceByIdentification(nsmDevices, deviceType, instanceNumber,
-                                         NSM_DEV_ROLE_RESERVED);
+                                         deviceRole);
 }
 std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
 {
