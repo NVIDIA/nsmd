@@ -49,20 +49,21 @@ class NsmRawCommandHandler : public NsmRawIntf
     NsmRawCommandHandler(sdbusplus::bus::bus& bus, const char* path);
     requester::Coroutine
         doSendRequest(uint8_t deviceType, uint8_t instanceId,
-                      uint8_t messageType, uint8_t commandCode,
-                      int duplicateFdHandle,
+                      uint8_t deviceRole, uint8_t messageType,
+                      uint8_t commandCode, int duplicateFdHandle,
                       std::shared_ptr<AsyncStatusIntf> statusInterface,
                       std::shared_ptr<AsyncValueIntf> valueInterface);
     requester::Coroutine doSendLongRunningRequest(
-        uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
-        uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
-        std::shared_ptr<AsyncStatusIntf> statusInterface,
+        uint8_t deviceType, uint8_t instanceId, uint8_t deviceRole,
+        bool isLongRunning, uint8_t messageType, uint8_t commandCode,
+        int duplicateFdHandle, std::shared_ptr<AsyncStatusIntf> statusInterface,
         std::shared_ptr<AsyncValueIntf> valueInterface);
 
   public:
     sdbusplus::message::object_path
-        sendRequest(uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
-                    uint8_t messageType, uint8_t commandCode,
+        sendRequest(uint8_t deviceType, uint8_t deviceRole, uint8_t instanceId,
+                    bool isLongRunning, uint8_t messageType,
+                    uint8_t commandCode,
                     sdbusplus::message::unix_fd fd) override;
 
     static void initialize(sdbusplus::bus::bus& bus, const char* path);

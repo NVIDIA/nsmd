@@ -72,9 +72,9 @@ static Response copyReasonCodeResponse(uint8_t cc, uint16_t reasonCode)
 }
 
 requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
-    uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
-    uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
-    std::shared_ptr<AsyncStatusIntf> statusInterface,
+    uint8_t deviceType, uint8_t instanceId, uint8_t deviceRole,
+    bool isLongRunning, uint8_t messageType, uint8_t commandCode,
+    int duplicateFdHandle, std::shared_ptr<AsyncStatusIntf> statusInterface,
     std::shared_ptr<AsyncValueIntf> valueInterface)
 {
     utils::CustomFD fd(duplicateFdHandle);
@@ -83,7 +83,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
     try
     {
         auto& manager = SensorManager::getInstance();
-        device = manager.getNsmDevice(deviceType, instanceId);
+        device = manager.getNsmDevice(deviceType, instanceId, deviceRole);
         if (!device)
         {
             statusInterface->status(AsyncOperationStatusType::InvalidArgument);
@@ -219,8 +219,8 @@ int NsmRawLongRunningEventHandler::handle(eid_t eid, NsmType, NsmEventId,
 }
 
 requester::Coroutine NsmRawCommandHandler::doSendRequest(
-    uint8_t deviceType, uint8_t instanceId, uint8_t messageType,
-    uint8_t commandCode, int duplicateFdHandle,
+    uint8_t deviceType, uint8_t instanceId, uint8_t deviceRole,
+    uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
     std::shared_ptr<AsyncStatusIntf> statusInterface,
     std::shared_ptr<AsyncValueIntf> valueInterface)
 {
@@ -237,7 +237,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                            data.size(), requestMsg);
 
         auto& manager = SensorManager::getInstance();
-        auto device = manager.getNsmDevice(deviceType, instanceId);
+        auto device = manager.getNsmDevice(deviceType, instanceId, deviceRole);
         if (!device)
         {
             throw std::invalid_argument(
@@ -305,9 +305,11 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     co_return rc;
 }
 
-sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
-    uint8_t deviceType, uint8_t instanceId, bool isLongRunning,
-    uint8_t messageType, uint8_t commandCode, sdbusplus::message::unix_fd fd)
+sdbusplus::message::object_path
+    NsmRawCommandHandler::sendRequest(uint8_t deviceType, uint8_t deviceRole,
+                                      uint8_t instanceId, bool isLongRunning,
+                                      uint8_t messageType, uint8_t commandCode,
+                                      sdbusplus::message::unix_fd fd)
 {
     if (deviceType > NSM_DEV_ID_MCTP_BRIDGE || messageType > NSM_TYPE_FIRMWARE)
     {
@@ -324,15 +326,15 @@ sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
 
     if (isLongRunning)
     {
-        doSendLongRunningRequest(deviceType, instanceId, isLongRunning,
-                                 messageType, commandCode, dup(fd),
-                                 statusInterface, valueInterface)
+        doSendLongRunningRequest(deviceType, instanceId, deviceRole,
+                                 isLongRunning, messageType, commandCode,
+                                 dup(fd), statusInterface, valueInterface)
             .detach();
     }
     else
     {
-        doSendRequest(deviceType, instanceId, messageType, commandCode, dup(fd),
-                      statusInterface, valueInterface)
+        doSendRequest(deviceType, instanceId, deviceRole, messageType,
+                      commandCode, dup(fd), statusInterface, valueInterface)
             .detach();
     }
 

@@ -80,7 +80,8 @@ class SensorManager
         return localEid;
     }
     std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
-                                            uint8_t instanceNumber);
+                                            uint8_t instanceNumber,
+                                            uint8_t deviceRole);
     std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
     // Static method to access the instance of the class
     static SensorManager& getInstance()
