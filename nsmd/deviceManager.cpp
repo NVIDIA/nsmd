@@ -710,9 +710,11 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
 {
     uint16_t deviceTypeAndRole = utils::combineDeviceTypeAndRole(deviceType,
                                                                  deviceRole);
+    bool foundInstanceMap = false;
     // remapping instanceNumber if needed.
     if (mapInstanceNumberToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
+        foundInstanceMap = true;
         auto& table = mapInstanceNumberToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), instanceNumber);
         if (mapInstanceNumberToLogger[deviceTypeAndRole][instanceNumber]
@@ -734,6 +736,7 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
     }
     else if (mapUuidToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
+        foundInstanceMap = true;
         auto& table = mapUuidToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), uuid);
         if (mapUuidToLogger[deviceTypeAndRole][uuid].shouldLog(
@@ -755,6 +758,7 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
     }
     else if (mapEidToInstanceNumber[deviceTypeAndRole].size() > 0)
     {
+        foundInstanceMap = true;
         auto& table = mapEidToInstanceNumber[deviceTypeAndRole];
         auto it = std::find(table.begin(), table.end(), eid);
         if (mapEidToLogger[deviceTypeAndRole][eid].shouldLog(
@@ -774,6 +778,13 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
             }
         }
     }
+    // Return 255 when mapping table for Device is present but EID is not
+    // present in that table
+    if (foundInstanceMap)
+    {
+        return UINT8_MAX;
+    }
+    // Return instance number return by EID if mapping table is not present.
     return instanceNumber;
 }
 
