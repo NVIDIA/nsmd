@@ -171,7 +171,7 @@ SocketInfo DaemonHandler::initSocket([[maybe_unused]] eid_t eid, int type,
     auto io = std::make_unique<IO>(
         event, sockFd, EPOLLIN,
         std::bind_front(&DaemonHandler::handleReceivedMsg, this));
-    io->set_priority(SD_EVENT_SOURCE_MAX_PRIORITY);
+    // io->set_priority(SD_EVENT_SOURCE_MAX_PRIORITY);
     socketInfoMap[pathName] = std::tuple(std::move(fd), sendBufferSize,
                                          std::move(io));
 
@@ -359,7 +359,7 @@ int InKernelHandler::registerMctpEndpoint(
     io = std::make_unique<IO>(
         event, fd, EPOLLIN,
         std::bind_front(&InKernelHandler::handleReceivedMsg, this));
-    io->set_priority(SD_EVENT_SOURCE_MAX_PRIORITY);
+    // io->set_priority(SD_EVENT_SOURCE_MAX_PRIORITY);
 
     manager.registerEndpoint(eid, fd, sendBufferSize);
 

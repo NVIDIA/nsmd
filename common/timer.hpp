@@ -93,7 +93,7 @@ class TimerAwaiter
             return false;      // Don't suspend on failure
         }
 
-        sd_event_source_set_priority(eventSource, SD_EVENT_PRIORITY_NORMAL);
+        // sd_event_source_set_priority(eventSource, SD_EVENT_PRIORITY_NORMAL);
         startTime = now;
         isRunning = true;
         return true; // Coroutine suspended successfully
@@ -114,7 +114,7 @@ class TimerAwaiter
                 rc = NSM_SW_ERROR; // Handle errors from adding the timer
                 return false;
             }
-            sd_event_source_set_priority(eventSource, SD_EVENT_PRIORITY_NORMAL);
+            // sd_event_source_set_priority(eventSource, SD_EVENT_PRIORITY_NORMAL);
         }
         return true;
     }
