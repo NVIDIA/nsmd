@@ -169,4 +169,52 @@ uint8_t NsmErrorInjectionEnabled::handleResponseMsg(
     return cc ? cc : rc;
 }
 
+NsmErrorInjectionPayload::NsmErrorInjectionPayload(
+    const NsmInterfaceProvider<ErrorInjectionPayloadIntf>& provider,
+    uint32_t errorInjectionId) :
+    NsmSensor(provider),
+    NsmInterfaceContainer<ErrorInjectionPayloadIntf>(provider),
+    errorInjectionId(errorInjectionId)
+{}
+
+std::optional<Request>
+    NsmErrorInjectionPayload::genRequestMsg(eid_t eid, uint8_t instanceNumber)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_error_injection_payload_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_error_injection_payload_req(
+        instanceNumber, errorInjectionId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_get_error_injection_payload_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+uint8_t NsmErrorInjectionPayload::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+    nsm_error_injection_payload data;
+    auto rc = decode_get_error_injection_payload_resp(responseMsg, responseLen,
+                                                      &cc, &reasonCode, &data);
+
+    LG2_ERROR_FLT(
+        "decode_get_error_injection_payload_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        invoke([data](auto& pdi) {
+            pdi.payload(static_cast<uint64_t>(data.fault_reason_bit_map));
+        });
+    }
+
+    return cc ? cc : rc;
+}
+
 } // namespace nsm

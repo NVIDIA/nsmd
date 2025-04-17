@@ -23,6 +23,7 @@
 
 #include <com/nvidia/ErrorInjection/ErrorInjection/server.hpp>
 #include <com/nvidia/ErrorInjection/ErrorInjectionCapability/server.hpp>
+#include <com/nvidia/ErrorInjection/ErrorInjectionPayload/server.hpp>
 
 namespace nsm
 {
@@ -30,6 +31,8 @@ using ErrorInjectionIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjection>;
 using ErrorInjectionCapabilityIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjectionCapability>;
+using ErrorInjectionPayloadIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjectionPayload>;
 
 class NsmErrorInjection :
     public NsmSensor,
@@ -69,6 +72,24 @@ class NsmErrorInjectionEnabled : public NsmErrorInjectionSupported
                                          uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+};
+
+class NsmErrorInjectionPayload :
+    public NsmSensor,
+    public NsmInterfaceContainer<ErrorInjectionPayloadIntf>
+{
+  public:
+    NsmErrorInjectionPayload(
+        const NsmInterfaceProvider<ErrorInjectionPayloadIntf>& provider,
+        uint32_t errorInjectionId);
+    NsmErrorInjectionPayload() = delete;
+    std::optional<Request> genRequestMsg(eid_t eid,
+                                         uint8_t instanceId) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
+
+  private:
+    uint32_t errorInjectionId;
 };
 
 } // namespace nsm

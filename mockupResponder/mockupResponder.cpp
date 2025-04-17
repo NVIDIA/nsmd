@@ -909,6 +909,17 @@ std::optional<std::vector<uint8_t>>
                       NSM_GET_DEVICE_RESET_STATISTICS,
                       NSM_GET_DEVICE_DIAGNOSTICS,
                   }},
+                 {NSM_TYPE_DEVICE_CONFIGURATION,
+                  {
+                      NSM_SET_ERROR_INJECTION_MODE_V1,
+                      NSM_GET_ERROR_INJECTION_MODE_V1,
+                      NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1,
+                      NSM_SET_CURRENT_ERROR_INJECTION_TYPES_V1,
+                      NSM_GET_CURRENT_ERROR_INJECTION_TYPES_V1,
+                      NSM_GET_ERROR_INJECTION_PAYLOAD,
+                      NSM_SET_ERROR_INJECTION_PAYLOAD,
+                      NSM_ACTIVATE_ERROR_INJECTION,
+                  }},
              }},
         };
 
