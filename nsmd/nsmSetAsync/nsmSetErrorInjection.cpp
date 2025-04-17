@@ -199,4 +199,93 @@ requester::Coroutine
     // coverity[missing_return]
     co_return cc ? cc : rc;
 }
+
+NsmSetErrorInjectionPayload::NsmSetErrorInjectionPayload(
+    const std::string& name, SensorManager& manager,
+    const Interfaces<ErrorInjectionPayloadIntf>& interfaces,
+    std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf) :
+    NsmInterfaceContainer<ErrorInjectionPayloadIntf>(interfaces),
+    NsmObject(name, "NSM_ErrorInjectionPayload"), manager(manager),
+    activateIntf(activateIntf)
+{}
+
+requester::Coroutine NsmSetErrorInjectionPayload::setErrorInjectionPayload(
+    const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    uint32_t faultBitMap;
+    uint32_t errorInjectionId;
+    const std::vector<std::tuple<std::string, uint32_t>>* payloadValue =
+        std::get_if<std::vector<std::tuple<std::string, uint32_t>>>(&value);
+
+    if (payloadValue == nullptr)
+    {
+        throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
+    }
+
+    for (auto val : *payloadValue)
+    {
+        if (std::get<0>(val) == "FaultBitMap")
+        {
+            faultBitMap = std::get<1>(val);
+        }
+        else if (std::get<0>(val) == "errorInjectionId")
+        {
+            errorInjectionId = std::get<1>(val);
+        }
+    }
+    // coverity[missing_return]
+    co_return co_await setPayload(faultBitMap, errorInjectionId, *status,
+                                  device);
+}
+
+requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
+    uint32_t faultBitMap, uint32_t errorInjectionId,
+    AsyncOperationStatusType& status, std::shared_ptr<NsmDevice> device)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_error_injection_payload_req));
+
+    auto eid = manager.getEid(device);
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    struct nsm_error_injection_payload data = {0, 0, 0};
+    data.offset = 0;
+    data.error_injection_id = errorInjectionId;
+    data.fault_reason_bit_map = faultBitMap;
+    auto rc = encode_set_error_injection_payload_req(0, &data, requestPtr);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "encode_set_error_injection_payload_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
+                                         responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmSetErrorInjectionPayload::setPayload: SendRecvNsmMsgSync failed."
+            "eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+    }
+
+    uint8_t cc = NSM_ERROR;
+    uint16_t reasonCode = ERR_NULL;
+
+    rc = decode_set_error_injection_payload_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reasonCode);
+    LG2_ERROR_FLT(
+        "NsmSetErrorInjectionPayload::setPayload failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    // coverity[missing_return]
+    co_return cc ? cc : rc;
+}
+
 } // namespace nsm

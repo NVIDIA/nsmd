@@ -21,6 +21,7 @@
 #include "nsmCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmDeviceDiagnostics.hpp"
+#include "nsmErrorInjectionCommon.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -80,7 +81,6 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         auto mctpUuid = std::make_shared<NsmChassis<MctpUuidIntf>>(name);
         mctpUuid->invoke(pdiMethod(uuid), uuid);
         device->addStaticSensor(mctpUuid);
-
         std::vector<utils::Association> associations{};
         co_await utils::coGetAssociations(
             objPath, baseInterface + ".Associations", associations);
@@ -336,6 +336,12 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         device->deviceSensors.emplace_back(resetStatisticsSensor);
         device->addSensor(resetStatisticsSensor, false);
     }
+    else if (type == "NSM_ChassisErrorInjectionPayload" &&
+             device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE)
+    {
+        createNsmMCUErrorInjectionSensors(
+            manager, device, path(chassisInventoryBasePath / name));
+    }
 
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -354,7 +360,8 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PrettyName",
     "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.ResetMetrics"};
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ResetMetrics",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ErrorInjectionPayload"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
 

@@ -1693,7 +1693,7 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
 
     auto capabilitiesCount =
-        size_t(ErrorInjectionCapabilityIntf::Type::Unknown);
+        size_t(ErrorInjectionCapabilityIntf::Type::Unknown) - 1;
     EXPECT_EQ(0, gpu.prioritySensors.size());
     // Total 10 RR sensor for type = NSM_Processor are added.
     // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
@@ -1707,7 +1707,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 
     int si = 10;
 
-    auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown);
+    auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown) -
+                              1;
     auto setErrorInjection =
         dynamic_pointer_cast<NsmSetErrorInjection>(gpu.deviceSensors[si++]);
     EXPECT_NE(nullptr, setErrorInjection);

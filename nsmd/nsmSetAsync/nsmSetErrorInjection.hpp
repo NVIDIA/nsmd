@@ -18,17 +18,20 @@
 #pragma once
 
 #include "asyncOperationManager.hpp"
+#include "nsmActivateErrorInjectAsyncIntf.hpp"
 #include "nsmInterface.hpp"
 
 #include <com/nvidia/ErrorInjection/ErrorInjection/server.hpp>
 #include <com/nvidia/ErrorInjection/ErrorInjectionCapability/server.hpp>
-
+#include <com/nvidia/ErrorInjection/ErrorInjectionPayload/server.hpp>
 namespace nsm
 {
 using ErrorInjectionIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjection>;
 using ErrorInjectionCapabilityIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjectionCapability>;
+using ErrorInjectionPayloadIntf = sdbusplus::server::object_t<
+    sdbusplus::com::nvidia::ErrorInjection::server::ErrorInjectionPayload>;
 
 class NsmSetErrorInjection : public NsmInterfaceProvider<ErrorInjectionIntf>
 {
@@ -69,6 +72,31 @@ class NsmSetErrorInjectionEnabled :
         const Interfaces<ErrorInjectionCapabilityIntf>& interfaces);
 
     requester::Coroutine enabled(const AsyncSetOperationValueType& value,
+                                 AsyncOperationStatusType* status,
+                                 std::shared_ptr<NsmDevice> device);
+};
+
+class NsmSetErrorInjectionPayload :
+    public NsmInterfaceContainer<ErrorInjectionPayloadIntf>,
+    public NsmObject
+{
+  private:
+    SensorManager& manager;
+    std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf;
+    requester::Coroutine setPayload(uint32_t faultBitMap,
+                                    uint32_t errorInjectionId,
+                                    AsyncOperationStatusType& status,
+                                    std::shared_ptr<NsmDevice> device);
+
+  public:
+    NsmSetErrorInjectionPayload() = delete;
+    NsmSetErrorInjectionPayload(
+        const std::string& name, SensorManager& manager,
+        const Interfaces<ErrorInjectionPayloadIntf>& interfaces,
+        std::shared_ptr<NsmActivateErrorInjectionPayloadIntf> activateIntf);
+
+    requester::Coroutine
+        setErrorInjectionPayload(const AsyncSetOperationValueType& value,
                                  AsyncOperationStatusType* status,
                                  std::shared_ptr<NsmDevice> device);
 };
