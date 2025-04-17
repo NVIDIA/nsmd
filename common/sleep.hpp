@@ -98,7 +98,7 @@ struct Sleep
             return false;      // Don't suspend on failure
         }
 
-        int64_t priority = SD_EVENT_SOURCE_MAX_PRIORITY;
+        int64_t priority [[maybe_unused]] = SD_EVENT_SOURCE_MAX_PRIORITY;
         uint64_t accuracyInUsec = 1; // Accuracy of 1us
 
         if (timerEventPriority == NonPriority)
@@ -119,7 +119,7 @@ struct Sleep
             return false;      // Don't suspend on failure
         }
 
-        sd_event_source_set_priority(eventSource, priority);
+        // sd_event_source_set_priority(eventSource, priority);
 
         return true; // Coroutine suspended successfully
     }
