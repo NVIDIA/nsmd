@@ -379,3 +379,46 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu8Write)
     EXPECT_EQ(1, data().gpu5_8);
     EXPECT_EQ(1, data().gpu8);
 }
+
+TEST_F(NsmSetWriteProtectedTest, goodTestGpus9_16Write)
+{
+    init(GPU_SPI_FLASH);
+    const Response enabled{0b10000000, 0b00001101, 0x00,       0b11110000,
+                           0b00001111, 0x00,       0b11111111, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().gpu1_4);
+    EXPECT_EQ(1, data().gpu5_8);
+    EXPECT_EQ(1, data().gpu9_12);
+    EXPECT_EQ(1, data().gpu13_16);
+    EXPECT_EQ(1, data().gpu1);
+    EXPECT_EQ(1, data().gpu2);
+    EXPECT_EQ(1, data().gpu3);
+    EXPECT_EQ(1, data().gpu4);
+    EXPECT_EQ(1, data().gpu5);
+    EXPECT_EQ(1, data().gpu6);
+    EXPECT_EQ(1, data().gpu7);
+    EXPECT_EQ(1, data().gpu8);
+    EXPECT_EQ(1, data().gpu9);
+    EXPECT_EQ(1, data().gpu10);
+    EXPECT_EQ(1, data().gpu11);
+    EXPECT_EQ(1, data().gpu12);
+    EXPECT_EQ(1, data().gpu13);
+    EXPECT_EQ(1, data().gpu14);
+    EXPECT_EQ(1, data().gpu15);
+    EXPECT_EQ(1, data().gpu16);
+}
+
+TEST_F(NsmSetWriteProtectedTest, goodTestCX8Write)
+{
+    init(CX8_SPI_FLASH);
+    const Response enabled{0b00010000, 0x00, 0x00, 0x00,
+                           0x00,       0x00, 0x00, 0x00};
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+
+    EXPECT_EQ(true, writeProtected(true, enabled));
+    EXPECT_EQ(1, data().cx8);
+}

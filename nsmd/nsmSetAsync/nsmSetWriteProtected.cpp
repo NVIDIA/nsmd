@@ -58,6 +58,10 @@ bool NsmSetWriteProtected::getValue(
             return data.gpu1_4;
         case GPU_5_8_SPI_FLASH:
             return data.gpu5_8;
+        case GPU_SPI_FLASH:
+            return data.gpu1_4 && data.gpu5_8 && data.gpu9_12 && data.gpu13_16;
+        case CX8_SPI_FLASH:
+            return data.cx8;
         case GPU_SPI_FLASH_1:
             return data.gpu1;
         case GPU_SPI_FLASH_2:
