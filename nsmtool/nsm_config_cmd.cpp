@@ -700,13 +700,14 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                result["GPUs 1-4 SPI Flash"] = (int)data.gpu1_4;
                 result["Any NVSW EROT"] = (int)data.nvSwitch;
+                result["NVSW 1"] = (int)data.nvSwitch1;
+                result["NVSW 2"] = (int)data.nvSwitch2;
                 result["PEXSW EROT"] = (int)data.pex;
                 result["FRU EEPROM (Baseboard or CX7 or HMC)"] =
                     (int)data.baseboard;
+                result["HMC SPI Flash"] = (int)data.hmc;
                 result["Any Retimer"] = (int)data.retimer;
-                result["GPU 5-8 SPI Flash"] = (int)data.gpu5_8;
                 result["Retimer 1"] = (int)data.retimer1;
                 result["Retimer 2"] = (int)data.retimer2;
                 result["Retimer 3"] = (int)data.retimer3;
@@ -715,17 +716,31 @@ class GetFpgaDiagnosticsSettings : public CommandInterface
                 result["Retimer 6"] = (int)data.retimer6;
                 result["Retimer 7"] = (int)data.retimer7;
                 result["Retimer 8"] = (int)data.retimer8;
+                result["GPUs 1-4 SPI Flash"] = (int)data.gpu1_4;
+                result["GPUs 5-8 SPI Flash"] = (int)data.gpu5_8;
+                result["GPUs SPI Flash"] = (int)(data.gpu1_4 && data.gpu5_8 &&
+                                                 data.gpu9_12 && data.gpu13_16);
+                result["CX8 SPI Flash"] = (int)data.cx8;
                 result["GPU 1"] = (int)data.gpu1;
                 result["GPU 2"] = (int)data.gpu2;
                 result["GPU 3"] = (int)data.gpu3;
                 result["GPU 4"] = (int)data.gpu4;
-                result["HMC SPI Flash"] = (int)data.hmc;
-                result["NVSW 1"] = (int)data.nvSwitch1;
-                result["NVSW 2"] = (int)data.nvSwitch2;
                 result["GPU 5"] = (int)data.gpu5;
                 result["GPU 6"] = (int)data.gpu6;
                 result["GPU 7"] = (int)data.gpu7;
                 result["GPU 8"] = (int)data.gpu8;
+                result["GPU 9"] = (int)data.gpu9;
+                result["GPU 10"] = (int)data.gpu10;
+                result["GPU 11"] = (int)data.gpu11;
+                result["GPU 12"] = (int)data.gpu12;
+                result["GPU 13"] = (int)data.gpu13;
+                result["GPU 14"] = (int)data.gpu14;
+                result["GPU 15"] = (int)data.gpu15;
+                result["GPU 16"] = (int)data.gpu16;
+                result["CPU 1"] = (int)data.cpu1;
+                result["CPU 2"] = (int)data.cpu2;
+                result["CPU 3"] = (int)data.cpu3;
+                result["CPU 4"] = (int)data.cpu4;
 
                 nsmtool::helper::DisplayInJson(result);
                 break;

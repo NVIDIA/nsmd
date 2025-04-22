@@ -251,12 +251,15 @@ struct nsm_fpga_diagnostics_settings_wp {
 	uint8_t baseboard : 1; // 1 – FRU EEPROM (Baseboard or CX7 or HMC)
 	uint8_t pex : 1;       // 2 – PEXSW EROT
 	uint8_t nvSwitch : 1;  // 3 – Any NVSW EROT
-	uint8_t res1 : 3;      // 4:6 – Reserved
+	uint8_t cx8 : 1;       // 4 – All CX8 SPI Flash
+	uint8_t res1 : 2;      // 5:6 – Reserved
 	uint8_t gpu1_4 : 1;    // Bit 7 – GPU 1-4 SPI Flash
 	/* Byte 1 */
-	uint8_t gpu5_8 : 1; // GPU 5-8 SPI Flash
-	uint8_t cpu1_4 : 1; // CPU 1-4 SPI Flash
-	uint8_t res2 : 6;   // 2:7 – Reserved
+	uint8_t gpu5_8 : 1;   // 0 – GPU 5-8 SPI Flash
+	uint8_t cpu1_4 : 1;   // 1 – CPU 1-4 SPI Flash
+	uint8_t gpu9_12 : 1;  // 2 – GPU 9-12 SPI Flash
+	uint8_t gpu13_16 : 1; // 3 – GPU 13-16 SPI Flash
+	uint8_t res2 : 4;     // 4:7 – Reserved
 	/* Byte 2 */
 	uint8_t retimer1 : 1; // Byte 2: Retimers (one per bit)
 	uint8_t retimer2 : 1;
@@ -283,11 +286,19 @@ struct nsm_fpga_diagnostics_settings_wp {
 	uint8_t cpu1 : 1; // 5:7 - CPU 1-3 SPI Flash (one per bit)
 	uint8_t cpu2 : 1;
 	uint8_t cpu3 : 1;
-	/* Bytes 5 */
+	/* Byte 5 */
 	uint8_t cpu4 : 1; // 0 - CPU 4 SPI Flash
 	uint8_t res5 : 7;
-	/* Bytes 6-7 reserved */
-	uint8_t res6;
+	/* Byte 6 */
+	uint8_t gpu9 : 1; // Byte 6: GPU 9-16 SPI Flash (one per bit)
+	uint8_t gpu10 : 1;
+	uint8_t gpu11 : 1;
+	uint8_t gpu12 : 1;
+	uint8_t gpu13 : 1;
+	uint8_t gpu14 : 1;
+	uint8_t gpu15 : 1;
+	uint8_t gpu16 : 1;
+	/* Byte 7 reserved */
 	uint8_t res7;
 
 } __attribute__((packed));

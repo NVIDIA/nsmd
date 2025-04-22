@@ -73,6 +73,8 @@ requester::Coroutine
             case NVSW_EEPROM_2:
             case GPU_1_4_SPI_FLASH:
             case GPU_5_8_SPI_FLASH:
+            case GPU_SPI_FLASH:
+            case CX8_SPI_FLASH:
             case GPU_SPI_FLASH_1:
             case GPU_SPI_FLASH_2:
             case GPU_SPI_FLASH_3:

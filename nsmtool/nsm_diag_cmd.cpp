@@ -701,14 +701,17 @@ class EnableDisableWriteProtected : public CommandInterface
             "128: Retimer EEPROM\n"
             "129: Baseboard FRU EEPROM\n"
             "130: PEX SW EEPROM\n"
-            "131: NVSW EEPROM (both)\n"
-            "133: NVSW EEPROM 1\n"
-            "134: NVSW EEPROM 2\n"
-            "160: GPU 1-4 SPI Flash\n"
-            "161: GPU 5-8 SPI Flash\n"
+            "131: NvSWs EEPROM\n"
+            "133: NvSW EEPROM 1\n"
+            "134: NvSW EEPROM 2\n"
+            "160: GPUs 1-4 SPI Flash\n"
+            "161: GPUs 5-8 SPI Flash\n"
             "162-169: Individual GPU SPI flash 1-8\n"
+            "170: GPUs SPI Flash\n"
             "176: HMC SPI Flash\n"
-            "192-199: Retimer EEPROM\n"
+            "183: CX8s SPI Flash\n"
+            "192-199: Retimer EEPROM 1-8\n"
+            "224-231: CPU SPI Flash 1-8\n"
             "232: CX7 FRU EEPROM\n"
             "233: HMC FRU EEPROM\n");
         value = 0;
@@ -740,7 +743,9 @@ class EnableDisableWriteProtected : public CommandInterface
             case GPU_SPI_FLASH_6:
             case GPU_SPI_FLASH_7:
             case GPU_SPI_FLASH_8:
+            case GPU_SPI_FLASH:
             case HMC_SPI_FLASH:
+            case CX8_SPI_FLASH:
             case RETIMER_EEPROM_1:
             case RETIMER_EEPROM_2:
             case RETIMER_EEPROM_3:
@@ -749,6 +754,14 @@ class EnableDisableWriteProtected : public CommandInterface
             case RETIMER_EEPROM_6:
             case RETIMER_EEPROM_7:
             case RETIMER_EEPROM_8:
+            case CPU_SPI_FLASH_1:
+            case CPU_SPI_FLASH_2:
+            case CPU_SPI_FLASH_3:
+            case CPU_SPI_FLASH_4:
+            case CPU_SPI_FLASH_5:
+            case CPU_SPI_FLASH_6:
+            case CPU_SPI_FLASH_7:
+            case CPU_SPI_FLASH_8:
             case CX7_FRU_EEPROM:
             case HMC_FRU_EEPROM:
             {

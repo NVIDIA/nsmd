@@ -4761,83 +4761,194 @@ std::optional<std::vector<uint8_t>>
         case PEX_SW_EEPROM:
             writeProtected.pex = value;
             break;
+        case CX8_SPI_FLASH:
+            writeProtected.cx8 = value;
+            break;
         case RETIMER_EEPROM:
             writeProtected.retimer = value;
+            writeProtected.retimer1 = value;
+            writeProtected.retimer2 = value;
+            writeProtected.retimer3 = value;
+            writeProtected.retimer4 = value;
+            writeProtected.retimer5 = value;
+            writeProtected.retimer6 = value;
+            writeProtected.retimer7 = value;
+            writeProtected.retimer8 = value;
             break;
         case NVSW_EEPROM_BOTH:
             writeProtected.nvSwitch = value;
+            writeProtected.nvSwitch1 = value;
+            writeProtected.nvSwitch2 = value;
             break;
         case NVSW_EEPROM_1:
             writeProtected.nvSwitch1 = value;
+            writeProtected.nvSwitch = writeProtected.nvSwitch1 |
+                                      writeProtected.nvSwitch2;
             break;
         case NVSW_EEPROM_2:
             writeProtected.nvSwitch2 = value;
+            writeProtected.nvSwitch = writeProtected.nvSwitch1 |
+                                      writeProtected.nvSwitch2;
             break;
         case GPU_1_4_SPI_FLASH:
             writeProtected.gpu1_4 = value;
+            writeProtected.gpu1 = value;
+            writeProtected.gpu2 = value;
+            writeProtected.gpu3 = value;
+            writeProtected.gpu4 = value;
             break;
         case GPU_5_8_SPI_FLASH:
             writeProtected.gpu5_8 = value;
+            writeProtected.gpu5 = value;
+            writeProtected.gpu6 = value;
+            writeProtected.gpu7 = value;
+            writeProtected.gpu8 = value;
+            break;
+        case GPU_SPI_FLASH:
+            writeProtected.gpu1_4 = value;
+            writeProtected.gpu5_8 = value;
+            writeProtected.gpu9_12 = value;
+            writeProtected.gpu13_16 = value;
+            writeProtected.gpu1 = value;
+            writeProtected.gpu2 = value;
+            writeProtected.gpu3 = value;
+            writeProtected.gpu4 = value;
+            writeProtected.gpu5 = value;
+            writeProtected.gpu6 = value;
+            writeProtected.gpu7 = value;
+            writeProtected.gpu8 = value;
+            writeProtected.gpu9 = value;
+            writeProtected.gpu10 = value;
+            writeProtected.gpu11 = value;
+            writeProtected.gpu12 = value;
+            writeProtected.gpu13 = value;
+            writeProtected.gpu14 = value;
+            writeProtected.gpu15 = value;
+            writeProtected.gpu16 = value;
             break;
         case GPU_SPI_FLASH_1:
             writeProtected.gpu1 = value;
+            writeProtected.gpu1_4 = writeProtected.gpu1 | writeProtected.gpu2 |
+                                    writeProtected.gpu3 | writeProtected.gpu4;
             break;
         case GPU_SPI_FLASH_2:
             writeProtected.gpu2 = value;
+            writeProtected.gpu1_4 = writeProtected.gpu1 | writeProtected.gpu2 |
+                                    writeProtected.gpu3 | writeProtected.gpu4;
             break;
         case GPU_SPI_FLASH_3:
             writeProtected.gpu3 = value;
+            writeProtected.gpu1_4 = writeProtected.gpu1 | writeProtected.gpu2 |
+                                    writeProtected.gpu3 | writeProtected.gpu4;
             break;
         case GPU_SPI_FLASH_4:
             writeProtected.gpu4 = value;
+            writeProtected.gpu1_4 = writeProtected.gpu1 | writeProtected.gpu2 |
+                                    writeProtected.gpu3 | writeProtected.gpu4;
             break;
         case GPU_SPI_FLASH_5:
             writeProtected.gpu5 = value;
+            writeProtected.gpu5_8 = writeProtected.gpu5 | writeProtected.gpu6 |
+                                    writeProtected.gpu7 | writeProtected.gpu8;
             break;
         case GPU_SPI_FLASH_6:
             writeProtected.gpu6 = value;
+            writeProtected.gpu5_8 = writeProtected.gpu5 | writeProtected.gpu6 |
+                                    writeProtected.gpu7 | writeProtected.gpu8;
             break;
         case GPU_SPI_FLASH_7:
             writeProtected.gpu7 = value;
+            writeProtected.gpu5_8 = writeProtected.gpu5 | writeProtected.gpu6 |
+                                    writeProtected.gpu7 | writeProtected.gpu8;
             break;
         case GPU_SPI_FLASH_8:
             writeProtected.gpu8 = value;
+            writeProtected.gpu5_8 = writeProtected.gpu5 | writeProtected.gpu6 |
+                                    writeProtected.gpu7 | writeProtected.gpu8;
             break;
         case RETIMER_EEPROM_1:
             writeProtected.retimer1 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_2:
             writeProtected.retimer2 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_3:
             writeProtected.retimer3 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_4:
             writeProtected.retimer4 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_5:
             writeProtected.retimer5 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_6:
             writeProtected.retimer6 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_7:
             writeProtected.retimer7 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case RETIMER_EEPROM_8:
             writeProtected.retimer8 = value;
+            writeProtected.retimer =
+                writeProtected.retimer1 | writeProtected.retimer2 |
+                writeProtected.retimer3 | writeProtected.retimer4 |
+                writeProtected.retimer5 | writeProtected.retimer6 |
+                writeProtected.retimer7 | writeProtected.retimer8;
             break;
         case CPU_SPI_FLASH_1:
             writeProtected.cpu1 = value;
+            writeProtected.cpu1_4 = writeProtected.cpu1 | writeProtected.cpu2 |
+                                    writeProtected.cpu3 | writeProtected.cpu4;
             break;
         case CPU_SPI_FLASH_2:
             writeProtected.cpu2 = value;
+            writeProtected.cpu1_4 = writeProtected.cpu1 | writeProtected.cpu2 |
+                                    writeProtected.cpu3 | writeProtected.cpu4;
             break;
         case CPU_SPI_FLASH_3:
             writeProtected.cpu3 = value;
+            writeProtected.cpu1_4 = writeProtected.cpu1 | writeProtected.cpu2 |
+                                    writeProtected.cpu3 | writeProtected.cpu4;
             break;
         case CPU_SPI_FLASH_4:
             writeProtected.cpu4 = value;
+            writeProtected.cpu1_4 = writeProtected.cpu1 | writeProtected.cpu2 |
+                                    writeProtected.cpu3 | writeProtected.cpu4;
             break;
         default:
             lg2::error(
