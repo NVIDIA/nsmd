@@ -73,10 +73,10 @@ int NsmEnergyAggregator::handleSamples(
 
         auto rc = decode_aggregate_energy_count_data(sample.data,
                                                      sample.data_len, &reading);
-
         if (rc == NSM_SW_SUCCESS)
         {
-            updateSensorReading(sample.tag, reading);
+            double readingInJoules = static_cast<double>(reading) / 1000.0;
+            updateSensorReading(sample.tag, readingInJoules);
         }
         else
         {
