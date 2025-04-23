@@ -274,6 +274,7 @@ TEST(nsmEnergySensorAggregator, GoodHandleSampleData)
     aggregator.addSensor(1, sensor);
 
     const uint64_t reading{3437844348};
+    double readingInJoules = static_cast<double>(reading) / 1000.0;
     std::array<uint8_t, sizeof(reading)> sample;
     size_t data_size;
 
@@ -281,7 +282,7 @@ TEST(nsmEnergySensorAggregator, GoodHandleSampleData)
                                                  &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*sensor, updateReading(reading, 0)).Times(1);
+    EXPECT_CALL(*sensor, updateReading(readingInJoules, 0)).Times(1);
 
     aggregator.handleSamples(
         {{1, static_cast<uint8_t>(data_size), sample.data(), true}});
