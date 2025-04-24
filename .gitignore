@@ -83,4 +83,3 @@ Makefile
 
 # vscode
 .vscode
-!.vscode/settings.json

@@ -34,6 +34,34 @@ sudo apt install clang-format-17
 
 This will install `clang-format-17` on your system, enabling it for use in the CI pipeline.
 
+### Using clang-format-17 for all changed files before commit
+
+To automatically format your code before each commit, create a pre-commit hook with the following steps:
+```
+cat > .git/hooks/pre-commit << EOL
+#!/bin/sh
+
+# Get list of staged files that are C/C++ source files
+files=$(git diff --cached --name-only --diff-filter=ACMR | grep ".*\.[ch]\(pp\)\?$")
+
+if [ -n "$files" ]; then
+    # Format the files
+    clang-format-17 -i $files
+    
+    # Add the formatted files back to staging
+    git add $files
+    
+    # Check if any files were modified after formatting
+    if ! git diff --cached --quiet; then
+        echo "Formatted C/C++ files were automatically fixed up"
+    fi
+fi
+
+exit 0
+EOL
+chmod +x .git/hooks/pre-commit
+```
+
 ## Artifacts
 
 Successful build should generate three binary artifacts.
