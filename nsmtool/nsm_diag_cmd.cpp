@@ -184,6 +184,12 @@ class QueryTokenParameters : public CommandInterface
             case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX7:
                 result["Device type"] = "CX7";
                 break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_MCU:
+                result["Device type"] = "MCU";
+                break;
+            case NSM_DEBUG_TOKEN_DEVICE_TYPE_ID_CX8:
+                result["Device type"] = "CX8";
+                break;
             default:
                 result["Device type"] =
                     "Invalid value: " +
