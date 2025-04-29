@@ -99,9 +99,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         discoverNsmDevice(mctpInfos);
     }
 
-    void onlineMctpEndpoint(const MctpInfo& mctpInfo) override;
+    requester::Coroutine onlineMctpEndpoint(const MctpInfo& mctpInfo) override;
 
-    void offlineMctpEndpoint(const MctpInfo& mctpInfo) override;
+    requester::Coroutine offlineMctpEndpoint(const MctpInfo& mctpInfo) override;
 
     requester::Coroutine SendRecvNsmMsg(eid_t eid, Request& request,
                                         const nsm_msg** responseMsg,
@@ -158,6 +158,9 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     void discoverNsmDevice(const MctpInfos& mctpInfos);
 
     requester::Coroutine discoverNsmDeviceTask();
+    requester::Coroutine coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos);
+    requester::Coroutine
+        coSetdeviceStateOfflineTask(const MctpInfos& mctpInfos);
     static DeviceManager* instance;
 
     requester::Coroutine ping(eid_t eid);
@@ -189,6 +192,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
 
     std::queue<MctpInfos> queuedMctpInfos;
     std::coroutine_handle<> discoverNsmDeviceTaskHandle;
+    std::coroutine_handle<> deviceOfflineTaskHandle;
     NsmDeviceTable& nsmDevices;
     DiscoveredEIDs discoveredEIDs;
 };

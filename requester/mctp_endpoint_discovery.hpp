@@ -38,10 +38,18 @@ class MctpDiscoveryHandlerIntf
 {
   public:
     virtual void handleMctpEndpoints(const MctpInfos& mctpInfos) = 0;
-    virtual void onlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
-    {}
-    virtual void offlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
-    {}
+    virtual requester::Coroutine
+        onlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
+    {
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    }
+    virtual requester::Coroutine
+        offlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
+    {
+        // coverity[missing_return]
+        co_return NSM_SW_SUCCESS;
+    }
     virtual ~MctpDiscoveryHandlerIntf() {}
 };
 
@@ -75,6 +83,13 @@ class MctpDiscovery
 
     /** @brief Used to watch for the removed MCTP endpoints */
     sdbusplus::bus::match_t mctpEndpointRemovedSignal;
+
+    /** @brief Queue to store the pending property change signal from mctp
+     * service */
+    std::queue<sdbusplus::message::message> mctpQueuedSignals;
+
+    std::coroutine_handle<> deviceStateChangeTaskHandle;
+    requester::Coroutine deviceStateChangeTask();
 
     void discoverEndpoints(sdbusplus::message::message& msg);
 
