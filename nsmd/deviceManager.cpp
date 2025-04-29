@@ -20,6 +20,7 @@
 #include "base.h"
 #include "platform-environmental.h"
 
+#include "common/sleep.hpp"
 #include "nsmDevice.hpp"
 #include "sensorManager.hpp"
 
@@ -95,6 +96,75 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
         }
         queuedMctpInfos.pop();
     }
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    DeviceManager::coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos)
+{
+    for (auto& mctpInfo : mctpInfos)
+    {
+        // try ping
+        auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding] = mctpInfo;
+        auto rc = co_await ping(eid);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc, "EID",
+                       eid);
+            continue;
+        }
+
+        lg2::info("found NSM device, eid={EID} uuid={UUID}", "EID", eid, "UUID",
+                  mctpUuid);
+
+        // get device identification from device
+        uint8_t deviceType = 0;
+        uint8_t instanceNumber = 0;
+        rc = co_await getQueryDeviceIdentification(eid, deviceType,
+                                                   instanceNumber);
+        if (rc != NSM_SUCCESS)
+        {
+            lg2::error(
+                "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
+                "RC", rc, "EID", eid);
+            continue;
+        }
+
+        // save the nsm device identification info
+        discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber, true};
+
+        // update eid table [from UUID from MCTP dbus property]
+        eidTable.insert(std::make_pair(
+            mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
+    }
+
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    DeviceManager::coSetdeviceStateOfflineTask(const MctpInfos& mctpInfos)
+{
+    for (auto& mctpInfo : mctpInfos)
+    {
+        const mctp_eid_t eid = std::get<0>(mctpInfo);
+        if (discoveredEIDs.find(eid) != discoveredEIDs.end())
+        {
+            auto& value = discoveredEIDs[eid];
+            std::get<3>(value) = false; // set EID is inactive
+        }
+
+        const std::string uuid = std::get<1>(mctpInfo);
+        auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+        if (nsmDevice)
+        {
+            co_await nsmDevice->setOffline();
+        }
+    }
+
+    co_await common::Sleep(event.get(), 1000000, common::NonPriority);
+
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -592,27 +662,21 @@ requester::Coroutine DeviceManager::SendRecvNsmMsg(eid_t eid, Request& request,
     co_return rc;
 }
 
-void DeviceManager::onlineMctpEndpoint(const MctpInfo& mctpInfo)
+requester::Coroutine DeviceManager::onlineMctpEndpoint(const MctpInfo& mctpInfo)
 {
     MctpInfos mctpInfos{mctpInfo};
-    discoverNsmDevice(mctpInfos);
+    co_await coSetdeviceStateOnlineTask(mctpInfos);
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 
-void DeviceManager::offlineMctpEndpoint(const MctpInfo& mctpInfo)
+requester::Coroutine
+    DeviceManager::offlineMctpEndpoint(const MctpInfo& mctpInfo)
 {
-    const mctp_eid_t eid = std::get<0>(mctpInfo);
-    if (discoveredEIDs.find(eid) != discoveredEIDs.end())
-    {
-        auto& value = discoveredEIDs[eid];
-        std::get<3>(value) = false; // set EID is inactive
-    }
-
-    const std::string uuid = std::get<1>(mctpInfo);
-    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
-    if (nsmDevice)
-    {
-        nsmDevice->setOffline();
-    }
+    MctpInfos mctpInfos{mctpInfo};
+    co_await coSetdeviceStateOfflineTask(mctpInfos);
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine

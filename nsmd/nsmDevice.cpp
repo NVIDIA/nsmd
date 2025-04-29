@@ -17,14 +17,15 @@
 
 #include "nsmDevice.hpp"
 
+#include "common/sleep.hpp"
 #include "nsmEvent/nsmFabricManagerStateEvent.hpp"
 #include "nsmEvent/nsmLongRunningEventHandler.hpp"
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
 #include "nsmLongRunning/nsmLongRunningSensor.hpp"
+#include "nsmMsgTypesSensor.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
-#include "nsmFwSwInventory/GPUSWInventory.hpp"
-#include "nsmMsgTypesSensor.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -180,7 +181,7 @@ void NsmDevice::setOnline()
     }
 }
 
-void NsmDevice::setOffline()
+requester::Coroutine NsmDevice::setOffline()
 {
     isDeviceActive = false;
     if (gpudriverSensor)
@@ -200,7 +201,10 @@ void NsmDevice::setOffline()
         auto sensor = sensors[sensorIndex];
         sensor->handleOfflineState();
         ++sensorIndex;
+        co_await common::Sleep(event.get(), 10000, common::NonPriority);
     }
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
 }
 
 NsmLongRunningEventHandler& NsmDevice::registerLongRunningEventHandler()

@@ -107,6 +107,8 @@ class NsmDevice
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
     NsmLongRunningEventHandler& longRunningEventHandler;
 
+    const sdeventplus::Event event = sdeventplus::Event::get_default();
+
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);
 
@@ -118,7 +120,7 @@ class NsmDevice
     void setOnline();
 
     /** @brief set the nsmDevice to offline state */
-    void setOffline();
+    requester::Coroutine setOffline();
 
     /**
      * @brief Adds device/static sensor to to NsmDevice.
