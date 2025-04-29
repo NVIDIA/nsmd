@@ -17,6 +17,7 @@
 #pragma once
 
 #include "coroutine.hpp"
+#include "types.hpp"
 #include "utils.hpp"
 
 #include <queue>
@@ -106,6 +107,71 @@ struct coGetDbusProperty
                       const std::string service = entityManagerService) :
         service(service),
         objectPath(objectPath), interface(interface), property(property), ret{}
+    {}
+};
+
+struct coGetAllDbusProperty
+{
+    const std::string service;
+    const std::string objectPath;
+    const std::string interface;
+
+    /** @brief For keeping the return value.
+     */
+    dbus::PropertyMap ret;
+
+    /** @brief Returning false to make await_suspend() to be called.
+     */
+    bool await_ready() noexcept
+    {
+        return false;
+    }
+
+    /** @brief Called by co_await operator before suspending coroutine. The
+     * method will send out NSM request message, register a call back function
+     * for the event when D-Bus method done.
+     */
+    bool await_suspend(std::coroutine_handle<> handle)
+    {
+        auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+        asioConnection->async_method_call(
+            [resumeHandle = handle, &ret = ret,
+             this](boost::system::error_code ec, dbus::PropertyMap value) {
+            if (ec)
+            {
+                lg2::error(
+                    "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}. {ERROR_MESSAGE} ",
+                    "SERVICE", service, "OBJECT_PATH", objectPath);
+            }
+            else
+            {
+                // can throw std::bad_variant_access
+                ret = value;
+            }
+            resumeHandle();
+        },
+            service.c_str(), objectPath.c_str(),
+            "org.freedesktop.DBus.Properties", "GetAll", interface);
+
+        return true;
+    }
+
+    /** @brief Called by co_await operator to get return value when awaitable
+     * object completed.
+     */
+    dbus::PropertyMap await_resume() const noexcept
+    {
+        return ret;
+    }
+
+    /** @brief Constructor of awaitable object to initialize necessary member
+     * variables.
+     */
+    coGetAllDbusProperty(const std::string& service,
+                         const std::string& objectPath,
+                         const std::string& interface = "") :
+        service(service), objectPath(objectPath), interface(interface), ret{}
     {}
 };
 
