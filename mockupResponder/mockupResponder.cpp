@@ -709,6 +709,23 @@ std::optional<Response>
     return std::nullopt;
 }
 
+bool pmDisabled()
+{
+    // touch /tmp/pm-disabled for disable persistent mode
+    // rm /tmp/pm-disabled for enable persistent mode
+    return std::filesystem::exists("/tmp/pm-disabled");
+}
+Response unsupportedResponse(uint8_t instanceId, uint8_t nvidiaMessageType,
+                             uint8_t commandCode)
+{
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp),
+                      0);
+    encode_common_resp(instanceId, NSM_ERR_UNSUPPORTED_COMMAND_CODE, ERR_NULL,
+                       nvidiaMessageType, commandCode,
+                       reinterpret_cast<nsm_msg*>(response.data()));
+    return response;
+}
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::unsupportedCommandHandler(const nsm_msg* requestMsg,
                                                size_t requestLen)
@@ -719,16 +736,9 @@ std::optional<std::vector<uint8_t>>
                   requestLen);
     }
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
-                                  0);
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
-    uint16_t reason_code = ERR_NULL;
-    [[maybe_unused]] auto rc = encode_cc_only_resp(
-        requestMsg->hdr.instance_id, requestMsg->hdr.nvidia_msg_type,
-        requestMsg->payload[0], NSM_ERR_UNSUPPORTED_COMMAND_CODE, reason_code,
-        responseMsg);
-    assert(rc == NSM_SW_SUCCESS);
-    return response;
+    return unsupportedResponse(requestMsg->hdr.instance_id,
+                               requestMsg->hdr.nvidia_msg_type,
+                               requestMsg->payload[0]);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -1974,6 +1984,13 @@ std::optional<Response>
         return std::nullopt;
     }
 
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_GET_MIG_MODE);
+    }
+
     bitfield8_t flags;
     flags.byte = state.migMode;
     Response response(
@@ -2026,6 +2043,13 @@ std::optional<Response>
         return std::nullopt;
     }
 
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_SET_MIG_MODE);
+    }
+
     Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     rc = encode_set_MIG_mode_resp(requestMsg->hdr.instance_id,
@@ -2056,6 +2080,13 @@ std::optional<Response>
         lg2::error("decode request for getEccModeHandler failed: rc={RC}", "RC",
                    rc);
         return std::nullopt;
+    }
+
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_GET_ECC_MODE);
     }
 
     bitfield8_t flags;
@@ -2109,6 +2140,13 @@ std::optional<Response>
     {
         lg2::error("decode_set_ECC_mode_req failed: rc={RC}", "RC", rc);
         return std::nullopt;
+    }
+
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_SET_ECC_MODE);
     }
 
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
@@ -4263,6 +4301,13 @@ std::optional<Response> MockupResponder::getCurrentUtilizationHandler(
         return std::nullopt;
     }
 
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_GET_CURRENT_UTILIZATION);
+    }
+
     nsm_get_current_utilization_data data{36, 75};
 
     Response response(
@@ -4427,6 +4472,14 @@ std::optional<Response> MockupResponder::getMemoryCapacityUtilHandler(
                    rc);
         return std::nullopt;
     }
+
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_GET_MEMORY_CAPACITY_UTILIZATION);
+    }
+
     struct nsm_memory_capacity_utilization data;
     data.reserved_memory = 2345567;
     data.used_memory = 128888;
@@ -5795,6 +5848,13 @@ std::optional<Response> MockupResponder::getViolationDurationHandler(
         lg2::error("decode_get_violation_duration_req failed: rc={RC}", "RC",
                    rc);
         return std::nullopt;
+    }
+
+    if (pmDisabled())
+    {
+        return unsupportedResponse(requestMsg->hdr.instance_id,
+                                   NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                                   NSM_GET_VIOLATION_DURATION);
     }
 
     struct nsm_violation_duration data;
