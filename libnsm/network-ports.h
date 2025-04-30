@@ -191,7 +191,7 @@ struct nsm_supported_port_counter {
 
 	uint8_t xmit_wait : 1;
 	uint8_t effective_ber : 1;
-	uint8_t estimated_effective_ber : 1;
+	uint8_t total_raw_error : 1;
 	uint8_t effective_error : 1;
 	uint8_t symbol_error : 1;
 	uint8_t total_raw_ber : 1;
@@ -227,7 +227,7 @@ struct nsm_port_counter_data {
 	uint64_t QP1_dropped;
 	uint64_t xmit_wait;
 	uint64_t effective_ber;
-	uint64_t estimated_effective_ber;
+	uint64_t total_raw_error;
 	uint64_t effective_error;
 	uint64_t symbol_error;
 	uint64_t total_raw_ber;

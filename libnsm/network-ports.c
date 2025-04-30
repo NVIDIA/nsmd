@@ -66,8 +66,7 @@ static void htolePortCounterData(struct nsm_port_counter_data *portData)
 	portData->QP1_dropped = htole64(portData->QP1_dropped);
 	portData->xmit_wait = htole64(portData->xmit_wait);
 	portData->effective_ber = htole64(portData->effective_ber);
-	portData->estimated_effective_ber =
-	    htole64(portData->estimated_effective_ber);
+	portData->total_raw_error = htole64(portData->total_raw_error);
 	portData->effective_error = htole64(portData->effective_error);
 	portData->symbol_error = htole64(portData->symbol_error);
 	portData->total_raw_ber = htole64(portData->total_raw_ber);
@@ -122,8 +121,7 @@ static void letohPortCounterData(struct nsm_port_counter_data *portData)
 	portData->QP1_dropped = le64toh(portData->QP1_dropped);
 	portData->xmit_wait = le64toh(portData->xmit_wait);
 	portData->effective_ber = le64toh(portData->effective_ber);
-	portData->estimated_effective_ber =
-	    le64toh(portData->estimated_effective_ber);
+	portData->total_raw_error = le64toh(portData->total_raw_error);
 	portData->effective_error = le64toh(portData->effective_error);
 	portData->symbol_error = le64toh(portData->symbol_error);
 	portData->total_raw_ber = le64toh(portData->total_raw_ber);
