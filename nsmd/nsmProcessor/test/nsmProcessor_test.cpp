@@ -1917,7 +1917,7 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
             gpu.deviceSensors[3]);
     EXPECT_NE(nullptr, partNumberSensor);
     EXPECT_EQ(1, partNumberSensor->interfaces.size());
-    EXPECT_EQ(BOARD_PART_NUMBER, partNumberSensor->property);
+    EXPECT_EQ(FRU_PART_NUMBER, partNumberSensor->property);
 
     // Check if the sensor interface is moved as expected
     EXPECT_EQ(1, devicePartNumberSensor->interfaces.size());

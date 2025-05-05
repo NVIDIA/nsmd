@@ -23,6 +23,8 @@
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
+#include <phosphor-logging/lg2.hpp>
+
 #include <cstdint>
 
 namespace nsm
@@ -71,10 +73,28 @@ requester::Coroutine
         auto assetsName = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
         // default part number for asset is Board part number
-        auto deviceAssembly = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "DeviceAssembly", baseInterface.c_str());
-        auto partNumberId = deviceAssembly ? DEVICE_PART_NUMBER
-                                           : BOARD_PART_NUMBER;
+        auto assemblyType = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "AssemblyType", baseInterface.c_str());
+
+        auto partNumberId = BOARD_PART_NUMBER;
+        if (assemblyType == "Device")
+        {
+            partNumberId = DEVICE_PART_NUMBER;
+        }
+        else if (assemblyType == "Board")
+        {
+            partNumberId = BOARD_PART_NUMBER;
+        }
+        else if (assemblyType == "FRU")
+        {
+            partNumberId = FRU_PART_NUMBER;
+        }
+        else
+        {
+            lg2::debug(
+                "NSM_Asset: Invalid AssemblyType={VAL} using default value BOARD_PART_NUMBER.",
+                "VAL", assemblyType);
+        }
 
         auto assetObject = NsmChassisAssembly<NsmAssetIntf>(chassisName, name);
         assetObject.invoke(pdiMethod(manufacturer), vendor);
