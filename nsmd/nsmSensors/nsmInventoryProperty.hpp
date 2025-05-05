@@ -102,6 +102,10 @@ inline void
             invoke(pdiMethod(partNumber),
                    std::string((char*)data.data(), data.size()));
             break;
+        case FRU_PART_NUMBER:
+            invoke(pdiMethod(partNumber),
+                   std::string((char*)data.data(), data.size()));
+            break;
         case BUILD_DATE:
         {
             std::string dateValue((char*)data.data(), data.size());
