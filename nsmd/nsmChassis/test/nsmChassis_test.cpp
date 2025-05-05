@@ -386,7 +386,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_NE(nullptr, width);
     EXPECT_NE(nullptr, height);
 
-    EXPECT_EQ(BOARD_PART_NUMBER, partNumber->property);
+    EXPECT_EQ(FRU_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
     EXPECT_EQ(MARKETING_NAME, model->property);
     EXPECT_EQ(PRODUCT_LENGTH, depth->property);
