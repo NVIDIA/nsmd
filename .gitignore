@@ -79,7 +79,13 @@ Makefile
 # meson
 /build
 /builddir
-/subprojects
+/subprojects/*
+!subprojects/nvidia-shmem.wrap
+!subprojects/nvidia-tal.wrap
+!subprojects/phosphor-dbus-interfaces.wrap
+!subprojects/phosphor-logging.wrap
+!subprojects/sdbusplus.wrap
+!subprojects/sdeventplus.wrap
 
 # vscode
 .vscode

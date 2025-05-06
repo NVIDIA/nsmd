@@ -1,0 +1,7 @@
+[wrap-git]
+url = ssh://git@gitlab-master.nvidia.com:12051/dgx/bmc/nvidia-tal.git
+revision = HEAD
+depth = 1
+
+[provide]
+nvidia-tal = nv_tal_dep
