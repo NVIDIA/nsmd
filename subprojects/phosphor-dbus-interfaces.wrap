@@ -1,0 +1,7 @@
+[wrap-git]
+url = ssh://git@gitlab-master.nvidia.com:12051/dgx/bmc/phosphor-dbus-interfaces.git
+revision = HEAD
+depth = 1
+
+[provide]
+phosphor-dbus-interfaces = phosphor_dbus_interfaces_dep

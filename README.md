@@ -5,10 +5,35 @@
 Source an NvBMC ARM/x86 SDK.
 
 ```bash
-meson build && ninja -C build
+# Meson configure
+meson setup --reconfigure -Db_sanitize=address,undefined -Db_lundef=true -Dwerror=true -Dwarning_level=3 -Db_colorout=never --buildtype=debug -Dcpp_args=\"-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Werror=uninitialized -Werror=strict-aliasing\" builddir
+# Build all targets
+ninja -C builddir
+# Run all unit tests
+meson test -C builddir
 ```
 
-### Installing clang-format-17 for CI Usage
+### Troubleshooting Build Issues
+
+#### sdbusplus Version Mismatch
+If you encounter `sdbusplus` build errors, verify that the revision in `subprojects/sdbusplus.wrap` matches the version specified in the [openbmc-build-scripts](https://gitlab-master.nvidia.com/dgx/bmc/openbmc-build-scripts/-/blob/develop/scripts/build-unit-test-docker#L273) repository. Version mismatches can cause build failures.
+
+#### Updating Subproject Dependencies
+For other subproject-related errors, you can update all subproject repositories to their latest commits using:
+
+```
+cd subprojects
+
+find -L . -type d -name ".git" | while read gitdir; do
+    repo=$(dirname "$gitdir")
+    echo "Pulling updates in $repo"
+    cd "$repo"
+    git pull
+    cd - > /dev/null
+done
+```
+
+## Installing clang-format-17 for CI Usage
 
 To ensure code consistency and formatting standards in the CI pipeline, `clang-format-17` needs to be installed. Follow the steps below to install `clang-format-17` on your system:
 

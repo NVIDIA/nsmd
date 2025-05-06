@@ -1,0 +1,7 @@
+[wrap-git]
+url = ssh://git@gitlab-master.nvidia.com:12051/dgx/bmc/nv-shmem.git
+revision = HEAD
+depth = 1
+
+[provide]
+nvidia-shmem = nv_shmem_dep

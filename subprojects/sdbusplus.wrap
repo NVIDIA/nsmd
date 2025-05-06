@@ -1,0 +1,9 @@
+[wrap-git]
+url = https://github.com/openbmc/sdbusplus.git
+# revision same as in openbmc-build-scripts repository (https://gitlab-master.nvidia.com/dgx/bmc/openbmc-build-scripts/-/blob/develop/scripts/build-unit-test-docker#L273)
+revision = 36137e09614746b13603b5fbae79e6f70819c46b
+depth = 1
+
+[provide]
+sdbusplus = sdbusplus_dep
+program_names = sdbus++, sdbus++-gen-meson
