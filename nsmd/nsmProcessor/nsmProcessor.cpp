@@ -1795,9 +1795,20 @@ void NsmAccumGpuUtilTime::updateMetricOnSharedMemory()
 void NsmAccumGpuUtilTime::updateReading(const uint32_t& context_util_time,
                                         const uint32_t& SM_util_time)
 {
+    // Convert from milliseconds to nanoseconds
+    std::chrono::milliseconds contextUtilTimeMs(context_util_time);
+    std::chrono::milliseconds smUtilTimeMs(SM_util_time);
+
+    std::chrono::nanoseconds contextUtilTimeNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(contextUtilTimeMs);
+    std::chrono::nanoseconds smUtilTimeNs =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(smUtilTimeMs);
+
     processorPerformanceIntf->accumulatedGPUContextUtilizationDuration(
-        context_util_time);
-    processorPerformanceIntf->accumulatedSMUtilizationDuration(SM_util_time);
+        contextUtilTimeNs.count());
+    processorPerformanceIntf->accumulatedSMUtilizationDuration(
+        smUtilTimeNs.count());
+
     updateMetricOnSharedMemory();
 }
 
