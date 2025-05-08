@@ -1632,8 +1632,8 @@ uint8_t
         "RC", rc);
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
-        cpuOperatingConfigIntf->utilization(data.gpu_utilization);
-        smUtilizationIntf->smUtilization(data.memory_utilization);
+        cpuOperatingConfigIntf->utilization(data.memory_utilization);
+        smUtilizationIntf->smUtilization(data.gpu_utilization);
         updateMetricOnSharedMemory();
     }
 
