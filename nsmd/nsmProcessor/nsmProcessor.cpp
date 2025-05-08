@@ -1687,8 +1687,8 @@ uint8_t
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        cpuOperatingConfigIntf->utilization(data.gpu_utilization);
-        smUtilizationIntf->smUtilization(data.memory_utilization);
+        cpuOperatingConfigIntf->utilization(data.memory_utilization);
+        smUtilizationIntf->smUtilization(data.gpu_utilization);
         updateMetricOnSharedMemory();
         clearErrorBitMap(handleFunctionName);
     }
