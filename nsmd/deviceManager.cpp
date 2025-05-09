@@ -163,8 +163,6 @@ requester::Coroutine
         }
     }
 
-    co_await common::Sleep(event.get(), 1000000, common::NonPriority);
-
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }

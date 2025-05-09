@@ -35,6 +35,8 @@
 #include <deque>
 #include <map>
 
+#define MAX_SENSOR_UPDATE_BATCH_SIZE 10
+
 namespace nsm
 {
 
@@ -117,7 +119,7 @@ class NsmDevice
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
     /** @brief set the nsmDevice to online state */
-    void setOnline();
+    requester::Coroutine setOnline();
 
     /** @brief set the nsmDevice to offline state */
     requester::Coroutine setOffline();
