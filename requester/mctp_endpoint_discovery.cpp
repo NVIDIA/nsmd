@@ -239,18 +239,19 @@ void MctpDiscovery::handleMctpEndpoints(const MctpInfos& mctpInfos)
     }
 }
 
-requester::Coroutine MctpDiscovery::deviceStateChangeTask()
+requester::Coroutine
+    MctpDiscovery::deviceStateChangeTask(const std::string objPath)
 {
-    while (!mctpQueuedSignals.empty())
+    while (!mctpQueuedSignals[objPath].empty())
     {
-        sdbusplus::message::message& msg = mctpQueuedSignals.front();
-        lg2::info("deviceStateChangeTask mctpQueuedSignals size= {SIZE}",
-                  "SIZE", mctpQueuedSignals.size());
+        sdbusplus::message::message& msg = mctpQueuedSignals[objPath].front();
+        lg2::info(
+            "deviceStateChangeTask mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
+            "OBJ_PATH", objPath, "SIZE", mctpQueuedSignals[objPath].size());
 
         std::string interface;
         dbus::PropertyMap properties;
         dbus::PropertyMap allProperties;
-        std::string objPath = msg.get_path();
         std::string sender = msg.get_sender();
 
         msg.read(interface, properties);
@@ -266,6 +267,14 @@ requester::Coroutine MctpDiscovery::deviceStateChangeTask()
             {
                 auto mapperResponse = co_await utils::coGetServiceMap(
                     objPath, dbus::Interfaces{});
+                if (mapperResponse.size() == 0)
+                {
+                    mctpQueuedSignals[objPath].pop();
+                    lg2::error(
+                        "deviceStateChangeTask: coGetServiceMap failed for PATH={OBJ_PATH}",
+                        "OBJ_PATH", objPath);
+                    co_return NSM_SW_SUCCESS;
+                }
                 std::string service = mapperResponse.begin()->first;
                 lg2::info("service of PATH={OBJ_PATH} is {SERVICE}", "OBJ_PATH",
                           objPath, "SERVICE", service);
@@ -346,10 +355,10 @@ requester::Coroutine MctpDiscovery::deviceStateChangeTask()
                 }
             }
         }
-        mctpQueuedSignals.pop();
-        lg2::info("mctpQueuedSignals size= {SIZE}", "SIZE",
-                  mctpQueuedSignals.size());
-        //}
+        mctpQueuedSignals[objPath].pop();
+        lg2::info("mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
+                  "OBJ_PATH", objPath, "SIZE",
+                  mctpQueuedSignals[objPath].size());
     }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
@@ -375,21 +384,30 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
             "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
             "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
 
-        mctpQueuedSignals.emplace(msg);
-        if (deviceStateChangeTaskHandle)
+        mctpQueuedSignals[objPath].emplace(msg);
+
+        if (deviceStateChangeTaskHandles.find(objPath) ==
+            deviceStateChangeTaskHandles.end())
         {
-            if (!deviceStateChangeTaskHandle.done())
+            auto co = deviceStateChangeTask(objPath);
+            deviceStateChangeTaskHandles[objPath] = co.handle;
+            return;
+        }
+
+        if (deviceStateChangeTaskHandles[objPath])
+        {
+            if (!deviceStateChangeTaskHandles[objPath].done())
             {
                 return;
             }
-            deviceStateChangeTaskHandle.destroy();
+            deviceStateChangeTaskHandles[objPath].destroy();
         }
 
-        auto co = deviceStateChangeTask();
-        deviceStateChangeTaskHandle = co.handle;
-        if (deviceStateChangeTaskHandle.done())
+        auto co = deviceStateChangeTask(objPath);
+        deviceStateChangeTaskHandles[objPath] = co.handle;
+        if (deviceStateChangeTaskHandles[objPath].done())
         {
-            deviceStateChangeTaskHandle = nullptr;
+            deviceStateChangeTaskHandles[objPath] = nullptr;
         }
     }
 }

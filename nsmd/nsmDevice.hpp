@@ -39,6 +39,8 @@
 #include <map>
 #include <ranges> // For ranges::find_if
 
+#define MAX_SENSOR_UPDATE_BATCH_SIZE 10
+
 namespace nsm
 {
 
@@ -123,7 +125,7 @@ class NsmDevice : public StateChangeLogger
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
     /** @brief set the nsmDevice to online state */
-    void setOnline();
+    requester::Coroutine setOnline();
 
     /** @brief set the nsmDevice to offline state */
     requester::Coroutine setOffline();
