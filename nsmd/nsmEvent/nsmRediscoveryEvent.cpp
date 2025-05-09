@@ -74,7 +74,11 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
         return NSM_SW_ERROR;
     }
 
-    logEvent("NsmRediscoveryEvent", info.severity, eventData);
+    if (info.logging)
+    {
+        logEvent("NsmRediscoveryEvent", info.severity, eventData);
+    }
+
     // Member to hold reference to DeviceManager and sensor manager
     DeviceManager& deviceManager = DeviceManager::getInstance();
     SensorManager& sensorManager = SensorManager::getInstance();
@@ -142,6 +146,9 @@ static requester::Coroutine
     info.messageArgs =
         co_await utils::coGetDbusProperty<std::vector<std::string>>(
             objPath.c_str(), "MessageArgs", interface.c_str());
+
+    info.logging = utils::DBusHandler().tryGetDbusProperty<bool>(
+        objPath.c_str(), "Logging", interface.c_str(), true);
 
     auto severityStr = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Severity", interface.c_str());
