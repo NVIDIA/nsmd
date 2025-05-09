@@ -543,6 +543,9 @@ int encode_get_network_device_log_info_resp(
 			if (log_data == NULL) {
 				return NSM_SW_ERROR_NULL;
 			}
+			if (log_data_size > sizeof(resp->log_data)) {
+				return NSM_SW_ERROR_LENGTH;
+			}
 		}
 		memcpy(resp->log_data, log_data, log_data_size);
 	}

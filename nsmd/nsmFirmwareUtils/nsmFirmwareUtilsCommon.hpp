@@ -65,12 +65,12 @@ inline std::tuple<uint16_t, std::string>
             case NSM_FW_UPDATE_CODE_AUTH_KEY_PERM:
                 return {cc, "Invalid KeyIndexes"};
             default:
-                return {cc, std::format("Unknown Error: cc={}", cc)};
+                return {cc, "Unknown Error: cc=" + std::to_string(cc)};
         }
     }
     // else: At present there are no specific errors for other cc
     return {cc,
-            std::format("Unknown Error: cc={} reason_code={}", cc, reasonCode)};
+            "Unknown Error: cc=" + std::to_string(cc) + " reason_code=" + std::to_string(reasonCode)};
 }
 
 } // namespace nsm

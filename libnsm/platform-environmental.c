@@ -2079,7 +2079,7 @@ int encode_set_programmable_EDPp_scaling_factor_resp(uint8_t instance_id,
 	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
 
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
-	if (rc != NSM_SUCCESS) {
+	if (rc != NSM_SW_SUCCESS) {
 		return rc;
 	}
 	if (cc != NSM_SUCCESS) {
@@ -3537,6 +3537,10 @@ int encode_nsm_xid_event(uint8_t instance_id, bool ackr,
 			 const char *message_text, size_t message_text_size,
 			 struct nsm_msg *msg)
 {
+	if (sizeof(payload) + message_text_size > NSM_EVENT_DATA_MAX_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
 	payload.reason = htole32(payload.reason);
 	payload.sequence_number = htole32(payload.sequence_number);
 	payload.timestamp = htole64(payload.timestamp);
@@ -3625,8 +3629,11 @@ int encode_query_aggregate_gpm_metrics_req(
 	request->retrieval_source = retrieval_source;
 	request->gpu_instance = gpu_instance;
 	request->compute_instance = compute_instance;
-	memcpy(request->metrics_bitfield, metrics_bitfield,
-	       metrics_bitfield_length);
+	// Add size validation to prevent buffer overflow
+	if (metrics_bitfield_length > sizeof(request->metrics_bitfield)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	memcpy(request->metrics_bitfield, metrics_bitfield, metrics_bitfield_length);
 
 	return NSM_SW_SUCCESS;
 }

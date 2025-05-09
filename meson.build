@@ -2,8 +2,8 @@ project(
     'libnsm',
     ['c', 'cpp'],
     version: '0.1',
-    meson_version: '>=0.58.0',
-    default_options: ['warning_level=3', 'werror=true', 'cpp_std=c++20'],
+    meson_version: '>=1.1.1',
+    default_options: ['warning_level=3', 'werror=true', 'cpp_std=c++23'],
 )
 
 # Enable support for the C++ coroutines extension

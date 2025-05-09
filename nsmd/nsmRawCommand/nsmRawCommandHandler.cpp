@@ -70,7 +70,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         if (rc != NSM_SW_SUCCESS)
         {
             throw std::invalid_argument(
-                std::format("encode_raw_cmd_req failed, rc={}", rc));
+                "encode_raw_cmd_req failed, rc=" + std::to_string(rc));
         }
 
         auto& manager = SensorManager::getInstance();
@@ -78,7 +78,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         if (!device)
         {
             throw std::invalid_argument(
-                std::format("Device {}:{} not found", deviceType, instanceId));
+                "Device " + std::to_string(deviceType) + ":" + std::to_string(instanceId) + " not found");
         }
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
@@ -89,7 +89,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(
-                std::format("SendRecvNsmMsg failed, rc={}", rc));
+                "SendRecvNsmMsg failed, rc=" + std::to_string(rc));
         }
 
         uint8_t cc;
@@ -100,7 +100,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(
-                std::format("decode_common_resp failed, rc={}", rc));
+                "decode_common_resp failed, rc=" + std::to_string(rc));
         }
         if (cc == NSM_SUCCESS)
         {
