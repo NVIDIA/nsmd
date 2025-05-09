@@ -155,7 +155,7 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
     }
 }
 
-void NsmDevice::setOnline()
+requester::Coroutine NsmDevice::setOnline()
 {
     isDeviceActive = true;
     lg2::info(
@@ -164,11 +164,19 @@ void NsmDevice::setOnline()
     isDeviceReady = false;
     NsmServiceReadyIntf::getInstance().setStateStarting();
 
+    uint32_t count = 0;
     for (auto sensor : roundRobinSensors)
     {
         // Mark all the sensors as unrefreshed.
         sensor->isRefreshed = false;
+        count++;
+        if (count == MAX_SENSOR_UPDATE_BATCH_SIZE)
+        {
+            co_await common::Sleep(event.get(), 10000, common::NonPriority);
+            count = 0;
+        }
     }
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmDevice::setOffline()
@@ -187,11 +195,18 @@ requester::Coroutine NsmDevice::setOffline()
 
     size_t sensorIndex{0};
     auto& sensors = deviceSensors;
+
     while (sensorIndex < sensors.size())
     {
-        auto sensor = sensors[sensorIndex];
-        sensor->handleOfflineState();
-        ++sensorIndex;
+        uint32_t count = 0;
+        while (count < MAX_SENSOR_UPDATE_BATCH_SIZE &&
+               sensorIndex < sensors.size())
+        {
+            auto sensor = sensors[sensorIndex];
+            sensor->handleOfflineState();
+            ++sensorIndex;
+            ++count;
+        }
         co_await common::Sleep(event.get(), 10000, common::NonPriority);
     }
     // coverity[missing_return]

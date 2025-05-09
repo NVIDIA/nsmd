@@ -84,12 +84,14 @@ class MctpDiscovery
     /** @brief Used to watch for the removed MCTP endpoints */
     sdbusplus::bus::match_t mctpEndpointRemovedSignal;
 
-    /** @brief Queue to store the pending property change signal from mctp
-     * service */
-    std::queue<sdbusplus::message::message> mctpQueuedSignals;
+    /** @brief map of Queue to store the pending property change signal from
+     * mctp service */
+    std::map<std::string, std::queue<sdbusplus::message::message>>
+        mctpQueuedSignals;
 
-    std::coroutine_handle<> deviceStateChangeTaskHandle;
-    requester::Coroutine deviceStateChangeTask();
+    std::map<std::string, std::coroutine_handle<void>>
+        deviceStateChangeTaskHandles;
+    requester::Coroutine deviceStateChangeTask(const std::string path);
 
     void discoverEndpoints(sdbusplus::message::message& msg);
 
