@@ -26,7 +26,7 @@ using namespace nsm;
 
 TEST(asyncOperationManager, GoodTest)
 {
-    AsyncOperationManager manager{8, AsyncOperationResultObjPath};
+    AsyncOperationManager manager{AsyncOperationResultObjPath};
 
     for (size_t i{0}; i < 4; ++i)
     {
@@ -55,8 +55,8 @@ TEST(asyncOperationManager, GoodTest)
     for (size_t i{0}; i < 32; ++i)
     {
         const auto [path, statusInterface] = manager.getNewStatusInterface();
-        EXPECT_EQ(path, "");
-        EXPECT_EQ(statusInterface.get(), nullptr);
+        EXPECT_NE(path, "");
+        EXPECT_NE(statusInterface.get(), nullptr);
     }
 
     for (size_t i{0}; i < 32; ++i)
@@ -64,48 +64,8 @@ TEST(asyncOperationManager, GoodTest)
         const auto [path, statusInterface,
                     valueInterface] = manager.getNewStatusValueInterface();
 
-        EXPECT_EQ(path, "");
-        EXPECT_EQ(statusInterface.get(), nullptr);
-        EXPECT_EQ(valueInterface.get(), nullptr);
-    }
-
-    manager.statusInterfaces[2]->status(AsyncOperationStatusType::Success);
-    manager.statusInterfaces[7]->status(AsyncOperationStatusType::WriteFailure);
-
-    {
-        const auto [path, statusInterface,
-                    valueInterface] = manager.getNewStatusValueInterface();
-
-        const std::string objPath = std::string{AsyncOperationResultObjPath} +
-                                    "/" + std::to_string(2);
-
-        EXPECT_EQ(path, objPath);
+        EXPECT_NE(path, "");
         EXPECT_NE(statusInterface.get(), nullptr);
         EXPECT_NE(valueInterface.get(), nullptr);
-    }
-
-    {
-        const auto [path, statusInterface,
-                    valueInterface] = manager.getNewStatusValueInterface();
-
-        const std::string objPath = std::string{AsyncOperationResultObjPath} +
-                                    "/" + std::to_string(7);
-
-        EXPECT_EQ(path, objPath);
-        EXPECT_NE(statusInterface.get(), nullptr);
-        EXPECT_NE(valueInterface.get(), nullptr);
-    }
-
-    manager.statusInterfaces[5]->status(
-        AsyncOperationStatusType::UnsupportedRequest);
-
-    {
-        const auto [path, statusInterface] = manager.getNewStatusInterface();
-
-        const std::string objPath = std::string{AsyncOperationResultObjPath} +
-                                    "/" + std::to_string(5);
-
-        EXPECT_EQ(path, objPath);
-        EXPECT_NE(statusInterface.get(), nullptr);
     }
 }
