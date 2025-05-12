@@ -22,6 +22,7 @@
 #include "nsmInterface.hpp"
 #include "nsmd/nsmCommon/nsmCommon.hpp"
 
+#include <com/nvidia/ResetCounters/ResetCounterMetrics/server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>

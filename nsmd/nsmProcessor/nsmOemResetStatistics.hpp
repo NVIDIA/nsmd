@@ -34,6 +34,11 @@ using ResetCountersIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::ResetCounters::server::ResetCounterMetrics>;
 using AssociationDefinitionsIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Association::server::Definitions>;
+
+using LastResetTypes = sdbusplus::com::nvidia::ResetCounters::server::
+    ResetCounterMetrics::ResetTypes;
+using BootReasonTypes = sdbusplus::com::nvidia::ResetCounters::server::
+    ResetCounterMetrics::BootReasonTypes;
 /** @class ResetStatisticsAggregator
  *
  * Derived from NsmSensorAggregator to handle reset statistics data in aggregate

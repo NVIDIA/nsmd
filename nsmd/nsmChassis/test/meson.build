@@ -10,6 +10,7 @@ dep_src_files = [
     '../nsmPCIeLTSSMState.cpp',
     '../nsmWriteProtectedJumper.cpp',
     '../nsmAERError.cpp',
+    '../../nsmSensorAggregator.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
@@ -38,6 +39,7 @@ dep_src_files = [
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../nsmProcessor/nsmOemResetStatistics.cpp',
 ]
 
 dep_src_headers = [
@@ -54,6 +56,7 @@ dep_src_headers = [
     '../../nsmDumpCollection',
     '../../nsmSetAsync',
     '../../nsmRawCommand',
+    '../../nsmProcessor',
     '../../../',
     '../../../common',
     '../../../libnsm',

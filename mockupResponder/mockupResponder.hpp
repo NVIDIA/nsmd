@@ -43,7 +43,8 @@ const std::unordered_map<uint8_t, uint64_t> resetMetricsMockTable = {
     {4, 30},  // FundamentalResetEntryCount
     {5, 25},  // FundamentalResetExitCount
     {6, 10},  // IRoTResetExitCount
-    {7, 2}    // LastResetType (enum8: e.g., 2 = Fundamental)
+    {7, 2},   // LastResetType (enum8: e.g., 2 = Fundamental)
+    {8, 3}    // BootReasonType (enum8: e.g., bit 0 = wake up, bit 1 = PowerOn)
 };
 
 constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
