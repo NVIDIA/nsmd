@@ -77,6 +77,7 @@ TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequest)
         0, 0, 0, false, 0, 0, unix_fd(fd));
     EXPECT_NE(path, sdbusplus::message::object_path{});
 }
+
 TEST_F(NsmRawCommandHandlerTest, BadTestSendRequest)
 {
     EXPECT_THROW(
@@ -87,27 +88,6 @@ TEST_F(NsmRawCommandHandlerTest, BadTestSendRequest)
         NsmRawCommandHandler::getInstance().sendRequest(
             0, 0, 0, false, NSM_TYPE_FIRMWARE + 1, 0, unix_fd(fd)),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
-    for (size_t i = 0; i < AsyncOperationManager::getInstance()->maxObjectCount;
-         i++)
-    {
-        AsyncOperationManager::getInstance()->getNewStatusInterface();
-    }
-    EXPECT_THROW(NsmRawCommandHandler::getInstance().sendRequest(
-                     0, 0, 0, false, 0, 0, unix_fd(fd)),
-                 sdbusplus::error::xyz::openbmc_project::common::Unavailable);
-    for (auto& interface :
-         AsyncOperationManager::getInstance()->statusInterfaces)
-    {
-        interface.reset();
-    }
-    for (auto& interface :
-         AsyncOperationManager::getInstance()->valueInterfaces)
-    {
-        interface.reset();
-    }
-    AsyncOperationManager::getInstance()->statusInterfaces.clear();
-    AsyncOperationManager::getInstance()->valueInterfaces.clear();
-    AsyncOperationManager::getInstance()->currentObjectCount = 0;
 }
 
 TEST_F(NsmRawCommandHandlerTest, BadTestNoDevice)

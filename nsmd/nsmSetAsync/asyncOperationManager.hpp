@@ -80,10 +80,10 @@ class AsyncOperationManager
         getNewStatusValueInterface();
 
   private:
-    AsyncOperationManager(const size_t maxResultObjectCount,
-                          const std::string& asyncOperationResultObjPath);
+    AsyncOperationManager(const std::string& asyncOperationResultObjPath);
 
     std::pair<bool, size_t> getCurrentObjectCount();
+    size_t currentObjectCount{0};
 
     /**
      * @brief Clear the value stored in the value interface, special attention
@@ -93,12 +93,14 @@ class AsyncOperationManager
      */
     void clearValueInterface(std::shared_ptr<AsyncValueIntf> valueIntf);
 
-    size_t currentObjectCount{};
-    const size_t maxObjectCount;
     const std::string asyncOperationResultObjPath;
 
-    std::vector<std::shared_ptr<AsyncStatusIntf>> statusInterfaces;
-    std::vector<std::shared_ptr<AsyncValueIntf>> valueInterfaces;
+    std::unordered_map<uint64_t, std::shared_ptr<AsyncStatusIntf>>
+        statusInterfaces;
+    std::unordered_map<uint64_t, std::shared_ptr<AsyncValueIntf>>
+        valueInterfaces;
+    std::unordered_map<uint64_t, std::shared_ptr<sdbusplus::Timer>>
+        objectPathTimers;
 
     std::unordered_map<std::string, AsyncSetOperationDispatcher> dispatchers;
 };

@@ -25,15 +25,12 @@ namespace nsm
 AsyncOperationManager* AsyncOperationManager::getInstance()
 {
     static const std::unique_ptr<AsyncOperationManager> instance{
-        new AsyncOperationManager{MaxAsyncOperationResultObjectCount,
-                                  AsyncOperationResultObjPath}};
+        new AsyncOperationManager{AsyncOperationResultObjPath}};
     return instance.get();
 }
 
 AsyncOperationManager::AsyncOperationManager(
-    const size_t maxResultObjectCount,
     const std::string& asyncOperationResultObjPath) :
-    maxObjectCount(maxResultObjectCount),
     asyncOperationResultObjPath(asyncOperationResultObjPath)
 {}
 
@@ -48,59 +45,31 @@ AsyncSetOperationDispatcher*
 
 std::pair<bool, size_t> AsyncOperationManager::getCurrentObjectCount()
 {
-    const size_t numResultObjects = statusInterfaces.size();
+    const std::string objPath = asyncOperationResultObjPath + "/" +
+                                std::to_string(currentObjectCount);
 
-    // check if maximum result object count is reached
-    if (numResultObjects >= maxObjectCount)
-    {
-        size_t count{currentObjectCount};
+    auto statusInterface = std::make_shared<AsyncStatusIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
 
-        // check for the next available not in progress result object
-        while (statusInterfaces[count]->status() ==
-               AsyncOperationStatusType::InProgress)
-        {
-            ++count;
+    auto valueInterface = std::make_shared<AsyncValueIntf>(
+        utils::DBusHandler::getBus(), objPath.c_str());
 
-            if (count >= maxObjectCount)
-            {
-                count = 0;
-            }
+    statusInterfaces[currentObjectCount] = statusInterface;
+    valueInterfaces[currentObjectCount] = valueInterface;
+    const size_t returnValue = currentObjectCount;
 
-            // all the result Objects are checked and no Object is found with
-            // status not in progress
-            if (count == currentObjectCount)
-            {
-                lg2::error(
-                    "AsyncOperationManager : no available result Object to allocate for the request.");
+    auto timer =
+        std::make_shared<sdbusplus::Timer>([this, index = returnValue]() {
+        statusInterfaces.erase(index);
+        valueInterfaces.erase(index);
+        objectPathTimers.erase(index);
+        return false; // Don't restart timer
+    });
+    timer->start(std::chrono::minutes(2));
 
-                return {false, {}};
-            }
-        }
-
-        currentObjectCount = count;
-    }
-    else
-    {
-        const std::string objPath = asyncOperationResultObjPath + "/" +
-                                    std::to_string(currentObjectCount);
-
-        auto statusInterface = std::make_shared<AsyncStatusIntf>(
-            utils::DBusHandler::getBus(), objPath.c_str());
-
-        auto valueInterface = std::make_shared<AsyncValueIntf>(
-            utils::DBusHandler::getBus(), objPath.c_str());
-
-        statusInterfaces.push_back(statusInterface);
-        valueInterfaces.push_back(valueInterface);
-    }
-
-    const size_t returnValue{currentObjectCount};
+    objectPathTimers[returnValue] = std::move(timer);
 
     ++currentObjectCount;
-    if (currentObjectCount >= maxObjectCount)
-    {
-        currentObjectCount = 0;
-    }
 
     return {true, returnValue};
 }
