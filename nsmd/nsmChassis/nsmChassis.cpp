@@ -25,6 +25,7 @@
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPowerSupplyStatus.hpp"
+#include "nsmProcessor/nsmOemResetStatistics.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 
 namespace nsm
@@ -58,6 +59,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
                                              const std::string& objPath)
 {
     std::string baseInterface = "xyz.openbmc_project.Configuration.NSM_Chassis";
+    auto& bus = utils::DBusHandler::getBus();
 
     auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", baseInterface.c_str());
@@ -290,6 +292,50 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
         device->addStaticSensor(chassisPrettyName);
     }
+    else if (type == "NSM_ResetMetrics")
+    {
+        auto objectPath = chassisInventoryBasePath.string() + "/" + name +
+                          "/ResetStatistics";
+        auto resetCountersIntf =
+            std::make_shared<ResetCountersIntf>(bus, objectPath.c_str());
+
+        //  Add associations between chassis and reset_statistics
+        std::vector<utils::Association> associations{
+            {"parent", "reset_statistics",
+             chassisInventoryBasePath.string() + "/" + name}};
+        auto resetMetricsAssociationIntf =
+            std::make_unique<AssociationDefinitionsIntf>(bus,
+                                                         objectPath.c_str());
+        std::vector<std::tuple<std::string, std::string, std::string>>
+            associationsList;
+        for (const auto& association : associations)
+        {
+            associationsList.emplace_back(association.forward,
+                                          association.backward,
+                                          association.absolutePath);
+        }
+        resetMetricsAssociationIntf->associations(associationsList);
+
+        // Initialize all properties to their default values
+        resetCountersIntf->lastResetType(LastResetTypes::Conventional);
+        resetCountersIntf->pfflrResetEntryCount(std::nan(""));
+        resetCountersIntf->pfflrResetExitCount(std::nan(""));
+        resetCountersIntf->conventionalResetEntryCount(std::nan(""));
+        resetCountersIntf->conventionalResetExitCount(std::nan(""));
+        resetCountersIntf->fundamentalResetEntryCount(std::nan(""));
+        resetCountersIntf->fundamentalResetExitCount(std::nan(""));
+        resetCountersIntf->iRoTResetExitCount(std::nan(""));
+        resetCountersIntf->bootReason(
+            std::vector<BootReasonTypes>{BootReasonTypes::PowerOn});
+
+        auto resetStatisticsSensor =
+            std::make_shared<ResetStatisticsAggregator>(
+                "ResetMetrics", "NSM_ResetStatistics", objectPath,
+                resetCountersIntf, std::move(resetMetricsAssociationIntf));
+
+        device->deviceSensors.emplace_back(resetStatisticsSensor);
+        device->addSensor(resetStatisticsSensor, false);
+    }
 
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -307,7 +353,8 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.OperationalStatus",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PowerState",
     "xyz.openbmc_project.Configuration.NSM_Chassis.PrettyName",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect"};
+    "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ResetMetrics"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
 

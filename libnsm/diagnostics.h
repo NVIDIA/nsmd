@@ -261,6 +261,40 @@ struct nsm_erase_debug_info_resp {
 	uint8_t reserved;
 } __attribute__((packed));
 
+/** @struct nsm_boot_reason_type_breakdown
+ *
+ *  Structure representing NSM Boot Reason Type breakdown.
+ */
+struct nsm_boot_reason_type_breakdown {
+	uint64_t wake_up : 1;
+	uint64_t power_on : 1;
+	uint64_t voltage_detect : 1;
+	uint64_t reserved3 : 1;
+	uint64_t warm_reset : 1;
+	uint64_t fatal_error : 1;
+	uint64_t reserved6 : 1;
+	uint64_t reserved7 : 1;
+	uint64_t pin : 1;
+	uint64_t debug_access_port : 1;
+	uint64_t reset_timeout : 1;
+	uint64_t low_power_acknowledge_timeout : 1;
+	uint64_t system_clock_generator : 1;
+	uint64_t windowed_watchdog_0 : 1;
+	uint64_t software : 1;
+	uint64_t lockup_reset : 1;
+	uint64_t cpu1 : 1;
+	uint64_t reserved17to23 : 7;
+	uint64_t vbat : 1;
+	uint64_t windowed_watchdog_1 : 1;
+	uint64_t code_watchdog_0 : 1;
+	uint64_t code_watchdog_1 : 1;
+	uint64_t jtag : 1;
+	uint64_t reserved29 : 1;
+	uint64_t security_violation : 1;
+	uint64_t tamper : 1;
+	uint64_t reserved32to63 : 32;
+} __attribute__((packed));
+
 /** @brief Encode a Get device diagnostics request message
  *
  *  @param[in] instance_id - NSM instance ID
@@ -667,6 +701,29 @@ int encode_reset_count_data(uint16_t count, uint8_t *data, size_t *data_len);
  */
 int decode_reset_count_data(const uint8_t *data, size_t data_len,
 			    uint16_t *count);
+
+/**
+ * @brief Encodes a uint64 reset count into a byte array.
+ *
+ * @param[in] count - Reset count as uint64_t.
+ * @param[out] data - Encoded byte array.
+ * @param[out] data_len - Length of the encoded data.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int encode_reset_count_64data(uint64_t count, uint8_t *data, size_t *data_len);
+
+/**
+ * @brief Decodes a uint64 reset count from a byte array.
+ *
+ * @param[in] data - Encoded byte array.
+ * @param[in] data_len - Length of the encoded data.
+ * @param[out] count - Decoded reset count as uint64_t.
+ *
+ * @return NSM_SW_SUCCESS on success, or appropriate error code.
+ */
+int decode_reset_count_64data(const uint8_t *data, size_t data_len,
+			      uint64_t *count);
 
 /**
  * @brief Decodes a "Get Device Reset Statistics" request message.

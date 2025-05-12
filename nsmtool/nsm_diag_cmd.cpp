@@ -299,7 +299,8 @@ class QueryResetStatistics : public CommandInterface
                 {4, "FundamentalResetEntryCount"},
                 {5, "FundamentalResetExitCount"},
                 {6, "IRoTResetExitCount"},
-                {7, "LastResetType"}};
+                {7, "LastResetType"},
+                {8, "BootReason"}};
 
             auto it = tagToPropertyMap.find(tag);
             if (it == tagToPropertyMap.end())
@@ -323,6 +324,21 @@ class QueryResetStatistics : public CommandInterface
                 sample_json["Tag"] = static_cast<int>(tag);
                 sample_json["Property"] = property;
                 sample_json["Value"] = resetType;
+            }
+            else if (property == "BootReason")
+            {
+                // Handle boot reason counter (uint64_t)
+                uint64_t counterVal;
+                if (decode_reset_count_64data(data, data_len, &counterVal) !=
+                    NSM_SW_SUCCESS)
+                {
+                    return NSM_SW_ERROR_LENGTH;
+                }
+
+                // Include the tag in the JSON
+                sample_json["Tag"] = static_cast<int>(tag);
+                sample_json["Property"] = property;
+                sample_json["Value"] = counterVal;
             }
             else
             {

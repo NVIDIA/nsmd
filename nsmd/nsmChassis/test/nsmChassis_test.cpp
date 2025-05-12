@@ -29,6 +29,7 @@ using namespace ::testing;
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPowerSupplyStatus.hpp"
+#include "nsmProcessor/nsmOemResetStatistics.hpp"
 #include "nsmWriteProtectedJumper.hpp"
 
 namespace nsm

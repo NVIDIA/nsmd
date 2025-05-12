@@ -99,6 +99,36 @@ TEST(ResetMetrics, DecodeResetEnumDataInvalidLength)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
+// Tests for `encode_reset_count_64data`
+TEST(ResetMetrics, EncodeResetCount64Data)
+{
+	uint64_t count = 256; // Example count value
+	uint8_t data[8];
+	size_t data_len;
+
+	auto rc = encode_reset_count_64data(count, data, &data_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data_len, sizeof(uint64_t));
+
+	uint64_t decodedCount;
+	memcpy(&decodedCount, data, sizeof(uint64_t));
+	EXPECT_EQ(decodedCount, htole64(count));
+}
+
+TEST(ResetMetrics, EncodeResetCount64DataNull)
+{
+	uint64_t count = 256;
+	size_t data_len;
+
+	auto rc = encode_reset_count_64data(count, nullptr, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_reset_count_64data(count, reinterpret_cast<uint8_t *>(0),
+				       nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
 // Tests for `decode_reset_count_data`
 TEST(ResetMetrics, DecodeResetCountData)
 {
@@ -133,6 +163,43 @@ TEST(ResetMetrics, DecodeResetCountDataNull)
 
 	uint8_t data[2] = {0};
 	rc = decode_reset_count_data(data, 2, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// Tests for `decode_reset_count_64data`
+TEST(ResetMetrics, DecodeResetCount64Data)
+{
+	uint64_t count = 256; // Example encoded value
+	uint8_t data[8];
+	memcpy(data, &count, sizeof(count));
+	uint64_t decodedCount;
+
+	auto rc = decode_reset_count_64data(data, sizeof(data), &decodedCount);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(decodedCount, le64toh(count));
+}
+
+TEST(ResetMetrics, DecodeResetCount64DataInvalidLength)
+{
+	uint64_t count = 256;
+	uint8_t data[8];
+	memcpy(data, &count, sizeof(count));
+	uint64_t decodedCount;
+
+	auto rc =
+	    decode_reset_count_64data(data, sizeof(data) - 1, &decodedCount);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(ResetMetrics, DecodeResetCount64DataNull)
+{
+	uint64_t decodedCount;
+	auto rc = decode_reset_count_64data(nullptr, 8, &decodedCount);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t data[8] = {0};
+	rc = decode_reset_count_64data(data, 8, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 

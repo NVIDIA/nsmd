@@ -172,6 +172,19 @@ int encode_reset_count_data(uint16_t count, uint8_t *data, size_t *data_len)
 	return NSM_SW_SUCCESS;
 }
 
+int encode_reset_count_64data(uint64_t counter, uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint64_t le_count = htole64(counter);
+	memcpy(data, &le_count, sizeof(uint64_t));
+	*data_len = sizeof(uint64_t);
+
+	return NSM_SW_SUCCESS;
+}
+
 int decode_reset_enum_data(const uint8_t *data, size_t data_len,
 			   uint8_t *resetType)
 {
@@ -201,6 +214,24 @@ int decode_reset_count_data(const uint8_t *data, size_t data_len,
 	uint16_t le_count;
 	memcpy(&le_count, data, sizeof(uint16_t));
 	*count = le16toh(le_count);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_reset_count_64data(const uint8_t *data, size_t data_len,
+			      uint64_t *counter)
+{
+	if (data == NULL || counter == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint64_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	uint64_t le_count;
+	memcpy(&le_count, data, sizeof(uint64_t));
+	*counter = le64toh(le_count);
 
 	return NSM_SW_SUCCESS;
 }

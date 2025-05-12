@@ -906,6 +906,7 @@ std::optional<std::vector<uint8_t>>
                   }},
                  {NSM_TYPE_DIAGNOSTIC,
                   {
+                      NSM_GET_DEVICE_RESET_STATISTICS,
                       NSM_GET_DEVICE_DIAGNOSTICS,
                   }},
              }},
@@ -5221,6 +5222,11 @@ std::optional<std::vector<uint8_t>>
         {
             rc = encode_reset_enum_data(static_cast<uint8_t>(mockValue),
                                         reading, &sample_len);
+        }
+        else if (tag == 8) // Special case for boot reason (uint64_t)
+        {
+            rc = encode_reset_count_64data(static_cast<uint64_t>(mockValue),
+                                           reading, &sample_len);
         }
         else // General case for reset counts (uint16_t)
         {
