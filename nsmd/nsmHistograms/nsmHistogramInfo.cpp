@@ -218,7 +218,7 @@ NsmHistogramFormat::NsmHistogramFormat(
     formatIntf(formatIntf), bucketInfoIntf(bucketInfoIntf),
     histogramId(histogramId), parameter(parameter)
 {
-    lg2::info("NsmHistogramFormat: {NAME}", "NAME", name.c_str());
+    lg2::debug("NsmHistogramFormat: {NAME}", "NAME", name.c_str());
     histogramName = name;
     deviceType = type;
     objPath = objPath + "/Histograms/" + histogramName;
