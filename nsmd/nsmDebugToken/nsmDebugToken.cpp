@@ -232,13 +232,15 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
+    uint8_t cc = NSM_SUCCESS;
     auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
                                                   responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: getStatus SendRecvNsmMsg: "
-                   "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+        LG2_ERROR_FLT(
+            "DebugToken: getStatus SendRecvNsmMsg failed | cc: {CC}, rc: {RC}, eid: {EID}",
+            "CC", nsm_completion_codes(cc), "RC", nsm_sw_codes(sendRc), "EID",
+            eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
@@ -253,7 +255,7 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
         // coverity[missing_return]
         co_return sendRc;
     }
-    uint8_t cc = NSM_SUCCESS;
+
     uint16_t reasonCode = ERR_NULL;
     nsm_debug_token_status status;
     nsm_debug_token_status_additional_info additionalInfo;
