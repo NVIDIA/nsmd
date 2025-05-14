@@ -25,6 +25,7 @@
 #include "nsmMNNVLinkTopologyIntf.hpp"
 
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/AssetTag/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Dimension/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PowerLimit/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
@@ -36,6 +37,7 @@ namespace nsm
 {
 using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
+using AssetTagIntf = object_t<Inventory::Decorator::server::AssetTag>;
 using DimensionIntf = object_t<Inventory::Decorator::server::Dimension>;
 using PowerLimitIntf = object_t<Inventory::Decorator::server::PowerLimit>;
 using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
@@ -113,6 +115,27 @@ inline void
                 invoke(pdiMethod(buildDate), nullDate);
             else
                 invoke(pdiMethod(buildDate), dateValue);
+            break;
+        }
+        default:
+            throw std::runtime_error("Not implemented PDI");
+            break;
+    }
+}
+
+template <>
+inline void
+    NsmInventoryProperty<AssetTagIntf>::handleResponse(const Response& data)
+{
+    switch (property)
+    {
+        case ASSET_TAG:
+        {
+            std::string assetTag((char*)data.data(), data.size());
+            if (assetTag.empty())
+                invoke(pdiMethod(assetTag), "");
+            else
+                invoke(pdiMethod(assetTag), assetTag);
             break;
         }
         default:

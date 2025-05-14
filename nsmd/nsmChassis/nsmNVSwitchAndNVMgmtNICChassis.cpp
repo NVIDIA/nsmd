@@ -165,6 +165,16 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             LocationIntf::convertLocationTypesFromString(locationType));
         device->addStaticSensor(chassisLocation);
     }
+    else if (type == "NSM_LocationCode")
+    {
+        auto locationCode = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "LocationCode", interface.c_str());
+        auto chassisLocationCode =
+            std::make_shared<NsmNVSwitchAndNicChassis<LocationCodeIntf>>(
+                name, baseType);
+        chassisLocationCode->invoke(pdiMethod(locationCode), locationCode);
+        device->addStaticSensor(chassisLocationCode);
+    }
     else if (type == "NSM_PrettyName")
     {
         auto prettyName = co_await utils::coGetDbusProperty<std::string>(
@@ -174,6 +184,14 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
                                                                  baseType);
         chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
         device->addStaticSensor(chassisPrettyName);
+    }
+    else if (type == "NSM_AssetTag")
+    {
+        auto assetTagIntf = NsmNVSwitchAndNicChassis<AssetTagIntf>(name,
+                                                                   baseType);
+        auto assetTag = std::make_shared<NsmInventoryProperty<AssetTagIntf>>(
+            assetTagIntf, ASSET_TAG);
+        device->addStaticSensor(assetTag);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -210,9 +228,11 @@ std::vector<std::string> nvSwitchChassisInterfaces{
 std::vector<std::string> nvLinkMgmtNicChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Asset",
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.AssetTag",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Chassis",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Health",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Location"};
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Location",
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.LocationCode"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmNVSwitchChassis,
                                nvSwitchChassisInterfaces)
