@@ -982,6 +982,9 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
                                             0x00, 0x00, 0x00, 0x00};
             generateDummyGUID(mockEid, property.data());
             break;
+        case ASSET_TAG:
+            populateFrom(property, "MCX750500B-0D00_DK");
+            break;
         case INFO_ROM_VERSION:
             populateFrom(property, "128");
             break;

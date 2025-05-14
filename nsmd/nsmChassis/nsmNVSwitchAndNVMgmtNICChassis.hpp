@@ -24,7 +24,9 @@
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/AssetTag/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
@@ -40,6 +42,8 @@ using LocationIntf = object_t<Inventory::Decorator::server::Location>;
 using ChassisIntf = object_t<Inventory::Item::server::Chassis>;
 using ItemIntf = object_t<Inventory::server::Item>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
+using AssetTagIntf = object_t<Inventory::Decorator::server::AssetTag>;
+using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
 
 template <typename IntfType>
 class NsmNVSwitchAndNicChassis : public NsmInterfaceProvider<IntfType>
