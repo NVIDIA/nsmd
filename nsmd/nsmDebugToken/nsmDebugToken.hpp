@@ -18,6 +18,7 @@
 #pragma once
 
 #include "nsmObjectFactory.hpp"
+#include "stateChangeLogger.hpp"
 #include "utils.hpp"
 
 #include <com/nvidia/DebugToken/server.hpp>
@@ -35,7 +36,10 @@ using namespace sdbusplus::server;
 using DebugTokenIntf = object_t<server::DebugToken>;
 using ProgressIntf = object_t<Common::server::Progress>;
 
-class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
+class NsmDebugTokenObject :
+    public NsmObject,
+    public DebugTokenIntf,
+    public StateChangeLogger
 {
   public:
     NsmDebugTokenObject(sdbusplus::bus::bus& bus, const std::string& name,
