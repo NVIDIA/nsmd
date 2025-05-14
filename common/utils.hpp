@@ -235,7 +235,8 @@ class IDBusHandler
      */
     template <typename Property>
     auto tryGetDbusProperty(const char* objPath, const char* dbusProp,
-                            const char* dbusInterface)
+                            const char* dbusInterface,
+                            const Property& defValue = Property())
     {
         try
         {
@@ -243,7 +244,7 @@ class IDBusHandler
         }
         catch (const sdbusplus::exception::exception&)
         {
-            return Property();
+            return defValue;
         }
     }
 };

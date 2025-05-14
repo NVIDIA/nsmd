@@ -32,6 +32,7 @@ struct NsmEventInfo
     std::string resolution;
     std::string errorId;
     std::vector<std::string> messageArgs;
+    bool logging;
 };
 
 }; // namespace nsm
