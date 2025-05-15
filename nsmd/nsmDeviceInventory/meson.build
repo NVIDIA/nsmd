@@ -1,4 +1,5 @@
 sources += [
+    'nsmDeviceInventory/nsmIRoTResponder.cpp',
     'nsmDeviceInventory/nsmNetworkAdapter.cpp',
     'nsmDeviceInventory/nsmPCIeRetimerFabricsDI.cpp',
     'nsmDeviceInventory/nsmPCIeRetimerSwitchDI.cpp',
