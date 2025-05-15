@@ -126,7 +126,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
 
     auto type = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Type", interface.c_str());
-    if (type == "NSM_Chassis")
+    if (type == "NSM_Chassis" || type == "NSM_ChassisRoT")
     {
         auto name = co_await utils::coGetDbusProperty<std::string>(
             objPath.c_str(), "Name", interface.c_str());
@@ -288,7 +288,8 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
 }
 
 std::vector<std::string> erotInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_Chassis"};
+    "xyz.openbmc_project.Configuration.NSM_Chassis",
+    "xyz.openbmc_project.Configuration.NSM_ChassisRoT"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmErotCreateSensors, erotInterfaces)
 
