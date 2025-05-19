@@ -4958,6 +4958,82 @@ class GetPortNetworkAddresses : public CommandInterface
     uint16_t portNumber;
 };
 
+class GetPortEccCounters : public CommandInterface
+{
+  public:
+    ~GetPortEccCounters() = default;
+    GetPortEccCounters() = delete;
+    GetPortEccCounters(const GetPortEccCounters&) = delete;
+    GetPortEccCounters(GetPortEccCounters&&) = default;
+    GetPortEccCounters& operator=(const GetPortEccCounters&) = delete;
+    GetPortEccCounters& operator=(GetPortEccCounters&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPortEccCounters(const char* type, const char* name,
+                                CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which ECC counters are to be retrieved.");
+
+        portNumber = 0;
+        portOptionGroup->add_option("-p, --portNum", portNumber,
+                                    "Retrieve ECC counters for Port number");
+        portOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_port_ecc_counters_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_port_ecc_counters_req(instanceId, portNumber,
+                                                   request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPortEccCountersAggregateResponseParser{}.parseAggregateResponse(
+            responsePtr, payloadLength);
+    class GetPortEccCountersAggregateResponseParser :
+      private:
+                             ordered_json& sample_json) final
+    {
+        uint64_t counter_value;
+        int rc = decode_aggregate_port_ecc_counter_data(tag, data, data_len,
+                                                        &counter_value);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return rc;
+        }
+
+        switch (tag)
+        {
+            case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+                sample_json["SymbolErrorRXBytes"] = counter_value;
+                break;
+            case NSM_TAG_ECC_CORRECTED_BITS:
+                sample_json["CorrectedBits"] = counter_value;
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+                sample_json["RawErrorsPerLane_0"] = counter_value;
+                break;
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
+                sample_json["RawErrorsPerLane_3"] = counter_value;
+            default:
+                return NSM_SW_ERROR_DATA;
+        }
+        return NSM_SW_SUCCESS;
+    }
+    };
+
+    uint16_t portNumber;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -5218,6 +5294,11 @@ void registerCommand(CLI::App& app)
         "GetPortNetworkAddresses", "Get Port Network Addresses");
     commands.push_back(std::make_unique<GetPortNetworkAddresses>(
         "telemetry", "GetPortNetworkAddresses", getPortNetworkAddresses));
+
+    auto getPortEccCounters = telemetry->add_subcommand(
+        "GetPortEccCounters", "Get Port ECC Counters");
+    commands.push_back(std::make_unique<GetPortEccCounters>(
+        "telemetry", "GetPortEccCounters", getPortEccCounters));
 }
 
 } // namespace telemetry
