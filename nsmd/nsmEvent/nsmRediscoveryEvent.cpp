@@ -96,7 +96,18 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
             lg2::info(
                 "Rediscovery event : The NSM device has been discovered for , uuid={UUID}",
                 "UUID", uuid);
-            deviceManager.updateNsmDevice(nsmDevice, eid).detach();
+            isRediscoveryRequired = true;
+            if (rediscoveryTaskHandler)
+            {
+                if (!rediscoveryTaskHandler.done())
+                {
+                    return NSM_SW_SUCCESS;
+                }
+                rediscoveryTaskHandler.destroy();
+            }
+
+            auto co = handleRediscovery(nsmDevice, eid);
+            rediscoveryTaskHandler = co.handle;
         }
         else
         {
@@ -112,6 +123,18 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
     }
 
     return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    NsmRediscoveryEvent::handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice,
+                                           eid_t& eid)
+{
+    while (isRediscoveryRequired)
+    {
+        isRediscoveryRequired = false;
+        co_await DeviceManager::getInstance().updateNsmDevice(nsmDevice, eid);
+    }
+    co_return NSM_SW_SUCCESS;
 }
 
 static requester::Coroutine
