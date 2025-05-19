@@ -56,6 +56,7 @@ enum nsm_network_port_commands {
 	NSM_GET_POWER_PROFILE = 0x0d,
 	NSM_GET_FABRIC_MANAGER_STATE = 0x0e,
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER = 0x0f,
+	NSM_GET_PORT_ECC_COUNTERS = 0x10,
 	NSM_GET_NETWORK_ADDRESSES = 0x11,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
@@ -178,6 +179,15 @@ enum nsm_network_address_link_type {
 	NSM_PORT_PROTOCOL_UNKNOWN = -1,
 	NSM_PORT_PROTOCOL_ETHERNET = 0,
 	NSM_PORT_PROTOCOL_INFINIBAND = 1
+};
+
+enum nsm_ecc_counters_tag {
+	NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES = 0,
+	NSM_TAG_ECC_CORRECTED_BITS = 1,
+	NSM_TAG_ECC_RAW_ERRORS_LANE_0 = 2,
+	NSM_TAG_ECC_RAW_ERRORS_LANE_1 = 3,
+	NSM_TAG_ECC_RAW_ERRORS_LANE_2 = 4,
+	NSM_TAG_ECC_RAW_ERRORS_LANE_3 = 5
 };
 
 struct nsm_supported_port_counter {
@@ -658,6 +668,12 @@ int decode_aggregate_network_address_data(uint8_t tag, const uint8_t *data,
 int encode_aggregate_network_address_data(
     uint8_t tag, const network_address_sample_data *address, uint8_t *data,
     size_t *data_len);
+
+/** @struct nsm_get_port_ecc_counters_req
+ *
+ *  Structure representing NSM get port ecc counters request.
+ */
+typedef struct nsm_common_port_req nsm_get_port_ecc_counters_req;
 
 #ifdef ENABLE_SYSTEM_GUID
 /** @brief Encode a Set System GUID request message
@@ -1322,6 +1338,49 @@ int decode_aggregate_eth_port_telemetry_data(
 int encode_aggregate_eth_port_telemetry_data(
     uint8_t tag, nsm_ethernet_port_counter_data *counter_reading, uint8_t *data,
     size_t *data_len);
+
+/** @brief Encode a Get Port ECC Counters request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - Port number
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
+				     struct nsm_msg *msg);
+
+/** @brief Decode a Get Port ECC Counters request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - port number
+ *  @return nsm_completion_codes
+ */
+int decode_get_port_ecc_counters_req(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *port_number);
+
+/** @brief Decode a aggregate port ecc counter data
+ *
+ *  @param[in] tag - tag
+ *  @param[in] data - data
+ *  @param[in] data_len - data length
+ *  @param[out] counter_value - counter value
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_port_ecc_counter_data(uint8_t tag, const uint8_t *data,
+					   size_t data_len,
+					   uint64_t *counter_value);
+
+/** @brief Encode a aggregate port ecc counter data
+ *
+ *  @param[in] tag - tag
+ *  @param[in] counter_value - counter value
+ *  @param[out] data - data
+ *  @param[out] data_len - data length
+ *  @return nsm_completion_codes
+ */
+int encode_aggregate_port_ecc_counter_data(uint8_t tag, uint64_t counter_value,
+					   uint8_t *data, size_t *data_len);
 
 #ifdef __cplusplus
 }

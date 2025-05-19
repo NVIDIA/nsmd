@@ -1961,3 +1961,115 @@ int encode_aggregate_network_address_data(
 
 	return NSM_SW_SUCCESS;
 }
+
+
+int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
+				     struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_get_port_ecc_counters_req *request =
+	    (nsm_get_port_ecc_counters_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_PORT_ECC_COUNTERS;
+	request->hdr.data_size = sizeof(port_number);
+	request->port_number = port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_port_ecc_counters_req(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(nsm_get_port_ecc_counters_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	nsm_get_port_ecc_counters_req *request =
+	    (nsm_get_port_ecc_counters_req *)msg->payload;
+
+	if (request->hdr.data_size < sizeof(request->port_number)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_port_ecc_counter_data(uint8_t tag, const uint8_t *data,
+					   size_t data_len,
+					   uint64_t *counter_value)
+{
+	if (data == NULL || counter_value == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint64_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	switch (tag) {
+	case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+	case NSM_TAG_ECC_CORRECTED_BITS:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_3: {
+		uint64_t le_reading;
+		memcpy(&le_reading, data, sizeof(uint64_t));
+		*counter_value = le64toh(le_reading);
+		break;
+	}
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_port_ecc_counter_data(uint8_t tag, uint64_t counter_value,
+					   uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// Check if the tag is a known ECC counter tag,
+	// not strictly necessary for encoding the value but good for
+	// consistency.
+	switch (tag) {
+	case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+	case NSM_TAG_ECC_CORRECTED_BITS:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+	case NSM_TAG_ECC_RAW_ERRORS_LANE_3: {
+		uint64_t le_value = htole64(counter_value);
+		memcpy(data, &le_value, sizeof(uint64_t));
+		*data_len = sizeof(uint64_t);
+		break;
+	}
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
