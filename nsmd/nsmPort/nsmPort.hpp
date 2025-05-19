@@ -22,6 +22,7 @@
 #include <xyz/openbmc_project/Metrics/IBPort/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem2/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem3/server.hpp>
+#include <xyz/openbmc_project/Metrics/PortPacketCounters/server.hpp>
 
 namespace nsm
 {
@@ -39,6 +40,10 @@ using PortMetricsOem3Intf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortMetricsOem3>;
 using AssociationDefInft = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::association::Definitions>;
+using EthPortIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::metrics::EthPort>;
+using PortPacketCountersIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::metrics::PortPacketCounters>;
 
 using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
@@ -51,9 +56,6 @@ using PortLinkStatus = sdbusplus::server::xyz::openbmc_project::inventory::
 
 using LinkDownReasonCodes =
     xyz::openbmc_project::metrics::IBPort::LinkDownReasonCodes;
-
-using EthPortIntf = sdbusplus::server::object_t<
-    sdbusplus::server::xyz::openbmc_project::metrics::EthPort>;
 
 class NsmPortStatus : public NsmObject
 {
@@ -107,14 +109,15 @@ class NsmPortCharacteristics : public NsmSensor
 class NsmPortMetrics : public NsmSensor
 {
   public:
-    NsmPortMetrics(sdbusplus::bus::bus& bus, std::string& portName,
-                   uint8_t portNum, const std::string& type,
-                   const uint8_t deviceType,
-                   const std::vector<utils::Association>& associations,
-                   std::string& parentObjPath, std::string& inventoryObjPath,
-                   std::shared_ptr<IBPortIntf> iBPortIntf,
-                   std::shared_ptr<PortIntf> portIntf,
-                   std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf);
+    NsmPortMetrics(
+        sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+        const std::string& type, const uint8_t deviceType,
+        const std::vector<utils::Association>& associations,
+        std::string& parentObjPath, std::string& inventoryObjPath,
+        std::shared_ptr<IBPortIntf> iBPortIntf,
+        std::shared_ptr<PortIntf> portIntf,
+        std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
     NsmPortMetrics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -130,6 +133,7 @@ class NsmPortMetrics : public NsmSensor
 
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
     std::shared_ptr<PortIntf> portIntf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
 
@@ -142,12 +146,10 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
 {
   public:
     EthPortTelemetryAggregator(
-        sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
+        sdbusplus::bus::bus& bus, std::string& portName,
         const std::string& type, std::string& inventoryObjPath,
-        std::shared_ptr<IBPortIntf> iBPortIntf,
-        std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf);
-
-    virtual ~EthPortTelemetryAggregator() = default;
+        std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
 
     virtual std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -165,12 +167,12 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
 
     uint8_t portNumber;
     std::string objPath;
-    std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
     std::unique_ptr<EthPortIntf> ethPortIntf = nullptr;
     std::unordered_map<uint8_t, std::string> tagToPropertyMap;
 
-    static std::unordered_map<uint8_t, std::string> initTagToPropertyMap();
+    static std::unordered_map<uint8_t, std::string> initPropertyTagToNameMap();
 };
 
 } // namespace nsm

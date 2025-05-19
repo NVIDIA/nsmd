@@ -845,7 +845,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
                  {0, {0, 1, 2, 5, 6, 7, 9, 10}},
-                 {1, {1}},
+                 {1, {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
