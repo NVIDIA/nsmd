@@ -584,10 +584,12 @@ NsmPortMetrics::NsmPortMetrics(
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath,
     std::shared_ptr<IBPortIntf> iBPortIntf, std::shared_ptr<PortIntf> portIntf,
-    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf) :
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
     NsmSensor(portName, type),
     portName(portName), iBPortIntf(iBPortIntf),
-    portMetricsOem2Intf(portMetricsOem2Intf), portIntf(portIntf),
+    portMetricsOem2Intf(portMetricsOem2Intf),
+    portPacketCountersIntf(portPacketCountersIntf), portIntf(portIntf),
     portNumber(portNum), typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
@@ -617,6 +619,8 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     std::vector<uint8_t> rawSmbpbiData = {};
     auto ifaceIBPortName = std::string(iBPortIntf->interface);
     auto ifacePortOem2Name = std::string(portMetricsOem2Intf->interface);
+    auto ifacePortPacketCountersName =
+        std::string(portPacketCountersIntf->interface);
 
     nv::sensor_aggregation::DbusVariantType variantRXP{iBPortIntf->rxPkts()};
     std::string propName = "RXPkts";
@@ -624,16 +628,18 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXP);
 
     nv::sensor_aggregation::DbusVariantType variantRXMP{
-        iBPortIntf->rxMulticastPkts()};
+        portPacketCountersIntf->rxMulticastPkts()};
     propName = "RXMulticastPkts";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXMP);
+        objPath, ifacePortPacketCountersName, propName, rawSmbpbiData,
+        variantRXMP);
 
     nv::sensor_aggregation::DbusVariantType variantRXUP{
-        iBPortIntf->rxUnicastPkts()};
+        portPacketCountersIntf->rxUnicastPkts()};
     propName = "RXUnicastPkts";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRXUP);
+        objPath, ifacePortPacketCountersName, propName, rawSmbpbiData,
+        variantRXUP);
 
     nv::sensor_aggregation::DbusVariantType variantMP{
         iBPortIntf->malformedPkts()};
@@ -670,22 +676,25 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantVLTXD);
 
     nv::sensor_aggregation::DbusVariantType variantTXUP{
-        iBPortIntf->txUnicastPkts()};
+        portPacketCountersIntf->txUnicastPkts()};
     propName = "TXUnicastPkts";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXUP);
+        objPath, ifacePortPacketCountersName, propName, rawSmbpbiData,
+        variantTXUP);
 
     nv::sensor_aggregation::DbusVariantType variantTXMP{
-        iBPortIntf->txMulticastPkts()};
+        portPacketCountersIntf->txMulticastPkts()};
     propName = "TXMulticastPkts";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXMP);
+        objPath, ifacePortPacketCountersName, propName, rawSmbpbiData,
+        variantTXMP);
 
     nv::sensor_aggregation::DbusVariantType variantTXBP{
-        iBPortIntf->txBroadcastPkts()};
+        portPacketCountersIntf->txBroadcastPkts()};
     propName = "TXBroadcastPkts";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTXBP);
+        objPath, ifacePortPacketCountersName, propName, rawSmbpbiData,
+        variantTXBP);
 
     nv::sensor_aggregation::DbusVariantType variantTXDP{
         iBPortIntf->txDiscardPkts()};
@@ -857,16 +866,6 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
                 iBPortIntf->rxPkts(portData->port_rcv_pkts);
             }
 
-            if (portData->supported_counter.port_multicast_rcv_pkts)
-            {
-                iBPortIntf->rxMulticastPkts(portData->port_multicast_rcv_pkts);
-            }
-
-            if (portData->supported_counter.port_unicast_rcv_pkts)
-            {
-                iBPortIntf->rxUnicastPkts(portData->port_unicast_rcv_pkts);
-            }
-
             if (portData->supported_counter.port_malformed_pkts)
             {
                 iBPortIntf->malformedPkts(portData->port_malformed_pkts);
@@ -895,21 +894,6 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
             if (portData->supported_counter.port_xmit_data_vl15)
             {
                 iBPortIntf->vL15TXData(portData->port_xmit_data_vl15);
-            }
-
-            if (portData->supported_counter.port_unicast_xmit_pkts)
-            {
-                iBPortIntf->txUnicastPkts(portData->port_unicast_xmit_pkts);
-            }
-
-            if (portData->supported_counter.port_multicast_xmit_pkts)
-            {
-                iBPortIntf->txMulticastPkts(portData->port_multicast_xmit_pkts);
-            }
-
-            if (portData->supported_counter.port_bcast_xmit_pkts)
-            {
-                iBPortIntf->txBroadcastPkts(portData->port_bcast_xmit_pkts);
             }
 
             if (portData->supported_counter.port_xmit_discard)
@@ -1036,6 +1020,46 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
                 "NAME", portName.c_str(), "NUM", portNumber, "DT",
                 typeOfDevice);
         }
+
+        if (portPacketCountersIntf)
+        {
+            if (portData->supported_counter.port_multicast_rcv_pkts)
+            {
+                portPacketCountersIntf->rxMulticastPkts(
+                    portData->port_multicast_rcv_pkts);
+            }
+
+            if (portData->supported_counter.port_unicast_rcv_pkts)
+            {
+                portPacketCountersIntf->rxUnicastPkts(
+                    portData->port_unicast_rcv_pkts);
+            }
+
+            if (portData->supported_counter.port_unicast_xmit_pkts)
+            {
+                portPacketCountersIntf->txUnicastPkts(
+                    portData->port_unicast_xmit_pkts);
+            }
+
+            if (portData->supported_counter.port_multicast_xmit_pkts)
+            {
+                portPacketCountersIntf->txMulticastPkts(
+                    portData->port_multicast_xmit_pkts);
+            }
+
+            if (portData->supported_counter.port_bcast_xmit_pkts)
+            {
+                portPacketCountersIntf->txBroadcastPkts(
+                    portData->port_bcast_xmit_pkts);
+            }
+        }
+        else
+        {
+            lg2::debug(
+                "NsmPortMetrics: updating counter value failed: portPacketCountersIntf is NULL for {NAME} with port number {NUM} for device type {DT}",
+                "NAME", portName.c_str(), "NUM", portNumber, "DT",
+                typeOfDevice);
+        }
     }
     else
     {
@@ -1087,17 +1111,17 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 EthPortTelemetryAggregator::EthPortTelemetryAggregator(
-    sdbusplus::bus::bus& bus, std::string& portName, uint8_t portNum,
-    const std::string& type, std::string& inventoryObjPath,
-    std::shared_ptr<IBPortIntf> iBPortIntf,
-    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf) :
+    sdbusplus::bus::bus& bus, std::string& portName, const std::string& type,
+    std::string& inventoryObjPath,
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
     NsmSensorAggregator(portName, type),
-    portName(portName), portNumber(portNum), objPath(inventoryObjPath),
-    iBPortIntf(iBPortIntf), portMetricsOem2Intf(portMetricsOem2Intf),
-    tagToPropertyMap(initTagToPropertyMap())
+    portName(portName), objPath(inventoryObjPath),
+    portMetricsOem2Intf(portMetricsOem2Intf),
+    portPacketCountersIntf(portPacketCountersIntf),
+    tagToPropertyMap(initPropertyTagToNameMap())
 {
-    lg2::debug("EthPortTelemetryAggregator: {NAME} with port number {NUM}",
-               "NAME", portName.c_str(), "NUM", portNum);
+    lg2::debug("EthPortTelemetryAggregator: {NAME}", "NAME", portName.c_str());
 
     ethPortIntf = std::make_unique<EthPortIntf>(bus, inventoryObjPath.c_str());
 
@@ -1134,8 +1158,6 @@ int EthPortTelemetryAggregator::handleSamples(
     {
         if (!sample.valid)
         {
-            // lg2::debug("Ignoring invalid sample tag={TAG}", "TAG",
-            // sample.tag);
             continue;
         }
 
@@ -1152,14 +1174,13 @@ int EthPortTelemetryAggregator::handleSamples(
 
         if (rc != NSM_SW_SUCCESS)
         {
-            // lg2::error(
-            //     "Failed to decode Ethernet port telemetry data for tag {TAG}:
-            //     {RC}", "TAG", sample.tag, "RC", rc);
+            lg2::error(
+                "Failed to decode Ethernet port telemetry data for tag {TAG} : rc = {RC}",
+                "TAG", sample.tag, "RC", rc);
             result = false;
             continue;
         }
 
-        // Update counter value based on this sample's tag
         updateCounterValues(sample.tag, counterValue);
     }
 
@@ -1176,7 +1197,6 @@ void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
     {
         const std::string& propName = it->second;
 
-        // Use the property name to update the corresponding property
         try
         {
             if (propName == "RXBytes")
@@ -1184,17 +1204,17 @@ void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
             else if (propName == "TXBytes")
                 portMetricsOem2Intf->txBytes(counterValue);
             else if (propName == "RXUnicastPkts")
-                portMetricsOem2Intf->rxUnicastPkts(counterValue);
+                portPacketCountersIntf->rxUnicastPkts(counterValue);
             else if (propName == "RXMulticastPkts")
-                portMetricsOem2Intf->rxMulticastPkts(counterValue);
+                portPacketCountersIntf->rxMulticastPkts(counterValue);
             else if (propName == "RXBroadcastPkts")
-                portMetricsOem2Intf->rxBroadcastPkts(counterValue);
+                portPacketCountersIntf->rxBroadcastPkts(counterValue);
             else if (propName == "TXUnicastPkts")
-                portMetricsOem2Intf->txUnicastPkts(counterValue);
+                portPacketCountersIntf->txUnicastPkts(counterValue);
             else if (propName == "TXMulticastPkts")
-                portMetricsOem2Intf->txMulticastPkts(counterValue);
+                portPacketCountersIntf->txMulticastPkts(counterValue);
             else if (propName == "TXBroadcastPkts")
-                portMetricsOem2Intf->txBroadcastPkts(counterValue);
+                portPacketCountersIntf->txBroadcastPkts(counterValue);
             else if (propName == "RXFCSErrors")
                 ethPortIntf->rxfcsErrors(counterValue);
             else if (propName == "RXAlignmentErrors")
@@ -1225,10 +1245,6 @@ void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
         catch (const std::exception& e)
         {
             return;
-            // lg2::error(
-            //     "EthPortTelemetryAggregator::updateCounterValues Failed to
-            //     set property {PROP} for tag {TAG}: {ERR}", "PROP", propName,
-            //     "TAG", tag, "ERR", e.what());
         }
     }
 }
@@ -1251,106 +1267,92 @@ void EthPortTelemetryAggregator::getCounterValue(const std::string propName,
         }
         else if (propName == "RXUnicastPkts")
         {
-            value = portMetricsOem2Intf->rxUnicastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->rxUnicastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "RXMulticastPkts")
         {
-            value = portMetricsOem2Intf->rxMulticastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->rxMulticastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "RXBroadcastPkts")
         {
-            value = portMetricsOem2Intf->rxBroadcastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->rxBroadcastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "TXUnicastPkts")
         {
-            value = portMetricsOem2Intf->txUnicastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->txUnicastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "TXMulticastPkts")
         {
-            value = portMetricsOem2Intf->txMulticastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->txMulticastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "TXBroadcastPkts")
         {
-            value = portMetricsOem2Intf->txBroadcastPkts();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
+            value = portPacketCountersIntf->txBroadcastPkts();
+            ifaceName = std::string(portPacketCountersIntf->interface);
         }
         else if (propName == "RXFCSErrors")
         {
             value = ethPortIntf->rxfcsErrors();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXAlignmentErrors")
         {
             value = ethPortIntf->rxAlignmentErrors();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXFalseCarrierDetections")
         {
             value = ethPortIntf->rxFalseCarrierDetections();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXRuntPkts")
         {
             value = ethPortIntf->rxRuntPkts();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXJabberPkts")
         {
             value = ethPortIntf->rxJabberPkts();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXXONFrames")
         {
             value = ethPortIntf->rxxonFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "RXXOFFFrames")
         {
             value = ethPortIntf->rxxoffFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXXONFrames")
         {
             value = ethPortIntf->txxonFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXXOFFFrames")
         {
             value = ethPortIntf->txxoffFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXSingleCollisionFrames")
         {
             value = ethPortIntf->txSingleCollisionFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXMultipleCollisionFrames")
         {
             value = ethPortIntf->txMultipleCollisionFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXLateCollisionFrames")
         {
             value = ethPortIntf->txLateCollisionFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
         else if (propName == "TXExcessiveCollisionFrames")
         {
             value = ethPortIntf->txExcessCollisionFrames();
-            ifaceName = std::string(ethPortIntf->interface);
         }
     }
     catch (const std::exception& e)
     {
+        lg2::error("Failed to get counter value for property {PROP}: {ERR}",
+                   "PROP", propName, "ERR", e.what());
         return;
-        // lg2::error("Failed to update shared memory for property {PROP}:
-        // {ERR}",
-        //            "PROP", propName, "ERR", e.what());
     }
 }
 
@@ -1374,7 +1376,7 @@ void EthPortTelemetryAggregator::updateMetricOnSharedMemory()
 }
 
 std::unordered_map<uint8_t, std::string>
-    EthPortTelemetryAggregator::initTagToPropertyMap()
+    EthPortTelemetryAggregator::initPropertyTagToNameMap()
 {
     std::unordered_map<uint8_t, std::string> map;
 
@@ -1470,6 +1472,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         auto portIntf = std::make_shared<PortIntf>(bus, objPath.c_str());
         auto portMetricsOem2Intf =
             std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
+        auto portPacketCountersIntf =
+            std::make_shared<PortPacketCountersIntf>(bus, objPath.c_str());
 
         if (deviceType == NSM_DEV_ID_GPU)
         {
@@ -1519,7 +1523,8 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
-            parentObjPath, objPath, iBPortIntf, portIntf, portMetricsOem2Intf);
+            parentObjPath, objPath, iBPortIntf, portIntf, portMetricsOem2Intf,
+            portPacketCountersIntf);
         if (!portMetricsSensor)
         {
             lg2::error(
@@ -1542,26 +1547,16 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
 
         auto ethPortMetricsSensor =
             std::make_shared<EthPortTelemetryAggregator>(
-                bus, portName, logicalPortNum, type, objPath, iBPortIntf,
-                portMetricsOem2Intf);
-        if (!ethPortMetricsSensor)
+                bus, portName, type, objPath, portMetricsOem2Intf,
+                portPacketCountersIntf);
+        nsmDevice->deviceSensors.emplace_back(ethPortMetricsSensor);
+        if (priority)
         {
-            lg2::error(
-                "Failed to create NSM Ethernet Port Metric sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
+            nsmDevice->prioritySensors.emplace_back(ethPortMetricsSensor);
         }
         else
         {
-            nsmDevice->deviceSensors.emplace_back(ethPortMetricsSensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(ethPortMetricsSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(ethPortMetricsSensor);
-            }
+            nsmDevice->roundRobinSensors.emplace_back(ethPortMetricsSensor);
         }
 
         manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
