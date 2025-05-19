@@ -478,6 +478,8 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getPortNetworkAddressesHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getPortEccCountersHandler(const nsm_msg* requestMsg, size_t requestLen);
 
   private:
     std::optional<Request>

@@ -437,6 +437,8 @@ std::optional<Response>
                                                              requestLen);
                 case NSM_GET_NETWORK_ADDRESSES:
                     return getPortNetworkAddressesHandler(request, requestLen);
+                case NSM_GET_PORT_ECC_COUNTERS:
+                    return getPortEccCountersHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -849,7 +851,7 @@ std::optional<std::vector<uint8_t>>
                  {0, {0, 1, 2, 5, 6, 7, 9, 10}},
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
-                   NSM_GET_NETWORK_ADDRESSES}},
+                   NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
@@ -6552,6 +6554,83 @@ std::optional<std::vector<uint8_t>>
         {
             break;
         }
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPortEccCountersHandler(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPortEccCountersHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t portNumber = 0;
+    auto rc = decode_get_port_ecc_counters_req(requestMsg, requestLen,
+                                               &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_port_ecc_counters_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               NSM_GET_PORT_ECC_COUNTERS, NSM_SUCCESS, 6,
+                               responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    std::array<uint8_t, 100> sample;
+    auto nsm_sample =
+        reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+    size_t consumed_len = 0;
+
+    uint64_t counter_value = 2;
+    uint8_t data[8];
+    size_t data_len = 0;
+
+    rc = encode_aggregate_port_ecc_counter_data(
+        NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, counter_value, data, &data_len);
+    assert(rc == NSM_SW_SUCCESS);
+
+    rc = encode_aggregate_resp_sample(NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, true,
+                                      data, data_len, nsm_sample,
+                                      &consumed_len);
+    assert(rc == NSM_SW_SUCCESS);
+    response.insert(response.end(), sample.begin(),
+                    std::next(sample.begin(), consumed_len));
+
+    counter_value = 8;
+    rc = encode_aggregate_port_ecc_counter_data(NSM_TAG_ECC_CORRECTED_BITS,
+                                                counter_value, data, &data_len);
+    assert(rc == NSM_SW_SUCCESS);
+
+    rc = encode_aggregate_resp_sample(NSM_TAG_ECC_CORRECTED_BITS, true, data,
+                                      data_len, nsm_sample, &consumed_len);
+    assert(rc == NSM_SW_SUCCESS);
+    response.insert(response.end(), sample.begin(),
+                    std::next(sample.begin(), consumed_len));
+
+    for (int i = 0; i < 4; i++)
+    {
+        counter_value = i + 1;
+        rc = encode_aggregate_port_ecc_counter_data(
+            NSM_TAG_ECC_RAW_ERRORS_LANE_0 + i, counter_value, data, &data_len);
+        assert(rc == NSM_SW_SUCCESS);
+
+        rc = encode_aggregate_resp_sample(NSM_TAG_ECC_RAW_ERRORS_LANE_0 + i,
+                                          true, data, data_len, nsm_sample,
+                                          &consumed_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), consumed_len));
     }
 
     return response;
