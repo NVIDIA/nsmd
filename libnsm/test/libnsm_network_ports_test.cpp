@@ -536,7 +536,7 @@ TEST(getPortTelemetryCounter, testGoodDecodeResponseCCSuccessLessCounters)
 		  le64toh(port_data_orig.port_xmit_pkts));
 	// rest all should be zero
 	EXPECT_EQ(port_tel_data.port_xmit_pkts_vl15, 0);
-	EXPECT_EQ(port_tel_data.estimated_effective_ber, 0);
+	EXPECT_EQ(port_tel_data.total_raw_error, 0);
 }
 
 TEST(getPortTelemetryCounter, testGoodDecodeResponseCCSuccessMoreCounters)

@@ -313,11 +313,11 @@ class GetPortTelemetryCounter : public CommandInterface
                 static_cast<uint64_t>(portData->effective_ber);
         }
 
-        if (portData->supported_counter.estimated_effective_ber)
+        if (portData->supported_counter.total_raw_error)
         {
             result[key].push_back(26);
-            countersResult["Estimated Effective BER"] =
-                static_cast<uint64_t>(portData->estimated_effective_ber);
+            countersResult["Total Raw Error"] =
+                static_cast<uint64_t>(portData->total_raw_error);
         }
 
         if (portData->supported_counter.effective_error)

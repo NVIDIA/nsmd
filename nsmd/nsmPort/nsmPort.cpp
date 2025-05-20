@@ -812,6 +812,12 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantRBER);
 
+    nv::sensor_aggregation::DbusVariantType variantTRERR{
+        iBPortIntf->totalRawError()};
+    propName = "TotalRawError";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantTRERR);
+
     nv::sensor_aggregation::DbusVariantType variantULD{
         iBPortIntf->unintentionalLinkDownCount()};
     propName = "UnintentionalLinkDownCount";
@@ -988,10 +994,9 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
                     getBitErrorRate(portData->effective_ber));
             }
 
-            if (portData->supported_counter.estimated_effective_ber)
+            if (portData->supported_counter.total_raw_error)
             {
-                iBPortIntf->estimatedEffectiveBER(
-                    getBitErrorRate(portData->estimated_effective_ber));
+                iBPortIntf->totalRawError(portData->total_raw_error);
             }
 
             if (portData->supported_counter.effective_error)
