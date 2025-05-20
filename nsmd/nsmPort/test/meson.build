@@ -5,6 +5,7 @@ dep_src_files = [
     '../../nsmDevice.cpp',
     '../../nsmSensorAggregator.cpp',
     '../../nsmSensor.cpp',
+    '../../nsmSensorAggregator.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../nsmEvent.cpp',

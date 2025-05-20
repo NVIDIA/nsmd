@@ -35,6 +35,7 @@ extern "C" {
 #define ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT 21
 // defined MAC address length
 #define MAC_ADDRESS_LENGTH 8
+#define RAW_ERRORS_PER_LANE_COUNT 4
 
 /** @brief NSM Type1 network port telemetry commands
  */

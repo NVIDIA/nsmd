@@ -21,6 +21,7 @@
 #include <xyz/openbmc_project/Inventory/Item/Port/server.hpp>
 #include <xyz/openbmc_project/Metrics/EthPort/server.hpp>
 #include <xyz/openbmc_project/Metrics/IBPort/server.hpp>
+#include <xyz/openbmc_project/Metrics/PortECC/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem2/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem3/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortPacketCounters/server.hpp>
@@ -53,6 +54,9 @@ using MACAddressIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::network::MACAddress>;
 using GuidIntf =
     sdbusplus::server::object_t<sdbusplus::server::com::nvidia::common::GUID>;
+using PortECCIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::metrics::PortECC>;
+
 using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
 using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
@@ -126,7 +130,8 @@ class NsmPortMetrics : public NsmSensor
         std::string& parentObjPath, std::string& inventoryObjPath,
         std::shared_ptr<IBPortIntf> iBPortIntf,
         std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
-        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
+        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf,
+        std::shared_ptr<PortECCIntf> portECCIntf);
     NsmPortMetrics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -143,6 +148,7 @@ class NsmPortMetrics : public NsmSensor
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
+    std::shared_ptr<PortECCIntf> portECCIntf = nullptr;
     std::unique_ptr<PortIntf> portIntf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
 
@@ -211,5 +217,23 @@ class NsmNetworkAddressAggregator : public NsmSensorAggregator
     std::unique_ptr<MACAddressIntf> permanentMacAddressIntf = nullptr;
     std::unique_ptr<GuidIntf> portGuidIntf = nullptr;
     std::unique_ptr<GuidIntf> nodeGuidIntf = nullptr;
+};
+
+class NsmGetPortECCCounters : public NsmSensorAggregator
+{
+  public:
+    NsmGetPortECCCounters(const std::string& name, const std::string& type,
+                          const std::string& inventoryObjPath,
+                          uint8_t portNumber,
+                          std::shared_ptr<PortECCIntf> portECCIntf);
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+
+  private:
+    std::string objPath;
+    uint8_t portNumber;
+    std::shared_ptr<PortECCIntf> portECCIntf = nullptr;
 };
 } // namespace nsm
