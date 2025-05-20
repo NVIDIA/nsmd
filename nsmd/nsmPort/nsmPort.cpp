@@ -1584,7 +1584,11 @@ NsmGetPortECCCounters::NsmGetPortECCCounters(
     std::shared_ptr<PortECCIntf> portECCIntf) :
     NsmSensorAggregator(name, type),
     objPath(inventoryObjPath), portNumber(portNumber), portECCIntf(portECCIntf)
-{}
+{
+#ifdef NVIDIA_SHMEM
+    updateMetricOnSharedMemory();
+#endif
+}
 
 std::optional<std::vector<uint8_t>>
     NsmGetPortECCCounters::genRequestMsg(eid_t eid, uint8_t instanceId)
@@ -1653,7 +1657,46 @@ int NsmGetPortECCCounters::handleSamples(
         }
     }
     portECCIntf->perLaneRawErrors(rawErrorsPerLane);
+
+    updateMetricOnSharedMemory();
     return NSM_SUCCESS;
+}
+
+void NsmGetPortECCCounters::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(portECCIntf->interface);
+    std::vector<uint8_t> smbusData = {};
+
+    // Update SymbolErrors
+    {
+        nv::sensor_aggregation::DbusVariantType symbolErrorsValue{
+            portECCIntf->symbolErrors()};
+        std::string symbolErrorsProp = "SymbolErrors";
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            objPath, ifaceName, symbolErrorsProp, smbusData, symbolErrorsValue);
+    }
+
+    // Update CorrectedBits
+    {
+        nv::sensor_aggregation::DbusVariantType correctedBitsValue{
+            portECCIntf->correctedBits()};
+        std::string correctedBitsProp = "CorrectedBits";
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            objPath, ifaceName, correctedBitsProp, smbusData,
+            correctedBitsValue);
+    }
+
+    // Update PerLaneRawErrors
+    {
+        nv::sensor_aggregation::DbusVariantType perLaneRawErrorsValue{
+            portECCIntf->perLaneRawErrors()};
+        std::string perLaneRawErrorsProp = "PerLaneRawErrors";
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            objPath, ifaceName, perLaneRawErrorsProp, smbusData,
+            perLaneRawErrorsValue);
+    }
+#endif
 }
 
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,
