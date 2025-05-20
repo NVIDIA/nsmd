@@ -525,6 +525,23 @@ requester::Coroutine
     co_return rc;
 }
 
+requester::Coroutine NsmGraceSpiObject::delay(uint64_t microseconds)
+{
+    boost::asio::io_context io;
+    boost::asio::steady_timer timer(io,
+                                    std::chrono::microseconds(microseconds));
+    bool done = false;
+    timer.async_wait(
+        [&done](const boost::system::error_code& /*error*/) { done = true; });
+
+    while (!done)
+    {
+        io.run_one();
+        co_await std::suspend_never{};
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
                                                    eid_t eid,
                                                    uint32_t blockAddress)
@@ -607,12 +624,24 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
 
         if (rc == NSM_SW_SUCCESS)
         {
-            for (auto i = 0; i <= MAX_NUMBER_OF_WRITE_POLL_CYCLES; i++)
+            const auto timeout = std::chrono::milliseconds(
+                CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT);
+            const auto startTime = std::chrono::steady_clock::now();
+            auto currentTime = startTime;
+            bool writeComplete = false;
+            while (!writeComplete)
             {
-                lg2::debug(
-                    "NsmGraceSpiObject: Checking if erase completed {COUNT}",
-                    "COUNT", i);
-                bool writeComplete = false;
+                currentTime = std::chrono::steady_clock::now();
+                if (currentTime - startTime > timeout)
+                {
+                    lg2::error(
+                        "NsmGraceSpiObject: Erase timed out, duration: {DURATION}ms",
+                        "DURATION",
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            currentTime - startTime)
+                            .count());
+                    co_return NSM_SW_ERROR_COMMAND_FAIL;
+                }
                 rc = co_await checkIfWriteComplete(manager, eid,
                                                    &writeComplete);
                 if (rc != NSM_SW_SUCCESS)
@@ -622,16 +651,16 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
 
                 if (writeComplete)
                 {
-                    lg2::debug("NsmGraceSpiObject: Erase block completed");
+                    lg2::info(
+                        "NsmGraceSpiObject: Erase block completed, duration: {DURATION}ms",
+                        "DURATION",
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            currentTime - startTime)
+                            .count());
                     break;
                 }
 
-                if (i == MAX_NUMBER_OF_WRITE_POLL_CYCLES)
-                {
-                    lg2::error("NsmGraceSpiObject: Erase timed out");
-                    co_return NSM_SW_ERROR_COMMAND_FAIL;
-                }
-
+                co_await delay(CHECK_INTERFACE_WRITE_COMPLETE_POLL_DELAY);
                 // TBD: May want to add a delay here to avoid
                 //      spamming the bus. Test to make sure
                 //      telemetry is OK first.
@@ -853,6 +882,7 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
     auto eid = manager.getEid(device);
 
     auto rc = co_await initSpi(manager, eid);
+    const auto startTime = std::chrono::steady_clock::now();
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -890,6 +920,13 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
             currentProgress->progress(percentComplete);
         }
     }
+    const auto finishTime = std::chrono::steady_clock::now();
+    lg2::info(
+        "NsmGraceSpiObject: eraseSpiAsyncHandler operation duration: {DURATION}ms",
+        "DURATION",
+        std::chrono::duration_cast<std::chrono::milliseconds>(finishTime -
+                                                              startTime)
+            .count());
 
     finishSpiOperation(SpiProgress::OperationStatus::Completed);
     co_return NSM_SW_SUCCESS;

@@ -25,7 +25,8 @@
 #define SPI_READ_BLOCK_SIZE 128
 #define SPI_SIZE_BYTES SPI_SECTORS* SPI_BLOCK_SIZE
 
-#define MAX_NUMBER_OF_WRITE_POLL_CYCLES 200
+#define CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT 1500
+#define CHECK_INTERFACE_WRITE_COMPLETE_POLL_DELAY 80000 // 80 milliseconds
 
 #include "nsmObjectFactory.hpp"
 
@@ -73,6 +74,7 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
     requester::Coroutine setSpiWriteEnable(SensorManager& manager, eid_t eid);
     requester::Coroutine setSpi4ByteAddressMode(SensorManager& manager,
                                                 eid_t eid);
+    requester::Coroutine delay(uint64_t microseconds);
     requester::Coroutine eraseBlock(SensorManager& manager, eid_t eid,
                                     uint32_t blockAddress);
 
