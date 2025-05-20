@@ -678,6 +678,7 @@ requester::Coroutine
                 nsmDevice->isDeviceActive = true;
                 co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
                 co_await nsmDevice->setOnline();
+                co_await common::Sleep(event.get(), 20000, common::NonPriority);
                 continue;
             }
             else
@@ -788,7 +789,9 @@ requester::Coroutine
             {
                 // Skip the RR-sensor
                 nsmDevice->roundRobinSensors.push_back(sensor);
-                continue;
+                co_await common::Sleep(event.get(), 20000, common::NonPriority);
+                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+                break;
             }
 
             // ServiceReady Logic:
@@ -830,15 +833,18 @@ requester::Coroutine
         uint64_t diff = t1 - t0;
         if (diff > pollingTimeInUsec)
         {
-            // We have already crossed the polling interval. Don't sleep
+            // We have already crossed the polling interval. Complete mandatory
+            // sleep of 20ms then continue polling
+            co_await common::Sleep(event, 20000, timerEventPriority);
             continue;
         }
 
         uint64_t sleepDeltaInUsec = pollingTimeInUsec - diff;
         if (sleepDeltaInUsec < allowedBufferInUsec)
         {
-            // If the delta is within the allowed buffer, we can skip sleeping
-            // and continue polling.
+            // If the delta is within the allowed buffer, complete mandatory
+            // sleep of 20ms and continue then polling.
+            co_await common::Sleep(event, 20000, timerEventPriority);
             continue;
         }
         co_await common::Sleep(event, sleepDeltaInUsec, timerEventPriority);
