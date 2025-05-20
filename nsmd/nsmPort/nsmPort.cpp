@@ -585,12 +585,13 @@ NsmPortMetrics::NsmPortMetrics(
     std::string& parentObjPath, std::string& inventoryObjPath,
     std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
-    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf,
+    std::shared_ptr<PortECCIntf> portECCIntf) :
     NsmSensor(portName, type),
     portName(portName), iBPortIntf(iBPortIntf),
     portMetricsOem2Intf(portMetricsOem2Intf),
-    portPacketCountersIntf(portPacketCountersIntf), portNumber(portNum),
-    typeOfDevice(deviceType), objPath(inventoryObjPath)
+    portPacketCountersIntf(portPacketCountersIntf), portECCIntf(portECCIntf),
+    portNumber(portNum), typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
         "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
@@ -622,6 +623,7 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     auto ifacePortOem2Name = std::string(portMetricsOem2Intf->interface);
     auto ifacePortPacketCountersName =
         std::string(portPacketCountersIntf->interface);
+    auto ifacePortECCName = std::string(portECCIntf->interface);
 
     nv::sensor_aggregation::DbusVariantType variantRXP{iBPortIntf->rxPkts()};
     std::string propName = "RXPkts";
@@ -793,10 +795,10 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEER);
 
     nv::sensor_aggregation::DbusVariantType variantSE{
-        iBPortIntf->symbolErrors()};
+        portECCIntf->symbolErrors()};
     propName = "SymbolErrors";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
+        objPath, ifacePortECCName, propName, rawSmbpbiData, variantSE);
 
     nv::sensor_aggregation::DbusVariantType variantRBER{
         iBPortIntf->totalRawBER()};
@@ -973,7 +975,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
 
             if (portData->supported_counter.symbol_error)
             {
-                iBPortIntf->symbolErrors(portData->symbol_error);
+                portECCIntf->symbolErrors(portData->symbol_error);
             }
 
             if (portData->supported_counter.total_raw_ber)
@@ -1576,6 +1578,84 @@ void NsmNetworkAddressAggregator::getLinkType(
     }
 }
 
+NsmGetPortECCCounters::NsmGetPortECCCounters(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath, uint8_t portNumber,
+    std::shared_ptr<PortECCIntf> portECCIntf) :
+    NsmSensorAggregator(name, type),
+    objPath(inventoryObjPath), portNumber(portNumber), portECCIntf(portECCIntf)
+{}
+
+std::optional<std::vector<uint8_t>>
+    NsmGetPortECCCounters::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_port_ecc_counters_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_port_ecc_counters_req(instanceId, portNumber,
+                                               requestPtr);
+    if (rc)
+    {
+        lg2::debug("encode_get_port_ecc_counters_req failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+int NsmGetPortECCCounters::handleSamples(
+    const std::vector<TelemetrySample>& samples)
+{
+    std::vector<uint64_t> rawErrorsPerLane(RAW_ERRORS_PER_LANE_COUNT, 0);
+    for (const auto& sample : samples)
+    {
+        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            continue;
+        }
+        if (!sample.valid)
+        {
+            continue;
+        }
+
+        uint64_t data;
+        auto rc = decode_aggregate_port_ecc_counter_data(
+            sample.tag, sample.data, sample.data_len, &data);
+        if (rc != NSM_SUCCESS)
+        {
+            lg2::error("Failed to decode port ecc counters sample data: {RC}",
+                       "RC", rc);
+            return rc;
+        }
+
+        switch (sample.tag)
+        {
+            case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+                portECCIntf->symbolErrors(data);
+                break;
+            case NSM_TAG_ECC_CORRECTED_BITS:
+                portECCIntf->correctedBits(data);
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+                rawErrorsPerLane[0] += data;
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+                rawErrorsPerLane[1] += data;
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+                rawErrorsPerLane[2] += data;
+                break;
+            case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
+                rawErrorsPerLane[3] += data;
+                break;
+            default:
+                break;
+        }
+    }
+    portECCIntf->perLaneRawErrors(rawErrorsPerLane);
+    return NSM_SUCCESS;
+}
+
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                                 const std::string& interface,
                                                 const std::string& objPath,
@@ -1698,10 +1778,14 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
         }
 
+        auto portECCIntf = std::make_shared<PortECCIntf>(bus, objPath.c_str());
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
             parentObjPath, objPath, iBPortIntf, portMetricsOem2Intf,
-            portPacketCountersIntf);
+            portPacketCountersIntf, portECCIntf);
+        auto portECCCountersSensor = std::make_shared<NsmGetPortECCCounters>(
+            portName, type, objPath, logicalPortNum, portECCIntf);
+
         if (!portMetricsSensor)
         {
             lg2::error(
