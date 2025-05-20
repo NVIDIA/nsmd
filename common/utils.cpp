@@ -259,7 +259,8 @@ eid_t getEidFromUUID(
         // seperate MR for selecting the fasted bandwidth medium instead of hard
         // coded value
         // Assuming UUID_LEN is defined correctly and accessible here
-        if (entry.first.substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN))
+        if (std::string_view(entry.first)
+                .starts_with(std::string_view(uuid.data(), UUID_LEN)))
         {
             eid = std::get<0>(
                 entry.second); // Accessing the first element (eid) of the tuple

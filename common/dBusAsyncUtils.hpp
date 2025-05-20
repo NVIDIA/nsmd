@@ -142,7 +142,7 @@ struct coGetAllDbusProperty
             {
                 lg2::error(
                     "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}. {ERROR_MESSAGE} ",
-                    "SERVICE", service, "OBJECT_PATH", objectPath);
+                    "SERVICE", service, "OBJECT_PATH", objectPath, "ERROR_MESSAGE", ec.message());
             }
             else
             {
@@ -213,7 +213,7 @@ struct coGetServiceMap
             if (ec)
             {
                 lg2::error(
-                    "error while xyz.openbmc_project.ObjectMapperGetObject for intf={INTERFACE} and path={OBJECT_PATH}. {ERROR_MESSAGE} ",
+                    "error while xyz.openbmc_project.ObjectMapperGetObject for path={OBJECT_PATH}. {ERROR_MESSAGE} ",
                     "OBJECT_PATH", objectPath, "ERROR_MESSAGE", ec.message());
             }
             else
