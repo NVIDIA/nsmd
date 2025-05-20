@@ -230,6 +230,7 @@ class NsmGetPortECCCounters : public NsmSensorAggregator
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
     int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    void updateMetricOnSharedMemory() override;
 
   private:
     std::string objPath;
