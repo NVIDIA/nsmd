@@ -33,6 +33,21 @@ namespace nsm
 // Definition of the static instance pointer
 DeviceManager* DeviceManager::instance = nullptr;
 
+bool DeviceManager::insertIntoEidTableifNotExist(
+    uuid_t uuid, const std::tuple<eid_t, MctpMedium, MctpBinding>& value)
+{
+    auto range = eidTable.equal_range(uuid);
+    for (auto it = range.first; it != range.second; ++it)
+    {
+        if (it->second == value)
+        {
+            return false;
+        }
+    }
+    eidTable.emplace(uuid, value);
+    return true;
+}
+
 void DeviceManager::discoverNsmDevice(const MctpInfos& mctpInfos)
 {
     queuedMctpInfos.emplace(mctpInfos);
@@ -91,8 +106,8 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber, true};
 
             // update eid table [from UUID from MCTP dbus property]
-            eidTable.insert(std::make_pair(
-                mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
+            insertIntoEidTableifNotExist(
+                mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
         }
         queuedMctpInfos.pop();
     }
@@ -135,8 +150,8 @@ requester::Coroutine
         discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber, true};
 
         // update eid table [from UUID from MCTP dbus property]
-        eidTable.insert(std::make_pair(
-            mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding)));
+        insertIntoEidTableifNotExist(
+            mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
     }
 
     // coverity[missing_return]
