@@ -19,7 +19,10 @@
 
 #include "nsmGraceSpi.hpp"
 
+#include "common/sleep.hpp"
+
 #include <phosphor-logging/lg2.hpp>
+#include <sdeventplus/event.hpp>
 
 #include <chrono> // To set start and end time in progress interface
 
@@ -166,6 +169,38 @@ void NsmGraceSpiObject::finishSpiOperation(
                 .count());
     }
     cmdInProgress = false;
+}
+
+requester::Coroutine
+    NsmGraceSpiObject::getHostPowerState(std::string& powerState)
+{
+    std::string interface = "xyz.openbmc_project.State.Host";
+    const dbus::Interfaces ifaceList{interface};
+
+    try
+    {
+        auto subtree = utils::DBusHandler().getSubtree(
+            "/xyz/openbmc_project/state", 0, ifaceList);
+
+        if (subtree.empty())
+        {
+            lg2::error("No chassis state object found");
+            co_return NSM_SW_ERROR;
+        }
+
+        std::string objPath = subtree[0].first;
+        std::string service = subtree[0].second.begin()->first;
+        auto value = co_await utils::coGetDbusProperty<std::string>(
+            objPath, "CurrentHostState", interface, service);
+        powerState = value;
+        co_return NSM_SW_SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Exception in getHostPowerState: {ERROR}", "ERROR",
+                   e.what());
+    }
+    co_return NSM_SW_ERROR;
 }
 
 requester::Coroutine
@@ -525,31 +560,10 @@ requester::Coroutine
     co_return rc;
 }
 
-requester::Coroutine NsmGraceSpiObject::delay(uint64_t microseconds)
+requester::Coroutine
+    NsmGraceSpiObject::validateSpiStatus(SensorManager& manager, eid_t eid)
 {
-    boost::asio::io_context io;
-    boost::asio::steady_timer timer(io,
-                                    std::chrono::microseconds(microseconds));
-    bool done = false;
-    timer.async_wait(
-        [&done](const boost::system::error_code& /*error*/) { done = true; });
-
-    while (!done)
-    {
-        io.run_one();
-        co_await std::suspend_never{};
-    }
-    co_return NSM_SW_SUCCESS;
-}
-
-requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
-                                                   eid_t eid,
-                                                   uint32_t blockAddress)
-{
-    lg2::debug("NsmGraceSpiObject: Erasing block {BLOCK}", "BLOCK",
-               blockAddress);
     enum nsm_spi_status status = NSM_SPI_ERROR;
-
     auto rc = co_await checkSpiStatus(manager, eid, &status);
 
     if (rc != NSM_SW_SUCCESS)
@@ -564,13 +578,18 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
         co_return NSM_SW_ERROR;
     }
 
-    Request eraseBlock(sizeof(nsm_msg_hdr) +
-                       sizeof(nsm_send_spi_operation_req));
+    co_return NSM_SW_SUCCESS;
+}
 
+requester::Coroutine
+    NsmGraceSpiObject::prepareEraseRequest(eid_t eid, uint32_t blockAddress,
+                                           Request& eraseBlock)
+{
+    eraseBlock.resize(sizeof(nsm_msg_hdr) + sizeof(nsm_send_spi_operation_req));
     auto eraseBlockMsg = reinterpret_cast<struct nsm_msg*>(eraseBlock.data());
 
-    rc = encode_send_spi_operation_req(0, eraseBlockMsg, blockAddress,
-                                       NSM_SPI_ERASE);
+    auto rc = encode_send_spi_operation_req(0, eraseBlockMsg, blockAddress,
+                                            NSM_SPI_ERASE);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
@@ -586,88 +605,149 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
         lg2::error(
             "NsmGraceSpiObject encode_send_spi_operation_req failed. eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
-        co_return rc;
     }
 
-    std::shared_ptr<const nsm_msg> eraseBlockResponseMsg;
-    size_t eraseBlockResponseLen = 0;
+    co_return rc;
+}
 
-    rc = co_await manager.SendRecvNsmMsg(eid, eraseBlock, eraseBlockResponseMsg,
-                                         eraseBlockResponseLen);
+requester::Coroutine NsmGraceSpiObject::sendEraseCommand(
+    SensorManager& manager, eid_t eid, Request& eraseBlock,
+    std::shared_ptr<const nsm_msg>& responseMsg, size_t& responseLen)
+{
+    auto rc = co_await manager.SendRecvNsmMsg(eid, eraseBlock, responseMsg,
+                                              responseLen);
 
     if (rc)
     {
         lg2::error(
             "NsmGraceSpiObject SendRecvNsmMsg for set Spi operation failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
-        co_return rc;
     }
 
-    uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
+    co_return rc;
+}
 
-    rc = decode_send_spi_operation_resp(
-        eraseBlockResponseMsg.get(), eraseBlockResponseLen, &cc, &reason_code);
+requester::Coroutine NsmGraceSpiObject::processEraseResponse(
+    const std::shared_ptr<const nsm_msg>& responseMsg, size_t responseLen,
+    uint8_t& cc, uint16_t& reason_code)
+{
+    auto rc = decode_send_spi_operation_resp(responseMsg.get(), responseLen,
+                                             &cc, &reason_code);
 
 #ifdef ENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP
     utils::printBuffer(
         utils::Rx,
         std::vector<unsigned char>(
-            reinterpret_cast<const uint8_t*>(eraseBlockResponseMsg.get()),
-            reinterpret_cast<const uint8_t*>(eraseBlockResponseMsg.get()) +
+            reinterpret_cast<const uint8_t*>(responseMsg.get()),
+            reinterpret_cast<const uint8_t*>(responseMsg.get()) +
                 (sizeof(nsm_msg_hdr) + sizeof(nsm_send_spi_operation_resp))));
 #endif
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    co_return rc;
+}
+
+requester::Coroutine
+    NsmGraceSpiObject::waitForEraseCompletion(SensorManager& manager, eid_t eid)
+{
+    const auto timeout =
+        std::chrono::milliseconds(CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT);
+    const auto startTime = std::chrono::steady_clock::now();
+    auto currentTime = startTime;
+    bool writeComplete = false;
+    auto event = sdeventplus::Event::get_default();
+    uint64_t t0 = 0;
+    sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
+
+    for (int retry = 0;
+         (retry < GRACE_SPI_OPERATIONS_MAX_WRITE_COMPLETED_RETRY) &&
+         (!writeComplete);
+         retry++)
     {
-        rc = co_await executeSpiTransaction(manager, eid, 0x05);
-
-        if (rc == NSM_SW_SUCCESS)
+        currentTime = std::chrono::steady_clock::now();
+        if (currentTime - startTime > timeout)
         {
-            const auto timeout = std::chrono::milliseconds(
-                CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT);
-            const auto startTime = std::chrono::steady_clock::now();
-            auto currentTime = startTime;
-            bool writeComplete = false;
-            while (!writeComplete)
-            {
-                currentTime = std::chrono::steady_clock::now();
-                if (currentTime - startTime > timeout)
-                {
-                    lg2::error(
-                        "NsmGraceSpiObject: Erase timed out, duration: {DURATION}ms",
-                        "DURATION",
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            currentTime - startTime)
-                            .count());
-                    co_return NSM_SW_ERROR_COMMAND_FAIL;
-                }
-                rc = co_await checkIfWriteComplete(manager, eid,
-                                                   &writeComplete);
-                if (rc != NSM_SW_SUCCESS)
-                {
-                    co_return rc;
-                }
+            lg2::error(
+                "NsmGraceSpiObject: Erase timed out, duration: {DURATION}ms",
+                "DURATION",
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    currentTime - startTime)
+                    .count());
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
 
-                if (writeComplete)
-                {
-                    lg2::info(
-                        "NsmGraceSpiObject: Erase block completed, duration: {DURATION}ms",
-                        "DURATION",
-                        std::chrono::duration_cast<std::chrono::milliseconds>(
-                            currentTime - startTime)
-                            .count());
-                    break;
-                }
-
-                co_await delay(CHECK_INTERFACE_WRITE_COMPLETE_POLL_DELAY);
-                // TBD: May want to add a delay here to avoid
-                //      spamming the bus. Test to make sure
-                //      telemetry is OK first.
-            }
-
+        auto rc = co_await checkIfWriteComplete(manager, eid, &writeComplete);
+        if (rc != NSM_SW_SUCCESS)
+        {
             co_return rc;
         }
+
+        if (writeComplete)
+        {
+            currentTime = std::chrono::steady_clock::now();
+            lg2::debug(
+                "NsmGraceSpiObject: Erase block completed, duration: {DURATION}ms",
+                "DURATION",
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    currentTime - startTime)
+                    .count());
+            break;
+        }
+
+        co_await common::Sleep(event, CHECK_INTERFACE_WRITE_COMPLETE_POLL_DELAY,
+                               common::Priority);
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
+                                                   eid_t eid,
+                                                   uint32_t blockAddress)
+{
+    lg2::debug("NsmGraceSpiObject: Erasing block {BLOCK}", "BLOCK",
+               blockAddress);
+
+    // Validate SPI status
+    auto rc = co_await validateSpiStatus(manager, eid);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        co_return rc;
+    }
+
+    // Prepare erase request
+    Request eraseBlock;
+    rc = co_await prepareEraseRequest(eid, blockAddress, eraseBlock);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        co_return rc;
+    }
+
+    // Send erase command
+    std::shared_ptr<const nsm_msg> eraseBlockResponseMsg;
+    size_t eraseBlockResponseLen = 0;
+    rc = co_await sendEraseCommand(
+        manager, eid, eraseBlock, eraseBlockResponseMsg, eraseBlockResponseLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        co_return rc;
+    }
+
+    // Process response
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    rc = co_await processEraseResponse(eraseBlockResponseMsg,
+                                       eraseBlockResponseLen, cc, reason_code);
+
+    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+    {
+        // Execute SPI transaction
+        rc = co_await executeSpiTransaction(manager, eid, 0x05);
+        if (rc == NSM_SW_SUCCESS)
+        {
+            // Wait for completion
+            rc = co_await waitForEraseCompletion(manager, eid);
+        }
+        co_return rc;
     }
     else
     {
@@ -890,6 +970,7 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
         co_return rc;
     }
 
+    std::string powerState = "xyz.openbmc_project.State.Host.HostState.Off";
     for (auto i = 0; i < SPI_SECTORS; i++)
     {
         rc = co_await setSpiWriteEnable(manager, eid);
@@ -898,6 +979,17 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
         {
             finishSpiOperation(SpiProgress::OperationStatus::Failed);
             co_return rc;
+        }
+
+        rc = co_await getHostPowerState(powerState);
+        if (rc == NSM_SW_SUCCESS &&
+            powerState != "xyz.openbmc_project.State.Host.HostState.Off")
+        {
+            finishSpiOperation(SpiProgress::OperationStatus::Failed);
+            lg2::info(
+                "NsmGraceSpiObject Erase operation abort (eid:{EID}).  Host power state:{POWERSTATE}",
+                "EID", eid, "POWERSTATE", powerState);
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         rc = co_await eraseBlock(manager, eid, i * SPI_BLOCK_SIZE);
@@ -912,23 +1004,24 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
         uint8_t percentComplete =
             (uint8_t)(((float)i / ((float)SPI_SECTORS)) * 100);
 
-        lg2::info("NsmGraceSpiObject Erase percent complete: {COMP}", "COMP",
-                  percentComplete);
+        lg2::info(
+            "NsmGraceSpiObject Erase (eid:{EID}) percent complete: {COMP}",
+            "EID", eid, "COMP", percentComplete);
 
         if (auto currentProgress = getCurrentProgress())
         {
             currentProgress->progress(percentComplete);
         }
     }
+
+    finishSpiOperation(SpiProgress::OperationStatus::Completed);
     const auto finishTime = std::chrono::steady_clock::now();
     lg2::info(
-        "NsmGraceSpiObject: eraseSpiAsyncHandler operation duration: {DURATION}ms",
-        "DURATION",
+        "NsmGraceSpiObject: eraseSpi (eid:{EID}) operation finished, duration: {DURATION}ms",
+        "EID", eid, "DURATION",
         std::chrono::duration_cast<std::chrono::milliseconds>(finishTime -
                                                               startTime)
             .count());
-
-    finishSpiOperation(SpiProgress::OperationStatus::Completed);
     co_return NSM_SW_SUCCESS;
 }
 
@@ -956,8 +1049,19 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
         co_return NSM_SW_ERROR;
     }
 
+    std::string powerState = "xyz.openbmc_project.State.Host.HostState.Off";
     for (auto i = 0; i < SPI_SIZE_BYTES; i += SPI_READ_BLOCK_SIZE)
     {
+        rc = co_await getHostPowerState(powerState);
+        if (rc == NSM_SW_SUCCESS &&
+            powerState != "xyz.openbmc_project.State.Host.HostState.Off")
+        {
+            finishSpiOperation(SpiProgress::OperationStatus::Failed);
+            lg2::info(
+                "NsmGraceSpiObject Read operation abort (eid:{EID}).  Host power state:{POWERSTATE}",
+                "EID", eid, "POWERSTATE", powerState);
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
         rc = co_await readToCache(manager, eid, i);
 
         if (rc != NSM_SW_SUCCESS)
@@ -978,11 +1082,14 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
         uint8_t percentComplete =
             (uint8_t)(((float)i / ((float)SPI_SIZE_BYTES)) * 100);
 
-        lg2::info("NsmGraceSpiObject Read percent complete: {COMP}", "COMP",
-                  percentComplete);
-
         if (auto currentProgress = getCurrentProgress())
         {
+            if (currentProgress->progress() != percentComplete)
+            {
+                lg2::info(
+                    "NsmGraceSpiObject Read percent complete: {COMP} eid: {EID}",
+                    "COMP", percentComplete, "EID", eid);
+            }
             currentProgress->progress(percentComplete);
         }
     }

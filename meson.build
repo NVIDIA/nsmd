@@ -66,6 +66,7 @@ endif
 conf_data = configuration_data()
 conf_data.set('SENSOR_POLLING_TIME', get_option('sensor-polling-time'))
 conf_data.set('SENSOR_POLLING_TIME_GPM', get_option('sensor-polling-time-gpm'))
+conf_data.set('GRACE_SPI_OPERATIONS_MAX_WRITE_COMPLETED_RETRY', get_option('grace-spi-operations-max-write-completed-retry'))
 conf_data.set('GPU_PWR_GD_GPIO', '"' + get_option('gpio-name') + '"')
 conf_data.set(
     'SENSOR_POLLING_TIME_LONG_RUNNING',

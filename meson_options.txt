@@ -36,6 +36,12 @@ option(
     value: 'disabled',
 )
 option(
+    'grace-spi-operations-max-write-completed-retry',
+    type: 'integer',
+    description: 'The maximum of polling cycles for write completed',
+    value: '4',
+)
+option(
     'sensor-polling-time',
     type: 'integer',
     min: 1,

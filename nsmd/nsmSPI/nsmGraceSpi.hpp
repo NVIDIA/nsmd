@@ -25,7 +25,7 @@
 #define SPI_READ_BLOCK_SIZE 128
 #define SPI_SIZE_BYTES SPI_SECTORS* SPI_BLOCK_SIZE
 
-#define CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT 1500
+#define CHECK_INTERFACE_WRITE_COMPLETE_TIMEOUT 4000
 #define CHECK_INTERFACE_WRITE_COMPLETE_POLL_DELAY 80000 // 80 milliseconds
 
 #include "nsmObjectFactory.hpp"
@@ -59,6 +59,8 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
     uint8_t startSpiOperation();
     void finishSpiOperation(SpiProgress::OperationStatus opProgress);
 
+    requester::Coroutine getHostPowerState(std::string& powerState);
+
     requester::Coroutine checkSpiStatus(SensorManager& manager, eid_t eid,
                                         enum nsm_spi_status* status);
     requester::Coroutine checkIfWriteComplete(SensorManager& manager, eid_t,
@@ -74,9 +76,26 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
     requester::Coroutine setSpiWriteEnable(SensorManager& manager, eid_t eid);
     requester::Coroutine setSpi4ByteAddressMode(SensorManager& manager,
                                                 eid_t eid);
-    requester::Coroutine delay(uint64_t microseconds);
     requester::Coroutine eraseBlock(SensorManager& manager, eid_t eid,
                                     uint32_t blockAddress);
+
+    requester::Coroutine validateSpiStatus(SensorManager& manager, eid_t eid);
+
+    requester::Coroutine prepareEraseRequest(eid_t eid, uint32_t blockAddress,
+                                             Request& eraseBlock);
+
+    requester::Coroutine
+        sendEraseCommand(SensorManager& manager, eid_t eid, Request& eraseBlock,
+                         std::shared_ptr<const nsm_msg>& responseMsg,
+                         size_t& responseLen);
+
+    requester::Coroutine
+        processEraseResponse(const std::shared_ptr<const nsm_msg>& responseMsg,
+                             size_t responseLen, uint8_t& cc,
+                             uint16_t& reason_code);
+
+    requester::Coroutine waitForEraseCompletion(SensorManager& manager,
+                                                eid_t eid);
 
     requester::Coroutine readToCache(SensorManager& manager, eid_t eid,
                                      uint32_t blockAddress);
