@@ -156,6 +156,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     {}
 
     void discoverNsmDevice(const MctpInfos& mctpInfos);
+    bool insertIntoEidTableifNotExist(
+        uuid_t uuid, const std::tuple<eid_t, MctpMedium, MctpBinding>& value);
 
     requester::Coroutine discoverNsmDeviceTask();
     requester::Coroutine coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos);
