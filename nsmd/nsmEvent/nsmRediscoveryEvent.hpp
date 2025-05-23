@@ -38,7 +38,7 @@ class NsmRediscoveryEvent : public NsmEvent
     std::map<std::string, std::string> eventData;
     std::string messageArgs{};
     requester::Coroutine handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice,
-                                           eid_t& eid);
+                                           eid_t eid);
     bool isRediscoveryRequired;
     std::coroutine_handle<> rediscoveryTaskHandler;
 };
