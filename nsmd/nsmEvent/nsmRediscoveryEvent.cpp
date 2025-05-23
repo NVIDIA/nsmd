@@ -127,7 +127,7 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
 
 requester::Coroutine
     NsmRediscoveryEvent::handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice,
-                                           eid_t& eid)
+                                           eid_t eid)
 {
     while (isRediscoveryRequired)
     {
