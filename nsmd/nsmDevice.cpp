@@ -133,25 +133,31 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 }
 
 void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
-                              bool priority, bool isLongRunning)
+                              PollingType pollingType)
 {
     sensor->deviceIdentifier =
         utils::getDeviceInstanceName(getDeviceType(), getInstanceNumber());
-    deviceSensors.emplace_back(sensor);
-    if (isLongRunning)
+    deviceSensors.push_back(sensor);
+    switch (pollingType)
     {
-        longRunningSensors.emplace_back(sensor);
-    }
-    else
-    {
-        if (priority)
-        {
-            prioritySensors.emplace_back(sensor);
-        }
-        else
-        {
-            roundRobinSensors.emplace_back(sensor);
-        }
+        case PollingType::Priority:
+            prioritySensors.push_back(sensor);
+            break;
+        case PollingType::GpuPerformanceMonitoring:
+            sensor->refreshLimitInUsec = DEFAULT_GPM_REFRESH_LIMIT_IN_USEC;
+            gpmSensors.push_back(sensor);
+            break;
+        case PollingType::Static:
+            std::const_pointer_cast<NsmObject>(sensor)->isStatic = true;
+            roundRobinSensors.push_back(sensor);
+            break;
+        case PollingType::LongRunning:
+            longRunningSensors.push_back(sensor);
+            break;
+        case PollingType::RoundRobin:
+        default:
+            roundRobinSensors.push_back(sensor);
+            break;
     }
 }
 

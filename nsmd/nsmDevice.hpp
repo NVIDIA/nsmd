@@ -59,6 +59,15 @@ struct ActiveLongRunningHandlerInfo
     std::shared_ptr<NsmLongRunningEvent> sensorInstance;
 };
 
+enum class PollingType
+{
+    Priority,                 // Priority polling [150ms] for priority sensors
+    GpuPerformanceMonitoring, // Gpu Performance Monitoring [1000ms]
+    Static,                   // One time polling for static sensors
+    RoundRobin,               // Round Robing polling for non-priority sensors
+    LongRunning,              // Long running polling for long running sensors
+};
+
 class NsmDevice : public StateChangeLogger
 {
   public:
@@ -101,6 +110,7 @@ class NsmDevice : public StateChangeLogger
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmObject>> prioritySensors;
     std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
+    std::deque<std::shared_ptr<NsmObject>> gpmSensors;
     std::vector<std::shared_ptr<NsmObject>> longRunningSensors;
     std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
@@ -137,41 +147,10 @@ class NsmDevice : public StateChangeLogger
      * @param sensor[in,out] Pointer to device/static sensor
      */
     template <typename SensorType>
-    void addStaticSensor(std::shared_ptr<SensorType>& sensor)
+    void addStaticSensor(SensorType sensor)
+        [[deprecated("Use addSensor(sensor, PollingType::Static) instead")]]
     {
-        sensor->isStatic = true;
-        addSensor(sensor, false, false);
-    }
-
-    /**
-     * @brief Inserts device/static sensor to to NsmDevice.
-     *
-     * @tparam SensorType Final derived sensor type
-     * @param sensor[in] Pointer to device/static sensor
-     */
-    template <typename SensorType>
-    void addStaticSensor(const std::shared_ptr<SensorType>& sensor)
-    {
-        sensor->isStatic = true;
-        addSensor(sensor, false, false);
-    }
-
-    /**
-     * @brief Inserts dynamic sensor to NsmDevice. If sensor of same type is
-     * already added, it will add the interfaces to the existing sensor instead
-     * of adding duplicated sensor
-     *
-     * @tparam SensorType Final derived sensor type
-     * @param sensor[in] Pointer to dynamic sensor
-     * @param priority[in] Flag to add sensor as priority sensor
-     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
-     */
-    template <typename SensorType>
-    void addSensor(const std::shared_ptr<SensorType>& sensor, bool priority,
-                   bool isLongRunning = false)
-    {
-        auto sensorCopy = sensor;
-        addSensor(sensorCopy, priority, isLongRunning);
+        addSensor(sensor, PollingType::Static);
     }
 
     /**
@@ -185,8 +164,42 @@ class NsmDevice : public StateChangeLogger
      * @param isLongRunning[in] Flag to add sensor as Long Running sensor
      */
     template <typename SensorType>
-    void addSensor(std::shared_ptr<SensorType>& sensor, bool priority,
-                   bool isLongRunning = false)
+    void addSensor(SensorType sensor, bool priority, bool isLongRunning = false)
+        [[deprecated("Use addSensor(sensor, pollingType) instead")]]
+    {
+        addSensor(sensor, isLongRunning ? PollingType::LongRunning
+                                        : (priority ? PollingType::Priority
+                                                    : PollingType::RoundRobin));
+    }
+
+    /**
+     * @brief Inserts dynamic sensor to NsmDevice. If sensor of same type is
+     * already added, it will add the interfaces to the existing sensor instead
+     * of adding duplicated sensor
+     *
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in] Pointer to dynamic sensor
+     * @param pollingType[in] Pooling type for the sensor
+     */
+    template <typename SensorType>
+    void addSensor(const std::shared_ptr<SensorType>& sensor,
+                   PollingType pollingType)
+    {
+        auto sensorCopy = sensor;
+        addSensor(sensorCopy, pollingType);
+    }
+
+    /**
+     * @brief Inserts dynamic sensor to NsmDevice. If sensor of same type is
+     * already added, it will add the interfaces to the existing sensor instead
+     * of adding duplicated sensor
+     *
+     * @tparam SensorType Final derived sensor type
+     * @param sensor[in,out] Pointer to dynamic sensor
+     * @param pollingType[in] Pooling type for the sensor
+     */
+    template <typename SensorType>
+    void addSensor(std::shared_ptr<SensorType>& sensor, PollingType pollingType)
         requires std::is_base_of_v<NsmSensor, SensorType> &&
                  std::is_base_of_v<
                      NsmInterfaces<typename SensorType::IntfType_t>, SensorType>
@@ -244,25 +257,24 @@ class NsmDevice : public StateChangeLogger
         else
         {
             // sensors was not added to deviceSensors
-            addSensorBase(sensor, priority, isLongRunning);
+            addSensorBase(sensor, pollingType);
         }
     }
 
     /**
      * @brief Adds dynamic sensor to NsmDevice. If sensor of same type is
      * already added, it will add the interfaces to the existing sensor instead
-     * of adding duplicated sensor
+     * of adding duplicated sensor. This is fallback method for
+     * addSensor(sensor, PollingType) with `requires` clause.
      *
      * @tparam SensorType Final derived sensor type
      * @param sensor[in,out] Pointer to dynamic sensor
-     * @param priority[in] Flag to add sensor as priority sensor
-     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
+     * @param pollingType[in] Pooling type for the sensor
      */
     template <typename SensorType>
-    void addSensor(std::shared_ptr<SensorType>& sensor, bool priority,
-                   bool isLongRunning = false)
+    void addSensor(std::shared_ptr<SensorType>& sensor, PollingType pollingType)
     {
-        addSensorBase(sensor, priority, isLongRunning);
+        addSensorBase(sensor, pollingType);
     }
 
     /** @brief getter of deviceType */
@@ -355,15 +367,13 @@ class NsmDevice : public StateChangeLogger
     void initMsgTypesSensor();
 
     /**
-     * @brief Adds dynamic sensor to NsmDevice. It read dbus property 'Priority'
-     * for the provided interface
+     * @brief Adds dynamic sensor to NsmDevice.
      *
      * @param sensor[in] Pointer to dynamic sensor
-     * @param priority[in] Flag to add sensor as priority sensor
-     * @param isLongRunning[in] Flag to add sensor as Long Running sensor
+     * @param pollingType[in] Pooling type for the sensor
      */
-    void addSensorBase(const std::shared_ptr<NsmObject>& sensor, bool priority,
-                       bool isLongRunning = false);
+    void addSensorBase(const std::shared_ptr<NsmObject>& sensor,
+                       PollingType pollingType);
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
