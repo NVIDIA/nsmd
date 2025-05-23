@@ -73,7 +73,6 @@ class SensorManager
                        bool bypassCommandCheck = false) = 0;
 
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
-    virtual void startPolling(uuid_t uuid) = 0;
     virtual sdbusplus::asio::object_server& getObjServer() = 0;
     eid_t getLocalEid()
     {
@@ -173,7 +172,6 @@ class SensorManagerImpl : public SensorManager
   private:
     // Regular methods as before
     void startPolling();
-    void startPolling(uuid_t uuid) override;
     void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedHandler(sdbusplus::message::message& msg);
     void doPollingLongRunning(std::shared_ptr<NsmDevice> nsmDevice);

@@ -29,6 +29,9 @@ static constexpr const uint64_t INIT_TIMESTAMP =
 static constexpr const uint64_t DEFAULT_RR_REFRESH_LIMIT_IN_USEC =
     DEFAULT_RR_REFRESH_LIMIT_IN_MS * 1000;
 
+static constexpr const uint64_t DEFAULT_GPM_REFRESH_LIMIT_IN_USEC =
+    SENSOR_POLLING_TIME_GPM * 1000;
+
 namespace nsm
 {
 
