@@ -111,8 +111,6 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
     std::string type =
         getPropertyFromCollection<std::string>(properties, "Type").value();
     type = utils::makeDBusNameValid(type);
-    const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
     const uint8_t retrievalSource =
         getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
             .value();
@@ -159,16 +157,8 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
         "Created NSM GPM PerInstance Metrics : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", nsmDevice->uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceSensors.emplace_back(gpmPerInstanceMetric);
-
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(gpmPerInstanceMetric);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(gpmPerInstanceMetric);
-    }
+    nsmDevice->addSensor(gpmPerInstanceMetric,
+                         PollingType::GpuPerformanceMonitoring);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -189,8 +179,6 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
     const std::string uuid =
         getPropertyFromCollection<std::string>(properties, "UUID").value();
-    const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
     const uint8_t retrievalSource =
         getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
             .value();
@@ -220,16 +208,6 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     {}
 
     auto nsmDevice = manager.getNsmDevice(uuid);
-
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
 
     auto gpmIntf = std::make_shared<GPMMetricsIntf>(bus,
                                                     inventoryObjPath.c_str());
@@ -265,16 +243,8 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
         "Created NSM GPM Aggregted Metrics : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceSensors.emplace_back(gpmAggregateMetrics);
-
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(gpmAggregateMetrics);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(gpmAggregateMetrics);
-    }
+    nsmDevice->addSensor(gpmAggregateMetrics,
+                         PollingType::GpuPerformanceMonitoring);
 
     auto perInstanceInterfaces = getPerInstanceInterfaces(interface, objPath);
     for (const auto& intf : perInstanceInterfaces)
@@ -303,8 +273,6 @@ static requester::Coroutine
     const std::string type = interface.substr(interface.find_last_of('.') + 1);
     const std::string uuid =
         getPropertyFromCollection<std::string>(properties, "UUID").value();
-    const bool priority =
-        getPropertyFromCollection<bool>(properties, "Priority").value();
     const uint8_t retrievalSource =
         getPropertyFromCollection<uint64_t>(properties, "RetrievalSource")
             .value();
@@ -329,16 +297,6 @@ static requester::Coroutine
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
     auto nsmDevice = manager.getNsmDevice(uuid);
-
-    if (!nsmDevice)
-    {
-        // cannot found a nsmDevice for the sensor
-        lg2::error(
-            "The UUID of GPM Metrics PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "UUID", uuid, "NAME", name, "TYPE", type);
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
 
     std::vector<NVLinkMetricsUpdatorInfo> updatorInfos;
 
@@ -401,16 +359,8 @@ static requester::Coroutine
             "METRIC", metric, "UUID", nsmDevice->uuid, "NAME", name, "TYPE",
             type);
 
-        nsmDevice->deviceSensors.emplace_back(gpmPerPortMetric);
-
-        if (priority)
-        {
-            nsmDevice->prioritySensors.emplace_back(gpmPerPortMetric);
-        }
-        else
-        {
-            nsmDevice->roundRobinSensors.emplace_back(gpmPerPortMetric);
-        }
+        nsmDevice->addSensor(gpmPerPortMetric,
+                             PollingType::GpuPerformanceMonitoring);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

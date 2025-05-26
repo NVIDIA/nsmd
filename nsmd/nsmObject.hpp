@@ -29,6 +29,9 @@ static constexpr const uint64_t INIT_TIMESTAMP =
 static constexpr const uint64_t DEFAULT_RR_REFRESH_LIMIT_IN_USEC =
     DEFAULT_RR_REFRESH_LIMIT_IN_MS * 1000;
 
+static constexpr const uint64_t GPM_REFRESH_LIMIT_IN_USEC =
+    SENSOR_POLLING_TIME_GPM * 1000;
+
 namespace nsm
 {
 
@@ -148,6 +151,7 @@ class NsmObject
     bool isStatic = false;
 
   private:
+    friend class NsmDevice;
     const std::string name;
     const std::string type;
     uint64_t lastUpdatedTimeStampInUsec = INIT_TIMESTAMP;

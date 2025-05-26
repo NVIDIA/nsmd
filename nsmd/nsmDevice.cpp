@@ -132,36 +132,34 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
     return supported;
 }
 
-NsmObject& NsmDevice::addStaticSensor(std::shared_ptr<NsmObject> sensor)
-{
-    sensor->isStatic = true;
-    deviceSensors.emplace_back(sensor);
-    roundRobinSensors.emplace_back(sensor);
-    return *sensor;
-}
-
-void NsmDevice::addSensor(const std::shared_ptr<NsmObject>& sensor,
-                          bool priority, bool isLongRunning)
+void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
+                              PollingType pollingType)
 {
     std::string deviceInstanceName =
         utils::getDeviceInstanceName(getDeviceType(), getInstanceNumber());
     sensor->setDeviceIdentifier(deviceInstanceName);
 
     deviceSensors.emplace_back(sensor);
-    if (isLongRunning)
+    switch (pollingType)
     {
-        longRunningSensors.emplace_back(sensor);
-    }
-    else
-    {
-        if (priority)
-        {
-            prioritySensors.emplace_back(sensor);
-        }
-        else
-        {
-            roundRobinSensors.emplace_back(sensor);
-        }
+        case PollingType::Priority:
+            prioritySensors.push_back(sensor);
+            break;
+        case PollingType::GpuPerformanceMonitoring:
+            sensor->refreshLimitInUsec = GPM_REFRESH_LIMIT_IN_USEC;
+            gpmSensors.push_back(sensor);
+            break;
+        case PollingType::Static:
+            std::const_pointer_cast<NsmObject>(sensor)->isStatic = true;
+            roundRobinSensors.push_back(sensor);
+            break;
+        case PollingType::LongRunning:
+            longRunningSensors.push_back(sensor);
+            break;
+        case PollingType::RoundRobin:
+        default:
+            roundRobinSensors.push_back(sensor);
+            break;
     }
 }
 
