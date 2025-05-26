@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "nsmEventInfo.hpp"
 #include "deviceManager.hpp"
+#include "nsmEventInfo.hpp"
 #include "sensorManager.hpp"
 
 namespace nsm

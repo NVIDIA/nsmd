@@ -142,7 +142,8 @@ struct coGetAllDbusProperty
             {
                 lg2::error(
                     "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}. {ERROR_MESSAGE} ",
-                    "SERVICE", service, "OBJECT_PATH", objectPath, "ERROR_MESSAGE", ec.message());
+                    "SERVICE", service, "OBJECT_PATH", objectPath,
+                    "ERROR_MESSAGE", ec.message());
             }
             else
             {
@@ -171,7 +172,8 @@ struct coGetAllDbusProperty
     coGetAllDbusProperty(const std::string& service,
                          const std::string& objectPath,
                          const std::string& interface = "") :
-        service(service), objectPath(objectPath), interface(interface), ret{}
+        service(service),
+        objectPath(objectPath), interface(interface), ret{}
     {}
 };
 
