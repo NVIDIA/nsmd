@@ -201,7 +201,7 @@ struct nsm_error_injection_payload {
  * Structure representing Set Error Injection payload request.
  */
 struct nsm_set_error_injection_payload_req {
-	struct nsm_common_req hdr;
+	struct nsm_common_req_v2 hdr;
 	struct nsm_error_injection_payload data;
 } __attribute__((packed));
 
@@ -210,7 +210,7 @@ struct nsm_set_error_injection_payload_req {
  * Structure representing Get Error Injection payload request.
  */
 struct nsm_get_error_injection_payload_req {
-	struct nsm_common_req hdr;
+	struct nsm_common_req_v2 hdr;
 	uint32_t error_injection_id;
 } __attribute__((packed));
 

@@ -274,6 +274,9 @@ requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
             "NsmSetErrorInjectionPayload::setPayload: SendRecvNsmMsgSync failed."
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
+        status = AsyncOperationStatusType::WriteFailure;
+        // coverity[missing_return]
+        co_return rc;
     }
 
     uint8_t cc = NSM_ERROR;
@@ -284,6 +287,10 @@ requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
     LG2_ERROR_FLT(
         "NsmSetErrorInjectionPayload::setPayload failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        status = AsyncOperationStatusType::WriteFailure;
+    }
     // coverity[missing_return]
     co_return cc ? cc : rc;
 }

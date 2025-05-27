@@ -225,6 +225,8 @@ class GetSupportedErrorInjectionTypesV1 : public CommandInterface
             bool((data.mask[0] >> EI_NVLINK_ERRORS) & 0x01);
         result["Device thermal error injection supported"] =
             bool((data.mask[0] >> EI_THERMAL_ERRORS) & 0x01);
+        result["Fatal error injection supported"] =
+            bool((data.mask[0] >> EI_FATAL_ERRORS) & 0x01);
         nsmtool::helper::DisplayInJson(result);
     }
 };
@@ -378,7 +380,7 @@ class ActivateErrorInjectionPayload : public CommandInterface
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
-                                        sizeof(nsm_common_req));
+                                        sizeof(nsm_common_req_v2));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_activate_error_injection_payload_req(instanceId,
                                                               request);
@@ -539,6 +541,8 @@ class GetCurrentErrorInjectionTypesV1 : public CommandInterface
             bool((data.mask[0] >> EI_NVLINK_ERRORS) & 0x01);
         result["Device thermal error injection enabled"] =
             bool((data.mask[0] >> EI_THERMAL_ERRORS) & 0x01);
+        result["Fatal error injection enabled"] =
+            bool((data.mask[0] >> EI_FATAL_ERRORS) & 0x01);
         nsmtool::helper::DisplayInJson(result);
     }
 };

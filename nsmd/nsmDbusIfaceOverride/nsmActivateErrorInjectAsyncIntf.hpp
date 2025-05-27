@@ -52,7 +52,7 @@ class NsmActivateErrorInjectionPayloadIntf :
     {
         SensorManager& manager = SensorManager::getInstance();
         auto eid = manager.getEid(device);
-        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2));
         auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
         auto rc = encode_activate_error_injection_payload_req(0, requestPtr);
 
