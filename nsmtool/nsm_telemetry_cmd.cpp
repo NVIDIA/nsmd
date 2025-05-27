@@ -3012,12 +3012,11 @@ class QueryMultiportScalarGroupTelemetry : public QueryScalarGroupTelemetry
             sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         const nsm_multiport_query_scalar_group_telemetry_v2_req_data data{
-            .type = type,
             .upstream_port_index = upstreamPortIndex,
+            .type = type,
             .index = index,
-            .device_index = deviceIndex,
             .group_index = groupId};
-        auto rc = encode_multiport_query_scalar_group_telemetry_v1_req(
+        auto rc = encode_multiport_query_scalar_group_telemetry_v2_req(
             instanceId, &data, request);
         return {rc, requestMsg};
     }

@@ -3706,10 +3706,10 @@ std::optional<Response>
     else if (verbose)
     {
         lg2::info(
-            "queryMultiportScalarGroupTelemetryHandler: deviceId={DEVICEID}, groupIndex={GROUPINDEX}, type={TYPE}, upstreamPortIndex={UPSTREAMPORTINDEX}, index={INDEX}",
-            "DEVICEID", int(data.device_index), "GROUPINDEX",
-            int(data.group_index), "TYPE", int(data.type), "UPSTREAMPORTINDEX",
-            int(data.upstream_port_index), "INDEX", int(data.index));
+            "queryMultiportScalarGroupTelemetryHandler: groupIndex={GROUPINDEX}, type={TYPE}, upstreamPortIndex={UPSTREAMPORTINDEX}, index={INDEX}",
+            "GROUPINDEX", int(data.group_index), "TYPE", int(data.type),
+            "UPSTREAMPORTINDEX", int(data.upstream_port_index), "INDEX",
+            int(data.index));
     }
 
     auto response = getQueryScalarGroupTelemetryResponse(

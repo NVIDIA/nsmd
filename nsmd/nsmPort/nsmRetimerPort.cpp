@@ -61,11 +61,11 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PortInfoIntf> portInfoIntf,
                                    std::shared_ptr<PortWidthIntf> portWidthIntf,
-                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortType,
                                    uint8_t multiPortIndex,
                                    uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+    NsmPcieGroup(name, type, GROUP_ID_1, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     objPath(inventoryPath), portInfoIntf(portInfoIntf),
     portWidthIntf(portWidthIntf)
 {
@@ -193,11 +193,11 @@ NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortType,
                                    uint8_t multiPortIndex,
                                    uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+    NsmPcieGroup(name, type, GROUP_ID_2, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmMultiPCIeECCGroup2: {NAME}", "NAME", name.c_str());
@@ -284,11 +284,11 @@ NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortType,
                                    uint8_t multiPortIndex,
                                    uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+    NsmPcieGroup(name, type, GROUP_ID_3, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmMultiPCIeECCGroup3: {NAME}", "NAME", name.c_str());
@@ -356,11 +356,11 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
                                    const std::string& type,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                                   uint8_t deviceIndex, uint8_t multiPortType,
+                                   uint8_t multiPortType,
                                    uint8_t multiPortIndex,
                                    uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+    NsmPcieGroup(name, type, GROUP_ID_4, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmMultiPCIeECCGroup4: {NAME}", "NAME", name.c_str());
@@ -443,13 +443,15 @@ NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
     updateMetricOnSharedMemory();
 }
 
-NsmPCIeECCGroup8::NsmPCIeECCGroup8(
-    const std::string& name, const std::string& type,
-    std::shared_ptr<LaneErrorIntf> laneErrorIntf, uint8_t deviceIndex,
-    const std::string& inventoryObjPath, uint8_t multiPortType,
-    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_8, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+NsmPCIeECCGroup8::NsmPCIeECCGroup8(const std::string& name,
+                                   const std::string& type,
+                                   std::shared_ptr<LaneErrorIntf> laneErrorIntf,
+                                   const std::string& inventoryObjPath,
+                                   uint8_t multiPortType,
+                                   uint8_t multiPortIndex,
+                                   uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_8, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     laneErrorIntf(laneErrorIntf), inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMultiPCIeECCGroup8: create sensor:{NAME}", "NAME",
@@ -515,15 +517,12 @@ NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
     updateMetricOnSharedMemory();
 }
 
-NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
-                                     const std::string& name,
-                                     const std::string& type,
-                                     const std::string& inventoryObjPath,
-                                     uint8_t deviceIndex, uint8_t multiPortType,
-                                     uint8_t multiPortIndex,
-                                     uint8_t multiPortUpstreamPortNumber) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_10, multiPortType,
-                 multiPortIndex, multiPortUpstreamPortNumber),
+NsmPCIeECCGroup10::NsmPCIeECCGroup10(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath, uint8_t multiPortType,
+    uint8_t multiPortIndex, uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_10, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
     inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMultiPCIeECCGroup10: create sensor:{NAME}", "NAME",
@@ -694,9 +693,6 @@ static requester::Coroutine
         utils::getPropertyFromCollection<bool>(properties, "Priority").value();
     const uint64_t count =
         utils::getPropertyFromCollection<uint64_t>(properties, "Count").value();
-    const uint64_t deviceInstance =
-        utils::getPropertyFromCollection<uint64_t>(properties, "DeviceInstance")
-            .value();
     std::string inventoryObjPath =
         utils::getPropertyFromCollection<std::string>(properties,
                                                       "InventoryObjPath")
@@ -720,22 +716,17 @@ static requester::Coroutine
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    // device_index are between [1 to 8] for retimers, which is
-    // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START
-    uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
-                          PCIE_RETIMER_DEVICE_INDEX_START;
-
-    uint8_t portTypeVal = 0;
+    uint8_t portTypeVal = NSM_PORT_TYPE_UPSTREAM;
     if (portType ==
         "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.UpstreamPort")
     {
-        portTypeVal = 0;
+        portTypeVal = NSM_PORT_TYPE_UPSTREAM;
     }
     else if (
         portType ==
         "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortType.DownstreamPort")
     {
-        portTypeVal = 1;
+        portTypeVal = NSM_PORT_TYPE_DOWNSTREAM;
     }
     else
     {
@@ -776,19 +767,19 @@ static requester::Coroutine
         portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
 
         auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-            portName, type, objPath, portInfoIntf, portWidthIntf, deviceIndex,
-            portTypeVal, i, static_cast<uint8_t>(upstreamPortNumber));
+            portName, type, objPath, portInfoIntf, portWidthIntf, portTypeVal,
+            i, static_cast<uint8_t>(upstreamPortNumber));
         auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
-            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            portName, type, objPath, pcieECCIntf, portTypeVal, i,
             static_cast<uint8_t>(upstreamPortNumber));
         auto multipcieSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
-            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            portName, type, objPath, pcieECCIntf, portTypeVal, i,
             static_cast<uint8_t>(upstreamPortNumber));
         auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
-            portName, type, objPath, pcieECCIntf, deviceIndex, portTypeVal, i,
+            portName, type, objPath, pcieECCIntf, portTypeVal, i,
             static_cast<uint8_t>(upstreamPortNumber));
         auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
-            bus, portName, type, objPath, deviceIndex, portTypeVal, i,
+            bus, portName, type, objPath, portTypeVal, i,
             static_cast<uint8_t>(upstreamPortNumber));
 
         if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||

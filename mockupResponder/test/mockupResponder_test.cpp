@@ -515,10 +515,10 @@ TEST_F(MockupResponderTest, testQueryScalarGroup10TelemetryHandler)
 TEST_F(MockupResponderTest, testMultiportQueryScalarGroup10TelemetryHandler)
 {
     nsm_multiport_query_scalar_group_telemetry_v2_req_data data = {
-        NSM_PORT_TYPE_UPSTREAM, 0, 0, 0, GROUP_ID_10};
+        0, NSM_PORT_TYPE_UPSTREAM, 0, GROUP_ID_10};
     nsm_query_scalar_group_telemetry_v1_group_10_resp response;
     test<nsm_multiport_query_scalar_group_telemetry_v2_req_data>(
-        &encode_multiport_query_scalar_group_telemetry_v1_req, data,
+        &encode_multiport_query_scalar_group_telemetry_v2_req, data,
         &MockupResponder::MockupResponder::
             queryMultiportScalarGroupTelemetryHandler,
         NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2, response);
