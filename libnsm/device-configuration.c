@@ -25,21 +25,27 @@ int encode_set_error_injection_payload_req(
     uint8_t instance_id, const struct nsm_error_injection_payload *data,
     struct nsm_msg *msg)
 {
-	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
-				   NSM_SET_ERROR_INJECTION_PAYLOAD, msg);
-	if (rc == NSM_SW_SUCCESS) {
-		if (data == NULL) {
-			return NSM_SW_ERROR_NULL;
-		}
-		struct nsm_set_error_injection_payload_req *req =
-		    (struct nsm_set_error_injection_payload_req *)msg->payload;
-		req->hdr.data_size = sizeof(struct nsm_error_injection_payload);
-		req->data.error_injection_id =
-		    htole32(data->error_injection_id);
-		req->data.offset = htole32(data->offset);
-		req->data.fault_reason_bit_map =
-		    htole32(data->fault_reason_bit_map);
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
 	}
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_DEVICE_CONFIGURATION};
+	uint8_t rc = pack_nsm_header_v2(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_set_error_injection_payload_req *request =
+	    (struct nsm_set_error_injection_payload_req *)msg->payload;
+	request->hdr.command = NSM_SET_ERROR_INJECTION_PAYLOAD;
+	request->hdr.data_size =
+	    htole16(sizeof(struct nsm_error_injection_payload));
+	if (data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	request->data.error_injection_id = htole32(data->error_injection_id);
+	request->data.offset = htole32(data->offset);
+	request->data.fault_reason_bit_map =
+	    htole32(data->fault_reason_bit_map);
 	return rc;
 }
 
@@ -98,14 +104,20 @@ int encode_get_error_injection_payload_req(uint8_t instance_id,
 					   uint32_t error_injection_id,
 					   struct nsm_msg *msg)
 {
-	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
-				   NSM_GET_ERROR_INJECTION_PAYLOAD, msg);
-	if (rc == NSM_SW_SUCCESS) {
-		struct nsm_get_error_injection_payload_req *req =
-		    (struct nsm_get_error_injection_payload_req *)msg->payload;
-		req->hdr.data_size = sizeof(uint32_t);
-		req->error_injection_id = htole32(error_injection_id);
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
 	}
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_DEVICE_CONFIGURATION};
+	uint8_t rc = pack_nsm_header_v2(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_get_error_injection_payload_req *request =
+	    (struct nsm_get_error_injection_payload_req *)msg->payload;
+	request->hdr.command = NSM_GET_ERROR_INJECTION_PAYLOAD;
+	request->hdr.data_size = htole16(sizeof(uint32_t));
+	request->error_injection_id = htole32(error_injection_id);
 	return rc;
 }
 
@@ -189,8 +201,20 @@ int decode_get_error_injection_payload_resp(
 int encode_activate_error_injection_payload_req(uint8_t instance_id,
 						struct nsm_msg *msg)
 {
-	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
-				 NSM_ACTIVATE_ERROR_INJECTION, msg);
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_DEVICE_CONFIGURATION};
+	uint8_t rc = pack_nsm_header_v2(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_common_req_v2 *request =
+	    (struct nsm_common_req_v2 *)msg->payload;
+	request->command = NSM_ACTIVATE_ERROR_INJECTION;
+	request->data_size = 0;
+	return rc;
 }
 
 int decode_activate_error_injection_payload_req(const struct nsm_msg *msg,
