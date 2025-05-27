@@ -860,7 +860,7 @@ int decode_list_available_pcie_ports_resp(
 	return NSM_SW_SUCCESS;
 }
 
-int encode_multiport_query_scalar_group_telemetry_v1_req(
+int encode_multiport_query_scalar_group_telemetry_v2_req(
     uint8_t instance_id,
     const struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data,
     struct nsm_msg *msg)

@@ -1867,12 +1867,12 @@ TEST(ListAvailablePciePorts, testBadDataResponse)
 TEST(MultiportQueryScalarGroupTelemetry, testRequest)
 {
 	const nsm_multiport_query_scalar_group_telemetry_v2_req_data data = {
-	    NSM_PORT_TYPE_DOWNSTREAM, 1, 0, 1, GROUP_ID_10};
+	    1, NSM_PORT_TYPE_DOWNSTREAM, 0, GROUP_ID_10};
 	nsm_multiport_query_scalar_group_telemetry_v2_req req;
 
 	testEncodeRequest<
 	    nsm_multiport_query_scalar_group_telemetry_v2_req_data>(
-	    &encode_multiport_query_scalar_group_telemetry_v1_req,
+	    &encode_multiport_query_scalar_group_telemetry_v2_req,
 	    NSM_TYPE_PCI_LINK, NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2,
 	    data, req.data);
 
@@ -1885,7 +1885,6 @@ TEST(MultiportQueryScalarGroupTelemetry, testRequest)
 	EXPECT_EQ(NSM_PORT_TYPE_DOWNSTREAM, req.data.type);
 	EXPECT_EQ(1, req.data.upstream_port_index);
 	EXPECT_EQ(0, req.data.index);
-	EXPECT_EQ(1, req.data.device_index);
 	EXPECT_EQ(GROUP_ID_10, req.data.group_index);
 }
 

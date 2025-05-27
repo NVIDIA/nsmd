@@ -70,8 +70,7 @@ class NsmPCIeECCGroup1 : public NsmPcieGroup
                      const std::string& inventoryPath,
                      std::shared_ptr<PortInfoIntf> portInfoIntf,
                      std::shared_ptr<PortWidthIntf> portWidthIntf,
-                     uint8_t deviceIndex, uint8_t multiPortType,
-                     uint8_t multiPortIndex,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
                      uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup1() = default;
 
@@ -97,8 +96,7 @@ class NsmPCIeECCGroup2 : public NsmPcieGroup
     NsmPCIeECCGroup2(const std::string& name, const std::string& type,
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                     uint8_t deviceIndex, uint8_t multiPortType,
-                     uint8_t multiPortIndex,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
                      uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup2() = default;
 
@@ -121,8 +119,7 @@ class NsmPCIeECCGroup3 : public NsmPcieGroup
     NsmPCIeECCGroup3(const std::string& name, const std::string& type,
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                     uint8_t deviceIndex, uint8_t multiPortType,
-                     uint8_t multiPortIndex,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
                      uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup3() = default;
 
@@ -145,8 +142,7 @@ class NsmPCIeECCGroup4 : public NsmPcieGroup
     NsmPCIeECCGroup4(const std::string& name, const std::string& type,
                      const std::string& inventoryPath,
                      std::shared_ptr<PCIeEccIntf> pcieEccIntf,
-                     uint8_t deviceIndex, uint8_t multiPortType,
-                     uint8_t multiPortIndex,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
                      uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup4() = default;
 
@@ -167,8 +163,8 @@ class NsmPCIeECCGroup8 : public NsmPcieGroup
                      uint8_t deviceIndex, const std::string& inventoryObjPath);
     NsmPCIeECCGroup8(const std::string& name, const std::string& type,
                      std::shared_ptr<LaneErrorIntf> laneErrorIntf,
-                     uint8_t deviceIndex, const std::string& inventoryObjPath,
-                     uint8_t multiPortType, uint8_t multiPortIndex,
+                     const std::string& inventoryObjPath, uint8_t multiPortType,
+                     uint8_t multiPortIndex,
                      uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup8() = default;
 
@@ -189,7 +185,7 @@ class NsmPCIeECCGroup10 : public NsmPcieGroup
                       const std::string& inventoryObjPath, uint8_t deviceIndex);
     NsmPCIeECCGroup10(sdbusplus::bus::bus& bus, const std::string& name,
                       const std::string& type,
-                      const std::string& inventoryObjPath, uint8_t deviceIndex,
+                      const std::string& inventoryObjPath,
                       uint8_t multiPortType, uint8_t multiPortIndex,
                       uint8_t multiPortUpstreamPortNumber);
     NsmPCIeECCGroup10() = default;

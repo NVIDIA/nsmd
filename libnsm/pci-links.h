@@ -339,11 +339,10 @@ enum nsm_port_type {
  * data.
  */
 struct nsm_multiport_query_scalar_group_telemetry_v2_req_data {
-	uint8_t type : 1; // 0 - upstream port, 1 - downstream port
 	uint8_t upstream_port_index : 7; // number of upstream port
-	uint8_t index;	      // index of the upstream/downstream port
-	uint8_t device_index; // device index
-	uint8_t group_index;  // group index
+	uint8_t type : 1;    // 0 - upstream port, 1 - downstream port
+	uint8_t index;	     // index of the upstream/downstream port
+	uint8_t group_index; // group index
 } __attribute__((packed));
 
 /** @struct nsm_multiport_query_scalar_group_telemetry_v2_req
@@ -958,7 +957,7 @@ int decode_list_available_pcie_ports_resp(
  *  @param[out] msg - Message will be written to this
  *  @return nsm_sw_codes
  */
-int encode_multiport_query_scalar_group_telemetry_v1_req(
+int encode_multiport_query_scalar_group_telemetry_v2_req(
     uint8_t instance_id,
     const struct nsm_multiport_query_scalar_group_telemetry_v2_req_data *data,
     struct nsm_msg *msg);
