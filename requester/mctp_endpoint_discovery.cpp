@@ -278,7 +278,7 @@ requester::Coroutine
                 lg2::error(
                     "refreshEndpoints: failed to get MctpInfo from PATH={OBJ_PATH},{ERROR}",
                     "OBJ_PATH", objPath, "ERROR", e);
-                // coverity[missing_return]
+                mctpQueuedSignals[objPath].pop();
                 co_return NSM_SW_SUCCESS;
             }
 
@@ -299,7 +299,7 @@ requester::Coroutine
                 // specification doc
                 if (eid == 0)
                 {
-                    // coverity[missing_return]
+                    mctpQueuedSignals[objPath].pop();
                     co_return NSM_SW_SUCCESS;
                 }
             }
