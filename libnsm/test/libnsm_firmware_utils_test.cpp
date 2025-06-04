@@ -773,7 +773,196 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	reason_code = decode_nsm_query_get_erot_state_parameters_resp(
 	    response, msg_len, &cc, &reason_code, &erot_info);
 	/* The last tag has an unsupported id */
-	EXPECT_EQ(reason_code, NSM_SW_ERROR_DATA);
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
+	EXPECT_NE(nullptr, erot_info.slot_info);
+	free(erot_info.slot_info);
+}
+
+TEST(GetRotInformation, testDecodeResponseWithUnsupportedTag)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,	       // PCI VID: NVIDIA 0x10DE
+	    0x00,	       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,	       // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_FIRMWARE, // NVIDIA_MSG_TYPE
+	    NSM_FW_GET_EROT_STATE_INFORMATION, // command
+	    0,				       // completion code
+	    27,
+	    0, // number of tags
+	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY,
+	    1,
+	    1,
+	    NSM_FIRMWARE_ACTIVE_KEY_SET,
+	    1,
+	    2,
+	    NSM_FIRMWARE_MINIMUM_SECURITY_VERSION_NUMBER,
+	    3,
+	    0xC0,
+	    0xC1,
+	    NSM_FIRMWARE_INBAND_UPDATE_POLICY,
+	    1,
+	    99,
+	    NSM_FIRMWARE_BOOT_STATUS_CODE,
+	    7,
+	    0x08,
+	    0x07,
+	    0x06,
+	    0x05,
+	    0x04,
+	    0x03,
+	    0x02,
+	    0x01,
+	    NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT,
+	    1,
+	    1,	// active slot: 1
+	    99, // unsupported tag number
+	    1,	// value
+	    1,	// value
+	    NSM_FIRMWARE_FIRMWARE_SLOT_COUNT,
+	    1,
+	    2, // number of slots: 2
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    1,
+	    0, // slot 0 tag
+	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
+	    0x0B,
+	    0x30,
+	    0x31,
+	    0x2E,
+	    0x30,
+	    0x33,
+	    0x2E,
+	    0x30,
+	    0x32,
+	    0x31,
+	    0x30,
+	    0x2E,
+	    0x30,
+	    0x30,
+	    0x30,
+	    0x33,
+	    0x5F,
+	    0x6E,
+	    0x30,
+	    0x33,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    NSM_FIRMWARE_BUILD_TYPE,
+	    1,
+	    1, // build type: 1
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    1,
+	    1, // firmware state: 1
+	    NSM_FIRMWARE_VERSION_COMPARISON_STAMP,
+	    5,
+	    0xD0,
+	    0xD1,
+	    0xD2,
+	    0xD3,
+	    NSM_FIRMWARE_SIGNING_TYPE,
+	    1,
+	    0xA1,
+	    NSM_FIRMWARE_WRITE_PROTECT_STATE,
+	    1,
+	    0xA2,
+	    NSM_FIRMWARE_SECURITY_VERSION_NUMBER,
+	    3,
+	    0xA3,
+	    0xA4,
+	    NSM_FIRMWARE_SIGNING_KEY_INDEX,
+	    3,
+	    0xA5,
+	    0xA6,
+	    NSM_FIRMWARE_FIRMWARE_SLOT_ID,
+	    1,
+	    1, // slot 1 tag
+	    NSM_FIRMWARE_FIRMWARE_VERSION_STRING,
+	    0x0B,
+	    0x30,
+	    0x31,
+	    0x2E,
+	    0x30,
+	    0x33,
+	    0x2E,
+	    0x30,
+	    0x32,
+	    0x31,
+	    0x30,
+	    0x2E,
+	    0x30,
+	    0x30,
+	    0x30,
+	    0x33,
+	    0x5F,
+	    0x6E,
+	    0x30,
+	    0x33,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    0,
+	    NSM_FIRMWARE_BUILD_TYPE,
+	    1,
+	    2, // build type: 2
+	    NSM_FIRMWARE_FIRMWARE_STATE,
+	    1,
+	    2, // firmware state: 2
+	    NSM_FIRMWARE_VERSION_COMPARISON_STAMP,
+	    5,
+	    0xE0,
+	    0xE1,
+	    0xE2,
+	    0xE3,
+	    NSM_FIRMWARE_SIGNING_TYPE,
+	    1,
+	    0xB1,
+	    NSM_FIRMWARE_WRITE_PROTECT_STATE,
+	    1,
+	    0xB2,
+	    NSM_FIRMWARE_SECURITY_VERSION_NUMBER,
+	    3,
+	    0xB3,
+	    0xB4,
+	    NSM_FIRMWARE_SIGNING_KEY_INDEX,
+	    3,
+	    0xB5,
+	    0xB6,
+	    23,
+	    1,
+	    1 // unsupported tag number
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	struct nsm_firmware_erot_state_info_resp erot_info = {};
+
+	reason_code = decode_nsm_query_get_erot_state_parameters_resp(
+	    response, msg_len, &cc, &reason_code, &erot_info);
+	/* The last tag has an unsupported id */
+	EXPECT_EQ(reason_code, NSM_SW_SUCCESS);
 	EXPECT_NE(nullptr, erot_info.slot_info);
 	free(erot_info.slot_info);
 }
