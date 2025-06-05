@@ -248,6 +248,35 @@ bool decode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
 	return true;
 }
 
+/**
+ * Skip the tag data by advancing the pointer
+ * @param buffer: pointer to the buffer
+ * @param buffer_size: size of the buffer
+ * @return true if the tag is skipped, false otherwise
+ */
+bool decode_nsm_firmware_aggregate_tag_skip(uint8_t **buffer,
+					    uint16_t *buffer_size)
+{
+	if (*buffer_size < sizeof(struct nsm_firmware_aggregate_tag)) {
+		return false;
+	}
+
+	struct nsm_firmware_aggregate_tag *field =
+	    (struct nsm_firmware_aggregate_tag *)*buffer;
+
+	size_t data_len = 1 << field->length;
+	size_t consumed_len =
+	    sizeof(struct nsm_firmware_aggregate_tag) + data_len - 1;
+
+	if (*buffer_size < consumed_len) {
+		return false;
+	}
+
+	*buffer += consumed_len;
+	*buffer_size -= consumed_len;
+	return true;
+}
+
 int decode_nsm_query_get_erot_state_parameters_req(
     const struct nsm_msg *msg, size_t msg_len,
     struct nsm_firmware_erot_state_info_req *fw_req)
@@ -512,14 +541,26 @@ int decode_nsm_query_firmware_header_information(
 			}
 			rc_ok = false;
 		} else {
-			/* Not expected field before firmware slot count */
-			DBGE(printf("Error: Decoded unsupported tag in header: "
-				    "0x%02x\n",
-				    field->tag);)
-			DBGE(printf("Left telemetries: %u, left payload: %u\n",
+			/* Skip unsupported tag */
+			DBG2(printf(
+				 "Skipping unsupported tag in header: 0x%02x\n",
+				 field->tag);)
+			DBG2(printf("Left telemetries: %u, left payload: %u\n",
 				    (uint32_t)(*telemetry_count),
 				    (uint32_t)(*payload_size));)
-			return NSM_SW_ERROR_DATA;
+			(*telemetry_count)--;
+			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
+			    ptr, payload_size);
+			if (!rc_ok) {
+				DBGE(printf("Error: The decoded message header "
+					    "is not "
+					    "properly encoded\n");)
+				DBGE(printf("Left telemetries: %u, left "
+					    "payload: %u\n",
+					    (uint32_t)(*telemetry_count),
+					    (uint32_t)(*payload_size));)
+				return NSM_SW_ERROR_LENGTH;
+			}
 		}
 
 		if (!rc_ok) {
@@ -676,14 +717,26 @@ int decode_nsm_query_firmware_slot_information(
 			/* we are good, we reached new firmware slot id */
 			return NSM_SW_SUCCESS;
 		} else {
-			/* Not expected field before firmware slot count */
-			DBGE(printf("Error: Decoded unsupported tag in slot "
+			/* Skip unsupported tag */
+			DBG2(printf("Skipping unsupported tag in slot "
 				    "information: 0x%02x\n",
 				    field->tag);)
-			DBGE(printf("Left telemetries: %u, left payload: %u\n",
+			DBG2(printf("Left telemetries: %u, left payload: %u\n",
 				    (uint32_t)(*telemetry_count),
 				    (uint32_t)(*payload_size));)
-			return NSM_SW_ERROR_DATA;
+			(*telemetry_count)--;
+			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
+			    ptr, payload_size);
+			if (!rc_ok) {
+				DBGE(printf("Error: The decoded message slot "
+					    "information is not properly "
+					    "encoded\n");)
+				DBGE(printf("Left telemetries: %u, left "
+					    "payload: %u\n",
+					    (uint32_t)(*telemetry_count),
+					    (uint32_t)(*payload_size));)
+				return NSM_SW_ERROR_LENGTH;
+			}
 		}
 
 		if (!rc_ok) {
