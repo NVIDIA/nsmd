@@ -129,6 +129,7 @@ TEST(SFxP24F8SMBusSensorBytesConverter, GoodTest)
     }
 }
 
+#ifdef NVIDIA_SHMEM
 TEST(NsmNumericSensorShmem, GoodTest)
 {
     nsm::NsmNumericSensorShmem value{
@@ -139,6 +140,7 @@ TEST(NsmNumericSensorShmem, GoodTest)
               "/xyz/openbmc_project/sensors/dummy_type/dummy_sensor");
     EXPECT_EQ(value.association, "/xyz/openbmc_project/inventory/dummy_device");
 }
+#endif
 
 TEST(NsmNumericSensorDbusStatus, GoodTest)
 {
