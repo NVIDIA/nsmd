@@ -615,44 +615,6 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
     co_return NSM_SW_SUCCESS;
 }
 
-static std::shared_ptr<NsmObject>
-    getNextSensorAndUpdatePollingState(
-        const std::shared_ptr<NsmDevice>& nsmDevice, bool& gpmSensorNeedUpdate,
-        size_t& gpmSensorsSize, size_t& roundRobinSensorsSize,
-        PollingType& pollingType, PollingType& nextPollingType)
-{
-    std::shared_ptr<NsmObject> sensor;
-    pollingType = nextPollingType;
-    if (pollingType == PollingType::GpuPerformanceMonitoring &&
-        gpmSensorsSize > 0)
-    {
-        sensor = nsmDevice->gpmSensors.front();
-        // Initialize the gpmSensorNeedUpdate flag for GPM polling
-        gpmSensorNeedUpdate = true;
-        // Move the sensor to the back of the queue
-        nsmDevice->gpmSensors.pop_front();
-        nsmDevice->gpmSensors.push_back(sensor);
-        gpmSensorsSize--;
-        nextPollingType = roundRobinSensorsSize > 0
-                              ? PollingType::RoundRobin
-                              : PollingType::GpuPerformanceMonitoring;
-    }
-    else if (pollingType == PollingType::RoundRobin &&
-             roundRobinSensorsSize > 0)
-    {
-        sensor = nsmDevice->roundRobinSensors.front();
-        nsmDevice->roundRobinSensors.pop_front();
-        // Push back is done in the polling loop when sensors is not updated and
-        // it is not a static sensor
-        roundRobinSensorsSize--;
-        nextPollingType = gpmSensorsSize > 0
-                              ? PollingType::GpuPerformanceMonitoring
-                              : PollingType::RoundRobin;
-        gpmSensorNeedUpdate &= gpmSensorsSize > 0;
-    }
-    return sensor;
-};
-
 requester::Coroutine
     SensorManagerImpl::doPollingTask(std::shared_ptr<NsmDevice> nsmDevice)
 {
@@ -753,13 +715,7 @@ requester::Coroutine
         // update roundRobin sensors for rest of polling time interval
         nsmDevice->setPollingState(POLL_NON_PRIORITY);
 
-        auto gpmSensorsSize = nsmDevice->gpmSensors.size();
-        auto roundRobinSensorsSize = nsmDevice->roundRobinSensors.size();
-        auto nextPollingType = gpmSensorsSize > 0
-                                   ? PollingType::GpuPerformanceMonitoring
-                                   : PollingType::RoundRobin;
-        auto pollingType = nextPollingType;
-        auto gpmSensorNeedUpdate = true;
+        auto toBeUpdated = nsmDevice->roundRobinSensors.size();
 
         // Make sure the first round-robin sensor is not compared
         // to an uninitialised timestamp
@@ -767,7 +723,7 @@ requester::Coroutine
 
         while ((t1 - t0) < pollingTimeInUsec)
         {
-            if (gpmSensorsSize == 0 && roundRobinSensorsSize == 0)
+            if (!toBeUpdated)
             {
                 // Either we were able to succesfully update all sensors in one
                 // iteration or there are no sensors in the queue. Mark ready in
@@ -792,42 +748,15 @@ requester::Coroutine
                 continue;
             }
 
-            // Get sensor to update from the appropriate queue
-            auto sensor = getNextSensorAndUpdatePollingState(
-                nsmDevice, gpmSensorNeedUpdate, gpmSensorsSize,
-                roundRobinSensorsSize, pollingType, nextPollingType);
-            if (sensor == nullptr)
-            {
-                // This should never happen as we check for empty queues earlier
-                lg2::critical(
-                    "Unexpected state: No sensors to update but queues are not empty, EID={EID}",
-                    "EID", eid);
-                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-                continue;
-            }
+            auto sensor = nsmDevice->roundRobinSensors.front();
 
-            const auto needsUpdate = sensor->needsUpdate(t1);
-            const auto isRoundRobin = pollingType == PollingType::RoundRobin;
-            if (isRoundRobin && !needsUpdate)
+            nsmDevice->roundRobinSensors.pop_front();
+            toBeUpdated--;
+
+            if (!sensor->needsUpdate(t1))
             {
-                // If both sensors don't need update, skip the RR-sensor
+                // Skip the RR-sensor or GPM
                 nsmDevice->roundRobinSensors.push_back(sensor);
-                if (!gpmSensorNeedUpdate)
-                {
-                    co_await common::Sleep(event.get(), 20000,
-                                           common::NonPriority);
-                    sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-                    continue;
-                }
-            }
-            if (!isRoundRobin)
-            {
-                gpmSensorNeedUpdate &= needsUpdate;
-            }
-            if (!needsUpdate)
-            {
-                // If the sensor doesn't need update or all previous sensors
-                // didn't need update, skip the polling
                 sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
                 continue;
             }
@@ -847,7 +776,7 @@ requester::Coroutine
             auto cc = co_await sensor->update(*this, eid);
             sensor->isRefreshed = true;
 
-            if (isRoundRobin && !(sensor->isStatic && cc == NSM_SUCCESS))
+            if (!(sensor->isStatic && cc == NSM_SUCCESS))
             {
                 // Filter out succesfully updated static sensor.
                 // Only re-queue non-static sensors or static sensors that
@@ -872,7 +801,7 @@ requester::Coroutine
         if (diff > pollingTimeInUsec)
         {
             // We have already crossed the polling interval. Complete mandatory
-            // sleep of 20ms then continue polling
+            // sleep of 20ms then continue polling for yield some CPU
             co_await common::Sleep(event, 20000, timerEventPriority);
             continue;
         }
