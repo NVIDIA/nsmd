@@ -110,7 +110,6 @@ class NsmDevice : public StateChangeLogger
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
     std::vector<std::shared_ptr<NsmObject>> prioritySensors;
     std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
-    std::deque<std::shared_ptr<NsmObject>> gpmSensors;
     std::vector<std::shared_ptr<NsmObject>> longRunningSensors;
     std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
