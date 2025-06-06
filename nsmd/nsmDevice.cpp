@@ -145,7 +145,7 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
             break;
         case PollingType::GpuPerformanceMonitoring:
             sensor->refreshLimitInUsec = DEFAULT_GPM_REFRESH_LIMIT_IN_USEC;
-            gpmSensors.push_back(sensor);
+            roundRobinSensors.push_back(sensor);
             break;
         case PollingType::Static:
             std::const_pointer_cast<NsmObject>(sensor)->isStatic = true;
