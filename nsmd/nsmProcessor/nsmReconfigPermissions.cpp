@@ -264,7 +264,7 @@ requester::Coroutine NsmReconfigPermissions::patchDOEOneShotConfig(
     }
     else
     {
-        if (doeConfigIntf->allowOneShotConfig())
+        if (hostConfigIntf->allowOneShotConfig())
         {
             permission = ALLOW_HOST_DISALLOW_DOE;
         }
@@ -345,7 +345,7 @@ requester::Coroutine NsmReconfigPermissions::patchDOEPersistentConfig(
     }
     else
     {
-        if (doeConfigIntf->allowPersistentConfig())
+        if (hostConfigIntf->allowPersistentConfig())
         {
             permission = ALLOW_HOST_DISALLOW_DOE;
         }
