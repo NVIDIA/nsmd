@@ -338,7 +338,7 @@ std::tuple<int, int, std::vector<uint8_t>>
     {
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
-            "/xyz/openbmc_project/mctp", 0, ifaceList);
+            "/au/com/codeconstruct/mctp1", 0, ifaceList);
         for (const auto& [objPath, mapperServiceMap] : getSubTreeResponse)
         {
             for (const auto& [serviceName, interfaces] : mapperServiceMap)
@@ -346,7 +346,7 @@ std::tuple<int, int, std::vector<uint8_t>>
                 dbus::ObjectValueTree objects{};
 
                 auto method = bus.new_method_call(
-                    serviceName.c_str(), "/xyz/openbmc_project/mctp",
+                    serviceName.c_str(), "/au/com/codeconstruct/mctp1",
                     "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
                 auto reply = bus.call(method);
                 reply.read(objects);

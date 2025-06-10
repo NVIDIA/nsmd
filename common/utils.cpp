@@ -197,15 +197,6 @@ eid_t getEidFromUUID(
         }
     }
 
-    if (eid == std::numeric_limits<uint8_t>::max())
-    {
-        lg2::error("EID not Found for UUID={UUID}", "UUID", uuid);
-    }
-    else
-    {
-        lg2::debug("EID={EID} Found for UUID={UUID}", "UUID", uuid, "EID", eid);
-    }
-
     return eid;
 }
 

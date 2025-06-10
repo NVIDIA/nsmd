@@ -38,17 +38,16 @@ const std::string emptyUUID = "00000000-0000-0000-0000-000000000000";
 MctpDiscovery::MctpDiscovery(
     sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
     std::initializer_list<MctpDiscoveryHandlerIntf*> list) :
-    bus(bus),
-    handler(handler),
+    bus(bus), handler(handler),
     mctpEndpointAddedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesAdded(
-            "/xyz/openbmc_project/mctp"),
+            "/au/com/codeconstruct/mctp1"),
         std::bind_front(&MctpDiscovery::discoverEndpoints, this)),
     mctpEndpointRemovedSignal(
         bus,
         sdbusplus::bus::match::rules::interfacesRemoved(
-            "/xyz/openbmc_project/mctp"),
+            "/au/com/codeconstruct/mctp1"),
         std::bind_front(&MctpDiscovery::cleanEndpoints, this)),
     handlers(list)
 {
@@ -60,7 +59,7 @@ MctpDiscovery::MctpDiscovery(
     {
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
-            "/xyz/openbmc_project/mctp", 0, ifaceList);
+            "/au/com/codeconstruct/mctp1", 0, ifaceList);
         for (const auto& [objPath, mapperServiceMap] : getSubTreeResponse)
         {
             for (const auto& [serviceName, interfaces] : mapperServiceMap)
@@ -81,7 +80,7 @@ MctpDiscovery::MctpDiscovery(
         try
         {
             auto method = bus.new_method_call(
-                service.c_str(), "/xyz/openbmc_project/mctp",
+                service.c_str(), "/au/com/codeconstruct/mctp1",
                 "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
             auto reply = bus.call(method);
             reply.read(objects);
@@ -90,7 +89,7 @@ MctpDiscovery::MctpDiscovery(
                 populateMctpInfo(interfaces, mctpInfos);
 
                 // watch PropertiesChanged signal from
-                // xyz.openbmc_project.Object.Enable PDI
+                // au.com.codeconstruct.MCTP.Endpoint1 PDI
                 if (enableMatches.find(objectPath.str) == enableMatches.end())
                 {
                     enableMatches.emplace(
@@ -99,7 +98,7 @@ MctpDiscovery::MctpDiscovery(
                             bus,
                             sdbusplus::bus::match::rules::propertiesChanged(
                                 objectPath.str,
-                                "xyz.openbmc_project.Object.Enable"),
+                                "au.com.codeconstruct.MCTP.Endpoint1"),
                             std::bind_front(&MctpDiscovery::refreshEndpoints,
                                             this)));
                 }
@@ -140,7 +139,7 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
             }
         }
 
-        if (uuid.empty() || address.empty() || !type)
+        if (uuid.empty())
         {
             return;
         }
@@ -159,9 +158,9 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
             const auto& properties = interfaces.at(mctpEndpointIntfName);
             if (properties.contains("EID") &&
                 properties.contains("SupportedMessageTypes") &&
-                properties.contains("MediumType"))
+                properties.contains("NetworkId"))
             {
-                auto eid = std::get<size_t>(properties.at("EID"));
+                auto eid = std::get<uint8_t>(properties.at("EID"));
                 // MCTP EID 0 is a special Null EID as per MCTP DMTF
                 // specification doc
                 if (eid == MCTP_NULL_EID)
@@ -170,9 +169,16 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 }
                 auto mctpTypes = std::get<std::vector<uint8_t>>(
                     properties.at("SupportedMessageTypes"));
-                auto mediumType =
-                    std::get<std::string>(properties.at("MediumType"));
-                auto networkId = std::get<size_t>(properties.at("NetworkId"));
+
+                std::string mediumType{};
+
+                auto hasMediumType = properties.find("MediumType");
+                if (hasMediumType != properties.end())
+                {
+                    mediumType = std::get<std::string>(hasMediumType->second);
+                }
+
+                auto networkId = std::get<uint32_t>(properties.at("NetworkId"));
                 if (std::find(mctpTypes.begin(), mctpTypes.end(),
                               mctpTypeVDM) != mctpTypes.end())
                 {
@@ -201,7 +207,8 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 
     populateMctpInfo(interfaces, mctpInfos);
 
-    // watch PropertiesChanged signal from xyz.openbmc_project.Object.Enable PDI
+    // watch PropertiesChanged signal from au.com.codeconstruct.MCTP.Endpoint1
+    // PDI
     if (enableMatches.find(objPath.str) == enableMatches.end())
     {
         enableMatches.emplace(
@@ -209,7 +216,7 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
             sdbusplus::bus::match_t(
                 bus,
                 sdbusplus::bus::match::rules::propertiesChanged(
-                    objPath.str, "xyz.openbmc_project.Object.Enable"),
+                    objPath.str, "au.com.codeconstruct.MCTP.Endpoint1"),
                 std::bind_front(&MctpDiscovery::refreshEndpoints, this)));
     }
     handleMctpEndpoints(mctpInfos);
@@ -235,14 +242,14 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
     std::string sender = msg.get_sender();
 
     msg.read(interface, properties);
-    auto prop = properties.find("Enabled");
+    auto prop = properties.find("Connectivity");
     if (prop != properties.end())
     {
-        auto enabled = std::get<bool>(prop->second);
+        auto connectivity = std::get<std::string>(prop->second);
         lg2::info(
-            "Received xyz.openbmc_poject.Object.Enabled propertiesChanged signal for "
-            "Enabled=={ENABLED} at PATH={OBJ_PATH} from sender={SENDER}",
-            "ENABLED", enabled, "OBJ_PATH", objPath, "SENDER", sender);
+            "Received au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
+            "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
+            "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
         try
         {
             std::string service = utils::DBusHandler().getService(
@@ -273,7 +280,7 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
 
         if (allProperties.contains("EID"))
         {
-            eid = std::get<uint32_t>(allProperties.at("EID"));
+            eid = std::get<uint8_t>(allProperties.at("EID"));
         }
         if (allProperties.contains("NetworkId"))
         {
@@ -299,7 +306,7 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
                                             bindingType);
         for (MctpDiscoveryHandlerIntf* handler : handlers)
         {
-            if (enabled)
+            if (connectivity == "Available")
             {
                 handler->onlineMctpEndpoint(mctpInfo);
             }
