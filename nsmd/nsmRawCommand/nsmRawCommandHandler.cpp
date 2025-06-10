@@ -157,18 +157,17 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
                 else
                 {
                     rc = co_await longRunningHandler->timer;
-                    if (rc != NSM_SW_SUCCESS)
-                    {
-                        lg2::error(
-                            "NsmRawCommandHandler::doSendLongRunningRequest: LongRunning timer start failed, eid={EID}",
-                            "EID", eid);
-                    }
-                    else if (longRunningHandler->timer.expired())
+                    if (longRunningHandler->timer.expired())
                     {
                         lg2::error(
                             "NsmRawCommandHandler::doSendLongRunningRequest:: LongRunning sensor timeout, eid={EID}",
                             "EID", eid);
-                        rc = NSM_SW_ERROR;
+                    }
+                    else if (rc != NSM_SW_SUCCESS)
+                    {
+                        lg2::error(
+                            "NsmRawCommandHandler::doSendLongRunningRequest: LongRunning timer start failed, eid={EID}",
+                            "EID", eid);
                     }
                     else
                     {
