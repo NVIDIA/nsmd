@@ -48,13 +48,14 @@ class NsmIRoTResponder : public NsmInterfaceProvider<IntfType>
   public:
     NsmIRoTResponder() = delete;
     NsmIRoTResponder(const std::string& name, const std::string& type) :
-        NsmInterfaceProvider<IntfType>(name, type, chassisInventoryBasePath)
+        NsmInterfaceProvider<IntfType>(name, type, chassisInventoryBasePath),
+        name(name)
     {}
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
-    std::string name_;
+    std::string name;
 };
 
 } // namespace nsm

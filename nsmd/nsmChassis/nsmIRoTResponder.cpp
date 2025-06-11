@@ -95,6 +95,11 @@ requester::Coroutine NsmIRoTResponder<IntfType>::update(SensorManager& manager,
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);
+            auto device = manager.getNsmDevice(deviceUuid);
+            auto spdmResponderObject =
+                std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
+                    this->name, "NSM_ChassisIRoTResponder");
+            device->addStaticSensor(spdmResponderObject);
             // coverity[missing_return]
             co_return NSM_SUCCESS;
         }
@@ -109,7 +114,7 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                                                    const std::string& interface,
                                                    const std::string& objPath)
 {
-    std::string baseType = "NSM_IRoTResponder";
+    std::string baseType = "NSM_ChassisIRoTResponder";
     std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;
 
     auto name = co_await utils::coGetDbusProperty<std::string>(
@@ -124,27 +129,12 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
     {
         lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
                    "TYPE", type.c_str());
-        // if Type 6 support is added for any of the related devices, an
-        // IRoT chassis object with the UUID interface might have been
-        // created already
-        try
-        {
-            auto uuidObject =
-                std::make_shared<NsmIRoTResponder<UuidIntf>>(name, baseType);
-            auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-                objPath.c_str(), "UUID", interface.c_str());
-            uuidObject->invoke(pdiMethod(uuid), uuid);
-            device->addStaticSensor(uuidObject);
-        }
-        catch (...)
-        {
-            lg2::debug("IRoTResponder: UUID object creation failed");
-        }
-
-        auto spdmResponderObject =
-            std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(name,
-                                                                  baseType);
-        device->addStaticSensor(spdmResponderObject);
+        auto uuidObject =
+            std::make_shared<NsmIRoTResponder<UuidIntf>>(name, baseType);
+        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
+            objPath.c_str(), "UUID", interface.c_str());
+        uuidObject->invoke(pdiMethod(uuid), uuid);
+        device->addStaticSensor(uuidObject);
 
         std::vector<utils::Association> associations{};
         co_await utils::coGetAssociations(objPath, interface + ".Associations",
@@ -223,11 +213,11 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
 }
 
 std::vector<std::string> IRoTResponderInterfaces{
-    "xyz.openbmc_project.Configuration.NSM_IRoTResponder",
-    "xyz.openbmc_project.Configuration.NSM_IRoTResponder.Asset",
-    "xyz.openbmc_project.Configuration.NSM_IRoTResponder.Chassis",
-    "xyz.openbmc_project.Configuration.NSM_IRoTResponder.Health",
-    "xyz.openbmc_project.Configuration.NSM_IRoTResponder.Location"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder",
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Asset",
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Chassis",
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Health",
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Location"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmIRoTResponder, IRoTResponderInterfaces)
 
