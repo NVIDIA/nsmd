@@ -20,6 +20,7 @@ sources += [
     'nsmChassis/nsmErot.cpp',
     'nsmChassis/nsmSecurityRBP.cpp',
     'nsmChassis/nsmProcessorModulePowerControl.cpp',
+    'nsmChassis/nsmIRoTResponder.cpp',
 ]
 
 nsmd_headers += ['.', '..', 'nsmDbusIfaceOverride', 'nsmFirmwareUtils']
