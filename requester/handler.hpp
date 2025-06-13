@@ -23,6 +23,7 @@
 #include "libnsm/requester/mctp.h"
 
 #include "common/types.hpp"
+#include "common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmd/instance_id.hpp"
 #include "nsmd/socket_manager.hpp"
@@ -292,9 +293,14 @@ class Handler
 
         if (!requestFound)
         {
-            lg2::error("Received response doesn't match any request. "
+            std::vector<uint8_t> reconstructed(
+                reinterpret_cast<const uint8_t*>(response),
+                reinterpret_cast<const uint8_t*>(response) + respMsgLen);
+            std::string msg = utils::requestMsgToHexString(reconstructed);
+            lg2::error("Received response {RESP} doesn't match any request. "
                        "Tag={TAG}, EID={EID}, Type={TYPE}, Command={CMD}.",
-                       "TAG", tag, "EID", eid, "TYPE", type, "CMD", command);
+                       "RESP", msg, "TAG", tag, "EID", eid, "TYPE", type, "CMD",
+                       command);
         }
     }
 
