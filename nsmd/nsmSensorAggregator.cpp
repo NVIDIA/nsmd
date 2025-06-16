@@ -27,19 +27,20 @@ NsmSensorAggregator::NsmSensorAggregator(const std::string& name,
                                          const std::string& type) :
     NsmSensor(name, type)
 {
-    samples.reserve(256);
+    sampleTags.reserve(256);
 }
 
 uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
                                                size_t responseLen)
 {
+    uint8_t returnValue = NSM_SW_SUCCESS;
     uint8_t cc{};
-    uint16_t telemetry_count{};
-    size_t consumed_len{};
-    auto response_data = reinterpret_cast<const uint8_t*>(responseMsg);
+    uint16_t telemetryCount{};
+    size_t consumedLen{};
+    auto responseData = reinterpret_cast<const uint8_t*>(responseMsg);
 
-    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumed_len,
-                                    &cc, &telemetry_count);
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &telemetryCount);
 
     if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
     {
@@ -50,24 +51,22 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
     {
         return cc ? cc : rc;
     }
-
-    samples.clear();
-
-    while (telemetry_count--)
+    sampleTags.clear();
+    while (telemetryCount--)
     {
         uint8_t tag;
         bool valid;
         const uint8_t* data;
-        size_t data_len;
+        size_t dataLen;
 
-        responseLen -= consumed_len;
-        response_data += consumed_len;
+        responseLen -= consumedLen;
+        responseData += consumedLen;
 
         auto sample =
-            reinterpret_cast<const nsm_aggregate_resp_sample*>(response_data);
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(responseData);
 
-        rc = decode_aggregate_resp_sample(sample, responseLen, &consumed_len,
-                                          &tag, &valid, &data, &data_len);
+        rc = decode_aggregate_resp_sample(sample, responseLen, &consumedLen,
+                                          &tag, &valid, &data, &dataLen);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -79,19 +78,19 @@ uint8_t NsmSensorAggregator::handleResponseMsg(const nsm_msg* responseMsg,
 
             continue;
         }
-
-        samples.emplace_back(tag, data_len, data, valid);
+        sampleTags.push_back(tag);
+        rc = handleSample(
+            TelemetrySample{tag, static_cast<uint8_t>(dataLen), data, valid});
+        if (rc != NSM_SW_SUCCESS && returnValue == NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "responseHandler: decoding failed for one or more samples. "
+                "Type={TYPE}, sensor={NAME}, rc={RC}",
+                "TYPE", getType(), "NAME", getName(), "RC", rc);
+            returnValue = rc;
+        }
     }
 
-    rc = handleSamples(samples);
-
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::debug("responseHandler: decoding failed for one or more samples. "
-                   "Type={TYPE}, sensor={NAME}, rc={RC}",
-                   "TYPE", getType(), "NAME", getName(), "RC", rc);
-    }
-
-    return rc;
+    return returnValue;
 }
 } // namespace nsm

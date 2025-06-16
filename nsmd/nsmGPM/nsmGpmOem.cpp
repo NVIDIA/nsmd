@@ -445,37 +445,34 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmGPMAggregated::handleSamples(const std::vector<TelemetrySample>& samples)
+int NsmGPMAggregated::handleSample(const TelemetrySample& sample)
 {
     uint8_t returnValue = NSM_SW_SUCCESS;
 
-    for (const auto& sample : samples)
+    if (sample.tag > metricsTable.size())
     {
-        if (sample.tag > metricsTable.size())
-        {
-            // Currently there is not need to handle special tag like timestamp
-            // and uuid
-            continue;
-        }
-
-        const auto& metric = metricsTable[sample.tag];
-        if (!metric.decodeFunc || !metric.updater)
-        {
-            continue;
-        }
-
-        auto [rc, val] = metric.decodeFunc(sample.data, sample.data_len);
-
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::debug(
-                "Failed to decode GPM Aggregate Metric {NAME}. Object Path = {OBJPATH}, rc = {RC}.",
-                "NAME", metric.name, "OBJPATH", objPath, "RC", rc);
-            returnValue = rc;
-        }
-
-        metric.updater->updateMetric(metric.name, val);
+        // Currently there is not need to handle special tag like timestamp
+        // and uuid
+        return returnValue;
     }
+
+    const auto& metric = metricsTable[sample.tag];
+    if (!metric.decodeFunc || !metric.updater)
+    {
+        return returnValue;
+    }
+
+    auto [rc, val] = metric.decodeFunc(sample.data, sample.data_len);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::debug(
+            "Failed to decode GPM Aggregate Metric {NAME}. Object Path = {OBJPATH}, rc = {RC}.",
+            "NAME", metric.name, "OBJPATH", objPath, "RC", rc);
+        returnValue = rc;
+    }
+
+    metric.updater->updateMetric(metric.name, val);
 
     return returnValue;
 }
@@ -485,7 +482,7 @@ NsmGPMPerInstance::NsmGPMPerInstance(
     uint8_t gpuInstance, uint8_t computeInstance, uint8_t metricId,
     const uint32_t instanceBitfield, GPMMetricsUnit unit,
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator) :
-    NsmSensorAggregator(name, type), retrievalSource(retrievalSource),
+    NsmSensor(name, type), retrievalSource(retrievalSource),
     gpuInstance(gpuInstance), computeInstance(computeInstance),
     metricId(metricId), instanceBitfield(instanceBitfield),
     metricUpdator(metricUpdator)
@@ -528,30 +525,85 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmGPMPerInstance::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+uint8_t NsmGPMPerInstance::handleResponseMsg(const nsm_msg* responseMsg,
+                                             size_t responseLen)
 {
     uint8_t returnValue = NSM_SW_SUCCESS;
+    uint8_t cc = NSM_SUCCESS;
+    size_t consumedLen{};
+    auto responseData = reinterpret_cast<const uint8_t*>(responseMsg);
+
+    uint16_t telemetryCount{};
+
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &telemetryCount);
+
+    if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
+    {
+        LG2_ERROR("decode_aggregate_resp | cc: {CC}, rc: {RC}", "CC", cc, "RC",
+                  rc);
+    }
+
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+
+    if (telemetryCount == 0)
+    {
+        metricUpdator->updateMetric(std::vector<double>());
+        return returnValue;
+    }
 
     metrics.clear();
 
-    for (const auto& sample : samples)
+    responseData += consumedLen;
+    responseLen -= consumedLen;
+
+    while (telemetryCount--)
     {
-        metrics.resize(
-            std::max(metrics.size(), static_cast<size_t>(sample.tag) + 1), 0);
-        auto [rc, val] = decodeFunc(sample.data, sample.data_len);
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t dataLen;
+
+        auto sampleData =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(responseData);
+
+        rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
+                                          &tag, &valid, &data, &dataLen);
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
 
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::debug(
-                "Failed to decode GPM Per-instance Metric for Instance ID {INSTANCE_ID}. Object Path = {OBJPATH}, rc = {RC}.",
-                "INSTANCE_ID", sample.tag, "OBJPATH", objPath, "RC", rc);
-            returnValue = rc;
-
+                "responseHandler: decode_aggregate_resp_sample failed. "
+                "Type={TYPE}, Tag={TAG}, sensor={NAME}, rc={RC}, valid_bit={VALID}",
+                "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
+                "VALID", valid);
             continue;
         }
 
-        metrics[sample.tag] = val;
+        if (tag >= metrics.size())
+        {
+            metrics.resize(tag + 1);
+        }
+
+        auto [decodeRc, val] = decodeFunc(data, dataLen);
+
+        if (decodeRc != NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "Failed to decode GPM Per-instance Metric for Instance ID {INSTANCE_ID}. Object Path = {OBJPATH}, rc = {RC}.",
+                "INSTANCE_ID", tag, "OBJPATH", objPath, "RC", decodeRc);
+            returnValue = decodeRc;
+        }
+        else
+        {
+            metrics[tag] = val;
+        }
     }
 
     metricUpdator->updateMetric(metrics);

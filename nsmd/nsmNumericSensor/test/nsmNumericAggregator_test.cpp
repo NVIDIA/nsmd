@@ -48,8 +48,7 @@ class MockNsmSensorAggregator : public NsmSensorAggregator
   public:
     MOCK_METHOD(std::optional<std::vector<uint8_t>>, genRequestMsg,
                 (eid_t eid, uint8_t instanceId), (override));
-    MOCK_METHOD(int, handleSamples,
-                (const std::vector<TelemetrySample>& samples), (override));
+    MOCK_METHOD(int, handleSample, (const TelemetrySample& sample), (override));
 };
 
 class MockNsmNumericAggregator : public NsmNumericAggregator
@@ -59,8 +58,7 @@ class MockNsmNumericAggregator : public NsmNumericAggregator
 
     MOCK_METHOD(std::optional<std::vector<uint8_t>>, genRequestMsg,
                 (eid_t eid, uint8_t instanceId), (override));
-    MOCK_METHOD(int, handleSamples,
-                (const std::vector<TelemetrySample>& samples), (override));
+    MOCK_METHOD(int, handleSample, (const TelemetrySample& sample), (override));
 };
 
 TEST(nsmSensorAggregator, GoodTest)
@@ -105,13 +103,15 @@ TEST(nsmSensorAggregator, GoodTest)
 
     EXPECT_CALL(
         aggregator,
-        handleSamples(ElementsAre(
-            FieldsAre(tags[0], data_len,
-                      ArrayPointee(data_len, ElementsAreArray(reading[0])),
-                      true),
-            FieldsAre(tags[1], data_len,
-                      ArrayPointee(data_len, ElementsAreArray(reading[1])),
-                      true))))
+        handleSample(FieldsAre(
+            tags[0], data_len,
+            ArrayPointee(data_len, ElementsAreArray(reading[0])), true)))
+        .Times(1);
+    EXPECT_CALL(
+        aggregator,
+        handleSample(FieldsAre(
+            tags[1], data_len,
+            ArrayPointee(data_len, ElementsAreArray(reading[1])), true)))
         .Times(1);
 
     // Invoke expected method

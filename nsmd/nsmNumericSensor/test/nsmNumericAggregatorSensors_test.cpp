@@ -71,8 +71,8 @@ TEST(nsmTempSensorAggregator, GoodHandleSampleData)
 
     EXPECT_CALL(*sensor, updateReading(DoubleNear(reading, 0.01), 0)).Times(1);
 
-    aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), sample.data(), true}});
+    aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), sample.data(), true});
 }
 
 TEST(nsmTempSensorAggregator, BadHandleSampleData)
@@ -87,12 +87,12 @@ TEST(nsmTempSensorAggregator, BadHandleSampleData)
                                                         &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size - 1), sample.data(), true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -141,11 +141,11 @@ TEST(nsmPowerSensorAggregator, GoodHandleSampleData)
         reading, reading_sample.data(), &reading_datasize);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    aggregator.handleSamples(
-        {{aggregator.TIMESTAMP, static_cast<uint8_t>(timestamp_datasize),
-          timestamp_sample.data(), true},
-         {1, static_cast<uint8_t>(reading_datasize), reading_sample.data(),
-          true}});
+    aggregator.handleSample({aggregator.TIMESTAMP,
+                             static_cast<uint8_t>(timestamp_datasize),
+                             timestamp_sample.data(), true});
+    aggregator.handleSample({1, static_cast<uint8_t>(reading_datasize),
+                             reading_sample.data(), true});
 }
 
 TEST(nsmPowerSensorAggregator, BadHandleSampleData)
@@ -161,13 +161,12 @@ TEST(nsmPowerSensorAggregator, BadHandleSampleData)
         reading, reading_sample.data(), &reading_datasize);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(reading_datasize), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(reading_datasize), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(reading_datasize - 1), reading_sample.data(),
-          true}});
+    rc = aggregator.handleSample({1, static_cast<uint8_t>(reading_datasize - 1),
+                                  reading_sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -216,11 +215,11 @@ TEST(nsmPeakPowerSensorAggregator, GoodHandleSampleData)
         reading, reading_sample.data(), &reading_datasize);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    aggregator.handleSamples(
-        {{aggregator.TIMESTAMP, static_cast<uint8_t>(timestamp_datasize),
-          timestamp_sample.data(), true},
-         {1, static_cast<uint8_t>(reading_datasize), reading_sample.data(),
-          true}});
+    aggregator.handleSample({aggregator.TIMESTAMP,
+                             static_cast<uint8_t>(timestamp_datasize),
+                             timestamp_sample.data(), true});
+    aggregator.handleSample({1, static_cast<uint8_t>(reading_datasize),
+                             reading_sample.data(), true});
 }
 
 TEST(nsmPeakPowerSensorAggregator, BadHandleSampleData)
@@ -236,13 +235,12 @@ TEST(nsmPeakPowerSensorAggregator, BadHandleSampleData)
         reading, reading_sample.data(), &reading_datasize);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(reading_datasize), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(reading_datasize), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(reading_datasize - 1), reading_sample.data(),
-          true}});
+    rc = aggregator.handleSample({1, static_cast<uint8_t>(reading_datasize - 1),
+                                  reading_sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -284,8 +282,8 @@ TEST(nsmEnergySensorAggregator, GoodHandleSampleData)
 
     EXPECT_CALL(*sensor, updateReading(readingInJoules, 0)).Times(1);
 
-    aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), sample.data(), true}});
+    aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), sample.data(), true});
 }
 
 TEST(nsmEnergySensorAggregator, BadHandleSampleData)
@@ -301,12 +299,12 @@ TEST(nsmEnergySensorAggregator, BadHandleSampleData)
                                                  &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size - 1), sample.data(), true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -345,8 +343,8 @@ TEST(nsmVoltageSensorAggregator, GoodHandleSampleData)
 
     EXPECT_CALL(*sensor, updateReading(reading / 1'000'000.0, 0)).Times(1);
 
-    aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), sample.data(), true}});
+    aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), sample.data(), true});
 }
 
 TEST(nsmVoltageSensorAggregator, BadHandleSampleData)
@@ -361,12 +359,12 @@ TEST(nsmVoltageSensorAggregator, BadHandleSampleData)
     auto rc = encode_aggregate_voltage_data(reading, sample.data(), &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size - 1), sample.data(), true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
@@ -407,8 +405,8 @@ TEST(nsmThresholdAggregator, GoodHandleSampleData)
 
     EXPECT_CALL(*sensor, updateReading(reading, 0)).Times(1);
 
-    aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), sample.data(), true}});
+    aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), sample.data(), true});
 }
 
 TEST(nsmThresholdAggregator, BadHandleSampleData)
@@ -424,11 +422,11 @@ TEST(nsmThresholdAggregator, BadHandleSampleData)
                                                       &data_size);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size), nullptr, true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size), nullptr, true});
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-    rc = aggregator.handleSamples(
-        {{1, static_cast<uint8_t>(data_size - 1), sample.data(), true}});
+    rc = aggregator.handleSample(
+        {1, static_cast<uint8_t>(data_size - 1), sample.data(), true});
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

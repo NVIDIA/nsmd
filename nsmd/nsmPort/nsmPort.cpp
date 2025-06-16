@@ -1183,42 +1183,45 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int EthPortTelemetryAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+int EthPortTelemetryAggregator::handleSample(const TelemetrySample& sample)
 {
     bool result = NSM_SW_SUCCESS;
+    if (!sample.valid ||
+        sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        return result;
 
-    for (const auto& sample : samples)
+    nsm_ethernet_port_counter_data counterValue = {};
+    size_t dataLen = sample.data_len;
+
+    int rc = decode_aggregate_eth_port_telemetry_data(
+        sample.data, &dataLen, sample.tag, &counterValue);
+
+    if (rc != NSM_SW_SUCCESS)
     {
-        if (!sample.valid)
-        {
-            continue;
-        }
-
-        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
-        {
-            continue;
-        }
-
-        nsm_ethernet_port_counter_data counterValue = {};
-        size_t dataLen = sample.data_len;
-
-        int rc = decode_aggregate_eth_port_telemetry_data(
-            sample.data, &dataLen, sample.tag, &counterValue);
-
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::debug(
-                "Failed to decode Ethernet port telemetry data for tag {TAG} : rc = {RC}",
-                "TAG", sample.tag, "RC", rc);
-            result = false;
-            continue;
-        }
-
-        updateCounterValues(sample.tag, &counterValue);
+        lg2::debug(
+            "Failed to decode Ethernet port telemetry data for tag {TAG} : rc = {RC}",
+            "TAG", sample.tag, "RC", rc);
+        result = false;
+        return result;
     }
 
-    updateMetricOnSharedMemory();
+    updateCounterValues(sample.tag, &counterValue);
+#ifdef NVIDIA_SHMEM
+    std::vector<uint8_t> smbusData = {};
+    std::string ifaceName = std::string(ethPortIntf->interface);
+    std::string propName = "";
+    auto it = tagToPropertyMap.find(sample.tag);
+    if (it != tagToPropertyMap.end())
+    {
+        propName = it->second;
+        getInterfaceName(propName, ifaceName);
+        nv::sensor_aggregation::DbusVariantType dbusValue{
+            counterValue.ethernet_port_counter_data_64bit};
+        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            objPath, ifaceName, propName, smbusData, dbusValue);
+    }
+
+#endif
 
     return result;
 }
@@ -1307,134 +1310,41 @@ void EthPortTelemetryAggregator::updateCounterValues(
     }
 }
 
-void EthPortTelemetryAggregator::getCounterValue(
-    const std::string propName, nsm_ethernet_port_counter_data& value,
-    std::string& ifaceName)
+void EthPortTelemetryAggregator::getInterfaceName(const std::string propName,
+                                                  std::string& ifaceName)
 {
     if (propName == "RXBytes")
     {
-        value.ethernet_port_counter_data_64bit = portMetricsOem2Intf->rxBytes();
         ifaceName = std::string(portMetricsOem2Intf->interface);
     }
     else if (propName == "TXBytes")
     {
-        value.ethernet_port_counter_data_64bit = portMetricsOem2Intf->txBytes();
         ifaceName = std::string(portMetricsOem2Intf->interface);
     }
     else if (propName == "RXUnicastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->rxUnicastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
     else if (propName == "RXMulticastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->rxMulticastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
     else if (propName == "RXBroadcastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->rxBroadcastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
     else if (propName == "TXUnicastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->txUnicastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
     else if (propName == "TXMulticastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->txMulticastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
     else if (propName == "TXBroadcastPkts")
     {
-        value.ethernet_port_counter_data_64bit =
-            portPacketCountersIntf->txBroadcastPkts();
         ifaceName = std::string(portPacketCountersIntf->interface);
     }
-    else if (propName == "RXFCSErrors")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->rxfcsErrors();
-    }
-    else if (propName == "RXAlignmentErrors")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->rxAlignmentErrors();
-    }
-    else if (propName == "RXFalseCarrierDetections")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->rxFalseCarrierDetections();
-    }
-    else if (propName == "RXRuntPkts")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->rxRuntPkts();
-    }
-    else if (propName == "RXJabberPkts")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->rxJabberPkts();
-    }
-    else if (propName == "RXXONFrames")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->rxxonFrames();
-    }
-    else if (propName == "RXXOFFFrames")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->rxxoffFrames();
-    }
-    else if (propName == "TXXONFrames")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->txxonFrames();
-    }
-    else if (propName == "TXXOFFFrames")
-    {
-        value.ethernet_port_counter_data_32bit = ethPortIntf->txxoffFrames();
-    }
-    else if (propName == "TXSingleCollisionFrames")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->txSingleCollisionFrames();
-    }
-    else if (propName == "TXMultipleCollisionFrames")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->txMultipleCollisionFrames();
-    }
-    else if (propName == "TXLateCollisionFrames")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->txLateCollisionFrames();
-    }
-    else if (propName == "TXExcessCollisionFrames")
-    {
-        value.ethernet_port_counter_data_32bit =
-            ethPortIntf->txExcessCollisionFrames();
-    }
-}
-
-void EthPortTelemetryAggregator::updateMetricOnSharedMemory()
-{
-#ifdef NVIDIA_SHMEM
-    std::vector<uint8_t> smbusData = {};
-
-    for (const auto& [tag, propName] : tagToPropertyMap)
-    {
-        nsm_ethernet_port_counter_data value = {};
-        std::string ifaceName = std::string(ethPortIntf->interface);
-
-        getCounterValue(propName, value, ifaceName);
-
-        nv::sensor_aggregation::DbusVariantType dbusValue{
-            value.ethernet_port_counter_data_64bit};
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            objPath, ifaceName, propName, smbusData, dbusValue);
-    }
-#endif
 }
 
 NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
@@ -1442,7 +1352,7 @@ NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
     const std::string& objPath, const std::string& nodeGuidObjPath,
     const std::string& ethernetMacAddressObjPath,
     const std::string& permanentMacAddressObjPath, uint16_t portNumber) :
-    NsmSensorAggregator(name, type), portNumber(portNumber)
+    NsmSensor(name, type), portNumber(portNumber)
 {
     linkTypeIntf = std::make_unique<LinkTypeIntf>(bus, objPath.c_str());
     portGuidIntf = std::make_unique<GuidIntf>(bus, objPath.c_str());
@@ -1451,6 +1361,7 @@ NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
         bus, ethernetMacAddressObjPath.c_str());
     permanentMacAddressIntf = std::make_unique<MACAddressIntf>(
         bus, permanentMacAddressObjPath.c_str());
+    samples.reserve(256);
 }
 
 std::optional<std::vector<uint8_t>>
@@ -1470,10 +1381,75 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmNetworkAddressAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+uint8_t
+    NsmNetworkAddressAggregator::handleResponseMsg(const nsm_msg* responseMsg,
+                                                   size_t responseLen)
 {
-    getLinkType(samples, linkType);
+    uint8_t returnValue = NSM_SW_SUCCESS;
+    uint8_t cc = NSM_SUCCESS;
+    size_t consumedLen{};
+    auto responseData = reinterpret_cast<const uint8_t*>(responseMsg);
+
+    uint16_t telemetryCount{};
+
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &telemetryCount);
+
+    if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
+    {
+        LG2_ERROR("decode_aggregate_resp | cc: {CC}, rc: {RC}", "CC", cc, "RC",
+                  rc);
+    }
+
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    responseData += consumedLen;
+    responseLen -= consumedLen;
+    samples.clear();
+    while (telemetryCount--)
+    {
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t dataLen;
+
+        auto sampleData =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(responseData);
+
+        rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
+                                          &tag, &valid, &data, &dataLen);
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "responseHandler: decode_aggregate_resp_sample failed. "
+                "Type={TYPE}, Tag={TAG}, sensor={NAME}, rc={RC}, valid_bit={VALID}",
+                "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
+                "VALID", valid);
+            continue;
+        }
+        if (tag == NSM_TAG_LINK_TYPE)
+        {
+            switch (data[0])
+            {
+                case NSM_PORT_PROTOCOL_ETHERNET:
+                    linkType = NSM_PORT_PROTOCOL_ETHERNET;
+                    break;
+                case NSM_PORT_PROTOCOL_INFINIBAND:
+                    linkType = NSM_PORT_PROTOCOL_INFINIBAND;
+                    break;
+                default:
+                    break;
+            }
+            continue;
+        }
+        samples.emplace_back(tag, dataLen, data, valid);
+    }
     if (linkType == NSM_PORT_PROTOCOL_UNKNOWN)
     {
         lg2::debug("Failed to get link type for port number {PNUM}", "PNUM",
@@ -1492,13 +1468,14 @@ int NsmNetworkAddressAggregator::handleSamples(
         }
 
         network_address_sample_data data;
-        auto rc = decode_aggregate_network_address_data(sample.tag, sample.data,
-                                                        sample.data_len, &data);
-        if (rc != NSM_SUCCESS)
+        auto decodeRc = decode_aggregate_network_address_data(
+            sample.tag, sample.data, sample.data_len, &data);
+        if (decodeRc != NSM_SUCCESS)
         {
             lg2::error("Failed to decode network address sample data: {RC}",
-                       "RC", rc);
-            return rc;
+                       "RC", decodeRc);
+            returnValue = decodeRc;
+            continue;
         }
 
         if (linkType == NSM_PORT_PROTOCOL_ETHERNET)
@@ -1552,36 +1529,13 @@ int NsmNetworkAddressAggregator::handleSamples(
             lg2::error("Invalid Port link type: {LT}", "LT", linkType);
         }
     }
-    return NSM_SUCCESS;
-}
-
-void NsmNetworkAddressAggregator::getLinkType(
-    const std::vector<TelemetrySample>& samples, int8_t& linkType)
-{
-    for (const auto& sample : samples)
-    {
-        if (sample.tag == NSM_TAG_LINK_TYPE)
-        {
-            switch (sample.data[0])
-            {
-                case NSM_PORT_PROTOCOL_ETHERNET:
-                    linkType = NSM_PORT_PROTOCOL_ETHERNET;
-                    break;
-                case NSM_PORT_PROTOCOL_INFINIBAND:
-                    linkType = NSM_PORT_PROTOCOL_INFINIBAND;
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
+    return returnValue;
 }
 
 NsmGetPortECCCounters::NsmGetPortECCCounters(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const std::string& inventoryObjPath, uint8_t portNumber) :
-    NsmSensorAggregator(name, type), objPath(inventoryObjPath),
-    portNumber(portNumber)
+    NsmSensor(name, type), objPath(inventoryObjPath), portNumber(portNumber)
 {
     portECCIntf = std::make_unique<PortECCIntf>(bus, objPath.c_str());
 #ifdef NVIDIA_SHMEM
@@ -1606,58 +1560,101 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmGetPortECCCounters::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+uint8_t NsmGetPortECCCounters::handleResponseMsg(const nsm_msg* responseMsg,
+                                                 size_t responseLen)
 {
+    uint8_t returnValue = NSM_SW_SUCCESS;
+    uint8_t cc = NSM_SUCCESS;
+    size_t consumedLen{};
+    auto responseData = reinterpret_cast<const uint8_t*>(responseMsg);
+
+    uint16_t telemetryCount{};
+
+    auto rc = decode_aggregate_resp(responseMsg, responseLen, &consumedLen, &cc,
+                                    &telemetryCount);
+
+    if (shouldLog("decode_aggregate_resp", uint16_t(0), cc, rc))
+    {
+        LG2_ERROR("decode_aggregate_resp | cc: {CC}, rc: {RC}", "CC", cc, "RC",
+                  rc);
+    }
+
+    if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+    {
+        return cc ? cc : rc;
+    }
+    responseData += consumedLen;
+    responseLen -= consumedLen;
     bool updateRawErrorsPerLane = false;
     std::vector<uint64_t> rawErrorsPerLane(RAW_ERRORS_PER_LANE_COUNT, 0);
-    for (const auto& sample : samples)
+    while (telemetryCount--)
     {
-        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
-        {
-            continue;
-        }
-        if (!sample.valid)
-        {
-            continue;
-        }
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t dataLen;
 
-        uint64_t data;
-        auto rc = decode_aggregate_port_ecc_counter_data(
-            sample.tag, sample.data, sample.data_len, &data);
-        if (rc != NSM_SUCCESS)
+        auto sampleData =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(responseData);
+
+        rc = decode_aggregate_resp_sample(sampleData, responseLen, &consumedLen,
+                                          &tag, &valid, &data, &dataLen);
+
+        responseData += consumedLen;
+        responseLen -= consumedLen;
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "responseHandler: decode_aggregate_resp_sample failed. "
+                "Type={TYPE}, Tag={TAG}, sensor={NAME}, rc={RC}, valid_bit={VALID}",
+                "TYPE", getType(), "TAG", tag, "NAME", getName(), "RC", rc,
+                "VALID", valid);
+            returnValue = rc;
+            continue;
+        }
+        if (!valid || tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            continue;
+        }
+        uint64_t counterData;
+        auto decodeRc = decode_aggregate_port_ecc_counter_data(
+            tag, data, dataLen, &counterData);
+        if (decodeRc != NSM_SUCCESS)
         {
             lg2::debug("Failed to decode port ecc counters sample data: {RC}",
-                       "RC", rc);
-            return rc;
+                       "RC", decodeRc);
+            returnValue = decodeRc;
         }
-
-        switch (sample.tag)
+        else
         {
-            case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
-                portECCIntf->symbolErrorRXBytes(data);
-                break;
-            case NSM_TAG_ECC_CORRECTED_BITS:
-                portECCIntf->correctedBits(data);
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
-                updateRawErrorsPerLane = true;
-                rawErrorsPerLane[0] += data;
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
-                updateRawErrorsPerLane = true;
-                rawErrorsPerLane[1] += data;
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
-                updateRawErrorsPerLane = true;
-                rawErrorsPerLane[2] += data;
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
-                updateRawErrorsPerLane = true;
-                rawErrorsPerLane[3] += data;
-                break;
-            default:
-                break;
+            switch (tag)
+            {
+                case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+                    portECCIntf->symbolErrorRXBytes(counterData);
+                    break;
+                case NSM_TAG_ECC_CORRECTED_BITS:
+                    portECCIntf->correctedBits(counterData);
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+                    updateRawErrorsPerLane = true;
+                    rawErrorsPerLane[0] += counterData;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+                    updateRawErrorsPerLane = true;
+                    rawErrorsPerLane[1] += counterData;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+                    updateRawErrorsPerLane = true;
+                    rawErrorsPerLane[2] += counterData;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
+                    updateRawErrorsPerLane = true;
+                    rawErrorsPerLane[3] += counterData;
+                    break;
+                default:
+                    break;
+            }
         }
     }
     if (updateRawErrorsPerLane)
@@ -1666,7 +1663,7 @@ int NsmGetPortECCCounters::handleSamples(
     }
 
     updateMetricOnSharedMemory();
-    return NSM_SUCCESS;
+    return returnValue;
 }
 
 void NsmGetPortECCCounters::updateMetricOnSharedMemory()

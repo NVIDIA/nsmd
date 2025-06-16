@@ -53,52 +53,48 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmPeakPowerAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+int NsmPeakPowerAggregator::handleSample(const TelemetrySample& sample)
 {
     uint32_t reading{};
     uint8_t returnValue = NSM_SW_SUCCESS;
 
-    for (const auto& sample : samples)
+    if (!sample.valid)
     {
-        if (!sample.valid)
+        updateSensorNotWorking(sample.tag, sample.valid);
+        return returnValue;
+    }
+
+    if (sample.tag == TIMESTAMP)
+    {
+        auto rc = decode_aggregate_timestamp_data(sample.data, sample.data_len,
+                                                  &timestamp);
+
+        if (rc != NSM_SW_SUCCESS)
         {
+            lg2::error("decode_aggregate_timestamp_data failed. rc={RC}.", "RC",
+                       rc);
+            returnValue = rc;
+        }
+    }
+    else if (sample.tag <= NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+    {
+        auto rc = decode_aggregate_get_current_power_draw_reading(
+            sample.data, sample.data_len, &reading);
+
+        if (rc == NSM_SW_SUCCESS)
+        {
+            // unit of power is milliwatt in NSM Command Response and
+            // selected unit in SensorValue PDI is Watts. Hence it is
+            // converted to Watts.
+            updateSensorReading(sample.tag, reading / 1000.0, timestamp);
+        }
+        else
+        {
+            lg2::error(
+                "decode_aggregate_get_current_power_draw_reading failed. rc={RC}.",
+                "RC", rc);
+            returnValue = rc;
             updateSensorNotWorking(sample.tag, sample.valid);
-            continue;
-        }
-
-        if (sample.tag == TIMESTAMP)
-        {
-            auto rc = decode_aggregate_timestamp_data(
-                sample.data, sample.data_len, &timestamp);
-
-            if (rc != NSM_SW_SUCCESS)
-            {
-                lg2::error("decode_aggregate_timestamp_data failed. rc={RC}.",
-                           "RC", rc);
-                returnValue = rc;
-            }
-        }
-        else if (sample.tag <= NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
-        {
-            auto rc = decode_aggregate_get_current_power_draw_reading(
-                sample.data, sample.data_len, &reading);
-
-            if (rc == NSM_SW_SUCCESS)
-            {
-                // unit of power is milliwatt in NSM Command Response and
-                // selected unit in SensorValue PDI is Watts. Hence it is
-                // converted to Watts.
-                updateSensorReading(sample.tag, reading / 1000.0, timestamp);
-            }
-            else
-            {
-                lg2::error(
-                    "decode_aggregate_get_current_power_draw_reading failed. rc={RC}.",
-                    "RC", rc);
-                returnValue = rc;
-                updateSensorNotWorking(sample.tag, sample.valid);
-            }
         }
     }
 

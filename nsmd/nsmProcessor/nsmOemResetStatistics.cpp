@@ -74,80 +74,76 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int ResetStatisticsAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+int ResetStatisticsAggregator::handleSample(const TelemetrySample& sample)
 {
     uint8_t returnValue = NSM_SW_SUCCESS;
 
-    for (const auto& sample : samples)
+    // Ensure tag is within valid range
+    if (sample.tag >
+        static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE))
     {
-        // Ensure tag is within valid range
-        if (sample.tag >
-            static_cast<uint8_t>(NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE))
+        // No need to handle special tags like timestamp and uuid for now
+        return returnValue;
+    }
+
+    // Map tag to corresponding property
+    auto it = tagToPropertyMap.find(sample.tag);
+    if (it == tagToPropertyMap.end())
+    {
+        lg2::debug("Unknown tag {TAG} in reset statistics response.", "TAG",
+                   sample.tag);
+        return returnValue;
+    }
+
+    const auto& property = it->second;
+
+    // Handle LastResetType (enum8) differently
+    if (property == "LastResetType")
+    {
+        uint8_t resetType;
+        if (decode_reset_enum_data(sample.data, sample.data_len, &resetType) !=
+            NSM_SW_SUCCESS)
         {
-            // No need to handle special tags like timestamp and uuid for now
-            continue;
+            lg2::error(
+                "Failed to decode LastResetType. Tag={TAG}, Data length={LEN}",
+                "TAG", sample.tag, "LEN", sample.data_len);
+            returnValue = NSM_SW_ERROR_LENGTH;
+            return returnValue;
         }
 
-        // Map tag to corresponding property
-        auto it = tagToPropertyMap.find(sample.tag);
-        if (it == tagToPropertyMap.end())
+        // Update property with enum8 value
+        updateProperty(property, resetType);
+    }
+    else if (property == "BootReason")
+    {
+        std::array<uint64_t, 4> counterVal;
+        if (decode_reset_count_256data(sample.data, sample.data_len,
+                                       counterVal.data(),
+                                       counterVal.size()) != NSM_SW_SUCCESS)
         {
-            lg2::debug("Unknown tag {TAG} in reset statistics response.", "TAG",
-                       sample.tag);
-            continue;
+            lg2::error(
+                "Failed to decode ResetCount 256 data. Tag={TAG}, Data length={LEN}",
+                "TAG", sample.tag, "LEN", sample.data_len);
+            returnValue = NSM_SW_ERROR_LENGTH;
+            return returnValue;
         }
-
-        const auto& property = it->second;
-
-        // Handle LastResetType (enum8) differently
-        if (property == "LastResetType")
+        // Update property with array of uint64 value
+        updateBootReasonProperty(property, counterVal);
+    }
+    else
+    {
+        uint16_t count;
+        if (decode_reset_count_data(sample.data, sample.data_len, &count) !=
+            NSM_SW_SUCCESS)
         {
-            uint8_t resetType;
-            if (decode_reset_enum_data(sample.data, sample.data_len,
-                                       &resetType) != NSM_SW_SUCCESS)
-            {
-                lg2::error(
-                    "Failed to decode LastResetType. Tag={TAG}, Data length={LEN}",
-                    "TAG", sample.tag, "LEN", sample.data_len);
-                returnValue = NSM_SW_ERROR_LENGTH;
-                continue;
-            }
-
-            // Update property with enum8 value
-            updateProperty(property, resetType);
+            lg2::error(
+                "Failed to decode ResetCount. Tag={TAG}, Data length={LEN}",
+                "TAG", sample.tag, "LEN", sample.data_len);
+            returnValue = NSM_SW_ERROR_LENGTH;
+            return returnValue;
         }
-        else if (property == "BootReason")
-        {
-            std::array<uint64_t, 4> counterVal;
-            if (decode_reset_count_256data(sample.data, sample.data_len,
-                                           counterVal.data(),
-                                           counterVal.size()) != NSM_SW_SUCCESS)
-            {
-                lg2::error(
-                    "Failed to decode ResetCount 256 data. Tag={TAG}, Data length={LEN}",
-                    "TAG", sample.tag, "LEN", sample.data_len);
-                returnValue = NSM_SW_ERROR_LENGTH;
-                continue;
-            }
-            // Update property with array of uint64 value
-            updateBootReasonProperty(property, counterVal);
-        }
-        else
-        {
-            uint16_t count;
-            if (decode_reset_count_data(sample.data, sample.data_len, &count) !=
-                NSM_SW_SUCCESS)
-            {
-                lg2::error(
-                    "Failed to decode ResetCount. Tag={TAG}, Data length={LEN}",
-                    "TAG", sample.tag, "LEN", sample.data_len);
-                returnValue = NSM_SW_ERROR_LENGTH;
-                continue;
-            }
-            // Update property with uint16 value
-            updateProperty(property, count);
-        }
+        // Update property with uint16 value
+        updateProperty(property, count);
     }
 
     return returnValue;

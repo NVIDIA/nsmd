@@ -168,18 +168,13 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
     virtual std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
-    virtual int
-        handleSamples(const std::vector<TelemetrySample>& samples) override;
-
-    void updateMetricOnSharedMemory() override;
+    int handleSample(const TelemetrySample& sample) override;
     std::string portName;
 
   private:
     void updateCounterValues(uint8_t tag,
                              nsm_ethernet_port_counter_data* counterValue);
-    void getCounterValue(const std::string propName,
-                         nsm_ethernet_port_counter_data& value,
-                         std::string& ifaceName);
+    void getInterfaceName(const std::string propName, std::string& ifaceName);
 
     uint16_t portNumber;
     std::string objPath;
@@ -189,7 +184,7 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
     std::unordered_map<uint8_t, std::string> tagToPropertyMap;
 };
 
-class NsmNetworkAddressAggregator : public NsmSensorAggregator
+class NsmNetworkAddressAggregator : public NsmSensor
 {
   public:
     NsmNetworkAddressAggregator(sdbusplus::bus::bus& bus,
@@ -200,13 +195,11 @@ class NsmNetworkAddressAggregator : public NsmSensorAggregator
                                 const std::string& ethernetMacAddressObjPath,
                                 const std::string& permanentMacAddressObjPath,
                                 uint16_t portNumber);
-    NsmNetworkAddressAggregator() = default;
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
-    void getLinkType(const std::vector<TelemetrySample>& samples,
-                     int8_t& linkType);
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) final;
 
   private:
     uint16_t portNumber;
@@ -216,9 +209,10 @@ class NsmNetworkAddressAggregator : public NsmSensorAggregator
     std::unique_ptr<MACAddressIntf> permanentMacAddressIntf = nullptr;
     std::unique_ptr<GuidIntf> portGuidIntf = nullptr;
     std::unique_ptr<GuidIntf> nodeGuidIntf = nullptr;
+    std::vector<NsmSensorAggregator::TelemetrySample> samples;
 };
 
-class NsmGetPortECCCounters : public NsmSensorAggregator
+class NsmGetPortECCCounters : public NsmSensor
 {
   public:
     NsmGetPortECCCounters(sdbusplus::bus::bus& bus, const std::string& name,
@@ -228,7 +222,8 @@ class NsmGetPortECCCounters : public NsmSensorAggregator
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) final;
     void updateMetricOnSharedMemory() override;
 
   private:

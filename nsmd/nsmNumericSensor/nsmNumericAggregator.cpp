@@ -113,14 +113,10 @@ requester::Coroutine
                                            responseMsg, responseLen, false);
     if (rc)
     {
-        // we are relying on samples in NsmSensorAggregator to
-        // be preserved across invocations of
-        // NsmSensor::update for this to work.
-        for (const auto& sample : samples)
+        for (const auto& tag : sampleTags)
         {
-            updateSensorNotWorking(sample.tag, false);
+            updateSensorNotWorking(tag, false);
         }
-
         co_return rc;
     }
 

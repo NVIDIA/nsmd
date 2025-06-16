@@ -60,7 +60,7 @@ class NsmSensorAggregator : public NsmSensor
      *  @param[in] data_len - number of bytes in data of telemetry sample
      *  @return nsm_completion_codes
      */
-    virtual int handleSamples(const std::vector<TelemetrySample>& samples) = 0;
+    virtual int handleSample(const TelemetrySample& sample) = 0;
 
   protected:
     enum SpecialTag : uint8_t
@@ -68,9 +68,6 @@ class NsmSensorAggregator : public NsmSensor
         UUID = 0xFE,
         TIMESTAMP = 0xFF
     };
-
-    // we are relying on samples in NsmSensorAggregator to be preserved across
-    // invocations of NsmSensor::update
-    std::vector<TelemetrySample> samples;
+    std::vector<uint8_t> sampleTags;
 };
 } // namespace nsm

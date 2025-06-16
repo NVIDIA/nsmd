@@ -51,42 +51,37 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmVoltageAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+int NsmVoltageAggregator::handleSample(const TelemetrySample& sample)
 {
     uint32_t reading{};
     uint8_t returnValue = NSM_SW_SUCCESS;
 
-    for (const auto& sample : samples)
+    if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
     {
-        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
-        {
-            continue;
-        }
+        return returnValue;
+    }
 
-        if (!sample.valid)
-        {
-            updateSensorNotWorking(sample.tag, sample.valid);
-            continue;
-        }
+    if (!sample.valid)
+    {
+        updateSensorNotWorking(sample.tag, sample.valid);
+        return returnValue;
+    }
 
-        auto rc = decode_aggregate_voltage_data(sample.data, sample.data_len,
-                                                &reading);
+    auto rc = decode_aggregate_voltage_data(sample.data, sample.data_len,
+                                            &reading);
 
-        if (rc == NSM_SW_SUCCESS)
-        {
-            // unit of voltage is microvolts in NSM Command Response and
-            // selected unit in SensorValue PDI is Volts. Hence it is converted
-            // to Volts.
-            updateSensorReading(sample.tag, reading / 1'000'000.0);
-        }
-        else
-        {
-            lg2::debug("decode_aggregate_voltage_data failed. rc={RC}.", "RC",
-                       rc);
-            returnValue = rc;
-            updateSensorNotWorking(sample.tag, sample.valid);
-        }
+    if (rc == NSM_SW_SUCCESS)
+    {
+        // unit of voltage is microvolts in NSM Command Response and
+        // selected unit in SensorValue PDI is Volts. Hence it is converted
+        // to Volts.
+        updateSensorReading(sample.tag, reading / 1'000'000.0);
+    }
+    else
+    {
+        lg2::debug("decode_aggregate_voltage_data failed. rc={RC}.", "RC", rc);
+        returnValue = rc;
+        updateSensorNotWorking(sample.tag, sample.valid);
     }
 
     return returnValue;

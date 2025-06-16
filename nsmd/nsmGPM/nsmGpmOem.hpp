@@ -19,6 +19,7 @@
 
 #include <com/nvidia/GPMMetrics/server.hpp>
 #include <com/nvidia/NVLink/NVLinkMetrics/server.hpp>
+#include <nsmSensor.hpp>
 #include <nsmSensorAggregator.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
 
@@ -132,7 +133,7 @@ class NsmGPMAggregated : public NsmSensorAggregator
     }
 
   private:
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    int handleSample(const TelemetrySample& sample) override;
 
   private:
     const uint8_t retrievalSource;
@@ -148,7 +149,7 @@ class NsmGPMAggregated : public NsmSensorAggregator
         metricsTable{};
 };
 
-class NsmGPMPerInstance : public NsmSensorAggregator
+class NsmGPMPerInstance : public NsmSensor
 {
   public:
     NsmGPMPerInstance(const std::string& name, const std::string& type,
@@ -159,9 +160,8 @@ class NsmGPMPerInstance : public NsmSensorAggregator
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
-
-  private:
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
+                              size_t responseLen) override;
 
   private:
     std::vector<double> metrics;

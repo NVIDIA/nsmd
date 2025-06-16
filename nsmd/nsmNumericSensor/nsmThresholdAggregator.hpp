@@ -30,7 +30,7 @@ class NsmThresholdAggregator : public NsmNumericAggregator
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
   private:
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    int handleSample(const TelemetrySample& sample) override;
 
     static constexpr uint8_t sensorId = 255;
 };

@@ -63,7 +63,7 @@ class ResetStatisticsAggregator : public NsmSensorAggregator
 
   private:
     /** @brief Handles telemetry samples in the response message */
-    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    int handleSample(const TelemetrySample& sample) override;
 
     /** @brief Updates a D-Bus property with the provided value */
     void updateProperty(const std::string& property, uint64_t value);

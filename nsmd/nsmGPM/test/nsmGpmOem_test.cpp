@@ -17,6 +17,8 @@
 
 #include "platform-environmental.h"
 
+#include <cmath>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -137,14 +139,15 @@ TEST(nsmGPMAggregated, GoodHandleResp)
                                                  bandwidth / conversionFactor))
         .Times(1);
 
-    rc = gpm.handleSamples({{3, static_cast<uint8_t>(percentage_data_len),
-                             percentage_data.data(), true},
-                            {8, static_cast<uint8_t>(bandwidth_data_len),
-                             bandwidth_data.data(), true}});
+    rc = gpm.handleSample({3, static_cast<uint8_t>(percentage_data_len),
+                           percentage_data.data(), true});
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = gpm.handleSample({8, static_cast<uint8_t>(bandwidth_data_len),
+                           bandwidth_data.data(), true});
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }
 
-TEST(nsmGPMPerIntance, GoodHandleResp)
+TEST(nsmGPMPerIntance, GoodGenReq)
 {
     const uint8_t retrieval_source = 1;
     const uint8_t gpu_instance = 0xFF;
@@ -187,7 +190,7 @@ TEST(nsmGPMPerIntance, GoodHandleResp)
     EXPECT_EQ(instance_bitmask, command->instance_bitmask);
 }
 
-TEST(nsmGPMPerIntance, GoodGenReq)
+TEST(nsmGPMPerIntance, GoodHandleResp)
 {
     const uint8_t retrieval_source = 1;
     const uint8_t gpu_instance = 0xFF;
@@ -232,8 +235,34 @@ TEST(nsmGPMPerIntance, GoodGenReq)
                                       bandwidth[1] / conversionFactor};
     EXPECT_CALL(*updator, updateMetric(metrics)).Times(1);
 
-    rc = gpm.handleSamples(
-        {{2, static_cast<uint8_t>(data_len), data[0].data(), true},
-         {4, static_cast<uint8_t>(data_len), data[1].data(), true}});
+    std::vector<uint8_t> responseBuffer(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp) +
+        2 * (sizeof(nsm_aggregate_resp_sample) - 1 + data_len));
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(responseBuffer.data());
+    responseMsg->hdr.instance_id = 0;
+    responseMsg->hdr.datagram = 0;
+
+    auto payload = reinterpret_cast<nsm_aggregate_resp*>(responseMsg->payload);
+    payload->completion_code = NSM_SUCCESS;
+    payload->telemetry_count = 2;
+
+    auto sample_ptr = reinterpret_cast<uint8_t*>(payload + 1);
+
+    auto sample1 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample1->tag = 2;
+    sample1->valid = 1;
+    sample1->length = std::log2(data_len);
+    memcpy(sample1->data, data[0].data(), data_len);
+
+    sample_ptr += sizeof(nsm_aggregate_resp_sample) - 1 + data_len;
+
+    auto sample2 = reinterpret_cast<nsm_aggregate_resp_sample*>(sample_ptr);
+    sample2->tag = 4;
+    sample2->valid = 1;
+    sample2->length = std::log2(data_len);
+    memcpy(sample2->data, data[1].data(), data_len);
+
+    rc = gpm.handleResponseMsg(responseMsg, responseBuffer.size());
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 }

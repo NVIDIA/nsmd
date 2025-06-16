@@ -52,39 +52,35 @@ std::optional<std::vector<uint8_t>>
     return request;
 }
 
-int NsmEnergyAggregator::handleSamples(
-    const std::vector<TelemetrySample>& samples)
+int NsmEnergyAggregator::handleSample(const TelemetrySample& sample)
 {
     uint64_t reading{};
     uint8_t returnValue = NSM_SW_SUCCESS;
 
-    for (const auto& sample : samples)
+    if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
     {
-        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
-        {
-            continue;
-        }
+        return returnValue;
+    }
 
-        if (!sample.valid)
-        {
-            updateSensorNotWorking(sample.tag, sample.valid);
-            continue;
-        }
+    if (!sample.valid)
+    {
+        updateSensorNotWorking(sample.tag, sample.valid);
+        return returnValue;
+    }
 
-        auto rc = decode_aggregate_energy_count_data(sample.data,
-                                                     sample.data_len, &reading);
-        if (rc == NSM_SW_SUCCESS)
-        {
-            double readingInJoules = static_cast<double>(reading) / 1000.0;
-            updateSensorReading(sample.tag, readingInJoules);
-        }
-        else
-        {
-            lg2::debug("decode_aggregate_energy_count_data failed. rc={RC}.",
-                       "RC", rc);
-            returnValue = rc;
-            updateSensorNotWorking(sample.tag, sample.valid);
-        }
+    auto rc = decode_aggregate_energy_count_data(sample.data, sample.data_len,
+                                                 &reading);
+    if (rc == NSM_SW_SUCCESS)
+    {
+        double readingInJoules = static_cast<double>(reading) / 1000.0;
+        updateSensorReading(sample.tag, readingInJoules);
+    }
+    else
+    {
+        lg2::debug("decode_aggregate_energy_count_data failed. rc={RC}.", "RC",
+                   rc);
+        returnValue = rc;
+        updateSensorNotWorking(sample.tag, sample.valid);
     }
 
     return returnValue;
