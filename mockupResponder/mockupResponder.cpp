@@ -4826,10 +4826,10 @@ std::optional<std::vector<uint8_t>>
     log_info.length = (log_data.size() / 4);
     log_info.entry_suffix = 444;
 
-    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
-                                      sizeof(nsm_device_log_info) +
-                                      log_data.size() + sizeof(nxt_handle),
-                                  0);
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_resp) +
+            log_data.size() + sizeof(nxt_handle),
+        0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
 
     rc = encode_get_network_device_log_info_resp(
