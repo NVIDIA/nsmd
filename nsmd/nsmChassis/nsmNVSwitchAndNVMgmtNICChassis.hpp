@@ -27,6 +27,7 @@
 #include <xyz/openbmc_project/Inventory/Decorator/AssetTag/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>
+#include <xyz/openbmc_project/Inventory/Decorator/Revision/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Chassis/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
@@ -44,6 +45,7 @@ using ItemIntf = object_t<Inventory::server::Item>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 using AssetTagIntf = object_t<Inventory::Decorator::server::AssetTag>;
 using LocationCodeIntf = object_t<Inventory::Decorator::server::LocationCode>;
+using RevisionIntf = object_t<Inventory::Decorator::server::Revision>;
 
 template <typename IntfType>
 class NsmNVSwitchAndNicChassis : public NsmInterfaceProvider<IntfType>

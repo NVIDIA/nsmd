@@ -193,6 +193,15 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
             assetTagIntf, ASSET_TAG);
         device->addStaticSensor(assetTag);
     }
+    else if (type == "NSM_ChassisVersion")
+    {
+        auto revisionObject = NsmNVSwitchAndNicChassis<RevisionIntf>(name,
+                                                                     baseType);
+        auto versionSensor =
+            std::make_shared<NsmInventoryProperty<RevisionIntf>>(
+                revisionObject, INFO_ROM_VERSION);
+        device->addStaticSensor(versionSensor);
+    }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -232,7 +241,8 @@ std::vector<std::string> nvLinkMgmtNicChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Chassis",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Health",
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Location",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.LocationCode"};
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.LocationCode",
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.ChassisVersion"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmNVSwitchChassis,
                                nvSwitchChassisInterfaces)
