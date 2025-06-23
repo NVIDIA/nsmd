@@ -23,6 +23,7 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../nsmSetEgmMode.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]

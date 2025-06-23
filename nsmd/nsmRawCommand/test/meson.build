@@ -20,6 +20,7 @@ dep_src_files = [
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
