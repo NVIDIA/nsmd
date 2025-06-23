@@ -7,6 +7,7 @@ dep_src_files = [
     '../nsmEvent.cpp',
     '../deviceManager.cpp',
     '../nsmEvent/nsmLongRunningEventHandler.cpp',
+    '../nsmCommon/sharedMemCommon.cpp',
     '../nsmFwSwInventory/GPUSWInventory.cpp',
     '../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../libnsm/instance-id.c',
