@@ -44,6 +44,14 @@ using namespace utils;
 namespace MockupResponder
 {
 
+std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable = {
+    {0, 17}, // PCIe_Gen_3_Preset
+    {1, 17}, // PCIe_Gen_4_Preset
+    {2, 17}, // PCIe_Gen_5_Preset
+    {3, 17}, // PCIe_Gen_6_Preset
+    {4, 1}   // PCIe_Tx_Amplitude
+};
+
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
@@ -580,6 +588,10 @@ std::optional<Response>
                                                             requestLen);
                 case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
                     return pcieFundamentalResetHandler(request, requestLen);
+                case NSM_GET_PORT_CONFIGURATION:
+                    return getPciePortConfigHandler(request, requestLen);
+                case NSM_SET_PORT_CONFIGURATION:
+                    return setPciePortConfigHandler(request, requestLen);
                 case NSM_CLEAR_DATA_SOURCE_V1:
                     return clearScalarDataSourceHandler(request, requestLen);
                 case NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES:
@@ -869,6 +881,8 @@ std::optional<std::vector<uint8_t>>
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
                       NSM_LIST_AVAILABLE_PCIE_PORTS,
                       NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2,
+                      NSM_GET_PORT_CONFIGURATION,
+                      NSM_SET_PORT_CONFIGURATION,
                   }},
                  {3, {12, 14, 97}},
                  {4,
@@ -5220,6 +5234,190 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_erase_debug_info_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPciePortConfigHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPciePortConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t port_number;
+    uint8_t port_type;
+    uint8_t port_index;
+
+    auto rc = decode_get_pcie_port_config_req(
+        requestMsg, requestLen, &port_number, &port_type, &port_index);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_pcie_port_config_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock reset metric data
+    for (const auto& [tag, mockValue] : pciePortConfigMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        if (tag <= 3) // PCIe_Gen_Preset tags (0-3)
+        {
+            rc = encode_preset_PCIe_data(static_cast<uint8_t>(mockValue),
+                                         reading, &sample_len);
+        }
+        else if (tag == 4) // PCIe_Tx_Amplitude tag
+        {
+            rc = encode_PCIe_TxAmplitude_data(static_cast<uint8_t>(mockValue),
+                                              reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Unexpected tag value: {TAG}", "TAG", tag);
+            continue;
+        }
+        // Encode the sample into the response
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: rc={RC}", "RC",
+                       rc);
+        }
+        assert(rc == NSM_SW_SUCCESS);
+
+        // Add the sample to the response vector
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    // Finalize the aggregate response
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_port_config_aggregate_resp(
+        requestMsg->hdr.instance_id, NSM_GET_PORT_CONFIGURATION, NSM_SUCCESS,
+        samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setPciePortConfigHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setPciePortConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t port_number;
+    uint8_t port_type;
+    uint8_t port_index;
+    uint16_t sample_count;
+    const uint8_t* sample_data;
+    size_t sample_data_len;
+
+    auto rc = decode_set_port_config_aggregate_req(
+        requestMsg, requestLen, &port_number, &port_type, &port_index,
+        &sample_count, &sample_data, &sample_data_len);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_port_config_aggregate_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    size_t consumed_len{};
+    // Decode sample data and set to mock values
+    while (sample_count--)
+    {
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t data_len;
+
+        sample_data += consumed_len;
+        sample_data_len -= consumed_len;
+        auto sample =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(sample_data);
+
+        rc = decode_aggregate_resp_sample(sample, sample_data_len,
+                                          &consumed_len, &tag, &valid, &data,
+                                          &data_len);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("decode_aggregate_resp_sample failed: rc={RC}", "RC",
+                       rc);
+        }
+        assert(rc == NSM_SW_SUCCESS);
+        if (valid)
+        {
+            if (tag <= 3) // PCIe_Gen_Preset tags (0-3)
+            {
+                uint8_t preset_0 = 0;
+                uint8_t preset_1 = 0;
+                rc = decode_preset_PCIe_data(data, data_len, &preset_0,
+                                             &preset_1);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error("decode_preset_PCIe_data failed: rc={RC}", "RC",
+                               rc);
+                }
+                lg2::info(
+                    "decode_preset_PCIe_data: tag={TAG}, preset_0={PRESET_0}, preset_1={PRESET_1}",
+                    "TAG", tag, "PRESET_0", preset_0, "PRESET_1", preset_1);
+                assert(rc == NSM_SW_SUCCESS);
+                pciePortConfigMockTable[tag] = preset_0 | (preset_1 << 4);
+            }
+            else if (tag == 4) // PCIe_Tx_Amplitude tag
+            {
+                uint8_t tx_amplitude = 0;
+                rc = decode_PCIe_TxAmplitude_data(data, data_len,
+                                                  &tx_amplitude);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error("decode_PCIe_TxAmplitude_data failed: rc={RC}",
+                               "RC", rc);
+                }
+                lg2::info(
+                    "decode_PCIe_TxAmplitude_data: tag={TAG}, tx_amplitude={TX_AMPLITUDE}",
+                    "TAG", tag, "TX_AMPLITUDE", tx_amplitude);
+                assert(rc == NSM_SW_SUCCESS);
+                pciePortConfigMockTable[tag] = tx_amplitude;
+            }
+            else
+            {
+                lg2::error("Unexpected tag value: {TAG}", "TAG", tag);
+                continue;
+            }
+        }
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_port_config_aggregate_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
     return response;
 }
 

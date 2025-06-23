@@ -46,6 +46,8 @@ enum pci_links_command {
 	NSM_CLEAR_DATA_SOURCE_V1 = 0x05,
 	NSM_ASSERT_PCIE_FUNDAMENTAL_RESET = 0x60,
 	NSM_LIST_AVAILABLE_PCIE_PORTS = 0x07,
+	NSM_GET_PORT_CONFIGURATION = 0x08,
+	NSM_SET_PORT_CONFIGURATION = 0x09,
 	NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2 = 0x24,
 };
 
@@ -353,6 +355,189 @@ struct nsm_multiport_query_scalar_group_telemetry_v2_req {
 	struct nsm_common_req hdr;
 	struct nsm_multiport_query_scalar_group_telemetry_v2_req_data data;
 } __attribute__((packed));
+
+/** @struct nsm_get_port_config_aggregate_resp
+ *
+ *  Structure representing NSM aggregator variant response.
+ */
+struct nsm_get_port_config_aggregate_resp {
+	uint8_t command;
+	uint8_t completion_code;
+	uint16_t telemetry_count;
+} __attribute__((packed));
+
+/** @struct nsm_set_port_config_aggregate_req_sample
+ *
+ *  Structure representing NSM telemetry sample of aggregator variant request.
+ */
+struct nsm_set_port_config_aggregate_req_sample {
+	uint8_t tag;
+	uint8_t valid : 1;
+	uint8_t length : 3;
+	uint8_t reserved : 4;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_port_config_aggregate_req
+ *
+ *  Structure representing Set PCIe Port Config aggregate request.
+ */
+struct nsm_set_port_config_aggregate_req {
+	struct nsm_common_req hdr;
+	uint8_t port_number : 7; // number of port
+	uint8_t port_type : 1;	 // 0 - upstream, 1 - downstream
+	uint8_t port_index;	 // index of the port
+	uint16_t sample_count;
+	uint8_t sample_data[1];
+} __attribute__((packed));
+
+/** @struct nsm_get_port_config_req
+ *
+ *  Structure representing Get PCIe Port Config request.
+ */
+struct nsm_get_port_config_req {
+	struct nsm_common_req hdr;
+	uint8_t port_number : 7; // number of port
+	uint8_t port_type : 1;	 // 0 - upstream, 1 - downstream
+	uint8_t port_index;	 // index of the port
+} __attribute__((packed));
+
+/** @brief Encode a Get PCIe Port Config request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - port number
+ *  @param[in] port_type - port type
+ *  @param[in] port_index - port index
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_pcie_port_config_req(uint8_t instance_id, uint8_t port_number,
+				    uint8_t port_type, uint8_t port_index,
+				    struct nsm_msg *msg);
+
+/** @brief Decode a Get PCIe Port Config response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[in] port_number - port number
+ *  @param[in] port_type - port type
+ *  @param[in] port_index - port index
+ *  @return nsm_completion_codes
+ */
+int decode_get_pcie_port_config_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *port_number, uint8_t *port_type,
+				    uint8_t *port_index);
+
+/** @brief Encode a Get PCIe Port Config response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_port_config_aggregate_resp(uint8_t instance_id, uint8_t command,
+					  uint8_t cc, uint16_t telemetry_count,
+					  struct nsm_msg *msg);
+
+/** @brief Encode a preset PCIe data
+ *
+ *  @param[in] preset - preset
+ *  @param[out] data - data
+ *  @param[out] data_len - length of data
+ *  @return nsm_completion_codes
+ */
+int encode_preset_PCIe_data(uint8_t preset, uint8_t *data, size_t *data_len);
+
+/** @brief Decode a preset PCIe data
+ *
+ *  @param[in] data - data
+ *  @param[in] data_len - length of data
+ *  @param[out] preset_0 - preset 0
+ *  @param[out] preset_1 - preset 1
+ *  @return nsm_completion_codes
+ */
+int decode_preset_PCIe_data(const uint8_t *data, size_t data_len,
+			    uint8_t *preset_0, uint8_t *preset_1);
+
+/** @brief Decode a PCIe Tx Amplitude data
+ *
+ *  @param[in] data - data
+ *  @param[in] data_len - length of data
+ *  @param[out] tx_amplitude - tx amplitude
+ *  @return nsm_completion_codes
+ */
+int decode_PCIe_TxAmplitude_data(const uint8_t *data, size_t data_len,
+				 uint8_t *tx_amplitude);
+
+/** @brief Encode a PCIe Tx Amplitude data
+ *
+ *  @param[in] tx_amplitude - tx amplitude
+ *  @param[out] data - data
+ *  @param[out] data_len - length of data
+ *  @return nsm_completion_codes
+ */
+int encode_PCIe_TxAmplitude_data(uint8_t tx_amplitude, uint8_t *data,
+				 size_t *data_len);
+
+/** @brief Encode a Set PCIe Port Config aggregate request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_id - port id
+ *  @param[in] port_type - port type
+ *  @param[in] port_index - port index
+ *  @param[in] sample_count - sample count
+ *  @param[in] sample_data - sample data
+ *  @param[in] sample_data_len - length of sample data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_port_config_aggregate_req(uint8_t instance_id, uint8_t port_id,
+					 uint8_t port_type, uint8_t port_index,
+					 uint16_t sample_count,
+					 const uint8_t *sample_data,
+					 size_t sample_data_len,
+					 struct nsm_msg *msg);
+
+/** @brief Decode a Set PCIe Port Config aggregate request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - port number
+ *  @param[out] port_type - port type
+ *  @param[out] port_index - port index
+ *  @param[out] sample_count - sample count
+ *  @param[out] sample_data - sample data
+ *  @param[out] sample_data_len - length of sample data
+ *  @return nsm_completion_codes
+ */
+int decode_set_port_config_aggregate_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *port_number,
+    uint8_t *port_type, uint8_t *port_index, uint16_t *sample_count,
+    const uint8_t **sample_data, size_t *sample_data_len);
+
+/** @brief Encode a Set PCIe Port Config aggregate response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_port_config_aggregate_resp(uint8_t instance_id, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg);
+
+/** @brief Decode a Set PCIe Port Config aggregate response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - NSM reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_port_config_aggregate_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code);
 
 /** @brief Encode a Query Scalar Group Telemetry v1 request message
  *

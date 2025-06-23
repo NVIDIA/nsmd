@@ -4647,6 +4647,190 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     uint32_t instanceBitfield;
 };
 
+/** @class GetPCIePortConfig
+ *  @brief Command to get PCIe port config.
+ */
+class GetPCIePortConfig : public CommandInterface
+{
+  public:
+    ~GetPCIePortConfig() = default;
+    GetPCIePortConfig() = delete;
+    GetPCIePortConfig(const GetPCIePortConfig&) = delete;
+    GetPCIePortConfig(GetPCIePortConfig&&) = default;
+    GetPCIePortConfig& operator=(const GetPCIePortConfig&) = delete;
+    GetPCIePortConfig& operator=(GetPCIePortConfig&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPCIePortConfig(const char* type, const char* name,
+                               CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-p, --portNumber", portNumber, "Port Number")
+            ->required();
+        app->add_option("-t, --portType", portType, "Port Type")->required();
+        app->add_option("-i, --portIndex", portIndex, "Port Index")->required();
+    }
+
+  private:
+    class GetPCIePortConfigAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        static const std::unordered_map<uint8_t, std::string> tagToPropertyMap;
+
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            auto it = tagToPropertyMap.find(tag);
+            if (it == tagToPropertyMap.end())
+            {
+                // Unknown tag; skip processing
+                return NSM_SW_ERROR_DATA;
+            }
+
+            const std::string& property = it->second;
+
+            // Handle all PCIe preset types
+            if (property.find("PCIe_Gen_") == 0 &&
+                property.find("_Preset") != std::string::npos)
+            {
+                uint8_t preset0, preset1;
+                if (decode_preset_PCIe_data(data, data_len, &preset0,
+                                            &preset1) != NSM_SW_SUCCESS)
+                {
+                    return NSM_SW_ERROR_LENGTH;
+                }
+                sample_json["Tag"] = static_cast<int>(tag);
+                sample_json["Property"] = property;
+                sample_json["Preset0"] = (preset0 & 0x0f);
+                sample_json["Preset1"] = (preset1 & 0x0f);
+            }
+            else if (property == "PCIe_Tx_Amplitude")
+            {
+                // Handle PCIe_Tx_Amplitude (uint16_t)
+                uint8_t txAmplitude;
+                if (decode_PCIe_TxAmplitude_data(
+                        data, data_len, &txAmplitude) != NSM_SW_SUCCESS)
+                {
+                    return NSM_SW_ERROR_LENGTH;
+                }
+                // Include the tag in the JSON
+                sample_json["Tag"] = static_cast<int>(tag);
+                sample_json["Property"] = property;
+                sample_json["TxAmplitude"] = txAmplitude;
+            }
+
+            return NSM_SW_SUCCESS;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_port_config_req));
+        auto requestPtr = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        // Encode the request message
+        auto rc = encode_get_pcie_port_config_req(
+            instanceId, portNumber, portType, portIndex, requestPtr);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPCIePortConfigAggregateResponseParser{}.parseAggregateResponse(
+            responsePtr, payloadLength);
+    }
+
+  private:
+    uint8_t portNumber;
+    uint8_t portType;
+    uint8_t portIndex;
+};
+
+const std::unordered_map<uint8_t, std::string> GetPCIePortConfig::
+    GetPCIePortConfigAggregateResponseParser::tagToPropertyMap = {
+        {0, "PCIe_Gen_3_Preset"},
+        {1, "PCIe_Gen_4_Preset"},
+        {2, "PCIe_Gen_5_Preset"},
+        {3, "PCIe_Gen_6_Preset"},
+        {4, "PCIe_Tx_Amplitude"}};
+
+class SetPCIePortConfig : public CommandInterface
+{
+  public:
+    SetPCIePortConfig() = delete;
+    SetPCIePortConfig(const SetPCIePortConfig&) = delete;
+    SetPCIePortConfig(SetPCIePortConfig&&) = default;
+    SetPCIePortConfig& operator=(const SetPCIePortConfig&) = delete;
+    SetPCIePortConfig& operator=(SetPCIePortConfig&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetPCIePortConfig(const char* type, const char* name,
+                               CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option("-p, --portNumber", portNumber, "Port Number")
+            ->required();
+        app->add_option("-t, --portType", portType, "Port Type")->required();
+        app->add_option("-i, --portIndex", portIndex, "Port Index")->required();
+        app->add_option("-c, --sampleCount", sampleCount, "Sample Count")
+            ->required();
+        app->add_option("-d, --sampleData", sampleData, "Sample Data")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        // Validate sampleCount matches actual data size
+        if (sampleCount * sizeof(nsm_aggregate_resp_sample) > sampleData.size())
+        {
+            return {NSM_SW_ERROR_DATA, {}};
+        }
+
+        // Initialize the request message with the minimum size
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_port_config_aggregate_req) -
+                1 + sampleData.size(),
+            0);
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_set_port_config_aggregate_req(
+            instanceId, portNumber, portType, portIndex, sampleCount,
+            sampleData.data(), sampleData.size(), request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        auto rc = decode_set_port_config_aggregate_resp(
+            responsePtr, payloadLength, &cc, &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Reason Code"] = reasonCode;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t portNumber;
+    uint8_t portType;
+    uint8_t portIndex;
+    uint16_t sampleCount;
+    std::vector<uint8_t> sampleData;
+};
+
 class GetViolationDuration : public CommandInterface
 {
   public:
@@ -5297,6 +5481,16 @@ void registerCommand(CLI::App& app)
         "GetListAvailablePciePorts", "get list of available PCIe ports");
     commands.push_back(std::make_unique<GetListAvailablePciePorts>(
         "telemetry", "GetListAvailablePciePorts", getListAvailablePciePorts));
+
+    auto getPCIePortConfig = telemetry->add_subcommand("GetPCIePortConfig",
+                                                       "get PCIe port config");
+    commands.push_back(std::make_unique<GetPCIePortConfig>(
+        "telemetry", "GetPCIePortConfig", getPCIePortConfig));
+
+    auto setPCIePortConfig = telemetry->add_subcommand("SetPCIePortConfig",
+                                                       "set PCIe port config");
+    commands.push_back(std::make_unique<SetPCIePortConfig>(
+        "telemetry", "SetPCIePortConfig", setPCIePortConfig));
 
     auto queryMultiportScalarGroupTelemetry = telemetry->add_subcommand(
         "QueryMultiportScalarGroupTelemetry",

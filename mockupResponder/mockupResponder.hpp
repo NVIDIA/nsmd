@@ -212,7 +212,10 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getPciePortConfigHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setPciePortConfigHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<Response>
         getViolationDurationHandler(const nsm_msg* requestMsg,
                                     size_t requestLen, bool isLongRunning,

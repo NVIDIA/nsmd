@@ -4,9 +4,13 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
+
 #ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
 #endif
+
+#include "nsmPort/nsmPortConfigurationInfo.hpp"
+
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -709,6 +713,45 @@ static requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
+inline void createNsmPCIePortConfigurationInfo(
+    sdbusplus::bus::bus& bus, const std::string& portName,
+    const std::string& type, const std::string& objPath, const bool priority,
+    const uint64_t upstreamPortNumber, const uint8_t portTypeVal,
+    const uint64_t index, std::shared_ptr<NsmDevice> nsmDevice)
+{
+    auto pciePortConfigurationInfoIntf =
+        std::make_shared<PCIePortConfigurationInfoIntf>(bus, objPath.c_str());
+    auto pciePortConfigurationInfo =
+        std::make_shared<NsmPCIePortConfigurationInfo>(
+            portName, type, pciePortConfigurationInfoIntf,
+            static_cast<uint8_t>(upstreamPortNumber), portTypeVal, index,
+            objPath);
+    nsmDevice->addSensor(pciePortConfigurationInfo, priority);
+
+    nsm::AsyncSetOperationHandler setPortConfigurationHandler =
+        std::bind(&NsmPCIePortConfigurationInfo::setPortConfiguration,
+                  pciePortConfigurationInfo, std::placeholders::_1,
+                  std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(objPath)
+        ->addAsyncSetOperation(
+            "xyz.openbmc_project.PCIe.PCIePortConfigurationInfo", "TxAmplitude",
+            AsyncSetOperationInfo{setPortConfigurationHandler,
+                                  pciePortConfigurationInfo, nsmDevice});
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(objPath)
+        ->addAsyncSetOperation(
+            "xyz.openbmc_project.PCIe.PCIePortConfigurationInfo", "Preset0",
+            AsyncSetOperationInfo{setPortConfigurationHandler,
+                                  pciePortConfigurationInfo, nsmDevice});
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(objPath)
+        ->addAsyncSetOperation(
+            "xyz.openbmc_project.PCIe.PCIePortConfigurationInfo", "Preset1",
+            AsyncSetOperationInfo{setPortConfigurationHandler,
+                                  pciePortConfigurationInfo, nsmDevice});
+}
+
 static requester::Coroutine
     createNsmMultiPCIeRetimerPorts(SensorManager& manager,
                                    const std::string& interface,
@@ -832,6 +875,13 @@ static requester::Coroutine
         nsmDevice->addSensor(multipcieSensorGroup3, priority);
         nsmDevice->addSensor(multipcieSensorGroup4, priority);
         nsmDevice->addSensor(multipcieSensorGroup10, priority);
+
+        if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)
+        {
+            createNsmPCIePortConfigurationInfo(bus, portName, type, objPath,
+                                               priority, upstreamPortNumber,
+                                               portTypeVal, i, nsmDevice);
+        }
     }
 
     co_return NSM_SUCCESS;
