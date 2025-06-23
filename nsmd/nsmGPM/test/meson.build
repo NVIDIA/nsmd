@@ -15,6 +15,7 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../libnsm/instance-id.c',
     '../../../requester/request_timeout_tracker.cpp',
+    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]

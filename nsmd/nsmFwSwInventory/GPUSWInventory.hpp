@@ -1,14 +1,17 @@
 #pragma once
 #include "platform-environmental.h"
 
-#include "globals.hpp"
+#include "../nsmCommon/sharedMemCommon.hpp"
 #include "../nsmDbusIfaceOverride/nsmAssetIntf.hpp"
+#include "globals.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
+#include <tal.hpp>
+#include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>
@@ -38,11 +41,14 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
     std::shared_ptr<NsmDevice> nsmDeviceFound = nullptr;
     enum8 driverState = 0;
     std::string driverVersion = "";
+    void updateMetricOnSharedMemory() override;
+
   private:
     void updateValue(enum8 driverState, std::string driverVersion);
     std::unique_ptr<SoftwareIntf> softwareVer = nullptr;
     std::unique_ptr<OperationalStatusIntf> operationalStatus = nullptr;
     std::unique_ptr<AssociationDefinitionsInft> associationDef = nullptr;
     std::unique_ptr<NsmAssetIntf> asset = nullptr;
+    std::string objPath = "";
 };
 } // namespace nsm

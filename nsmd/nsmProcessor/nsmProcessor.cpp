@@ -541,6 +541,12 @@ void NsmEccErrorCounts::updateMetricOnSharedMemory()
         static_cast<int64_t>(eccErrorCountIntf->ueCount())};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem);
+
+    propName = "isThresholdExceeded";
+    nv::sensor_aggregation::DbusVariantType isThresholdExceeded{
+        static_cast<bool>(eccErrorCountIntf->isThresholdExceeded())};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        inventoryObjPath, ifaceName, propName, smbusData, isThresholdExceeded);
 #endif
 }
 

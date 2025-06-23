@@ -4,6 +4,7 @@
 #include "deviceManager.hpp"
 
 #include "nsmAssetIntf.hpp"
+#include "nsmCommon/sharedMemCommon.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -41,6 +42,22 @@ NsmGPUSWInventoryDriverVersionAndStatus::
     associationDef->associations(associations_list);
     asset = std::make_unique<NsmAssetIntf>(bus, GPUFWInvBasePath.c_str());
     asset->manufacturer(manufacturer);
+    objPath = GPUFWInvBasePath.c_str();
+    updateValue(DriverStateUnknown, "");
+}
+
+void NsmGPUSWInventoryDriverVersionAndStatus::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifaceName = std::string(operationalStatus->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+    std::string propName = "Functional";
+
+    nv::sensor_aggregation::DbusVariantType variantFun{
+        operationalStatus->functional()};
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
+                                                 rawSmbpbiData, variantFun);
+#endif
 }
 
 void NsmGPUSWInventoryDriverVersionAndStatus::updateValue(
@@ -60,6 +77,7 @@ void NsmGPUSWInventoryDriverVersionAndStatus::updateValue(
     // to be consumed by unit tests
     this->driverState = driverState;
     this->driverVersion = driverVersion;
+    updateMetricOnSharedMemory();
 }
 
 requester::Coroutine
