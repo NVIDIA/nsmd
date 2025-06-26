@@ -19,20 +19,15 @@
 
 #include "diagnostics.h"
 
-#include "globals.hpp"
-#include "nsmDevice.hpp"
-#include "nsmSensor.hpp"
+#include "sensorManager.hpp"
 #include "utils.hpp"
 
-#include <unistd.h>
-
 #include <phosphor-logging/lg2.hpp>
+#include <sdbusplus/asio/object_server.hpp>
 
-#include <filesystem>
-#include <sstream>
-#include <stdexcept>
-
-using std::filesystem::path;
+#define NSM_LOG_INFO_START_RECORD 0x00
+#define NSM_LOG_INFO_END_RECORD 0x00
+#define NSM_LOG_INFO_BUFFER_SIZE 65535
 
 namespace nsm
 {
@@ -45,30 +40,24 @@ NsmLogInfoObject::NsmLogInfoObject(sdbusplus::bus::bus& bus,
     NsmObject(name, type),
     LogInfoIntf(bus, (inventoryPath + name).c_str()), uuid(uuid)
 {
-    lg2::debug("NsmLogInfoObject: {NAME}", "NAME", name.c_str());
-
-    objPath = inventoryPath + name;
-    fdName = name + "_log_info";
-    sdbusplus::message::unix_fd unixFd(0);
-    fd(unixFd, true);
+    buffer.reserve(NSM_LOG_INFO_BUFFER_SIZE);
+    lg2::debug("Created NsmLogInfoObject: {NAME}", "NAME", name.c_str());
 }
 
-uint8_t NsmLogInfoObject::startLogInfoCmd()
+void NsmLogInfoObject::finish(AsyncOperationStatusType status, uint8_t rc)
 {
-    if (cmdInProgress)
-    {
-        return NSM_SW_ERROR;
-    }
-    cmdInProgress = true;
-    status(CmdOperationStatus::InProgress);
-
-    return NSM_SW_SUCCESS;
+    statusInterface->status(status);
+    valueInterface->value(rc);
+    close(fd);
 }
 
-void NsmLogInfoObject::finishLogInfoCmd(CmdOperationStatus opStatus)
+void NsmLogInfoObject::getLogInfoAsyncHandler(uint32_t recordHandle)
 {
-    status(opStatus);
-    cmdInProgress = false;
+    auto request = std::make_shared<Request>(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_req));
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
+    encode_get_network_device_log_info_req(0, recordHandle, requestMsg);
+    getLogInfoAsyncHandler(request).detach();
 }
 
 requester::Coroutine
@@ -79,77 +68,46 @@ requester::Coroutine
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
-    if (sendRc != NSM_SW_SUCCESS)
+    auto rc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
+                                              responseLen);
+    if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("NsmLogInfoObject: getRequest SendRecvNsmMsg: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
-        finishLogInfoCmd(CmdOperationStatus::InternalFailure);
+                   "EID", eid, "RC", rc);
+        finish(AsyncOperationStatusType::InternalFailure, rc);
         // coverity[missing_return]
-        co_return sendRc;
+        co_return rc;
     }
 
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
+    uint16_t bufferSize = 0;
     uint32_t nextHandle = 0;
-    uint16_t logInfoSize = 0;
-    struct nsm_device_log_info_breakdown logInfo;
-    std::vector<uint8_t> logData(65535, 0);
+    nsm_device_log_info_breakdown logInfo;
 
-    auto rc = decode_get_network_device_log_info_resp(
+    buffer.resize(NSM_LOG_INFO_BUFFER_SIZE);
+    rc = decode_get_network_device_log_info_resp(
         responseMsg.get(), responseLen, &cc, &reasonCode, &nextHandle, &logInfo,
-        logData.data(), &logInfoSize);
+        buffer.data(), &bufferSize);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
         lg2::error("NsmLogInfoObject: decode_get_network_device_log_info_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
                    "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen);
-        finishLogInfoCmd(CmdOperationStatus::InternalFailure);
+        finish(AsyncOperationStatusType::InternalFailure, rc);
         // coverity[missing_return]
         co_return rc;
     }
-
-    int fileDesc = memfd_create(fdName.c_str(), 0);
-    if (fileDesc == -1)
-    {
-        lg2::error("NsmLogInfoObject: memfd_create: eid={EID} error={ERROR}",
-                   "EID", eid, "ERROR", strerror(errno));
-        finishLogInfoCmd(CmdOperationStatus::WriteFailure);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR;
-    }
-    const uint8_t* requestPtr = logData.data();
-    while (logInfoSize != 0)
-    {
-        ssize_t written = write(fileDesc, requestPtr, logInfoSize);
-        if (written < 0)
-        {
-            lg2::error("NsmLogInfoObject: write: eid={EID} error={ERROR}",
-                       "EID", eid, "ERROR", strerror(errno));
-            close(fileDesc);
-            finishLogInfoCmd(CmdOperationStatus::WriteFailure);
-            // coverity[missing_return]
-            co_return NSM_SW_ERROR;
-        }
-        requestPtr += written;
-        logInfoSize -= written;
-    }
-    (void)lseek(fileDesc, 0, SEEK_SET);
-    sdbusplus::message::unix_fd unixFd(fileDesc);
+    buffer.resize(bufferSize);
 
     // update data on interface
-    fd(unixFd, true);
-    nextRecordHandle(static_cast<uint64_t>(nextHandle));
     lostEvents(static_cast<uint64_t>(logInfo.lost_events));
     entryPrefix(static_cast<uint64_t>(logInfo.entry_prefix));
     entrySuffix(static_cast<uint64_t>(logInfo.entry_suffix));
     length(static_cast<uint64_t>(logInfo.length));
-
-    uint64_t timestamp64 = ((uint64_t)logInfo.time_high << 32) |
-                           logInfo.time_low;
-    timeStamp(timestamp64);
+    timeStamp(static_cast<uint64_t>(((uint64_t)logInfo.time_high << 32) |
+                                    logInfo.time_low));
 
     switch (logInfo.synced_time)
     {
@@ -161,50 +119,68 @@ requester::Coroutine
             break;
         default:
             lg2::error("NsmLogInfoObject: unknown value for time synced");
-            finishLogInfoCmd(CmdOperationStatus::InternalFailure);
-            throw Common::Error::InternalFailure();
+            finish(AsyncOperationStatusType::InternalFailure, NSM_SW_ERROR);
+            // coverity[missing_return]
+            co_return NSM_SW_ERROR;
     }
-    finishLogInfoCmd(CmdOperationStatus::Success);
+
+    try
+    {
+        utils::appendBufferToFd(fd, buffer);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("NsmLogInfoObject: appendBufferToFd failed: {ERR}", "ERR",
+                   e.what());
+        finish(AsyncOperationStatusType::WriteFailure, NSM_SW_ERROR);
+        co_return NSM_SW_ERROR;
+    }
+
+    if (nextHandle == NSM_LOG_INFO_END_RECORD)
+    {
+        finish(AsyncOperationStatusType::Success, NSM_SW_SUCCESS);
+    }
+    else
+    {
+        getLogInfoAsyncHandler(nextHandle);
+    }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
-void NsmLogInfoObject::getLogInfo(uint64_t recHandle)
+sdbusplus::message::object_path
+    NsmLogInfoObject::getLogInfo(sdbusplus::message::unix_fd fd)
 {
-    if (startLogInfoCmd() != NSM_SW_SUCCESS)
+    if (statusInterface != nullptr &&
+        statusInterface->status() == AsyncOperationStatusType::InProgress)
     {
+        lg2::debug("NsmLogInfoObject: getLogInfo already in progress");
         throw Common::Error::Unavailable();
     }
 
-    if (fd() != 0)
+    const auto [objectPath, statusInterface, valueInterface] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+    if (objectPath.empty())
     {
-        close(fd());
-        sdbusplus::message::unix_fd unixFd(0);
-        fd(unixFd, true);
+        lg2::debug(
+            "NsmLogInfoObject: getLogInfo: cannot start async operation, objectPath is empty");
+        throw Common::Error::Unavailable();
     }
 
-    auto request = std::make_shared<Request>(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_device_log_info_req));
-    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
-    recordHandle(recHandle);
-
-    auto rc = encode_get_network_device_log_info_req(
-        0, static_cast<uint32_t>(recHandle), requestMsg);
-    if (rc == NSM_SW_SUCCESS)
+    this->statusInterface = statusInterface;
+    this->valueInterface = valueInterface;
+    this->fd = dup(fd);
+    if (this->fd < 0)
     {
-        getLogInfoAsyncHandler(request).detach();
-        return;
+        lg2::error(
+            "NsmLogInfoObject: Failed to duplicate file descriptor: {ERR}",
+            "ERR", strerror(errno));
+        finish(AsyncOperationStatusType::InternalFailure, NSM_SW_ERROR);
+        throw Common::Error::InternalFailure();
     }
-    lg2::error(
-        "NsmLogInfoObject: encode_get_network_device_log_info_req: rc={RC}",
-        "RC", rc);
-    if (rc == NSM_ERR_INVALID_DATA)
-    {
-        finishLogInfoCmd(CmdOperationStatus::InvalidArgument);
-        throw Common::Error::InvalidArgument();
-    }
-    finishLogInfoCmd(CmdOperationStatus::InternalFailure);
-    throw Common::Error::InternalFailure();
+    getLogInfoAsyncHandler(NSM_LOG_INFO_START_RECORD);
+    return objectPath;
 }
 
 } // namespace nsm

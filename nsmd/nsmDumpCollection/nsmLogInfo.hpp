@@ -17,11 +17,9 @@
 
 #pragma once
 
-#include "nsmObjectFactory.hpp"
-#include "utils.hpp"
+#include "asyncOperationManager.hpp"
 
 #include <com/nvidia/Dump/LogInfo/server.hpp>
-#include <sdbusplus/asio/object_server.hpp>
 
 #include <memory>
 
@@ -35,9 +33,6 @@ using LogInfoIntf = object_t<sdbusplus::com::nvidia::Dump::server::LogInfo>;
 using TimeSyncFrom =
     sdbusplus::common::com::nvidia::dump::LogInfo::TimeSyncFrom;
 
-using CmdOperationStatus =
-    sdbusplus::common::com::nvidia::dump::LogInfo::OperationStatus;
-
 class NsmLogInfoObject : public NsmObject, public LogInfoIntf
 {
   public:
@@ -45,17 +40,19 @@ class NsmLogInfoObject : public NsmObject, public LogInfoIntf
                      const std::string& inventoryPath, const std::string& type,
                      const uuid_t& uuid);
 
-    void getLogInfo(uint64_t recHandle) override;
+    sdbusplus::message::object_path
+        getLogInfo(sdbusplus::message::unix_fd fd) override;
 
   private:
-    uint8_t startLogInfoCmd();
-    void finishLogInfoCmd(OperationStatus opStatus);
+    void finish(AsyncOperationStatusType status, uint8_t rc);
+    void getLogInfoAsyncHandler(uint32_t recordHandle);
     requester::Coroutine
         getLogInfoAsyncHandler(std::shared_ptr<Request> request);
 
-    std::string objPath;
-    std::string fdName;
     uuid_t uuid;
-    bool cmdInProgress{false};
+    std::shared_ptr<AsyncStatusIntf> statusInterface;
+    std::shared_ptr<AsyncValueIntf> valueInterface;
+    sdbusplus::message::unix_fd fd;
+    std::vector<uint8_t> buffer;
 };
 } // namespace nsm
