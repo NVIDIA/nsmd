@@ -19,8 +19,8 @@
 
 #include "deviceManager.hpp"
 #include "nsmCommon.hpp"
+#include "nsmDebugInfo.hpp"
 #include "nsmDevice.hpp"
-#include "nsmDeviceDiagnostics.hpp"
 #include "nsmErrorInjectionCommon.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -128,9 +128,10 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 #endif
         if (device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE)
         {
-            device->addStaticSensor(std::make_shared<NsmDeviceDiagnostics>(
+            device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
                 utils::DBusHandler::getBus(), name,
-                chassisInventoryBasePath.string() + "/", type, uuid));
+                chassisInventoryBasePath.string() + "/", type, uuid,
+                DebugDumpType::Diagnostics));
         }
     }
     else if (type == "NSM_FPGA_Asset")

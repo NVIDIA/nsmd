@@ -41,7 +41,6 @@ dep_src_files = [
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmLongRunning/nsmAsyncLongRunningSensor.cpp',
     '../../nsmDumpCollection/nsmDebugInfo.cpp',
-    '../../nsmDumpCollection/nsmDeviceDiagnostics.cpp',
     '../../nsmDumpCollection/nsmEraseTrace.cpp',
     '../../nsmDumpCollection/nsmLogInfo.cpp',
     '../../../common/utils.cpp',

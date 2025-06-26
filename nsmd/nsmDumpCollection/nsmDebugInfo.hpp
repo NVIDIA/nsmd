@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include "nsmObjectFactory.hpp"
-#include "utils.hpp"
+#include "diagnostics.h"
+
+#include "asyncOperationManager.hpp"
 
 #include <com/nvidia/Dump/DebugInfo/server.hpp>
-#include <sdbusplus/asio/object_server.hpp>
 
 #include <memory>
 
@@ -35,9 +35,6 @@ using DebugInfoIntf = object_t<sdbusplus::com::nvidia::Dump::server::DebugInfo>;
 using DebugInformationType =
     sdbusplus::common::com::nvidia::dump::DebugInfo::DebugInformationType;
 
-using OperationStatus =
-    sdbusplus::common::com::nvidia::dump::DebugInfo::OperationStatus;
-
 using DebugDumpType = sdbusplus::common::com::nvidia::dump::DebugInfo::DumpType;
 
 class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
@@ -45,21 +42,30 @@ class NsmDebugInfoObject : public NsmObject, public DebugInfoIntf
   public:
     NsmDebugInfoObject(sdbusplus::bus::bus& bus, const std::string& name,
                        const std::string& inventoryPath,
-                       const std::string& type, const uuid_t& uuid);
+                       const std::string& type, const uuid_t& uuid,
+                       DebugDumpType dumpType);
 
-    void getDebugInfo(DebugInformationType debugInfoType,
-                      uint64_t recHandle) override;
+    sdbusplus::message::object_path
+        getDebugInfo(DebugInformationType debugInfoType,
+                     sdbusplus::message::unix_fd fd) override;
+    sdbusplus::message::object_path
+        getDiagnostics(sdbusplus::message::unix_fd fd) override;
 
   private:
-    uint8_t startDebugInfoCmd();
-    void finishDebugInfoCmd(OperationStatus opStatus);
+    void finish(AsyncOperationStatusType status, uint8_t rc);
+    void getDebugInfoAsyncHandler(uint32_t recordHandle);
     requester::Coroutine
         getDebugInfoAsyncHandler(std::shared_ptr<Request> request);
+    void getDiagnosticsAsyncHandler(uint32_t recordHandle);
+    requester::Coroutine
+        getDiagnosticsAsyncHandler(std::shared_ptr<Request> request);
 
-    std::string objPath;
-    std::string fdName;
     uuid_t uuid;
-    bool cmdInProgress{false};
+    nsm_debug_information_type infoType;
+    std::shared_ptr<AsyncStatusIntf> statusInterface;
+    std::shared_ptr<AsyncValueIntf> valueInterface;
+    sdbusplus::message::unix_fd fd;
+    std::vector<uint8_t> buffer;
 };
 
 } // namespace nsm

@@ -566,7 +566,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
 
         // NetIR dump for NVSwitch
         auto nvSwitchDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
-            bus, name, inventoryObjPath, type, uuid);
+            bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
         device->addStaticSensor(nvSwitchDebugInfoObject);
 
         auto nvSwitchEraseTraceObject = std::make_shared<NsmEraseTraceObject>(

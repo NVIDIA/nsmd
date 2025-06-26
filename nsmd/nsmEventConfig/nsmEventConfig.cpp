@@ -112,12 +112,10 @@ requester::Coroutine NsmEventConfig::setCurrentEventSources(
     uint8_t cc = NSM_SUCCESS;
     rc = decode_nsm_set_current_event_sources_resp(responseMsg.get(),
                                                    responseLen, &cc);
-    if (rc)
-    {
-        lg2::error(
-            "decode_nsm_set_current_event_sources_resp failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
-    }
+    LG2_ERROR_FLT(
+        "decode_nsm_set_current_event_sources_resp failed | cc: {CC}, rc: {RC}, eid: {EID}",
+        "CC", nsm_completion_codes(cc), "RC", nsm_sw_codes(rc), "EID", eid);
+
     // coverity[missing_return]
     co_return cc;
 }
@@ -236,7 +234,7 @@ requester::Coroutine NsmGetEventConfig::update(SensorManager& manager,
         &supported_event_sources[0]);
 
     LG2_ERROR_FLT(
-        "encode_nsm_get_supported_event_source_req failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "decode_nsm_get_supported_event_source_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reason_code, "CC", cc, "RC", rc);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
@@ -244,10 +242,6 @@ requester::Coroutine NsmGetEventConfig::update(SensorManager& manager,
         bool validationPassed = validateEventIds(eid, supported_event_sources);
         if (!validationPassed)
         {
-            lg2::error("EID: {EID} validateEventSource Failed", "EID", eid);
-            lg2::info(
-                "EID: {EID} Set Event Source for MessageType = {MSG_TYPE}",
-                "EID", eid, "MSG_TYPE", messageType);
             co_await eventConfig->update(manager, eid);
         }
     }
@@ -271,12 +265,19 @@ bool NsmGetEventConfig::validateEventIds(
 
                 // Check if this configured event is supported
                 uint8_t supportedByte = supported_event_sources[byteIndex].byte;
-                if (!(supportedByte & (1 << bitOffset)))
+                bool validateEventSourceForEventId =
+                    !(supportedByte & (1 << bitOffset));
+                if (validateEventSourceForEventId)
                 {
-                    lg2::error(
+                    validateEventSource = false;
+                }
+                if (shouldLog("NsmGetEventConfig::validateEventIds " +
+                                  std::to_string(eventId),
+                              validateEventSourceForEventId))
+                {
+                    LG2_ERROR(
                         "EID: {EID} Configured event ID {ID} for Message Type {MSG_TYPE} is not supported",
                         "EID", eid, "ID", eventId, "MSG_TYPE", messageType);
-                    validateEventSource = false;
                 }
             }
         }
