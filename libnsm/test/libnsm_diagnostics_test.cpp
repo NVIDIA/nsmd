@@ -99,33 +99,34 @@ TEST(ResetMetrics, DecodeResetEnumDataInvalidLength)
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-// Tests for `encode_reset_count_64data`
-TEST(ResetMetrics, EncodeResetCount64Data)
+// Tests for `encode_reset_count_256data`
+TEST(ResetMetrics, EncodeResetCount256Data)
 {
-	uint64_t count = 256; // Example count value
-	uint8_t data[8];
-	size_t data_len;
+	std::array<uint64_t, 4> count = {256, 256, 256,
+					 256}; // Example count value
+	uint8_t data[32];
+	size_t data_len = 0;
 
-	auto rc = encode_reset_count_64data(count, data, &data_len);
+	auto rc = encode_reset_count_256data(count.data(), data, &data_len);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(data_len, sizeof(uint64_t));
+	EXPECT_EQ(data_len, sizeof(uint64_t) * 4);
 
-	uint64_t decodedCount;
-	memcpy(&decodedCount, data, sizeof(uint64_t));
-	EXPECT_EQ(decodedCount, htole64(count));
+	std::array<uint64_t, 4> decodedCount;
+	memcpy(decodedCount.data(), data, sizeof(uint64_t) * 4);
+	EXPECT_EQ(decodedCount, count);
 }
 
-TEST(ResetMetrics, EncodeResetCount64DataNull)
+TEST(ResetMetrics, EncodeResetCount256DataNull)
 {
-	uint64_t count = 256;
+	std::array<uint64_t, 4> count = {256, 256, 256, 256};
 	size_t data_len;
 
-	auto rc = encode_reset_count_64data(count, nullptr, &data_len);
+	auto rc = encode_reset_count_256data(count.data(), nullptr, &data_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = encode_reset_count_64data(count, reinterpret_cast<uint8_t *>(0),
-				       nullptr);
+	rc = encode_reset_count_256data(
+	    count.data(), reinterpret_cast<uint8_t *>(0), nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
@@ -166,40 +167,48 @@ TEST(ResetMetrics, DecodeResetCountDataNull)
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
-// Tests for `decode_reset_count_64data`
-TEST(ResetMetrics, DecodeResetCount64Data)
+// Tests for `decode_reset_count_256data`
+TEST(ResetMetrics, DecodeResetCount256Data)
 {
-	uint64_t count = 256; // Example encoded value
-	uint8_t data[8];
-	memcpy(data, &count, sizeof(count));
-	uint64_t decodedCount;
+	std::array<uint64_t, 4> count = {256, 256, 256,
+					 256}; // Example encoded value
+	uint8_t data[32];
+	memcpy(data, count.data(), sizeof(count));
+	std::array<uint64_t, 4> decodedCount;
 
-	auto rc = decode_reset_count_64data(data, sizeof(data), &decodedCount);
+	auto rc = decode_reset_count_256data(data, sizeof(data),
+					     decodedCount.data(), 4);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(decodedCount, le64toh(count));
+	EXPECT_EQ(decodedCount, count);
+	EXPECT_EQ(decodedCount[0], le64toh(count[0]));
+	EXPECT_EQ(decodedCount[1], le64toh(count[1]));
+	EXPECT_EQ(decodedCount[2], le64toh(count[2]));
+	EXPECT_EQ(decodedCount[3], le64toh(count[3]));
 }
 
-TEST(ResetMetrics, DecodeResetCount64DataInvalidLength)
+TEST(ResetMetrics, DecodeResetCount256DataInvalidLength)
 {
-	uint64_t count = 256;
-	uint8_t data[8];
-	memcpy(data, &count, sizeof(count));
-	uint64_t decodedCount;
+	std::array<uint64_t, 4> count = {256, 256, 256,
+					 256}; // Example encoded value
+	uint8_t data[32];
+	memcpy(data, count.data(), sizeof(count));
+	std::array<uint64_t, 4> decodedCount;
 
-	auto rc =
-	    decode_reset_count_64data(data, sizeof(data) - 1, &decodedCount);
+	auto rc = decode_reset_count_256data(data, sizeof(data) - 1,
+					     decodedCount.data(), 4);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-TEST(ResetMetrics, DecodeResetCount64DataNull)
+TEST(ResetMetrics, DecodeResetCount256DataNull)
 {
-	uint64_t decodedCount;
-	auto rc = decode_reset_count_64data(nullptr, 8, &decodedCount);
+	std::array<uint64_t, 4> decodedCount;
+	auto rc =
+	    decode_reset_count_256data(nullptr, 32, decodedCount.data(), 4);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	uint8_t data[8] = {0};
-	rc = decode_reset_count_64data(data, 8, nullptr);
+	uint8_t data[32] = {0};
+	rc = decode_reset_count_256data(data, 32, nullptr, 4);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 

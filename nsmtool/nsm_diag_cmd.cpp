@@ -328,8 +328,9 @@ class QueryResetStatistics : public CommandInterface
             else if (property == "BootReason")
             {
                 // Handle boot reason counter (uint64_t)
-                uint64_t counterVal;
-                if (decode_reset_count_64data(data, data_len, &counterVal) !=
+                std::array<uint64_t, 4> counterVal;
+                if (decode_reset_count_256data(
+                        data, data_len, counterVal.data(), counterVal.size()) !=
                     NSM_SW_SUCCESS)
                 {
                     return NSM_SW_ERROR_LENGTH;
@@ -338,7 +339,10 @@ class QueryResetStatistics : public CommandInterface
                 // Include the tag in the JSON
                 sample_json["Tag"] = static_cast<int>(tag);
                 sample_json["Property"] = property;
-                sample_json["Value"] = counterVal;
+                sample_json["Value0to63"] = counterVal[0];
+                sample_json["Value64to127"] = counterVal[1];
+                sample_json["Value128to191"] = counterVal[2];
+                sample_json["Value192to255"] = counterVal[3];
             }
             else
             {

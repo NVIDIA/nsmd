@@ -34,6 +34,7 @@
 
 namespace MockupResponder
 {
+const std::array<uint64_t, 4> bootReasonMockValue = {100, 548682072066, 0, 0};
 
 const std::unordered_map<uint8_t, uint64_t> resetMetricsMockTable = {
     {0, 100}, // PF_FLR_ResetEntryCount

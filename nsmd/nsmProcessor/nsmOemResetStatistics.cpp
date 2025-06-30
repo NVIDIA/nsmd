@@ -119,18 +119,19 @@ int ResetStatisticsAggregator::handleSamples(
         }
         else if (property == "BootReason")
         {
-            uint64_t counterVal;
-            if (decode_reset_count_64data(sample.data, sample.data_len,
-                                          &counterVal) != NSM_SW_SUCCESS)
+            std::array<uint64_t, 4> counterVal;
+            if (decode_reset_count_256data(sample.data, sample.data_len,
+                                           counterVal.data(),
+                                           counterVal.size()) != NSM_SW_SUCCESS)
             {
                 lg2::error(
-                    "Failed to decode ResetCount 64 data. Tag={TAG}, Data length={LEN}",
+                    "Failed to decode ResetCount 256 data. Tag={TAG}, Data length={LEN}",
                     "TAG", sample.tag, "LEN", sample.data_len);
                 returnValue = NSM_SW_ERROR_LENGTH;
                 continue;
             }
-            // Update property with uint64 value
-            updateProperty(property, counterVal);
+            // Update property with array of uint64 value
+            updateBootReasonProperty(property, counterVal);
         }
         else
         {
@@ -252,60 +253,6 @@ void ResetStatisticsAggregator::updateProperty(const std::string& property,
             auto resetType = static_cast<ResetCountersIntf::ResetTypes>(value);
             resetCountersIntf->lastResetType(resetType);
         }
-        else if (property == "BootReason")
-        {
-            // Convert and update enum array property
-            nsm_boot_reason_type_breakdown bootReason;
-            std::memcpy(&bootReason, &value, sizeof(bootReason));
-            std::vector<BootReasonTypes> enabledReasons;
-
-            if (bootReason.wake_up)
-                enabledReasons.emplace_back(BootReasonTypes::WakeUp);
-            if (bootReason.power_on)
-                enabledReasons.emplace_back(BootReasonTypes::PowerOn);
-            if (bootReason.voltage_detect)
-                enabledReasons.emplace_back(BootReasonTypes::VoltageDetect);
-            if (bootReason.warm_reset)
-                enabledReasons.emplace_back(BootReasonTypes::WarmReset);
-            if (bootReason.fatal_error)
-                enabledReasons.emplace_back(BootReasonTypes::FatalError);
-            if (bootReason.pin)
-                enabledReasons.emplace_back(BootReasonTypes::Pin);
-            if (bootReason.debug_access_port)
-                enabledReasons.emplace_back(BootReasonTypes::DebugAccessPort);
-            if (bootReason.reset_timeout)
-                enabledReasons.emplace_back(BootReasonTypes::ResetTimeout);
-            if (bootReason.low_power_acknowledge_timeout)
-                enabledReasons.emplace_back(
-                    BootReasonTypes::LowPowerAcknowledgeTimeout);
-            if (bootReason.system_clock_generator)
-                enabledReasons.emplace_back(
-                    BootReasonTypes::SystemClockGenerator);
-            if (bootReason.windowed_watchdog_0)
-                enabledReasons.emplace_back(BootReasonTypes::WindowedWatchdog0);
-            if (bootReason.software)
-                enabledReasons.emplace_back(BootReasonTypes::Software);
-            if (bootReason.lockup_reset)
-                enabledReasons.emplace_back(BootReasonTypes::LockupReset);
-            if (bootReason.cpu1)
-                enabledReasons.emplace_back(BootReasonTypes::CPU1);
-            if (bootReason.vbat)
-                enabledReasons.emplace_back(BootReasonTypes::VBAT);
-            if (bootReason.windowed_watchdog_1)
-                enabledReasons.emplace_back(BootReasonTypes::WindowedWatchdog1);
-            if (bootReason.code_watchdog_0)
-                enabledReasons.emplace_back(BootReasonTypes::CodeWatchdog0);
-            if (bootReason.code_watchdog_1)
-                enabledReasons.emplace_back(BootReasonTypes::CodeWatchdog1);
-            if (bootReason.jtag)
-                enabledReasons.emplace_back(BootReasonTypes::JTAG);
-            if (bootReason.security_violation)
-                enabledReasons.emplace_back(BootReasonTypes::SecurityViolation);
-            if (bootReason.tamper)
-                enabledReasons.emplace_back(BootReasonTypes::Tamper);
-
-            resetCountersIntf->bootReason(enabledReasons);
-        }
         else
         {
             // Update numeric properties as double
@@ -321,4 +268,124 @@ void ResetStatisticsAggregator::updateProperty(const std::string& property,
             "PROPERTY", property, "VALUE", value, "ERROR", e.what());
     }
 }
+
+void ResetStatisticsAggregator::updateBootReasonProperty(
+    const std::string& property, const std::array<uint64_t, 4>& value)
+{
+    try
+    {
+        // Convert and update enum array property
+        nsm_boot_reason_type_breakdown bootReason;
+        std::memcpy(&bootReason, &value, sizeof(bootReason));
+        std::vector<BootReasonTypes> enabledReasons;
+
+        if (bootReason.wake_up)
+            enabledReasons.emplace_back(BootReasonTypes::WakeUp);
+        if (bootReason.power_on)
+            enabledReasons.emplace_back(BootReasonTypes::PowerOn);
+        if (bootReason.voltage_detect)
+            enabledReasons.emplace_back(BootReasonTypes::VoltageDetect);
+        if (bootReason.warm_reset)
+            enabledReasons.emplace_back(BootReasonTypes::WarmReset);
+        if (bootReason.fatal_error)
+            enabledReasons.emplace_back(BootReasonTypes::FatalError);
+        if (bootReason.pin)
+            enabledReasons.emplace_back(BootReasonTypes::Pin);
+        if (bootReason.debug_access_port)
+            enabledReasons.emplace_back(BootReasonTypes::DebugAccessPort);
+        if (bootReason.reset_timeout)
+            enabledReasons.emplace_back(BootReasonTypes::ResetTimeout);
+        if (bootReason.low_power_acknowledge_timeout)
+            enabledReasons.emplace_back(
+                BootReasonTypes::LowPowerAcknowledgeTimeout);
+        if (bootReason.system_clock_generator)
+            enabledReasons.emplace_back(BootReasonTypes::SystemClockGenerator);
+        if (bootReason.windowed_watchdog_0)
+            enabledReasons.emplace_back(BootReasonTypes::WindowedWatchdog0);
+        if (bootReason.software)
+            enabledReasons.emplace_back(BootReasonTypes::Software);
+        if (bootReason.lockup_reset)
+            enabledReasons.emplace_back(BootReasonTypes::LockupReset);
+        if (bootReason.cpu1)
+            enabledReasons.emplace_back(BootReasonTypes::CPU1);
+        if (bootReason.vbat)
+            enabledReasons.emplace_back(BootReasonTypes::VBAT);
+        if (bootReason.windowed_watchdog_1)
+            enabledReasons.emplace_back(BootReasonTypes::WindowedWatchdog1);
+        if (bootReason.code_watchdog_0)
+            enabledReasons.emplace_back(BootReasonTypes::CodeWatchdog0);
+        if (bootReason.code_watchdog_1)
+            enabledReasons.emplace_back(BootReasonTypes::CodeWatchdog1);
+        if (bootReason.jtag)
+            enabledReasons.emplace_back(BootReasonTypes::JTAG);
+        if (bootReason.security_violation)
+            enabledReasons.emplace_back(BootReasonTypes::SecurityViolation);
+        if (bootReason.tamper)
+            enabledReasons.emplace_back(BootReasonTypes::Tamper);
+        if (bootReason.iaccviol)
+            enabledReasons.emplace_back(BootReasonTypes::IAccViol);
+        if (bootReason.daccviol)
+            enabledReasons.emplace_back(BootReasonTypes::DAccViol);
+        if (bootReason.munstkerr)
+            enabledReasons.emplace_back(BootReasonTypes::Munstkerr);
+        if (bootReason.mstkerr)
+            enabledReasons.emplace_back(BootReasonTypes::Mstkerr);
+        if (bootReason.mmfarvalid)
+            enabledReasons.emplace_back(BootReasonTypes::MMFarValid);
+        if (bootReason.bfarvalid)
+            enabledReasons.emplace_back(BootReasonTypes::BFarValid);
+        if (bootReason.stkerr)
+            enabledReasons.emplace_back(BootReasonTypes::Stkerr);
+        if (bootReason.unstkerr)
+            enabledReasons.emplace_back(BootReasonTypes::Unstkerr);
+        if (bootReason.imprecise_error)
+            enabledReasons.emplace_back(BootReasonTypes::ImpreciseError);
+        if (bootReason.precise_error)
+            enabledReasons.emplace_back(BootReasonTypes::PreciseError);
+        if (bootReason.ibuserr)
+            enabledReasons.emplace_back(BootReasonTypes::IBusErr);
+        if (bootReason.undefinstr)
+            enabledReasons.emplace_back(BootReasonTypes::UndefInstr);
+        if (bootReason.invstate)
+            enabledReasons.emplace_back(BootReasonTypes::InvState);
+        if (bootReason.invpc)
+            enabledReasons.emplace_back(BootReasonTypes::InvPC);
+        if (bootReason.nocp)
+            enabledReasons.emplace_back(BootReasonTypes::NoCP);
+        if (bootReason.unaligned)
+            enabledReasons.emplace_back(BootReasonTypes::Unaligned);
+        if (bootReason.devbyzero)
+            enabledReasons.emplace_back(BootReasonTypes::DevByZero);
+        if (bootReason.vecttbl)
+            enabledReasons.emplace_back(BootReasonTypes::VectTbl);
+        if (bootReason.forced)
+            enabledReasons.emplace_back(BootReasonTypes::Forced);
+        if (bootReason.debugevt)
+            enabledReasons.emplace_back(BootReasonTypes::DebugEvt);
+        if (bootReason.mctp)
+            enabledReasons.emplace_back(BootReasonTypes::MCTP);
+        if (bootReason.i2c)
+            enabledReasons.emplace_back(BootReasonTypes::I2C);
+        if (bootReason.i3c)
+            enabledReasons.emplace_back(BootReasonTypes::I3C);
+        if (bootReason.pldm)
+            enabledReasons.emplace_back(BootReasonTypes::PLDM);
+        if (bootReason.usb)
+            enabledReasons.emplace_back(BootReasonTypes::USB);
+        if (bootReason.flash)
+            enabledReasons.emplace_back(BootReasonTypes::Flash);
+        if (bootReason.logger)
+            enabledReasons.emplace_back(BootReasonTypes::Logger);
+        if (bootReason.spdm)
+            enabledReasons.emplace_back(BootReasonTypes::SPDM);
+
+        resetCountersIntf->bootReason(enabledReasons);
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Failed to update property {PROPERTY}: {ERROR}", "PROPERTY",
+                   property, "ERROR", e.what());
+    }
+}
+
 } // namespace nsm

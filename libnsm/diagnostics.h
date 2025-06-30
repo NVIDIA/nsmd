@@ -292,7 +292,43 @@ struct nsm_boot_reason_type_breakdown {
 	uint64_t reserved29 : 1;
 	uint64_t security_violation : 1;
 	uint64_t tamper : 1;
-	uint64_t reserved32to63 : 32;
+	uint64_t iaccviol : 1;
+	uint64_t daccviol : 1;
+	uint64_t reserved34 : 1;
+	uint64_t munstkerr : 1;
+	uint64_t mstkerr : 1;
+	uint64_t reserved37to38 : 2;
+	uint64_t mmfarvalid : 1;
+	uint64_t bfarvalid : 1;
+	uint64_t reserved41to42 : 2;
+	uint64_t stkerr : 1;
+	uint64_t unstkerr : 1;
+	uint64_t imprecise_error : 1;
+	uint64_t precise_error : 1;
+	uint64_t ibuserr : 1;
+	uint64_t undefinstr : 1;
+	uint64_t invstate : 1;
+	uint64_t invpc : 1;
+	uint64_t nocp : 1;
+	uint64_t reserved52to55 : 4;
+	uint64_t unaligned : 1;
+	uint64_t devbyzero : 1;
+	uint64_t reserved58to64 : 7;
+	uint64_t vecttbl : 1;
+	uint64_t reserved66to93 : 28;
+	uint64_t forced : 1;
+	uint64_t debugevt : 1;
+	uint64_t mctp : 1;
+	uint64_t i2c : 1;
+	uint64_t i3c : 1;
+	uint64_t pldm : 1;
+	uint64_t usb : 1;
+	uint64_t flash : 1;
+	uint64_t logger : 1;
+	uint64_t spdm : 1;
+	uint64_t reserved104to127 : 24;
+	uint64_t reserved128to191 : 64;
+	uint64_t reserved192to255 : 64;
 } __attribute__((packed));
 
 /** @brief Encode a Get device diagnostics request message
@@ -705,13 +741,14 @@ int decode_reset_count_data(const uint8_t *data, size_t data_len,
 /**
  * @brief Encodes a uint64 reset count into a byte array.
  *
- * @param[in] count - Reset count as uint64_t.
+ * @param[in] count - Reset count as uint64_t array.
  * @param[out] data - Encoded byte array.
  * @param[out] data_len - Length of the encoded data.
  *
  * @return NSM_SW_SUCCESS on success, or appropriate error code.
  */
-int encode_reset_count_64data(uint64_t count, uint8_t *data, size_t *data_len);
+int encode_reset_count_256data(const uint64_t *count, uint8_t *data,
+			       size_t *data_len);
 
 /**
  * @brief Decodes a uint64 reset count from a byte array.
@@ -719,11 +756,12 @@ int encode_reset_count_64data(uint64_t count, uint8_t *data, size_t *data_len);
  * @param[in] data - Encoded byte array.
  * @param[in] data_len - Length of the encoded data.
  * @param[out] count - Decoded reset count as uint64_t.
+ * @param[in] count_len - Length of the decoded count.
  *
  * @return NSM_SW_SUCCESS on success, or appropriate error code.
  */
-int decode_reset_count_64data(const uint8_t *data, size_t data_len,
-			      uint64_t *count);
+int decode_reset_count_256data(const uint8_t *data, size_t data_len,
+			       uint64_t *count, size_t count_len);
 
 /**
  * @brief Decodes a "Get Device Reset Statistics" request message.
