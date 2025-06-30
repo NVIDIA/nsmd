@@ -653,7 +653,7 @@ static requester::Coroutine
     uint8_t deviceIndex = static_cast<uint8_t>(deviceInstance) +
                           PCIE_RETIMER_DEVICE_INDEX_START;
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         // cannot find a nsmDevice for the sensor
@@ -767,7 +767,7 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         // cannot find a nsmDevice for the sensor

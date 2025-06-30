@@ -87,7 +87,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
                                       associations);
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (!nsmDevice)
     {

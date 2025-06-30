@@ -722,7 +722,7 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         }
 
         inventoryObjPath = inventoryObjPath + "_DRAM_0";
-        auto nsmDevice = manager.getNsmDevice(uuid);
+        auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
         if (!nsmDevice)
         {
             // cannot found a nsmDevice for the sensor

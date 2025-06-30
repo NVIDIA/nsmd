@@ -47,7 +47,7 @@ NsmThresholdFactory::NsmThresholdFactory(
     const NumericSensorInfo& info, const uuid_t& uuid) :
     manager(manager), interface(interface), objPath(objPath),
     numericSensor(numericSensor), info(info), uuid(uuid),
-    nsmDevice(manager.getNsmDevice(uuid))
+    nsmDevice(manager.getNsmDeviceFromStaticUUID(uuid))
 {}
 
 requester::Coroutine NsmThresholdFactory::make()

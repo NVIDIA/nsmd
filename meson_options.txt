@@ -64,6 +64,22 @@ option(
     value: 0,
 )
 option(
+    'device-update-post-patch-sleep',
+    type: 'integer',
+    min: 0,
+    max: 4294967295,
+    description: 'The interval size in which post/patch operation will be paused when device update is in progress',
+    value: 250,
+)
+option(
+    'device-update-post-patch-sleep-iteration',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'Max number of iteration async sleep will be called when device update is in progress',
+    value: 40,
+)
+option(
     'num-gpu-per-module',
     type: 'integer',
     description: 'Total number of GPU in each processor module.',

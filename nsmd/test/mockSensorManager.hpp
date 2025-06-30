@@ -22,24 +22,148 @@
 
 #define private public
 #define protected public
+#include "deviceManager.hpp"
+#include "eventManager.hpp"
+#include "instance_id.hpp"
+#include "requester/handler.hpp"
 #include "sensorManager.hpp"
+#include "socket_handler.hpp"
+#include "socket_manager.hpp"
+
+#include <sdbusplus/asio/connection.hpp>
+#include <sdbusplus/asio/object_server.hpp>
+#include <sdeventplus/event.hpp>
 
 using namespace nsm;
 using ::testing::NiceMock;
+
+class MockDeviceManager
+{
+  public:
+    static MockDeviceManager& getInstance(NsmDeviceTable& nsmDevices)
+    {
+        if (!instance)
+        {
+            instance = new MockDeviceManager(nsmDevices);
+        }
+        return *instance;
+    }
+
+  private:
+    MockDeviceManager() = delete;
+    ~MockDeviceManager() = default;
+    MockDeviceManager(const MockDeviceManager&) = delete;
+    MockDeviceManager& operator=(const MockDeviceManager&) = delete;
+    MockDeviceManager(MockDeviceManager&&) = delete;
+    MockDeviceManager& operator=(MockDeviceManager&&) = delete;
+    MockDeviceManager(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices) {};
+    std::map<uint8_t, std::map<uint16_t, std::shared_ptr<NsmDevice>>> deviceMap;
+    NsmDeviceTable& nsmDevices;
+
+  public:
+    static MockDeviceManager* instance;
+    std::shared_ptr<NsmDevice> findOrCreateNsmDevice(uint8_t deviceType,
+                                                     uint8_t deviceRole,
+                                                     uint8_t instanceNumber,
+                                                     std::string remapPropName,
+                                                     std::string remapPropValue)
+    {
+        uint16_t staticInstanceAndRole = (deviceRole >> 8) | instanceNumber;
+
+        if (deviceMap.find(deviceType) != deviceMap.end())
+        {
+            if (deviceMap[deviceType].find(staticInstanceAndRole) !=
+                deviceMap[deviceType].end())
+            {
+                return deviceMap[deviceType][staticInstanceAndRole];
+            }
+        }
+
+        auto nsmDevice = std::make_shared<NsmDevice>(
+            deviceType, instanceNumber, remapPropName, remapPropValue,
+            deviceRole);
+        lg2::info(
+            "Creating new NsmDevice for deviceType:{TYPE} instanceNumber:{INST} deviceRole:{ROLE} remapPropName:{REMAPPNAME} remapPropValue:{REMAPPVALUE}",
+            "TYPE", deviceType, "INST", instanceNumber, "ROLE", deviceRole,
+            "REMAPPNAME", remapPropName, "REMAPPVALUE", remapPropValue);
+        nsmDevices.emplace_back(nsmDevice);
+        nsmDevice->isDeviceActive = false;
+        deviceMap[deviceType][staticInstanceAndRole] = nsmDevice;
+        return deviceMap[deviceType][staticInstanceAndRole];
+    }
+    std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid)
+    {
+        uint8_t deviceType = 0xff;
+        uint8_t instanceNumber = 0xff;
+        uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
+        std::string remapPropName;
+        std::string remapPropValue;
+        if (utils::parseStaticUuid(uuid, deviceType, instanceNumber, deviceRole,
+                                   remapPropName, remapPropValue) < 0)
+        {
+            throw std::runtime_error(
+                "MockDeviceManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d:s:s), UUID=" +
+                uuid);
+        }
+
+        return findOrCreateNsmDevice(deviceType, deviceRole, instanceNumber,
+                                     remapPropName, remapPropValue);
+    }
+
+    std::shared_ptr<NsmDevice>
+        getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
+                                     uint8_t deviceRole)
+    {
+        std::shared_ptr<NsmDevice> ret{};
+        uint16_t staticInstanceAndRole = (deviceRole << 8) | instanceNumber;
+        if (deviceMap.find(deviceType) != deviceMap.end())
+        {
+            if (deviceMap[deviceType].find(staticInstanceAndRole) !=
+                deviceMap[deviceType].end())
+            {
+                ret = deviceMap[deviceType][staticInstanceAndRole];
+            }
+        }
+        return ret;
+    }
+};
+
+MockDeviceManager* MockDeviceManager::instance = nullptr;
 
 struct MockSensorManager : public SensorManager
 {
     MockSensorManager() = delete;
     MockSensorManager(NsmDeviceTable& nsmDevices) : SensorManager(nsmDevices, 0)
-    {}
+    {
+        // Ignore nsmDevices parameter for mock
+    }
     MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
                 (eid_t eid, Request& request,
                  std::shared_ptr<const nsm_msg>& responseMsg,
                  size_t& responseLen, bool bypassCommandCheck),
                 (override));
+    MOCK_METHOD(requester::Coroutine, postPatchNsmCommand,
+                (eid_t eid, Request& request,
+                 std::shared_ptr<const nsm_msg>& responseMsg,
+                 size_t& responseLen),
+                (override));
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));
     MOCK_METHOD(sdbusplus::asio::object_server&, getObjServer, (), (override));
+
+    std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid) override
+    {
+        return MockDeviceManager::getInstance(nsmDevices)
+            .getNsmDeviceFromStaticUUID(uuid);
+    };
+    std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
+                                            uint8_t instanceNumber,
+                                            uint8_t deviceRole) override
+    {
+        return MockDeviceManager::getInstance(nsmDevices)
+            .getNsmDeviceByIdentification(deviceType, instanceNumber,
+                                          deviceRole);
+    }
 };
 
 class SensorManagerTest
@@ -95,6 +219,28 @@ class SensorManagerTest
     auto mockSendRecvNsmMsg(nsm_completion_codes code = NSM_SUCCESS)
     {
         return mockSendRecvNsmMsg(Response(), code);
+    }
+
+    auto mockPostPatchNsmCommand(const Response& response,
+                                 nsm_completion_codes code = NSM_SUCCESS)
+    {
+        lastResponse = response;
+        return [response, code](eid_t, Request&,
+                                std::shared_ptr<const nsm_msg>& responseMsg,
+                                size_t& responseLen) -> requester::Coroutine {
+            allocMessage(response, responseMsg, responseLen);
+            // coverity[missing_return]
+            co_return code;
+        };
+    }
+    auto mockPostPatchNsmCommand(const Response& header, const Response& data,
+                                 nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockPostPatchNsmCommand(joinResponse(header, data), code);
+    }
+    auto mockPostPatchNsmCommand(nsm_completion_codes code = NSM_SUCCESS)
+    {
+        return mockPostPatchNsmCommand(Response(), code);
     }
 
     SensorManagerTest() = delete;

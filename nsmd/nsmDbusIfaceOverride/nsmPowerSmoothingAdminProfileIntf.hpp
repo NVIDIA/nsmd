@@ -87,12 +87,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "getAdminProfileFromDevice SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
+                "getAdminProfileFromDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             // coverity[missing_return]
             co_return rc_;
@@ -192,12 +192,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "overrideAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "overrideAdminProfileParam postPatchNsmCommand failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
                 "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
@@ -264,12 +264,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "resetAdminProfileParam SendRecvNsmMsgSync failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "resetAdminProfileParam postPatchNsmCommand failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
                 "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;

@@ -57,7 +57,7 @@ static requester::Coroutine createNsmZones(SensorManager& manager,
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         // cannot find a nsmDevice for the sensor

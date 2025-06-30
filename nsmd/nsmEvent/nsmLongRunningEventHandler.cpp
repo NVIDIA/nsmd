@@ -31,32 +31,14 @@ int NsmLongRunningEventHandler::handle(eid_t eid, NsmType type,
                                        size_t eventLen)
 {
     DeviceManager& deviceManager = DeviceManager::getInstance();
-    SensorManager& sensorManager = SensorManager::getInstance();
-    std::shared_ptr<NsmDevice> nsmDevice = nullptr;
-    // update sensors for capabilities refresh
-    // Get UUID from EID
-    auto uuidOptional = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
-    if (uuidOptional)
+    auto nsmDevice = deviceManager.getNsmDeviceFromEid(eid);
+    if (!nsmDevice)
     {
-        uuid_t uuid = *uuidOptional;
-        // findNSMDevice instance for that eid
-        nsmDevice = sensorManager.getNsmDevice(uuid);
-        if (!nsmDevice)
-        {
-            lg2::error(
-                "LongRunning event : The NSM device has not been discovered for , uuid={UUID}",
-                "UUID", uuid);
-            return NSM_SW_ERROR_DATA;
-        }
-    }
-    else
-    {
-        lg2::error("LonrRunning event : No UUID found for EID {EID}", "EID",
-                   eid);
+        lg2::error(
+            "LongRunning event : The NSM device has not been discovered for , eid={EID}",
+            "EID", eid);
         return NSM_SW_ERROR_DATA;
     }
-
-    // Delegate the invocation to the NSM device
     return nsmDevice->invokeLongRunningHandler(eid, type, eventId, event,
                                                eventLen);
 }

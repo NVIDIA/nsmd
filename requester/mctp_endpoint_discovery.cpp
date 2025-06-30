@@ -126,6 +126,7 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
     int protocol = 0;
     std::vector<uint8_t> address{};
     std::string bindingType;
+    Active active = false;
     try
     {
         for (const auto& [intfName, properties] : interfaces)
@@ -141,6 +142,13 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 protocol = std::get<size_t>(properties.at("Protocol"));
                 address =
                     std::get<std::vector<uint8_t>>(properties.at("Address"));
+            }
+
+            if (intfName == codeConstructEndpointIntfName)
+            {
+                auto connectivity =
+                    std::get<std::string>(properties.at("Connectivity"));
+                active = (connectivity == "Available");
             }
         }
 
@@ -192,7 +200,7 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 {
                     handler.registerMctpEndpoint(eid, type, protocol, address);
                     mctpInfos.emplace_back(std::make_tuple(
-                        eid, uuid, mediumType, networkId, bindingType));
+                        eid, uuid, mediumType, networkId, bindingType, active));
                 }
             }
         }
@@ -265,6 +273,11 @@ requester::Coroutine
                 "Processing au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
                 "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
                 "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
+            for (MctpDiscoveryHandlerIntf* handler : handlers)
+            {
+                handler->handleMctpStateTransition(
+                    objPath, (connectivity == "Available"));
+            }
             try
             {
                 auto mapperResponse = co_await utils::coGetServiceMap(
@@ -341,7 +354,8 @@ requester::Coroutine
             }
 
             MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType,
-                                                networkId, bindingType);
+                                                networkId, bindingType,
+                                                (connectivity == "Available"));
             for (MctpDiscoveryHandlerIntf* handler : handlers)
             {
                 if (connectivity == "Available")
@@ -349,12 +363,14 @@ requester::Coroutine
                     if (std::find(mctpTypes.begin(), mctpTypes.end(),
                                   mctpTypeVDM) != mctpTypes.end())
                     {
-                        co_await handler->onlineMctpEndpoint(mctpInfo);
+                        MctpInfos mctpInfos{mctpInfo};
+                        handler->handleMctpEndpoints(mctpInfos);
                     }
                 }
                 else
                 {
-                    co_await handler->offlineMctpEndpoint(mctpInfo);
+                    MctpInfos mctpInfos{mctpInfo};
+                    handler->handleMctpEndpoints(mctpInfos);
                 }
             }
         }

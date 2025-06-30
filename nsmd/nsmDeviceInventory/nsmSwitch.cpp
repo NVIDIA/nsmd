@@ -191,12 +191,12 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "setL1PowerDevice SendRecvNsmMsgSync failed for while setting PowerMode "
+            "setL1PowerDevice postPatchNsmCommand failed for while setting PowerMode "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -482,12 +482,12 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmSwitchIsolationMode::setSwitchIsolationMode SendRecvNsmMsgSync failed for"
+            "NsmSwitchIsolationMode::setSwitchIsolationMode postPatchNsmCommand failed for"
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -556,7 +556,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
 
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (type == "NSM_NVSwitch")
     {

@@ -38,7 +38,10 @@ requester::Coroutine
     nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath);
-}
+NsmDeviceTable devices;
+std::shared_ptr<NsmDevice> gpu;
+std::shared_ptr<NsmDevice> fpga;
+} // namespace nsm
 
 using namespace nsm;
 
@@ -55,18 +58,27 @@ struct NsmChassisPCIeDeviceTest :
     const std::string name = "PCIeDevice1";
     const std::string objPath = chassisInventoryBasePath / chassisName / name;
 
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
-    const uuid_t gpuDeviceUuid = "592b3ec1-e464-f145-8686-409009062aa8";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
+    const uuid_t gpuDeviceUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
 
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>(gpuUuid)},
-        {std::make_shared<NsmDevice>(fpgaUuid)},
-    };
-    NsmDevice& gpu = *devices[0];
-    NsmDevice& fpga = *devices[1];
-
-    NsmChassisPCIeDeviceTest() : SensorManagerTest(devices) {}
+    NsmChassisPCIeDeviceTest() : SensorManagerTest(devices)
+    {
+        if (fpga)
+        {
+            fpga->staticSensors.clear();
+            fpga->deviceSensors.clear();
+            fpga->prioritySensors.clear();
+            fpga->roundRobinSensors.clear();
+        }
+        if (gpu)
+        {
+            gpu->staticSensors.clear();
+            gpu->deviceSensors.clear();
+            gpu->prioritySensors.clear();
+            gpu->roundRobinSensors.clear();
+        }
+    }
 
     const PropertyValuesCollection error = {
         {"Type", "NSM_ChassispCIeDevice"},
@@ -144,12 +156,11 @@ TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
     propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
 
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    gpu = devices[0];
+    EXPECT_EQ(0, gpu->deviceSensors.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
 }
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 {
@@ -182,22 +193,20 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     propertyMap["Health"] = std::get<std::string>(get(health, "Health").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Health",
                                       objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(3, gpu.staticSensors.size());
-    EXPECT_EQ(3, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(3, gpu->staticSensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(3, gpu->deviceSensors.size());
 
     auto sensor = 0;
     auto uuidObject = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
-        gpu.deviceSensors[sensor++]);
+        gpu->deviceSensors[sensor++]);
     auto associationsObject =
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsIntf>>(
-            gpu.deviceSensors[sensor++]);
+            gpu->deviceSensors[sensor++]);
     auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-        gpu.deviceSensors[sensor++]);
+        gpu->deviceSensors[sensor++]);
 
     EXPECT_NE(nullptr, uuidObject);
     EXPECT_NE(nullptr, associationsObject);
@@ -257,37 +266,35 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(5, gpu.roundRobinSensors.size());
-    EXPECT_EQ(4, gpu.staticSensors.size());
-    EXPECT_EQ(9, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(4, gpu->staticSensors.size());
+    EXPECT_EQ(5, gpu->roundRobinSensors.size());
+    EXPECT_EQ(9, gpu->deviceSensors.size());
 
     auto sensors = 0;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu.deviceSensors[sensors++]);
+        gpu->deviceSensors[sensors++]);
     auto serialNumber =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu.deviceSensors[sensors++]);
+            gpu->deviceSensors[sensors++]);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu.deviceSensors[sensors++]);
+        gpu->deviceSensors[sensors++]);
     auto pcieDeviceObject =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
-            gpu.deviceSensors[sensors++]);
+            gpu->deviceSensors[sensors++]);
     auto functionSensor =
-        dynamic_pointer_cast<NsmPCIeFunction>(gpu.deviceSensors[sensors++]);
+        dynamic_pointer_cast<NsmPCIeFunction>(gpu->deviceSensors[sensors++]);
     sensors++;
     auto ltssmStateSensor =
-        dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu.deviceSensors[sensors++]);
+        dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu->deviceSensors[sensors++]);
     auto pcieRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<PCIeRefClockIntf>>(
-            gpu.deviceSensors[sensors++]);
+            gpu->deviceSensors[sensors++]);
     auto nvLinkRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
-            gpu.deviceSensors[sensors++]);
-    EXPECT_EQ(sensors, gpu.deviceSensors.size());
+            gpu->deviceSensors[sensors++]);
+    EXPECT_EQ(sensors, gpu->deviceSensors.size());
 
     EXPECT_NE(nullptr, partNumber);
     EXPECT_NE(nullptr, serialNumber);
@@ -316,7 +323,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
         .WillRepeatedly(mockSendRecvNsmMsg());
     for (auto i = 0; i < sensors; i++)
     {
-        gpu.deviceSensors[i]->update(mockManager, eid).detach();
+        gpu->deviceSensors[i]->update(mockManager, eid).detach();
     }
 }
 

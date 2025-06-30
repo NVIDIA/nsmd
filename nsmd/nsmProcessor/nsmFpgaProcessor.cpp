@@ -87,7 +87,7 @@ static requester::Coroutine
                 allBaseIfaceProperties.at("InventoryObjPath"));
         }
 
-        auto nsmDevice = manager.getNsmDevice(uuid);
+        auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
         if (!nsmDevice)
         {
             // cannot found a nsmDevice for the sensor

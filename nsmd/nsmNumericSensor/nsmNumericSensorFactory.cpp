@@ -141,7 +141,7 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (!nsmDevice)
     {

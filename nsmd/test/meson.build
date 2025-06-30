@@ -10,6 +10,7 @@ dep_src_files = [
     '../nsmCommon/sharedMemCommon.cpp',
     '../nsmFwSwInventory/GPUSWInventory.cpp',
     '../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../socket_handler.cpp',
     '../../libnsm/instance-id.c',
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',

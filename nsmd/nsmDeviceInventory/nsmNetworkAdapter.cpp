@@ -91,7 +91,7 @@ static requester::Coroutine
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
                                       associations);
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
         bus, name, associations, type, inventoryObjPath);

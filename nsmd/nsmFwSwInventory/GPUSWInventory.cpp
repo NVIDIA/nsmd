@@ -133,6 +133,8 @@ requester::Coroutine
             "EID", eid);
         DeviceManager& deviceManager = DeviceManager::getInstance();
         co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
+        co_await DeviceManager::getInstance().refreshCapabilitySensor(
+            nsmDeviceFound);
     }
 
     // coverity[missing_return]
@@ -169,7 +171,7 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
                                       associations);
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         // cannot found a nsmDevice for the sensor

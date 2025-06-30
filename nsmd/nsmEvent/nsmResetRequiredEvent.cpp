@@ -151,7 +151,7 @@ static requester::Coroutine
 
     info.severity = severityEnum.value_or(Level::Critical);
 
-    auto nsmDevice = manager.getNsmDevice(info.uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(info.uuid);
 
     if (!nsmDevice)
     {

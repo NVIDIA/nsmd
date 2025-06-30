@@ -77,15 +77,15 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await manager.postPatchNsmCommand(
+        eid, *request, responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: disableTokens SendRecvNsmMsg: "
+        lg2::error("DebugToken: disableTokens postPatchNsmCommand: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -138,15 +138,15 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await manager.postPatchNsmCommand(
+        eid, *request, responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: getRequest SendRecvNsmMsg: "
+        lg2::error("DebugToken: getRequest postPatchNsmCommand: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -228,17 +228,17 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = NSM_SUCCESS;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await manager.postPatchNsmCommand(
+        eid, *request, responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
         LG2_ERROR_FLT(
-            "DebugToken: getStatus SendRecvNsmMsg failed | cc: {CC}, rc: {RC}, eid: {EID}",
+            "DebugToken: getStatus postPatchNsmCommand failed | cc: {CC}, rc: {RC}, eid: {EID}",
             "CC", nsm_completion_codes(cc), "RC", nsm_sw_codes(sendRc), "EID",
             eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -373,15 +373,15 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await manager.postPatchNsmCommand(
+        eid, *request, responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: installToken SendRecvNsmMsg: "
+        lg2::error("DebugToken: installToken postPatchNsmCommand: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)

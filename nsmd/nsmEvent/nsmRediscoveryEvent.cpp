@@ -83,45 +83,37 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
 
     // Member to hold reference to DeviceManager and sensor manager
     DeviceManager& deviceManager = DeviceManager::getInstance();
-    SensorManager& sensorManager = SensorManager::getInstance();
-    // update sensors for capabilities refresh
-    // Get UUID from EID
-    auto uuidOptional = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
-    if (uuidOptional)
+    auto nsmDevice = deviceManager.getNsmDeviceFromEid(eid);
+    if (nsmDevice)
     {
-        uuid_t uuid = *uuidOptional;
-        // findNSMDevice instance for that eid
-        lg2::info("rediscovery event : UUID found: {UUID}", "UUID", uuid);
-        auto nsmDevice = sensorManager.getNsmDevice(uuid);
-        if (nsmDevice)
+        lg2::info(
+            "Rediscovery event : The NSM device has been discovered for , eid={EID}",
+            "EID", eid);
+        if (nsmDevice->discoveryPending)
         {
             lg2::info(
-                "Rediscovery event : The NSM device has been discovered for , uuid={UUID}",
-                "UUID", uuid);
-            isRediscoveryRequired = true;
-            if (rediscoveryTaskHandler)
-            {
-                if (!rediscoveryTaskHandler.done())
-                {
-                    return NSM_SW_SUCCESS;
-                }
-                rediscoveryTaskHandler.destroy();
-            }
-
-            auto co = handleRediscovery(nsmDevice, eid);
-            rediscoveryTaskHandler = co.handle;
+                "Rediscovery event : Dropping the rediscovery process for eid={EID}, as mctp rediscovery is already in progress",
+                "EID", eid);
+            return NSM_SW_SUCCESS;
         }
-        else
+        isRediscoveryRequired = true;
+        if (rediscoveryTaskHandler)
         {
-            lg2::error(
-                "Rediscovery event : The NSM device has not been discovered for , uuid={UUID}",
-                "UUID", uuid);
+            if (!rediscoveryTaskHandler.done())
+            {
+                return NSM_SW_SUCCESS;
+            }
+            rediscoveryTaskHandler.destroy();
         }
+
+        auto co = handleRediscovery(nsmDevice, eid);
+        rediscoveryTaskHandler = co.handle;
     }
     else
     {
-        lg2::error("Rediscovery event : No UUID found for EID {EID}", "EID",
-                   eid);
+        lg2::error(
+            "Rediscovery event : The NSM device has not been discovered for , eid={EID}",
+            "EID", eid);
     }
 
     return NSM_SW_SUCCESS;
@@ -135,12 +127,14 @@ requester::Coroutine
     {
         isRediscoveryRequired = false;
         co_await DeviceManager::getInstance().updateNsmDevice(nsmDevice, eid);
+        co_await DeviceManager::getInstance().refreshCapabilitySensor(
+            nsmDevice);
     }
     co_return NSM_SW_SUCCESS;
 }
 
 static requester::Coroutine
-    createNsmRediscoveryEvent(SensorManager& manager,
+    createNsmRediscoveryEvent([[maybe_unused]] SensorManager& manager,
                               const std::string& interface,
                               const std::string& objPath)
 {
@@ -205,7 +199,8 @@ static requester::Coroutine
 
     info.severity = severityEnum.value_or(Level::Critical);
 
-    auto nsmDevice = manager.getNsmDevice(info.uuid);
+    auto nsmDevice =
+        DeviceManager::getInstance().getNsmDeviceFromStaticUUID(info.uuid);
 
     if (!nsmDevice)
     {

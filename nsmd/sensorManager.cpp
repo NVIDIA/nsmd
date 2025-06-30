@@ -722,7 +722,11 @@ requester::Coroutine
 
         if (!nsmDevice->isDeviceActive)
         {
-            co_await tryActivateDevice(nsmDevice);
+            const uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS *
+                                                     1000;
+            co_await common::Sleep(event, inActiveSleepTimeInUsec,
+                                   common::Priority);
+            continue;
         }
         else if (!nsmDevice->allCommandCodesAreRetrieved())
         {
@@ -766,28 +770,11 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     uint8_t messageType = requestMsg->hdr.nvidia_msg_type;
     uint8_t commandCode = requestMsg->payload[0];
 
-    auto uuid = utils::getUUIDFromEID(eidTable, eid);
-    if (stateChangeLoggers[eid].shouldLog("SendRecvNsmMsg getUUIDFromEID",
-                                          uuid == std::nullopt))
-    {
-        LG2_ERROR("No UUID found for EID {EID}", "EID", eid);
-    }
-    if (!uuid)
-    {
-        // coverity[missing_return]
-        co_return NSM_ERROR;
-    }
-
-    auto nsmDevice = getNsmDevice(*uuid);
-    if (stateChangeLoggers[eid].shouldLog("SendRecvNsmMsg getNsmDevice",
-                                          nsmDevice == nullptr))
-    {
-        LG2_ERROR("No nsmDevice found for eid={EID} , uuid={UUID}", "EID", eid,
-                  "UUID", *uuid);
-    }
+    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
     if (!nsmDevice)
     {
-        // coverity[missing_return]
+        LG2_ERROR("No nsmDevice found for eid={EID}", "EID", eid);
+
         co_return NSM_ERROR;
     }
 
@@ -817,41 +804,69 @@ requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
     co_return rc;
 }
 
-std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uint8_t deviceType,
-                                                       uint8_t instanceNumber,
-                                                       uint8_t deviceRole)
+requester::Coroutine SensorManagerImpl::postPatchNsmCommand(
+    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
+    size_t& responseLen)
 {
-    return findNsmDeviceByIdentification(nsmDevices, deviceType, instanceNumber,
-                                         deviceRole);
-}
-std::shared_ptr<NsmDevice> SensorManager::getNsmDevice(uuid_t uuid)
-{
-    auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
+    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
     if (!nsmDevice)
     {
-        // check if the uuid is in static inventory format.
-        uint8_t deviceType = 0xff;
-        uint8_t instanceNumber = 0xff;
-        uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
-        if (parseStaticUuid(uuid, deviceType, instanceNumber, deviceRole) < 0)
-        {
-            throw std::runtime_error(
-                "SensorManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d), UUID=" +
-                uuid);
-        }
+        LG2_ERROR("No nsmDevice found for eid={EID}", "EID", eid);
 
-        nsmDevice = findNsmDeviceByIdentification(nsmDevices, deviceType,
-                                                  instanceNumber, deviceRole);
-        if (!nsmDevice)
-        {
-            // create nsmDevice
-            nsmDevice = std::make_shared<NsmDevice>(deviceType, instanceNumber,
-                                                    deviceRole);
-            nsmDevices.emplace_back(nsmDevice);
-            nsmDevice->isDeviceActive = false;
-        }
+        co_return NSM_ERROR;
     }
-    return nsmDevice;
+
+    auto rc = co_await nsmDevice->waitForNsmDeviceUpdate();
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (rc == NSM_SW_ERROR_TIMEOUT)
+        {
+            lg2::error(
+                "SensorManager::postPatchNsmCommand NsmDevice update taking longer than expected for eid={EID}",
+                "EID", eid);
+        }
+        else
+        {
+            lg2::error(
+                "SensorManager::postPatchNsmCommand unexpected arror while waiting for NsmDevice update for eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc);
+        }
+        co_return rc;
+    }
+
+    if (!nsmDevice->isDeviceActive)
+    {
+        // coverity[missing_return]
+        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    const nsm_msg* response = nullptr;
+    rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
+        handler, eid, request, &response, &responseLen);
+    responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
+    }); // the memory is allocated and free at sock_handler.cpp
+    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
+    // request that timedout
+    if (rc && rc != NSM_SW_ERROR_NULL)
+    {
+        lg2::error("NsmDevice::postPatchNsmCommand failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+    }
+    // coverity[missing_return]
+    co_return rc;
+}
+
+std::shared_ptr<NsmDevice>
+    SensorManagerImpl::getNsmDevice(uint8_t deviceType, uint8_t instanceNumber,
+                                    uint8_t deviceRole)
+{
+    return DeviceManager::getInstance().getNsmDeviceByIdentification(
+        deviceType, instanceNumber, deviceRole);
+}
+std::shared_ptr<NsmDevice>
+    SensorManagerImpl::getNsmDeviceFromStaticUUID(uuid_t uuid)
+{
+    return DeviceManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
 }
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)

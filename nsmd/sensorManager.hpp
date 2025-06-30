@@ -71,6 +71,10 @@ class SensorManager
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t& responseLen,
                        bool bypassCommandCheck = false) = 0;
+    virtual requester::Coroutine
+        postPatchNsmCommand(eid_t eid, Request& request,
+                            std::shared_ptr<const nsm_msg>& responseMsg,
+                            size_t& responseLen) = 0;
 
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual sdbusplus::asio::object_server& getObjServer() = 0;
@@ -78,10 +82,11 @@ class SensorManager
     {
         return localEid;
     }
-    std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
-                                            uint8_t instanceNumber,
-                                            uint8_t deviceRole);
-    std::shared_ptr<NsmDevice> getNsmDevice(uuid_t uuid);
+    virtual std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
+                                                    uint8_t instanceNumber,
+                                                    uint8_t deviceRole) = 0;
+    virtual std::shared_ptr<NsmDevice>
+        getNsmDeviceFromStaticUUID(uuid_t uuid) = 0;
     // Static method to access the instance of the class
     static SensorManager& getInstance()
     {
@@ -198,6 +203,15 @@ class SensorManagerImpl : public SensorManager
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t& responseLen,
                        bool bypassCommandCheck = false) override;
+    requester::Coroutine
+        postPatchNsmCommand(eid_t eid, Request& request,
+                            std::shared_ptr<const nsm_msg>& responseMsg,
+                            size_t& responseLen) override;
+
+    std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid) override;
+    std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
+                                            uint8_t instanceNumber,
+                                            uint8_t deviceRole) override;
     void scanInventory();
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
 

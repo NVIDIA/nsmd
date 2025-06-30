@@ -104,7 +104,7 @@ int NsmThresholdEvent::handle(eid_t eid, NsmType /*type*/,
     }
 
     SensorManager& manager = SensorManager::getInstance();
-    auto nsmDevice = manager.getNsmDevice(info.uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(info.uuid);
     auto messageArg = info.messageArgs[0];
     if (nsmDevice)
     {
@@ -147,7 +147,7 @@ requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
         info.uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
 
-    auto device = manager.getNsmDevice(info.uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(info.uuid);
 
     std::string name{};
     if (allCurrentIfaceProperties.count("Name"))

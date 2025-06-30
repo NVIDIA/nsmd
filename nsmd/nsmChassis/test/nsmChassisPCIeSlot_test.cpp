@@ -33,11 +33,16 @@ requester::Coroutine
     nsmChassisPCIeSlotCreateSensors(SensorManager& manager,
                                     const std::string& interface,
                                     const std::string& objPath);
-}
+NsmDeviceTable devices;
+std::shared_ptr<NsmDevice> baseboard;
+} // namespace nsm
 
 using namespace nsm;
 
-struct NsmChassisPCIeSlotTest : public testing::Test, public utils::DBusTest
+struct NsmChassisPCIeSlotTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
@@ -47,14 +52,17 @@ struct NsmChassisPCIeSlotTest : public testing::Test, public utils::DBusTest
     const std::string name = "PCIeSlot1";
     const std::string objPath = chassisInventoryBasePath / chassisName / name;
 
-    const uuid_t baseboardUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    const uuid_t baseboardUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:255";
 
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>(baseboardUuid)},
-    };
-    NsmDevice& baseboard = *devices[0];
-
-    NiceMock<MockSensorManager> mockManager{devices};
+    NsmChassisPCIeSlotTest() : SensorManagerTest(devices)
+    {
+        if (baseboard)
+        {
+            baseboard->deviceSensors.clear();
+            baseboard->prioritySensors.clear();
+            baseboard->roundRobinSensors.clear();
+        }
+    }
 
     const PropertyValuesCollection error = {
         {"UUID", "99sb3ec1-e468-f145-8686-409009062aa8"},
@@ -94,21 +102,23 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(0, baseboard.prioritySensors.size());
-    EXPECT_EQ(1, baseboard.roundRobinSensors.size());
-    EXPECT_EQ(1, baseboard.staticSensors.size());
-    EXPECT_EQ(2, baseboard.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    baseboard = devices[0];
+    EXPECT_EQ(0, baseboard->prioritySensors.size());
+    EXPECT_EQ(1, baseboard->staticSensors.size());
+    EXPECT_EQ(1, baseboard->roundRobinSensors.size());
+    EXPECT_EQ(2, baseboard->deviceSensors.size());
 
     auto sensors = 0;
     auto sensor = dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeSlotIntf>>(
-        baseboard.deviceSensors[sensors++]);
+        baseboard->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, sensor);
     EXPECT_EQ(PCIeSlotIntf::convertSlotTypesFromString(
                   get<std::string>(basic, "SlotType")),
               sensor->invoke(pdiMethod(slotType)));
     auto associations =
         dynamic_pointer_cast<NsmChassisPCIeSlot<AssociationDefinitionsIntf>>(
-            baseboard.deviceSensors[sensors++]);
+            baseboard->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, associations);
     EXPECT_EQ(0, associations->invoke(pdiMethod(associations)).size());
 }
@@ -134,9 +144,10 @@ TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
     propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
 
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, baseboard.prioritySensors.size());
-    EXPECT_EQ(0, baseboard.roundRobinSensors.size());
-    EXPECT_EQ(0, baseboard.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, baseboard->prioritySensors.size());
+    EXPECT_EQ(0, baseboard->roundRobinSensors.size());
+    EXPECT_EQ(0, baseboard->deviceSensors.size());
 }
 
 struct NsmPCIeSlotTest : public NsmChassisPCIeSlotTest

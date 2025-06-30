@@ -166,12 +166,12 @@ requester::Coroutine NsmProcessorModulePowerControl::updatePowerLimitOnModule(
         size_t responseLen = 0;
         auto eid = manager.getEid(nsmDevice);
         lg2::info("update Power Limit On Module for eid = {EID}", "EID", eid);
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         if (rc)
         {
             lg2::error(
-                "updatePowerLimitOnModule SendRecvNsmMsg failed for while setting power limit for eid = {EID} rc = {RC}",
+                "updatePowerLimitOnModule postPatchNsmCommand failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc);
             break;
         }
@@ -438,7 +438,7 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     std::string processorModuleName =
         chassisPath.substr(chassisPath.rfind('/') + 1, chassisPath.size());

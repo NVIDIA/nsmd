@@ -33,7 +33,8 @@ namespace nsm
 requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
                                              const std::string& interface,
                                              const std::string& objPath);
-};
+NsmDeviceTable devices;
+}; // namespace nsm
 
 using namespace nsm;
 
@@ -49,17 +50,8 @@ struct NsmThresholdEventTest :
     const std::string name = "ThresholdEventSetting";
     const std::string objPath = chassisInventoryBasePath / name;
 
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>((uint8_t)NSM_DEV_ID_GPU, instanceId)},
-    };
-    NsmDevice& gpu = *devices[0];
-
-    NsmThresholdEventTest() : SensorManagerTest(devices)
-    {
-        gpu.uuid = gpuUuid;
-    }
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    NsmThresholdEventTest() : SensorManagerTest(devices) {}
 
     const PropertyValuesCollection error = {
         {"UUID", "992b3ec1-e468-f145-8686-badbadbadbad"},
@@ -93,7 +85,7 @@ TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
     propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, gpu.deviceEvents.size());
+    EXPECT_EQ(0, devices.size());
 }
 
 TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
@@ -122,7 +114,8 @@ TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
     }
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(1, gpu.deviceEvents.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(1, devices.back()->deviceEvents.size());
 }
 
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
@@ -147,16 +140,18 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
 
-    EXPECT_EQ(2, gpu.deviceEvents.size());
-    EXPECT_EQ(2, gpu.eventDispatcher.eventsMap.size());
+    EXPECT_EQ(1, devices.size());
+    auto gpu = devices.back();
+    EXPECT_EQ(2, gpu->deviceEvents.size());
+    EXPECT_EQ(2, gpu->eventDispatcher.eventsMap.size());
 
     auto event =
-        dynamic_pointer_cast<NsmThresholdEvent>(gpu.deviceEvents.back());
+        dynamic_pointer_cast<NsmThresholdEvent>(gpu->deviceEvents.back());
     EXPECT_NE(nullptr, event);
-    auto& eventMapEntry =
-        *gpu.eventDispatcher.eventsMap[NSM_TYPE_NETWORK_PORT].find(
+    auto eventMapEntry =
+        gpu->eventDispatcher.eventsMap[NSM_TYPE_NETWORK_PORT].find(
             NSM_THRESHOLD_EVENT);
-    EXPECT_EQ(event.get(), eventMapEntry.second.get());
+    EXPECT_EQ(event.get(), eventMapEntry->second.get());
 
     const nsm_health_event_payload payload{0, 0, 1, 1, 1, 1, 1, 1, 1, 0};
     std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
@@ -165,12 +160,12 @@ TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
     auto rc = encode_nsm_health_event(eid, true, &payload, msg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
-    rc = gpu.eventDispatcher.handle(eid, NSM_TYPE_NETWORK_PORT,
-                                    NSM_THRESHOLD_EVENT, msg, eventMsg.size());
+    rc = gpu->eventDispatcher.handle(eid, NSM_TYPE_NETWORK_PORT,
+                                     NSM_THRESHOLD_EVENT, msg, eventMsg.size());
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
-    rc = gpu.eventDispatcher.handle(eid, NSM_TYPE_NETWORK_PORT,
-                                    NSM_THRESHOLD_EVENT, msg,
-                                    eventMsg.size() - 3);
+    rc = gpu->eventDispatcher.handle(eid, NSM_TYPE_NETWORK_PORT,
+                                     NSM_THRESHOLD_EVENT, msg,
+                                     eventMsg.size() - 3);
     EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
 }

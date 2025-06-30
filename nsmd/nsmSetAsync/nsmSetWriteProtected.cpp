@@ -145,14 +145,14 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetWriteProtected::setWriteProtected: SendRecvNsmMsgSync failed."
+                "NsmSetWriteProtected::setWriteProtected: postPatchNsmCommand failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }

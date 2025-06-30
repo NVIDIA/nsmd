@@ -3,6 +3,7 @@ dep_src_files = [
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
+    '../../socket_handler.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmObjectFactory.cpp',

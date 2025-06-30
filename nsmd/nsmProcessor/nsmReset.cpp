@@ -90,7 +90,7 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
                 std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceIndex"));
         }
 
-        auto nsmDevice = manager.getNsmDevice(uuid);
+        auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
         if (!nsmDevice)
         {
             // cannot found a nsmDevice for the sensor

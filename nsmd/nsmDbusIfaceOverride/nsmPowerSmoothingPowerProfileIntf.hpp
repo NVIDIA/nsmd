@@ -89,12 +89,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "getProfileInfo SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
+                "getProfileInfo postPatchNsmCommand failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
 
             co_return rc_;
@@ -197,12 +197,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "updateProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "updateProfileInfoOnDevice postPatchNsmCommand failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
                 profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
@@ -264,12 +264,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "resetProfileInfoOnDevice SendRecvNsmMsg failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
+                "resetProfileInfoOnDevice postPatchNsmCommand failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
                 profileId, "VALUE", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;

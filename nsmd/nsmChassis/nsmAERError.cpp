@@ -112,12 +112,12 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "clearAERError SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "clearAERError postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]

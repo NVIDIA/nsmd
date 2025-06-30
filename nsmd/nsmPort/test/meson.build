@@ -10,6 +10,7 @@ dep_src_files = [
     '../../sensorManager.cpp',
     '../../nsmEvent.cpp',
     '../../deviceManager.cpp',
+    '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmHistograms/nsmHistogramInfo.cpp',

@@ -78,12 +78,12 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "clearReqClockLimit SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "clearReqClockLimit postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -279,12 +279,12 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmChassisClockControl::setRangeClockLimits SendRecvNsmMsgSync failed for while setting requested speed limit "
+            "NsmChassisClockControl::setRangeClockLimits postPatchNsmCommand failed for while setting requested speed limit "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -363,7 +363,7 @@ static requester::Coroutine CreateControlGpuClock(SensorManager& manager,
             std::get<std::string>(allCurrentIfaceProperties.at("ClockMode"));
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (!nsmDevice)
     {

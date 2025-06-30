@@ -68,12 +68,12 @@ class NsmResetEdppAsyncIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "NsmResetEdppAsyncIntf::clearSetPoint SendRecvNsmMsgSync failed for  "
+                "NsmResetEdppAsyncIntf::clearSetPoint postPatchNsmCommand failed for  "
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;

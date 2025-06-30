@@ -92,7 +92,7 @@ requester::Coroutine
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
 
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (type == "NSM_Chassis")
     {
@@ -106,7 +106,6 @@ requester::Coroutine
 
         chassisUuid->invoke(pdiMethod(uuid), deviceUuid);
         device->addStaticSensor(chassisUuid);
-
         auto mctpUuid = std::make_shared<NsmChassis<MctpUuidIntf>>(name);
         mctpUuid->invoke(pdiMethod(uuid), uuid);
         device->addStaticSensor(mctpUuid);

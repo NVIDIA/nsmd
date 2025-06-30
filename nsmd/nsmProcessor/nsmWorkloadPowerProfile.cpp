@@ -61,12 +61,12 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestEnablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "requestEnablePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}, msg={MSG}",
             "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -164,12 +164,12 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestDisablePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "requestDisablePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}, msg={MSG}",
             "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;

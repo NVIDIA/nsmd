@@ -9,6 +9,7 @@ dep_src_files = [
     '../../deviceManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
+    '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',

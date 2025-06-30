@@ -120,6 +120,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
 
     requester::Coroutine updateNsmDevice(std::shared_ptr<NsmDevice> nsmDevice,
                                          uint8_t eid);
+    requester::Coroutine
+        refreshCapabilitySensor(std::shared_ptr<NsmDevice> nsmDevice);
 
     requester::Coroutine
         updateFruDeviceIntf(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
@@ -141,6 +143,14 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     requester::Coroutine
         refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice, uint8_t eid);
 
+    std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid);
+    std::shared_ptr<NsmDevice> getNsmDeviceFromEid(eid_t eid);
+    std::shared_ptr<NsmDevice>
+        getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
+                                     uint8_t deviceRole);
+    void handleMctpStateTransition(const std::string objPath,
+                                   const bool state) override;
+
   private:
     DeviceManager(
         sdeventplus::Event& event,
@@ -158,7 +168,7 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     bool insertIntoEidTableifNotExist(
         uuid_t uuid, const std::tuple<eid_t, MctpMedium, MctpBinding>& value);
 
-    requester::Coroutine discoverNsmDeviceTask();
+    requester::Coroutine discoverNsmDeviceTask(eid_t eid);
     requester::Coroutine coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos);
     requester::Coroutine
         coSetdeviceStateOfflineTask(const MctpInfos& mctpInfos);
@@ -185,13 +195,32 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
                                 uint8_t deviceRole, uuid_t& uuid,
                                 mctp_eid_t eid);
 
+    std::shared_ptr<NsmDevice>
+        findOrCreateNsmDevice(uint8_t deviceType, uint8_t deviceRole,
+                              uint8_t instanceNumber, std::string remapPropName,
+                              std::string remapPropValue);
+    void updateDeviceParameter(std::shared_ptr<NsmDevice> nsmDevice, eid_t eid,
+                               uuid_t uuid, uint8_t deviceInstanceNumber);
+    int mapMctpEIDForNsmDevice(std::shared_ptr<NsmDevice> nsmDevice);
+    void discoverAndUpdateNsmDeviceTask(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        updateNsmDeviceTask(std::shared_ptr<NsmDevice> nsmDevice);
+
+    std::shared_ptr<NsmDevice> mapNsmDeviceUsingEid(eid_t eid, uuid_t mctpUuid,
+                                                    uint8_t deviceType,
+                                                    uint8_t instanceNumber,
+                                                    bool active);
+
     sdeventplus::Event& event;
     requester::Handler<requester::Request>& handler;
     nsm::InstanceIdDb& instanceIdDb;
     sdbusplus::asio::object_server& objServer;
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>& eidTable;
+    std::map<uint8_t, std::map<uint16_t, std::shared_ptr<NsmDevice>>> deviceMap;
 
     std::queue<MctpInfos> queuedMctpInfos;
+    std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
+    std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
     std::coroutine_handle<> discoverNsmDeviceTaskHandle;
     std::coroutine_handle<> deviceOfflineTaskHandle;
     NsmDeviceTable& nsmDevices;

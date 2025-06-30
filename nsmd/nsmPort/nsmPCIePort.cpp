@@ -58,7 +58,7 @@ requester::Coroutine createNsmPCIePort(SensorManager& manager,
     {
         uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",

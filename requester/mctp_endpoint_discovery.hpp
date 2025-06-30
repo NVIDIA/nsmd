@@ -50,6 +50,8 @@ class MctpDiscoveryHandlerIntf
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
     }
+    virtual void handleMctpStateTransition(const std::string objPath,
+                                           const bool state) = 0;
     virtual ~MctpDiscoveryHandlerIntf() {}
 };
 
@@ -133,6 +135,9 @@ class MctpDiscovery
     /** @brief Unix Socket interface name */
     static constexpr std::string_view unixSocketIntfName{
         "xyz.openbmc_project.Common.UnixSocket"};
+
+    static constexpr std::string_view codeConstructEndpointIntfName{
+        "au.com.codeconstruct.MCTP.Endpoint1"};
 
     std::vector<MctpDiscoveryHandlerIntf*> handlers;
 

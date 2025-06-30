@@ -237,7 +237,7 @@ static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
             allCurrentIfaceProperties.at("PhysicalContext"));
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (!nsmDevice)
     {

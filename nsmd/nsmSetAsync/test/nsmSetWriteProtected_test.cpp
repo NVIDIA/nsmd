@@ -81,10 +81,10 @@ struct NsmSetWriteProtectedTest : public testing::Test, public SensorManagerTest
 TEST_F(NsmSetWriteProtectedTest, badTestBaseboardWrite)
 {
     init(HMC_SPI_FLASH);
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
         .Times(1)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg, Response(),
-                                     NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg,
+                                          NSM_ERR_UNSUPPORTED_COMMAND_CODE));
 
     EXPECT_THROW(
         writeProtected(true),
@@ -96,8 +96,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestBaseboardWrite)
     init(HMC_SPI_FLASH);
     const Response enabled{0b00,       0x00, 0b00, 0x00,
                            0b00010000, 0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().hmc);
@@ -108,8 +108,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer1Write)
     init(RETIMER_EEPROM_1);
     const Response enabled{0b00000001, 0x00, 0b00000001, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -120,8 +120,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer2Write)
     init(RETIMER_EEPROM_2);
     const Response enabled{0b00000001, 0x00, 0b00000010, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -132,8 +132,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer3Write)
     init(RETIMER_EEPROM_3);
     const Response enabled{0b00000001, 0x00, 0b00000100, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -144,8 +144,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer4Write)
     init(RETIMER_EEPROM_4);
     const Response enabled{0b00000001, 0x00, 0b00001000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -156,8 +156,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer5Write)
     init(RETIMER_EEPROM_5);
     const Response enabled{0b00000001, 0x00, 0b00010000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -168,8 +168,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer6Write)
     init(RETIMER_EEPROM_6);
     const Response enabled{0b00000001, 0x00, 0b00100000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -180,8 +180,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer7Write)
     init(RETIMER_EEPROM_7);
     const Response enabled{0b00000001, 0x00, 0b01000000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -192,8 +192,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestRetimer8Write)
     init(RETIMER_EEPROM_8);
     const Response enabled{0b00000001, 0x00, 0b10000000, 0x00,
                            0x00,       0x00, 0x00,       0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().retimer);
@@ -204,8 +204,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCpu1Write)
     init(CPU_SPI_FLASH_1);
     const Response enabled{0x00,       0b00000010, 0x00, 0x00,
                            0b00100000, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cpu1_4);
@@ -216,8 +216,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCpu2Write)
     init(CPU_SPI_FLASH_2);
     const Response enabled{0x00,       0b00000010, 0x00, 0x00,
                            0b01000000, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cpu1_4);
@@ -228,8 +228,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCpu3Write)
     init(CPU_SPI_FLASH_3);
     const Response enabled{0x00,       0b00000010, 0x00, 0x00,
                            0b10000000, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cpu1_4);
@@ -240,8 +240,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCpu4Write)
     init(CPU_SPI_FLASH_4);
     const Response enabled{0x00, 0b00000010, 0x00, 0x00,
                            0x00, 0b00000001, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cpu1_4);
@@ -252,8 +252,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch1Write)
     init(NVSW_EEPROM_1);
     const Response enabled{0b00001000, 0x00, 0x00, 0b0000001,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().nvSwitch);
@@ -264,8 +264,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvSwitch2Write)
     init(NVSW_EEPROM_2);
     const Response enabled{0b00001000, 0x00, 0x00, 0b0000010,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().nvSwitch);
@@ -276,8 +276,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestNvLinkManagementWrite)
     init(PEX_SW_EEPROM);
     const Response enabled{0b00000100, 0x00, 0x00, 0x00,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().pex);
@@ -288,8 +288,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu1Write)
     init(GPU_SPI_FLASH_1);
     const Response enabled{0b10000000, 0x00, 0x00, 0b00010000,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu1_4);
@@ -300,8 +300,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu2Write)
     init(GPU_SPI_FLASH_2);
     const Response enabled{0b10000000, 0x00, 0x00, 0b00100000,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu1_4);
@@ -312,8 +312,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu3Write)
     init(GPU_SPI_FLASH_3);
     const Response enabled{0b10000000, 0x00, 0x00, 0b01000000,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu1_4);
@@ -324,8 +324,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu4Write)
     init(GPU_SPI_FLASH_4);
     const Response enabled{0b10000000, 0x00, 0x00, 0b10000000,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu1_4);
@@ -336,8 +336,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu5Write)
     init(GPU_SPI_FLASH_5);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000001, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu5_8);
@@ -348,8 +348,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu6Write)
     init(GPU_SPI_FLASH_6);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000010, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu5_8);
@@ -360,8 +360,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu7Write)
     init(GPU_SPI_FLASH_7);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00000100, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu5_8);
@@ -372,8 +372,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpu8Write)
     init(GPU_SPI_FLASH_8);
     const Response enabled{0x00,       0b00000001, 0x00, 0x00,
                            0b00001000, 0x00,       0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu5_8);
@@ -385,8 +385,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestGpus9_16Write)
     init(GPU_SPI_FLASH);
     const Response enabled{0b10000000, 0b00001101, 0x00,       0b11110000,
                            0b00001111, 0x00,       0b11111111, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().gpu1_4);
@@ -416,8 +416,8 @@ TEST_F(NsmSetWriteProtectedTest, goodTestCX8Write)
     init(CX8_SPI_FLASH);
     const Response enabled{0b00010000, 0x00, 0x00, 0x00,
                            0x00,       0x00, 0x00, 0x00};
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableDisableMsg));
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(enableDisableMsg));
 
     EXPECT_EQ(true, writeProtected(true, enabled));
     EXPECT_EQ(1, data().cx8);

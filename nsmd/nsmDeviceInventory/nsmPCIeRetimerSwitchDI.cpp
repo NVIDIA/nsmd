@@ -226,7 +226,7 @@ static requester::Coroutine
                                       associations);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     // device_index are between [1 to 8] for retimers, which is
     // calculated as device_instance + PCIE_RETIMER_DEVICE_INDEX_START

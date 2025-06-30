@@ -1000,4 +1000,38 @@ requester::Coroutine coGetCachedBaseProperties(
     co_return NSM_SUCCESS;
 #endif
 }
+
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
+                    uint8_t& deviceRole, std::string& remapPropName,
+                    std::string& remapPropValue)
+{
+    int n1 = -1;
+    int n2 = -1;
+    char propName[128] = {0};
+    char propValue[128] = {0};
+
+    // Use sscanf with width specifiers to avoid buffer overflow
+    int numParsed = std::sscanf(uuid.c_str(), "STATIC:%d:%d:%127[^:]:%127s",
+                                &n1, &n2, propName, propValue);
+    if (numParsed != 4)
+    {
+        return -3; // Parsing failed
+    }
+
+    if (n1 < 0 || n1 > 0xffff)
+    {
+        return -1;
+    }
+    if (n2 < 0 || n2 > 0xff)
+    {
+        return -2;
+    }
+
+    utils::getDeviceTypeAndRole(n1, &deviceType, &deviceRole);
+    instanceNumber = static_cast<uint8_t>(n2);
+    remapPropName = std::string(propName);
+    remapPropValue = std::string(propValue);
+    return 0;
+}
+
 } // namespace utils

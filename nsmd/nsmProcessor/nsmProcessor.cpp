@@ -1129,12 +1129,12 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmEDPpScalingFactor::patchSetPoint SendRecvNsmMsgSync failed for while setting edpp setpoint "
+            "NsmEDPpScalingFactor::patchSetPoint postPatchNsmCommand failed for while setting edpp setpoint "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -2812,12 +2812,12 @@ requester::Coroutine NsmConfidentialCompute::patchCCMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmConfidentialCompute :: patchCCMode SendRecvNsmMsgSync failed"
+            "NsmConfidentialCompute :: patchCCMode postPatchNsmCommand failed"
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
 
@@ -2902,12 +2902,12 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmConfidentialCompute :: patchCCDevMode SendRecvNsmMsgSync failed"
+            "NsmConfidentialCompute :: patchCCDevMode postPatchNsmCommand failed"
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
 
@@ -3056,7 +3056,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             allBaseIfaceProperties.at("InventoryObjPath"));
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (type == "NSM_Processor")
     {

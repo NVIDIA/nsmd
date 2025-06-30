@@ -31,11 +31,17 @@ requester::Coroutine
     nsmChassisAssemblyCreateSensors(SensorManager& manager,
                                     const std::string& interface,
                                     const std::string& objPath);
-};
+NsmDeviceTable devices;
+std::shared_ptr<NsmDevice> gpu;
+std::shared_ptr<NsmDevice> fpga;
+}; // namespace nsm
 
 using namespace nsm;
 
-struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
+struct NsmChassisAssemblyTest :
+    public testing::Test,
+    public utils::DBusTest,
+    public SensorManagerTest
 {
     eid_t eid = 0;
     uint8_t instanceId = 0;
@@ -45,17 +51,28 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
     const std::string name = "Assembly1";
     const std::string objPath = chassisInventoryBasePath / chassisName / name;
 
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>(gpuUuid)},
-        {std::make_shared<NsmDevice>(fpgaUuid)},
-    };
-    NsmDevice& gpu = *devices[0];
-    NsmDevice& fpga = *devices[1];
+    //  NiceMock<MockSensorManager> mockManager{devices};
 
-    NiceMock<MockSensorManager> mockManager{devices};
+    NsmChassisAssemblyTest() : SensorManagerTest(devices)
+    {
+        if (fpga)
+        {
+            fpga->staticSensors.clear();
+            fpga->deviceSensors.clear();
+            fpga->roundRobinSensors.clear();
+            fpga->prioritySensors.clear();
+        }
+        if (gpu)
+        {
+            gpu->staticSensors.clear();
+            gpu->deviceSensors.clear();
+            gpu->roundRobinSensors.clear();
+            gpu->prioritySensors.clear();
+        }
+    }
 
     const PropertyValuesCollection error = {
         {"Type", "NSM_GPU_ChasisAssembly"},
@@ -89,27 +106,25 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
 
 TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
     propertyMap.clear();
 
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(error, "Type"));
-    values.push(objPath, get(basic, "UUID"));
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
 
     // Set up propertyMap with the invalid type to ensure it's used
     propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
 
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
-
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    gpu = devices[0];
+    EXPECT_EQ(0, gpu->deviceSensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
 }
+
 TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 {
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
@@ -146,33 +161,31 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
         std::get<std::string>(get(location, "LocationType").second);
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Location",
                                     objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(4, gpu.staticSensors.size());
-    EXPECT_EQ(4, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(4, gpu->staticSensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(4, gpu->deviceSensors.size());
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<AssemblyIntf>>(
-                           gpu.deviceSensors[0]));
+                           gpu->deviceSensors[0]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<AreaIntf>>(
-                           gpu.deviceSensors[1]));
+                           gpu->deviceSensors[1]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu.deviceSensors[2]));
+                           gpu->deviceSensors[2]));
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                           gpu.deviceSensors[3]));
+                           gpu->deviceSensors[3]));
 
     EXPECT_EQ(AreaIntf::PhysicalContextType::GPU,
               dynamic_pointer_cast<NsmInterfaceProvider<AreaIntf>>(
-                  gpu.deviceSensors[1])
+                  gpu->deviceSensors[1])
                   ->invoke(pdiMethod(physicalContext)));
     EXPECT_EQ(HealthIntf::HealthType::OK,
               dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                  gpu.deviceSensors[2])
+                  gpu->deviceSensors[2])
                   ->invoke(pdiMethod(health)));
     EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                  gpu.deviceSensors[3])
+                  gpu->deviceSensors[3])
                   ->invoke(pdiMethod(locationType)));
 }
 
@@ -195,25 +208,23 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     propertyMap["Name"] = std::get<std::string>(get(asset, "Name").second);
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(4, gpu.staticSensors.size());
-    EXPECT_EQ(4, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(4, gpu->staticSensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(4, gpu->deviceSensors.size());
     for (int i = 0; i < 4; i++)
     {
-        auto& sensor = gpu.deviceSensors[i];
+        auto& sensor = gpu->deviceSensors[i];
         auto inventorySensor =
             dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(sensor);
         EXPECT_NE(nullptr, inventorySensor);
     }
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu.deviceSensors[0]);
+        gpu->deviceSensors[0]);
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu.deviceSensors[2]);
+        gpu->deviceSensors[2]);
     EXPECT_EQ(get<std::string>(asset, "Vendor"),
               model->invoke(pdiMethod(manufacturer)));
     EXPECT_EQ(get<std::string>(asset, "Name"), model->invoke(pdiMethod(name)));
@@ -242,10 +253,8 @@ TEST_F(NsmChassisAssemblyTest, badTestNoDevideFound)
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
 
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(0, gpu->deviceSensors.size());
 }

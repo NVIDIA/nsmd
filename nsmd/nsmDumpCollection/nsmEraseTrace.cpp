@@ -90,7 +90,7 @@ void NsmEraseTraceObject::eraseDebugInfo(EraseInfoType infoType)
 requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::tuple<EraseOperationStatus, EraseStatus> result(eraseTraceStatus());
     auto& [operationStatus, eraseStatus] = result;
@@ -109,11 +109,11 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmEraseTraceObject: getRequest SendRecvNsmMsg: "
+        lg2::error("NsmEraseTraceObject: getRequest postPatchNsmCommand: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         operationStatus = EraseOperationStatus::InternalFailure;
@@ -163,7 +163,7 @@ requester::Coroutine
     NsmEraseTraceObject::eraseDebugInfoOnDevice(uint8_t infoType)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::tuple<EraseOperationStatus, EraseStatus> result(
         eraseDebugInfoStatus());
@@ -184,11 +184,11 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmEraseDebugInfoObject: getRequest SendRecvNsmMsg: "
+        lg2::error("NsmEraseDebugInfoObject: getRequest postPatchNsmCommand: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         operationStatus = EraseOperationStatus::InternalFailure;

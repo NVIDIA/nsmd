@@ -113,9 +113,8 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        const bool bypassCommandSupportCheck = true;
-        rc = co_await manager.SendRecvNsmMsg(
-            eid, request, responseMsg, responseLen, bypassCommandSupportCheck);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         uint8_t cc;
         uint16_t reasonCode = 0;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -128,7 +127,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         else if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(std::format(
-                "NsmRawCommandHandler::doSendLongRunningRequest: SendRecvNsmMsg failed, rc={}",
+                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchNsmCommand failed, rc={}",
                 rc));
         }
         else
@@ -246,9 +245,8 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        const bool bypassCommandSupportCheck = true;
-        rc = co_await manager.SendRecvNsmMsg(
-            eid, request, responseMsg, responseLen, bypassCommandSupportCheck);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
 
         uint8_t cc;
         uint16_t reasonCode = 0;
@@ -260,8 +258,9 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         }
         else if (rc != NSM_SW_SUCCESS)
         {
-            throw std::runtime_error("SendRecvNsmMsg failed, rc=" +
-                                     std::to_string(rc));
+            throw std::runtime_error(
+                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchNsmCommand failed, rc" +
+                std::to_string(rc));
         }
         else
         {

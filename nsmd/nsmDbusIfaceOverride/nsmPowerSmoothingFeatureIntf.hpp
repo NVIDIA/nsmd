@@ -69,12 +69,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "getPwrSmoothingControlsFromDevice SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
+                "getPwrSmoothingControlsFromDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             // coverity[missing_return]
             co_return rc_;
@@ -156,12 +156,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "togglePowerSmoothingOnDevice SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
+                "togglePowerSmoothingOnDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -239,12 +239,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                                   responseLen);
+        auto rc_ = co_await manager.postPatchNsmCommand(
+            eid, request, responseMsg, responseLen);
         if (rc_)
         {
             lg2::error(
-                "toggleImmediateRampDownOnDevice SendRecvNsmMsg failed for eid = {EID} rc = {RC}",
+                "toggleImmediateRampDownOnDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;

@@ -102,12 +102,12 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "setDevicePortDisableFuture SendRecvNsmMsgSync failed for while setting MigMode "
+            "setDevicePortDisableFuture postPatchNsmCommand failed for while setting PortDisableFuture "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;

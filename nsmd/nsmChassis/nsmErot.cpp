@@ -150,7 +150,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
         }
 
-        auto device = manager.getNsmDevice(uuid);
+        auto device = manager.getNsmDeviceFromStaticUUID(uuid);
         auto& bus = utils::DBusHandler::getBus();
 
         std::shared_ptr<ProgressIntf> rotProgressIntf = nullptr;

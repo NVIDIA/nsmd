@@ -173,7 +173,7 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 #endif
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (!nsmDevice)
     {

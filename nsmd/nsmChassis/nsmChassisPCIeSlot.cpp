@@ -70,7 +70,7 @@ requester::Coroutine
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
 
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     auto pcieSlotProvider = NsmChassisPCIeSlot<PCIeSlotIntf>(chassisName, name);
     pcieSlotProvider.invoke(pdiMethod(slotType),

@@ -84,16 +84,16 @@ requester::Coroutine
     NsmKeyMgmt::revokeKeysAsyncHandler(std::shared_ptr<Request> request)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
     auto eid = manager.getEid(device);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await manager.postPatchNsmCommand(
+        eid, *request, responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
         lg2::error("KeyMgmt - revokeKeys - "
-                   "SendRecvNsmMsg: eid={EID} rc={RC}",
+                   "postPatchNsmCommand: eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         errorCode(getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, sendRc));
         finishOperation(Progress::OperationStatus::Aborted);

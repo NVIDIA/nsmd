@@ -68,7 +68,7 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
 
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (type == baseType)
     {

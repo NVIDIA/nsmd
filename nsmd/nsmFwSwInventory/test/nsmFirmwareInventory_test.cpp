@@ -34,7 +34,8 @@ namespace nsm
 requester::Coroutine nsmFirmwareInventoryCreateSensors(SensorManager&,
                                                        const std::string&,
                                                        const std::string&);
-}
+NsmDeviceTable devices;
+} // namespace nsm
 
 struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
 {
@@ -43,12 +44,7 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
     const std::string name = "HGX_FW_PCIeRetimer_5";
     const std::string objPath = firmwareInventoryBasePath / name;
 
-    const uuid_t fpgaUuid = "992b3ec1-e464-f145-8686-409009062aa8";
-
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>(fpgaUuid)},
-    };
-    NsmDevice& fpga = *devices[0];
+    const uuid_t fpgaUuid = "STATIC:3:0:NSM_DEVICE_INSTANCE_NUMBER:0";
 
     NiceMock<MockSensorManager> mockManager{devices};
 
@@ -112,6 +108,26 @@ struct NsmFirmwareInventoryTest : public testing::Test, public utils::DBusTest
     const MapperServiceMap emtpyServiceMap;
 };
 
+TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
+{
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties with INVALID UUID that doesn't match any device
+    const uuid_t invalidUuid =
+        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
+    propertyMap["Name"] = std::get<std::string>(get(retimer, "Name").second);
+    propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
+
+    // Set up interface-specific properties
+    propertyMap["Type"] = std::get<std::string>(get(retimer, "Type").second);
+    propertyMap["DataIndex"] =
+        std::get<uint64_t>(get(retimer, "DataIndex").second);
+
+    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
+    EXPECT_EQ(0, devices.size());
+}
+
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 {
     auto sensors = 0;
@@ -130,10 +146,10 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         std::get<std::string>(get(retimerAsset, "Manufacturer").second);
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-
+    auto fpga = devices.back();
     auto retimerAsset =
         dynamic_pointer_cast<NsmFirmwareInventory<NsmAssetIntf>>(
-            fpga.deviceSensors[sensors++]);
+            fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAsset);
     EXPECT_EQ(get<std::string>(retimer, "Manufacturer"),
               retimerAsset->invoke(pdiMethod(manufacturer)));
@@ -153,17 +169,17 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 
     auto retimerAssociation =
         dynamic_pointer_cast<NsmFirmwareInventory<AssociationDefinitionsIntf>>(
-            fpga.deviceSensors[sensors++]);
+            fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerAssociation);
     EXPECT_EQ(2, retimerAssociation->invoke(pdiMethod(associations)).size());
 
     auto retimerSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
-        fpga.deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, retimerSettings);
     EXPECT_EQ(get<uint64_t>(retimer, "DataIndex"), retimerSettings->dataIndex);
 
     auto writeProtectedSensor = dynamic_pointer_cast<NsmWriteProtectedControl>(
-        fpga.deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, writeProtectedSensor);
     EXPECT_TRUE(writeProtectedSensor->sensors.empty());
 
@@ -176,7 +192,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
         mockManager, basicIntfName + ".FirmwareVersion", objPath);
 
     auto version = dynamic_pointer_cast<NsmInventoryProperty<VersionIntf>>(
-        fpga.deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, version);
     EXPECT_EQ(PCIERETIMER_0_EEPROM_VERSION +
                   get<uint64_t>(retimer, "InstanceNumber"),
@@ -190,16 +206,15 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     auto gpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
-        fpga.deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, gpuSettings);
     EXPECT_EQ(get<uint64_t>(gpu, "DataIndex"), gpuSettings->dataIndex);
 
     EXPECT_EQ(1, writeProtectedSensor->sensors.size());
-
-    EXPECT_EQ(1, fpga.roundRobinSensors.size());
-    EXPECT_EQ(3, fpga.staticSensors.size());
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(sensors, fpga.deviceSensors.size());
+    EXPECT_EQ(3, fpga->staticSensors.size());
+    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(0, fpga->prioritySensors.size());
+    EXPECT_EQ(sensors, fpga->deviceSensors.size());
 }
 
 TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
@@ -215,43 +230,31 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
     propertyMap["Type"] = std::get<std::string>(get(cpu, "Type").second);
     propertyMap["DataIndex"] = std::get<uint64_t>(get(cpu, "DataIndex").second);
 
+    EXPECT_EQ(1, devices.size());
+    if (devices.size() > 0)
+    {
+        devices.back()->staticSensors.clear();
+        devices.back()->roundRobinSensors.clear();
+        devices.back()->prioritySensors.clear();
+        devices.back()->deviceSensors.clear();
+    }
+    EXPECT_EQ(1, devices.size());
     utils::MockDbusAsync::getServiceMap() = emtpyServiceMap;
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-
-    EXPECT_EQ(1, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.staticSensors.size());
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(2, fpga.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    auto fpga = devices.back();
+    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(0, fpga->staticSensors.size());
+    EXPECT_EQ(0, fpga->prioritySensors.size());
+    EXPECT_EQ(2, fpga->deviceSensors.size());
     auto sensors = 0;
     auto cpuSettings = dynamic_pointer_cast<NsmSetWriteProtected>(
-        fpga.deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, cpuSettings);
     EXPECT_EQ(get<uint64_t>(cpu, "DataIndex"), cpuSettings->dataIndex);
 
     auto cpuWriteProtectedSensor =
         dynamic_pointer_cast<NsmWriteProtectedControl>(
-            fpga.deviceSensors[sensors++]);
+            fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, cpuWriteProtectedSensor);
-}
-
-TEST_F(NsmFirmwareInventoryTest, badTestNoDevideFound)
-{
-    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
-    propertyMap.clear();
-
-    // Set up base properties with INVALID UUID that doesn't match any device
-    const uuid_t invalidUuid =
-        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
-    propertyMap["Name"] = std::get<std::string>(get(retimer, "Name").second);
-    propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
-
-    // Set up interface-specific properties
-    propertyMap["Type"] = std::get<std::string>(get(retimer, "Type").second);
-    propertyMap["DataIndex"] =
-        std::get<uint64_t>(get(retimer, "DataIndex").second);
-
-    nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(0, fpga.roundRobinSensors.size());
-    EXPECT_EQ(0, fpga.deviceSensors.size());
 }

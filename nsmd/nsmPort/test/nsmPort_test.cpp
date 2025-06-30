@@ -122,6 +122,8 @@ using PortIntf = object_t<Inventory::Item::server::Port>;
 using PortStateIntf = object_t<Inventory::Decorator::server::PortState>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 
+NsmDeviceTable devices;
+
 struct NsmPCIePortTest :
     public testing::Test,
     public utils::DBusTest,
@@ -137,18 +139,9 @@ struct NsmPCIePortTest :
         "HGX_NVLinkManagementNIC_0/NetworkAdapters/NVLinkManagementNIC_0/Ports" /
         name;
 
-    const uuid_t cx7Uuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    const uuid_t cx7Uuid = "STATIC:2:255:NSM_DEVICE_INSTANCE_NUMBER:255";
 
-    NsmDeviceTable devices{
-        {std::make_shared<NsmDevice>((uint8_t)NSM_DEV_ID_PCIE_BRIDGE,
-                                     instanceId)},
-    };
-    NsmDevice& cx7 = *devices[0];
-
-    NsmPCIePortTest() : SensorManagerTest(devices)
-    {
-        cx7.uuid = cx7Uuid;
-    }
+    NsmPCIePortTest() : SensorManagerTest(devices) {}
 
     const PropertyValuesCollection error = {
         {"UUID", "992b3ec1-e468-f145-8686-badbadbadbad"},
@@ -202,9 +195,7 @@ TEST_F(NsmPCIePortTest, badTestCreateDeviceSensors)
     propertyMap["UUID"] = invalidUuid; // Invalid UUID as uuid_t type
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, cx7.prioritySensors.size());
-    EXPECT_EQ(0, cx7.roundRobinSensors.size());
-    EXPECT_EQ(0, cx7.deviceSensors.size());
+    EXPECT_EQ(0, devices.size());
 }
 
 TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
@@ -236,34 +227,44 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     propertyMap["LinkStatus"] =
         std::get<std::string>(get(basic, "LinkStatus").second);
 
+    auto initialDevice = 0;
+    auto initialRoundRobin = 0;
+    auto initialPriority = 0;
+    if (devices.size() > 0)
+    {
+        initialDevice = devices.back()->deviceSensors.size();
+        initialRoundRobin = devices.back()->roundRobinSensors.size();
+        initialPriority = devices.back()->prioritySensors.size();
+    }
+
     createNsmPCIePort(mockManager, basicIntfName, objPath);
+    auto cx7 = devices.back();
 
-    EXPECT_EQ(0, cx7.prioritySensors.size());
-    EXPECT_EQ(4, cx7.roundRobinSensors.size());
-    EXPECT_EQ(0, cx7.staticSensors.size());
-    EXPECT_EQ(8, cx7.deviceSensors.size());
+    EXPECT_EQ(initialPriority + 0, cx7->prioritySensors.size());
+    EXPECT_EQ(initialRoundRobin + 4, cx7->roundRobinSensors.size());
+    EXPECT_EQ(initialDevice + 8, cx7->deviceSensors.size());
 
-    auto sensors = 0;
+    auto sensors = initialRoundRobin;
     auto associationsObject =
         dynamic_pointer_cast<NsmPCIePort<AssociationDefinitionsInft>>(
-            cx7.deviceSensors[sensors++]);
+            cx7->deviceSensors[sensors++]);
     auto healthObject = dynamic_pointer_cast<NsmPCIePort<HealthIntf>>(
-        cx7.deviceSensors[sensors++]);
+        cx7->deviceSensors[sensors++]);
     auto portObject = dynamic_pointer_cast<NsmPCIePort<PortIntf>>(
-        cx7.deviceSensors[sensors++]);
+        cx7->deviceSensors[sensors++]);
     auto portStateObject = dynamic_pointer_cast<NsmPCIePort<PortStateIntf>>(
-        cx7.deviceSensors[sensors++]);
+        cx7->deviceSensors[sensors++]);
     auto pcieLinkSpeed =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<NsmPortInfoIntf>>(
-            cx7.deviceSensors[sensors++]);
+            cx7->deviceSensors[sensors++]);
     auto pcieErrorsGroup2 =
-        dynamic_pointer_cast<NsmPCIeErrors>(cx7.deviceSensors[sensors++]);
+        dynamic_pointer_cast<NsmPCIeErrors>(cx7->deviceSensors[sensors++]);
     auto pcieErrorsGroup3 =
-        dynamic_pointer_cast<NsmPCIeErrors>(cx7.deviceSensors[sensors++]);
+        dynamic_pointer_cast<NsmPCIeErrors>(cx7->deviceSensors[sensors++]);
     auto pcieErrorsGroup4 =
-        dynamic_pointer_cast<NsmPCIeErrors>(cx7.deviceSensors[sensors++]);
+        dynamic_pointer_cast<NsmPCIeErrors>(cx7->deviceSensors[sensors++]);
 
-    EXPECT_EQ(sensors, cx7.deviceSensors.size());
+    EXPECT_EQ(sensors, cx7->deviceSensors.size());
     EXPECT_NE(nullptr, associationsObject);
     EXPECT_NE(nullptr, healthObject);
     EXPECT_NE(nullptr, portObject);
@@ -294,10 +295,16 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(GROUP_ID_4, pcieErrorsGroup4->groupId);
 
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(cx7.roundRobinSensors.size())
+        .Times(cx7->roundRobinSensors.size())
         .WillRepeatedly(mockSendRecvNsmMsg());
-    for (size_t i = 0; i < cx7.roundRobinSensors.size(); i++)
+    for (size_t i = initialRoundRobin; i < cx7->roundRobinSensors.size(); i++)
     {
-        cx7.roundRobinSensors[i]->update(mockManager, eid).detach();
+        cx7->roundRobinSensors[i]->update(mockManager, eid).detach();
     }
 }
+/*
+TEST_F(NsmPCIePortTest, TearDown)
+{
+    devices.clear();
+    ::testing::Mock::VerifyAndClearExpectations(&mockManager);
+} */

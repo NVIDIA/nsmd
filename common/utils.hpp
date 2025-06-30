@@ -781,4 +781,7 @@ void setCachedBaseProperties(const std::string& objPath,
                              const std::string& baseInterface,
                              const dbus::PropertyMap& properties);
 
+int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
+                    uint8_t& deviceRole, std::string& remapPropName,
+                    std::string& remapPropValue);
 } // namespace utils

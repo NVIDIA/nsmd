@@ -461,12 +461,12 @@ requester::Coroutine NsmReconfigPermissions::setAllowPermission(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmSetReconfigSettings::setAllowPermission: SendRecvNsmMsgSync failed."
+            "NsmSetReconfigSettings::setAllowPermission: postPatchNsmCommand failed."
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;

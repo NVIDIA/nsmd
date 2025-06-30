@@ -1483,6 +1483,22 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
     rc = currentProfileSensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+namespace nsm
+{
+requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
+                                              const std::string& interface,
+                                              const std::string& objPath);
+requester::Coroutine createNsmMemorySensor(SensorManager& manager,
+                                           const std::string& interface,
+                                           const std::string& objPath);
+requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
+                                             const std::string& interface,
+                                             const std::string& objPath);
+NsmDeviceTable devices;
+std::shared_ptr<NsmDevice> gpu;
+}; // namespace nsm
+
 struct NsmProcessorTest :
     public testing::Test,
     public utils::DBusTest,
@@ -1505,17 +1521,19 @@ struct NsmProcessorTest :
     const std::string chassisName = "HGX_GPU_SXM_1";
     const std::string chassisObjPath = chassisInventoryBasePath / chassisName;
 
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    const uuid_t gpuUuid = "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:4";
     const uuid_t badUuid = "092b3ec1-e468-f145-8686-409009062aa8";
-
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
-    NsmDeviceTable devices{{gpuPtr}};
-    NsmDevice& gpu = *gpuPtr;
 
     NsmProcessorTest() : SensorManagerTest(devices)
     {
+        if (gpu)
+        {
+            gpu->deviceSensors.clear();
+            gpu->prioritySensors.clear();
+            gpu->roundRobinSensors.clear();
+            gpu->longRunningSensors.clear();
+        }
         AsyncOperationManager::getInstance()->dispatchers.clear();
-        gpu.eid = eid;
     }
 
     const PropertyValuesCollection error = {
@@ -1590,19 +1608,6 @@ struct NsmProcessorTest :
     };
 };
 
-namespace nsm
-{
-requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
-                                              const std::string& interface,
-                                              const std::string& objPath);
-requester::Coroutine createNsmMemorySensor(SensorManager& manager,
-                                           const std::string& interface,
-                                           const std::string& objPath);
-requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath);
-}; // namespace nsm
-
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
@@ -1617,9 +1622,11 @@ TEST_F(NsmProcessorTest, badTestTypeError)
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(basic, "InventoryObjPath").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    gpu = devices.back();
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(0, gpu->deviceSensors.size());
 }
 
 TEST_F(NsmProcessorTest, badTestNoDevideFound)
@@ -1638,9 +1645,10 @@ TEST_F(NsmProcessorTest, badTestNoDevideFound)
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(basic, "InventoryObjPath").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(0, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(0, gpu->roundRobinSensors.size());
+    EXPECT_EQ(0, gpu->deviceSensors.size());
 }
 
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
@@ -1664,10 +1672,10 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
                              basicIntfName + ".ReconfigPermissions", objPath);
 
     const size_t expectedSensorsCount = 22;
-    EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(22, gpu.roundRobinSensors.size());
-    EXPECT_EQ(0, gpu.staticSensors.size());
-    EXPECT_EQ(expectedSensorsCount, gpu.deviceSensors.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(22, gpu->roundRobinSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(expectedSensorsCount, gpu->deviceSensors.size());
 
     nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0, 0, 1, 1};
     Response response(sizeof(nsm_msg_hdr) +
@@ -1684,7 +1692,7 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     for (size_t i = 0; i < expectedSensorsCount; i++)
     {
         auto reconfigPermissions =
-            dynamic_pointer_cast<NsmReconfigPermissions>(gpu.deviceSensors[i]);
+            dynamic_pointer_cast<NsmReconfigPermissions>(gpu->deviceSensors[i]);
         EXPECT_NE(nullptr, reconfigPermissions);
 
         // Test if added permissions are sorted and unique
@@ -1720,38 +1728,40 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     propertyMap["DEVICE_UUID"] =
         std::get<uuid_t>(get(basic, "DEVICE_UUID").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(0, gpu->prioritySensors.size());
+    EXPECT_EQ(8, gpu->staticSensors.size());
+    EXPECT_EQ(3, gpu->roundRobinSensors.size());
 
     auto capabilitiesCount =
         size_t(ErrorInjectionCapabilityIntf::Type::Unknown) - 1;
-    EXPECT_EQ(0, gpu.prioritySensors.size());
+
     // Total 10 RR sensor for type = NSM_Processor are added.
     // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
     // of createNsmErrorInjectionSensors()
-    EXPECT_EQ(3, gpu.roundRobinSensors.size());
-    EXPECT_EQ(8, gpu.staticSensors.size());
     // Total 18 device sensor for type = NSM_Processor are added.
     // 10 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
     // run) and 8 are added as part of createNsmErrorInjectionSensors()
-    EXPECT_EQ(15 + capabilitiesCount, gpu.deviceSensors.size());
+    EXPECT_EQ(15 + capabilitiesCount, gpu->deviceSensors.size());
 
     int si = 10;
 
     auto expectedInterfaces = int(ErrorInjectionCapabilityIntf::Type::Unknown) -
                               1;
     auto setErrorInjection =
-        dynamic_pointer_cast<NsmSetErrorInjection>(gpu.deviceSensors[si++]);
+        dynamic_pointer_cast<NsmSetErrorInjection>(gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, setErrorInjection);
     auto errorInjectionSensor =
-        dynamic_pointer_cast<NsmErrorInjection>(gpu.deviceSensors[si++]);
+        dynamic_pointer_cast<NsmErrorInjection>(gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionSensor);
     auto errorInjectionSupported =
         dynamic_pointer_cast<NsmErrorInjectionSupported>(
-            gpu.deviceSensors[si++]);
+            gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionSupported);
     EXPECT_EQ(expectedInterfaces, errorInjectionSupported->interfaces.size());
-    auto errorInjectionEnabled =
-        dynamic_pointer_cast<NsmErrorInjectionEnabled>(gpu.deviceSensors[si++]);
+    auto errorInjectionEnabled = dynamic_pointer_cast<NsmErrorInjectionEnabled>(
+        gpu->deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionEnabled);
     EXPECT_EQ(expectedInterfaces, errorInjectionEnabled->interfaces.size());
 
@@ -1761,7 +1771,7 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     {
         setErrorInjectionEnabled[i] =
             dynamic_pointer_cast<NsmSetErrorInjectionEnabled>(
-                gpu.deviceSensors[si++]);
+                gpu->deviceSensors[si++]);
         EXPECT_NE(nullptr, setErrorInjectionEnabled[i]);
         EXPECT_EQ(expectedInterfaces,
                   setErrorInjectionEnabled[i]->interfaces.size());
@@ -1804,11 +1814,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(supportedResponse))
-        .WillOnce(mockSendRecvNsmMsg(setModeResponse))
-        .WillOnce(mockSendRecvNsmMsg(modeResponse));
-
-    errorInjectionSupported->update(mockManager, eid).detach();
+        .WillOnce(mockSendRecvNsmMsg(supportedResponse));
+    errorInjectionSupported->update(mockManager, eid);
 
     const auto errorInjectionBasePath = processorsInventoryBasePath / name /
                                         "ErrorInjection";
@@ -1826,8 +1833,14 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         errorInjectionSupported->interfaces[thermalErrorsPath]->supported());
 
     auto status = AsyncOperationStatusType::Success;
-    setErrorInjection->errorInjectionModeEnabled(true, &status, gpuPtr);
+
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(setModeResponse));
+    setErrorInjection->errorInjectionModeEnabled(true, &status, gpu);
     EXPECT_EQ(AsyncOperationStatusType::Success, status);
+
+    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        .WillOnce(mockSendRecvNsmMsg(modeResponse));
     errorInjectionSensor->update(mockManager, eid);
 
     EXPECT_TRUE(
@@ -1846,10 +1859,10 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, &enabledData, enableResponseMsg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
-    gpu.isDeviceActive = true;
+    gpu->isDeviceActive = true;
+    EXPECT_CALL(mockManager, postPatchNsmCommand)
+        .WillOnce(mockPostPatchNsmCommand(setEnableResponse));
     EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(2)
-        .WillOnce(mockSendRecvNsmMsg(setEnableResponse))
         .WillOnce(mockSendRecvNsmMsg(enableResponse));
     const AsyncSetOperationValueType value{};
     auto dispatcher =
@@ -1883,11 +1896,13 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
     createNsmProcessorSensor(mockManager, basicIntfName + ".MemCapacityUtil",
                              objPath);
-    EXPECT_EQ(1, gpu.deviceSensors.size());
-    EXPECT_EQ(1, gpu.longRunningSensors.size());
+    EXPECT_EQ(1, devices.size());
+    gpu = devices.back();
+    EXPECT_EQ(1, gpu->deviceSensors.size());
+    EXPECT_EQ(1, gpu->longRunningSensors.size());
 
     auto memoryCapacityUtilSensor =
-        dynamic_pointer_cast<NsmMemoryCapacityUtil>(gpu.deviceSensors.back());
+        dynamic_pointer_cast<NsmMemoryCapacityUtil>(gpu->deviceSensors.back());
     EXPECT_NE(nullptr, memoryCapacityUtilSensor);
     EXPECT_EQ(1, memoryCapacityUtilSensor->interfaces.size());
 
@@ -1902,14 +1917,11 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
                           memoryObjPath);
 
     // Check if the sensors isn't duplicated
-    EXPECT_EQ(1, gpu.deviceSensors.size());
-    EXPECT_EQ(1, gpu.longRunningSensors.size());
-    EXPECT_EQ(memoryCapacityUtilSensor.get(), gpu.deviceSensors.back().get());
+    EXPECT_EQ(1, gpu->deviceSensors.size());
+    EXPECT_EQ(1, gpu->longRunningSensors.size());
+    EXPECT_EQ(memoryCapacityUtilSensor.get(), gpu->deviceSensors.back().get());
     // Check if the sensor interface is moved as expected
     EXPECT_EQ(2, memoryCapacityUtilSensor->interfaces.size());
-
-    gpu.deviceSensors.clear();
-    gpu.longRunningSensors.clear();
 }
 TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
 {
@@ -1927,16 +1939,17 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
     propertyMap["Manufacturer"] =
         std::get<std::string>(get(asset, "Manufacturer").second);
     createNsmProcessorSensor(mockManager, basicIntfName + ".Asset", objPath);
-
-    EXPECT_EQ(3, gpu.deviceSensors.size());
+    EXPECT_EQ(1, devices.size());
+    EXPECT_EQ(3, gpu->deviceSensors.size());
+    EXPECT_EQ(0, gpu->longRunningSensors.size());
     auto devicePartNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu.deviceSensors[0]);
+            gpu->deviceSensors[0]);
     auto serialNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu.deviceSensors[1]);
+            gpu->deviceSensors[1]);
     auto modelSensor = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu.deviceSensors[2]);
+        gpu->deviceSensors[2]);
     EXPECT_NE(nullptr, devicePartNumberSensor);
     EXPECT_NE(nullptr, serialNumberSensor);
     EXPECT_NE(nullptr, modelSensor);
@@ -1961,16 +1974,16 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
                             chassisObjPath);
 
     // only BOARD_PART_NUMBER shall be added as new sensor
-    EXPECT_EQ(4, gpu.deviceSensors.size());
+    EXPECT_EQ(4, gpu->deviceSensors.size());
     auto partNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu.deviceSensors[3]);
+            gpu->deviceSensors[3]);
     EXPECT_NE(nullptr, partNumberSensor);
     EXPECT_EQ(1, partNumberSensor->interfaces.size());
     EXPECT_EQ(FRU_PART_NUMBER, partNumberSensor->property);
 
     // Check if the sensor interface is moved as expected
-    EXPECT_EQ(1, devicePartNumberSensor->interfaces.size());
+    EXPECT_EQ(1, partNumberSensor->interfaces.size());
     EXPECT_EQ(2, serialNumberSensor->interfaces.size());
     EXPECT_EQ(2, modelSensor->interfaces.size());
 
@@ -2061,4 +2074,16 @@ TEST(nsmTotalNvLinks, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
     rc = sensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST_F(NsmProcessorTest, TearDown)
+{
+    // Ensure all async operations complete
+    AsyncOperationManager::getInstance()->dispatchers.clear();
+
+    // Clear device references
+    devices.clear();
+
+    // Reset mock expectations
+    ::testing::Mock::VerifyAndClearExpectations(&mockManager);
 }

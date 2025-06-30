@@ -28,6 +28,7 @@
 #include "nsmInterface.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
+#include "requester/handler.hpp"
 #include "stateChangeLogger.hpp"
 #include "types.hpp"
 #include "utils.hpp"
@@ -109,6 +110,13 @@ struct FruInterfaceManager
             eidTable);
 };
 
+enum class DeviceRemapProperty
+{
+    MCTP_EID,
+    MCTP_UUID,
+    NSM_DEVICE_INSTANCE_NUMBER
+};
+
 class NsmDevice : public StateChangeLogger
 {
   public:
@@ -138,6 +146,59 @@ class NsmDevice : public StateChangeLogger
 #endif
     }
 
+    NsmDevice(uint8_t deviceType, uint8_t instanceNumber,
+              std::string remapPropName, std::string remapPropValue,
+              uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
+        isDeviceActive(false),
+        longRunningEventHandler(registerLongRunningEventHandler()),
+        messageTypesToCommandCodeMatrix(
+            NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
+        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
+        instanceNumber(instanceNumber), deviceRole(deviceRole)
+    {
+        if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
+        {
+            deviceRemapProp = DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER;
+            try
+            {
+                nsmDeviceInstanceNumber = std::stoi(remapPropValue);
+            }
+            catch (const std::invalid_argument& e)
+            {
+                LG2_ERROR(
+                    "Got Error E : {E}, while converting Reampping Property Value: {REMAP_PROP_VALUE} to NsmDeviceInstanceNumber",
+                    "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
+            };
+        }
+        else if (remapPropName == "MCTP_EID")
+        {
+            deviceRemapProp = DeviceRemapProperty::MCTP_EID;
+            try
+            {
+                eid = std::stoi(remapPropValue);
+            }
+            catch (const std::invalid_argument& e)
+            {
+                LG2_ERROR(
+                    "Got Error E : {E}, while converting Reampping Property Value: {REMAP_PROP_VALUE} to EID",
+                    "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
+            };
+        }
+        else if (remapPropName == "MCTP_UUID")
+        {
+            deviceRemapProp = DeviceRemapProperty::MCTP_UUID;
+            uuid = remapPropValue;
+        }
+        else
+        {
+            LG2_ERROR("Invalid Reampping Property: {REMAP_PROP_VALUE} provided",
+                      "REMAP_PROP_VALUE", remapPropValue);
+        }
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        initMsgTypesSensor();
+#endif
+    }
+
     FruInterfaceManager fruDeviceManager;
     std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
 
@@ -146,6 +207,9 @@ class NsmDevice : public StateChangeLogger
     uuid_t deviceUuid;
     bool isDeviceActive;
     bool isDeviceReady = false;
+    DeviceRemapProperty deviceRemapProp;
+    uint8_t nsmDeviceInstanceNumber;
+    bool discoveryPending = false;
 
     requester::Coroutine task, longRunningTask;
 
@@ -179,6 +243,8 @@ class NsmDevice : public StateChangeLogger
 
     /** @brief set the nsmDevice to offline state */
     requester::Coroutine setOffline();
+
+    requester::Coroutine waitForNsmDeviceUpdate();
 
     /**
      * @brief Inserts device/static sensor to to NsmDevice.
@@ -368,6 +434,12 @@ class NsmDevice : public StateChangeLogger
         getActiveLongRunningHandler() const;
     int invokeLongRunningHandler(eid_t eid, NsmType type, NsmEventId eventId,
                                  const nsm_msg* event, size_t eventLen);
+
+    std::coroutine_handle<> updateNsmDeviceTaskHandle;
+    common::CoroutineSemaphore
+        discoverNsmDeviceSemaphore; // Semaphore for synchronizing update nsm
+                                    // device during init if mctp rediscovery
+                                    // signal is also received
 
   private:
     std::vector<std::vector<bitfield8_t>> commands;

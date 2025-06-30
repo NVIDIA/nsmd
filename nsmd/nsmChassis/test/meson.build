@@ -24,6 +24,7 @@ dep_src_files = [
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
     '../../nsmEvent.cpp',
+    '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmSetAsync/asyncOperationManager.cpp',

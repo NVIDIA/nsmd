@@ -83,12 +83,12 @@ class NsmClearPowerCapAsyncIntf :
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         if (rc)
         {
-            lg2::error("SendRecvNsmMsg failed.eid={EID} rc={RC}", "EID", eid,
-                       "RC", rc);
+            lg2::error("postPatchNsmCommand failed.eid={EID} rc={RC}", "EID",
+                       eid, "RC", rc);
             // coverity[missing_return]
             co_return rc;
         }
@@ -142,12 +142,12 @@ class NsmClearPowerCapAsyncIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         if (rc)
         {
             lg2::error(
-                "clearPowerCapOnDevice SendRecvNsmMsg failed for while setting power limit for eid = {EID} rc = {RC}",
+                "clearPowerCapOnDevice postPatchNsmCommand failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]

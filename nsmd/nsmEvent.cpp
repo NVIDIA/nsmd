@@ -151,26 +151,13 @@ void DelegatingEventHandler::delegate(eid_t eid, NsmType type,
                                       NsmEventId eventId, const nsm_msg* event,
                                       size_t eventLen)
 {
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    SensorManager& sensorManager = SensorManager::getInstance();
-
-    auto uuidOptional = utils::getUUIDFromEID(deviceManager.getEidTable(), eid);
-    if (!uuidOptional)
-    {
-        lg2::error("Nsm Event : No UUID found for EID {EID}", "EID", eid);
-
-        return;
-    }
-
-    uuid_t uuid = *uuidOptional;
-
-    auto nsmDevice = sensorManager.getNsmDevice(uuid);
+    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
 
     if (!nsmDevice)
     {
         lg2::error(
-            "Nsm Event : The NSM device has not been discovered for EID={EID}, uuid={UUID}",
-            "EID", eid, "UUID", uuid);
+            "Nsm Event : The NSM device has not been discovered for EID={EID}",
+            "EID", eid);
 
         return;
     }

@@ -67,12 +67,12 @@ class NsmActivateErrorInjectionPayloadIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         if (rc)
         {
             lg2::error(
-                "NsmActivateErrorInjectionPayload::activatePayload: SendRecvNsmMsgSync failed."
+                "NsmActivateErrorInjectionPayload::activatePayload: postPatchNsmCommand failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
             statusInterface->status(AsyncOperationStatusType::WriteFailure);

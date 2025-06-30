@@ -97,7 +97,7 @@ requester::Coroutine NsmIRoTResponder<IntfType>::update(SensorManager& manager,
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);
-            auto device = manager.getNsmDevice(deviceUuid);
+            auto device = manager.getNsmDeviceFromStaticUUID(deviceUuid);
             auto spdmResponderObject =
                 std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
                     this->name, "NSM_ChassisIRoTResponder");
@@ -145,7 +145,7 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
         uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
     }
 
-    auto device = manager.getNsmDevice(uuid);
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
     if (type == baseType)
     {

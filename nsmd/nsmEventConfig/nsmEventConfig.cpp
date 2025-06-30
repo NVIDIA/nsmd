@@ -329,7 +329,7 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
             allBaseIfaceProperties.at("SubscribedEventIDs"));
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         lg2::error(

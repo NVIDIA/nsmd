@@ -193,7 +193,7 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     catch (const std::exception& e)
     {}
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     auto gpmIntf = std::make_shared<GPMMetricsIntf>(bus,
                                                     inventoryObjPath.c_str());
@@ -294,7 +294,7 @@ static requester::Coroutine
             .value();
     inventoryObjPath = utils::makeDBusNameValid(inventoryObjPath);
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
     std::vector<NVLinkMetricsUpdatorInfo> updatorInfos;
 

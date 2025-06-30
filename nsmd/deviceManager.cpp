@@ -50,79 +50,56 @@ bool DeviceManager::insertIntoEidTableifNotExist(
 
 void DeviceManager::discoverNsmDevice(const MctpInfos& mctpInfos)
 {
-    queuedMctpInfos.emplace(mctpInfos);
-    if (discoverNsmDeviceTaskHandle)
+    for (auto mctpInfo : mctpInfos)
     {
-        if (!discoverNsmDeviceTaskHandle.done())
+        auto eid = std::get<0>(mctpInfo);
+        perEidQueuedMctpInfos[eid].emplace(mctpInfo);
+        if (perEidDiscoverNsmDeviceTaskHandle.find(eid) ==
+            perEidDiscoverNsmDeviceTaskHandle.end())
         {
-            return;
+            auto co = discoverNsmDeviceTask(eid);
+            perEidDiscoverNsmDeviceTaskHandle[eid] = co.handle;
+            continue;
         }
-        discoverNsmDeviceTaskHandle.destroy();
-    }
 
-    auto co = discoverNsmDeviceTask();
-    discoverNsmDeviceTaskHandle = co.handle;
-    if (discoverNsmDeviceTaskHandle.done())
-    {
-        discoverNsmDeviceTaskHandle = nullptr;
+        if (perEidDiscoverNsmDeviceTaskHandle[eid])
+        {
+            if (!perEidDiscoverNsmDeviceTaskHandle[eid].done())
+            {
+                continue;
+            }
+            perEidDiscoverNsmDeviceTaskHandle[eid].destroy();
+        }
+
+        auto co = discoverNsmDeviceTask(eid);
+        perEidDiscoverNsmDeviceTaskHandle[eid] = co.handle;
+        if (perEidDiscoverNsmDeviceTaskHandle[eid].done())
+        {
+            perEidDiscoverNsmDeviceTaskHandle[eid] = nullptr;
+        }
     }
 }
 
-requester::Coroutine DeviceManager::discoverNsmDeviceTask()
+requester::Coroutine DeviceManager::discoverNsmDeviceTask(eid_t eid)
 {
-    while (!queuedMctpInfos.empty())
+    while (!perEidQueuedMctpInfos[eid].empty())
     {
-        const MctpInfos& mctpInfos = queuedMctpInfos.front();
-        for (auto& mctpInfo : mctpInfos)
+        lg2::info("discoverNsmDeviceTask eid={EID}, size={SIZE}", "EID", eid,
+                  "SIZE", perEidQueuedMctpInfos[eid].size());
+        auto mctpInfo = perEidQueuedMctpInfos[eid].front();
+        auto active = std::get<5>(mctpInfo);
+        MctpInfos mctpInfos{mctpInfo};
+        if (active)
         {
-            // try ping
-            auto& [eid, mctpUuid, mctpMedium, networkdId,
-                   mctpBinding] = mctpInfo;
-            auto rc = co_await ping(eid);
-            if (rc != NSM_SW_SUCCESS)
-            {
-                lg2::error("NSM ping failed, rc={RC} eid={EID}", "RC", rc,
-                           "EID", eid);
-                continue;
-            }
-
-            lg2::info("found NSM device, eid={EID} uuid={UUID}", "EID", eid,
-                      "UUID", mctpUuid);
-
-            // get device identification from device
-            uint8_t deviceType = 0;
-            uint8_t instanceNumber = 0;
-            rc = co_await getQueryDeviceIdentification(eid, deviceType,
-                                                       instanceNumber);
-            if (rc != NSM_SUCCESS)
-            {
-                lg2::error(
-                    "NSM getQueryDeviceIdentification failed, rc={RC} eid={EID}",
-                    "RC", rc, "EID", eid);
-                continue;
-            }
-
-            // save the nsm device identification info
-            discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber, true};
-
-            // update eid table [from UUID from MCTP dbus property]
-            insertIntoEidTableifNotExist(
-                mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
-
-            auto nsmDevice = findNsmDeviceByUUID(nsmDevices, mctpUuid);
-            if (nsmDevice)
-            {
-                // if nsmDevice already exists, update its EID based on the MCTP
-                // Binding
-
-                lg2::info(
-                    "Found additional EID for existing NSM device. UUID={UUID} EID={EID}",
-                    "UUID", mctpUuid, "EID", eid);
-
-                co_await nsmDevice->setOffline();
-            }
+            co_await coSetdeviceStateOnlineTask(mctpInfos);
         }
-        queuedMctpInfos.pop();
+        else
+        {
+            co_await coSetdeviceStateOfflineTask(mctpInfos);
+        }
+        perEidQueuedMctpInfos[eid].pop();
+        lg2::info("discoverNsmDeviceTask eid={EID}, size={SIZE}", "EID", eid,
+                  "SIZE", perEidQueuedMctpInfos[eid].size());
     }
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
@@ -134,7 +111,8 @@ requester::Coroutine
     for (auto& mctpInfo : mctpInfos)
     {
         // try ping
-        auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding] = mctpInfo;
+        auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding,
+               active] = mctpInfo;
         auto rc = co_await ping(eid);
         if (rc != NSM_SW_SUCCESS)
         {
@@ -161,7 +139,20 @@ requester::Coroutine
 
         // save the nsm device identification info
         discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber, true};
-
+        auto nsmDevice = mapNsmDeviceUsingEid(eid, mctpUuid, deviceType,
+                                              instanceNumber, true);
+        if (nsmDevice)
+        {
+            nsmDevice->isDeviceActive = false;
+            nsmDevice->discoveryPending = true;
+            auto rc = co_await updateNsmDevice(nsmDevice, eid);
+            if (rc == NSM_SW_SUCCESS && perEidQueuedMctpInfos[eid].size() == 1)
+            {
+                co_await nsmDevice->setOnline();
+                co_await refreshCapabilitySensor(nsmDevice);
+                nsmDevice->discoveryPending = false;
+            }
+        }
         // update eid table [from UUID from MCTP dbus property]
         insertIntoEidTableifNotExist(
             mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
@@ -176,18 +167,25 @@ requester::Coroutine
 {
     for (auto& mctpInfo : mctpInfos)
     {
+        std::shared_ptr<NsmDevice> nsmDevice{};
         const mctp_eid_t eid = std::get<0>(mctpInfo);
         if (discoveredEIDs.find(eid) != discoveredEIDs.end())
         {
             auto& value = discoveredEIDs[eid];
             std::get<3>(value) = false; // set EID is inactive
+            auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber,
+                   active] = value;
+            nsmDevice = mapNsmDeviceUsingEid(eid, uuid, mctpDeviceType,
+                                             mctpDeviceInstanceNumber, false);
         }
 
-        const std::string uuid = std::get<1>(mctpInfo);
-        auto nsmDevice = findNsmDeviceByUUID(nsmDevices, uuid);
         if (nsmDevice)
         {
             co_await nsmDevice->setOffline();
+            if (perEidQueuedMctpInfos[eid].size() == 1)
+            {
+                nsmDevice->discoveryPending = false;
+            }
         }
     }
 
@@ -448,6 +446,10 @@ requester::Coroutine
     DeviceManager::updateNsmDevice(std::shared_ptr<NsmDevice> nsmDevice,
                                    uint8_t eid)
 {
+    nsmDevice->discoverNsmDeviceSemaphore.acquire(eid);
+    lg2::info(
+        "DeviceManager::updateNsmDevice discoverNsmDeviceSemaphore acqired for EID = {EID}",
+        "EID", eid);
     auto mctpUuid = utils::getUUIDFromEID(eidTable, eid);
     if (mctpUuid.has_value())
     {
@@ -464,6 +466,7 @@ requester::Coroutine
     {
         lg2::error("getSupportedNvidiaMessageType() failed, rc={RC} eid={EID}",
                    "RC", rc, "EID", eid);
+        nsmDevice->discoverNsmDeviceSemaphore.release();
         // coverity[missing_return]
         co_return rc;
     }
@@ -515,19 +518,30 @@ requester::Coroutine
                    "EID", eid);
     }
 
-    // update sensors that needs to be refreshed after rediscovery event/change
-    // of device capabilities
+    nsmDevice->discoverNsmDeviceSemaphore.release();
+
+    lg2::info(
+        "DeviceManager::updateNsmDevice discoverNsmDeviceSemaphore released for EID = {EID}",
+        "EID", eid);
+    // coverity[missing_return]
+    co_return rc;
+}
+
+requester::Coroutine
+    DeviceManager::refreshCapabilitySensor(std::shared_ptr<NsmDevice> nsmDevice)
+{
     SensorManager& sensorManager = SensorManager::getInstance();
     size_t sensorIndex{0};
     auto& sensors = nsmDevice->capabilityRefreshSensors;
     while (sensorIndex < sensors.size())
     {
         auto sensor = sensors[sensorIndex];
-        co_await sensor->update(sensorManager, eid);
+        co_await sensor->update(sensorManager, nsmDevice->eid);
         ++sensorIndex;
     }
-    // coverity[missing_return]
-    co_return rc;
+    lg2::info("Capability Sensors refreshed for EID : {EID}", "EID",
+              nsmDevice->eid);
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine DeviceManager::getInventoryInformation(
@@ -726,6 +740,8 @@ requester::Coroutine
     // get inventory information from device
     InventoryProperties properties{};
     uint8_t rc = NSM_SW_SUCCESS;
+    lg2::info("updateFruDeviceIntf: eid={EID} deviceType={TYPE}", "EID", eid,
+              "TYPE", nsmDevice->getDeviceType());
     if (nsmDevice->isCommandSupported(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
                                       NSM_GET_INVENTORY_INFORMATION))
     {
@@ -999,4 +1015,243 @@ std::optional<mctp_eid_t>
     return std::nullopt;
 }
 
+void DeviceManager::updateDeviceParameter(std::shared_ptr<NsmDevice> nsmDevice,
+                                          eid_t eid, uuid_t uuid,
+                                          uint8_t deviceInstanceNumber)
+{
+    nsmDevice->eid = eid;
+    nsmDevice->uuid = uuid;
+    nsmDevice->nsmDeviceInstanceNumber = deviceInstanceNumber;
+}
+
+int DeviceManager::mapMctpEIDForNsmDevice(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    for (auto& [eid, value] : discoveredEIDs)
+    {
+        auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active] = value;
+        if (mctpDeviceType == nsmDevice->getDeviceType() &&
+            mctpDeviceInstanceNumber == nsmDevice->nsmDeviceInstanceNumber &&
+            nsmDevice->deviceRemapProp ==
+                DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER)
+        {
+            updateDeviceParameter(nsmDevice, eid, uuid,
+                                  mctpDeviceInstanceNumber);
+            return NSM_SW_SUCCESS;
+        }
+        else if (mctpDeviceType == nsmDevice->getDeviceType() &&
+                 uuid == nsmDevice->uuid &&
+                 nsmDevice->deviceRemapProp == DeviceRemapProperty::MCTP_UUID)
+        {
+            updateDeviceParameter(nsmDevice, eid, uuid,
+                                  mctpDeviceInstanceNumber);
+            return NSM_SW_SUCCESS;
+        }
+        else if (mctpDeviceType == nsmDevice->getDeviceType() &&
+                 eid == nsmDevice->eid &&
+                 nsmDevice->deviceRemapProp == DeviceRemapProperty::MCTP_EID)
+        {
+            updateDeviceParameter(nsmDevice, eid, uuid,
+                                  mctpDeviceInstanceNumber);
+            return NSM_SW_SUCCESS;
+        }
+    }
+    return NSM_SW_ERROR_DATA;
+}
+
+std::shared_ptr<NsmDevice> DeviceManager::findOrCreateNsmDevice(
+    uint8_t deviceType, uint8_t deviceRole, uint8_t instanceNumber,
+    std::string remapPropName, std::string remapPropValue)
+{
+    uint16_t staticInstanceAndRole = (deviceRole << 8) | instanceNumber;
+
+    if (deviceMap.find(deviceType) != deviceMap.end())
+    {
+        if (deviceMap[deviceType].find(staticInstanceAndRole) !=
+            deviceMap[deviceType].end())
+        {
+            return deviceMap[deviceType][staticInstanceAndRole];
+        }
+    }
+
+    auto nsmDevice = std::make_shared<NsmDevice>(
+        deviceType, instanceNumber, remapPropName, remapPropValue, deviceRole);
+    lg2::info(
+        "Creating new NsmDevice for deviceType:{TYPE} instanceNumber:{INST} deviceRole:{ROLE} remapPropName:{REMAPPNAME} remapPropValue:{REMAPPVALUE}",
+        "TYPE", deviceType, "INST", instanceNumber, "ROLE", deviceRole,
+        "REMAPPNAME", remapPropName, "REMAPPVALUE", remapPropValue);
+    nsmDevices.emplace_back(nsmDevice);
+    nsmDevice->isDeviceActive = false;
+    deviceMap[deviceType][staticInstanceAndRole] = nsmDevice;
+    if (mapMctpEIDForNsmDevice(nsmDevice) == NSM_SW_SUCCESS)
+    {
+        nsmDevice->discoveryPending = true;
+        discoverAndUpdateNsmDeviceTask(nsmDevice);
+    }
+    return deviceMap[deviceType][staticInstanceAndRole];
+}
+
+std::shared_ptr<NsmDevice>
+    DeviceManager::getNsmDeviceFromStaticUUID(uuid_t uuid)
+{
+    uint8_t deviceType = 0xff;
+    uint8_t instanceNumber = 0xff;
+    uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
+    std::string remapPropName;
+    std::string remapPropValue;
+    if (utils::parseStaticUuid(uuid, deviceType, instanceNumber, deviceRole,
+                               remapPropName, remapPropValue) < 0)
+    {
+        throw std::runtime_error(
+            "DeviceManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d:s:s), UUID=" +
+            uuid);
+    }
+
+    return findOrCreateNsmDevice(deviceType, deviceRole, instanceNumber,
+                                 remapPropName, remapPropValue);
+}
+
+std::shared_ptr<NsmDevice> DeviceManager::mapNsmDeviceUsingEid(
+    eid_t eid, uuid_t mctpUuid, uint8_t deviceType, uint8_t instanceNumber,
+    [[__maybe_unused__]] bool active)
+{
+    std::shared_ptr<NsmDevice> ret{};
+
+    if (deviceMap.find(deviceType) == deviceMap.end())
+    {
+        lg2::info("No NsmDevice found for Mctp Eid : {EID}", "EID", eid);
+        return ret;
+    }
+
+    for (auto it : deviceMap[deviceType])
+    {
+        auto nsmDevice = it.second;
+        if (nsmDevice->deviceRemapProp ==
+                DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER &&
+            nsmDevice->nsmDeviceInstanceNumber == instanceNumber)
+        {
+            updateDeviceParameter(nsmDevice, eid, mctpUuid, instanceNumber);
+            ret = nsmDevice;
+            return ret;
+        }
+        else if (nsmDevice->deviceRemapProp == DeviceRemapProperty::MCTP_UUID &&
+                 nsmDevice->uuid == mctpUuid)
+        {
+            updateDeviceParameter(nsmDevice, eid, mctpUuid, instanceNumber);
+            ret = nsmDevice;
+            return ret;
+        }
+        else if (nsmDevice->deviceRemapProp == DeviceRemapProperty::MCTP_EID &&
+                 nsmDevice->eid == eid)
+        {
+            updateDeviceParameter(nsmDevice, eid, mctpUuid, instanceNumber);
+            ret = nsmDevice;
+            return ret;
+        }
+    }
+
+    lg2::info("No NsmDevice found for Mctp Eid : {EID}", "EID", eid);
+    return ret;
+}
+
+std::shared_ptr<NsmDevice> DeviceManager::getNsmDeviceFromEid(eid_t eid)
+{
+    std::shared_ptr<NsmDevice> ret{};
+    if (discoveredEIDs.find(eid) == discoveredEIDs.end())
+    {
+        return ret;
+    }
+
+    auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber,
+           active] = discoveredEIDs[eid];
+
+    ret = mapNsmDeviceUsingEid(eid, uuid, mctpDeviceType,
+                               mctpDeviceInstanceNumber, active);
+    return ret;
+}
+
+std::shared_ptr<NsmDevice> DeviceManager::getNsmDeviceByIdentification(
+    uint8_t deviceType, uint8_t instanceNumber, uint8_t deviceRole)
+{
+    std::shared_ptr<NsmDevice> ret{};
+    uint16_t staticInstanceAndRole = (deviceRole << 8) | instanceNumber;
+    if (deviceMap.find(deviceType) != deviceMap.end())
+    {
+        if (deviceMap[deviceType].find(staticInstanceAndRole) !=
+            deviceMap[deviceType].end())
+        {
+            ret = deviceMap[deviceType][staticInstanceAndRole];
+        }
+    }
+    return ret;
+}
+
+void DeviceManager::handleMctpStateTransition(const std::string objPath,
+                                              [[maybe_unused]] const bool state)
+{
+    eid_t eid = 0;
+    size_t lastSlash = objPath.rfind('/');
+    if (lastSlash == std::string::npos || lastSlash == objPath.length() - 1)
+    {
+        return;
+    }
+
+    std::string numberStr = objPath.substr(lastSlash + 1);
+    try
+    {
+        eid = std::stoi(numberStr);
+    }
+    catch (const std::exception&)
+    {
+        lg2::info(
+            "DeviceManager::handleMctpStateTransition Invalid eid parsed: {EID}",
+            "EID", numberStr);
+        return;
+    }
+    auto nsmDevice = getNsmDeviceFromEid(eid);
+    if (nsmDevice)
+    {
+        nsmDevice->discoveryPending = true;
+        nsmDevice->isDeviceActive = false;
+    }
+    else
+    {
+        lg2::info(
+            "DeviceManager::handleMctpStateTransition No NsmDevice found for Eid: {EID}",
+            "EID", eid);
+    }
+}
+
+void DeviceManager::discoverAndUpdateNsmDeviceTask(
+    std::shared_ptr<NsmDevice> nsmDevice)
+{
+    if (nsmDevice->updateNsmDeviceTaskHandle)
+    {
+        if (nsmDevice->updateNsmDeviceTaskHandle.done())
+        {
+            auto co = updateNsmDeviceTask(nsmDevice);
+            nsmDevice->updateNsmDeviceTaskHandle = co.handle;
+        }
+    }
+    else
+    {
+        auto co = updateNsmDeviceTask(nsmDevice);
+        nsmDevice->updateNsmDeviceTaskHandle = co.handle;
+    }
+}
+
+requester::Coroutine
+    DeviceManager::updateNsmDeviceTask(std::shared_ptr<NsmDevice> nsmDevice)
+{
+    auto rc = co_await updateNsmDevice(nsmDevice, nsmDevice->eid);
+    if (rc == NSM_SW_SUCCESS &&
+        perEidQueuedMctpInfos[nsmDevice->eid].size() == 0 &&
+        nsmDevice->discoveryPending)
+    {
+        co_await nsmDevice->setOnline();
+        co_await refreshCapabilitySensor(nsmDevice);
+        nsmDevice->discoveryPending = false;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
 } // namespace nsm

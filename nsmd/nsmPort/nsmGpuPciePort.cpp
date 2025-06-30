@@ -236,12 +236,12 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "clearPCIeErrorCounter SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "clearPCIeErrorCounter postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -389,7 +389,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
         auto processorPath = inventoryObjPath;
         inventoryObjPath = inventoryObjPath + "/Ports/PCIe_0";
 
-        auto nsmDevice = manager.getNsmDevice(uuid);
+        auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
         if (!nsmDevice)
         {
             // cannot found a nsmDevice for the sensor

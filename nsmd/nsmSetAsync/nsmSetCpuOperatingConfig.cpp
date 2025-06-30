@@ -50,11 +50,11 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
-        lg2::error("SendRecvNsmMsg failed. "
+        lg2::error("getMinGraphicsClockLimit: postPatchNsmCommand failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -107,11 +107,11 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
-        lg2::error("SendRecvNsmMsg failed. "
+        lg2::error("getMaxGraphicsClockLimit: postPatchNsmCommand failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -218,12 +218,12 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "setClockLimitOnDevice SendRecvNsmMsg failed for while setting clock limits "
+            "setClockLimitOnDevice postPatchNsmCommand failed for while setting clock limits "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
 

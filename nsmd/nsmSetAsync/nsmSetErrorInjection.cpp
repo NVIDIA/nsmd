@@ -72,14 +72,14 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetErrorInjection::setModeEnabled: SendRecvNsmMsgSync failed."
+                "NsmSetErrorInjection::setModeEnabled: postPatchNsmCommand failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
@@ -168,14 +168,14 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetErrorInjectionEnabled::setEnabled: SendRecvNsmMsgSync failed."
+                "NsmSetErrorInjectionEnabled::setEnabled: postPatchNsmCommand failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
@@ -266,12 +266,12 @@ requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                              responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmSetErrorInjectionPayload::setPayload: SendRecvNsmMsgSync failed."
+            "NsmSetErrorInjectionPayload::setPayload: postPatchNsmCommand failed."
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;

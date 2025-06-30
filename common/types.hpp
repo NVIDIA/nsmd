@@ -39,7 +39,9 @@ using NsmType = uint8_t;
 using MctpMedium = std::string;
 using MctpBinding = std::string;
 using NetworkId = uint8_t;
-using MctpInfo = std::tuple<eid_t, uuid_t, MctpMedium, NetworkId, MctpBinding>;
+using Active = bool;
+using MctpInfo =
+    std::tuple<eid_t, uuid_t, MctpMedium, NetworkId, MctpBinding, Active>;
 using MctpInfos = std::vector<MctpInfo>;
 using VendorIANA = uint32_t;
 

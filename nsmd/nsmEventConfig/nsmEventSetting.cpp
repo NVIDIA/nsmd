@@ -182,7 +182,7 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
             allCurrentIfaceProperties.at("EventGenerationSetting"));
     }
 
-    auto nsmDevice = manager.getNsmDevice(uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
     if (!nsmDevice)
     {
         lg2::error(

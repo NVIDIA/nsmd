@@ -657,12 +657,12 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestActivatePresetProfile SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "requestActivatePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -745,12 +745,12 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                               responseLen);
+    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                    responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestApplyAdminOverride SendRecvNsmMsgSync failed for for eid = {EID} rc = {RC}",
+            "requestApplyAdminOverride postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;

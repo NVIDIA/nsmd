@@ -64,11 +64,11 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
         if (rc)
         {
-            lg2::error("SendRecvNsmMsgSync failed. "
+            lg2::error("postPatchNsmCommand failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
             // coverity[missing_return]
@@ -127,13 +127,14 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
+                                                  responseLen);
 
-        if (shouldLog("setPowerCapOnDevice SendRecvNsmMsg", nsm_sw_codes(rc)))
+        if (shouldLog("setPowerCapOnDevice postPatchNsmCommand",
+                      nsm_sw_codes(rc)))
         {
             LG2_ERROR(
-                "setPowerCapOnDevice SendRecvNsmMsg failed, eid = {EID}, rc = {RC}",
+                "setPowerCapOnDevice postPatchNsmCommand failed, eid = {EID}, rc = {RC}",
                 "EID", eid, "RC", rc);
         }
         if (rc)

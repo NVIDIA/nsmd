@@ -167,10 +167,6 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
 
 requester::Coroutine NsmDevice::setOnline()
 {
-    isDeviceActive = true;
-    lg2::info(
-        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
-        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     isDeviceReady = false;
     NsmServiceReadyIntf::getInstance().setStateStarting();
 
@@ -186,6 +182,10 @@ requester::Coroutine NsmDevice::setOnline()
             count = 0;
         }
     }
+    isDeviceActive = true;
+    lg2::info(
+        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
+        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
     co_return NSM_SW_SUCCESS;
 }
 
@@ -220,6 +220,23 @@ requester::Coroutine NsmDevice::setOffline()
         co_await common::Sleep(event.get(), 10000, common::NonPriority);
     }
     // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmDevice::waitForNsmDeviceUpdate()
+{
+    int iter = 0;
+    while (discoveryPending && iter < DEVICE_UPDATE_POST_PATCH_SLEEP_MAX_ITER)
+    {
+        iter++;
+        co_await common::Sleep(event.get(),
+                               DEVICE_UPDATE_POST_PATCH_SLEEP_MS * 1000,
+                               common::NonPriority);
+    }
+    if (discoveryPending)
+    {
+        co_return NSM_SW_ERROR_TIMEOUT;
+    }
     co_return NSM_SW_SUCCESS;
 }
 
