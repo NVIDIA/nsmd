@@ -5237,10 +5237,10 @@ std::optional<std::vector<uint8_t>>
             rc = encode_reset_enum_data(static_cast<uint8_t>(mockValue),
                                         reading, &sample_len);
         }
-        else if (tag == 8) // Special case for boot reason (uint64_t)
+        else if (tag == 8) // Special case for boot reason (256 bytes)
         {
-            rc = encode_reset_count_64data(static_cast<uint64_t>(mockValue),
-                                           reading, &sample_len);
+            rc = encode_reset_count_256data(bootReasonMockValue.data(), reading,
+                                            &sample_len);
         }
         else // General case for reset counts (uint16_t)
         {

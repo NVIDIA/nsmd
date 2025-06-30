@@ -172,15 +172,19 @@ int encode_reset_count_data(uint16_t count, uint8_t *data, size_t *data_len)
 	return NSM_SW_SUCCESS;
 }
 
-int encode_reset_count_64data(uint64_t counter, uint8_t *data, size_t *data_len)
+int encode_reset_count_256data(const uint64_t *counter, uint8_t *data,
+			       size_t *data_len)
 {
 	if (data == NULL || data_len == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	uint64_t le_count = htole64(counter);
-	memcpy(data, &le_count, sizeof(uint64_t));
-	*data_len = sizeof(uint64_t);
+	for (size_t i = 0; i < 4; i++) {
+		uint64_t le_count = htole64(counter[i]);
+		memcpy(data + i * sizeof(uint64_t), &le_count,
+		       sizeof(uint64_t));
+	}
+	*data_len = sizeof(uint64_t) * 4;
 
 	return NSM_SW_SUCCESS;
 }
@@ -218,20 +222,23 @@ int decode_reset_count_data(const uint8_t *data, size_t data_len,
 	return NSM_SW_SUCCESS;
 }
 
-int decode_reset_count_64data(const uint8_t *data, size_t data_len,
-			      uint64_t *counter)
+int decode_reset_count_256data(const uint8_t *data, size_t data_len,
+			       uint64_t *counter, size_t counter_len)
 {
-	if (data == NULL || counter == NULL) {
+	if (data == NULL || counter == NULL || counter_len != 4) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (data_len != sizeof(uint64_t)) {
+	if (data_len != sizeof(uint64_t) * counter_len) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	uint64_t le_count;
-	memcpy(&le_count, data, sizeof(uint64_t));
-	*counter = le64toh(le_count);
+	for (size_t i = 0; i < counter_len; i++) {
+		uint64_t le_count;
+		memcpy(&le_count, data + i * sizeof(uint64_t),
+		       sizeof(uint64_t));
+		counter[i] = le64toh(le_count);
+	}
 
 	return NSM_SW_SUCCESS;
 }

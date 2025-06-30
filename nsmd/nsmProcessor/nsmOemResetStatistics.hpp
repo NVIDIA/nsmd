@@ -68,6 +68,10 @@ class ResetStatisticsAggregator : public NsmSensorAggregator
     /** @brief Updates a D-Bus property with the provided value */
     void updateProperty(const std::string& property, uint64_t value);
 
+    /** @brief Updates a D-Bus property with the provided value */
+    void updateBootReasonProperty(const std::string& property,
+                                  const std::array<uint64_t, 4>& value);
+
     // Mapping of tags to property names
     static const std::unordered_map<uint8_t, std::string> tagToPropertyMap;
 
