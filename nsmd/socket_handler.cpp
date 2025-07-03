@@ -37,6 +37,11 @@
 
 namespace mctp_socket
 {
+
+alignas(64) uint8_t
+    InKernelHandler::staticBuffer[InKernelHandler::STATIC_BUF_SIZE];
+alignas(64) uint8_t DaemonHandler::staticBuffer[DaemonHandler::STATIC_BUF_SIZE];
+
 std::optional<Response> Handler::processRxMsg(uint8_t tag, uint8_t eid,
                                               [[maybe_unused]] uint8_t type,
                                               const uint8_t* nsmMsg,
@@ -238,45 +243,62 @@ void DaemonHandler::handleReceivedMsg(IO& io, int fd, uint32_t revents)
     }
     else
     {
-        std::vector<uint8_t> requestMsg(peekedLength);
-        auto recvDataLength = recv(fd, static_cast<void*>(requestMsg.data()),
-                                   peekedLength, 0);
+        uint8_t* requestMsgData;
+        size_t requestMsgSize = peekedLength;
+
+        // Only create dynamic buffer when actually needed
+        std::optional<std::vector<uint8_t>> dynamicBuffer;
+        if (static_cast<size_t>(peekedLength) <= STATIC_BUF_SIZE)
+        {
+            requestMsgData = staticBuffer;
+        }
+        else
+        {
+            // Constructs a vector of size peekedLength in the optional
+            // dynamicBuffer
+            dynamicBuffer.emplace(peekedLength);
+            requestMsgData = dynamicBuffer->data();
+        }
+
+        auto recvDataLength = recv(fd, static_cast<void*>(requestMsgData),
+                                   requestMsgSize, 0);
         if (recvDataLength == peekedLength)
         {
             if (verbose)
             {
-                utils::printBuffer(utils::Rx, &requestMsg[3],
-                                   requestMsg.size() - 3, requestMsg[0],
-                                   requestMsg[1]);
+                utils::printBuffer(utils::Rx, &requestMsgData[3],
+                                   requestMsgSize - 3, requestMsgData[0],
+                                   requestMsgData[1]);
             }
 
-            if (MCTP_MSG_TYPE_VDM != requestMsg[2])
+            if (MCTP_MSG_TYPE_VDM != requestMsgData[2])
             {
                 // Skip this message and continue.
             }
             else
             {
                 // process message and send response
-                auto response = processRxMsg(requestMsg[0], requestMsg[1],
-                                             requestMsg[2], &requestMsg[3],
-                                             requestMsg.size() - 3);
+                auto response = processRxMsg(
+                    requestMsgData[0], requestMsgData[1], requestMsgData[2],
+                    &requestMsgData[3], requestMsgSize - 3);
                 if (response.has_value())
                 {
                     constexpr uint8_t tagOwnerBitPos = 3;
                     constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
                     // Set tag owner bit to 0 for NSM responses
-                    requestMsg[0] = requestMsg[0] & tagOwnerMask;
-                    iov[0].iov_base = &requestMsg[0];
-                    iov[0].iov_len = sizeof(requestMsg[0]) +
-                                     sizeof(requestMsg[1]) +
-                                     sizeof(requestMsg[2]);
+                    requestMsgData[0] = requestMsgData[0] & tagOwnerMask;
+                    iov[0].iov_base = &requestMsgData[0];
+                    iov[0].iov_len = sizeof(requestMsgData[0]) +
+                                     sizeof(requestMsgData[1]) +
+                                     sizeof(requestMsgData[2]);
                     iov[1].iov_base = (*response).data();
                     iov[1].iov_len = (*response).size();
 
                     if (verbose)
                     {
-                        utils::printBuffer(utils::Tx, *response, requestMsg[0],
-                                           requestMsg[1]);
+                        utils::printBuffer(utils::Tx, *response,
+                                           requestMsgData[0],
+                                           requestMsgData[1]);
                     }
 
                     msg.msg_iov = iov;
@@ -422,7 +444,22 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
     }
     else
     {
-        std::vector<uint8_t> requestMsg(peekedLength);
+        uint8_t* requestMsgData;
+        size_t requestMsgSize = peekedLength;
+
+        // Only create dynamic buffer when actually needed
+        std::optional<std::vector<uint8_t>> dynamicBuffer;
+        if (static_cast<size_t>(peekedLength) <= STATIC_BUF_SIZE)
+        {
+            requestMsgData = staticBuffer;
+        }
+        else
+        {
+            // Constructs a vector of size peekedLength in the optional
+            // dynamicBuffer
+            dynamicBuffer.emplace(peekedLength);
+            requestMsgData = dynamicBuffer->data();
+        }
 
         struct sockaddr_mctp addr;
         memset(&addr, 0, sizeof(addr));
@@ -430,15 +467,15 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
         socklen_t addrlen = sizeof(addr);
 
         ssize_t recvDataLength = recvfrom(
-            fd, static_cast<void*>(requestMsg.data()), peekedLength, MSG_TRUNC,
+            fd, static_cast<void*>(requestMsgData), peekedLength, MSG_TRUNC,
             reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
 
         if (recvDataLength == peekedLength)
         {
             if (verbose)
             {
-                utils::printBuffer(utils::Rx, requestMsg, addr.smctp_tag,
-                                   addr.smctp_addr.s_addr);
+                utils::printBuffer(utils::Rx, requestMsgData, requestMsgSize,
+                                   addr.smctp_tag, addr.smctp_addr.s_addr);
             }
 
             if (MCTP_MSG_TYPE_VDM != addr.smctp_type)
@@ -450,7 +487,7 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
                 // process message and send response
                 auto response = processRxMsg(
                     addr.smctp_tag, addr.smctp_addr.s_addr, addr.smctp_type,
-                    requestMsg.data(), requestMsg.size());
+                    requestMsgData, requestMsgSize);
                 if (response.has_value())
                 {
                     if (verbose)
@@ -465,7 +502,7 @@ void InKernelHandler::handleReceivedMsg(IO& io, int fd,
                     destAddr.smctp_family = AF_MCTP;
                     destAddr.smctp_network = MCTP_NET_ANY;
                     destAddr.smctp_addr.s_addr = addr.smctp_addr.s_addr;
-                    destAddr.smctp_type = requestMsg[0];
+                    destAddr.smctp_type = requestMsgData[0];
 
                     constexpr uint8_t tagOwnerBitPos = 3;
                     constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);

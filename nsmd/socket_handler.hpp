@@ -121,6 +121,9 @@ class InKernelHandler : public Handler
     int fd;
     int sendBufferSize;
     bool isFdValid{false};
+
+    static constexpr size_t STATIC_BUF_SIZE = 64;
+    alignas(64) static uint8_t staticBuffer[STATIC_BUF_SIZE];
 };
 
 class DaemonHandler : public Handler
@@ -144,6 +147,8 @@ class DaemonHandler : public Handler
              std::tuple<std::unique_ptr<utils::CustomFD>, SendBufferSize,
                         std::unique_ptr<IO>>>
         socketInfoMap;
+    static constexpr size_t STATIC_BUF_SIZE = 64;
+    alignas(64) static uint8_t staticBuffer[STATIC_BUF_SIZE];
 };
 
 } // namespace mctp_socket
