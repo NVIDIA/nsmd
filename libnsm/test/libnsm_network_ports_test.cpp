@@ -3481,16 +3481,17 @@ TEST(getFabricManagerState, testBadDecodeResponseWithPayload)
 TEST(encodeEthPortTelemetryCounterReq, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> request_msg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_req));
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_get_ethernet_port_telemetry_counter_req));
 
-	uint8_t port_number = 1;
+	uint16_t port_number = 1;
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
 
 	auto rc =
 	    encode_get_eth_port_telemetry_counter_req(0, port_number, request);
 
-	nsm_get_port_telemetry_counter_req *req =
-	    reinterpret_cast<nsm_get_port_telemetry_counter_req *>(
+	struct nsm_get_ethernet_port_telemetry_counter_req *req =
+	    reinterpret_cast<nsm_get_ethernet_port_telemetry_counter_req *>(
 		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -3522,7 +3523,7 @@ TEST(decodeEthPortTelemetryCounterReq, testGoodDecodeRequest)
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
 	size_t msg_len = request_msg.size();
 
-	uint8_t port_number = 0;
+	uint16_t port_number = 0;
 	auto rc = decode_get_eth_port_telemetry_counter_req(request, msg_len,
 							    &port_number);
 
@@ -3542,9 +3543,9 @@ TEST(decodeEthPortTelemetryCounterReq, testBadDecodeRequest)
 					 1};
 
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
-	uint8_t port_number = 0;
-	size_t msg_len =
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_req);
+	uint16_t port_number = 0;
+	size_t msg_len = sizeof(nsm_msg_hdr) +
+			 sizeof(nsm_get_ethernet_port_telemetry_counter_req);
 
 	auto rc =
 	    decode_get_eth_port_telemetry_counter_req(nullptr, 0, &port_number);
@@ -3564,17 +3565,20 @@ TEST(decodeEthPortTelemetryCounterReq, testBadDecodeRequest)
 
 TEST(EncodeAggregateEthPortTelemetryData, TestGoodEncode)
 {
-	uint32_t counter_reading = 12345678;
+	nsm_ethernet_port_counter_data counter_reading{
+	    .ethernet_port_counter_data_32bit = 12345678};
 	std::vector<uint8_t> data(sizeof(uint32_t), 0);
 	size_t data_len = data.size();
 
 	auto rc = encode_aggregate_eth_port_telemetry_data(
-	    &counter_reading, data.data(), &data_len);
+	    ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS, &counter_reading,
+	    data.data(), &data_len);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(data_len, sizeof(uint32_t));
 
-	uint32_t expected_le_reading = htole32(counter_reading);
+	uint32_t expected_le_reading =
+	    htole32(counter_reading.ethernet_port_counter_data_32bit);
 	uint32_t actual_le_reading;
 	std::memcpy(&actual_le_reading, data.data(), sizeof(uint32_t));
 	EXPECT_EQ(actual_le_reading, expected_le_reading);
@@ -3582,67 +3586,82 @@ TEST(EncodeAggregateEthPortTelemetryData, TestGoodEncode)
 
 TEST(EncodeAggregateEthPortTelemetryData, TestBadEncode)
 {
-	uint32_t counter_reading = 12345678;
+	nsm_ethernet_port_counter_data counter_reading{
+	    .ethernet_port_counter_data_32bit = 12345678};
 	std::vector<uint8_t> data(sizeof(uint32_t) - 1,
 				  0); // Intentionally small buffer
 	size_t data_len = data.size();
 
 	auto rc = encode_aggregate_eth_port_telemetry_data(
-	    &counter_reading, data.data(), &data_len);
+	    ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS, &counter_reading,
+	    data.data(), &data_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	rc = encode_aggregate_eth_port_telemetry_data(nullptr, data.data(),
-						      &data_len);
+	rc = encode_aggregate_eth_port_telemetry_data(
+	    ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS, nullptr, data.data(),
+	    &data_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = encode_aggregate_eth_port_telemetry_data(&counter_reading, nullptr,
-						      &data_len);
+	rc = encode_aggregate_eth_port_telemetry_data(
+	    ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS, &counter_reading, nullptr,
+	    &data_len);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = encode_aggregate_eth_port_telemetry_data(&counter_reading,
-						      data.data(), nullptr);
+	rc = encode_aggregate_eth_port_telemetry_data(
+	    ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS, &counter_reading,
+	    data.data(), nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
 
 TEST(DecodeAggregateEthPortTelemetryData, TestGoodDecode)
 {
-	uint32_t counter_reading = 12345678;
-	uint32_t le_reading = htole32(counter_reading);
+	nsm_ethernet_port_counter_data counter_reading{
+	    .ethernet_port_counter_data_32bit = 12345678};
+	uint32_t le_reading =
+	    htole32(counter_reading.ethernet_port_counter_data_32bit);
 	std::vector<uint8_t> data(sizeof(uint32_t), 0);
 	std::memcpy(data.data(), &le_reading, sizeof(uint32_t));
 	size_t data_len = data.size();
 
-	uint32_t decoded_counter_reading = 0;
+	nsm_ethernet_port_counter_data decoded_counter_reading;
 	auto rc = decode_aggregate_eth_port_telemetry_data(
-	    data.data(), &data_len, &decoded_counter_reading);
+	    data.data(), &data_len, ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS,
+	    &decoded_counter_reading);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(decoded_counter_reading, counter_reading);
+	EXPECT_EQ(decoded_counter_reading.ethernet_port_counter_data_32bit,
+		  counter_reading.ethernet_port_counter_data_32bit);
 }
 
 TEST(DecodeAggregateEthPortTelemetryData, TestBadDecode)
 {
-	uint32_t counter_reading = 12345678;
-	uint32_t le_reading = htole32(counter_reading);
+	nsm_ethernet_port_counter_data counter_reading{
+	    .ethernet_port_counter_data_32bit = 12345678};
+	uint32_t le_reading =
+	    htole32(counter_reading.ethernet_port_counter_data_32bit);
 	std::vector<uint8_t> data(sizeof(uint32_t) - 1,
 				  0); // Intentionally small buffer
 	std::memcpy(data.data(), &le_reading, data.size());
 	size_t data_len = data.size();
 
-	uint32_t decoded_counter_reading = 0;
+	nsm_ethernet_port_counter_data decoded_counter_reading;
 	auto rc = decode_aggregate_eth_port_telemetry_data(
-	    data.data(), &data_len, &decoded_counter_reading);
+	    data.data(), &data_len, ETHERNET_PORT_COUNTER_TAG_RX_BYTES,
+	    &decoded_counter_reading);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	rc = decode_aggregate_eth_port_telemetry_data(nullptr, &data_len,
-						      &decoded_counter_reading);
+	rc = decode_aggregate_eth_port_telemetry_data(
+	    nullptr, &data_len, ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS,
+	    &decoded_counter_reading);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_aggregate_eth_port_telemetry_data(data.data(), nullptr,
-						      &decoded_counter_reading);
+	rc = decode_aggregate_eth_port_telemetry_data(
+	    data.data(), nullptr, ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS,
+	    &decoded_counter_reading);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode_aggregate_eth_port_telemetry_data(data.data(), &data_len,
-						      nullptr);
+	rc = decode_aggregate_eth_port_telemetry_data(
+	    data.data(), &data_len, ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS,
+	    nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }

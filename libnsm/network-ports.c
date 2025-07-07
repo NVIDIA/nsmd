@@ -1670,7 +1670,7 @@ int decode_nsm_get_fabric_manager_state_event(
 }
 
 int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
-					      uint8_t port_number,
+					      uint16_t port_number,
 					      struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -1687,74 +1687,148 @@ int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
 		return rc;
 	}
 
-	nsm_get_port_telemetry_counter_req *request =
-	    (nsm_get_port_telemetry_counter_req *)msg->payload;
+	struct nsm_get_ethernet_port_telemetry_counter_req *request =
+	    (struct nsm_get_ethernet_port_telemetry_counter_req *)msg->payload;
 
 	request->hdr.command = NSM_GET_ETH_PORT_TELEMETRY_COUNTER;
 	request->hdr.data_size = sizeof(port_number);
-	request->port_number = port_number;
+	request->port_number = htole16(port_number);
 
 	return NSM_SW_SUCCESS;
 }
 
 int decode_get_eth_port_telemetry_counter_req(const struct nsm_msg *msg,
 					      size_t msg_len,
-					      uint8_t *port_number)
+					      uint16_t *port_number)
 {
 	if (msg == NULL || port_number == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(nsm_get_port_telemetry_counter_req)) {
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_get_ethernet_port_telemetry_counter_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	nsm_get_port_telemetry_counter_req *request =
-	    (nsm_get_port_telemetry_counter_req *)msg->payload;
+	struct nsm_get_ethernet_port_telemetry_counter_req *request =
+	    (struct nsm_get_ethernet_port_telemetry_counter_req *)msg->payload;
 
 	if (request->hdr.data_size < sizeof(request->port_number)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*port_number = request->port_number;
+	*port_number = le16toh(request->port_number);
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_aggregate_eth_port_telemetry_data(const uint8_t *data,
-					     size_t *data_len,
-					     uint32_t *counter_reading)
+int decode_aggregate_eth_port_telemetry_data(
+    const uint8_t *data, size_t *data_len, uint8_t tag,
+    nsm_ethernet_port_counter_data *counter_reading)
 {
 	if (data == NULL || data_len == NULL || counter_reading == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (*data_len != sizeof(uint32_t)) {
-		return NSM_SW_ERROR_LENGTH;
+	switch (tag) {
+	case ETHERNET_PORT_COUNTER_TAG_RX_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_UNICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_MULTICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_BROADCAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_UNICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_MULTICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_BROADCAST_BYTES: {
+		if (*data_len != sizeof(uint64_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		uint64_t le_reading;
+		memcpy(&le_reading, data, sizeof(uint64_t));
+		counter_reading->ethernet_port_counter_data_64bit =
+		    le64toh(le_reading);
+		break;
 	}
-
-	uint32_t le_reading;
-	memcpy(&le_reading, data, sizeof(uint32_t));
-	*counter_reading = le32toh(le_reading);
+	case ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_ALIGNMENT_ERRORS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_FALSE_CARRIER_DETECTIONS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_RUNT_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_JABBER_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_XON_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_XOFF_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_XON_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_XOFF_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_SINGLE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_MULTIPLE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_LATE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_EXCESSIVE_COLLISION_FRAMES: {
+		if (*data_len != sizeof(uint32_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		uint32_t le_reading32;
+		memcpy(&le_reading32, data, sizeof(uint32_t));
+		counter_reading->ethernet_port_counter_data_32bit =
+		    le32toh(le_reading32);
+		break;
+	}
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
 
 	return NSM_SW_SUCCESS;
 }
 
-int encode_aggregate_eth_port_telemetry_data(uint32_t *counter_reading,
-					     uint8_t *data, size_t *data_len)
+int encode_aggregate_eth_port_telemetry_data(
+    uint8_t tag, nsm_ethernet_port_counter_data *counter_reading, uint8_t *data,
+    size_t *data_len)
 {
 	if (data == NULL || data_len == NULL || counter_reading == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
-	if (*data_len < sizeof(uint32_t)) {
-		return NSM_SW_ERROR_LENGTH;
+	switch (tag) {
+	case ETHERNET_PORT_COUNTER_TAG_RX_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_UNICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_MULTICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_BROADCAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_UNICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_MULTICAST_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_BROADCAST_BYTES: {
+		if (*data_len != sizeof(uint64_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		uint64_t le_reading =
+		    htole64(counter_reading->ethernet_port_counter_data_64bit);
+		memcpy(data, &le_reading, sizeof(uint64_t));
+		*data_len = sizeof(uint64_t);
+		break;
 	}
-
-	uint32_t le_reading = htole32(*counter_reading);
-	memcpy(data, &le_reading, sizeof(uint32_t));
-	*data_len = sizeof(uint32_t);
+	case ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_ALIGNMENT_ERRORS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_FALSE_CARRIER_DETECTIONS:
+	case ETHERNET_PORT_COUNTER_TAG_RX_RUNT_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_JABBER_BYTES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_XON_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_XOFF_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_XON_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_TX_XOFF_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_SINGLE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_MULTIPLE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_LATE_COLLISION_FRAMES:
+	case ETHERNET_PORT_COUNTER_TAG_RX_EXCESSIVE_COLLISION_FRAMES: {
+		if (*data_len != sizeof(uint32_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		uint32_t le_reading32 =
+		    htole32(counter_reading->ethernet_port_counter_data_32bit);
+		memcpy(data, &le_reading32, sizeof(uint32_t));
+		*data_len = sizeof(uint32_t);
+		break;
+	}
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
 
 	return NSM_SW_SUCCESS;
 }

@@ -4788,7 +4788,8 @@ class GetEthPortTelemetryCounter : public CommandInterface
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
         std::vector<uint8_t> requestMsg(
-            sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_telemetry_counter_req));
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_get_ethernet_port_telemetry_counter_req));
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
         auto rc = encode_get_eth_port_telemetry_counter_req(
             instanceId, portNumber, request);
@@ -4809,19 +4810,20 @@ class GetEthPortTelemetryCounter : public CommandInterface
         int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
                              ordered_json& sample_json) final
         {
-            uint32_t counter_reading;
-            int rc = decode_aggregate_eth_port_telemetry_data(data, &data_len,
-                                                              &counter_reading);
+            nsm_ethernet_port_counter_data counter_reading;
+            int rc = decode_aggregate_eth_port_telemetry_data(
+                data, &data_len, tag, &counter_reading);
             if (rc != NSM_SW_SUCCESS)
             {
                 return rc;
             }
-            sample_json[ethPortTelemetryCounterList[tag]] = counter_reading;
+            sample_json[ethPortTelemetryCounterList[tag]] =
+                counter_reading.ethernet_port_counter_data_64bit;
             return NSM_SW_SUCCESS;
         }
     };
 
-    uint8_t portNumber;
+    uint16_t portNumber;
     static constexpr const char* ethPortTelemetryCounterList[21] = {
         "RXBytes",                   // 0
         "TXBytes",                   // 1

@@ -146,7 +146,7 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
 {
   public:
     EthPortTelemetryAggregator(
-        sdbusplus::bus::bus& bus, std::string& portName,
+        sdbusplus::bus::bus& bus, std::string& portName, uint16_t portNumber,
         const std::string& type, std::string& inventoryObjPath,
         std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
         std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
@@ -161,18 +161,18 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
     std::string portName;
 
   private:
-    void updateCounterValues(uint8_t tag, uint32_t counterValue);
-    void getCounterValue(const std::string propName, uint32_t& value,
+    void updateCounterValues(uint8_t tag,
+                             nsm_ethernet_port_counter_data* counterValue);
+    void getCounterValue(const std::string propName,
+                         nsm_ethernet_port_counter_data& value,
                          std::string& ifaceName);
 
-    uint8_t portNumber;
+    uint16_t portNumber;
     std::string objPath;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
     std::unique_ptr<EthPortIntf> ethPortIntf = nullptr;
     std::unordered_map<uint8_t, std::string> tagToPropertyMap;
-
-    static std::unordered_map<uint8_t, std::string> initPropertyTagToNameMap();
 };
 
 } // namespace nsm

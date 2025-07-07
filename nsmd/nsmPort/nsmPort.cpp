@@ -1111,15 +1111,37 @@ uint8_t NsmPortMetrics::handleResponseMsg(const struct nsm_msg* responseMsg,
 }
 
 EthPortTelemetryAggregator::EthPortTelemetryAggregator(
-    sdbusplus::bus::bus& bus, std::string& portName, const std::string& type,
-    std::string& inventoryObjPath,
+    sdbusplus::bus::bus& bus, std::string& portName, uint16_t portNumber,
+    const std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
     NsmSensorAggregator(portName, type),
-    portName(portName), objPath(inventoryObjPath),
+    portName(portName), portNumber(portNumber), objPath(inventoryObjPath),
     portMetricsOem2Intf(portMetricsOem2Intf),
     portPacketCountersIntf(portPacketCountersIntf),
-    tagToPropertyMap(initPropertyTagToNameMap())
+    tagToPropertyMap({
+        {0, "RXBytes"},                   // Total Bytes Received
+        {1, "TXBytes"},                   // Total Bytes Transmitted
+        {2, "RXUnicastPkts"},             // Total Unicast Packets Received
+        {3, "RXMulticastPkts"},           // Total Multicast Packets Received
+        {4, "RXBroadcastPkts"},           // Total Broadcast Packets Received
+        {5, "TXUnicastPkts"},             // Total Unicast Packets Transmitted
+        {6, "TXMulticastPkts"},           // Total Multicast Packets Transmitted
+        {7, "TXBroadcastPkts"},           // Total Broadcast Packets Transmitted
+        {8, "RXFCSErrors"},               // FCS Receive Errors
+        {9, "RXAlignmentErrors"},         // Alignment Errors
+        {10, "RXFalseCarrierDetections"}, // False Carrier Detections
+        {11, "RXRuntPkts"},               // Runt Packets Received
+        {12, "RXJabberPkts"},             // Jabber Packets Received
+        {13, "RXXONFrames"},              // Pause XON Frames Received
+        {14, "RXXOFFFrames"},             // Pause XOFF Frames Received
+        {15, "TXXONFrames"},              // Pause XON Frames Transmitted
+        {16, "TXXOFFFrames"},             // Pause XOFF Frames Transmitted
+        {17, "TXSingleCollisionFrames"},  // Single Collision Transmit Frames
+        {18, "TXMultipleCollisionFrames"}, // Multiple Collision Transmit Frames
+        {19, "TXLateCollisionFrames"},     // Late Collision Frames
+        {20, "TXExcessCollisionFrames"},   // Excessive Collision Frames
+    })
 {
     lg2::debug("EthPortTelemetryAggregator: {NAME}", "NAME", portName.c_str());
 
@@ -1131,8 +1153,9 @@ EthPortTelemetryAggregator::EthPortTelemetryAggregator(
 std::optional<std::vector<uint8_t>>
     EthPortTelemetryAggregator::genRequestMsg(eid_t eid, uint8_t instanceId)
 {
-    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
-                                 sizeof(nsm_get_port_telemetry_counter_req));
+    std::vector<uint8_t> request(
+        sizeof(nsm_msg_hdr) +
+        sizeof(nsm_get_ethernet_port_telemetry_counter_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
 
     // Use the eth port telemetry counter command
@@ -1166,22 +1189,22 @@ int EthPortTelemetryAggregator::handleSamples(
             continue;
         }
 
-        uint32_t counterValue = 0;
+        nsm_ethernet_port_counter_data counterValue = {};
         size_t dataLen = sample.data_len;
 
-        int rc = decode_aggregate_eth_port_telemetry_data(sample.data, &dataLen,
-                                                          &counterValue);
+        int rc = decode_aggregate_eth_port_telemetry_data(
+            sample.data, &dataLen, sample.tag, &counterValue);
 
         if (rc != NSM_SW_SUCCESS)
         {
-            lg2::error(
+            lg2::debug(
                 "Failed to decode Ethernet port telemetry data for tag {TAG} : rc = {RC}",
                 "TAG", sample.tag, "RC", rc);
             result = false;
             continue;
         }
 
-        updateCounterValues(sample.tag, counterValue);
+        updateCounterValues(sample.tag, &counterValue);
     }
 
     updateMetricOnSharedMemory();
@@ -1189,8 +1212,8 @@ int EthPortTelemetryAggregator::handleSamples(
     return result;
 }
 
-void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
-                                                     uint32_t counterValue)
+void EthPortTelemetryAggregator::updateCounterValues(
+    uint8_t tag, nsm_ethernet_port_counter_data* counterValue)
 {
     auto it = tagToPropertyMap.find(tag);
     if (it != tagToPropertyMap.end())
@@ -1200,159 +1223,186 @@ void EthPortTelemetryAggregator::updateCounterValues(uint8_t tag,
         try
         {
             if (propName == "RXBytes")
-                portMetricsOem2Intf->rxBytes(counterValue);
+                portMetricsOem2Intf->rxBytes(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "TXBytes")
-                portMetricsOem2Intf->txBytes(counterValue);
+                portMetricsOem2Intf->txBytes(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "RXUnicastPkts")
-                portPacketCountersIntf->rxUnicastPkts(counterValue);
+                portPacketCountersIntf->rxUnicastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "RXMulticastPkts")
-                portPacketCountersIntf->rxMulticastPkts(counterValue);
+                portPacketCountersIntf->rxMulticastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "RXBroadcastPkts")
-                portPacketCountersIntf->rxBroadcastPkts(counterValue);
+                portPacketCountersIntf->rxBroadcastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "TXUnicastPkts")
-                portPacketCountersIntf->txUnicastPkts(counterValue);
+                portPacketCountersIntf->txUnicastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "TXMulticastPkts")
-                portPacketCountersIntf->txMulticastPkts(counterValue);
+                portPacketCountersIntf->txMulticastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "TXBroadcastPkts")
-                portPacketCountersIntf->txBroadcastPkts(counterValue);
+                portPacketCountersIntf->txBroadcastPkts(
+                    counterValue->ethernet_port_counter_data_64bit);
             else if (propName == "RXFCSErrors")
-                ethPortIntf->rxfcsErrors(counterValue);
+                ethPortIntf->rxfcsErrors(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXAlignmentErrors")
-                ethPortIntf->rxAlignmentErrors(counterValue);
+                ethPortIntf->rxAlignmentErrors(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXFalseCarrierDetections")
-                ethPortIntf->rxFalseCarrierDetections(counterValue);
+                ethPortIntf->rxFalseCarrierDetections(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXRuntPkts")
-                ethPortIntf->rxRuntPkts(counterValue);
+                ethPortIntf->rxRuntPkts(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXJabberPkts")
-                ethPortIntf->rxJabberPkts(counterValue);
+                ethPortIntf->rxJabberPkts(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXXONFrames")
-                ethPortIntf->rxxonFrames(counterValue);
+                ethPortIntf->rxxonFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "RXXOFFFrames")
-                ethPortIntf->rxxoffFrames(counterValue);
+                ethPortIntf->rxxoffFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "TXXONFrames")
-                ethPortIntf->txxonFrames(counterValue);
+                ethPortIntf->txxonFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "TXXOFFFrames")
-                ethPortIntf->txxoffFrames(counterValue);
+                ethPortIntf->txxoffFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "TXSingleCollisionFrames")
-                ethPortIntf->txSingleCollisionFrames(counterValue);
+                ethPortIntf->txSingleCollisionFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "TXMultipleCollisionFrames")
-                ethPortIntf->txMultipleCollisionFrames(counterValue);
+                ethPortIntf->txMultipleCollisionFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
             else if (propName == "TXLateCollisionFrames")
-                ethPortIntf->txLateCollisionFrames(counterValue);
-            else if (propName == "TXExcessiveCollisionFrames")
-                ethPortIntf->txExcessCollisionFrames(counterValue);
+                ethPortIntf->txLateCollisionFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
+            else if (propName == "TXExcessCollisionFrames")
+                ethPortIntf->txExcessCollisionFrames(
+                    counterValue->ethernet_port_counter_data_32bit);
         }
         catch (const std::exception& e)
         {
+            lg2::error(
+                "Failed to update property {PROP} with value {VALUE}: {ERR}",
+                "PROP", propName, "VALUE", counterValue, "ERR", e.what());
             return;
         }
     }
 }
 
-void EthPortTelemetryAggregator::getCounterValue(const std::string propName,
-                                                 uint32_t& value,
-                                                 std::string& ifaceName)
+void EthPortTelemetryAggregator::getCounterValue(
+    const std::string propName, nsm_ethernet_port_counter_data& value,
+    std::string& ifaceName)
 {
-    try
+    if (propName == "RXBytes")
     {
-        if (propName == "RXBytes")
-        {
-            value = portMetricsOem2Intf->rxBytes();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
-        }
-        else if (propName == "TXBytes")
-        {
-            value = portMetricsOem2Intf->txBytes();
-            ifaceName = std::string(portMetricsOem2Intf->interface);
-        }
-        else if (propName == "RXUnicastPkts")
-        {
-            value = portPacketCountersIntf->rxUnicastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "RXMulticastPkts")
-        {
-            value = portPacketCountersIntf->rxMulticastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "RXBroadcastPkts")
-        {
-            value = portPacketCountersIntf->rxBroadcastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "TXUnicastPkts")
-        {
-            value = portPacketCountersIntf->txUnicastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "TXMulticastPkts")
-        {
-            value = portPacketCountersIntf->txMulticastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "TXBroadcastPkts")
-        {
-            value = portPacketCountersIntf->txBroadcastPkts();
-            ifaceName = std::string(portPacketCountersIntf->interface);
-        }
-        else if (propName == "RXFCSErrors")
-        {
-            value = ethPortIntf->rxfcsErrors();
-        }
-        else if (propName == "RXAlignmentErrors")
-        {
-            value = ethPortIntf->rxAlignmentErrors();
-        }
-        else if (propName == "RXFalseCarrierDetections")
-        {
-            value = ethPortIntf->rxFalseCarrierDetections();
-        }
-        else if (propName == "RXRuntPkts")
-        {
-            value = ethPortIntf->rxRuntPkts();
-        }
-        else if (propName == "RXJabberPkts")
-        {
-            value = ethPortIntf->rxJabberPkts();
-        }
-        else if (propName == "RXXONFrames")
-        {
-            value = ethPortIntf->rxxonFrames();
-        }
-        else if (propName == "RXXOFFFrames")
-        {
-            value = ethPortIntf->rxxoffFrames();
-        }
-        else if (propName == "TXXONFrames")
-        {
-            value = ethPortIntf->txxonFrames();
-        }
-        else if (propName == "TXXOFFFrames")
-        {
-            value = ethPortIntf->txxoffFrames();
-        }
-        else if (propName == "TXSingleCollisionFrames")
-        {
-            value = ethPortIntf->txSingleCollisionFrames();
-        }
-        else if (propName == "TXMultipleCollisionFrames")
-        {
-            value = ethPortIntf->txMultipleCollisionFrames();
-        }
-        else if (propName == "TXLateCollisionFrames")
-        {
-            value = ethPortIntf->txLateCollisionFrames();
-        }
-        else if (propName == "TXExcessiveCollisionFrames")
-        {
-            value = ethPortIntf->txExcessCollisionFrames();
-        }
+        value.ethernet_port_counter_data_64bit = portMetricsOem2Intf->rxBytes();
+        ifaceName = std::string(portMetricsOem2Intf->interface);
     }
-    catch (const std::exception& e)
+    else if (propName == "TXBytes")
     {
-        lg2::error("Failed to get counter value for property {PROP}: {ERR}",
-                   "PROP", propName, "ERR", e.what());
-        return;
+        value.ethernet_port_counter_data_64bit = portMetricsOem2Intf->txBytes();
+        ifaceName = std::string(portMetricsOem2Intf->interface);
+    }
+    else if (propName == "RXUnicastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->rxUnicastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "RXMulticastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->rxMulticastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "RXBroadcastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->rxBroadcastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "TXUnicastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->txUnicastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "TXMulticastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->txMulticastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "TXBroadcastPkts")
+    {
+        value.ethernet_port_counter_data_64bit =
+            portPacketCountersIntf->txBroadcastPkts();
+        ifaceName = std::string(portPacketCountersIntf->interface);
+    }
+    else if (propName == "RXFCSErrors")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->rxfcsErrors();
+    }
+    else if (propName == "RXAlignmentErrors")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->rxAlignmentErrors();
+    }
+    else if (propName == "RXFalseCarrierDetections")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->rxFalseCarrierDetections();
+    }
+    else if (propName == "RXRuntPkts")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->rxRuntPkts();
+    }
+    else if (propName == "RXJabberPkts")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->rxJabberPkts();
+    }
+    else if (propName == "RXXONFrames")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->rxxonFrames();
+    }
+    else if (propName == "RXXOFFFrames")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->rxxoffFrames();
+    }
+    else if (propName == "TXXONFrames")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->txxonFrames();
+    }
+    else if (propName == "TXXOFFFrames")
+    {
+        value.ethernet_port_counter_data_32bit = ethPortIntf->txxoffFrames();
+    }
+    else if (propName == "TXSingleCollisionFrames")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->txSingleCollisionFrames();
+    }
+    else if (propName == "TXMultipleCollisionFrames")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->txMultipleCollisionFrames();
+    }
+    else if (propName == "TXLateCollisionFrames")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->txLateCollisionFrames();
+    }
+    else if (propName == "TXExcessCollisionFrames")
+    {
+        value.ethernet_port_counter_data_32bit =
+            ethPortIntf->txExcessCollisionFrames();
     }
 }
 
@@ -1363,47 +1413,17 @@ void EthPortTelemetryAggregator::updateMetricOnSharedMemory()
 
     for (const auto& [tag, propName] : tagToPropertyMap)
     {
-        uint32_t value = 0;
+        nsm_ethernet_port_counter_data value = {};
         std::string ifaceName = std::string(ethPortIntf->interface);
 
         getCounterValue(propName, value, ifaceName);
 
-        nv::sensor_aggregation::DbusVariantType dbusValue{value};
+        nv::sensor_aggregation::DbusVariantType dbusValue{
+            value.ethernet_port_counter_data_64bit};
         nsm_shmem_utils::updateSharedMemoryOnSuccess(
             objPath, ifaceName, propName, smbusData, dbusValue);
     }
 #endif
-}
-
-std::unordered_map<uint8_t, std::string>
-    EthPortTelemetryAggregator::initPropertyTagToNameMap()
-{
-    std::unordered_map<uint8_t, std::string> map;
-
-    // Map each tag to its corresponding property name
-    map[0] = "RXBytes";                   // Total Bytes Received
-    map[1] = "TXBytes";                   // Total Bytes Transmitted
-    map[2] = "RXUnicastPkts";             // Total Unicast Packets Received
-    map[3] = "RXMulticastPkts";           // Total Multicast Packets Received
-    map[4] = "RXBroadcastPkts";           // Total Broadcast Packets Received
-    map[5] = "TXUnicastPkts";             // Total Unicast Packets Transmitted
-    map[6] = "TXMulticastPkts";           // Total Multicast Packets Transmitted
-    map[7] = "TXBroadcastPkts";           // Total Broadcast Packets Transmitted
-    map[8] = "RXFCSErrors";               // FCS Receive Errors
-    map[9] = "RXAlignmentErrors";         // Alignment Errors
-    map[10] = "RXFalseCarrierDetections"; // False Carrier Detections
-    map[11] = "RXRuntPkts";               // Runt Packets Received
-    map[12] = "RXJabberPkts";             // Jabber Packets Received
-    map[13] = "RXXONFrames";              // Pause XON Frames Received
-    map[14] = "RXXOFFFrames";             // Pause XOFF Frames Received
-    map[15] = "TXXONFrames";              // Pause XON Frames Transmitted
-    map[16] = "TXXOFFFrames";             // Pause XOFF Frames Transmitted
-    map[17] = "TXSingleCollisionFrames";  // Single Collision Transmit Frames
-    map[18] = "TXMultipleCollisionFrames"; // Multiple Collision Transmit Frames
-    map[19] = "TXLateCollisionFrames";     // Late Collision Frames
-    map[20] = "TXExcessiveCollisionFrames"; // Excessive Collision Frames
-
-    return map;
 }
 
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,
@@ -1545,18 +1565,14 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
         }
 
-        auto ethPortMetricsSensor =
-            std::make_shared<EthPortTelemetryAggregator>(
-                bus, portName, type, objPath, portMetricsOem2Intf,
-                portPacketCountersIntf);
-        nsmDevice->deviceSensors.emplace_back(ethPortMetricsSensor);
-        if (priority)
+        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+            nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8)
         {
-            nsmDevice->prioritySensors.emplace_back(ethPortMetricsSensor);
-        }
-        else
-        {
-            nsmDevice->roundRobinSensors.emplace_back(ethPortMetricsSensor);
+            auto ethPortMetricsSensor =
+                std::make_shared<EthPortTelemetryAggregator>(
+                    bus, portName, static_cast<uint16_t>(logicalPortNum), type,
+                    objPath, portMetricsOem2Intf, portPacketCountersIntf);
+            nsmDevice->addSensor(ethPortMetricsSensor, priority);
         }
 
         manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
