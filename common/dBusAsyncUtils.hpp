@@ -272,6 +272,12 @@ struct MockDbusAsync
         static MapperServiceMap map{};
         return map;
     }
+
+    static auto& getPropertyMap()
+    {
+        static dbus::PropertyMap propertyMap{};
+        return propertyMap;
+    }
 };
 
 template <typename type>
@@ -352,6 +358,52 @@ struct coGetServiceMap
     {}
 };
 
+struct coGetAllDbusProperty
+{
+    const std::string service;
+    const std::string objectPath;
+    const std::string interface;
+
+    /** @brief For keeping the return value.
+     */
+    dbus::PropertyMap ret;
+
+    /** @brief Returning false to make await_suspend() to be called.
+     */
+    bool await_ready() noexcept
+    {
+        auto& value = utils::MockDbusAsync::getPropertyMap();
+        ret = value;
+
+        return true;
+    }
+
+    /** @brief Called by co_await operator before suspending coroutine. The
+     * method will send out NSM request message, register a call back function
+     * for the event when D-Bus method done.
+     */
+    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle) noexcept
+    {
+        return true;
+    }
+
+    /** @brief Called by co_await operator to get return value when awaitable
+     * object completed.
+     */
+    dbus::PropertyMap await_resume() const noexcept
+    {
+        return ret;
+    }
+
+    /** @brief Constructor of awaitable object to initialize necessary member
+     * variables.
+     */
+    coGetAllDbusProperty(const std::string& service,
+                         const std::string& objectPath,
+                         const std::string& interface = "") :
+        service(service), objectPath(objectPath), interface(interface), ret{}
+    {}
+};
 #endif
 
 } // namespace utils
