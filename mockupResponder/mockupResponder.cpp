@@ -6285,7 +6285,7 @@ std::optional<std::vector<uint8_t>>
                   "LEN", requestLen);
     }
 
-    uint8_t portNumber = 0;
+    uint16_t portNumber = 0;
     auto rc = decode_get_eth_port_telemetry_counter_req(requestMsg, requestLen,
                                                         &portNumber);
     if (rc != NSM_SW_SUCCESS)
@@ -6295,35 +6295,97 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    std::vector<uint8_t> response(
+    const size_t maxResponseSize =
+        ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT * sizeof(uint64_t) +
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp);
+    static std::vector<uint8_t> ethPortTelemetryCounterResponse(
         sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
-    response.reserve(256);
+    ethPortTelemetryCounterResponse.reserve(maxResponseSize);
+    ethPortTelemetryCounterResponse.clear();
+    if (((ethPortTelemetryCounterResponse.capacity() - sizeof(nsm_msg_hdr) -
+          sizeof(nsm_aggregate_resp)) >
+         ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT * sizeof(uint64_t)))
+    {
+        lg2::error(
+            "Response capacity more than maximum aggregate response size");
+        return std::nullopt;
+    }
 
     uint16_t samplesCount = 0;
     for (uint8_t tag = 0; tag < ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT; ++tag)
     {
         ++samplesCount;
 
-        uint32_t mockValue = tag * 10; // Mock value for each counter
-        uint8_t reading[sizeof(uint32_t)] = {};
-        size_t sample_len = sizeof(reading);
-
-        rc = encode_aggregate_eth_port_telemetry_data(&mockValue, reading,
-                                                      &sample_len);
-        if (rc != NSM_SW_SUCCESS)
-        {
-            lg2::error(
-                "encode_aggregate_eth_port_telemetry_data failed: rc={RC}",
-                "RC", rc);
-            return std::nullopt;
-        }
-
         std::array<uint8_t, 256> sample;
         auto nsm_sample =
             reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        size_t sample_len = 0;
 
-        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
-                                          nsm_sample, &sample_len);
+        switch (tag)
+        {
+            case ETHERNET_PORT_COUNTER_TAG_RX_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_UNICAST_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_MULTICAST_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_BROADCAST_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_UNICAST_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_MULTICAST_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_BROADCAST_BYTES:
+            {
+                nsm_ethernet_port_counter_data mockValue{
+                    .ethernet_port_counter_data_64bit = static_cast<uint64_t>(
+                        2000000 + tag * 10)}; // Mock value for 64 bit counter
+                uint8_t reading[sizeof(uint64_t)] = {};
+                sample_len = sizeof(reading);
+
+                rc = encode_aggregate_eth_port_telemetry_data(
+                    tag, &mockValue, reading, &sample_len);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error(
+                        "encode_aggregate_eth_port_telemetry_data failed: rc={RC}",
+                        "RC", rc);
+                    return std::nullopt;
+                }
+                rc = encode_aggregate_resp_sample(
+                    tag, true, reading, sample_len, nsm_sample, &sample_len);
+                break;
+            }
+            case ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS:
+            case ETHERNET_PORT_COUNTER_TAG_RX_ALIGNMENT_ERRORS:
+            case ETHERNET_PORT_COUNTER_TAG_RX_FALSE_CARRIER_DETECTIONS:
+            case ETHERNET_PORT_COUNTER_TAG_RX_RUNT_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_JABBER_BYTES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_XON_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_XOFF_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_XON_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_TX_XOFF_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_SINGLE_COLLISION_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_MULTIPLE_COLLISION_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_LATE_COLLISION_FRAMES:
+            case ETHERNET_PORT_COUNTER_TAG_RX_EXCESSIVE_COLLISION_FRAMES:
+            {
+                nsm_ethernet_port_counter_data mockValue{
+                    .ethernet_port_counter_data_32bit = static_cast<uint32_t>(
+                        2000000 + tag * 10)}; // Mock value for 32 bit counter
+                uint8_t reading[sizeof(uint32_t)] = {};
+                sample_len = sizeof(reading);
+
+                rc = encode_aggregate_eth_port_telemetry_data(
+                    tag, &mockValue, reading, &sample_len);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error(
+                        "encode_aggregate_eth_port_telemetry_data failed: rc={RC}",
+                        "RC", rc);
+                    return std::nullopt;
+                }
+                rc = encode_aggregate_resp_sample(
+                    tag, true, reading, sample_len, nsm_sample, &sample_len);
+                break;
+            }
+        }
+
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("encode_aggregate_resp_sample failed: rc={RC}", "RC",
@@ -6331,11 +6393,23 @@ std::optional<std::vector<uint8_t>>
             return std::nullopt;
         }
 
-        response.insert(response.end(), sample.begin(),
-                        std::next(sample.begin(), sample_len));
+        if ((ethPortTelemetryCounterResponse.size() + sample_len) <=
+            ethPortTelemetryCounterResponse.capacity())
+        {
+            ethPortTelemetryCounterResponse.insert(
+                ethPortTelemetryCounterResponse.end(), sample.begin(),
+                std::next(sample.begin(), sample_len));
+        }
+        else
+        {
+            lg2::debug(
+                "Not enough capacity in ethPortTelemetryCounterResponse to insert sample");
+            return std::nullopt;
+        }
     }
 
-    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    auto responseMsg =
+        reinterpret_cast<nsm_msg*>(ethPortTelemetryCounterResponse.data());
     rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
                                NSM_GET_ETH_PORT_TELEMETRY_COUNTER, NSM_SUCCESS,
                                samplesCount, responseMsg);
@@ -6345,7 +6419,7 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    return response;
+    return ethPortTelemetryCounterResponse;
 }
 
 } // namespace MockupResponder

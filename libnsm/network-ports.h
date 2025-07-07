@@ -237,6 +237,44 @@ struct nsm_port_counter_data {
 	uint64_t intentional_link_down_count;
 } __attribute__((packed));
 
+enum ethernet_port_counter_data_tag {
+	ETHERNET_PORT_COUNTER_TAG_RX_BYTES = 0,
+	ETHERNET_PORT_COUNTER_TAG_TX_BYTES = 1,
+	ETHERNET_PORT_COUNTER_TAG_RX_UNICAST_BYTES = 2,
+	ETHERNET_PORT_COUNTER_TAG_RX_MULTICAST_BYTES = 3,
+	ETHERNET_PORT_COUNTER_TAG_RX_BROADCAST_BYTES = 4,
+	ETHERNET_PORT_COUNTER_TAG_TX_UNICAST_BYTES = 5,
+	ETHERNET_PORT_COUNTER_TAG_TX_MULTICAST_BYTES = 6,
+	ETHERNET_PORT_COUNTER_TAG_TX_BROADCAST_BYTES = 7,
+	ETHERNET_PORT_COUNTER_TAG_RX_FCS_ERRORS = 8,
+	ETHERNET_PORT_COUNTER_TAG_RX_ALIGNMENT_ERRORS = 9,
+	ETHERNET_PORT_COUNTER_TAG_RX_FALSE_CARRIER_DETECTIONS = 10,
+	ETHERNET_PORT_COUNTER_TAG_RX_RUNT_BYTES = 11,
+	ETHERNET_PORT_COUNTER_TAG_RX_JABBER_BYTES = 12,
+	ETHERNET_PORT_COUNTER_TAG_RX_XON_FRAMES = 13,
+	ETHERNET_PORT_COUNTER_TAG_RX_XOFF_FRAMES = 14,
+	ETHERNET_PORT_COUNTER_TAG_TX_XON_FRAMES = 15,
+	ETHERNET_PORT_COUNTER_TAG_TX_XOFF_FRAMES = 16,
+	ETHERNET_PORT_COUNTER_TAG_RX_SINGLE_COLLISION_FRAMES = 17,
+	ETHERNET_PORT_COUNTER_TAG_RX_MULTIPLE_COLLISION_FRAMES = 18,
+	ETHERNET_PORT_COUNTER_TAG_RX_LATE_COLLISION_FRAMES = 19,
+	ETHERNET_PORT_COUNTER_TAG_RX_EXCESSIVE_COLLISION_FRAMES = 20,
+};
+
+typedef union {
+	uint64_t ethernet_port_counter_data_64bit;
+	uint32_t ethernet_port_counter_data_32bit;
+} nsm_ethernet_port_counter_data;
+
+/** @struct nsm_get_port_telemetry_counter_req
+ *
+ *  Structure representing NSM get port telemetry counter request.
+ */
+struct nsm_get_ethernet_port_telemetry_counter_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number;
+} __attribute__((packed));
+
 struct status {
 	uint32_t link_state : 3;
 	uint32_t sub_link_state : 5;
@@ -1170,7 +1208,7 @@ int decode_nsm_get_fabric_manager_state_event(
  *  @return nsm_completion_codes
  */
 int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
-					      uint8_t port_number,
+					      uint16_t port_number,
 					      struct nsm_msg *msg);
 
 /** @brief Decode a get Ethernet port telemetry counter request message
@@ -1182,7 +1220,7 @@ int encode_get_eth_port_telemetry_counter_req(uint8_t instance_id,
  */
 int decode_get_eth_port_telemetry_counter_req(const struct nsm_msg *msg,
 					      size_t msg_len,
-					      uint8_t *port_number);
+					      uint16_t *port_number);
 
 /** @brief Decode aggregate Ethernet port telemetry data
  *
@@ -1191,9 +1229,9 @@ int decode_get_eth_port_telemetry_counter_req(const struct nsm_msg *msg,
  *  @param[out] counter_reading - Decoded counter_reading
  *  @return nsm_completion_codes
  */
-int decode_aggregate_eth_port_telemetry_data(const uint8_t *data,
-					     size_t *data_len,
-					     uint32_t *counter_reading);
+int decode_aggregate_eth_port_telemetry_data(
+    const uint8_t *data, size_t *data_len, uint8_t tag,
+    nsm_ethernet_port_counter_data *counter_reading);
 
 /** @brief Encode aggregate Ethernet port telemetry data
  *
@@ -1202,8 +1240,9 @@ int decode_aggregate_eth_port_telemetry_data(const uint8_t *data,
  *  @param[out] data_len - Length of data buffer
  *  @return nsm_completion_codes
  */
-int encode_aggregate_eth_port_telemetry_data(uint32_t *counter_reading,
-					     uint8_t *data, size_t *data_len);
+int encode_aggregate_eth_port_telemetry_data(
+    uint8_t tag, nsm_ethernet_port_counter_data *counter_reading, uint8_t *data,
+    size_t *data_len);
 
 #ifdef __cplusplus
 }
