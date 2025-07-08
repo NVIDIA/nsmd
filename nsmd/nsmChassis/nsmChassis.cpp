@@ -55,26 +55,58 @@ requester::Coroutine NsmChassis<IntfType>::update(SensorManager& manager,
     co_return NSM_SUCCESS;
 }
 
-requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
-                                             const std::string& interface,
-                                             const std::string& objPath)
+requester::Coroutine
+    nsmChassisCreateSensors(SensorManager& manager,
+                            [[maybe_unused]] const std::string& interface,
+                            const std::string& objPath)
 {
     std::string baseInterface = "xyz.openbmc_project.Configuration.NSM_Chassis";
     auto& bus = utils::DBusHandler::getBus();
+    std::string name{};
+    std::string type{};
+    uuid_t uuid{};
+    std::string entityManagerServiceStr = "xyz.openbmc_project.EntityManager";
+    dbus::PropertyMap allBaseIfaceProperties =
+        co_await utils::coGetAllDbusProperty(entityManagerServiceStr, objPath,
+                                             baseInterface);
+    dbus::PropertyMap allCurrentIfaceProperties =
+        co_await utils::coGetAllDbusProperty(entityManagerServiceStr, objPath,
+                                             interface);
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
 
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    for (auto& property : allBaseIfaceProperties)
+    {
+        lg2::info("Base Property {PROP}", "PROP", property.first);
+    }
+    for (auto& property : allCurrentIfaceProperties)
+    {
+        lg2::info("Current Iface Property {PROP}", "PROP", property.first);
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_Chassis")
     {
         auto chassisUuid = std::make_shared<NsmChassis<UuidIntf>>(name);
-        auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "DEVICE_UUID", interface.c_str());
+        uuid_t deviceUuid;
+        if (allCurrentIfaceProperties.count("DEVICE_UUID"))
+        {
+            deviceUuid =
+                std::get<uuid_t>(allCurrentIfaceProperties.at("DEVICE_UUID"));
+        }
+        // auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
+        //     objPath.c_str(), "DEVICE_UUID", interface.c_str());
         chassisUuid->invoke(pdiMethod(uuid), deviceUuid);
         device->addStaticSensor(chassisUuid);
 
@@ -112,9 +144,16 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 #ifdef NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT
         lg2::info("PCIeReferenceClockCount is supported. "
                   "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is enabled.");
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
+        uint64_t deviceType{};
+        if (allBaseIfaceProperties.count("DeviceType"))
+        {
+            deviceType =
+                std::get<uint64_t>(allBaseIfaceProperties.at("DeviceType"));
+        }
+        // auto deviceType =
+        //     (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+        //         uint64_t>(objPath.c_str(), "DeviceType",
+        //         baseInterface.c_str());
 
         if (deviceType == NSM_DEV_ID_BASEBOARD)
         {
@@ -137,16 +176,28 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     else if (type == "NSM_FPGA_Asset")
     {
         auto chassisAsset = std::make_shared<NsmChassis<NsmAssetIntf>>(name);
-        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string manufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            manufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
+        // auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset->invoke(pdiMethod(manufacturer), manufacturer);
         device->deviceSensors.emplace_back(chassisAsset);
     }
     else if (type == "NSM_Asset")
     {
         auto chassisAsset = NsmChassis<NsmAssetIntf>(name);
-        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string manufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            manufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
+        // auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "Manufacturer", interface.c_str());
         chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
@@ -162,8 +213,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_ChassisType")
     {
-        auto chassisType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "ChassisType", interface.c_str());
+        std::string chassisType;
+        if (allCurrentIfaceProperties.count("ChassisType"))
+        {
+            chassisType = std::get<std::string>(
+                allCurrentIfaceProperties.at("ChassisType"));
+        }
+        // auto chassisType = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "ChassisType", interface.c_str());
         auto chassis = std::make_shared<NsmChassis<ChassisIntf>>(name);
         chassis->invoke(pdiMethod(type),
                         ChassisIntf::convertChassisTypeFromString(chassisType));
@@ -184,8 +241,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Health")
     {
-        auto health = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Health", interface.c_str());
+        std::string health;
+        if (allCurrentIfaceProperties.count("Health"))
+        {
+            health =
+                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
+        }
+        // auto health = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "Health", interface.c_str());
         auto chassisHealth = std::make_shared<NsmChassis<HealthIntf>>(name);
         chassisHealth->invoke(pdiMethod(health),
                               HealthIntf::convertHealthTypeFromString(health));
@@ -193,8 +256,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_Location")
     {
-        auto locationType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationType", interface.c_str());
+        std::string locationType;
+        if (allCurrentIfaceProperties.count("LocationType"))
+        {
+            locationType = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationType"));
+        }
+        // auto locationType = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "LocationType", interface.c_str());
         auto chassisLocation = std::make_shared<NsmChassis<LocationIntf>>(name);
         chassisLocation->invoke(
             pdiMethod(locationType),
@@ -203,8 +272,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_LocationCode")
     {
-        auto locationCode = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationCode", interface.c_str());
+        std::string locationCode;
+        if (allCurrentIfaceProperties.count("LocationCode"))
+        {
+            locationCode = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationCode"));
+        }
+        // auto locationCode = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "LocationCode", interface.c_str());
         auto chassisLocationCode =
             std::make_shared<NsmChassis<LocationCodeIntf>>(name);
         chassisLocationCode->invoke(pdiMethod(locationCode), locationCode);
@@ -213,8 +288,13 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     else if (type == "NSM_PowerLimit")
     {
         auto chassisPowerLimit = NsmChassis<PowerLimitIntf>(name);
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority;
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+        // auto priority = co_await utils::coGetDbusProperty<bool>(
+        //     objPath.c_str(), "Priority", interface.c_str());
         device->addSensor(
             std::make_shared<NsmInventoryProperty<PowerLimitIntf>>(
                 chassisPowerLimit, MINIMUM_DEVICE_POWER_LIMIT),
@@ -226,21 +306,48 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_OperationalStatus")
     {
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
+        uint64_t deviceType;
+        if (allBaseIfaceProperties.count("DeviceType"))
+        {
+            deviceType =
+                std::get<bool>(allBaseIfaceProperties.at("DeviceType"));
+        }
+        // auto deviceType =
+        //     (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+        //         uint64_t>(objPath.c_str(), "DeviceType",
+        //         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
                 "Cannot use NSM_OperationalStatus for different device than Baseboard");
         }
-        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
-        auto inventoryObjPaths =
-            co_await utils::coGetDbusProperty<dbus::Interfaces>(
-                objPath.c_str(), "InventoryObjPaths", interface.c_str());
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+
+        uint64_t instanceNumber;
+        if (allBaseIfaceProperties.count("InstanceNumber"))
+        {
+            instanceNumber =
+                std::get<uint64_t>(allBaseIfaceProperties.at("InstanceNumber"));
+        }
+        // auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
+        //     objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+
+        std::string inventoryObjPaths;
+        if (allCurrentIfaceProperties.count("InventoryObjPaths"))
+        {
+            inventoryObjPaths = std::get<std::string>(
+                allCurrentIfaceProperties.at("InventoryObjPaths"));
+        }
+        // auto inventoryObjPaths =
+        //     co_await utils::coGetDbusProperty<dbus::Interfaces>(
+        //         objPath.c_str(), "InventoryObjPaths", interface.c_str());
+
+        bool priority;
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+        // auto priority = co_await utils::coGetDbusProperty<bool>(
+        //     objPath.c_str(), "Priority", interface.c_str());
         auto gpuOperationalStatus = NsmInterfaceProvider<OperationalStatusIntf>(
             name, type, inventoryObjPaths);
         device->addSensor(std::make_shared<NsmGpuPresenceAndPowerStatus>(
@@ -249,21 +356,50 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PowerState")
     {
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
+        uint64_t deviceType;
+        if (allBaseIfaceProperties.count("DeviceType"))
+        {
+            deviceType =
+                std::get<uint64_t>(allBaseIfaceProperties.at("DeviceType"));
+        }
+        // auto deviceType =
+        //     (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+        //         uint64_t>(objPath.c_str(), "DeviceType",
+        //         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
                 "Cannot use NSM_PowerState for different device than Baseboard");
         }
-        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", baseInterface.c_str());
-        auto inventoryObjPaths =
-            co_await utils::coGetDbusProperty<dbus::Interfaces>(
-                objPath.c_str(), "InventoryObjPaths", interface.c_str());
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+
+        uint64_t instanceNumber;
+        if (allBaseIfaceProperties.count("InstanceNumber"))
+        {
+            instanceNumber =
+                std::get<uint64_t>(allBaseIfaceProperties.at("InstanceNumber"));
+        }
+        // auto instanceNumber = co_await
+        // utils::coGetDbusProperty<uint64_t>(
+        //     objPath.c_str(), "InstanceNumber", baseInterface.c_str());
+
+        std::string inventoryObjPaths;
+        if (allCurrentIfaceProperties.count("InventoryObjPaths"))
+        {
+            inventoryObjPaths = std::get<std::string>(
+                allCurrentIfaceProperties.at("InventoryObjPaths"));
+        }
+        // auto inventoryObjPaths =
+        //     co_await utils::coGetDbusProperty<dbus::Interfaces>(
+        //         objPath.c_str(), "InventoryObjPaths", interface.c_str());
+
+        bool priority;
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+        // auto priority = co_await utils::coGetDbusProperty<bool>(
+        //     objPath.c_str(), "Priority", interface.c_str());
+
         auto gpuPowerState =
             NsmInterfaceProvider<PowerStateIntf>(name, type, inventoryObjPaths);
         device->addSensor(std::make_shared<NsmPowerSupplyStatus>(
@@ -272,9 +408,16 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_WriteProtect")
     {
-        auto deviceType =
-            (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
-                uint64_t>(objPath.c_str(), "DeviceType", baseInterface.c_str());
+        NsmDeviceIdentification deviceType;
+        if (allBaseIfaceProperties.count("DeviceType"))
+        {
+            deviceType = (NsmDeviceIdentification)std::get<uint64_t>(
+                allBaseIfaceProperties.at("DeviceType"));
+        }
+        // auto deviceType =
+        //     (NsmDeviceIdentification) co_await utils::coGetDbusProperty<
+        //         uint64_t>(objPath.c_str(), "DeviceType",
+        //         baseInterface.c_str());
         if (deviceType != NSM_DEV_ID_BASEBOARD)
         {
             throw std::runtime_error(
@@ -287,8 +430,14 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
     }
     else if (type == "NSM_PrettyName")
     {
-        auto prettyName = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
+        std::string prettyName;
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            prettyName =
+                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
+        // auto prettyName = co_await utils::coGetDbusProperty<std::string>(
+        //     objPath.c_str(), "Name", interface.c_str());
         auto chassisPrettyName = std::make_shared<NsmChassis<ItemIntf>>(name);
         chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
         device->addStaticSensor(chassisPrettyName);
