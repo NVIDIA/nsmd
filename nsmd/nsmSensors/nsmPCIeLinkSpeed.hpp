@@ -43,17 +43,28 @@ class NsmPCIeLinkSpeedBase : public NsmSensor
 {
   public:
     NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t deviceIndex);
+    NsmPCIeLinkSpeedBase(const NsmObject& provider, uint8_t multiPortType,
+                         uint8_t multiPortIndex,
+                         uint8_t multiPortUpstreamPortNumber);
     NsmPCIeLinkSpeedBase() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
                                          uint8_t instanceId) override;
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
                               size_t responseLen) override;
+    std::optional<Request> genSinglePCIeRequestMsg(eid_t eid,
+                                                   uint8_t instanceId);
+    std::optional<Request> genMultiPCIeRequestMsg(eid_t eid,
+                                                  uint8_t instanceId);
 
   protected:
     virtual void handleResponse(
         const nsm_query_scalar_group_telemetry_group_1& data) = 0;
-    const uint8_t deviceIndex;
+    uint8_t deviceIndex;
+    bool isMultiPciePortEnabled = false;
+    uint8_t multiPortType;
+    uint8_t multiPortIndex;
+    uint8_t multiPortUpstreamPortNumber;
 
     static PCIeSlotIntf::Generations generation(uint32_t value);
     static PCIeDeviceIntf::PCIeTypes pcieType(uint32_t value);
@@ -77,6 +88,23 @@ class NsmPCIeLinkSpeed :
     NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
                      uint8_t deviceIndex) :
         NsmPCIeLinkSpeedBase(provider, deviceIndex),
+        NsmInterfaceContainer<IntfType>(provider)
+    {
+        nsm_query_scalar_group_telemetry_group_1 data{
+            .negotiated_link_speed = 1, // Gen1
+            .negotiated_link_width = 0,
+            .target_link_speed = 0,
+            .max_link_speed = 1, // Gen1
+            .max_link_width = 0,
+        };
+        handleResponse(data);
+        updateMetricOnSharedMemory();
+    }
+    NsmPCIeLinkSpeed(const NsmInterfaceProvider<IntfType>& provider,
+                     uint8_t multiPortType, uint8_t multiPortIndex,
+                     uint8_t multiPortUpstreamPortNumber) :
+        NsmPCIeLinkSpeedBase(provider, multiPortType, multiPortIndex,
+                             multiPortUpstreamPortNumber),
         NsmInterfaceContainer<IntfType>(provider)
     {
         nsm_query_scalar_group_telemetry_group_1 data{

@@ -159,6 +159,27 @@ requester::Coroutine
             device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
         }
     }
+    else if (type == "NSM_MultiPortPCIeDevice")
+    {
+        auto deviceType = co_await utils::coGetDbusProperty<std::string>(
+            objPath.c_str(), "DeviceType", interface.c_str());
+        auto functionIds =
+            co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
+                objPath.c_str(), "Functions", interface.c_str());
+        auto pcieDeviceObject =
+            NsmChassisPCIeDevice<PCIeDeviceIntf>(chassisName, name);
+        pcieDeviceObject.invoke(pdiMethod(deviceType), deviceType);
+        device->addSensor(std::make_shared<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
+                              pcieDeviceObject, 0, 0, 0),
+                          PCIE_LINK_SPEED_PCIE_DEVICE_PRIORITY);
+
+        for (auto& id : functionIds)
+        {
+            auto function = std::make_shared<NsmPCIeFunction>(pcieDeviceObject,
+                                                              id, 0, 0, 0);
+            device->addStaticSensor(function);
+        }
+    }
     else if (type == "NSM_LTSSMState")
     {
         auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
@@ -210,6 +231,7 @@ dbus::Interfaces chassisPCIeDeviceInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Asset",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.Health",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.PCIeDevice",
+    "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.MultiPortPCIeDevice",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.LTSSMState",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.ClockOutputEnableState",
     "xyz.openbmc_project.Configuration.NSM_ChassisPCIeDevice.AERErrorStatus"};
