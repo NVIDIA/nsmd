@@ -28,8 +28,17 @@ NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(const NsmObject& provider,
     deviceIndex(deviceIndex)
 {}
 
-std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
-                                                           uint8_t instanceId)
+NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(
+    const NsmObject& provider, uint8_t multiPortType, uint8_t multiPortIndex,
+    uint8_t multiPortUpstreamPortNumber) :
+    NsmSensor(provider),
+    isMultiPciePortEnabled(true), multiPortType(multiPortType),
+    multiPortIndex(multiPortIndex),
+    multiPortUpstreamPortNumber(multiPortUpstreamPortNumber)
+{}
+
+std::optional<Request>
+    NsmPCIeLinkSpeedBase::genSinglePCIeRequestMsg(eid_t eid, uint8_t instanceId)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_query_scalar_group_telemetry_v1_req));
@@ -45,6 +54,44 @@ std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
     }
 
     return request;
+}
+
+std::optional<Request>
+    NsmPCIeLinkSpeedBase::genMultiPCIeRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    const nsm_multiport_query_scalar_group_telemetry_v2_req_data data{
+        .upstream_port_index = multiPortUpstreamPortNumber,
+        .type = multiPortType,
+        .index = multiPortIndex,
+        .group_index = GROUP_ID_1};
+
+    auto rc = encode_multiport_query_scalar_group_telemetry_v2_req(
+        instanceId, &data, requestPtr);
+    if (rc)
+    {
+        lg2::debug(
+            "encode_multi_query_scalar_group_telemetry_v2_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+std::optional<Request> NsmPCIeLinkSpeedBase::genRequestMsg(eid_t eid,
+                                                           uint8_t instanceId)
+{
+    if (isMultiPciePortEnabled)
+    {
+        return genMultiPCIeRequestMsg(eid, instanceId);
+    }
+    else
+    {
+        return genSinglePCIeRequestMsg(eid, instanceId);
+    }
 }
 
 uint8_t

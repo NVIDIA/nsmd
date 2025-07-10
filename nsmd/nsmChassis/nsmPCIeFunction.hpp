@@ -35,6 +35,10 @@ class NsmPCIeFunction :
   public:
     NsmPCIeFunction(const NsmInterfaceProvider<PCIeDeviceIntf>& provider,
                     uint8_t deviceIndex, uint8_t functionId);
+    NsmPCIeFunction(const NsmInterfaceProvider<PCIeDeviceIntf>& provider,
+                    uint8_t functionId, uint8_t multiPortType,
+                    uint8_t multiPortIndex,
+                    uint8_t multiPortUpstreamPortNumber);
     NsmPCIeFunction() = delete;
 
     std::optional<Request> genRequestMsg(eid_t eid,
@@ -43,8 +47,17 @@ class NsmPCIeFunction :
                               size_t responseLen) override;
 
   private:
-    const uint8_t deviceIndex;
+    std::optional<Request> genSinglePCIeRequestMsg(eid_t eid,
+                                                   uint8_t instanceId);
+    std::optional<Request> genMultiPCIeRequestMsg(eid_t eid,
+                                                  uint8_t instanceId);
+
+    uint8_t deviceIndex;
     const uint8_t functionId;
+    bool isMultiPciePortEnabled = false;
+    uint8_t multiPortType;
+    uint8_t multiPortIndex;
+    uint8_t multiPortUpstreamPortNumber;
 };
 
 } // namespace nsm
