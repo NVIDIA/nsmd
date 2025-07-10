@@ -4998,37 +4998,49 @@ class GetPortEccCounters : public CommandInterface
     {
         GetPortEccCountersAggregateResponseParser{}.parseAggregateResponse(
             responsePtr, payloadLength);
-    class GetPortEccCountersAggregateResponseParser :
-      private:
-                             ordered_json& sample_json) final
-    {
-        uint64_t counter_value;
-        int rc = decode_aggregate_port_ecc_counter_data(tag, data, data_len,
-                                                        &counter_value);
-        if (rc != NSM_SW_SUCCESS)
-        {
-            return rc;
-        }
-
-        switch (tag)
-        {
-            case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
-                sample_json["SymbolErrorRXBytes"] = counter_value;
-                break;
-            case NSM_TAG_ECC_CORRECTED_BITS:
-                sample_json["CorrectedBits"] = counter_value;
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
-                sample_json["RawErrorsPerLane_0"] = counter_value;
-                break;
-                break;
-            case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
-                sample_json["RawErrorsPerLane_3"] = counter_value;
-            default:
-                return NSM_SW_ERROR_DATA;
-        }
-        return NSM_SW_SUCCESS;
     }
+
+  private:
+    class GetPortEccCountersAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint64_t counter_value;
+            int rc = decode_aggregate_port_ecc_counter_data(tag, data, data_len,
+                                                            &counter_value);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+
+            switch (tag)
+            {
+                case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
+                    sample_json["SymbolErrorRXBytes"] = counter_value;
+                    break;
+                case NSM_TAG_ECC_CORRECTED_BITS:
+                    sample_json["CorrectedBits"] = counter_value;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+                    sample_json["RawErrorsPerLane_0"] = counter_value;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+                    sample_json["RawErrorsPerLane_1"] = counter_value;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+                    sample_json["RawErrorsPerLane_2"] = counter_value;
+                    break;
+                case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
+                    sample_json["RawErrorsPerLane_3"] = counter_value;
+                    break;
+                default:
+                    return NSM_SW_ERROR_DATA;
+            }
+            return NSM_SW_SUCCESS;
+        }
     };
 
     uint16_t portNumber;

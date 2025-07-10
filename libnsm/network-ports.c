@@ -1962,8 +1962,7 @@ int encode_aggregate_network_address_data(
 	return NSM_SW_SUCCESS;
 }
 
-
-int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
+int encode_get_port_ecc_counters_req(uint8_t instance_id, uint16_t port_number,
 				     struct nsm_msg *msg)
 {
 	if (msg == NULL) {
@@ -1980,36 +1979,36 @@ int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
 		return rc;
 	}
 
-	nsm_get_port_ecc_counters_req *request =
-	    (nsm_get_port_ecc_counters_req *)msg->payload;
+	struct nsm_get_port_ecc_counters_req *request =
+	    (struct nsm_get_port_ecc_counters_req *)msg->payload;
 
 	request->hdr.command = NSM_GET_PORT_ECC_COUNTERS;
 	request->hdr.data_size = sizeof(port_number);
-	request->port_number = port_number;
+	request->port_number = htole16(port_number);
 
 	return NSM_SW_SUCCESS;
 }
 
 int decode_get_port_ecc_counters_req(const struct nsm_msg *msg, size_t msg_len,
-				     uint8_t *port_number)
+				     uint16_t *port_number)
 {
 	if (msg == NULL || port_number == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(nsm_get_port_ecc_counters_req)) {
+			  sizeof(struct nsm_get_port_ecc_counters_req)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
 
-	nsm_get_port_ecc_counters_req *request =
-	    (nsm_get_port_ecc_counters_req *)msg->payload;
+	struct nsm_get_port_ecc_counters_req *request =
+	    (struct nsm_get_port_ecc_counters_req *)msg->payload;
 
 	if (request->hdr.data_size < sizeof(request->port_number)) {
 		return NSM_SW_ERROR_DATA;
 	}
 
-	*port_number = request->port_number;
+	*port_number = le16toh(request->port_number);
 
 	return NSM_SW_SUCCESS;
 }
@@ -2052,9 +2051,6 @@ int encode_aggregate_port_ecc_counter_data(uint8_t tag, uint64_t counter_value,
 		return NSM_SW_ERROR_NULL;
 	}
 
-	// Check if the tag is a known ECC counter tag,
-	// not strictly necessary for encoding the value but good for
-	// consistency.
 	switch (tag) {
 	case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
 	case NSM_TAG_ECC_CORRECTED_BITS:

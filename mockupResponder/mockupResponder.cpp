@@ -6569,7 +6569,7 @@ std::optional<std::vector<uint8_t>>
                   requestLen);
     }
 
-    uint8_t portNumber = 0;
+    uint16_t portNumber = 0;
     auto rc = decode_get_port_ecc_counters_req(requestMsg, requestLen,
                                                &portNumber);
     if (rc != NSM_SW_SUCCESS)
@@ -6597,7 +6597,8 @@ std::optional<std::vector<uint8_t>>
     size_t data_len = 0;
 
     rc = encode_aggregate_port_ecc_counter_data(
-        NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, counter_value, data, &data_len);
+        NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, 10000000000 + counter_value, data,
+        &data_len);
     assert(rc == NSM_SW_SUCCESS);
 
     rc = encode_aggregate_resp_sample(NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, true,
@@ -6609,7 +6610,8 @@ std::optional<std::vector<uint8_t>>
 
     counter_value = 8;
     rc = encode_aggregate_port_ecc_counter_data(NSM_TAG_ECC_CORRECTED_BITS,
-                                                counter_value, data, &data_len);
+                                                10000000000 + counter_value,
+                                                data, &data_len);
     assert(rc == NSM_SW_SUCCESS);
 
     rc = encode_aggregate_resp_sample(NSM_TAG_ECC_CORRECTED_BITS, true, data,
@@ -6622,7 +6624,8 @@ std::optional<std::vector<uint8_t>>
     {
         counter_value = i + 1;
         rc = encode_aggregate_port_ecc_counter_data(
-            NSM_TAG_ECC_RAW_ERRORS_LANE_0 + i, counter_value, data, &data_len);
+            NSM_TAG_ECC_RAW_ERRORS_LANE_0 + i, 10000000000 + counter_value,
+            data, &data_len);
         assert(rc == NSM_SW_SUCCESS);
 
         rc = encode_aggregate_resp_sample(NSM_TAG_ECC_RAW_ERRORS_LANE_0 + i,

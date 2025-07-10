@@ -130,8 +130,7 @@ class NsmPortMetrics : public NsmSensor
         std::string& parentObjPath, std::string& inventoryObjPath,
         std::shared_ptr<IBPortIntf> iBPortIntf,
         std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
-        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf,
-        std::shared_ptr<PortECCIntf> portECCIntf);
+        std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
     NsmPortMetrics() = default;
 
     std::optional<std::vector<uint8_t>>
@@ -148,7 +147,6 @@ class NsmPortMetrics : public NsmSensor
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
-    std::shared_ptr<PortECCIntf> portECCIntf = nullptr;
     std::unique_ptr<PortIntf> portIntf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
 
@@ -222,10 +220,10 @@ class NsmNetworkAddressAggregator : public NsmSensorAggregator
 class NsmGetPortECCCounters : public NsmSensorAggregator
 {
   public:
-    NsmGetPortECCCounters(const std::string& name, const std::string& type,
+    NsmGetPortECCCounters(sdbusplus::bus::bus& bus, const std::string& name,
+                          const std::string& type,
                           const std::string& inventoryObjPath,
-                          uint8_t portNumber,
-                          std::shared_ptr<PortECCIntf> portECCIntf);
+                          uint8_t portNumber);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
@@ -234,7 +232,7 @@ class NsmGetPortECCCounters : public NsmSensorAggregator
 
   private:
     std::string objPath;
-    uint8_t portNumber;
-    std::shared_ptr<PortECCIntf> portECCIntf = nullptr;
+    uint16_t portNumber;
+    std::unique_ptr<PortECCIntf> portECCIntf = nullptr;
 };
 } // namespace nsm
