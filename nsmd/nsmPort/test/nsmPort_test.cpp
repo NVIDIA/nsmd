@@ -50,17 +50,14 @@ TEST(NsmPortMetrics, GoodTest)
         std::make_shared<PortMetricsOem2Intf>(bus, inventoryObjPath.c_str());
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf =
         std::make_shared<PortPacketCountersIntf>(bus, inventoryObjPath.c_str());
-    std::shared_ptr<PortECCIntf> portECCIntf =
-        std::make_shared<PortECCIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmPortMetrics portTel(bus, pName, portNum, type, deviceType,
                                 associations, parentObjPath, inventoryObjPath,
                                 iBPortIntf, portMetricsOem2Intf,
-                                portPacketCountersIntf, portECCIntf);
+                                portPacketCountersIntf);
 
     EXPECT_EQ(portTel.portName, pName);
     EXPECT_EQ(portTel.portNumber, portNum);
     EXPECT_EQ(portTel.iBPortIntf, iBPortIntf);
-    EXPECT_NE(portTel.portECCIntf, portECCIntf);
     EXPECT_NE(portTel.portMetricsOem2Intf, nullptr);
     EXPECT_NE(portTel.associationDefinitionsIntf, nullptr);
 

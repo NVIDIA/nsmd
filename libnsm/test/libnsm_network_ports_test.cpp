@@ -3805,3 +3805,123 @@ TEST(getPortNetworkAddresses, testBadEncodeAggregateData)
 	    encode_aggregate_network_address_data(99, &address, data, &dataLen);
 	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
 }
+
+TEST(getPortECCCounters, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> request_msg(
+	    sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_port_ecc_counters_req));
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	uint16_t port_number = 1;
+
+	auto rc = encode_get_port_ecc_counters_req(0, port_number, request);
+	struct nsm_get_port_ecc_counters_req *req =
+	    reinterpret_cast<struct nsm_get_port_ecc_counters_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_PORT_ECC_COUNTERS, req->hdr.command);
+	EXPECT_EQ(sizeof(uint16_t), req->hdr.data_size);
+	EXPECT_EQ(port_number, req->port_number);
+}
+
+TEST(getPortECCCounters, testBadEncodeRequest)
+{
+	auto rc = encode_get_port_ecc_counters_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPortECCCounters, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x80,		       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		       // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_ECC_COUNTERS, // command
+	    0x02,		       // data size
+	    0x01,		       // port number
+	    0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+
+	size_t msg_len = request_msg.size();
+	uint16_t port_number = 0;
+	auto rc =
+	    decode_get_port_ecc_counters_req(request, msg_len, &port_number);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(port_number, 1);
+}
+
+TEST(getPortECCCounters, testBadDecodeRequest)
+{
+	std::vector<uint8_t> request_msg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x80,		       // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		       // OCP_TYPE=1, OCP_VER=1, OCP=1
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_PORT_ECC_COUNTERS, // command
+	    0x02,		       // data size
+	    0x01,		       // port number
+	    0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
+	size_t msg_len = request_msg.size();
+	uint16_t port_number = 0;
+	auto rc = decode_get_port_ecc_counters_req(request, msg_len - 1,
+						   &port_number);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_port_ecc_counters_req(nullptr, msg_len, &port_number);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPortECCCounters, testGoodEncodeResponse)
+{
+	uint64_t counter_value = 0x0000000000001006;
+	uint8_t data[sizeof(uint64_t)];
+	size_t data_len = sizeof(uint64_t);
+	auto rc = encode_aggregate_port_ecc_counter_data(
+	    NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, counter_value, data, &data_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data[0], 0x06);
+	EXPECT_EQ(data[1], 0x10);
+	EXPECT_EQ(data[2], 0x00);
+	EXPECT_EQ(data[3], 0x00);
+	EXPECT_EQ(data[4], 0x00);
+	EXPECT_EQ(data[5], 0x00);
+	EXPECT_EQ(data[6], 0x00);
+	EXPECT_EQ(data[7], 0x00);
+}
+
+TEST(getPortECCCounters, testGoodDecodeResponse)
+{
+	uint64_t counter_value = 0;
+	uint8_t data[sizeof(uint64_t)] = {0x06, 0x10, 0x00, 0x00,
+					  0x00, 0x00, 0x00, 0x00};
+	size_t data_len = sizeof(uint64_t);
+	auto rc = decode_aggregate_port_ecc_counter_data(
+	    NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, data, data_len, &counter_value);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(counter_value, 0x0000000000001006);
+}
+
+TEST(getPortECCCounters, testBadDecodeResponse)
+{
+	uint64_t counter_value = 0;
+	uint8_t data[sizeof(uint64_t)] = {0x06, 0x10, 0x00, 0x00,
+					  0x00, 0x00, 0x00, 0x00};
+	size_t data_len = sizeof(uint64_t);
+	auto rc = decode_aggregate_port_ecc_counter_data(
+	    NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, data, data_len - 1,
+	    &counter_value);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_aggregate_port_ecc_counter_data(
+	    NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES, data, data_len, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}

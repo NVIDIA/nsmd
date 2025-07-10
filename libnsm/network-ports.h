@@ -674,7 +674,10 @@ int encode_aggregate_network_address_data(
  *
  *  Structure representing NSM get port ecc counters request.
  */
-typedef struct nsm_common_port_req nsm_get_port_ecc_counters_req;
+struct nsm_get_port_ecc_counters_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number;
+} __attribute__((packed));
 
 #ifdef ENABLE_SYSTEM_GUID
 /** @brief Encode a Set System GUID request message
@@ -1347,7 +1350,7 @@ int encode_aggregate_eth_port_telemetry_data(
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
+int encode_get_port_ecc_counters_req(uint8_t instance_id, uint16_t port_number,
 				     struct nsm_msg *msg);
 
 /** @brief Decode a Get Port ECC Counters request message
@@ -1358,7 +1361,7 @@ int encode_get_port_ecc_counters_req(uint8_t instance_id, uint8_t port_number,
  *  @return nsm_completion_codes
  */
 int decode_get_port_ecc_counters_req(const struct nsm_msg *msg, size_t msg_len,
-				     uint8_t *port_number);
+				     uint16_t *port_number);
 
 /** @brief Decode a aggregate port ecc counter data
  *

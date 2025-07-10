@@ -585,13 +585,12 @@ NsmPortMetrics::NsmPortMetrics(
     std::string& parentObjPath, std::string& inventoryObjPath,
     std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
-    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf,
-    std::shared_ptr<PortECCIntf> portECCIntf) :
+    std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
     NsmSensor(portName, type),
     portName(portName), iBPortIntf(iBPortIntf),
     portMetricsOem2Intf(portMetricsOem2Intf),
-    portPacketCountersIntf(portPacketCountersIntf), portECCIntf(portECCIntf),
-    portNumber(portNum), typeOfDevice(deviceType), objPath(inventoryObjPath)
+    portPacketCountersIntf(portPacketCountersIntf), portNumber(portNum),
+    typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
         "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
@@ -623,7 +622,6 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
     auto ifacePortOem2Name = std::string(portMetricsOem2Intf->interface);
     auto ifacePortPacketCountersName =
         std::string(portPacketCountersIntf->interface);
-    auto ifacePortECCName = std::string(portECCIntf->interface);
 
     nv::sensor_aggregation::DbusVariantType variantRXP{iBPortIntf->rxPkts()};
     std::string propName = "RXPkts";
@@ -795,10 +793,10 @@ void NsmPortMetrics::updateMetricOnSharedMemory()
         objPath, ifaceIBPortName, propName, rawSmbpbiData, variantEER);
 
     nv::sensor_aggregation::DbusVariantType variantSE{
-        portECCIntf->symbolErrors()};
+        iBPortIntf->symbolErrors()};
     propName = "SymbolErrors";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
-        objPath, ifacePortECCName, propName, rawSmbpbiData, variantSE);
+        objPath, ifaceIBPortName, propName, rawSmbpbiData, variantSE);
 
     nv::sensor_aggregation::DbusVariantType variantRBER{
         iBPortIntf->totalRawBER()};
@@ -975,7 +973,7 @@ void NsmPortMetrics::updateCounterValues(struct nsm_port_counter_data* portData)
 
             if (portData->supported_counter.symbol_error)
             {
-                portECCIntf->symbolErrors(portData->symbol_error);
+                iBPortIntf->symbolErrors(portData->symbol_error);
             }
 
             if (portData->supported_counter.total_raw_ber)
@@ -1579,12 +1577,12 @@ void NsmNetworkAddressAggregator::getLinkType(
 }
 
 NsmGetPortECCCounters::NsmGetPortECCCounters(
-    const std::string& name, const std::string& type,
-    const std::string& inventoryObjPath, uint8_t portNumber,
-    std::shared_ptr<PortECCIntf> portECCIntf) :
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& inventoryObjPath, uint8_t portNumber) :
     NsmSensorAggregator(name, type),
-    objPath(inventoryObjPath), portNumber(portNumber), portECCIntf(portECCIntf)
+    objPath(inventoryObjPath), portNumber(portNumber)
 {
+    portECCIntf = std::make_unique<PortECCIntf>(bus, objPath.c_str());
 #ifdef NVIDIA_SHMEM
     updateMetricOnSharedMemory();
 #endif
@@ -1610,6 +1608,7 @@ std::optional<std::vector<uint8_t>>
 int NsmGetPortECCCounters::handleSamples(
     const std::vector<TelemetrySample>& samples)
 {
+    bool updateRawErrorsPerLane = false;
     std::vector<uint64_t> rawErrorsPerLane(RAW_ERRORS_PER_LANE_COUNT, 0);
     for (const auto& sample : samples)
     {
@@ -1627,7 +1626,7 @@ int NsmGetPortECCCounters::handleSamples(
             sample.tag, sample.data, sample.data_len, &data);
         if (rc != NSM_SUCCESS)
         {
-            lg2::error("Failed to decode port ecc counters sample data: {RC}",
+            lg2::debug("Failed to decode port ecc counters sample data: {RC}",
                        "RC", rc);
             return rc;
         }
@@ -1635,28 +1634,35 @@ int NsmGetPortECCCounters::handleSamples(
         switch (sample.tag)
         {
             case NSM_TAG_ECC_RX_SYMBOL_ERRORS_BYTES:
-                portECCIntf->symbolErrors(data);
+                portECCIntf->symbolErrorRXBytes(data);
                 break;
             case NSM_TAG_ECC_CORRECTED_BITS:
                 portECCIntf->correctedBits(data);
                 break;
             case NSM_TAG_ECC_RAW_ERRORS_LANE_0:
+                updateRawErrorsPerLane = true;
                 rawErrorsPerLane[0] += data;
                 break;
             case NSM_TAG_ECC_RAW_ERRORS_LANE_1:
+                updateRawErrorsPerLane = true;
                 rawErrorsPerLane[1] += data;
                 break;
             case NSM_TAG_ECC_RAW_ERRORS_LANE_2:
+                updateRawErrorsPerLane = true;
                 rawErrorsPerLane[2] += data;
                 break;
             case NSM_TAG_ECC_RAW_ERRORS_LANE_3:
+                updateRawErrorsPerLane = true;
                 rawErrorsPerLane[3] += data;
                 break;
             default:
                 break;
         }
     }
-    portECCIntf->perLaneRawErrors(rawErrorsPerLane);
+    if (updateRawErrorsPerLane)
+    {
+        portECCIntf->rawErrorsPerLane(rawErrorsPerLane);
+    }
 
     updateMetricOnSharedMemory();
     return NSM_SUCCESS;
@@ -1668,33 +1674,22 @@ void NsmGetPortECCCounters::updateMetricOnSharedMemory()
     auto ifaceName = std::string(portECCIntf->interface);
     std::vector<uint8_t> smbusData = {};
 
-    // Update SymbolErrors
+    // Update SymbolErrorRXBytes
     {
         nv::sensor_aggregation::DbusVariantType symbolErrorsValue{
-            portECCIntf->symbolErrors()};
-        std::string symbolErrorsProp = "SymbolErrors";
+            portECCIntf->symbolErrorRXBytes()};
+        std::string propertyName = "SymbolErrorRXBytes";
         nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            objPath, ifaceName, symbolErrorsProp, smbusData, symbolErrorsValue);
+            objPath, ifaceName, propertyName, smbusData, symbolErrorsValue);
     }
 
     // Update CorrectedBits
     {
         nv::sensor_aggregation::DbusVariantType correctedBitsValue{
             portECCIntf->correctedBits()};
-        std::string correctedBitsProp = "CorrectedBits";
+        std::string propertyName = "CorrectedBits";
         nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            objPath, ifaceName, correctedBitsProp, smbusData,
-            correctedBitsValue);
-    }
-
-    // Update PerLaneRawErrors
-    {
-        nv::sensor_aggregation::DbusVariantType perLaneRawErrorsValue{
-            portECCIntf->perLaneRawErrors()};
-        std::string perLaneRawErrorsProp = "PerLaneRawErrors";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
-            objPath, ifaceName, perLaneRawErrorsProp, smbusData,
-            perLaneRawErrorsValue);
+            objPath, ifaceName, propertyName, smbusData, correctedBitsValue);
     }
 #endif
 }
@@ -1821,13 +1816,19 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
         }
 
-        auto portECCIntf = std::make_shared<PortECCIntf>(bus, objPath.c_str());
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
             parentObjPath, objPath, iBPortIntf, portMetricsOem2Intf,
-            portPacketCountersIntf, portECCIntf);
-        auto portECCCountersSensor = std::make_shared<NsmGetPortECCCounters>(
-            portName, type, objPath, logicalPortNum, portECCIntf);
+            portPacketCountersIntf);
+        if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+            nsmDevice->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8)
+        {
+            auto portECCCountersSensor =
+                std::make_shared<NsmGetPortECCCounters>(
+                    bus, portName, type, objPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(portECCCountersSensor, priority);
+        }
 
         if (!portMetricsSensor)
         {
