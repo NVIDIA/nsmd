@@ -126,13 +126,13 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         lg2::info("PCIeReferenceClockCount is not supported. "
                   "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is disabled.");
 #endif
-        if (device->getDeviceType() == NSM_DEV_ID_MCTP_BRIDGE)
-        {
-            device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
-                utils::DBusHandler::getBus(), name,
-                chassisInventoryBasePath.string() + "/", type, uuid,
-                DebugDumpType::Diagnostics));
-        }
+    }
+    else if (type == "NSM_DeviceDiagnostics")
+    {
+        device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
+            utils::DBusHandler::getBus(), name,
+            chassisInventoryBasePath.string() + "/", type, uuid,
+            DebugDumpType::Diagnostics));
     }
     else if (type == "NSM_FPGA_Asset")
     {
@@ -362,7 +362,8 @@ std::vector<std::string> chassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_Chassis.PrettyName",
     "xyz.openbmc_project.Configuration.NSM_Chassis.WriteProtect",
     "xyz.openbmc_project.Configuration.NSM_Chassis.ResetMetrics",
-    "xyz.openbmc_project.Configuration.NSM_Chassis.ErrorInjectionPayload"};
+    "xyz.openbmc_project.Configuration.NSM_Chassis.ErrorInjectionPayload",
+    "xyz.openbmc_project.Configuration.NSM_Chassis.DeviceDiagnostics"};
 
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisCreateSensors, chassisInterfaces)
 
