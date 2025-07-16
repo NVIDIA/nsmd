@@ -800,4 +800,31 @@ void getDeviceTypeAndRole(uint16_t combined, uint8_t* deviceType,
     *deviceType = (uint8_t)(combined & 0xFF); // Type is in low byte
     *deviceRole = (uint8_t)(combined >> 8);   // Role is in high byte
 }
+
+void convertMacAddressToString(const uint8_t* macAddress,
+                               size_t macAddressDataLen,
+                               std::string& macAddressString)
+{
+    const static size_t MAC_FORMAT_LENGTH = sizeof("XX:XX:XX:XX:XX:XX");
+    if (macAddressDataLen < MAC_ADDRESS_DATA_LEN)
+    {
+        lg2::error(
+            "convertMacAddressToString - Invalid mac address data length: {LEN}",
+            "LEN", macAddressDataLen);
+        macAddressString.clear();
+        return;
+    }
+    char buffer[MAC_FORMAT_LENGTH];
+    snprintf(buffer, MAC_FORMAT_LENGTH, "%02x:%02x:%02x:%02x:%02x:%02x",
+             macAddress[0], macAddress[1], macAddress[2], macAddress[3],
+             macAddress[4], macAddress[5]);
+    macAddressString = buffer;
+}
+
+void convertGuid64ToString(uint64_t guid, std::string& guidString)
+{
+    guidString = std::format("{:04X}-{:04X}-{:04X}-{:04X}",
+                             (guid >> 48) & 0xFFFF, (guid >> 32) & 0xFFFF,
+                             (guid >> 16) & 0xFFFF, guid & 0xFFFF);
+}
 } // namespace utils

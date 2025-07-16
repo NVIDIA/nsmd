@@ -33,6 +33,8 @@ extern "C" {
 // defined in MBps
 #define MAXLINKBANDWIDTH 50000
 #define ETH_PORT_TELEMETRY_COUNTER_ENABLED_COUNT 21
+// defined MAC address length
+#define MAC_ADDRESS_LENGTH 8
 
 /** @brief NSM Type1 network port telemetry commands
  */
@@ -54,6 +56,7 @@ enum nsm_network_port_commands {
 	NSM_GET_POWER_PROFILE = 0x0d,
 	NSM_GET_FABRIC_MANAGER_STATE = 0x0e,
 	NSM_GET_ETH_PORT_TELEMETRY_COUNTER = 0x0f,
+	NSM_GET_NETWORK_ADDRESSES = 0x11,
 	NSM_QUERY_PORTS_AVAILABLE = 0x41,
 	NSM_QUERY_PORT_CHARACTERISTICS = 0x42,
 	NSM_QUERY_PORT_STATUS = 0x43,
@@ -161,6 +164,20 @@ enum port_down_reason_code {
 	NSM_PORT_DOWN_REASON_CODE_PEER_THERMAL_EVENT = 0x23,
 	NSM_PORT_DOWN_REASON_CODE_PEER_FORCE_EVENT = 0x24,
 	NSM_PORT_DOWN_REASON_CODE_PEER_RESET_EVENT = 0x25
+};
+
+enum nsm_network_address_property_tag {
+	NSM_TAG_LINK_TYPE = 0,
+	NSM_TAG_MAC_ADDRESS = 1,
+	NSM_TAG_PERMANENT_MAC_ADDRESS = 2,
+	NSM_TAG_NODE_GUID = 3,
+	NSM_TAG_PORT_GUID = 4
+};
+
+enum nsm_network_address_link_type {
+	NSM_PORT_PROTOCOL_UNKNOWN = -1,
+	NSM_PORT_PROTOCOL_ETHERNET = 0,
+	NSM_PORT_PROTOCOL_INFINIBAND = 1
 };
 
 struct nsm_supported_port_counter {
@@ -579,6 +596,68 @@ struct nsm_get_fabric_manager_state_resp {
  */
 typedef struct nsm_fabric_manager_state_data
     nsm_get_fabric_manager_state_event_payload;
+
+/** @struct nsm_get_network_addresses_req
+ *
+ *  Structure representing NSM get port network addresses request.
+ */
+struct nsm_get_network_addresses_req {
+	struct nsm_common_req hdr;
+	uint16_t port_number;
+} __attribute__((packed));
+
+/** @struct network_address_sample_data
+ *
+ *  Union representing get network addresses response sample data.
+ */
+typedef union {
+	uint8_t mac_address[MAC_ADDRESS_LENGTH];
+	uint64_t network_identifier_64bit;
+	uint8_t link_type;
+} network_address_sample_data;
+
+/** @brief Encode Get Network Addresses request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] port_number - Port number
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_network_addresses_req(uint8_t instance_id, uint16_t port_number,
+				     struct nsm_msg *msg);
+
+/** @brief Decode Get Network Addresses request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] port_number - port number
+ *  @return nsm_completion_codes
+ */
+int decode_get_network_addresses_req(const struct nsm_msg *msg, size_t msg_len,
+				     uint16_t *port_number);
+
+/** @brief Decode a Get Network Addresses request message
+ *
+ *  @param[out] tag - pointer to telemetry sample tag
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ *  @param[out] address - pointer to network address sample data
+ *  @return nsm_completion_codes
+ */
+int decode_aggregate_network_address_data(uint8_t tag, const uint8_t *data,
+					  size_t data_len,
+					  network_address_sample_data *address);
+
+/** @brief Encode a Aggregate Network Address Data request message
+ *
+ *  @param[in] tag - telemetry sample tag
+ *  @param[in] address - pointer to network address sample data
+ *  @param[out] data - pointer to telemetry sample data
+ *  @param[out] data_len - number of bytes in telemetry sample data
+ */
+int encode_aggregate_network_address_data(
+    uint8_t tag, const network_address_sample_data *address, uint8_t *data,
+    size_t *data_len);
 
 #ifdef ENABLE_SYSTEM_GUID
 /** @brief Encode a Set System GUID request message

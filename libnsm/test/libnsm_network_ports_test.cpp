@@ -3668,3 +3668,140 @@ TEST(DecodeAggregateEthPortTelemetryData, TestBadDecode)
 	    nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+TEST(GetPortNetworkAddresses, TestGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_get_network_addresses_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint8_t instanceId = 0;
+	uint16_t portNumber = 3;
+
+	auto rc =
+	    encode_get_network_addresses_req(instanceId, portNumber, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(request->hdr.instance_id, instanceId);
+	EXPECT_EQ(request->hdr.nvidia_msg_type, NSM_TYPE_NETWORK_PORT);
+
+	auto req =
+	    reinterpret_cast<nsm_get_network_addresses_req *>(request->payload);
+	EXPECT_EQ(req->hdr.command, NSM_GET_NETWORK_ADDRESSES);
+	EXPECT_EQ(req->hdr.data_size, sizeof(portNumber));
+	uint16_t decodedPortNumber = le16toh(req->port_number);
+	EXPECT_EQ(decodedPortNumber, portNumber);
+}
+
+TEST(getPortNetworkAddresses, testBadEncodeRequest)
+{
+	auto rc = encode_get_network_addresses_req(0, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPortNetworkAddresses, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{0x10,
+					0xDE,
+					0x80,
+					0x89,
+					NSM_TYPE_NETWORK_PORT,
+					NSM_GET_NETWORK_ADDRESSES,
+					0x02,
+					0x03,
+					0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msgLen = requestMsg.size();
+
+	uint16_t portNumber = 0;
+	auto rc =
+	    decode_get_network_addresses_req(request, msgLen, &portNumber);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(portNumber, 3);
+}
+
+TEST(getPortNetworkAddresses, testBadDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,
+	    0x80,
+	    0x89,
+	    NSM_TYPE_NETWORK_PORT,     // NVIDIA_MSG_TYPE
+	    NSM_GET_NETWORK_ADDRESSES, // command
+	    0x00,		       // Data size [should not be 0]
+	    0x01,
+	    0x00};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint16_t portNumber = 0;
+	size_t msgLen =
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_network_addresses_req);
+
+	auto rc = decode_get_network_addresses_req(nullptr, 0, &portNumber);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_network_addresses_req(request, 0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_network_addresses_req(request, 0, &portNumber);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_network_addresses_req(request, msgLen, &portNumber);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getPortNetworkAddresses, testGoodDecodeAggregateData)
+{
+	network_address_sample_data address = {};
+	uint64_t IB_NODE_GUID = 0x123456789ABCDEF0;
+
+	auto rc = decode_aggregate_network_address_data(
+	    NSM_TAG_NODE_GUID, reinterpret_cast<const uint8_t *>(&IB_NODE_GUID),
+	    sizeof(uint64_t), &address);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(address.network_identifier_64bit, le64toh(IB_NODE_GUID));
+}
+
+TEST(getPortNetworkAddresses, testBadDecodeAggregateData)
+{
+	network_address_sample_data address = {};
+	size_t invalidDataLen = 5;
+	uint8_t invalidData[5] = {0x00, 0x1A, 0x2B, 0x3C, 0x4D};
+
+	auto rc = decode_aggregate_network_address_data(
+	    NSM_TAG_NODE_GUID, invalidData, invalidDataLen, &address);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_aggregate_network_address_data(99, invalidData,
+						   invalidDataLen, &address);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(getPortNetworkAddresses, testGoodEncodeAggregateData)
+{
+	network_address_sample_data address = {};
+	address.link_type = 0;
+	uint8_t data[1];
+	size_t dataLen = 0;
+
+	auto rc = encode_aggregate_network_address_data(
+	    NSM_TAG_LINK_TYPE, &address, data, &dataLen);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(dataLen, sizeof(uint8_t));
+	EXPECT_EQ(data[0], address.link_type);
+}
+
+TEST(getPortNetworkAddresses, testBadEncodeAggregateData)
+{
+	network_address_sample_data address = {};
+	uint8_t data[1];
+	size_t dataLen = 0;
+
+	auto rc =
+	    encode_aggregate_network_address_data(99, &address, data, &dataLen);
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}

@@ -1832,3 +1832,132 @@ int encode_aggregate_eth_port_telemetry_data(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_network_addresses_req(uint8_t instance_id, uint16_t port_number,
+				     struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_NETWORK_PORT;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_network_addresses_req *request =
+	    (struct nsm_get_network_addresses_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_NETWORK_ADDRESSES;
+	request->hdr.data_size = sizeof(port_number);
+	request->port_number = htole16(port_number);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_network_addresses_req(const struct nsm_msg *msg, size_t msg_len,
+				     uint16_t *port_number)
+{
+	if (msg == NULL || port_number == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_network_addresses_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_network_addresses_req *request =
+	    (struct nsm_get_network_addresses_req *)msg->payload;
+
+	if (request->hdr.data_size != sizeof(request->port_number)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = le16toh(request->port_number);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_aggregate_network_address_data(uint8_t tag, const uint8_t *data,
+					  size_t data_len,
+					  network_address_sample_data *address)
+{
+	if (data == NULL || address == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	switch (tag) {
+	case NSM_TAG_LINK_TYPE:
+		if (data_len != sizeof(uint8_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		address->link_type = data[0];
+		break;
+
+	case NSM_TAG_MAC_ADDRESS:
+	case NSM_TAG_PERMANENT_MAC_ADDRESS:
+		if (data_len != MAC_ADDRESS_LENGTH) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		memcpy(address->mac_address, data, MAC_ADDRESS_LENGTH);
+		break;
+
+	case NSM_TAG_NODE_GUID:
+	case NSM_TAG_PORT_GUID:
+		if (data_len != sizeof(uint64_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+
+		uint64_t le_reading;
+		memcpy(&le_reading, data, sizeof(uint64_t));
+		address->network_identifier_64bit = le64toh(le_reading);
+		break;
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_aggregate_network_address_data(
+    uint8_t tag, const network_address_sample_data *address, uint8_t *data,
+    size_t *data_len)
+{
+	if (address == NULL || data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	switch (tag) {
+	case NSM_TAG_LINK_TYPE:
+		*data_len = sizeof(uint8_t);
+		data[0] = address->link_type;
+		break;
+
+	case NSM_TAG_MAC_ADDRESS:
+	case NSM_TAG_PERMANENT_MAC_ADDRESS: {
+		memcpy(data, address->mac_address, MAC_ADDRESS_LENGTH);
+		*data_len = MAC_ADDRESS_LENGTH;
+		break;
+	}
+
+	case NSM_TAG_NODE_GUID:
+	case NSM_TAG_PORT_GUID: {
+		uint64_t le_reading =
+		    htole64(address->network_identifier_64bit);
+		memcpy(data, &le_reading, sizeof(uint64_t));
+		*data_len = sizeof(uint64_t);
+		break;
+	}
+
+	default:
+		return NSM_SW_ERROR_DATA;
+	}
+
+	return NSM_SW_SUCCESS;
+}

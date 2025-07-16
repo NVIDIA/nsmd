@@ -3,6 +3,7 @@ dep_src_files = [
     '../nsmPCIePort.cpp',
     '../nsmPCIeErrors.cpp',
     '../../nsmDevice.cpp',
+    '../../nsmSensorAggregator.cpp',
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',

@@ -10,6 +10,7 @@
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/Common/GUID/server.hpp>
 #include <nsmSensorAggregator.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <tal.hpp>
@@ -23,6 +24,8 @@
 #include <xyz/openbmc_project/Metrics/PortMetricsOem2/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortMetricsOem3/server.hpp>
 #include <xyz/openbmc_project/Metrics/PortPacketCounters/server.hpp>
+#include <xyz/openbmc_project/Network/LinkType/server.hpp>
+#include <xyz/openbmc_project/Network/MACAddress/server.hpp>
 
 namespace nsm
 {
@@ -44,7 +47,12 @@ using EthPortIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::EthPort>;
 using PortPacketCountersIntf = sdbusplus::server::object_t<
     sdbusplus::server::xyz::openbmc_project::metrics::PortPacketCounters>;
-
+using LinkTypeIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::network::LinkType>;
+using MACAddressIntf = sdbusplus::server::object_t<
+    sdbusplus::server::xyz::openbmc_project::network::MACAddress>;
+using GuidIntf =
+    sdbusplus::server::object_t<sdbusplus::server::com::nvidia::common::GUID>;
 using PortType = sdbusplus::server::xyz::openbmc_project::inventory::decorator::
     PortInfo::PortType;
 using PortProtocol = sdbusplus::server::xyz::openbmc_project::inventory::
@@ -53,6 +61,8 @@ using PortLinkStates = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortState::LinkStates;
 using PortLinkStatus = sdbusplus::server::xyz::openbmc_project::inventory::
     decorator::PortState::LinkStatusType;
+using PossibleLinks =
+    sdbusplus::server::xyz::openbmc_project::network::LinkType::PossibleLinks;
 
 using LinkDownReasonCodes =
     xyz::openbmc_project::metrics::IBPort::LinkDownReasonCodes;
@@ -115,7 +125,6 @@ class NsmPortMetrics : public NsmSensor
         const std::vector<utils::Association>& associations,
         std::string& parentObjPath, std::string& inventoryObjPath,
         std::shared_ptr<IBPortIntf> iBPortIntf,
-        std::shared_ptr<PortIntf> portIntf,
         std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
         std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf);
     NsmPortMetrics() = default;
@@ -134,7 +143,7 @@ class NsmPortMetrics : public NsmSensor
     std::shared_ptr<IBPortIntf> iBPortIntf = nullptr;
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf = nullptr;
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf = nullptr;
-    std::shared_ptr<PortIntf> portIntf = nullptr;
+    std::unique_ptr<PortIntf> portIntf = nullptr;
     std::unique_ptr<AssociationDefInft> associationDefinitionsIntf = nullptr;
 
     uint8_t portNumber;
@@ -175,4 +184,32 @@ class EthPortTelemetryAggregator : public NsmSensorAggregator
     std::unordered_map<uint8_t, std::string> tagToPropertyMap;
 };
 
+class NsmNetworkAddressAggregator : public NsmSensorAggregator
+{
+  public:
+    NsmNetworkAddressAggregator(sdbusplus::bus::bus& bus,
+                                const std::string& name,
+                                const std::string& type,
+                                const std::string& objPath,
+                                const std::string& nodeGuidObjPath,
+                                const std::string& ethernetMacAddressObjPath,
+                                const std::string& permanentMacAddressObjPath,
+                                uint16_t portNumber);
+    NsmNetworkAddressAggregator() = default;
+
+    std::optional<std::vector<uint8_t>>
+        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    int handleSamples(const std::vector<TelemetrySample>& samples) override;
+    void getLinkType(const std::vector<TelemetrySample>& samples,
+                     int8_t& linkType);
+
+  private:
+    uint16_t portNumber;
+    int8_t linkType = NSM_PORT_PROTOCOL_UNKNOWN;
+    std::unique_ptr<LinkTypeIntf> linkTypeIntf = nullptr;
+    std::unique_ptr<MACAddressIntf> macAddressIntf = nullptr;
+    std::unique_ptr<MACAddressIntf> permanentMacAddressIntf = nullptr;
+    std::unique_ptr<GuidIntf> portGuidIntf = nullptr;
+    std::unique_ptr<GuidIntf> nodeGuidIntf = nullptr;
+};
 } // namespace nsm

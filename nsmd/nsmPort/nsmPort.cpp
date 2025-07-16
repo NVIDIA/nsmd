@@ -583,19 +583,20 @@ NsmPortMetrics::NsmPortMetrics(
     const std::string& type, const uint8_t deviceType,
     const std::vector<utils::Association>& associations,
     std::string& parentObjPath, std::string& inventoryObjPath,
-    std::shared_ptr<IBPortIntf> iBPortIntf, std::shared_ptr<PortIntf> portIntf,
+    std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
     NsmSensor(portName, type),
     portName(portName), iBPortIntf(iBPortIntf),
     portMetricsOem2Intf(portMetricsOem2Intf),
-    portPacketCountersIntf(portPacketCountersIntf), portIntf(portIntf),
-    portNumber(portNum), typeOfDevice(deviceType), objPath(inventoryObjPath)
+    portPacketCountersIntf(portPacketCountersIntf), portNumber(portNum),
+    typeOfDevice(deviceType), objPath(inventoryObjPath)
 {
     lg2::debug(
         "NsmPortMetrics: {NAME} with port number {NUM} for device type {DT}",
         "NAME", portName.c_str(), "NUM", portNum, "DT", typeOfDevice);
 
+    portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
     portIntf->portNumber(portNum);
 
     associationDefinitionsIntf =
@@ -1426,25 +1427,174 @@ void EthPortTelemetryAggregator::updateMetricOnSharedMemory()
 #endif
 }
 
+NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
+    sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
+    const std::string& objPath, const std::string& nodeGuidObjPath,
+    const std::string& ethernetMacAddressObjPath,
+    const std::string& permanentMacAddressObjPath, uint16_t portNumber) :
+    NsmSensorAggregator(name, type),
+    portNumber(portNumber)
+{
+    linkTypeIntf = std::make_unique<LinkTypeIntf>(bus, objPath.c_str());
+    portGuidIntf = std::make_unique<GuidIntf>(bus, objPath.c_str());
+    nodeGuidIntf = std::make_unique<GuidIntf>(bus, nodeGuidObjPath.c_str());
+    macAddressIntf = std::make_unique<MACAddressIntf>(
+        bus, ethernetMacAddressObjPath.c_str());
+    permanentMacAddressIntf = std::make_unique<MACAddressIntf>(
+        bus, permanentMacAddressObjPath.c_str());
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmNetworkAddressAggregator::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
+                                 sizeof(nsm_get_network_addresses_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_network_addresses_req(instanceId, portNumber,
+                                               requestPtr);
+    if (rc)
+    {
+        lg2::debug("encode_get_network_addresses_req failed. eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+    return request;
+}
+
+int NsmNetworkAddressAggregator::handleSamples(
+    const std::vector<TelemetrySample>& samples)
+{
+    lg2::error("testlog NsmNetworkAddressAggregator handleSamples");
+    getLinkType(samples, linkType);
+    if (linkType == NSM_PORT_PROTOCOL_UNKNOWN)
+    {
+        lg2::debug("Failed to get link type for port number {PNUM}", "PNUM",
+                   portNumber);
+        return NSM_SW_ERROR_DATA;
+    }
+    for (const auto& sample : samples)
+    {
+        lg2::error(
+            "testlog0 NsmNetworkAddressAggregator handleSamples sample.tag={TAG}",
+            "TAG", sample.tag);
+        if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
+        {
+            continue;
+        }
+        if (!sample.valid)
+        {
+            continue;
+        }
+
+        network_address_sample_data data;
+        auto rc = decode_aggregate_network_address_data(sample.tag, sample.data,
+                                                        sample.data_len, &data);
+        if (rc != NSM_SUCCESS)
+        {
+            lg2::error("Failed to decode network address sample data: {RC}",
+                       "RC", rc);
+            return rc;
+        }
+
+        if (linkType == NSM_PORT_PROTOCOL_ETHERNET)
+        {
+            linkTypeIntf->linkType(PossibleLinks::Ethernet);
+            if (sample.tag == NSM_TAG_MAC_ADDRESS)
+            {
+                std::string macStr;
+                lg2::error(
+                    "testlog1 NsmNetworkAddressAggregator convertMacAddressToString ");
+                utils::convertMacAddressToString(data.mac_address,
+                                                 MAC_ADDRESS_LENGTH, macStr);
+                macAddressIntf->macAddress(macStr.c_str());
+            }
+            else if (sample.tag == NSM_TAG_PERMANENT_MAC_ADDRESS)
+            {
+                std::string permanentMacStr;
+                lg2::error(
+                    "testlog2 NsmNetworkAddressAggregator convertMacAddressToString ");
+                utils::convertMacAddressToString(
+                    data.mac_address, MAC_ADDRESS_LENGTH, permanentMacStr);
+                permanentMacAddressIntf->macAddress(permanentMacStr.c_str());
+            }
+            else
+            {
+                lg2::error("Invalid Tag = {TAG} for link type: {LT}", "TAG",
+                           sample.tag, "LT", linkType);
+            }
+        }
+        else if (linkType == NSM_PORT_PROTOCOL_INFINIBAND)
+        {
+            linkTypeIntf->linkType(PossibleLinks::InfiniBand);
+            if (sample.tag == NSM_TAG_NODE_GUID)
+            {
+                std::string IBNodeGuidStr;
+                utils::convertGuid64ToString(data.network_identifier_64bit,
+                                             IBNodeGuidStr);
+                nodeGuidIntf->guid(IBNodeGuidStr);
+            }
+            else if (sample.tag == NSM_TAG_PORT_GUID)
+            {
+                std::string IBPortGuidStr;
+                utils::convertGuid64ToString(data.network_identifier_64bit,
+                                             IBPortGuidStr);
+                portGuidIntf->guid(IBPortGuidStr);
+            }
+            else
+            {
+                lg2::error("Invalid Tag = {TAG} for link type: {LT}", "TAG",
+                           sample.tag, "LT", linkType);
+            }
+        }
+        else
+        {
+            lg2::error("Invalid Port link type: {LT}", "LT", linkType);
+        }
+    }
+    return NSM_SUCCESS;
+}
+
+void NsmNetworkAddressAggregator::getLinkType(
+    const std::vector<TelemetrySample>& samples, int8_t& linkType)
+{
+    for (const auto& sample : samples)
+    {
+        if (sample.tag == NSM_TAG_LINK_TYPE)
+        {
+            switch (sample.data[0])
+            {
+                case NSM_PORT_PROTOCOL_ETHERNET:
+                    linkType = NSM_PORT_PROTOCOL_ETHERNET;
+                    break;
+                case NSM_PORT_PROTOCOL_INFINIBAND:
+                    linkType = NSM_PORT_PROTOCOL_INFINIBAND;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+}
+
 static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                                 const std::string& interface,
-                                                const std::string& objPath)
+                                                const std::string& objPath,
+                                                bool enableNetworkPortAddresses)
 {
     auto& bus = utils::DBusHandler::getBus();
     auto name = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "Name", interface.c_str());
     auto parentObjPath = co_await utils::coGetDbusProperty<std::string>(
         objPath.c_str(), "ParentObjPath", interface.c_str());
-    auto priority = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Priority", interface.c_str());
     auto count = co_await utils::coGetDbusProperty<uint64_t>(
         objPath.c_str(), "Count", interface.c_str());
-    auto deviceType = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "DeviceType", interface.c_str());
     auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
         objPath.c_str(), "UUID", interface.c_str());
+    auto priority = co_await utils::coGetDbusProperty<bool>(
+        objPath.c_str(), "Priority", interface.c_str());
+    auto deviceType = co_await utils::coGetDbusProperty<uint64_t>(
+        objPath.c_str(), "DeviceType", interface.c_str());
     auto type = interface.substr(interface.find_last_of('.') + 1);
-
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)
     {
@@ -1472,6 +1622,11 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         uint8_t logicalPortNum = i + 1;
         std::string portName = name + '_' + std::to_string(i);
         std::string objPath = parentObjPath + "/Ports/" + portName;
+        std::string nodeGuidObjPath = objPath + "/Infiniband_Node_Guid";
+        std::string ethernetMacAddressObjPath = objPath +
+                                                "/Ethernet_MAC_Address";
+        std::string permanentMacAddressObjPath = objPath +
+                                                 "/Permanent_MAC_Address";
         std::vector<utils::Association> associations;
 
         auto deviceTopologyIt = deviceTopologies.find(objPath);
@@ -1488,13 +1643,34 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                 "PNUM", logicalPortNum, "OBJP", objPath);
         }
 
+        if (enableNetworkPortAddresses)
+        {
+            associations.emplace_back("parent_device",
+                                      "network_device_functions",
+                                      parentObjPath.c_str());
+            associations.emplace_back("associated_infiniband_port_address",
+                                      "associated_port",
+                                      nodeGuidObjPath.c_str());
+            associations.emplace_back("associated_ethernet_port_address",
+                                      "associated_port",
+                                      ethernetMacAddressObjPath.c_str());
+            associations.emplace_back("associated_ethernet_port_address",
+                                      "associated_port",
+                                      permanentMacAddressObjPath.c_str());
+
+            auto aggregateNetworkAddressesSensor =
+                std::make_shared<NsmNetworkAddressAggregator>(
+                    bus, portName, type, objPath, nodeGuidObjPath,
+                    ethernetMacAddressObjPath, permanentMacAddressObjPath,
+                    static_cast<uint16_t>(logicalPortNum));
+            nsmDevice->addSensor(aggregateNetworkAddressesSensor, false);
+        }
+
         auto iBPortIntf = std::make_shared<IBPortIntf>(bus, objPath.c_str());
-        auto portIntf = std::make_shared<PortIntf>(bus, objPath.c_str());
         auto portMetricsOem2Intf =
             std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
         auto portPacketCountersIntf =
             std::make_shared<PortPacketCountersIntf>(bus, objPath.c_str());
-
         if (deviceType == NSM_DEV_ID_GPU)
         {
             std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf =
@@ -1503,15 +1679,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             auto portStatusSensor = std::make_shared<NsmPortStatus>(
                 bus, portName, logicalPortNum, type, portMetricsOem3Intf,
                 objPath);
-            nsmDevice->deviceSensors.emplace_back(portStatusSensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(portStatusSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(portStatusSensor);
-            }
+            nsmDevice->addSensor(portStatusSensor, priority);
 
             auto portCharacteristicsSensor =
                 std::make_shared<NsmPortCharacteristics>(
@@ -1526,24 +1694,13 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             }
             else
             {
-                nsmDevice->deviceSensors.emplace_back(
-                    portCharacteristicsSensor);
-                if (priority)
-                {
-                    nsmDevice->prioritySensors.emplace_back(
-                        portCharacteristicsSensor);
-                }
-                else
-                {
-                    nsmDevice->roundRobinSensors.emplace_back(
-                        portCharacteristicsSensor);
-                }
+                nsmDevice->addSensor(portCharacteristicsSensor, priority);
             }
         }
 
         auto portMetricsSensor = std::make_shared<NsmPortMetrics>(
             bus, portName, logicalPortNum, type, deviceType, associations,
-            parentObjPath, objPath, iBPortIntf, portIntf, portMetricsOem2Intf,
+            parentObjPath, objPath, iBPortIntf, portMetricsOem2Intf,
             portPacketCountersIntf);
         if (!portMetricsSensor)
         {
@@ -1554,15 +1711,7 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
         }
         else
         {
-            nsmDevice->deviceSensors.emplace_back(portMetricsSensor);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(portMetricsSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(portMetricsSensor);
-            }
+            nsmDevice->addSensor(portMetricsSensor, priority);
         }
 
         if (nsmDevice->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
@@ -1574,8 +1723,6 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                     objPath, portMetricsOem2Intf, portPacketCountersIntf);
             nsmDevice->addSensor(ethPortMetricsSensor, priority);
         }
-
-        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
 
 #ifdef NVIDIA_HISTOGRAM
         if (deviceType != NSM_DEV_ID_PCIE_BRIDGE)
@@ -1613,12 +1760,35 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
             nsmDevice->addSensor(getFECHistoDataObject, false);
         }
 #endif
+
+        manager.deviceToPortMap[nsmDevice][logicalPortNum] = portName;
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmPortSensor,
+static requester::Coroutine
+    createNsmPortSensorWithNetworkPortAddresses(SensorManager& manager,
+                                                const std::string& interface,
+                                                const std::string& objPath)
+{
+    auto rc = co_await createNsmPortSensor(manager, interface, objPath, true);
+    co_return rc;
+}
+
+static requester::Coroutine
+    createNsmPortSensorGeneric(SensorManager& manager,
+                               const std::string& interface,
+                               const std::string& objPath)
+{
+    auto rc = co_await createNsmPortSensor(manager, interface, objPath, false);
+    co_return rc;
+}
+
+REGISTER_NSM_CREATION_FUNCTION(
+    createNsmPortSensorWithNetworkPortAddresses,
+    "xyz.openbmc_project.Configuration.NSM_NVLinkWithNetworkPortAddresses")
+REGISTER_NSM_CREATION_FUNCTION(createNsmPortSensorGeneric,
                                "xyz.openbmc_project.Configuration.NSM_NVLink")
 
 } // namespace nsm

@@ -71,6 +71,7 @@ using PropertyValuesCollection =
 
 #define UUID_INT_SIZE 16
 #define UUID_LEN 36
+#define MAC_ADDRESS_DATA_LEN 6
 
 // Largest safe integer for double precision (2^53 - 1)
 const uint64_t MAX_SAFE_INTEGER_IN_DOUBLE = (1ULL << 53) - 1;
@@ -701,4 +702,24 @@ uint16_t combineDeviceTypeAndRole(uint8_t deviceType, uint8_t deviceRole);
  */
 void getDeviceTypeAndRole(uint16_t combined, uint8_t* deviceType,
                           uint8_t* deviceRole);
+
+/**
+ * @brief Converts a MAC address to a string representation.
+ *
+ * @param macAddress Pointer to the MAC address to convert.
+ * @param macAddressDataLen Length of the MAC address.
+ * @param macAddressString Reference to the string to store the converted MAC
+ * address.
+ */
+void convertMacAddressToString(const uint8_t* macAddress,
+                               size_t macAddressDataLen,
+                               std::string& macAddressString);
+
+/**
+ * @brief Converts a 64-bit GUID to a string representation.
+ *
+ * @param guid The 64-bit GUID to convert.
+ * @param guidString Reference to the string to store the converted GUID.
+ */
+void convertGuid64ToString(uint64_t guid, std::string& guidString);
 } // namespace utils

@@ -4849,6 +4849,115 @@ class GetEthPortTelemetryCounter : public CommandInterface
     };
 };
 
+class GetPortNetworkAddresses : public CommandInterface
+{
+  public:
+    ~GetPortNetworkAddresses() = default;
+    GetPortNetworkAddresses() = delete;
+    GetPortNetworkAddresses(const GetPortNetworkAddresses&) = delete;
+    GetPortNetworkAddresses(GetPortNetworkAddresses&&) = default;
+    GetPortNetworkAddresses& operator=(const GetPortNetworkAddresses&) = delete;
+    GetPortNetworkAddresses& operator=(GetPortNetworkAddresses&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPortNetworkAddresses(const char* type, const char* name,
+                                     CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto portOptionGroup = app->add_option_group(
+            "Required",
+            "Port number for which network addresses are to be retrieved.");
+
+        portNumber = 0;
+        portOptionGroup->add_option(
+            "-p, --portNum", portNumber,
+            "Retrieve network addresses for Port number");
+        portOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_network_addresses_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_network_addresses_req(instanceId, portNumber,
+                                                   request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPortNetworkAddressesAggregateResponseParser{}.parseAggregateResponse(
+            responsePtr, payloadLength);
+    }
+
+  private:
+    class GetPortNetworkAddressesAggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            network_address_sample_data address;
+            int rc = decode_aggregate_network_address_data(tag, data, data_len,
+                                                           &address);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return rc;
+            }
+
+            switch (tag)
+            {
+                case NSM_TAG_LINK_TYPE:
+                    sample_json["Link Type"] = address.link_type;
+                    break;
+                case NSM_TAG_MAC_ADDRESS:
+                {
+                    std::string network_address;
+                    utils::convertMacAddressToString(address.mac_address,
+                                                     MAC_ADDRESS_LENGTH,
+                                                     network_address);
+                    sample_json["MAC Address"] = network_address.c_str();
+                }
+                break;
+                case NSM_TAG_PERMANENT_MAC_ADDRESS:
+                {
+                    std::string network_address;
+                    utils::convertMacAddressToString(address.mac_address,
+                                                     MAC_ADDRESS_LENGTH,
+                                                     network_address);
+                    sample_json["Permanent MAC Address"] =
+                        network_address.c_str();
+                }
+                break;
+                case NSM_TAG_NODE_GUID:
+                {
+                    std::string network_address;
+                    utils::convertGuid64ToString(
+                        address.network_identifier_64bit, network_address);
+                    sample_json["InfiniBand Node GUID"] = network_address;
+                }
+                break;
+                case NSM_TAG_PORT_GUID:
+                {
+                    std::string network_address;
+                    utils::convertGuid64ToString(
+                        address.network_identifier_64bit, network_address);
+                    sample_json["InfiniBand Port GUID"] = network_address;
+                }
+                break;
+                default:
+                    return NSM_SW_ERROR_DATA;
+            }
+            return NSM_SW_SUCCESS;
+        }
+    };
+
+    uint16_t portNumber;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto telemetry = app.add_subcommand(
@@ -5105,6 +5214,10 @@ void registerCommand(CLI::App& app)
         "GetEthPortTelemetryCounter", "get ethernet port telemetry counter");
     commands.push_back(std::make_unique<GetEthPortTelemetryCounter>(
         "telemetry", "GetEthPortTelemetryCounter", getEthPortTelemetryCounter));
+    auto getPortNetworkAddresses = telemetry->add_subcommand(
+        "GetPortNetworkAddresses", "Get Port Network Addresses");
+    commands.push_back(std::make_unique<GetPortNetworkAddresses>(
+        "telemetry", "GetPortNetworkAddresses", getPortNetworkAddresses));
 }
 
 } // namespace telemetry
