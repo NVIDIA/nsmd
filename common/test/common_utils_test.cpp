@@ -232,3 +232,34 @@ TEST(memFd, TestGoodWriteReadForEmptyBuffer)
 
     EXPECT_THAT(data, ElementsAre());
 }
+
+TEST(convertMacAddressToString, TestGoodConversionMacAddressToString)
+{
+    std::vector<uint8_t> macAddress{0x01, 0x01, 0x02, 0x03,
+                                    0x04, 0x05, 0x00, 0x00};
+    std::string macAddressString;
+    macAddressString.resize(sizeof("XX:XX:XX:XX:XX:XX"));
+    utils::convertMacAddressToString(macAddress.data(), macAddress.size(),
+                                     macAddressString);
+    macAddressString.resize(strlen(macAddressString.c_str()));
+    EXPECT_EQ(macAddressString, "01:01:02:03:04:05");
+}
+
+TEST(convertMacAddressToString, TestBadConversionMacAddressToString)
+{
+    std::vector<uint8_t> macAddress{0x01, 0x01, 0x02, 0x03};
+    std::string macAddressString;
+    macAddressString.resize(sizeof("XX:XX:XX:XX:XX:XX"));
+    utils::convertMacAddressToString(macAddress.data(), macAddress.size(),
+                                     macAddressString);
+    macAddressString.resize(strlen(macAddressString.c_str()));
+    EXPECT_EQ(macAddressString, "");
+}
+
+TEST(convertGuid64ToString, TestGoodConversionGuid64ToString)
+{
+    uint64_t guid = 0x0102030405060708;
+    std::string guidString;
+    utils::convertGuid64ToString(guid, guidString);
+    EXPECT_EQ(guidString, "0102-0304-0506-0708");
+}

@@ -435,6 +435,8 @@ std::optional<Response>
                 case NSM_GET_ETH_PORT_TELEMETRY_COUNTER:
                     return getEthPortTelemetryCounterHandler(request,
                                                              requestLen);
+                case NSM_GET_NETWORK_ADDRESSES:
+                    return getPortNetworkAddressesHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -845,7 +847,9 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
                  {0, {0, 1, 2, 5, 6, 7, 9, 10}},
-                 {1, {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER}},
+                 {1,
+                  {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
+                   NSM_GET_NETWORK_ADDRESSES}},
                  {NSM_TYPE_PCI_LINK,
                   {
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
@@ -6420,6 +6424,137 @@ std::optional<std::vector<uint8_t>>
     }
 
     return ethPortTelemetryCounterResponse;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPortNetworkAddressesHandler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPortNetworkAddressesHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t portNumber = 0;
+    auto rc = decode_get_network_addresses_req(requestMsg, requestLen,
+                                               &portNumber);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_network_addresses_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               NSM_GET_NETWORK_ADDRESSES, NSM_SUCCESS, 3,
+                               responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    std::array<uint8_t, 50> sample;
+    auto nsmSample =
+        reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+    size_t consumedLen = 0;
+
+    network_address_sample_data address = {};
+    address.link_type = portNumber % 2; // 0 or 1
+    uint8_t data[1];
+    size_t dataLen = 0;
+
+    rc = encode_aggregate_network_address_data(NSM_TAG_LINK_TYPE, &address,
+                                               data, &dataLen);
+    assert(rc == NSM_SW_SUCCESS);
+
+    rc = encode_aggregate_resp_sample(NSM_TAG_LINK_TYPE, true, data, dataLen,
+                                      nsmSample, &consumedLen);
+    assert(rc == NSM_SW_SUCCESS);
+    response.insert(response.end(), sample.begin(),
+                    std::next(sample.begin(), consumedLen));
+
+    switch (address.link_type)
+    {
+        case NSM_PORT_PROTOCOL_ETHERNET:
+        {
+            network_address_sample_data macAddress = {
+                .mac_address = {0x1A, 0x2B, 0x1C, 0x3D, 0x4E, 0x5F, 0x00,
+                                0x00}};
+
+            uint8_t reading[MAC_ADDRESS_LENGTH]{};
+            size_t readingLen{};
+
+            rc = encode_aggregate_network_address_data(
+                NSM_TAG_MAC_ADDRESS, &macAddress, reading, &readingLen);
+            assert(rc == NSM_SW_SUCCESS);
+
+            rc = encode_aggregate_resp_sample(NSM_TAG_MAC_ADDRESS, true,
+                                              reading, readingLen, nsmSample,
+                                              &consumedLen);
+            assert(rc == NSM_SW_SUCCESS);
+
+            response.insert(response.end(), sample.begin(),
+                            std::next(sample.begin(), consumedLen));
+
+            network_address_sample_data permanentMacAddress = {
+                .mac_address = {0x1A, 0x2B, 0x3C, 0x4D, 0x5E, 0x6F, 0x00,
+                                0x00}};
+
+            rc = encode_aggregate_network_address_data(
+                NSM_TAG_PERMANENT_MAC_ADDRESS, &permanentMacAddress, reading,
+                &readingLen);
+            assert(rc == NSM_SW_SUCCESS);
+
+            rc = encode_aggregate_resp_sample(NSM_TAG_PERMANENT_MAC_ADDRESS,
+                                              true, reading, readingLen,
+                                              nsmSample, &consumedLen);
+            assert(rc == NSM_SW_SUCCESS);
+            response.insert(response.end(), sample.begin(),
+                            std::next(sample.begin(), consumedLen));
+            break;
+        }
+        case NSM_PORT_PROTOCOL_INFINIBAND:
+        {
+            network_address_sample_data nodeGuid = {};
+            nodeGuid.network_identifier_64bit = 0x123456789ABCDEF0;
+
+            uint8_t reading[sizeof(uint64_t)]{};
+            size_t readingLen{};
+
+            rc = encode_aggregate_network_address_data(
+                NSM_TAG_NODE_GUID, &nodeGuid, reading, &readingLen);
+            assert(rc == NSM_SW_SUCCESS);
+
+            rc = encode_aggregate_resp_sample(NSM_TAG_NODE_GUID, true, reading,
+                                              readingLen, nsmSample,
+                                              &consumedLen);
+            assert(rc == NSM_SW_SUCCESS);
+            response.insert(response.end(), sample.begin(),
+                            std::next(sample.begin(), consumedLen));
+
+            network_address_sample_data portGuid = {};
+            portGuid.network_identifier_64bit = 0xABCDEF0123456789;
+
+            rc = encode_aggregate_network_address_data(
+                NSM_TAG_PORT_GUID, &portGuid, reading, &readingLen);
+            assert(rc == NSM_SW_SUCCESS);
+
+            rc = encode_aggregate_resp_sample(NSM_TAG_PORT_GUID, true, reading,
+                                              readingLen, nsmSample,
+                                              &consumedLen);
+            assert(rc == NSM_SW_SUCCESS);
+            response.insert(response.end(), sample.begin(),
+                            std::next(sample.begin(), consumedLen));
+            break;
+        }
+        default:
+        {
+            break;
+        }
+    }
+
+    return response;
 }
 
 } // namespace MockupResponder
