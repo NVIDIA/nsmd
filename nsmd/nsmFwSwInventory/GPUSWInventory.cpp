@@ -90,29 +90,33 @@ requester::Coroutine
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     enum8 driverState = 0;
-    char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
+    std::string driverVersion("", MAX_VERSION_STRING_SIZE);
 
     rc = decode_get_driver_info_resp(responseMsg.get(), responseLen, &cc,
-                                     &reasonCode, &driverState, driverVersion);
+                                     &reasonCode, &driverState,
+                                     (char*)driverVersion.data());
 
     LG2_ERROR_FLT(
         "decode_get_driver_info_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        std::string version(driverVersion);
-        // Check if the values have changed
-        bool stateChanged = (this->driverState != driverState);
-        updateValue(driverState, version);
-        if (stateChanged)
-        {
-            lg2::info(
-                "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
-                "EID", eid);
-            DeviceManager& deviceManager = DeviceManager::getInstance();
-            co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
-        }
+        // Set previous version on error;
+        driverVersion = this->driverVersion;
     }
+
+    // Check if the values have changed
+    bool stateChanged = (this->driverState != driverState);
+    updateValue(driverState, driverVersion);
+    if (stateChanged)
+    {
+        lg2::info(
+            "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
+            "EID", eid);
+        DeviceManager& deviceManager = DeviceManager::getInstance();
+        co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
+    }
+
     // coverity[missing_return]
     co_return cc ? cc : rc;
 }
