@@ -3491,7 +3491,8 @@ TEST(encodeEthPortTelemetryCounterReq, testGoodEncodeRequest)
 	    encode_get_eth_port_telemetry_counter_req(0, port_number, request);
 
 	struct nsm_get_ethernet_port_telemetry_counter_req *req =
-	    reinterpret_cast<nsm_get_ethernet_port_telemetry_counter_req *>(
+	    reinterpret_cast<
+		struct nsm_get_ethernet_port_telemetry_counter_req *>(
 		request->payload);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -3499,8 +3500,9 @@ TEST(encodeEthPortTelemetryCounterReq, testGoodEncodeRequest)
 	EXPECT_EQ(1, request->hdr.request);
 	EXPECT_EQ(NSM_TYPE_NETWORK_PORT, request->hdr.nvidia_msg_type);
 	EXPECT_EQ(NSM_GET_ETH_PORT_TELEMETRY_COUNTER, req->hdr.command);
-	EXPECT_EQ(1, req->hdr.data_size);
-	EXPECT_EQ(port_number, req->port_number);
+	EXPECT_EQ(2, req->hdr.data_size);
+	uint16_t decodedPortNumber = le16toh(req->port_number);
+	EXPECT_EQ(port_number, decodedPortNumber);
 }
 
 TEST(encodeEthPortTelemetryCounterReq, testBadEncodeRequest)
@@ -3517,8 +3519,9 @@ TEST(decodeEthPortTelemetryCounterReq, testGoodDecodeRequest)
 					 0x89,
 					 NSM_TYPE_NETWORK_PORT,
 					 NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
+					 2,
 					 1,
-					 1};
+					 0};
 
 	auto request = reinterpret_cast<nsm_msg *>(request_msg.data());
 	size_t msg_len = request_msg.size();
