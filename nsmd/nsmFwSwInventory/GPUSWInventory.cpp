@@ -91,35 +91,35 @@ requester::Coroutine
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     enum8 driverState = 0;
-    char driverVersion[MAX_VERSION_STRING_SIZE] = {0};
+    std::string driverVersion("", MAX_VERSION_STRING_SIZE);
 
     rc = decode_get_driver_info_resp(responseMsg.get(), responseLen, &cc,
-                                     &reasonCode, &driverState, driverVersion);
+                                     &reasonCode, &driverState,
+                                     (char*)driverVersion.data());
 
-    if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
+     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        std::string version(driverVersion);
-        // Check if the values have changed
-        bool stateChanged = (this->driverState != driverState);
-        updateValue(driverState, version);
-        if (stateChanged)
-        {
-            lg2::info(
-                "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
-                "EID", eid);
-            DeviceManager& deviceManager = DeviceManager::getInstance();
-            co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
-        }
         clearErrorBitMap("decode_get_driver_info_resp");
     }
     else
     {
         logHandleResponseMsg("decode_get_driver_info_resp", reasonCode, cc, rc);
-        // coverity[missing_return]
-        co_return NSM_SW_ERROR_COMMAND_FAIL;
     }
+
+    // Check if the values have changed
+    bool stateChanged = (this->driverState != driverState);
+    updateValue(driverState, driverVersion);
+    if (stateChanged)
+    {
+        lg2::info(
+            "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
+            "EID", eid);
+        DeviceManager& deviceManager = DeviceManager::getInstance();
+        co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
+    }
+
     // coverity[missing_return]
-    co_return cc;
+    co_return cc ? cc : rc;
 }
 
 static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
