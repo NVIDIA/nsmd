@@ -55,8 +55,7 @@ SensorManagerImpl::SensorManagerImpl(
     mctp_socket::Manager& sockManager, bool verbose) :
     SensorManager(nsmDevices, localEid), bus(bus), event(event),
     handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-    eidTable(eidTable), sockManager(sockManager), verbose(verbose),
-    globalPollingStateManager(nsmDevices)
+    eidTable(eidTable), sockManager(sockManager), verbose(verbose)
 {
     deferScanInventory = std::make_unique<sdeventplus::source::Defer>(
         event, std::bind(&SensorManagerImpl::scanInventory, this));
@@ -574,14 +573,6 @@ requester::Coroutine SensorManagerImpl::doPollingTaskLongRunning(
 
         while (sensorIndex < sensors.size())
         {
-            if (globalPollingStateManager.getState() != POLL_NON_PRIORITY)
-            {
-                // Sleep for 20ms and then check again if we have time.
-                co_await common::Sleep(event.get(), 20000, common::Priority);
-                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-                continue;
-            }
-
             auto sensor = sensors[sensorIndex];
 
             if (!sensor->needsUpdate(t1))
@@ -642,6 +633,7 @@ requester::Coroutine
     uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
     uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
     bool hasFailedToSearchEID = false;
+    DeviceManager& deviceManager = DeviceManager::getInstance();
 
     do
     {
@@ -652,7 +644,6 @@ requester::Coroutine
         if (!nsmDevice->isDeviceActive)
         {
             // search EID
-            DeviceManager& deviceManager = DeviceManager::getInstance();
             auto foundEID = deviceManager.searchEID(
                 nsmDevice->getDeviceType(), nsmDevice->getInstanceNumber(),
                 nsmDevice->getDeviceRole());
@@ -665,9 +656,8 @@ requester::Coroutine
                     nsmDevice->getDeviceRole());
 
                 nsmDevice->eid = *foundEID;
-                nsmDevice->isDeviceActive = true;
-                co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
                 co_await nsmDevice->setOnline();
+                co_await deviceManager.updateNsmDevice(nsmDevice, *foundEID);
                 co_await common::Sleep(event.get(), 20000, common::NonPriority);
                 continue;
             }
@@ -700,7 +690,6 @@ requester::Coroutine
             co_await pollEvents(eid);
         }
 #endif
-        DeviceManager& deviceManager = DeviceManager::getInstance();
         // Refresh command matrix
         auto rc = co_await deviceManager.refreshCommandMatrix(nsmDevice, eid);
         if (rc != NSM_SW_SUCCESS)
@@ -708,8 +697,6 @@ requester::Coroutine
             lg2::error("Failed to refresh command matrix, rc={RC}, eid={EID}",
                        "RC", rc, "EID", eid);
         }
-        // update all priority sensors
-        nsmDevice->setPollingState(POLL_PRIORITY);
 
         auto& sensors = nsmDevice->prioritySensors;
         const size_t prioritySensorCount = sensors.size();
@@ -734,16 +721,13 @@ requester::Coroutine
         lttng_ust_tracepoint(nsmd, priority_polling_ended, eid);
 #endif
 
-        // update roundRobin sensors for rest of polling time interval
-        nsmDevice->setPollingState(POLL_NON_PRIORITY);
-
         auto toBeUpdated = nsmDevice->roundRobinSensors.size();
 
         // Make sure the first round-robin sensor is not compared
         // to an uninitialised timestamp
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
 
-        while ((t1 - t0) < pollingTimeInUsec)
+        while ((t1 - t0) < (pollingTimeInUsec - allowedBufferInUsec))
         {
             if (!toBeUpdated)
             {
@@ -756,18 +740,6 @@ requester::Coroutine
                     checkAllDevicesReady();
                 }
                 break;
-            }
-
-            if (globalPollingStateManager.getState() != POLL_NON_PRIORITY &&
-                nsmDevice
-                    ->isDeviceReady) // Throttling logic shouldn't affect HMC
-                                     // Ready. Check if the device is ready and
-                                     // only then implement the throttling logic
-            {
-                // Sleep for 20ms and then check again if we have time.
-                co_await common::Sleep(event.get(), 20000, common::Priority);
-                sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-                continue;
             }
 
             auto sensor = nsmDevice->roundRobinSensors.front();
@@ -819,24 +791,16 @@ requester::Coroutine
             timerEventPriority = common::NonPriority;
         }
 
-        uint64_t diff = t1 - t0;
-        if (diff > pollingTimeInUsec)
+        auto sleepTime = (t1 - t0) < pollingTimeInUsec
+                             ? pollingTimeInUsec - (t1 - t0)
+                             : allowedBufferInUsec; // sleep for at least
+                                                    // allowedBufferInUsec to
+                                                    // ensure minimal delay and
+                                                    // CPU usage
+        if (sleepTime > 0)
         {
-            // We have already crossed the polling interval. Complete mandatory
-            // sleep of 20ms then continue polling for yield some CPU
-            co_await common::Sleep(event, 20000, timerEventPriority);
-            continue;
+            co_await common::Sleep(event, sleepTime, timerEventPriority);
         }
-
-        uint64_t sleepDeltaInUsec = pollingTimeInUsec - diff;
-        if (sleepDeltaInUsec < allowedBufferInUsec)
-        {
-            // If the delta is within the allowed buffer, complete mandatory
-            // sleep of 20ms and continue then polling.
-            co_await common::Sleep(event, 20000, timerEventPriority);
-            continue;
-        }
-        co_await common::Sleep(event, sleepDeltaInUsec, timerEventPriority);
 
     } while (true);
 

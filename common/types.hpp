@@ -52,12 +52,6 @@ using InventoryPropertyData =
 using InventoryProperties =
     std::map<InventoryPropertyId, InventoryPropertyData>;
 
-enum PollingState
-{
-    POLL_PRIORITY,
-    POLL_NON_PRIORITY,
-};
-
 } // namespace nsm
 
 namespace dbus

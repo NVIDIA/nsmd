@@ -333,16 +333,6 @@ class NsmDevice : public StateChangeLogger
         return longRunningSemaphore;
     }
 
-    inline PollingState getPollingState()
-    {
-        return devicePollingState;
-    }
-
-    inline void setPollingState(const PollingState s)
-    {
-        devicePollingState = s;
-    }
-
     // Track if NSM message types were successfully retrieved
     bool areMessageTypesRetrieved{false};
 
@@ -394,7 +384,6 @@ class NsmDevice : public StateChangeLogger
         longRunningSemaphore; // Semaphore for synchronizing long running
                               // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
-    PollingState devicePollingState = POLL_NON_PRIORITY;
 
     void initMsgTypesSensor();
 
