@@ -106,6 +106,19 @@ TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
 {
     auto& values = utils::MockDbusAsync::getValues();
+
+    // Also populate PropertyMap for coGetAllDbusProperty (base interface
+    // properties)
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["UUID"] = std::get<std::string>(get(basic, "UUID").second);
+    propertyMap["AssemblyType"] =
+        std::get<std::string>(get(basic, "AssemblyType").second);
+
     values.push(objPath, get(basic, "ChassisName"));
     values.push(objPath, get(basic, "Name"));
     values.push(objPath, get(basic, "Type"));

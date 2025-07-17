@@ -52,11 +52,11 @@ requester::Coroutine
     {
         uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
-    unsigned long long deviceIndex{};
+    uint64_t deviceIndex{};
     if (allCurrentIfaceProperties.count("DeviceIndex"))
     {
-        deviceIndex = std::get<unsigned long long>(
-            allCurrentIfaceProperties.at("DeviceIndex"));
+        deviceIndex =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceIndex"));
     }
     std::string slotType{};
     if (allCurrentIfaceProperties.count("SlotType"))

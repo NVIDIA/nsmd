@@ -176,10 +176,10 @@ requester::Coroutine
             deviceType = std::get<std::string>(
                 allCurrentIfaceProperties.at("DeviceType"));
         }
-        std::vector<unsigned long long> functionIds{};
+        std::vector<uint64_t> functionIds{};
         if (allCurrentIfaceProperties.count("Functions"))
         {
-            functionIds = std::get<std::vector<unsigned long long>>(
+            functionIds = std::get<std::vector<uint64_t>>(
                 allCurrentIfaceProperties.at("Functions"));
         }
 
@@ -232,11 +232,11 @@ requester::Coroutine
     }
     else if (type == "NSM_LTSSMState")
     {
-        unsigned long long deviceIndex{};
+        uint64_t deviceIndex{};
         if (allCurrentIfaceProperties.count("DeviceIndex"))
         {
-            deviceIndex = std::get<unsigned long long>(
-                allCurrentIfaceProperties.at("DeviceIndex"));
+            deviceIndex =
+                std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceIndex"));
         }
         bool priority{};
         if (allCurrentIfaceProperties.count("Priority"))
@@ -261,7 +261,7 @@ requester::Coroutine
         uint64_t instanceNumber{};
         if (allCurrentIfaceProperties.count("InstanceNumber"))
         {
-            instanceNumber = std::get<unsigned long long>(
+            instanceNumber = std::get<uint64_t>(
                 allCurrentIfaceProperties.at("InstanceNumber"));
         }
 

@@ -45,7 +45,8 @@ NsmFpgaPortInfo::NsmFpgaPortInfo(const std::string& name,
                                  const std::string& portType,
                                  const std::string& portProtocol,
                                  std::shared_ptr<PortInfoIntf> portInfoIntf) :
-    NsmObject(name, type), portInfoIntf(portInfoIntf)
+    NsmObject(name, type),
+    portInfoIntf(portInfoIntf)
 {
     lg2::info("NsmFpgaPortInfo: create sensor:{NAME}", "NAME", name.c_str());
     portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
@@ -161,10 +162,10 @@ static requester::Coroutine
                 priority =
                     std::get<bool>(allCurrentIfaceProperties.at("Priority"));
             }
-            unsigned long long deviceIndex{};
+            uint64_t deviceIndex{};
             if (allBaseIfaceProperties.count("DeviceIndex"))
             {
-                deviceIndex = std::get<unsigned long long>(
+                deviceIndex = std::get<uint64_t>(
                     allBaseIfaceProperties.at("DeviceIndex"));
             }
 
@@ -211,10 +212,10 @@ static requester::Coroutine
                 priority =
                     std::get<bool>(allCurrentIfaceProperties.at("Priority"));
             }
-            unsigned long long deviceIndex{};
+            uint64_t deviceIndex{};
             if (allBaseIfaceProperties.count("DeviceIndex"))
             {
-                deviceIndex = std::get<unsigned long long>(
+                deviceIndex = std::get<uint64_t>(
                     allBaseIfaceProperties.at("DeviceIndex"));
             }
 

@@ -45,9 +45,9 @@ NsmThresholdFactory::NsmThresholdFactory(
     SensorManager& manager, const std::string& interface,
     const std::string& objPath, std::shared_ptr<NsmNumericSensor> numericSensor,
     const NumericSensorInfo& info, const uuid_t& uuid) :
-    manager(manager), interface(interface), objPath(objPath),
-    numericSensor(numericSensor), info(info), uuid(uuid),
-    nsmDevice(manager.getNsmDevice(uuid))
+    manager(manager),
+    interface(interface), objPath(objPath), numericSensor(numericSensor),
+    info(info), uuid(uuid), nsmDevice(manager.getNsmDevice(uuid))
 {}
 
 requester::Coroutine NsmThresholdFactory::make()
@@ -243,11 +243,11 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
         co_return NSM_ERROR;
     }
 
-    unsigned long long sensorId{};
+    uint64_t sensorId{};
     if (allCurrentIfaceProperties.count("ParameterId"))
     {
-        sensorId = std::get<unsigned long long>(
-            allCurrentIfaceProperties.at("ParameterId"));
+        sensorId =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("ParameterId"));
     }
     thresholdInfo.sensorId = sensorId;
 

@@ -52,7 +52,8 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     const std::vector<utils::Association>& associations,
     const std::string& type, const std::string& deviceType,
     const uint8_t deviceIndex, std::string& inventoryObjPath) :
-    NsmSensor(name, type), deviceIndex(deviceIndex)
+    NsmSensor(name, type),
+    deviceIndex(deviceIndex)
 {
     objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeDeviceQueryScalarTelemetry: {NAME}", "NAME",
@@ -298,11 +299,11 @@ static requester::Coroutine
     {
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
-    unsigned long long deviceInstance{};
+    uint64_t deviceInstance{};
     if (allCurrentIfaceProperties.count("DeviceInstance"))
     {
-        deviceInstance = std::get<unsigned long long>(
-            allCurrentIfaceProperties.at("DeviceInstance"));
+        deviceInstance =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceInstance"));
     }
 
     std::vector<utils::Association> associations{};

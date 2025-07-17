@@ -33,8 +33,8 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
                                  const std::string& type,
                                  uint8_t eventGenerationSetting,
                                  std::shared_ptr<NsmDevice> nsmDevice) :
-    NsmObject(name, type), eventGenerationSetting(eventGenerationSetting),
-    nsmDevice(nsmDevice)
+    NsmObject(name, type),
+    eventGenerationSetting(eventGenerationSetting), nsmDevice(nsmDevice)
 {}
 
 requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
@@ -99,7 +99,8 @@ requester::Coroutine
 NsmGetEventSetting::NsmGetEventSetting(
     const std::string& name, const std::string& type,
     std::shared_ptr<NsmEventSetting> eventSetting) :
-    NsmObject(name, type), eventSetting(eventSetting)
+    NsmObject(name, type),
+    eventSetting(eventSetting)
 {}
 
 requester::Coroutine NsmGetEventSetting::update(SensorManager& manager,
@@ -175,10 +176,10 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
     {
         uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
     }
-    unsigned long long eventGenerationSetting{};
+    uint64_t eventGenerationSetting{};
     if (allCurrentIfaceProperties.count("EventGenerationSetting"))
     {
-        eventGenerationSetting = std::get<unsigned long long>(
+        eventGenerationSetting = std::get<uint64_t>(
             allCurrentIfaceProperties.at("EventGenerationSetting"));
     }
 

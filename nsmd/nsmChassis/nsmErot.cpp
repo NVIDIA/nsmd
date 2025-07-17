@@ -29,7 +29,8 @@ NsmBuildTypeObject::NsmBuildTypeObject(const std::string& name,
                                        const std::string& type,
                                        const uuid_t& uuid, int classification,
                                        int identifier) :
-    NsmSensor(name, type), uuid(uuid)
+    NsmSensor(name, type),
+    uuid(uuid)
 {
     nsmRequest = {.component_classification = uint16_t(classification),
                   .component_identifier = uint16_t(identifier),
@@ -59,7 +60,8 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    struct ::nsm_firmware_erot_state_info_resp erotInfo{};
+    struct ::nsm_firmware_erot_state_info_resp erotInfo
+    {};
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reasonCode, &erotInfo);
     LG2_ERROR_FLT(
@@ -138,11 +140,11 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             // coverity[missing_return]
             co_return NSM_SUCCESS;
         }
-        unsigned long long slotCount{};
+        uint64_t slotCount{};
         if (allCurrentIfaceProperties.count("SlotCount"))
         {
-            slotCount = std::get<unsigned long long>(
-                allCurrentIfaceProperties.at("SlotCount"));
+            slotCount =
+                std::get<uint64_t>(allCurrentIfaceProperties.at("SlotCount"));
         }
         uuid_t uuid{};
         if (allCurrentIfaceProperties.count("UUID"))
@@ -182,16 +184,16 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 utils::DBusHandler().getDbusProperty<uint64_t>(
                     slotPath.c_str(), "ComponentClassification",
                     erotSlotInterface);
-            unsigned long long identifier{};
+            uint64_t identifier{};
             if (allSlotIfaceProperties.count("ComponentIdentifier"))
             {
-                identifier = std::get<unsigned long long>(
+                identifier = std::get<uint64_t>(
                     allSlotIfaceProperties.at("ComponentIdentifier"));
             }
-            unsigned long long index{};
+            uint64_t index{};
             if (allSlotIfaceProperties.count("ComponentIndex"))
             {
-                index = std::get<unsigned long long>(
+                index = std::get<uint64_t>(
                     allSlotIfaceProperties.at("ComponentIndex"));
             }
             std::string fwType{};

@@ -62,8 +62,8 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
 
     if (allCurrentIfaceProperties.count("SensorId"))
     {
-        info.sensorId = std::get<unsigned long long>(
-            allCurrentIfaceProperties.at("SensorId"));
+        info.sensorId =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("SensorId"));
     }
 
     if (allCurrentIfaceProperties.count("Priority"))

@@ -378,7 +378,8 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerModePatch(
 NsmSwitchIsolationMode::NsmSwitchIsolationMode(
     const std::string& name, const std::string& type,
     std::shared_ptr<SwitchIsolationIntf> switchIsolationIntf) :
-    NsmSensor(name, type), switchIsolationIntf(switchIsolationIntf)
+    NsmSensor(name, type),
+    switchIsolationIntf(switchIsolationIntf)
 {}
 
 std::optional<std::vector<uint8_t>>

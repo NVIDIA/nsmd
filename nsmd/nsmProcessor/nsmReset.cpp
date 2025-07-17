@@ -33,7 +33,8 @@ namespace nsm
 NsmReset::NsmReset(sdbusplus::bus::bus& bus, const std::string& name,
                    const std::string& type, std::string& inventoryObjPath,
                    std::shared_ptr<NsmDevice> device,
-                   const uint8_t deviceIndex) : NsmObject(name, type)
+                   const uint8_t deviceIndex) :
+    NsmObject(name, type)
 {
     lg2::info("NsmReset: create sensor:{NAME}", "NAME", name.c_str());
     resetIntf = std::make_shared<NsmResetIntf>(bus, inventoryObjPath.c_str());
@@ -77,17 +78,17 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
         uint64_t instanceNumber{};
         if (allCurrentIfaceProperties.count("InstanceNumber"))
         {
-            instanceNumber = std::get<unsigned long long>(
+            instanceNumber = std::get<uint64_t>(
                 allCurrentIfaceProperties.at("InstanceNumber"));
         }
 
         inventoryObjPath = inventoryObjPath + std::to_string(instanceNumber);
 
-        unsigned long long deviceIndex{};
+        uint64_t deviceIndex{};
         if (allCurrentIfaceProperties.count("DeviceIndex"))
         {
-            deviceIndex = std::get<unsigned long long>(
-                allCurrentIfaceProperties.at("DeviceIndex"));
+            deviceIndex =
+                std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceIndex"));
         }
 
         auto nsmDevice = manager.getNsmDevice(uuid);

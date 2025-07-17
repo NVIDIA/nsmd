@@ -14,7 +14,8 @@ NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
     sdbusplus::bus::bus& bus, const std::string& name,
     const std::vector<utils::Association>& associations,
     const std::string& type, std::string& inventoryObjPath, uint8_t deviceIdx) :
-    NsmObject(name, type), deviceIndex(deviceIdx)
+    NsmObject(name, type),
+    deviceIndex(deviceIdx)
 {
     auto objPath = inventoryObjPath + name;
     lg2::debug("NsmPCIeRetimerSwitchDI: {NAME}", "NAME", name.c_str());
@@ -214,11 +215,11 @@ static requester::Coroutine
     {
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
-    unsigned long long deviceInstance{};
+    uint64_t deviceInstance{};
     if (allCurrentIfaceProperties.count("DeviceInstance"))
     {
-        deviceInstance = std::get<unsigned long long>(
-            allCurrentIfaceProperties.at("DeviceInstance"));
+        deviceInstance =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceInstance"));
     }
 
     std::vector<utils::Association> associations{};

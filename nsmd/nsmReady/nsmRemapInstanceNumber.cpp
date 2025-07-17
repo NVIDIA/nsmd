@@ -102,10 +102,10 @@ requester::Coroutine
 
     if (type == "NSM_GetInstanceIDByDeviceInstanceID")
     {
-        std::vector<unsigned long long> mappingArray{};
+        std::vector<uint64_t> mappingArray{};
         if (allCurrentIfaceProperties.count("MappingArray"))
         {
-            mappingArray = std::get<std::vector<unsigned long long>>(
+            mappingArray = std::get<std::vector<uint64_t>>(
                 allCurrentIfaceProperties.at("MappingArray"));
         }
 
@@ -132,10 +132,10 @@ requester::Coroutine
     }
     else if (type == "NSM_GetInstanceIDByDeviceEID")
     {
-        std::vector<unsigned long long> mappingArray{};
+        std::vector<uint64_t> mappingArray{};
         if (allCurrentIfaceProperties.count("MappingArray"))
         {
-            mappingArray = std::get<std::vector<unsigned long long>>(
+            mappingArray = std::get<std::vector<uint64_t>>(
                 allCurrentIfaceProperties.at("MappingArray"));
         }
 
