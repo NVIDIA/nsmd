@@ -117,22 +117,39 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
 {
     auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
 
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
     if (type == "NSM_Chassis" || type == "NSM_ChassisRoT")
     {
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
+        std::string name{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
         auto path = std::string(chassisInventoryBasePath) + "/" + name;
         if (name.find("RoT_") == std::string::npos)
         {
             // coverity[missing_return]
             co_return NSM_SUCCESS;
         }
-        auto slotCount = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "SlotCount", interface.c_str());
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
+        unsigned long long slotCount{};
+        if (allCurrentIfaceProperties.count("SlotCount"))
+        {
+            slotCount = std::get<unsigned long long>(
+                allCurrentIfaceProperties.at("SlotCount"));
+        }
+        uuid_t uuid{};
+        if (allCurrentIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+        }
+
         auto device = manager.getNsmDevice(uuid);
         auto& bus = utils::DBusHandler::getBus();
 
@@ -151,22 +168,46 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
         {
             auto slotPath = path + "/Slot" + std::to_string(slotIndex);
-            auto slotName = co_await utils::coGetDbusProperty<std::string>(
-                slotPath.c_str(), "Name", erotSlotInterface);
+            auto allSlotIfaceProperties = co_await utils::coGetAllDbusProperty(
+                utils::entityManagerServiceStr, slotPath.c_str(),
+                erotSlotInterface);
+
+            std::string slotName{};
+            if (allSlotIfaceProperties.count("Name"))
+            {
+                slotName =
+                    std::get<std::string>(allSlotIfaceProperties.at("Name"));
+            }
             auto classification =
                 utils::DBusHandler().getDbusProperty<uint64_t>(
                     slotPath.c_str(), "ComponentClassification",
                     erotSlotInterface);
-            auto identifier = co_await utils::coGetDbusProperty<uint64_t>(
-                slotPath.c_str(), "ComponentIdentifier", erotSlotInterface);
-            auto index = co_await utils::coGetDbusProperty<uint64_t>(
-                slotPath.c_str(), "ComponentIndex", erotSlotInterface);
-            auto fwType = co_await utils::coGetDbusProperty<std::string>(
-                slotPath.c_str(), "FirmwareType", erotSlotInterface);
+            unsigned long long identifier{};
+            if (allSlotIfaceProperties.count("ComponentIdentifier"))
+            {
+                identifier = std::get<unsigned long long>(
+                    allSlotIfaceProperties.at("ComponentIdentifier"));
+            }
+            unsigned long long index{};
+            if (allSlotIfaceProperties.count("ComponentIndex"))
+            {
+                index = std::get<unsigned long long>(
+                    allSlotIfaceProperties.at("ComponentIndex"));
+            }
+            std::string fwType{};
+            if (allSlotIfaceProperties.count("FirmwareType"))
+            {
+                fwType = std::get<std::string>(
+                    allSlotIfaceProperties.at("FirmwareType"));
+            }
             auto associations = utils::getAssociations(
                 slotPath, std::string(erotSlotInterface) + ".Associations");
-            auto chassisName = co_await utils::coGetDbusProperty<std::string>(
-                slotPath.c_str(), "ChassisName", erotSlotInterface);
+            std::string chassisName{};
+            if (allSlotIfaceProperties.count("ChassisName"))
+            {
+                chassisName = std::get<std::string>(
+                    allSlotIfaceProperties.at("ChassisName"));
+            }
 
             if (fwType == "AP")
             {

@@ -22,6 +22,7 @@
 #include "common/types.hpp"
 #include "eventHandler.hpp"
 
+#include <coroutine>
 #include <memory>
 #include <unordered_map>
 
@@ -55,8 +56,17 @@ class NsmEvent
     const std::string type;
 };
 
-int logEvent(const std::string& messageId, Level level,
-             const std::map<std::string, std::string>& data);
+/**
+ * @brief Asynchronous version of logEvent that doesn't block the event loop
+ *
+ * @param messageId - The message ID for the log entry
+ * @param level - The log level/severity
+ * @param data - Additional data for the log entry
+ * @return requester::Coroutine - Coroutine that can be co_awaited
+ */
+requester::Coroutine
+    logEventAsync(const std::string& messageId, Level level,
+                  const std::map<std::string, std::string>& data);
 
 class EventDispatcher
 {

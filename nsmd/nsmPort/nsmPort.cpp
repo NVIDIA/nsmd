@@ -59,17 +59,29 @@ static requester::Coroutine coGetTopologyData(const std::string& topoObjPath,
         {
             if (interface.find(topoIntfSubStr) != std::string::npos)
             {
-                auto inventoryObjPath =
-                    co_await utils::coGetDbusProperty<std::string>(
-                        topoObjPath.c_str(), "InventoryObjPath",
+                auto allCurrentIfaceProperties =
+                    co_await utils::coGetAllDbusProperty(
+                        utils::entityManagerServiceStr, topoObjPath.c_str(),
                         interface.c_str());
-                auto logicalPortNumber =
-                    co_await utils::coGetDbusProperty<uint64_t>(
-                        topoObjPath.c_str(), "LogicalPortNumber",
-                        interface.c_str());
-                auto associations =
-                    co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                        topoObjPath.c_str(), "Associations", interface.c_str());
+
+                std::string inventoryObjPath{};
+                if (allCurrentIfaceProperties.count("InventoryObjPath"))
+                {
+                    inventoryObjPath = std::get<std::string>(
+                        allCurrentIfaceProperties.at("InventoryObjPath"));
+                }
+                unsigned long long logicalPortNumber{};
+                if (allCurrentIfaceProperties.count("LogicalPortNumber"))
+                {
+                    logicalPortNumber = std::get<unsigned long long>(
+                        allCurrentIfaceProperties.at("LogicalPortNumber"));
+                }
+                std::vector<std::string> associations{};
+                if (allCurrentIfaceProperties.count("Associations"))
+                {
+                    associations = std::get<std::vector<std::string>>(
+                        allCurrentIfaceProperties.at("Associations"));
+                }
 
                 if (associations.size() % 3 != 0)
                 {
@@ -1697,18 +1709,42 @@ static requester::Coroutine createNsmPortSensor(SensorManager& manager,
                                                 bool enableNetworkPortAddresses)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
-    auto parentObjPath = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "ParentObjPath", interface.c_str());
-    auto count = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "Count", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
-    auto priority = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Priority", interface.c_str());
-    auto deviceType = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "DeviceType", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
+    std::string parentObjPath{};
+    if (allCurrentIfaceProperties.count("ParentObjPath"))
+    {
+        parentObjPath = std::get<std::string>(
+            allCurrentIfaceProperties.at("ParentObjPath"));
+    }
+    bool priority{};
+    if (allCurrentIfaceProperties.count("Priority"))
+    {
+        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+    }
+    uint64_t count{};
+    if (allCurrentIfaceProperties.count("Count"))
+    {
+        count = std::get<uint64_t>(allCurrentIfaceProperties.at("Count"));
+    }
+    uint64_t deviceType{};
+    if (allCurrentIfaceProperties.count("DeviceType"))
+    {
+        deviceType =
+            std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceType"));
+    }
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
+
     auto type = interface.substr(interface.find_last_of('.') + 1);
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)

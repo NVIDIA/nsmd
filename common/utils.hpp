@@ -730,4 +730,48 @@ void convertMacAddressToString(const uint8_t* macAddress,
  * @param guidString Reference to the string to store the converted GUID.
  */
 void convertGuid64ToString(uint64_t guid, std::string& guidString);
+/* @brief Async function to get base properties with single-flight pattern
+ *
+ * This function ensures that only one D-Bus call is made per object path +
+ * interface combination, even when multiple concurrent requests arrive.
+ * Subsequent requests will wait for the first request to complete and share the
+ * result.
+ *
+ * @param objPath D-Bus object path
+ * @param baseInterface D-Bus interface name
+ * @param cachedProperties Reference to store the retrieved properties
+ */
+requester::Coroutine
+    coGetCachedBaseProperties(const std::string& objPath,
+                              const std::string& baseInterface,
+                              dbus::PropertyMap& cachedProperties);
+
+/**
+ * @brief Get cached base properties if available
+ *
+ * This function checks if the base interface properties are already cached
+ * for the given object path and interface combination.
+ *
+ * @param objPath D-Bus object path
+ * @param baseInterface D-Bus interface name
+ * @param cachedProperties Output parameter to store cached properties
+ * @return true if properties were found in cache, false otherwise
+ */
+bool getCachedBaseProperties(const std::string& objPath,
+                             const std::string& baseInterface,
+                             dbus::PropertyMap& cachedProperties);
+
+/**
+ * @brief Store base properties in cache
+ *
+ * This function stores the base interface properties in the cache
+ * for the given object path and interface combination.
+ *
+ * @param objPath D-Bus object path
+ * @param baseInterface D-Bus interface name
+ * @param properties Properties to cache
+ */
+void setCachedBaseProperties(const std::string& objPath,
+                             const std::string& baseInterface,
+                             const dbus::PropertyMap& properties);
 } // namespace utils

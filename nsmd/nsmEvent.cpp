@@ -17,43 +17,80 @@
 
 #include "nsmEvent.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "eventHandler.hpp"
 #include "sensorManager.hpp"
+#include "utils.hpp"
+
+#include <coroutine>
+#include <mutex>
+#include <optional>
 
 namespace nsm
 {
 
-int logEvent(const std::string& messageId, Level level,
-             const std::map<std::string, std::string>& data)
+requester::Coroutine
+    logEventAsync(const std::string& messageId, Level level,
+                  const std::map<std::string, std::string>& data)
 {
     static constexpr auto logObjPath = "/xyz/openbmc_project/logging";
     static constexpr auto logInterface = "xyz.openbmc_project.Logging.Create";
-    auto& bus = utils::DBusHandler::getBus();
 
-    try
+    // Cache the logging service since it's fixed after first discovery
+    static std::optional<std::string> cachedLoggingService;
+    static std::mutex serviceCacheMutex;
+
+    std::string service;
     {
-        auto service = utils::DBusHandler().getService(logObjPath,
-                                                       logInterface);
-        auto severity =
-            sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
-                level);
-        auto method = bus.new_method_call(service.c_str(), logObjPath,
-                                          logInterface, "Create");
-        method.append(messageId, level, data);
-        bus.call_noreply(method);
+        std::lock_guard<std::mutex> lock(serviceCacheMutex);
+        if (cachedLoggingService)
+        {
+            service = *cachedLoggingService;
+        }
     }
-    catch (const std::exception& e)
+
+    // If service not cached, look it up using existing utility
+    if (service.empty())
+    {
+        auto serviceMap = co_await utils::coGetServiceMap(logObjPath,
+                                                          {logInterface});
+
+        if (serviceMap.empty())
+        {
+            lg2::error(
+                "logEventAsync : Failed to lookup logging service. MessageId={MSG}",
+                "MSG", messageId);
+            co_return NSM_SW_ERROR;
+        }
+
+        service = serviceMap.begin()->first;
+
+        // Cache the service for future calls
+        {
+            std::lock_guard<std::mutex> lock(serviceCacheMutex);
+            if (!cachedLoggingService) // Double-check in case another coroutine
+                                       // cached it
+            {
+                cachedLoggingService = service;
+            }
+        }
+    }
+
+    // Make the logging call asynchronously
+    auto logSuccess = co_await utils::coLogEvent(service, messageId, level,
+                                                 data);
+
+    if (!logSuccess)
     {
         lg2::error(
-            "logEvent : Failed to create D-Bus log entry for message registry, {ERROR}. MessageId={MSG}",
-            "ERROR", e, "MSG", messageId);
-
-        return NSM_SW_ERROR;
+            "logEventAsync : Failed to create log entry. MessageId={MSG}",
+            "MSG", messageId);
+        co_return NSM_SW_ERROR;
     }
 
-    return NSM_SW_SUCCESS;
-};
+    co_return NSM_SW_SUCCESS;
+}
 
 int EventDispatcher::addEvent(NsmType type, NsmEventId eventId,
                               std::shared_ptr<NsmEvent> event)

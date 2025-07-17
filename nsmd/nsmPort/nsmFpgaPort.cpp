@@ -1,4 +1,10 @@
 #include "nsmFpgaPort.hpp"
+
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
+
+#include <unordered_map>
+
 #define FPGA_PORT_INTERFACE "xyz.openbmc_project.Configuration.NSM_FpgaPort"
 namespace nsm
 {
@@ -69,17 +75,38 @@ static requester::Coroutine
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", FPGA_PORT_INTERFACE);
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", FPGA_PORT_INTERFACE);
+        dbus::PropertyMap allBaseIfaceProperties;
+        auto rc = co_await utils::coGetCachedBaseProperties(
+            objPath, FPGA_PORT_INTERFACE, allBaseIfaceProperties);
+        if (rc != NSM_SUCCESS)
+        {
+            co_return rc;
+        }
+        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
-
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", FPGA_PORT_INTERFACE);
+        std::string name{};
+        if (allBaseIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        }
+        uuid_t uuid{};
+        if (allBaseIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        }
+        std::string type{};
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        std::string inventoryObjPath{};
+        if (allBaseIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allBaseIfaceProperties.at("InventoryObjPath"));
+        }
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -96,10 +123,19 @@ static requester::Coroutine
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
-            auto health = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "Health", interface.c_str());
-            auto chasisState = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "ChasisPowerState", interface.c_str());
+            std::string health{};
+            if (allCurrentIfaceProperties.count("Health"))
+            {
+                health = std::get<std::string>(
+                    allCurrentIfaceProperties.at("Health"));
+            }
+            std::string chasisState{};
+            if (allCurrentIfaceProperties.count("ChasisPowerState"))
+            {
+                chasisState = std::get<std::string>(
+                    allCurrentIfaceProperties.at("ChasisPowerState"));
+            }
+
             auto sensor = std::make_shared<NsmFpgaPort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
@@ -107,15 +143,31 @@ static requester::Coroutine
         }
         else if (type == "NSM_PortInfo")
         {
-            auto portType = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "PortType", interface.c_str());
-            auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "PortProtocol", interface.c_str());
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            std::string portType{};
+            if (allCurrentIfaceProperties.count("PortType"))
+            {
+                portType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("PortType"));
+            }
+            std::string portProtocol{};
+            if (allCurrentIfaceProperties.count("PortProtocol"))
+            {
+                portProtocol = std::get<std::string>(
+                    allCurrentIfaceProperties.at("PortProtocol"));
+            }
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
+            unsigned long long deviceIndex{};
+            if (allBaseIfaceProperties.count("DeviceIndex"))
+            {
+                deviceIndex = std::get<unsigned long long>(
+                    allBaseIfaceProperties.at("DeviceIndex"));
+            }
 
-            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceIndex", FPGA_PORT_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
             auto portWidthIntf =
@@ -140,18 +192,31 @@ static requester::Coroutine
         }
         else if (type == "NSM_PortState")
         {
-            auto linkStatus = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "LinkStatus", interface.c_str());
+            std::string linkStatus{};
+            if (allCurrentIfaceProperties.count("LinkStatus"))
+            {
+                linkStatus = std::get<std::string>(
+                    allCurrentIfaceProperties.at("LinkStatus"));
+            }
+
             auto portStateSensor = std::make_shared<NsmFpgaPortState>(
                 bus, name, type, linkStatus, inventoryObjPath);
             nsmDevice->deviceSensors.emplace_back(portStateSensor);
         }
         else if (type == "NSM_PCIe")
         {
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
-            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceIndex", FPGA_PORT_INTERFACE);
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
+            unsigned long long deviceIndex{};
+            if (allBaseIfaceProperties.count("DeviceIndex"))
+            {
+                deviceIndex = std::get<unsigned long long>(
+                    allBaseIfaceProperties.at("DeviceIndex"));
+            }
 
             auto pcieECCIntf =
                 std::make_shared<PCIeEccIntf>(bus, inventoryObjPath.c_str());

@@ -31,8 +31,15 @@ requester::Coroutine
                             const std::string& interface,
                             const std::string& objPath)
 {
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
+
     auto type = interface.substr(interface.find_last_of('.') + 1);
     DeviceManager& deviceManager = DeviceManager::getInstance();
 
@@ -95,9 +102,13 @@ requester::Coroutine
 
     if (type == "NSM_GetInstanceIDByDeviceInstanceID")
     {
-        auto mappingArray =
-            co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
-                objPath.c_str(), "MappingArray", interface.c_str());
+        std::vector<unsigned long long> mappingArray{};
+        if (allCurrentIfaceProperties.count("MappingArray"))
+        {
+            mappingArray = std::get<std::vector<unsigned long long>>(
+                allCurrentIfaceProperties.at("MappingArray"));
+        }
+
         if (mappingArray.size() > 0)
         {
             deviceManager.mapInstanceNumberToInstanceNumber[deviceTypeAndRole] =
@@ -106,9 +117,13 @@ requester::Coroutine
     }
     else if (type == "NSM_GetInstanceIDByMctpUUID")
     {
-        auto mappingArray =
-            co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                objPath.c_str(), "MappingArray", interface.c_str());
+        std::vector<std::string> mappingArray{};
+        if (allCurrentIfaceProperties.count("MappingArray"))
+        {
+            mappingArray = std::get<std::vector<std::string>>(
+                allCurrentIfaceProperties.at("MappingArray"));
+        }
+
         if (mappingArray.size() > 0)
         {
             deviceManager.mapUuidToInstanceNumber[deviceTypeAndRole] =
@@ -117,9 +132,13 @@ requester::Coroutine
     }
     else if (type == "NSM_GetInstanceIDByDeviceEID")
     {
-        auto mappingArray =
-            co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
-                objPath.c_str(), "MappingArray", interface.c_str());
+        std::vector<unsigned long long> mappingArray{};
+        if (allCurrentIfaceProperties.count("MappingArray"))
+        {
+            mappingArray = std::get<std::vector<unsigned long long>>(
+                allCurrentIfaceProperties.at("MappingArray"));
+        }
+
         if (mappingArray.size() > 0)
         {
             deviceManager.mapEidToInstanceNumber[deviceTypeAndRole] =

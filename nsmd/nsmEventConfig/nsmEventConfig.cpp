@@ -19,16 +19,20 @@
 
 #include "device-capability-discovery.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "sensorManager.hpp"
-#include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <unordered_map>
+
 namespace nsm
 {
+
 NsmEventConfig::NsmEventConfig(const std::string& name, const std::string& type,
                                uint8_t messageType,
                                std::vector<uint64_t>& srcEventIds,
@@ -290,20 +294,53 @@ static requester::Coroutine createNsmEventConfig(SensorManager& manager,
                                                  const std::string& interface,
                                                  const std::string& objPath)
 {
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name",
-        "xyz.openbmc_project.Configuration.NSM_EventConfig");
+    std::string baseInterface =
+        "xyz.openbmc_project.Configuration.NSM_EventConfig";
+
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+
+    std::string name{};
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID",
-        "xyz.openbmc_project.Configuration.NSM_EventConfig");
-    auto messageType = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "MessageType",
-        "xyz.openbmc_project.Configuration.NSM_EventConfig");
-    auto subscribedEventIds =
-        co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
-            objPath.c_str(), "SubscribedEventIDs",
-            "xyz.openbmc_project.Configuration.NSM_EventConfig");
+    uuid_t uuid{};
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+    unsigned long long messageType{};
+    if (allBaseIfaceProperties.count("MessageType"))
+    {
+        messageType = std::get<unsigned long long>(
+            allBaseIfaceProperties.at("MessageType"));
+    }
+    std::vector<unsigned long long> subscribedEventIds{};
+    if (allBaseIfaceProperties.count("SubscribedEventIDs"))
+    {
+        subscribedEventIds = std::get<std::vector<unsigned long long>>(
+            allBaseIfaceProperties.at("SubscribedEventIDs"));
+    }
+    // auto name = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "Name",
+    //     "xyz.openbmc_project.Configuration.NSM_EventConfig");
+    // auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
+    //     objPath.c_str(), "UUID",
+    //     "xyz.openbmc_project.Configuration.NSM_EventConfig");
+    // auto messageType = co_await utils::coGetDbusProperty<uint64_t>(
+    //     objPath.c_str(), "MessageType",
+    //     "xyz.openbmc_project.Configuration.NSM_EventConfig");
+    // auto subscribedEventIds =
+    //     co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
+    //         objPath.c_str(), "SubscribedEventIDs",
+    //         "xyz.openbmc_project.Configuration.NSM_EventConfig");
 
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)

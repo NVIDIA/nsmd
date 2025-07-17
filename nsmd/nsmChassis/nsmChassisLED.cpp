@@ -19,10 +19,15 @@
 
 #include "network-ports.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+
+#include <unordered_map>
 
 #define NSM_CHASSIS_LED_INTERFACE                                              \
     "xyz.openbmc_project.Configuration.NSM_ChassisLED"
+
 namespace nsm
 {
 
@@ -133,17 +138,39 @@ static requester::Coroutine
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", NSM_CHASSIS_LED_INTERFACE);
+        dbus::PropertyMap allBaseIfaceProperties;
+        auto rc = co_await utils::coGetCachedBaseProperties(
+            objPath, NSM_CHASSIS_LED_INTERFACE, allBaseIfaceProperties);
+        if (rc != NSM_SUCCESS)
+        {
+            co_return rc;
+        }
+        dbus::PropertyMap allCurrentIfaceProperties =
+            co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
+                                                 objPath, interface);
 
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
+        std::string name{};
+        std::string type{};
+        uuid_t uuid{};
+        std::string inventoryObjPath{};
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", NSM_CHASSIS_LED_INTERFACE);
-
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", NSM_CHASSIS_LED_INTERFACE);
+        if (allBaseIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        }
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        if (allBaseIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        }
+        if (allBaseIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allBaseIfaceProperties.at("InventoryObjPath"));
+        }
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)

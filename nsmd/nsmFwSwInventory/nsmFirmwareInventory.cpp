@@ -17,13 +17,16 @@
 
 #include "nsmFirmwareInventory.hpp"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSetWriteProtected.hpp"
 #include "nsmWriteProtectedControl.hpp"
-#include "utils.hpp"
+
+#include <unordered_map>
 
 namespace nsm
 {
@@ -36,12 +39,32 @@ requester::Coroutine
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_WriteProtect";
 
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    uuid_t uuid{};
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_WriteProtect")
@@ -58,10 +81,13 @@ requester::Coroutine
             device->addStaticSensor(associationsObject);
         }
 
-        auto dataIndex =
-            (diagnostics_enable_disable_wp_data_index) co_await utils::
-                coGetDbusProperty<uint64_t>(objPath.c_str(), "DataIndex",
-                                            baseInterface.c_str());
+        diagnostics_enable_disable_wp_data_index dataIndex{};
+        if (allBaseIfaceProperties.count("DataIndex"))
+        {
+            dataIndex =
+                (diagnostics_enable_disable_wp_data_index)std::get<uint64_t>(
+                    allBaseIfaceProperties.at("DataIndex"));
+        }
 
         switch (dataIndex)
         {
@@ -127,16 +153,26 @@ requester::Coroutine
     }
     else if (type == "NSM_Asset")
     {
-        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string manufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            manufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
+
         auto asset = std::make_shared<NsmFirmwareInventory<NsmAssetIntf>>(name);
         asset->invoke(pdiMethod(manufacturer), manufacturer);
         device->addStaticSensor(asset);
     }
     else if (type == "NSM_FirmwareVersion")
     {
-        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", interface.c_str());
+        uint64_t instanceNumber{};
+        if (allCurrentIfaceProperties.count("InstanceNumber"))
+        {
+            instanceNumber = std::get<uint64_t>(
+                allCurrentIfaceProperties.at("InstanceNumber"));
+        }
+
         auto firmwareInventoryVersion = NsmFirmwareInventory<VersionIntf>(name);
         firmwareInventoryVersion.invoke(pdiMethod(purpose),
                                         VersionIntf::VersionPurpose::Other);

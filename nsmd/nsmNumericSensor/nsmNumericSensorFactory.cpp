@@ -41,28 +41,48 @@ requester::Coroutine NumericSensorFactory::make(SensorManager& manager,
 {
     auto& bus = utils::DBusHandler::getBus();
 
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
 
     NumericSensorInfo info{};
 
-    info.name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        info.name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
     info.name = utils::makeDBusNameValid(info.name);
 
     info.type = interface.substr(interface.find_last_of('.') + 1);
 
-    info.sensorId = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "SensorId", interface.c_str());
+    if (allCurrentIfaceProperties.count("SensorId"))
+    {
+        info.sensorId = std::get<unsigned long long>(
+            allCurrentIfaceProperties.at("SensorId"));
+    }
 
-    info.priority = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Priority", interface.c_str());
+    if (allCurrentIfaceProperties.count("Priority"))
+    {
+        info.priority =
+            std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+    }
 
-    info.aggregated = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Aggregated", interface.c_str());
+    if (allCurrentIfaceProperties.count("Aggregated"))
+    {
+        info.aggregated =
+            std::get<bool>(allCurrentIfaceProperties.at("Aggregated"));
+    }
 
-    info.physicalContext = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "PhysicalContext", interface.c_str());
+    if (allCurrentIfaceProperties.count("PhysicalContext"))
+    {
+        info.physicalContext = std::get<std::string>(
+            allCurrentIfaceProperties.at("PhysicalContext"));
+    }
 
     try
     {

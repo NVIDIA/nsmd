@@ -33,18 +33,43 @@ requester::Coroutine
                                     const std::string& interface,
                                     const std::string& objPath)
 {
-    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "ChassisName", interface.c_str());
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
-    auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "DeviceIndex", interface.c_str());
-    auto slotType = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "SlotType", interface.c_str());
-    auto priority = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Priority", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string chassisName{};
+    if (allCurrentIfaceProperties.count("ChassisName"))
+    {
+        chassisName =
+            std::get<std::string>(allCurrentIfaceProperties.at("ChassisName"));
+    }
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
+    unsigned long long deviceIndex{};
+    if (allCurrentIfaceProperties.count("DeviceIndex"))
+    {
+        deviceIndex = std::get<unsigned long long>(
+            allCurrentIfaceProperties.at("DeviceIndex"));
+    }
+    std::string slotType{};
+    if (allCurrentIfaceProperties.count("SlotType"))
+    {
+        slotType =
+            std::get<std::string>(allCurrentIfaceProperties.at("SlotType"));
+    }
+    bool priority{};
+    if (allCurrentIfaceProperties.count("Priority"))
+    {
+        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     auto pcieSlotProvider = NsmChassisPCIeSlot<PCIeSlotIntf>(chassisName, name);

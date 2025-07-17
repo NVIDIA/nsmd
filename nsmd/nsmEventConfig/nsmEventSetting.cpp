@@ -160,16 +160,27 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
                                                   const std::string& interface,
                                                   const std::string& objPath)
 {
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name",
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(),
         "xyz.openbmc_project.Configuration.NSM_EventSetting");
+
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID",
-        "xyz.openbmc_project.Configuration.NSM_EventSetting");
-    auto eventGenerationSetting = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "EventGenerationSetting",
-        "xyz.openbmc_project.Configuration.NSM_EventSetting");
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
+    unsigned long long eventGenerationSetting{};
+    if (allCurrentIfaceProperties.count("EventGenerationSetting"))
+    {
+        eventGenerationSetting = std::get<unsigned long long>(
+            allCurrentIfaceProperties.at("EventGenerationSetting"));
+    }
 
     auto nsmDevice = manager.getNsmDevice(uuid);
     if (!nsmDevice)

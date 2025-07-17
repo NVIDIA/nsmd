@@ -17,12 +17,14 @@
 
 #include "nsmNVSwitchAndNVMgmtNICChassisAssembly.hpp"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 
-#include <utils.hpp>
+#include <unordered_map>
 
 namespace nsm
 {
@@ -34,14 +36,38 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
 {
     std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;
 
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "ChassisName", baseInterface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    std::string chassisName{};
+    if (allBaseIfaceProperties.count("ChassisName"))
+    {
+        chassisName =
+            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
+    }
+    uuid_t uuid{};
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == baseType)
@@ -63,8 +89,13 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
     }
     else if (type == "NSM_Area")
     {
-        auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "PhysicalContext", interface.c_str());
+        std::string physicalContext{};
+        if (allCurrentIfaceProperties.count("PhysicalContext"))
+        {
+            physicalContext = std::get<std::string>(
+                allCurrentIfaceProperties.at("PhysicalContext"));
+        }
+
         auto assemblyArea =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<AreaIntf>>(
                 chassisName, name, baseType);
@@ -81,10 +112,18 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         auto assetObject = NsmNVSwitchAndNicChassisAssembly<NsmAssetIntf>(
             chassisName, name, baseType);
 
-        auto assemblyName = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
-        auto vendor = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Vendor", interface.c_str());
+        std::string assemblyName{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            assemblyName =
+                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
+        std::string vendor{};
+        if (allCurrentIfaceProperties.count("Vendor"))
+        {
+            vendor =
+                std::get<std::string>(allCurrentIfaceProperties.at("Vendor"));
+        }
 
         // initial value update
         assetObject.invoke(pdiMethod(name), assemblyName);
@@ -115,8 +154,12 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
         auto healthObject =
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<HealthIntf>>(
                 chassisName, name, baseType);
-        auto health = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Health", interface.c_str());
+        std::string health{};
+        if (allCurrentIfaceProperties.count("Health"))
+        {
+            health =
+                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
+        }
 
         healthObject->invoke(pdiMethod(health),
                              HealthIntf::convertHealthTypeFromString(health));
@@ -131,8 +174,12 @@ requester::Coroutine createNsmChassisAssembly(SensorManager& manager,
             std::make_shared<NsmNVSwitchAndNicChassisAssembly<LocationIntf>>(
                 chassisName, name, baseType);
 
-        auto locationType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationType", interface.c_str());
+        std::string locationType{};
+        if (allCurrentIfaceProperties.count("LocationType"))
+        {
+            locationType = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationType"));
+        }
 
         locationObject->invoke(
             pdiMethod(locationType),

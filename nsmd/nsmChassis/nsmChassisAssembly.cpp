@@ -17,15 +17,17 @@
 
 #include "nsmChassisAssembly.hpp"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmDevice.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
-#include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
 #include <cstdint>
+#include <unordered_map>
 
 namespace nsm
 {
@@ -37,15 +39,40 @@ requester::Coroutine
 {
     std::string baseInterface =
         "xyz.openbmc_project.Configuration.NSM_ChassisAssembly";
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    dbus::PropertyMap allCurrentIfaceProperties =
+        co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
+                                             objPath, interface);
 
-    auto chassisName = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "ChassisName", baseInterface.c_str());
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    std::string chassisName{};
+    std::string name{};
+    std::string type{};
+    uuid_t uuid{};
+
+    if (allBaseIfaceProperties.count("ChassisName"))
+    {
+        chassisName =
+            std::get<std::string>(allBaseIfaceProperties.at("ChassisName"));
+    }
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_ChassisAssembly")
@@ -57,8 +84,13 @@ requester::Coroutine
     }
     else if (type == "NSM_Area")
     {
-        auto physicalContext = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "PhysicalContext", interface.c_str());
+        std::string physicalContext{};
+        if (allCurrentIfaceProperties.count("PhysicalContext"))
+        {
+            physicalContext = std::get<std::string>(
+                allCurrentIfaceProperties.at("PhysicalContext"));
+        }
+
         auto chassisArea =
             std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
         chassisArea->invoke(
@@ -68,13 +100,25 @@ requester::Coroutine
     }
     else if (type == "NSM_Asset")
     {
-        auto vendor = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Vendor", interface.c_str());
-        auto assetsName = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
+        std::string vendor{};
+        if (allCurrentIfaceProperties.count("Vendor"))
+        {
+            vendor =
+                std::get<std::string>(allCurrentIfaceProperties.at("Vendor"));
+        }
+        std::string assetsName{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            assetsName =
+                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
         // default part number for asset is Board part number
-        auto assemblyType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "AssemblyType", baseInterface.c_str());
+        std::string assemblyType{};
+        if (allBaseIfaceProperties.count("AssemblyType"))
+        {
+            assemblyType = std::get<std::string>(
+                allBaseIfaceProperties.at("AssemblyType"));
+        }
 
         auto partNumberId = BOARD_PART_NUMBER;
         if (assemblyType == "Device")
@@ -116,8 +160,13 @@ requester::Coroutine
     }
     else if (type == "NSM_Health")
     {
-        auto health = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Health", interface.c_str());
+        std::string health{};
+        if (allCurrentIfaceProperties.count("Health"))
+        {
+            health =
+                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
+        }
+
         auto healthObject =
             std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
         healthObject->invoke(pdiMethod(health),
@@ -126,8 +175,13 @@ requester::Coroutine
     }
     else if (type == "NSM_Location")
     {
-        auto locationType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationType", interface.c_str());
+        std::string locationType{};
+        if (allCurrentIfaceProperties.count("LocationType"))
+        {
+            locationType = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationType"));
+        }
+
         auto locationObject =
             std::make_shared<NsmChassisAssembly<LocationIntf>>(chassisName,
                                                                name);

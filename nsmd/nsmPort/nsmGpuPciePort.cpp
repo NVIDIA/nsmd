@@ -19,12 +19,15 @@
 
 #include "nsmPriorityMapping.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "nsmInterface.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 
 #include <cstdint>
+#include <unordered_map>
 
 #define GPU_PCIe_INTERFACE "xyz.openbmc_project.Configuration.NSM_GPU_PCIe_0"
 namespace nsm
@@ -350,17 +353,39 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", GPU_PCIe_INTERFACE);
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", GPU_PCIe_INTERFACE);
+        dbus::PropertyMap allBaseIfaceProperties;
+        auto rc = co_await utils::coGetCachedBaseProperties(
+            objPath, GPU_PCIe_INTERFACE, allBaseIfaceProperties);
+        if (rc != NSM_SUCCESS)
+        {
+            co_return rc;
+        }
+        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
+        std::string name{};
+        if (allBaseIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        }
+        uuid_t uuid{};
+        if (allBaseIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        }
+        std::string type{};
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        std::string inventoryObjPath{};
+        if (allBaseIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allBaseIfaceProperties.at("InventoryObjPath"));
+        }
 
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", GPU_PCIe_INTERFACE);
         auto processorPath = inventoryObjPath;
         inventoryObjPath = inventoryObjPath + "/Ports/PCIe_0";
 
@@ -379,21 +404,36 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
-            auto health = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "Health", interface.c_str());
-            auto chasisState = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "ChasisPowerState", interface.c_str());
+            std::string health{};
+            if (allCurrentIfaceProperties.count("Health"))
+            {
+                health = std::get<std::string>(
+                    allCurrentIfaceProperties.at("Health"));
+            }
+            std::string chasisState{};
+            if (allCurrentIfaceProperties.count("ChasisPowerState"))
+            {
+                chasisState = std::get<std::string>(
+                    allCurrentIfaceProperties.at("ChasisPowerState"));
+            }
+
             auto sensor = std::make_shared<NsmGpuPciePort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
             nsmDevice->deviceSensors.emplace_back(sensor);
-            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceIndex", GPU_PCIe_INTERFACE);
-
-            auto clearableScalarGroup =
-                co_await utils::coGetDbusProperty<std::vector<uint64_t>>(
-                    objPath.c_str(), "ClearableScalarGroup",
-                    GPU_PCIe_INTERFACE);
+            unsigned long long deviceIndex{};
+            if (allBaseIfaceProperties.count("DeviceIndex"))
+            {
+                deviceIndex = std::get<unsigned long long>(
+                    allBaseIfaceProperties.at("DeviceIndex"));
+            }
+            std::vector<unsigned long long> clearableScalarGroup{};
+            if (allBaseIfaceProperties.count("ClearableScalarGroup"))
+            {
+                clearableScalarGroup =
+                    std::get<std::vector<unsigned long long>>(
+                        allBaseIfaceProperties.at("ClearableScalarGroup"));
+            }
 
             auto clearPCIeIntf = std::make_shared<NsmClearPCIeIntf>(
                 bus, inventoryObjPath.c_str(), deviceIndex, nsmDevice);
@@ -455,15 +495,31 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
         }
         else if (type == "NSM_PortInfo")
         {
-            auto portType = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "PortType", interface.c_str());
-            auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "PortProtocol", interface.c_str());
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            std::string portType{};
+            if (allCurrentIfaceProperties.count("PortType"))
+            {
+                portType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("PortType"));
+            }
+            std::string portProtocol{};
+            if (allCurrentIfaceProperties.count("PortProtocol"))
+            {
+                portProtocol = std::get<std::string>(
+                    allCurrentIfaceProperties.at("PortProtocol"));
+            }
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
+            unsigned long long deviceIndex{};
+            if (allBaseIfaceProperties.count("DeviceIndex"))
+            {
+                deviceIndex = std::get<unsigned long long>(
+                    allBaseIfaceProperties.at("DeviceIndex"));
+            }
 
-            auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-                objPath.c_str(), "DeviceIndex", GPU_PCIe_INTERFACE);
             auto portInfoIntf =
                 std::make_shared<PortInfoIntf>(bus, inventoryObjPath.c_str());
             auto portWidthIntf =

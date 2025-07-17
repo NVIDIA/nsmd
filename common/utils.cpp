@@ -35,8 +35,10 @@
 #include <cctype>
 #include <ctime>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -409,15 +411,33 @@ requester::Coroutine coGetAssociations(const std::string& objPath,
                 associations.push_back({});
                 auto& association = associations.back();
 
-                association.forward = co_await coGetDbusProperty<std::string>(
-                    objPath.c_str(), "Forward", interface.c_str());
+                auto allCurrentIfaceProperties = co_await coGetAllDbusProperty(
+                    entityManagerServiceStr, objPath.c_str(),
+                    interface.c_str());
 
-                association.backward = co_await coGetDbusProperty<std::string>(
-                    objPath.c_str(), "Backward", interface.c_str());
+                std::string forward{};
+                if (allCurrentIfaceProperties.count("Forward"))
+                {
+                    forward = std::get<std::string>(
+                        allCurrentIfaceProperties.at("Forward"));
+                }
+                association.forward = forward;
 
-                association.absolutePath =
-                    co_await coGetDbusProperty<std::string>(
-                        objPath.c_str(), "AbsolutePath", interface.c_str());
+                std::string backward{};
+                if (allCurrentIfaceProperties.count("Backward"))
+                {
+                    backward = std::get<std::string>(
+                        allCurrentIfaceProperties.at("Backward"));
+                }
+                association.backward = backward;
+
+                std::string absolutePath{};
+                if (allCurrentIfaceProperties.count("AbsolutePath"))
+                {
+                    absolutePath = std::get<std::string>(
+                        allCurrentIfaceProperties.at("AbsolutePath"));
+                }
+                association.absolutePath = absolutePath;
                 association.absolutePath =
                     makeDBusNameValid(association.absolutePath);
             }
@@ -851,4 +871,120 @@ void convertGuid64ToString(uint64_t guid, std::string& guidString)
                              (guid >> 48) & 0xFFFF, (guid >> 32) & 0xFFFF,
                              (guid >> 16) & 0xFFFF, guid & 0xFFFF);
 }
+// Single-flight pattern implementation for single-threaded async execution
+// for EM configuration PDI properties
+requester::Coroutine
+    coGetCachedBaseProperties(const std::string& objPath,
+                              const std::string& baseInterface,
+                              dbus::PropertyMap& cachedProperties)
+{
+    static std::unordered_map<
+        std::string, std::unordered_map<std::string, dbus::PropertyMap>>
+        basePropertiesCache;
+
+    static std::unordered_map<
+        std::string,
+        std::unordered_map<std::string, std::shared_future<dbus::PropertyMap>>>
+        pendingRequests;
+
+    // Check if already cached
+    auto objPathIt = basePropertiesCache.find(objPath);
+    if (objPathIt != basePropertiesCache.end())
+    {
+        auto interfaceIt = objPathIt->second.find(baseInterface);
+        if (interfaceIt != objPathIt->second.end())
+        {
+            // "Cache hit: Using cached base properties for
+            // {OBJPATH}:{INTERFACE}", "OBJPATH", objPath, "INTERFACE",
+            // baseInterface);
+            cachedProperties = interfaceIt->second;
+            co_return NSM_SUCCESS;
+        }
+    }
+
+    // Check if request is already pending
+    auto pendingObjIt = pendingRequests.find(objPath);
+    if (pendingObjIt != pendingRequests.end())
+    {
+        auto pendingInterfaceIt = pendingObjIt->second.find(baseInterface);
+        if (pendingInterfaceIt != pendingObjIt->second.end())
+        {
+            //     "Request pending: Waiting for ongoing request for
+            //     {OBJPATH}:{INTERFACE}", "OBJPATH", objPath, "INTERFACE",
+            //     baseInterface);
+
+            try
+            {
+                dbus::PropertyMap result = pendingInterfaceIt->second.get();
+                cachedProperties = result;
+                co_return NSM_SUCCESS;
+            }
+            catch (...)
+            {
+                // If the future threw an exception, we'll try making our own
+                // request Continue to the request creation logic below
+            }
+        }
+    }
+
+    // Create a promise for this request
+    std::promise<dbus::PropertyMap> promise;
+    std::shared_future<dbus::PropertyMap> future = promise.get_future().share();
+
+    // Store the pending request
+    pendingRequests[objPath][baseInterface] = future;
+
+    // "Cache miss: First retrieval for {OBJPATH}:{INTERFACE}",
+    // "OBJPATH", objPath, "INTERFACE", baseInterface);
+
+    try
+    {
+        // Make the actual D-Bus call
+        dbus::PropertyMap properties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath, baseInterface);
+
+        // Cache the result and clean up pending request
+        basePropertiesCache[objPath][baseInterface] = properties;
+
+        // Remove from pending requests
+        auto pendingObjIt = pendingRequests.find(objPath);
+        if (pendingObjIt != pendingRequests.end())
+        {
+            pendingObjIt->second.erase(baseInterface);
+            if (pendingObjIt->second.empty())
+            {
+                pendingRequests.erase(objPath);
+            }
+        }
+
+        // Set the promise result
+        promise.set_value(properties);
+
+        cachedProperties = properties;
+        co_return NSM_SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        // Clean up pending request on error
+        auto pendingObjIt = pendingRequests.find(objPath);
+        if (pendingObjIt != pendingRequests.end())
+        {
+            pendingObjIt->second.erase(baseInterface);
+            if (pendingObjIt->second.empty())
+            {
+                pendingRequests.erase(objPath);
+            }
+        }
+
+        // Set the promise exception
+        promise.set_exception(std::current_exception());
+
+        lg2::error(
+            "Failed to fetch base properties for {OBJPATH}:{INTERFACE}:{ERROR}",
+            "OBJPATH", objPath, "INTERFACE", baseInterface, "ERROR", e.what());
+
+        throw;
+    }
+}
+
 } // namespace utils

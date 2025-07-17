@@ -20,6 +20,8 @@
 #include "base.h"
 #include "network-ports.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
@@ -38,7 +40,9 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #include "sharedMemCommon.hpp"
-#include "utils.hpp"
+
+#include <unordered_map>
+
 namespace nsm
 {
 
@@ -520,14 +524,38 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         "xyz.openbmc_project.Configuration.NSM_NVSwitch";
 
     auto& bus = utils::DBusHandler::getBus();
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "InventoryObjPath", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    std::string inventoryObjPath{};
+    if (allBaseIfaceProperties.count("InventoryObjPath"))
+    {
+        inventoryObjPath = std::get<std::string>(
+            allBaseIfaceProperties.at("InventoryObjPath"));
+    }
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    uuid_t uuid{};
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == "NSM_NVSwitch")
@@ -639,8 +667,12 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
     else if (type == "NSM_PortDisableFuture")
     {
         // Port disable future status on NVSwitch
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         auto nvSwitchPortDisableFuture =
             std::make_shared<nsm::NsmDevicePortDisableFuture>(name, type,
                                                               inventoryObjPath);
@@ -663,8 +695,12 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
     }
     else if (type == "NSM_PowerMode")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         auto nvSwitchL1PowerMode =
             std::make_shared<NsmSwitchDIPowerMode>(name, inventoryObjPath);
 
@@ -737,11 +773,18 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
     {
         auto nvSwitchObject =
             std::make_shared<NsmSwitchDI<SwitchIntf>>(name, inventoryObjPath);
-        auto switchType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "SwitchType", interface.c_str());
-        auto switchProtocols =
-            co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                objPath.c_str(), "SwitchSupportedProtocols", interface.c_str());
+        std::string switchType{};
+        if (allCurrentIfaceProperties.count("SwitchType"))
+        {
+            switchType = std::get<std::string>(
+                allCurrentIfaceProperties.at("SwitchType"));
+        }
+        std::vector<std::string> switchProtocols{};
+        if (allCurrentIfaceProperties.count("SwitchSupportedProtocols"))
+        {
+            switchProtocols = std::get<std::vector<std::string>>(
+                allCurrentIfaceProperties.at("SwitchSupportedProtocols"));
+        }
 
         std::vector<SwitchIntf::SwitchType> supported_protocols;
         for (const auto& protocol : switchProtocols)
@@ -763,21 +806,37 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
     {
         auto nvSwitchAsset =
             std::make_shared<NsmSwitchDI<NsmAssetIntf>>(name, inventoryObjPath);
-        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string manufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            manufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
 
         nvSwitchAsset->invoke(pdiMethod(manufacturer), manufacturer);
         device->addStaticSensor(nvSwitchAsset);
     }
     else if (type == "NSM_FabricManager")
     {
-        auto nameFM = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
-        auto inventoryObjPathFM =
-            co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "InventoryObjPath", interface.c_str());
-        auto description = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Description", interface.c_str());
+        std::string nameFM{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            nameFM =
+                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
+        std::string inventoryObjPathFM{};
+        if (allCurrentIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPathFM = std::get<std::string>(
+                allCurrentIfaceProperties.at("InventoryObjPath"));
+        }
+        std::string description{};
+        if (allCurrentIfaceProperties.count("Description"))
+        {
+            description = std::get<std::string>(
+                allCurrentIfaceProperties.at("Description"));
+        }
+
         inventoryObjPathFM = inventoryObjPathFM + nameFM;
         auto fabricMgrState = std::make_shared<NsmFabricManagerState>(
             name, type, inventoryObjPath, inventoryObjPathFM, bus, description);

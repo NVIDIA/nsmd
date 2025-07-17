@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#include "coroutine.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmGpmOem.hpp"
@@ -45,21 +46,17 @@ std::vector<uint8_t> convertToBytes(const std::vector<uint64_t>& data)
     return result;
 }
 
-static std::vector<std::string>
-    getPerInstanceInterfaces(const std::string& interface,
-                             const std::string& objPath)
+static requester::Coroutine
+    getPerInstanceInterfacesAsync(const std::string& interface,
+                                  const std::string& objPath,
+                                  std::vector<std::string>& interfaces)
 {
     const std::string interfaceName = interface + ".PerInstanceMetrics";
-    std::vector<std::string> interfaces;
-    std::map<std::string, std::vector<std::string>> mapperResponse;
-    auto& bus = utils::DBusHandler::getBus();
+    interfaces.clear();
 
-    auto mapper = bus.new_method_call(utils::mapperService, utils::mapperPath,
-                                      utils::mapperInterface, "GetObject");
-    mapper.append(objPath, std::vector<std::string>{});
-
-    auto mapperResponseMsg = bus.call(mapper);
-    mapperResponseMsg.read(mapperResponse);
+    // Use existing async utility instead of blocking call
+    auto mapperResponse = co_await utils::coGetServiceMap(objPath,
+                                                          dbus::Interfaces{});
 
     for (const auto& [service, intfs] : mapperResponse)
     {
@@ -72,7 +69,7 @@ static std::vector<std::string>
         }
     }
 
-    return interfaces;
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine createNsmPerInstanceGPMMetric(
@@ -235,11 +232,17 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
     nsmDevice->addSensor(gpmAggregateMetrics,
                          PollingType::GpuPerformanceMonitoring);
 
-    auto perInstanceInterfaces = getPerInstanceInterfaces(interface, objPath);
-    for (const auto& intf : perInstanceInterfaces)
+    std::vector<std::string> perInstanceInterfaces;
+    auto result = co_await getPerInstanceInterfacesAsync(interface, objPath,
+                                                         perInstanceInterfaces);
+
+    if (result == NSM_SW_SUCCESS)
     {
-        co_await createNsmPerInstanceGPMMetric(gpmIntf, nsmDevice,
-                                               inventoryObjPath, intf, objPath);
+        for (const auto& intf : perInstanceInterfaces)
+        {
+            co_await createNsmPerInstanceGPMMetric(
+                gpmIntf, nsmDevice, inventoryObjPath, intf, objPath);
+        }
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

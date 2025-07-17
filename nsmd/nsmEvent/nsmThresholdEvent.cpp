@@ -121,13 +121,14 @@ int NsmThresholdEvent::handle(eid_t eid, NsmType /*type*/,
         }
     }
 
-    logEvent(
+    auto loggingTask = logEventAsync(
         "NsmThresholdEvent", info.severity,
         {{"REDFISH_ORIGIN_OF_CONDITION", info.originOfCondition},
          {"REDFISH_MESSAGE_ARGS", messageArg + ", " + errors + ""},
          {"REDFISH_MESSAGE_ID", info.messageId},
          {"namespace", info.loggingNamespace},
          {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}});
+    loggingTask.detach(); // Fire-and-forget - runs independently
 
     return NSM_SW_SUCCESS;
 }
@@ -138,36 +139,79 @@ requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
 {
     NsmEventInfo info{};
 
-    info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        info.uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
 
     auto device = manager.getNsmDevice(info.uuid);
 
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
     name = utils::makeDBusNameValid(name);
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 
-    info.originOfCondition = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "OriginOfCondition", interface.c_str());
+    if (allCurrentIfaceProperties.count("OriginOfCondition"))
+    {
+        info.originOfCondition = std::get<std::string>(
+            allCurrentIfaceProperties.at("OriginOfCondition"));
+    }
 
-    info.messageId = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "MessageId", interface.c_str());
+    if (allCurrentIfaceProperties.count("MessageId"))
+    {
+        info.messageId =
+            std::get<std::string>(allCurrentIfaceProperties.at("MessageId"));
+    }
 
-    info.loggingNamespace = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "LoggingNamespace", interface.c_str());
+    if (allCurrentIfaceProperties.count("LoggingNamespace"))
+    {
+        info.loggingNamespace = std::get<std::string>(
+            allCurrentIfaceProperties.at("LoggingNamespace"));
+    }
     info.loggingNamespace = utils::makeDBusNameValid(info.loggingNamespace);
 
-    info.resolution = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Resolution", interface.c_str());
+    if (allCurrentIfaceProperties.count("Resolution"))
+    {
+        info.resolution =
+            std::get<std::string>(allCurrentIfaceProperties.at("Resolution"));
+    }
 
-    info.messageArgs =
-        co_await utils::coGetDbusProperty<std::vector<std::string>>(
-            objPath.c_str(), "MessageArgs", interface.c_str());
+    if (allCurrentIfaceProperties.count("MessageArgs"))
+    {
+        info.messageArgs = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("MessageArgs"));
+    }
 
-    auto severityStr = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Severity", interface.c_str());
+    std::string severityStr{};
+    if (allCurrentIfaceProperties.count("Severity"))
+    {
+        severityStr =
+            std::get<std::string>(allCurrentIfaceProperties.at("Severity"));
+    }
+    // info.uuid = co_await utils::coGetDbusProperty<uuid_t>(
+    //     objPath.c_str(), "UUID", interface.c_str());
+    // auto name = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "Name", interface.c_str());
+    // info.originOfCondition = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "OriginOfCondition", interface.c_str());
+    // info.messageId = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "MessageId", interface.c_str());
+    // info.loggingNamespace = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "LoggingNamespace", interface.c_str());
+    // info.resolution = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "Resolution", interface.c_str());
+    // info.messageArgs =
+    //     co_await utils::coGetDbusProperty<std::vector<std::string>>(
+    //         objPath.c_str(), "MessageArgs", interface.c_str());
+    // auto severityStr = co_await utils::coGetDbusProperty<std::string>(
+    //     objPath.c_str(), "Severity", interface.c_str());
 
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
         Entry::convertStringToLevel("xyz.openbmc_project.Logging.Entry.Level." +

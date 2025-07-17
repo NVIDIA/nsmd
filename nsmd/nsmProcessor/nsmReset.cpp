@@ -50,25 +50,45 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
+        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
-
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
-
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", interface.c_str());
-
-        auto instanceNumber = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "InstanceNumber", interface.c_str());
+        std::string name{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
+        uuid_t uuid{};
+        if (allCurrentIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+        }
+        std::string type{};
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        std::string inventoryObjPath{};
+        if (allCurrentIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allCurrentIfaceProperties.at("InventoryObjPath"));
+        }
+        uint64_t instanceNumber{};
+        if (allCurrentIfaceProperties.count("InstanceNumber"))
+        {
+            instanceNumber = std::get<unsigned long long>(
+                allCurrentIfaceProperties.at("InstanceNumber"));
+        }
 
         inventoryObjPath = inventoryObjPath + std::to_string(instanceNumber);
 
-        auto deviceIndex = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceIndex", interface.c_str());
+        unsigned long long deviceIndex{};
+        if (allCurrentIfaceProperties.count("DeviceIndex"))
+        {
+            deviceIndex = std::get<unsigned long long>(
+                allCurrentIfaceProperties.at("DeviceIndex"));
+        }
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)

@@ -19,17 +19,19 @@
 
 #include "debug-token.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmCommon.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
-#include "utils.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
 #include <format>
+#include <unordered_map>
 
 namespace nsm
 {
@@ -117,12 +119,32 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
     std::string baseType = "NSM_ChassisIRoTResponder";
     std::string baseInterface = "xyz.openbmc_project.Configuration." + baseType;
 
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", baseInterface.c_str());
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", baseInterface.c_str());
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(objPath, baseInterface,
+                                                        allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string name{};
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    uuid_t uuid{};
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+
     auto device = manager.getNsmDevice(uuid);
 
     if (type == baseType)
@@ -131,8 +153,12 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                    "TYPE", type.c_str());
         auto uuidObject =
             std::make_shared<NsmIRoTResponder<UuidIntf>>(name, baseType);
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", interface.c_str());
+        uuid_t uuid{};
+        if (allCurrentIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+        }
+
         uuidObject->invoke(pdiMethod(uuid), uuid);
         device->addStaticSensor(uuidObject);
 
@@ -152,10 +178,19 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                    "TYPE", type.c_str());
         auto assetObject =
             std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(name, baseType);
-        auto assetName = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", interface.c_str());
-        auto assetManufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string assetName{};
+        if (allCurrentIfaceProperties.count("Name"))
+        {
+            assetName =
+                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+        }
+        std::string assetManufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            assetManufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
+
         assetObject->invoke(pdiMethod(name), assetName);
         assetObject->invoke(pdiMethod(manufacturer), assetManufacturer);
         device->addStaticSensor(assetObject);
@@ -176,8 +211,13 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                    "TYPE", type.c_str());
         auto chassisObject =
             std::make_shared<NsmIRoTResponder<ChassisIntf>>(name, baseType);
-        auto chassisType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "ChassisType", interface.c_str());
+        std::string chassisType{};
+        if (allCurrentIfaceProperties.count("ChassisType"))
+        {
+            chassisType = std::get<std::string>(
+                allCurrentIfaceProperties.at("ChassisType"));
+        }
+
         chassisObject->invoke(
             pdiMethod(type),
             ChassisIntf::convertChassisTypeFromString(chassisType));
@@ -189,8 +229,13 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                    "TYPE", type.c_str());
         auto healthObject =
             std::make_shared<NsmIRoTResponder<HealthIntf>>(name, baseType);
-        auto health = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Health", interface.c_str());
+        std::string health{};
+        if (allCurrentIfaceProperties.count("Health"))
+        {
+            health =
+                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
+        }
+
         healthObject->invoke(pdiMethod(health),
                              HealthIntf::convertHealthTypeFromString(health));
         device->addStaticSensor(healthObject);
@@ -201,8 +246,13 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                    "TYPE", type.c_str());
         auto locationObject =
             std::make_shared<NsmIRoTResponder<LocationIntf>>(name, baseType);
-        auto locationType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationType", interface.c_str());
+        std::string locationType{};
+        if (allCurrentIfaceProperties.count("LocationType"))
+        {
+            locationType = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationType"));
+        }
+
         locationObject->invoke(
             pdiMethod(locationType),
             LocationIntf::convertLocationTypesFromString(locationType));

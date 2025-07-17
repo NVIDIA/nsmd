@@ -59,14 +59,27 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
                                                  const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-    auto powerSupplyType = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "PowerSupplyType", interface.c_str());
+    std::string name{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
 
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
+    std::string powerSupplyType{};
+    if (allCurrentIfaceProperties.count("PowerSupplyType"))
+    {
+        powerSupplyType = std::get<std::string>(
+            allCurrentIfaceProperties.at("PowerSupplyType"));
+    }
+
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
 

@@ -2,6 +2,8 @@
 
 #include "platform-environmental.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
@@ -11,6 +13,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
+#include <unordered_map>
 #include <vector>
 #define MEMORY_INTERFACE "xyz.openbmc_project.Configuration.NSM_Memory"
 
@@ -686,17 +689,38 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 {
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", MEMORY_INTERFACE);
+        dbus::PropertyMap allBaseIfaceProperties;
+        auto rc = co_await utils::coGetCachedBaseProperties(
+            objPath, MEMORY_INTERFACE, allBaseIfaceProperties);
+        if (rc != NSM_SUCCESS)
+        {
+            co_return rc;
+        }
+        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", MEMORY_INTERFACE);
+        std::string name{};
+        if (allBaseIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        }
+        uuid_t uuid{};
+        if (allBaseIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        }
+        std::string type{};
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        std::string inventoryObjPath{};
+        if (allBaseIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allBaseIfaceProperties.at("InventoryObjPath"));
+        }
 
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
-
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", MEMORY_INTERFACE);
         inventoryObjPath = inventoryObjPath + "_DRAM_0";
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -718,15 +742,24 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                 getInterfaceOnObjectPath<DimmIntf>(
                     sensorObjectPath, manager, bus, inventoryObjPath.c_str());
 
-            auto correctionType =
-                co_await utils::coGetDbusProperty<std::string>(
-                    objPath.c_str(), "ErrorCorrection", interface.c_str());
+            std::string correctionType{};
+            if (allCurrentIfaceProperties.count("ErrorCorrection"))
+            {
+                correctionType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("ErrorCorrection"));
+            }
+
             auto sensorErrorCorrection =
                 std::make_shared<NsmMemoryErrorCorrection>(
                     name, type, dimmIntf, correctionType, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorErrorCorrection);
-            auto deviceType = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "DeviceType", interface.c_str());
+            std::string deviceType{};
+            if (allCurrentIfaceProperties.count("DeviceType"))
+            {
+                deviceType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("DeviceType"));
+            }
+
             auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
                 name, type, dimmIntf, deviceType, inventoryObjPath);
             nsmDevice->deviceSensors.push_back(sensorDeviceType);
@@ -743,8 +776,12 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                 bus, name, type, inventoryObjPath, associations);
             nsmDevice->deviceSensors.push_back(associationSensor);
 
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
 
             dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
             auto minMemoryClockSensor =
@@ -773,8 +810,13 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         {
             auto rowRemapIntf = std::make_shared<MemoryRowRemappingIntf>(
                 bus, inventoryObjPath.c_str());
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
+
             auto sensorRowRemapState = std::make_shared<NsmRowRemapState>(
                 name, type, rowRemapIntf, inventoryObjPath);
             auto sensorRowRemappingCounts =
@@ -790,8 +832,13 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         }
         else if (type == "NSM_ECC")
         {
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
+
             auto eccModeIntf = std::make_shared<EccModeIntfDram>(
                 bus, inventoryObjPath.c_str());
             auto sensor = std::make_shared<NsmEccErrorCountsDram>(
@@ -807,8 +854,12 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
         }
         else if (type == "NSM_MemCapacityUtil")
         {
-            auto priority = co_await utils::coGetDbusProperty<bool>(
-                objPath.c_str(), "Priority", interface.c_str());
+            bool priority{};
+            if (allCurrentIfaceProperties.count("Priority"))
+            {
+                priority =
+                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+            }
 
             auto isLongRunning = true;
 

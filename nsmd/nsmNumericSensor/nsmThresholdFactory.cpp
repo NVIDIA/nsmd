@@ -17,6 +17,7 @@
 
 #include "nsmThresholdFactory.hpp"
 
+#include "dBusAsyncUtils.hpp"
 #include "nsmNumericSensorFactory.hpp"
 #include "nsmThreshold.hpp"
 #include "nsmThresholdAggregator.hpp"
@@ -51,8 +52,15 @@ NsmThresholdFactory::NsmThresholdFactory(
 
 requester::Coroutine NsmThresholdFactory::make()
 {
-    std::unordered_map<std::string, std::string> thresholdInterfaces =
-        getThresholdInterfaces();
+    std::unordered_map<std::string, std::string> thresholdInterfaces;
+    auto result = co_await getThresholdInterfacesAsync(thresholdInterfaces);
+
+    if (result != NSM_SW_SUCCESS)
+    {
+        lg2::error("Failed to get threshold interfaces for {OBJPATH}",
+                   "OBJPATH", objPath);
+        co_return result;
+    }
 
     co_await processThresholdsPair<ThresholdWarningIntf,
                                    NsmThresholdValueWarningLow,
@@ -77,6 +85,35 @@ requester::Coroutine NsmThresholdFactory::make()
     co_return NSM_SUCCESS;
 }
 
+requester::Coroutine NsmThresholdFactory::getThresholdInterfacesAsync(
+    std::unordered_map<std::string, std::string>& thresholdInterfaces)
+{
+    const std::string thresholdInterfaceName = interface + ".ThermalParameters";
+    thresholdInterfaces.clear();
+
+    // Use existing async utility instead of blocking call
+    auto mapperResponse = co_await utils::coGetServiceMap(objPath,
+                                                          dbus::Interfaces{});
+
+    for (const auto& [service, interfaces] : mapperResponse)
+    {
+        for (const auto& intf : interfaces)
+        {
+            if (intf.find(thresholdInterfaceName) != std::string::npos)
+            {
+                // Use async property read instead of blocking call
+                auto name = co_await utils::coGetDbusProperty<std::string>(
+                    objPath, "Name", intf, service);
+
+                thresholdInterfaces[name] = intf;
+            }
+        }
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+// Keep original function for backward compatibility (deprecated)
 std::unordered_map<std::string, std::string>
     NsmThresholdFactory::getThresholdInterfaces()
 {
@@ -162,13 +199,22 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
 
     thresholdInfo.name = info.name + "_" + thresholdType;
 
-    bool dynamic = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Dynamic", intfName.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), intfName.c_str());
+
+    bool dynamic{};
+    if (allCurrentIfaceProperties.count("Dynamic"))
+    {
+        dynamic = std::get<bool>(allCurrentIfaceProperties.at("Dynamic"));
+    }
 
     if (!dynamic)
     {
-        double threshold = co_await utils::coGetDbusProperty<double>(
-            objPath.c_str(), "Value", intfName.c_str());
+        double threshold{};
+        if (allCurrentIfaceProperties.count("Value"))
+        {
+            threshold = std::get<double>(allCurrentIfaceProperties.at("Value"));
+        }
 
         thresholdValue->updateReading(threshold);
 
@@ -180,8 +226,12 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
         co_return NSM_SUCCESS;
     }
 
-    thresholdInfo.type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", intfName.c_str());
+    std::string type{};
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    thresholdInfo.type = type;
 
     if (thresholdInfo.type != "NSM_ThermalParameter")
     {
@@ -193,8 +243,13 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
         co_return NSM_ERROR;
     }
 
-    thresholdInfo.sensorId = co_await utils::coGetDbusProperty<uint64_t>(
-        objPath.c_str(), "ParameterId", intfName.c_str());
+    unsigned long long sensorId{};
+    if (allCurrentIfaceProperties.count("ParameterId"))
+    {
+        sensorId = std::get<unsigned long long>(
+            allCurrentIfaceProperties.at("ParameterId"));
+    }
+    thresholdInfo.sensorId = sensorId;
 
     bool periodicUpdate{false};
 
@@ -223,11 +278,19 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
         co_return NSM_SUCCESS;
     }
 
-    thresholdInfo.priority = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Priority", intfName.c_str());
+    bool priority{};
+    if (allCurrentIfaceProperties.count("Priority"))
+    {
+        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+    }
+    thresholdInfo.priority = priority;
 
-    thresholdInfo.aggregated = co_await utils::coGetDbusProperty<bool>(
-        objPath.c_str(), "Aggregated", intfName.c_str());
+    bool aggregated{};
+    if (allCurrentIfaceProperties.count("Aggregated"))
+    {
+        aggregated = std::get<bool>(allCurrentIfaceProperties.at("Aggregated"));
+    }
+    thresholdInfo.aggregated = aggregated;
 
     NumericSensorFactory::makeAggregatorAndAddSensor(
         std::make_unique<NsmThresholdAggregatorBuilder>().get(), thresholdInfo,

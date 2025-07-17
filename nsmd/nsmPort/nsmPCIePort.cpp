@@ -44,25 +44,54 @@ requester::Coroutine createNsmPCIePort(SensorManager& manager,
                                        const std::string& interface,
                                        const std::string& objPath)
 {
-    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "InventoryObjPath", interface.c_str());
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", interface.c_str());
+    auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+        utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
+
+    std::string inventoryObjPath{};
+    if (allCurrentIfaceProperties.count("InventoryObjPath"))
+    {
+        inventoryObjPath = std::get<std::string>(
+            allCurrentIfaceProperties.at("InventoryObjPath"));
+    }
+    uuid_t uuid{};
+    if (allCurrentIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allCurrentIfaceProperties.at("UUID"));
+    }
     auto device = manager.getNsmDevice(uuid);
 
     std::vector<utils::Association> associations{};
     co_await utils::coGetAssociations(objPath, interface + ".Associations",
                                       associations);
-    auto health = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Health", interface.c_str());
-    auto portType = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "PortType", interface.c_str());
-    auto portProtocol = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "PortProtocol", interface.c_str());
-    auto linkState = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "LinkState", interface.c_str());
-    auto linkStatus = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "LinkStatus", interface.c_str());
+    std::string health{};
+    if (allCurrentIfaceProperties.count("Health"))
+    {
+        health = std::get<std::string>(allCurrentIfaceProperties.at("Health"));
+    }
+    std::string portType{};
+    if (allCurrentIfaceProperties.count("PortType"))
+    {
+        portType =
+            std::get<std::string>(allCurrentIfaceProperties.at("PortType"));
+    }
+    std::string portProtocol{};
+    if (allCurrentIfaceProperties.count("PortProtocol"))
+    {
+        portProtocol =
+            std::get<std::string>(allCurrentIfaceProperties.at("PortProtocol"));
+    }
+    std::string linkState{};
+    if (allCurrentIfaceProperties.count("LinkState"))
+    {
+        linkState =
+            std::get<std::string>(allCurrentIfaceProperties.at("LinkState"));
+    }
+    std::string linkStatus{};
+    if (allCurrentIfaceProperties.count("LinkStatus"))
+    {
+        linkStatus =
+            std::get<std::string>(allCurrentIfaceProperties.at("LinkStatus"));
+    }
 
     auto associationsObject =
         std::make_shared<NsmPCIePort<AssociationDefinitionsInft>>(

@@ -46,6 +46,8 @@ class NsmThresholdFactory
     };
 
     std::unordered_map<std::string, std::string> getThresholdInterfaces();
+    requester::Coroutine getThresholdInterfacesAsync(
+        std::unordered_map<std::string, std::string>& thresholdInterfaces);
 
     template <typename DBusIntf,
               std::derived_from<NsmThresholdValue> ThresholdValueLow,

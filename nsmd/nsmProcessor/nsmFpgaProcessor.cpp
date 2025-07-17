@@ -1,6 +1,10 @@
 #include "nsmFpgaProcessor.hpp"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+
+#include <unordered_map>
 
 #define FPGA_PROCESSOR_INTERFACE                                               \
     "xyz.openbmc_project.Configuration.NSM_FpgaProcessor"
@@ -50,17 +54,38 @@ static requester::Coroutine
     try
     {
         auto& bus = utils::DBusHandler::getBus();
-        auto name = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Name", FPGA_PROCESSOR_INTERFACE);
 
-        auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "UUID", FPGA_PROCESSOR_INTERFACE);
+        dbus::PropertyMap allBaseIfaceProperties;
+        auto rc = co_await utils::coGetCachedBaseProperties(
+            objPath, FPGA_PROCESSOR_INTERFACE, allBaseIfaceProperties);
+        if (rc != NSM_SUCCESS)
+        {
+            co_return rc;
+        }
+        auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
 
-        auto type = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Type", interface.c_str());
-
-        auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "InventoryObjPath", FPGA_PROCESSOR_INTERFACE);
+        std::string name{};
+        if (allBaseIfaceProperties.count("Name"))
+        {
+            name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+        }
+        uuid_t uuid{};
+        if (allBaseIfaceProperties.count("UUID"))
+        {
+            uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+        }
+        std::string type{};
+        if (allCurrentIfaceProperties.count("Type"))
+        {
+            type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+        }
+        std::string inventoryObjPath{};
+        if (allBaseIfaceProperties.count("InventoryObjPath"))
+        {
+            inventoryObjPath = std::get<std::string>(
+                allBaseIfaceProperties.at("InventoryObjPath"));
+        }
 
         auto nsmDevice = manager.getNsmDevice(uuid);
         if (!nsmDevice)
@@ -74,15 +99,28 @@ static requester::Coroutine
         }
         if (type == "NSM_FpgaProcessor")
         {
-            auto locationType = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "LocationType", interface.c_str());
-            auto fpgaType = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "FpgaType", interface.c_str());
+            std::string locationType{};
+            if (allCurrentIfaceProperties.count("LocationType"))
+            {
+                locationType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("LocationType"));
+            }
+            std::string fpgaType{};
+            if (allCurrentIfaceProperties.count("FpgaType"))
+            {
+                fpgaType = std::get<std::string>(
+                    allCurrentIfaceProperties.at("FpgaType"));
+            }
+
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
-            auto health = co_await utils::coGetDbusProperty<std::string>(
-                objPath.c_str(), "Health", interface.c_str());
+            std::string health{};
+            if (allCurrentIfaceProperties.count("Health"))
+            {
+                health = std::get<std::string>(
+                    allCurrentIfaceProperties.at("Health"));
+            }
 
             auto processorSensor = std::make_shared<NsmFpgaProcessor>(
                 bus, name, type, inventoryObjPath, associations, fpgaType,

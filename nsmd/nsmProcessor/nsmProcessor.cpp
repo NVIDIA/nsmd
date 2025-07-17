@@ -28,6 +28,8 @@
 #endif
 #include "platform-environmental.h"
 
+#include "../../common/coroutine.hpp"
+#include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
@@ -55,6 +57,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 #define PROCESSOR_INTERFACE "xyz.openbmc_project.Configuration.NSM_Processor"
@@ -3013,17 +3016,40 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                               const std::string& objPath)
 {
     auto& bus = utils::DBusHandler::getBus();
-    auto name = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Name", PROCESSOR_INTERFACE);
 
-    auto uuid = co_await utils::coGetDbusProperty<uuid_t>(
-        objPath.c_str(), "UUID", PROCESSOR_INTERFACE);
+    dbus::PropertyMap allBaseIfaceProperties;
+    auto rc = co_await utils::coGetCachedBaseProperties(
+        objPath, PROCESSOR_INTERFACE, allBaseIfaceProperties);
+    if (rc != NSM_SUCCESS)
+    {
+        co_return rc;
+    }
+    dbus::PropertyMap allCurrentIfaceProperties =
+        co_await utils::coGetAllDbusProperty(utils::entityManagerServiceStr,
+                                             objPath, interface);
 
-    auto type = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "Type", interface.c_str());
+    std::string name{};
+    uuid_t uuid{};
+    std::string type{};
+    std::string inventoryObjPath{};
 
-    auto inventoryObjPath = co_await utils::coGetDbusProperty<std::string>(
-        objPath.c_str(), "InventoryObjPath", PROCESSOR_INTERFACE);
+    if (allBaseIfaceProperties.count("Name"))
+    {
+        name = std::get<std::string>(allBaseIfaceProperties.at("Name"));
+    }
+    if (allBaseIfaceProperties.count("UUID"))
+    {
+        uuid = std::get<uuid_t>(allBaseIfaceProperties.at("UUID"));
+    }
+    if (allCurrentIfaceProperties.count("Type"))
+    {
+        type = std::get<std::string>(allCurrentIfaceProperties.at("Type"));
+    }
+    if (allBaseIfaceProperties.count("InventoryObjPath"))
+    {
+        inventoryObjPath = std::get<std::string>(
+            allBaseIfaceProperties.at("InventoryObjPath"));
+    }
 
     auto nsmDevice = manager.getNsmDevice(uuid);
 
@@ -3049,8 +3075,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->deviceSensors.push_back(resetSupportSensor);
 #endif
 
-        auto deviceUuid = co_await utils::coGetDbusProperty<uuid_t>(
-            objPath.c_str(), "DEVICE_UUID", PROCESSOR_INTERFACE);
+        uuid_t deviceUuid{};
+        if (allBaseIfaceProperties.count("DEVICE_UUID"))
+        {
+            deviceUuid =
+                std::get<uuid_t>(allBaseIfaceProperties.at("DEVICE_UUID"));
+        }
 
         auto uuidSensor = std::make_shared<NsmUuidIntf>(
             bus, name, type, inventoryObjPath, deviceUuid);
@@ -3150,8 +3180,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     else if (type == "NSM_PortDisableFuture")
     {
         // Port disable future status on Processor
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         size_t pos = inventoryObjPath.find_last_of('/');
         std::string basePath = inventoryObjPath;
@@ -3184,16 +3217,26 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_Location")
     {
-        auto locationType = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationType", interface.c_str());
+        std::string locationType{};
+        if (allCurrentIfaceProperties.count("LocationType"))
+        {
+            locationType = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationType"));
+        }
+
         auto sensor = std::make_shared<NsmLocationIntfProcessor>(
             bus, name, type, inventoryObjPath, locationType);
         nsmDevice->deviceSensors.push_back(sensor);
     }
     else if (type == "NSM_LocationCode")
     {
-        auto locationCode = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "LocationCode", interface.c_str());
+        std::string locationCode{};
+        if (allCurrentIfaceProperties.count("LocationCode"))
+        {
+            locationCode = std::get<std::string>(
+                allCurrentIfaceProperties.at("LocationCode"));
+        }
+
         auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
             bus, name, type, inventoryObjPath, locationCode);
         nsmDevice->deviceSensors.push_back(sensor);
@@ -3202,8 +3245,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     {
         auto assetIntf =
             std::make_shared<NsmAssetIntf>(bus, inventoryObjPath.c_str());
-        auto manufacturer = co_await utils::coGetDbusProperty<std::string>(
-            objPath.c_str(), "Manufacturer", interface.c_str());
+        std::string manufacturer{};
+        if (allCurrentIfaceProperties.count("Manufacturer"))
+        {
+            manufacturer = std::get<std::string>(
+                allCurrentIfaceProperties.at("Manufacturer"));
+        }
 
         auto assetObject = NsmInterfaceProvider<NsmAssetIntf>(
             name, type, inventoryObjPath, assetIntf);
@@ -3221,8 +3268,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_MIG")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         auto isLongRunning = true;
 
@@ -3243,8 +3293,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_EGM")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         auto sensor = std::make_shared<NsmEgmMode>(bus, name, type,
                                                    inventoryObjPath);
@@ -3261,12 +3314,24 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
     if (type == "NSM_PCIe")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
-        auto deviceId = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceId", interface.c_str());
-        int count = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "Count", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
+        uint64_t deviceId{};
+        if (allCurrentIfaceProperties.count("DeviceId"))
+        {
+            deviceId =
+                std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceId"));
+        }
+        int count{};
+        if (allCurrentIfaceProperties.count("Count"))
+        {
+            count = std::get<uint64_t>(allCurrentIfaceProperties.at("Count"));
+        }
+
         auto pcieECCIntf =
             std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
         auto pcieDeviceProvider =
@@ -3299,8 +3364,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_ECC")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         auto isLongRunning = true;
 
@@ -3329,8 +3397,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_EDPp")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         auto eDPpIntf = std::make_shared<EDPpLocal>(bus,
                                                     inventoryObjPath.c_str());
         auto resetEdppAsyncIntf = std::make_shared<NsmResetEdppAsyncIntf>(
@@ -3359,8 +3431,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_CpuOperatingConfig")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         auto cpuOperatingConfigIntf = std::make_shared<CpuOperatingConfigIntf>(
             bus, inventoryObjPath.c_str());
         auto smUtilizationIntf =
@@ -3406,10 +3482,18 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_ProcessorPerformance")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
-        auto deviceId = co_await utils::coGetDbusProperty<uint64_t>(
-            objPath.c_str(), "DeviceId", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
+        uint64_t deviceId{};
+        if (allCurrentIfaceProperties.count("DeviceId"))
+        {
+            deviceId =
+                std::get<uint64_t>(allCurrentIfaceProperties.at("DeviceId"));
+        }
 
         bool isLongRunning = true;
 
@@ -3437,8 +3521,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_MemCapacityUtil")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         auto isLongRunning = true;
 
@@ -3451,11 +3538,19 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_PowerCap")
     {
-        std::vector<std::string> candidateForList =
-            co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                objPath.c_str(), "CompositeNumericSensors", interface.c_str());
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        std::vector<std::string> candidateForList{};
+        if (allCurrentIfaceProperties.count("CompositeNumericSensors"))
+        {
+            candidateForList = std::get<std::vector<std::string>>(
+                allCurrentIfaceProperties.at("CompositeNumericSensors"));
+        }
+
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         // create power cap , clear power cap and power limit interface
         auto powerCapIntf = std::make_shared<NsmPowerCapIntf>(
             bus, inventoryObjPath.c_str(), name, candidateForList, nsmDevice);
@@ -3510,11 +3605,19 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_ReconfigPermissions")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
-        auto featuresNames =
-            co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                objPath.c_str(), "Features", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
+        std::vector<std::string> featuresNames{};
+        if (allCurrentIfaceProperties.count("Features"))
+        {
+            featuresNames = std::get<std::vector<std::string>>(
+                allCurrentIfaceProperties.at("Features"));
+        }
+
         std::map<ReconfigSettingsIntf::FeatureType, std::string> features;
         for (auto& featureName : featuresNames)
         {
@@ -3616,8 +3719,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_PowerSmoothing")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
 
         std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf =
             std::make_shared<OemPowerSmoothingFeatIntf>(bus, inventoryObjPath,
@@ -3736,8 +3842,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     }
     else if (type == "NSM_TotalNvLinksCount")
     {
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
         auto totalNvLinkInterface = std::make_shared<TotalNvLinkInterface>(
             bus, inventoryObjPath.c_str());
         auto totalNvLinkSensor = std::make_shared<NsmTotalNvLinks>(
@@ -3747,11 +3857,18 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     else if (type == "NSM_WorkloadPowerProfile")
     {
         lg2::info("NSM_WorkloadPowerProfile added");
-        auto priority = co_await utils::coGetDbusProperty<bool>(
-            objPath.c_str(), "Priority", interface.c_str());
-        auto profileIdMap =
-            co_await utils::coGetDbusProperty<std::vector<std::string>>(
-                objPath.c_str(), "ProfileIdMap", interface.c_str());
+        bool priority{};
+        if (allCurrentIfaceProperties.count("Priority"))
+        {
+            priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+        }
+
+        std::vector<std::string> profileIdMap{};
+        if (allCurrentIfaceProperties.count("ProfileIdMap"))
+        {
+            profileIdMap = std::get<std::vector<std::string>>(
+                allCurrentIfaceProperties.at("ProfileIdMap"));
+        }
 
         auto profileMapper =
             std::make_shared<NsmWorkLoadProfileEnum>(name, type, profileIdMap);
