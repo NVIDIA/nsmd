@@ -84,8 +84,13 @@ struct NsmThresholdEventTest :
 
 TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(error, "UUID"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties with INVALID UUID that doesn't match any device
+    const uuid_t invalidUuid =
+        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
+    propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, gpu.deviceEvents.size());
@@ -93,16 +98,26 @@ TEST_F(NsmThresholdEventTest, badTestUuidNotFound)
 
 TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
 {
-    auto& values = utils::MockDbusAsync::getValues();
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up properties from basic collection with modified MessageArgs
     for (auto& pair : basic)
     {
         if (pair.first == "MessageArgs")
         {
-            values.push(objPath, get(error, pair.first));
+            propertyMap[pair.first] = std::get<std::vector<std::string>>(
+                get(error, pair.first).second);
         }
         else
         {
-            values.push(objPath, pair);
+            // Need to handle different types based on the property
+            if (pair.first == "UUID")
+                propertyMap[pair.first] = std::get<uuid_t>(pair.second);
+            else if (pair.first == "EventId")
+                propertyMap[pair.first] = std::get<uint64_t>(pair.second);
+            else
+                propertyMap[pair.first] = std::get<std::string>(pair.second);
         }
     }
 
@@ -112,10 +127,22 @@ TEST_F(NsmThresholdEventTest, badTestMessageArgsSize)
 
 TEST_F(NsmThresholdEventTest, goodTestCreateEvent)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    for (auto& it : basic)
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up properties from basic collection
+    for (auto& pair : basic)
     {
-        values.push(objPath, it);
+        // Need to handle different types based on the property
+        if (pair.first == "UUID")
+            propertyMap[pair.first] = std::get<uuid_t>(pair.second);
+        else if (pair.first == "EventId")
+            propertyMap[pair.first] = std::get<uint64_t>(pair.second);
+        else if (pair.first == "MessageArgs")
+            propertyMap[pair.first] =
+                std::get<std::vector<std::string>>(pair.second);
+        else
+            propertyMap[pair.first] = std::get<std::string>(pair.second);
     }
 
     createNsmThresholdEvent(mockManager, basicIntfName, objPath);

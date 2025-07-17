@@ -76,13 +76,22 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 {
     auto& map = utils::MockDbusAsync::getServiceMap();
     map = serviceMap;
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(basic, "DeviceIndex"));
-    values.push(objPath, get(basic, "SlotType"));
-    values.push(objPath, get(basic, "Priority"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["DeviceIndex"] =
+        std::get<uint64_t>(get(basic, "DeviceIndex").second);
+    propertyMap["SlotType"] =
+        std::get<std::string>(get(basic, "SlotType").second);
+    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(0, baseboard.prioritySensors.size());
@@ -104,13 +113,24 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
 }
 TEST_F(NsmChassisPCIeSlotTest, badTestNoDeviceFound)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(error, "UUID"));
-    values.push(objPath, get(basic, "DeviceIndex"));
-    values.push(objPath, get(basic, "SlotType"));
-    values.push(objPath, get(basic, "Priority"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties with INVALID UUID that doesn't match any device
+    const uuid_t invalidUuid =
+        "99sb3ec1-e468-f145-8686-409009062aa8"; // From error collection
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = invalidUuid; // Invalid UUID as uuid_t type
+
+    // Set up interface-specific properties
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["DeviceIndex"] =
+        std::get<uint64_t>(get(basic, "DeviceIndex").second);
+    propertyMap["SlotType"] =
+        std::get<std::string>(get(basic, "SlotType").second);
+    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
 
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, baseboard.prioritySensors.size());

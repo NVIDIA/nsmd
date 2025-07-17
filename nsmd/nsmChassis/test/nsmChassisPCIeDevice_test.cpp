@@ -131,11 +131,17 @@ struct NsmChassisPCIeDeviceTest :
 
 TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(error, "Type"));
-    values.push(objPath, get(basic, "UUID"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties with invalid type
+    propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
 
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -150,24 +156,30 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     auto& map = utils::MockDbusAsync::getServiceMap();
     map = gpuServiceMap;
 
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(basic, "DEVICE_UUID"));
-    values.push(objPath, get(associations[0], "Forward"));
-    values.push(objPath, get(associations[0], "Backward"));
-    values.push(objPath, get(associations[0], "AbsolutePath"));
-    values.push(objPath, get(associations[1], "Forward"));
-    values.push(objPath, get(associations[1], "Backward"));
-    values.push(objPath, get(associations[1], "AbsolutePath"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // First call: NSM_ChassisPCIeDevice
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["DEVICE_UUID"] =
+        std::get<uuid_t>(get(basic, "DEVICE_UUID").second);
+    propertyMap["Forward"] =
+        std::get<std::string>(get(associations[0], "Forward").second);
+    propertyMap["Backward"] =
+        std::get<std::string>(get(associations[0], "Backward").second);
+    propertyMap["AbsolutePath"] =
+        std::get<std::string>(get(associations[0], "AbsolutePath").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(health, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(health, "Health"));
+
+    // Second call: NSM_Health
+    propertyMap["Type"] = std::get<std::string>(get(health, "Type").second);
+    propertyMap["Health"] = std::get<std::string>(get(health, "Health").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Health",
                                       objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
@@ -198,37 +210,49 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(asset, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(asset, "Manufacturer"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["ChassisName"] =
+        std::get<std::string>(get(basic, "ChassisName").second);
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // First call: NSM_Asset
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["Manufacturer"] =
+        std::get<std::string>(get(asset, "Manufacturer").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
                                       objPath);
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(pcieDevice, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(pcieDevice, "DeviceType"));
-    values.push(objPath, get(pcieDevice, "Functions"));
+
+    // Second call: NSM_PCIeDevice
+    propertyMap["Type"] = std::get<std::string>(get(pcieDevice, "Type").second);
+    propertyMap["DeviceType"] =
+        std::get<std::string>(get(pcieDevice, "DeviceType").second);
+    propertyMap["Functions"] =
+        std::get<std::vector<uint64_t>>(get(pcieDevice, "Functions").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(ltssmState, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(ltssmState, "DeviceIndex"));
-    values.push(objPath, get(ltssmState, "Priority"));
-    values.push(objPath, get(ltssmState, "InventoryObjPath"));
+
+    // Third call: NSM_LTSSMState
+    propertyMap["Type"] = std::get<std::string>(get(ltssmState, "Type").second);
+    propertyMap["DeviceIndex"] =
+        std::get<uint64_t>(get(ltssmState, "DeviceIndex").second);
+    propertyMap["Priority"] =
+        std::get<bool>(get(ltssmState, "Priority").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(ltssmState, "InventoryObjPath").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".LTSSMState", objPath);
-    values.push(objPath, get(basic, "ChassisName"));
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(clockOutputEnableState, "Type"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(clockOutputEnableState, "DeviceType"));
-    values.push(objPath, get(clockOutputEnableState, "InstanceNumber"));
+
+    // Fourth call: NSM_ClockOutputEnableState
+    propertyMap["Type"] =
+        std::get<std::string>(get(clockOutputEnableState, "Type").second);
+    propertyMap["DeviceType"] =
+        std::get<uint64_t>(get(clockOutputEnableState, "DeviceType").second);
+    propertyMap["InstanceNumber"] = std::get<uint64_t>(
+        get(clockOutputEnableState, "InstanceNumber").second);
     nsmChassisPCIeDeviceCreateSensors(
         mockManager, basicIntfName + ".NSM_ClockOutputEnableState", objPath);
 

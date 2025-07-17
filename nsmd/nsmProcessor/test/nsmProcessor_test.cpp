@@ -1605,11 +1605,17 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
 
 TEST_F(NsmProcessorTest, badTestTypeError)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(error, "Type"));
-    values.push(objPath, get(basic, "InventoryObjPath"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties with invalid type
+    propertyMap["Type"] = std::get<std::string>(get(error, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
@@ -1618,11 +1624,19 @@ TEST_F(NsmProcessorTest, badTestTypeError)
 
 TEST_F(NsmProcessorTest, badTestNoDevideFound)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(error, "UUID"));
-    values.push(objPath, get(basic, "Type"));
-    values.push(objPath, get(basic, "InventoryObjPath"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties with INVALID UUID that doesn't match any device
+    const uuid_t invalidUuid =
+        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = invalidUuid;          // Invalid UUID as uuid_t type
+
+    // Set up interface-specific properties
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
@@ -1631,13 +1645,20 @@ TEST_F(NsmProcessorTest, badTestNoDevideFound)
 
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(prcKnobs, "Type"));
-    values.push(objPath, get(basic, "InventoryObjPath"));
-    values.push(objPath, get(prcKnobs, "Priority"));
-    values.push(objPath, get(prcKnobs, "Features"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties for ReconfigPermissions
+    propertyMap["Type"] = std::get<std::string>(get(prcKnobs, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["Priority"] = std::get<bool>(get(prcKnobs, "Priority").second);
+    propertyMap["Features"] =
+        std::get<std::vector<std::string>>(get(prcKnobs, "Features").second);
 
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ReconfigPermissions", objPath);
@@ -1684,12 +1705,19 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 
 TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(basic, "Type"));
-    values.push(objPath, get(basic, "InventoryObjPath"));
-    values.push(objPath, get(basic, "DEVICE_UUID"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties for NSM_Processor
+    propertyMap["Type"] = std::get<std::string>(get(basic, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["DEVICE_UUID"] =
+        std::get<uuid_t>(get(basic, "DEVICE_UUID").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
 
     auto capabilitiesCount =
@@ -1840,12 +1868,18 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 
 TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "Name"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(memory, "Type"));
-    values.push(objPath, get(basic, "InventoryObjPath"));
-    values.push(objPath, get(basic, "Priority"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties for MemCapacityUtil
+    propertyMap["Type"] = std::get<std::string>(get(memory, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
     createNsmProcessorSensor(mockManager, basicIntfName + ".MemCapacityUtil",
                              objPath);
     EXPECT_EQ(1, gpu.deviceSensors.size());
@@ -1856,11 +1890,13 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     EXPECT_NE(nullptr, memoryCapacityUtilSensor);
     EXPECT_EQ(1, memoryCapacityUtilSensor->interfaces.size());
 
-    values.push(memoryObjPath, get(memory, "Name"));
-    values.push(memoryObjPath, get(memory, "UUID"));
-    values.push(memoryObjPath, get(memory, "Type"));
-    values.push(memoryObjPath, get(memory, "InventoryObjPath"));
-    values.push(memoryObjPath, get(memory, "Priority"));
+    // Set up properties for second memory sensor
+    propertyMap["Name"] = std::get<std::string>(get(memory, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(memory, "UUID").second);
+    propertyMap["Type"] = std::get<std::string>(get(memory, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(memory, "InventoryObjPath").second);
+    propertyMap["Priority"] = std::get<bool>(get(memory, "Priority").second);
     createNsmMemorySensor(mockManager, memoryBasicIntfName + ".MemCapacityUtil",
                           memoryObjPath);
 
@@ -1876,12 +1912,19 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
 }
 TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(asset, "Name"));
-    values.push(objPath, get(asset, "UUID"));
-    values.push(objPath, get(asset, "Type"));
-    values.push(objPath, get(asset, "InventoryObjPath"));
-    values.push(objPath, get(asset, "Manufacturer"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["Name"] = std::get<std::string>(get(asset, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(asset, "UUID").second);
+
+    // Set up interface-specific properties for Asset
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(asset, "InventoryObjPath").second);
+    propertyMap["Manufacturer"] =
+        std::get<std::string>(get(asset, "Manufacturer").second);
     createNsmProcessorSensor(mockManager, basicIntfName + ".Asset", objPath);
 
     EXPECT_EQ(3, gpu.deviceSensors.size());
@@ -1903,11 +1946,16 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
     EXPECT_EQ(SERIAL_NUMBER, serialNumberSensor->property);
     EXPECT_EQ(MARKETING_NAME, modelSensor->property);
 
-    values.push(chassisObjPath, get(chassisAsset, "Name"));
-    values.push(chassisObjPath, get(chassisAsset, "UUID"));
-    values.push(chassisObjPath, get(chassisAsset, "Type"));
-    values.push(chassisObjPath, get(chassisAsset, "InventoryObjPath"));
-    values.push(chassisObjPath, get(chassisAsset, "Manufacturer"));
+    // Set up properties for chassis asset
+    propertyMap["Name"] =
+        std::get<std::string>(get(chassisAsset, "Name").second);
+    propertyMap["UUID"] = std::get<uuid_t>(get(chassisAsset, "UUID").second);
+    propertyMap["Type"] =
+        std::get<std::string>(get(chassisAsset, "Type").second);
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(chassisAsset, "InventoryObjPath").second);
+    propertyMap["Manufacturer"] =
+        std::get<std::string>(get(chassisAsset, "Manufacturer").second);
     nsmChassisCreateSensors(mockManager, chassisBasicIntfName + ".Asset",
                             chassisObjPath);
 

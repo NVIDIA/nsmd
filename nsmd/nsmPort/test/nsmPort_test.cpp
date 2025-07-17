@@ -191,9 +191,15 @@ struct NsmPCIePortTest :
 
 TEST_F(NsmPCIePortTest, badTestCreateDeviceSensors)
 {
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "InventoryObjPath"));
-    values.push(objPath, get(error, "UUID"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties with INVALID UUID that doesn't match any device
+    const uuid_t invalidUuid =
+        "a3b0bdf6-8661-4d8e-8268-0e59415f2076"; // From error collection
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["UUID"] = invalidUuid; // Invalid UUID as uuid_t type
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
     EXPECT_EQ(0, cx7.prioritySensors.size());
@@ -205,17 +211,30 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
 {
     utils::MockDbusAsync::getServiceMap() = serviceMap;
 
-    auto& values = utils::MockDbusAsync::getValues();
-    values.push(objPath, get(basic, "InventoryObjPath"));
-    values.push(objPath, get(basic, "UUID"));
-    values.push(objPath, get(associations[0], "Forward"));
-    values.push(objPath, get(associations[0], "Backward"));
-    values.push(objPath, get(associations[0], "AbsolutePath"));
-    values.push(objPath, get(basic, "Health"));
-    values.push(objPath, get(basic, "PortType"));
-    values.push(objPath, get(basic, "PortProtocol"));
-    values.push(objPath, get(basic, "LinkState"));
-    values.push(objPath, get(basic, "LinkStatus"));
+    auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
+    propertyMap.clear();
+
+    // Set up base properties that coGetCachedBaseProperties needs
+    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
+
+    // Set up interface-specific properties
+    propertyMap["InventoryObjPath"] =
+        std::get<std::string>(get(basic, "InventoryObjPath").second);
+    propertyMap["Forward"] =
+        std::get<std::string>(get(associations[0], "Forward").second);
+    propertyMap["Backward"] =
+        std::get<std::string>(get(associations[0], "Backward").second);
+    propertyMap["AbsolutePath"] =
+        std::get<std::string>(get(associations[0], "AbsolutePath").second);
+    propertyMap["Health"] = std::get<std::string>(get(basic, "Health").second);
+    propertyMap["PortType"] =
+        std::get<std::string>(get(basic, "PortType").second);
+    propertyMap["PortProtocol"] =
+        std::get<std::string>(get(basic, "PortProtocol").second);
+    propertyMap["LinkState"] =
+        std::get<std::string>(get(basic, "LinkState").second);
+    propertyMap["LinkStatus"] =
+        std::get<std::string>(get(basic, "LinkStatus").second);
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
 
