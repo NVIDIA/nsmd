@@ -138,11 +138,9 @@ class NsmDevice : public StateChangeLogger
     uuid_t deviceUuid;
     bool isDeviceActive;
     bool isDeviceReady = false;
-    std::coroutine_handle<> doPollingTaskHandle;
-    std::coroutine_handle<> doPollingTaskHandleLongRunning;
+
+    requester::Coroutine task, longRunningTask;
     std::vector<std::shared_ptr<NsmObject>> deviceSensors;
-    std::vector<std::shared_ptr<NsmObject>> prioritySensors;
-    std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
     std::vector<std::shared_ptr<NsmObject>> longRunningSensors;
     std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
@@ -395,6 +393,11 @@ class NsmDevice : public StateChangeLogger
      */
     void addSensorBase(const std::shared_ptr<NsmObject>& sensor,
                        PollingType pollingType);
+
+    friend class SensorManagerImpl;
+    friend class NumericSensorFactory;
+    std::vector<std::shared_ptr<NsmObject>> prioritySensors;
+    std::deque<std::shared_ptr<NsmObject>> roundRobinSensors;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

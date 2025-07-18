@@ -63,6 +63,11 @@ class NsmServiceReadyIntf
     NsmServiceReadyIntf(NsmServiceReadyIntf&&) = delete;
     NsmServiceReadyIntf& operator=(NsmServiceReadyIntf&&) = delete;
 
+    bool isStateEnabled() const
+    {
+        return serviceIntf->state() == ServiceReadyIntf::States::Enabled;
+    }
+
     void setStateEnabled()
     {
         serviceIntf->state(ServiceReadyIntf::States::Enabled);

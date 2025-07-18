@@ -530,16 +530,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
                 deviceIndex);
 
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(
-                    pcieECCIntfSensorGroup1);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(
-                    pcieECCIntfSensorGroup1);
-            }
+            nsmDevice->addSensor(pcieECCIntfSensorGroup1, priority);
         }
     }
 

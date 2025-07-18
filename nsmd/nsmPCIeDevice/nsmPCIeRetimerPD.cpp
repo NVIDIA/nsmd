@@ -331,14 +331,8 @@ static requester::Coroutine
         std::make_shared<NsmPCIeDeviceQueryScalarTelemetry>(
             bus, name, associations, type, deviceType, deviceIndex,
             inventoryObjPath);
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(retimerScalarTelemetry);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(retimerScalarTelemetry);
-    }
+
+    nsmDevice->addSensor(retimerScalarTelemetry, priority);
 
     auto retimerRefClock = std::make_shared<NsmPCIeDeviceGetClockOutput>(
         bus, name, type, deviceInstance, inventoryObjPath);
@@ -351,14 +345,8 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(retimerRefClock);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(retimerRefClock);
-    }
+    nsmDevice->addSensor(retimerRefClock, priority);
+
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

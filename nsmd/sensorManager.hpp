@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "instance_id.hpp"
 #include "nsmDevice.hpp"
@@ -26,6 +25,7 @@
 #include "nsmd/nsmNumericSensor/nsmNumericSensorComposite.hpp"
 #include "requester/handler.hpp"
 #include "stateChangeLogger.hpp"
+#include "types.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
@@ -161,6 +161,7 @@ class SensorManagerImpl : public SensorManager
             eidTable,
         NsmDeviceTable& nsmDevices, eid_t localEid,
         mctp_socket::Manager& sockManager, bool verbose);
+    ~SensorManagerImpl();
     static void dumpReadinessLogs();
 
     static bool isEMReady();
@@ -171,25 +172,33 @@ class SensorManagerImpl : public SensorManager
   private:
     // Regular methods as before
     void startPolling();
-    void doPolling(std::shared_ptr<NsmDevice> nsmDevice);
     void interfaceAddedHandler(sdbusplus::message::message& msg);
-    void doPollingLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
 #ifdef NVIDIA_STANDBYTODC
     void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
 #endif
-    void _startPolling(sdeventplus::source::EventBase& /* source */);
-    requester::Coroutine doPollingTask(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        tryActivateDevice(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        pollNonPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
+                               uint64_t t0);
+
+    requester::Coroutine deviceTask(std::shared_ptr<NsmDevice> nsmDevice);
+    requester::Coroutine
+        deviceLongRunningTask(std::shared_ptr<NsmDevice> nsmDevice);
+
     requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,
                        std::shared_ptr<const nsm_msg>& responseMsg,
                        size_t& responseLen,
                        bool bypassCommandCheck = false) override;
-    requester::Coroutine
-        doPollingTaskLongRunning(std::shared_ptr<NsmDevice> nsmDevice);
     void scanInventory();
-    requester::Coroutine pollEvents(eid_t eid);
     eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) override;
 
+    bool pollingIsRunning = false;
     static bool isReadyForReadinessCheck;
     static bool isMCTPReadyCheck;
     static bool isEMReadyCheck;
@@ -223,6 +232,5 @@ class SensorManagerImpl : public SensorManager
     std::coroutine_handle<> interfaceAddedTaskHandle;
     requester::Coroutine interfaceAddedTask();
     std::map<eid_t, StateChangeLogger> stateChangeLoggers;
-    StateChangeLogger uuidLogger;
 };
 } // namespace nsm

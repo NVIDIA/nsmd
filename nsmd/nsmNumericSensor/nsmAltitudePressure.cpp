@@ -146,16 +146,7 @@ requester::Coroutine makeNsmAltitudePressure(SensorManager& manager,
     lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceSensors.emplace_back(sensor);
-
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(sensor);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(sensor);
-    }
+    nsmDevice->addSensor(sensor, priority);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

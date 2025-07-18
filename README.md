@@ -26,6 +26,10 @@ cd boost_1_84_0
 ./b2 install
 ```
 
+#### Copy missing libmctp header
+
+> git archive --remote=ssh://git@gitlab-master.nvidia.com:12051/dgx/bmc/libmctp.git develop libmctp-externals.h | tar -x -C common/
+
 ### Configure and build with Meson
 
 ```bash
@@ -105,7 +109,7 @@ meson test -C builddir nsmChassis_test --gdb
         {
             "label": "Compile meson test",
             "type": "shell",
-            "command": "meson compile -C builddir/${config:openbmc.buildConfig} ${fileBasenameNoExtension}",
+            "command": "meson compile -C builddir ${fileBasenameNoExtension}",
             "group": "build",
         }
     ]

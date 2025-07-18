@@ -270,14 +270,7 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    if (priority)
-    {
-        nsmDevice->prioritySensors.emplace_back(retimerSwitchRefClock);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.emplace_back(retimerSwitchRefClock);
-    }
+    nsmDevice->addSensor(retimerSwitchRefClock, priority);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

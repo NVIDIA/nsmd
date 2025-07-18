@@ -169,14 +169,7 @@ static requester::Coroutine
     auto sensor = std::make_shared<NsmSWInventoryDriverVersionAndStatus>(
         bus, name, associations, type, manufacturer);
 
-    if (priority)
-    {
-        nsmDevice->prioritySensors.push_back(sensor);
-    }
-    else
-    {
-        nsmDevice->roundRobinSensors.push_back(sensor);
-    }
+    nsmDevice->addSensor(sensor, priority);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

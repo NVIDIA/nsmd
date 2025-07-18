@@ -19,6 +19,9 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <coroutine>
+#include <exception>
+#include <memory>
+#include <utility>
 
 namespace requester
 {
@@ -114,6 +117,10 @@ struct Coroutine
                 lg2::error("Caught exception:: {HANDLER_EXCEPTION}",
                            "HANDLER_EXCEPTION", e.what());
             }
+            catch (...)
+            {
+                lg2::error("Caught unknown exception in coroutine");
+            }
         }
 
         /** @brief Keeping the value returned by co_return operator
@@ -124,12 +131,21 @@ struct Coroutine
         }
     };
 
+    /** @brief Check if the coroutine is done.
+     *
+     * @return True if the coroutine is done, false otherwise.
+     */
+    bool done() const noexcept
+    {
+        return !handle || handle.done();
+    }
+
     /** @brief Called by co_await to check if it needs to be
      * suspened.
      */
     bool await_ready() const noexcept
     {
-        return handle.done();
+        return done();
     }
 
     /** @brief Called by co_await operator to get return value when coroutine
@@ -137,7 +153,7 @@ struct Coroutine
      */
     uint8_t await_resume() const noexcept
     {
-        return std::move(handle.promise().data);
+        return handle ? std::move(handle.promise().data) : 0;
     }
 
     /** @brief Called when the coroutine itself is being suspended. The
@@ -146,8 +162,31 @@ struct Coroutine
      */
     bool await_suspend(std::coroutine_handle<> coroutine)
     {
-        handle.promise().parent_handle = coroutine;
+        if (handle)
+        {
+            handle.promise().parent_handle = coroutine;
+        }
         return true;
+    }
+
+    Coroutine() : handle(nullptr) {}
+    Coroutine(std::coroutine_handle<promise_type> h) : handle(h) {}
+    Coroutine(const Coroutine&) = delete;
+    Coroutine& operator=(const Coroutine&) = delete;
+    Coroutine(Coroutine&& other) noexcept :
+        handle(std::exchange(other.handle, {}))
+    {}
+    Coroutine& operator=(Coroutine&& other) noexcept
+    {
+        if (this != &other)
+        {
+            if (handle)
+            {
+                handle.destroy();
+            }
+            handle = std::exchange(other.handle, {});
+        }
+        return *this;
     }
 
     ~Coroutine()
@@ -179,6 +218,46 @@ struct Coroutine
     /** @brief Assigned by promise_type::get_return_object to keep coroutine
      * handle itself.
      */
-    mutable std::coroutine_handle<promise_type> handle;
+    mutable std::coroutine_handle<promise_type> handle = nullptr;
+
+    /** @brief Assign a new coroutine to the handle.
+     *
+     * @param handle The handle to assign the coroutine to.
+     * @param task The task to assign to the handle.
+     * @return True if the coroutine was assigned, false otherwise.
+     */
+    template <typename Task>
+    static bool assign(std::coroutine_handle<>& handle, Task&& task)
+    {
+        // Coroutine still running, return false
+        if (handle && !handle.done())
+        {
+            return false;
+        }
+
+        // Destroy the old coroutine if it exists and is done
+        if (handle && handle.done())
+        {
+            handle.destroy();
+        }
+        handle = nullptr;
+
+        auto co = task();
+        if (!co.handle)
+        {
+            return true; // no new coroutine
+        }
+
+        // Destroy the new coroutine if it's already finished
+        if (co.handle.done())
+        {
+            co.handle.destroy();
+            return true;
+        }
+
+        // Assign the new coroutine
+        handle = co.handle;
+        return true;
+    }
 };
 } // namespace requester

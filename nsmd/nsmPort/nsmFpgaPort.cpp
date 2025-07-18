@@ -179,16 +179,7 @@ static requester::Coroutine
                 name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
                 deviceIndex);
 
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(
-                    pcieECCIntfSensorGroup1);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(
-                    pcieECCIntfSensorGroup1);
-            }
+            nsmDevice->addSensor(pcieECCIntfSensorGroup1, priority);
         }
         else if (type == "NSM_PortState")
         {
@@ -238,24 +229,12 @@ static requester::Coroutine
                 // coverity[missing_return]
                 co_return NSM_ERROR;
             }
-            if (priority)
-            {
-                nsmDevice->prioritySensors.emplace_back(
-                    pcieECCIntfSensorGroup2);
-                nsmDevice->prioritySensors.emplace_back(
-                    pcieECCIntfSensorGroup3);
-                nsmDevice->prioritySensors.emplace_back(
-                    pcieECCIntfSensorGroup4);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.emplace_back(
-                    pcieECCIntfSensorGroup2);
-                nsmDevice->roundRobinSensors.emplace_back(
-                    pcieECCIntfSensorGroup3);
-                nsmDevice->roundRobinSensors.emplace_back(
-                    pcieECCIntfSensorGroup4);
-            }
+
+            nsmDevice->addSensor(pcieECCIntfSensorGroup2, priority);
+
+            nsmDevice->addSensor(pcieECCIntfSensorGroup3, priority);
+
+            nsmDevice->addSensor(pcieECCIntfSensorGroup4, priority);
         }
     }
 

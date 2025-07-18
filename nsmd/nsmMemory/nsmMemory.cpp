@@ -794,14 +794,7 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
             auto currClockFreqSensor = std::make_shared<NsmMemCurrClockFreq>(
                 name, type, dimmIntf, inventoryObjPath);
 
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(currClockFreqSensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(currClockFreqSensor);
-            }
+            nsmDevice->addSensor(currClockFreqSensor, priority);
             auto memCapacitySensor =
                 std::make_shared<NsmMemCapacity>(name, type, dimmIntf);
             nsmDevice->addStaticSensor(memCapacitySensor);
@@ -843,14 +836,8 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                 bus, inventoryObjPath.c_str());
             auto sensor = std::make_shared<NsmEccErrorCountsDram>(
                 name, type, eccModeIntf, inventoryObjPath);
-            if (priority)
-            {
-                nsmDevice->prioritySensors.push_back(sensor);
-            }
-            else
-            {
-                nsmDevice->roundRobinSensors.push_back(sensor);
-            }
+
+            nsmDevice->addSensor(sensor, priority);
         }
         else if (type == "NSM_MemCapacityUtil")
         {
