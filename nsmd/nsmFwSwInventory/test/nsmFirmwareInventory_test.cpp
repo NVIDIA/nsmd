@@ -196,7 +196,8 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateSensors)
 
     EXPECT_EQ(1, writeProtectedSensor->sensors.size());
 
-    EXPECT_EQ(4, fpga.roundRobinSensors.size());
+    EXPECT_EQ(1, fpga.roundRobinSensors.size());
+    EXPECT_EQ(3, fpga.staticSensors.size());
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(sensors, fpga.deviceSensors.size());
 }
@@ -218,6 +219,7 @@ TEST_F(NsmFirmwareInventoryTest, goodTestCreateCpuSensors)
     nsmFirmwareInventoryCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
+    EXPECT_EQ(0, fpga.staticSensors.size());
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(2, fpga.deviceSensors.size());
     auto sensors = 0;

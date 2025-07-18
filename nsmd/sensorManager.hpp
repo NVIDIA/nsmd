@@ -42,6 +42,7 @@ class NsmPowerCap;
 class NsmDefaultPowerCap;
 class NsmMaxPowerCap;
 class NsmMinPowerCap;
+class LimitedSensorQueue;
 /**
  * @brief Sensor manager abstraction class
  *

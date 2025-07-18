@@ -150,7 +150,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(4, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(4, gpu.staticSensors.size());
     EXPECT_EQ(4, gpu.deviceSensors.size());
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<AssemblyIntf>>(
                            gpu.deviceSensors[0]));
@@ -198,7 +199,8 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(4, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(4, gpu.staticSensors.size());
     EXPECT_EQ(4, gpu.deviceSensors.size());
     for (int i = 0; i < 4; i++)
     {

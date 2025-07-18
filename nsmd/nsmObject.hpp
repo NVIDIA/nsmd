@@ -26,11 +26,17 @@
 static constexpr const uint64_t INIT_TIMESTAMP =
     std::numeric_limits<uint64_t>().min();
 
-static constexpr const uint64_t DEFAULT_RR_REFRESH_LIMIT_IN_USEC =
+static constexpr const uint64_t PRIORITY_REFRESH_LIMIT_IN_USEC =
+    SENSOR_POLLING_TIME * 1000;
+
+static constexpr const uint64_t RR_REFRESH_LIMIT_IN_USEC =
     DEFAULT_RR_REFRESH_LIMIT_IN_MS * 1000;
 
-static constexpr const uint64_t DEFAULT_GPM_REFRESH_LIMIT_IN_USEC =
+static constexpr const uint64_t GPM_REFRESH_LIMIT_IN_USEC =
     SENSOR_POLLING_TIME_GPM * 1000;
+
+static constexpr const uint64_t LONG_RUNNING_REFRESH_LIMIT_IN_USEC =
+    SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
 
 namespace nsm
 {
@@ -84,7 +90,6 @@ class NsmObject : virtual public StateChangeLogger
     virtual void updateMetricOnSharedMemory() {}
 
     bool isRefreshed = false;
-    bool isStatic = false;
 
   protected:
   private:
@@ -93,6 +98,6 @@ class NsmObject : virtual public StateChangeLogger
     const std::string name;
     const std::string type;
     uint64_t lastUpdatedTimeStampInUsec = INIT_TIMESTAMP;
-    uint64_t refreshLimitInUsec = DEFAULT_RR_REFRESH_LIMIT_IN_USEC;
+    uint64_t refreshLimitInUsec = RR_REFRESH_LIMIT_IN_USEC;
 };
 } // namespace nsm

@@ -29,6 +29,8 @@
 
 #include <phosphor-logging/lg2.hpp>
 
+#include <ranges>
+
 namespace nsm
 {
 
@@ -122,14 +124,17 @@ uint8_t NsmDevice::getEventMode()
     return eventMode;
 }
 
+bool NsmDevice::allCommandCodesAreRetrieved()
+{
+    return areMessageTypesRetrieved &&
+           std::ranges::all_of(retrievedMessageTypes, [&](auto messageType) {
+        return commandCodesRetrieved[messageType];
+    });
+}
+
 bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
 {
-    bool supported = false;
-    if (messageTypesToCommandCodeMatrix[messageType][commandCode])
-    {
-        supported = true;
-    }
-    return supported;
+    return messageTypesToCommandCodeMatrix[messageType][commandCode];
 }
 
 void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
@@ -141,24 +146,23 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
     switch (pollingType)
     {
         case PollingType::Priority:
-            prioritySensors.push_back(sensor);
+            sensor->refreshLimitInUsec = PRIORITY_REFRESH_LIMIT_IN_USEC;
             break;
         case PollingType::GpuPerformanceMonitoring:
-            sensor->refreshLimitInUsec = DEFAULT_GPM_REFRESH_LIMIT_IN_USEC;
-            roundRobinSensors.push_back(sensor);
-            break;
-        case PollingType::Static:
-            std::const_pointer_cast<NsmObject>(sensor)->isStatic = true;
-            roundRobinSensors.push_back(sensor);
+            sensor->refreshLimitInUsec = GPM_REFRESH_LIMIT_IN_USEC;
             break;
         case PollingType::LongRunning:
-            longRunningSensors.push_back(sensor);
+            sensor->refreshLimitInUsec = LONG_RUNNING_REFRESH_LIMIT_IN_USEC;
             break;
+        case PollingType::Static:
         case PollingType::RoundRobin:
-        default:
-            roundRobinSensors.push_back(sensor);
+            sensor->refreshLimitInUsec = RR_REFRESH_LIMIT_IN_USEC;
             break;
+        default:
+            throw std::runtime_error(
+                "NsmDevice::addSensorBase: Invalid polling type");
     }
+    sensors[pollingType].push(sensor);
 }
 
 requester::Coroutine NsmDevice::setOnline()
@@ -171,7 +175,7 @@ requester::Coroutine NsmDevice::setOnline()
     NsmServiceReadyIntf::getInstance().setStateStarting();
 
     uint32_t count = 0;
-    for (auto sensor : roundRobinSensors)
+    for (auto sensor : deviceSensors)
     {
         // Mark all the sensors as unrefreshed.
         sensor->isRefreshed = false;

@@ -1666,6 +1666,7 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     const size_t expectedSensorsCount = 22;
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(22, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.staticSensors.size());
     EXPECT_EQ(expectedSensorsCount, gpu.deviceSensors.size());
 
     nsm_reconfiguration_permissions_v1 data = {0, 1, 1, 0, 0, 1, 1};
@@ -1726,7 +1727,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     // Total 10 RR sensor for type = NSM_Processor are added.
     // 8 are added as part of createNsmProcessorSensor() and 2 are added as part
     // of createNsmErrorInjectionSensors()
-    EXPECT_EQ(11, gpu.roundRobinSensors.size());
+    EXPECT_EQ(3, gpu.roundRobinSensors.size());
+    EXPECT_EQ(8, gpu.staticSensors.size());
     // Total 18 device sensor for type = NSM_Processor are added.
     // 10 are added as part of createNsmProcessorSensor() (NOTE:
     // NVIDIA_RESET_METRICS & ENABLE_SYSTEM_GUID are disabled during this test
@@ -1748,7 +1750,6 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
             gpu.deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionSupported);
     EXPECT_EQ(expectedInterfaces, errorInjectionSupported->interfaces.size());
-    EXPECT_TRUE(errorInjectionSupported->isStatic);
     auto errorInjectionEnabled =
         dynamic_pointer_cast<NsmErrorInjectionEnabled>(gpu.deviceSensors[si++]);
     EXPECT_NE(nullptr, errorInjectionEnabled);

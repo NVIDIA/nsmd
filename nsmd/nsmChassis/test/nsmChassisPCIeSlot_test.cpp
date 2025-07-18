@@ -95,7 +95,8 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(0, baseboard.prioritySensors.size());
-    EXPECT_EQ(2, baseboard.roundRobinSensors.size());
+    EXPECT_EQ(1, baseboard.roundRobinSensors.size());
+    EXPECT_EQ(1, baseboard.staticSensors.size());
     EXPECT_EQ(2, baseboard.deviceSensors.size());
 
     auto sensors = 0;

@@ -229,7 +229,8 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(7, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(7, gpu.staticSensors.size());
     EXPECT_EQ(7, gpu.deviceSensors.size());
 
     auto sensors = 0;
@@ -329,7 +330,8 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
-    EXPECT_EQ(3, fpga.roundRobinSensors.size());
+    EXPECT_EQ(0, fpga.roundRobinSensors.size());
+    EXPECT_EQ(3, fpga.staticSensors.size());
     EXPECT_EQ(4, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(0, gpu.roundRobinSensors.size());
@@ -389,7 +391,8 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
                             objPath);
 
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(6, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(6, gpu.staticSensors.size());
     EXPECT_EQ(6, gpu.deviceSensors.size());
 
     auto sensors = 0;
@@ -426,6 +429,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
+    EXPECT_EQ(0, fpga.staticSensors.size());
     EXPECT_EQ(1, fpga.deviceSensors.size());
 
     sensors = 0;
@@ -469,9 +473,11 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
                             objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());
     EXPECT_EQ(1, fpga.roundRobinSensors.size());
+    EXPECT_EQ(0, fpga.staticSensors.size());
     EXPECT_EQ(1, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
     EXPECT_EQ(2, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.staticSensors.size());
     EXPECT_EQ(2, gpu.deviceSensors.size());
 }
 

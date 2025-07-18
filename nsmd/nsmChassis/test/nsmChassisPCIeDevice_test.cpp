@@ -186,7 +186,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(3, gpu.roundRobinSensors.size());
+    EXPECT_EQ(0, gpu.roundRobinSensors.size());
+    EXPECT_EQ(3, gpu.staticSensors.size());
     EXPECT_EQ(3, gpu.deviceSensors.size());
 
     auto sensor = 0;
@@ -260,7 +261,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(0, fpga.roundRobinSensors.size());
     EXPECT_EQ(0, fpga.deviceSensors.size());
     EXPECT_EQ(0, gpu.prioritySensors.size());
-    EXPECT_EQ(9, gpu.roundRobinSensors.size());
+    EXPECT_EQ(5, gpu.roundRobinSensors.size());
+    EXPECT_EQ(4, gpu.staticSensors.size());
     EXPECT_EQ(9, gpu.deviceSensors.size());
 
     auto sensors = 0;

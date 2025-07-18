@@ -240,6 +240,7 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
 
     EXPECT_EQ(0, cx7.prioritySensors.size());
     EXPECT_EQ(4, cx7.roundRobinSensors.size());
+    EXPECT_EQ(0, cx7.staticSensors.size());
     EXPECT_EQ(8, cx7.deviceSensors.size());
 
     auto sensors = 0;
