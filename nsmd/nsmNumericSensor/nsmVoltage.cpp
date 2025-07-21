@@ -74,16 +74,12 @@ uint8_t NsmVoltage::handleResponseMsg(const struct nsm_msg* responseMsg,
     LG2_ERROR_FLT(
         "decode_get_voltage_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
-    {
-        // unit of voltage is microvolts in NSM Command Response and selected
-        // unit in SensorValue PDI is Volts. Hence it is converted to Volts.
-        sensorValue->updateReading(reading / 1'000'000.0);
-    }
-    else
-    {
-        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-    }
+    // unit of voltage is microvolts in NSM Command Response and selected unit
+    // in SensorValue PDI is Volts. Hence it is converted to Volts.
+    double value = rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS
+                       ? reading / 1'000'000.0
+                       : std::numeric_limits<double>::quiet_NaN();
+    sensorValue->updateReading(value, utils::getCurrentSteadyClockTimestamp());
 
     return cc ? cc : rc;
 }

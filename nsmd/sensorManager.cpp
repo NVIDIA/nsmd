@@ -31,6 +31,8 @@
 #include "sensorQueueMap.hpp"
 #include "utils.hpp"
 
+#include <ranges>
+
 #ifdef LTTNG_TRACING
 #include "tracepoints/nsmd-tp.h"
 #endif

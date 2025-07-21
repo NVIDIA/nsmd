@@ -106,13 +106,18 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
     }
     associationDefinitionsIntf.associations(associations_list);
 
-    updateReading(std::numeric_limits<double>::quiet_NaN());
+    valueIntf.value(previousValue);
 }
 
-void NsmNumericSensorDbusValue::updateReading(double value,
-                                              uint64_t /*timestamp*/)
+void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
 {
-    valueIntf.value(value);
+    if (timestamp == 0 ||
+        (previousValue != value && (timestamp - lastTimestamp) > 1000))
+    {
+        lastTimestamp = timestamp;
+        valueIntf.value(value);
+        previousValue = value;
+    }
 }
 
 NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
@@ -133,8 +138,12 @@ NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
 void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
                                                        uint64_t timestamp)
 {
-    timestampIntf.elapsed(timestamp);
-    NsmNumericSensorDbusValue::updateReading(value);
+    if (lastTimestamp < timestamp)
+    {
+        lastTimestamp = timestamp;
+        timestampIntf.elapsed(timestamp);
+    }
+    NsmNumericSensorDbusValue::updateReading(value, timestamp);
 }
 
 NsmNumericSensorDbusPeakValueTimestamp::NsmNumericSensorDbusPeakValueTimestamp(
@@ -242,10 +251,7 @@ NsmNumericSensorShmem::NsmNumericSensorShmem(
 
 void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
 {
-    auto timestamp = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
     nv::sensor_aggregation::DbusVariantType valueVariant{value};
 

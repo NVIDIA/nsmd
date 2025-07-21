@@ -45,7 +45,6 @@ static const std::string readingBasis("Headroom");
 static const std::string description("dummy_sensor");
 
 static const double val{32432.8970};
-static const uint64_t timestamp{13432548};
 
 TEST(NsmNumericSensorDbusValue, GoodTest)
 {
@@ -65,6 +64,7 @@ TEST(NsmNumericSensorDbusValueTimestamp, GoodTest)
         bus,           sensorName,       sensorType, nsm::SensorUnit::DegreesC,
         associations,  physicalContexnt, nullptr,    maxAllowableValue,
         &readingBasis, &description};
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
     value.updateReading(val, timestamp);
 
     EXPECT_EQ(value.timestampIntf.elapsed(), timestamp);
@@ -163,6 +163,7 @@ TEST(NsmNumericSensorAggregator, GoodTest)
 
     EXPECT_EQ(aggregator.objects.size(), 2);
 
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
     EXPECT_CALL(*elem1Ptr, updateReading(val, timestamp)).Times(1);
     EXPECT_CALL(*elem2Ptr, updateReading(val, timestamp)).Times(1);
 

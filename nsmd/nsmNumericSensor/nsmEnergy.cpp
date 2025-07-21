@@ -80,18 +80,17 @@ uint8_t NsmEnergy::handleResponseMsg(const struct nsm_msg* responseMsg,
 
     auto rc = decode_get_current_energy_count_resp(
         responseMsg, responseLen, &cc, &reasonCode, &readingInMilliJoules);
-    double readingInJoules = (double)readingInMilliJoules / 1000.0;
     LG2_ERROR_FLT(
         "decode_get_current_energy_count_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
-    {
-        sensorValue->updateReading(readingInJoules);
-    }
-    else
-    {
-        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-    }
+
+    // unit of energy is millijoules in NSM Command Response and selected unit
+    // in SensorValue PDI is Joules. Hence it is converted to Joules.
+    auto reading = rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS
+                       ? readingInMilliJoules / 1000.0
+                       : std::numeric_limits<double>::quiet_NaN();
+    sensorValue->updateReading(reading,
+                               utils::getCurrentSteadyClockTimestamp());
 
     return cc ? cc : rc;
 }

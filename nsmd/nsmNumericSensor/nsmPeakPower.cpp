@@ -76,16 +76,12 @@ uint8_t NsmPeakPower::handleResponseMsg(const struct nsm_msg* responseMsg,
     LG2_ERROR_FLT(
         "decode_get_max_observed_power_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
-    {
-        // unit of power is milliwatt in NSM Command Response and selected unit
-        // on DBus is Watts. Hence it is converted to Watts.
-        sensorValue->updateReading(reading / 1000.0);
-    }
-    else
-    {
-        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-    }
+    // unit of power is milliwatt in NSM Command Response and selected unit
+    // on DBus is Watts. Hence it is converted to Watts.
+    double value = rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS
+                       ? reading / 1000.0
+                       : std::numeric_limits<double>::quiet_NaN();
+    sensorValue->updateReading(value, utils::getCurrentSteadyClockTimestamp());
 
     return cc ? cc : rc;
 }

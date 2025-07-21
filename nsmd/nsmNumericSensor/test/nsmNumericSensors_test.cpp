@@ -109,7 +109,8 @@ TEST(nsmTemp, GoodHandleResp)
                                                   reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(testing::DoubleNear(reading, 0.01), 0))
+    EXPECT_CALL(*value, updateReading(testing::DoubleNear(reading, 0.01),
+                                      testing::Gt(0)))
         .Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
@@ -222,7 +223,8 @@ TEST(nsmPower, GoodHandleResp)
                                                  reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(reading / 1000.0, 0)).Times(1);
+    EXPECT_CALL(*value, updateReading(reading / 1000.0, testing::Gt(0)))
+        .Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
 }
@@ -313,7 +315,8 @@ TEST(nsmPeakPower, GoodHandleResp)
                                                  reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(reading / 1000.0, 0)).Times(1);
+    EXPECT_CALL(*value, updateReading(reading / 1000.0, testing::Gt(0)))
+        .Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
 }
@@ -412,7 +415,8 @@ TEST(nsmEnergy, GoodHandleResp)
                                                    reading, msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(readingInJoules, 0)).Times(1);
+    EXPECT_CALL(*value, updateReading(readingInJoules, testing::Gt(0)))
+        .Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
 }
@@ -505,7 +509,8 @@ TEST(nsmVoltage, GoodHandleResp)
                                       msg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-    EXPECT_CALL(*value, updateReading(reading / 1'000'000.0, 0)).Times(1);
+    EXPECT_CALL(*value, updateReading(reading / 1'000'000.0, testing::Gt(0)))
+        .Times(1);
 
     sensor.handleResponseMsg(msg, msg_size);
 }

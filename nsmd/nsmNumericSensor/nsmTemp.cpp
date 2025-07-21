@@ -84,14 +84,12 @@ uint8_t NsmTemp::handleResponseMsg(const struct nsm_msg* responseMsg,
     LG2_ERROR_FLT(
         "decode_get_temperature_reading_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
         "REASONCODE", reasonCode, "CC", cc, "RC", rc);
-    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
-    {
-        sensorValue->updateReading(reading);
-    }
-    else
-    {
-        sensorValue->updateReading(std::numeric_limits<double>::quiet_NaN());
-    }
+
+    reading = rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS
+                  ? reading
+                  : std::numeric_limits<double>::quiet_NaN();
+    sensorValue->updateReading(reading,
+                               utils::getCurrentSteadyClockTimestamp());
 
     return cc ? cc : rc;
 }

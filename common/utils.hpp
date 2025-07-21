@@ -437,6 +437,12 @@ std::vector<std::string> split(std::string_view srcStr, std::string_view delim,
  */
 std::string getCurrentSystemTime();
 
+/** @brief Get the current system time in milliseconds
+ *
+ *  @return - uint64_t equivalent of the system time
+ */
+uint64_t getCurrentSteadyClockTimestamp();
+
 /** @brief Get UUID from the eid
  *
  *  @return - uuid_t uuid for corresponding eid

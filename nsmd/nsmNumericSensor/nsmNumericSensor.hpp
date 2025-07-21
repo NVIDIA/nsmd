@@ -91,6 +91,8 @@ class NsmNumericSensorDbusValue : public NsmNumericSensorValue
     void updateReading(double value, uint64_t timestamp = 0) override;
 
   private:
+    uint64_t lastTimestamp = 0;
+    double previousValue = std::numeric_limits<double>::quiet_NaN();
     ValueIntf valueIntf;
     AssociationDefinitionsInft associationDefinitionsIntf;
     DecoratorAreaIntf decoratorAreaIntf;
@@ -109,9 +111,10 @@ class NsmNumericSensorDbusValueTimestamp : public NsmNumericSensorDbusValue
         const std::string& physicalContext, const std::string* implementation,
         const double maxAllowableValue, const std::string* readingBasis,
         const std::string* description);
-    void updateReading(double value, uint64_t timestamp = 0) final;
+    void updateReading(double value, uint64_t timestamp) final;
 
   private:
+    uint64_t lastTimestamp = 0;
     TimestampIntf timestampIntf;
 };
 

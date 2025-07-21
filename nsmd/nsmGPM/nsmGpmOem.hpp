@@ -41,6 +41,9 @@ using DecodeMetricFunc = std::pair<uint8_t, double> (*)(const uint8_t*, size_t);
 
 class MetricUpdator
 {
+  protected:
+    double previousValue = std::numeric_limits<double>::quiet_NaN();
+
   public:
     virtual ~MetricUpdator() = default;
 
@@ -49,6 +52,9 @@ class MetricUpdator
 
 class MetricPerInstanceUpdator
 {
+  protected:
+    std::vector<double> previousMetrics;
+
   public:
     virtual ~MetricPerInstanceUpdator() = default;
     virtual void updateMetric(const std::vector<double>& metrics) = 0;

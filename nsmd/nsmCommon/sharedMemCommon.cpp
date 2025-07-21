@@ -17,9 +17,10 @@
 
 #include "config.h"
 
+#include "utils.hpp"
+
 #include <tal.hpp>
 
-#include <chrono>
 namespace nsm_shmem_utils
 {
 void updateSharedMemoryOnSuccess(
@@ -30,10 +31,7 @@ void updateSharedMemoryOnSuccess(
     [[maybe_unused]] nv::sensor_aggregation::DbusVariantType propValue)
 {
 #ifdef NVIDIA_SHMEM
-    auto timestamp = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
     tal::TelemetryAggregator::updateTelemetry(inventoryObjPath, ifaceName,
                                               propName, smbusData, timestamp, 0,
                                               propValue);

@@ -41,13 +41,14 @@ class GPMMetricUpdator : public MetricUpdator
     void updateMetric([[maybe_unused]] const std::string& name,
                       const double val) override
     {
-        (intf->*updateFunc)(val);
+        if (previousValue != val)
+        {
+            (intf->*updateFunc)(val);
+            previousValue = val;
+        }
 
 #ifdef NVIDIA_SHMEM
-        auto timestamp = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count());
+        auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
         DbusVariantType valueVariant{val};
 
@@ -76,13 +77,14 @@ class NVLinkMetricUpdator : public MetricUpdator
     void updateMetric([[maybe_unused]] const std::string& name,
                       const double val) override
     {
-        (intf->*updateFunc)(val);
+        if (previousValue != val)
+        {
+            (intf->*updateFunc)(val);
+            previousValue = val;
+        }
 
 #ifdef NVIDIA_SHMEM
-        auto timestamp = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count());
+        auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
         DbusVariantType valueVariant{val};
 
@@ -109,13 +111,14 @@ DRAMUsageMetricUpdator::DRAMUsageMetricUpdator(std::shared_ptr<DimmIntf> intf,
 void DRAMUsageMetricUpdator::updateMetric(
     [[maybe_unused]] const std::string& name, const double val)
 {
-    intf->utilization(val);
+    if (previousValue != val)
+    {
+        intf->utilization(val);
+        previousValue = val;
+    }
 
 #ifdef NVIDIA_SHMEM
-    auto timestamp = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
     DbusVariantType valueVariant{val};
 
@@ -163,13 +166,14 @@ class GPMMetricInstanceUpdator : public MetricPerInstanceUpdator
     {}
     void updateMetric(const std::vector<double>& metrics) override
     {
-        (*gpmIntf.*updateFunc)(metrics);
+        if (previousMetrics != metrics)
+        {
+            (*gpmIntf.*updateFunc)(metrics);
+            previousMetrics = metrics;
+        }
 
 #ifdef NVIDIA_SHMEM
-        auto timestamp = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count());
+        auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
         DbusVariantType valueVariant{metrics};
 
@@ -201,15 +205,22 @@ class PortMetricPerInstanceUpdator : public MetricPerInstanceUpdator
     void updateMetric(const std::vector<double>& metrics) override
     {
         const size_t length = std::min(metrics.size(), updatorInfos.size());
+        if (previousMetrics.size() != length)
+        {
+            previousMetrics.resize(length,
+                                   std::numeric_limits<double>::quiet_NaN());
+        }
+
         for (size_t i{}; i < length; ++i)
         {
-            (updatorInfos[i].interface.get()->*updateFunc)(metrics[i]);
+            if (previousMetrics[i] != metrics[i])
+            {
+                (updatorInfos[i].interface.get()->*updateFunc)(metrics[i]);
+                previousMetrics[i] = metrics[i];
+            }
 
 #ifdef NVIDIA_SHMEM
-            auto timestamp = static_cast<uint64_t>(
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now().time_since_epoch())
-                    .count());
+            auto timestamp = utils::getCurrentSteadyClockTimestamp();
 
             DbusVariantType valueVariant{metrics[i]};
 

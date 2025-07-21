@@ -251,6 +251,13 @@ std::optional<uuid_t> getUUIDFromEID(
     return std::nullopt;
 }
 
+uint64_t getCurrentSteadyClockTimestamp()
+{
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
 eid_t getEidFromUUID(
     const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
         eidTable,
