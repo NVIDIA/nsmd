@@ -189,7 +189,9 @@ class SensorManagerImpl : public SensorManager
 
     requester::Coroutine deviceTask(std::shared_ptr<NsmDevice> nsmDevice);
     requester::Coroutine
-        deviceLongRunningTask(std::shared_ptr<NsmDevice> nsmDevice);
+        updateLongRunningSensor(std::shared_ptr<NsmDevice> nsmDevice,
+                                std::shared_ptr<NsmObject> sensor,
+                                std::shared_ptr<LimitedSensorQueue> sensors);
 
     requester::Coroutine
         SendRecvNsmMsg(eid_t eid, Request& request,

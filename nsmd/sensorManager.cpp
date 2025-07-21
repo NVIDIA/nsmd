@@ -222,6 +222,7 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
             for (auto nsmDevice : nsmDevices)
             {
                 // Mark all the round-robin sensors as unrefreshed.
+                // TODO: check with @aishwaryj
                 for (auto sensor : nsmDevice->roundRobinSensors)
                 {
                     sensor->isRefreshed = false;
@@ -501,78 +502,21 @@ void SensorManagerImpl::startPolling()
                       nsmDevice->getInstanceNumber(), "ROLE",
                       nsmDevice->getDeviceRole());
             nsmDevice->task = deviceTask(nsmDevice);
-            nsmDevice->longRunningTask = deviceLongRunningTask(nsmDevice);
         }
     }
 }
 
-requester::Coroutine SensorManagerImpl::deviceLongRunningTask(
-    std::shared_ptr<NsmDevice> nsmDevice)
+requester::Coroutine SensorManagerImpl::updateLongRunningSensor(
+    std::shared_ptr<NsmDevice> nsmDevice, std::shared_ptr<NsmObject> sensor,
+    std::shared_ptr<LimitedSensorQueue> sensors)
 {
-    uint64_t t0 = 0, t1 = 0;
-    uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
-    uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME_LONG_RUNNING * 1000;
-    uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
+    uint64_t t1 = 0;
+    co_await sensor->update(*this, nsmDevice->eid);
+    sensor->isRefreshed = true;
+    sensors->next();
 
-    do
-    {
-        if (!nsmDevice->isDeviceActive)
-        {
-            // Sleep. Wait for the device to get active.
-            co_await common::Sleep(event, inActiveSleepTimeInUsec,
-                                   common::Priority);
-            continue;
-        }
-
-        eid_t eid = getEid(nsmDevice);
-        auto& sensors = nsmDevice->longRunningSensors;
-        size_t sensorIndex{0};
-
-        sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
-        t1 = t0;
-
-        while (sensorIndex < sensors.size())
-        {
-            auto sensor = sensors[sensorIndex];
-
-            if (!sensor->needsUpdate(t1))
-            {
-                // Skip the LongRunning Sensor
-                ++sensorIndex;
-                continue;
-            }
-
-            co_await sensor->update(*this, eid);
-
-            sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
-
-            sensor->setLastUpdatedTimeStamp(t1);
-
-            ++sensorIndex;
-        }
-
-        uint64_t diff = t1 - t0;
-        if (diff > pollingTimeInUsec)
-        {
-            // We have already crossed the polling interval. Don't sleep
-            continue;
-        }
-
-        uint64_t sleepDeltaInUsec = pollingTimeInUsec - diff;
-        if (sleepDeltaInUsec < allowedBufferInUsec)
-        {
-            // If the delta is within the allowed buffer, we can skip sleeping
-            // and continue polling.
-            continue;
-        }
-
-        co_await common::Sleep(
-            event, sleepDeltaInUsec,
-            common::NonPriority); // The timer for long running commands can
-                                  // have a normal priority
-
-    } while (true);
-
+    sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+    sensor->setLastUpdatedTimeStamp(t1);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -670,9 +614,12 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     std::shared_ptr<NsmDevice> nsmDevice, uint64_t t0)
 {
     uint64_t t1 = 0;
+    auto longRunningQueue =
+        std::make_shared<LimitedSensorQueue>(nsmDevice->longRunningSensors);
     SensorQueueMap sensors = SensorQueueUnorderedMap({
         {PollingType::GpuPerformanceMonitoring,
          std::make_shared<LimitedSensorQueue>(nsmDevice->gpmSensors)},
+        {PollingType::LongRunning, longRunningQueue},
         {PollingType::Static,
          std::make_shared<LimitedSensorQueue>(nsmDevice->staticSensors)},
         {PollingType::RoundRobin,
@@ -715,6 +662,20 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
         if (!sensor->needsUpdate(t1))
         {
+            // Skip to next sensor
+            continue;
+        }
+
+        if (pollingType == PollingType::LongRunning)
+        {
+            // Assign new coroutine for long running sensor if there is no
+            // other coroutine running for it
+
+            if (nsmDevice->longRunningTask.done())
+            {
+                nsmDevice->longRunningTask = updateLongRunningSensor(
+                    nsmDevice, sensor, longRunningQueue);
+            }
             // Skip to next sensor
             continue;
         }
