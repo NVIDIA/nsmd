@@ -32,8 +32,7 @@ namespace nsm
 NsmThresholdEvent::NsmThresholdEvent(const std::string& name,
                                      const std::string& type,
                                      const NsmEventInfo info) :
-    NsmEvent(name, type),
-    info(info)
+    NsmEvent(name, type), info(info)
 {
     if (info.messageId != "ResourceEvent.1.0.ResourceErrorsDetected")
     {

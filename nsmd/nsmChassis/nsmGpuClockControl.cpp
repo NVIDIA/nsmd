@@ -41,8 +41,7 @@ enum class clockLimitFlag
 NsmClearClockLimAsyncIntf::NsmClearClockLimAsyncIntf(
     sdbusplus::bus::bus& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
-    ClearClockLimAsyncIntf(bus, path),
-    device(device){};
+    ClearClockLimAsyncIntf(bus, path), device(device) {};
 
 requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
     std::shared_ptr<AsyncStatusIntf> statusInterface)
@@ -132,8 +131,7 @@ NsmChassisClockControl::NsmChassisClockControl(
     const std::vector<utils::Association>& associations, std::string& type,
     const std::string& inventoryObjPath, const std::string& physicalContext,
     const std::string& clockMode) :
-    NsmSensor(name, type),
-    cpuOperatingConfigIntf(cpuOperatingConfigIntf),
+    NsmSensor(name, type), cpuOperatingConfigIntf(cpuOperatingConfigIntf),
     nsmClearClockLimAsyncIntf(nsmClearClockLimAsyncIntf),
     inventoryObjPath(inventoryObjPath)
 {

@@ -239,8 +239,9 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         auto device = manager.getNsmDevice(deviceType, instanceId, deviceRole);
         if (!device)
         {
-            throw std::invalid_argument(
-                "Device " + std::to_string(deviceType) + ":" + std::to_string(instanceId) + " not found");
+            throw std::invalid_argument("Device " + std::to_string(deviceType) +
+                                        ":" + std::to_string(instanceId) +
+                                        " not found");
         }
         auto eid = manager.getEid(device);
         std::shared_ptr<const nsm_msg> responseMsg;
@@ -259,8 +260,8 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         }
         else if (rc != NSM_SW_SUCCESS)
         {
-            throw std::runtime_error(
-                "SendRecvNsmMsg failed, rc=" + std::to_string(rc));
+            throw std::runtime_error("SendRecvNsmMsg failed, rc=" +
+                                     std::to_string(rc));
         }
         else
         {

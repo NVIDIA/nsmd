@@ -461,8 +461,7 @@ class QueryPortStatus : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit QueryPortStatus(const char* type, const char* name,
-                             CLI::App* app) :
-        CommandInterface(type, name, app)
+                             CLI::App* app) : CommandInterface(type, name, app)
     {
         auto portStatusOptionGroup = app->add_option_group(
             "Required",
@@ -3618,8 +3617,7 @@ class GetCurrClockFreq : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit GetCurrClockFreq(const char* type, const char* name,
-                              CLI::App* app) :
-        CommandInterface(type, name, app)
+                              CLI::App* app) : CommandInterface(type, name, app)
     {
         auto currClockFreqOptionGroup = app->add_option_group(
             "Required",
@@ -4554,8 +4552,7 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     {
       public:
         QueryPerInstanceGPMMetricsAggregateResponseParser(
-            const MetricsInfo* info) :
-            info(info)
+            const MetricsInfo* info) : info(info)
         {}
 
       private:

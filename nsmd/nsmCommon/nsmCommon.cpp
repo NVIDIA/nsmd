@@ -223,8 +223,8 @@ NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMinGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());
@@ -311,8 +311,8 @@ NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     std::string& name, std::string& type,
     std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
     std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    cpuOperatingConfigIntf(cpuConfigIntf), inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), cpuOperatingConfigIntf(cpuConfigIntf),
+    inventoryObjPath(inventoryObjPath)
 {
     lg2::info("NsmMaxGraphicsClockLimit: create sensor:{NAME}", "NAME",
               name.c_str());

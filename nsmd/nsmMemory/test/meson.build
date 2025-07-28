@@ -41,9 +41,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'nsmMemory_test',
-]
+tests = ['nsmMemory_test']
 
 foreach t : tests
     test(

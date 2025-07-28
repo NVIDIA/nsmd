@@ -16,22 +16,14 @@ dep_src_files = [
     '../../libnsm/firmware-utils.c',
 ]
 
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../common',
-    '../../libnsm',
-]
+dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
 
 test_src = declare_dependency(
     sources: dep_src_files,
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'mockupResponder_test',
-]
+tests = ['mockupResponder_test']
 
 foreach t : tests
     test(

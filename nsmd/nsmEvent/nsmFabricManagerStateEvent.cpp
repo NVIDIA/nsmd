@@ -34,8 +34,8 @@ NsmFabricManagerStateEvent::NsmFabricManagerStateEvent(
     std::shared_ptr<OperaStatusIntf> opStateIntf,
     std::shared_ptr<NsmAggregateFabricManagerState>
         nsmAggregateFabricManagerState) :
-    NsmEvent(name, type),
-    fabricManagerIntf(fabricMgrIntf), operationalStatusIntf(opStateIntf),
+    NsmEvent(name, type), fabricManagerIntf(fabricMgrIntf),
+    operationalStatusIntf(opStateIntf),
     nsmAggregateFabricManagerState(nsmAggregateFabricManagerState)
 {
     lg2::debug("NsmFabricManagerStateEvent: Name {NAME}.", "NAME", name);

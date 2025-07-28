@@ -473,8 +473,7 @@ class GetHistogramData : public CommandInterface
     using CommandInterface::CommandInterface;
 
     explicit GetHistogramData(const char* type, const char* name,
-                              CLI::App* app) :
-        CommandInterface(type, name, app)
+                              CLI::App* app) : CommandInterface(type, name, app)
     {
         auto histoDataOptionGroup = app->add_option_group(
             "Required",

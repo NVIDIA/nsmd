@@ -11,13 +11,12 @@ dep_src_files = [
     '../pci-links.c',
 ]
 
-dep_src_headers = [
-    '.',
-    '..',
-    '../../common',
-]
+dep_src_headers = ['.', '..', '../../common']
 
-test_src = declare_dependency(sources: dep_src_files, include_directories: dep_src_headers)
+test_src = declare_dependency(
+    sources: dep_src_files,
+    include_directories: dep_src_headers,
+)
 
 tests = [
     'libnsm_base_test',

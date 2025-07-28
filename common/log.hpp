@@ -57,9 +57,9 @@
 
 /* Macro to check for odd-numbered arguments to prevent flooding. */
 #define SHOULD_LOG(msg, ...)                                                   \
-    std::apply(                                                                \
-        [this](auto&&... args) { return this->shouldLog(msg, args...); },      \
-        StateChangeLogger::extractOddArgs(__VA_ARGS__))
+    std::apply([this](auto&&... args) {                                        \
+        return this->shouldLog(msg, args...);                                  \
+    }, StateChangeLogger::extractOddArgs(__VA_ARGS__))
 
 /* Logging macros which will store log level, fileName and line */
 #define LG2_LEVEL_FILE(level, msg, ...)                                        \

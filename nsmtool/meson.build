@@ -28,12 +28,7 @@ executable(
     sources,
     implicit_include_directories: false,
     include_directories: include_directories(nsmtool_headers),
-    dependencies: [
-        CLI11_dep,
-        nlohmann_json,
-        sdbusplus,
-        phosphor_logging,
-    ],
+    dependencies: [CLI11_dep, nlohmann_json, sdbusplus, phosphor_logging],
     install: true,
     install_dir: get_option('bindir'),
 )

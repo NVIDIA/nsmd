@@ -139,8 +139,8 @@ struct Sleep
      */
     Sleep(const sdeventplus::Event& event, uint64_t durationInUsec,
           TimerEventPriority priority) :
-        event(event),
-        durationInUsec(durationInUsec), timerEventPriority(priority),
+        event(event), durationInUsec(durationInUsec),
+        timerEventPriority(priority),
         rc(NSM_SW_SUCCESS) // Initialize the result code to success
     {}
 };

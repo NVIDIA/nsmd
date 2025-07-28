@@ -100,9 +100,8 @@ class Handler
         uint8_t numRetries = static_cast<uint8_t>(NUMBER_OF_REQUEST_RETRIES),
         std::chrono::milliseconds responseTimeOut =
             std::chrono::milliseconds(RESPONSE_TIME_OUT)) :
-        event(event),
-        instanceIdDb(instanceIdDb), sockManager(sockManager), verbose(verbose),
-        instanceIdExpiryInterval(instanceIdExpiryInterval),
+        event(event), instanceIdDb(instanceIdDb), sockManager(sockManager),
+        verbose(verbose), instanceIdExpiryInterval(instanceIdExpiryInterval),
         numRetries(numRetries), responseTimeOut(responseTimeOut),
         socketHandler(nullptr)
     {}
@@ -492,8 +491,7 @@ struct SendRecvNsmMsg
     SendRecvNsmMsg(RequesterHandler& handler, eid_t eid,
                    std::vector<uint8_t>& request, const nsm_msg** responseMsg,
                    size_t* responseLen) :
-        handler(handler),
-        eid(eid), request(request), responseMsg(responseMsg),
+        handler(handler), eid(eid), request(request), responseMsg(responseMsg),
         responseLen(responseLen), rc(NSM_ERROR)
     {}
 

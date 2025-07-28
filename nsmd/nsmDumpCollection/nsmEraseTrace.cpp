@@ -38,8 +38,8 @@ NsmEraseTraceObject::NsmEraseTraceObject(sdbusplus::bus::bus& bus,
                                          const std::string& inventoryPath,
                                          const std::string& type,
                                          const uuid_t& uuid) :
-    NsmObject(name, type),
-    EraseIntf(bus, (inventoryPath + name).c_str()), uuid(uuid)
+    NsmObject(name, type), EraseIntf(bus, (inventoryPath + name).c_str()),
+    uuid(uuid)
 {
     lg2::debug("NsmEraseTraceObject: {NAME}", "NAME", name.c_str());
     objPath = inventoryPath + name;

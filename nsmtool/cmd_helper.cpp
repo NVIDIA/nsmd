@@ -57,8 +57,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     }
     Logger(verbose, "Success in creating the socket : RC = ", sockFd);
 
-    struct sockaddr_un addr
-    {};
+    struct sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
 
     memcpy(addr.sun_path, devPath, sizeof(devPath) - 1);
@@ -441,8 +440,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
 
         CustomFD socketFd(sockFd);
 
-        struct sockaddr_un addr
-        {};
+        struct sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         memcpy(addr.sun_path, sockAddress.data(), sockAddress.size());
         rc = connect(sockFd, reinterpret_cast<struct sockaddr*>(&addr),

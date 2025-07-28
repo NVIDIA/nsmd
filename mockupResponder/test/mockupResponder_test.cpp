@@ -81,12 +81,10 @@ class MockupResponderTest : public Test
     {
         std::optional<Request> longRunningEvent;
         // test as not long running
-        test(
-            requestMsg, requestMsgLen,
-            [&handler, &longRunningEvent](const nsm_msg* request, size_t len) {
+        test(requestMsg, requestMsgLen,
+             [&handler, &longRunningEvent](const nsm_msg* request, size_t len) {
             return handler(request, len, false, longRunningEvent);
-        },
-            command, response);
+        }, command, response);
 
         // test as long running
         auto resp = handler(requestMsg, requestMsgLen, true, longRunningEvent);

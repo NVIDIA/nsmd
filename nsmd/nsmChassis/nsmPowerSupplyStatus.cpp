@@ -26,8 +26,8 @@ namespace nsm
 NsmPowerSupplyStatus::NsmPowerSupplyStatus(
     const NsmInterfaceProvider<PowerStateIntf>& provider,
     uint8_t gpuInstanceId) :
-    NsmGroupSensor(provider),
-    NsmInterfaceContainer(provider), gpuInstanceId(gpuInstanceId)
+    NsmGroupSensor(provider), NsmInterfaceContainer(provider),
+    gpuInstanceId(gpuInstanceId)
 {}
 
 std::optional<Request> NsmPowerSupplyStatus::genRequestMsg(eid_t eid,

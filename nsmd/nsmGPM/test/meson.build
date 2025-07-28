@@ -32,11 +32,12 @@ dep_src_headers = [
     '../../nsmDbusIfaceOverride',
 ]
 
-test_src = declare_dependency(sources: dep_src_files, include_directories: dep_src_headers)
+test_src = declare_dependency(
+    sources: dep_src_files,
+    include_directories: dep_src_headers,
+)
 
-tests_files = [
-    'nsmGpmOem_test.cpp',
-]
+tests_files = ['nsmGpmOem_test.cpp']
 
 test(
     'nsmGpmOem_test',

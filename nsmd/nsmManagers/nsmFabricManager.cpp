@@ -129,13 +129,10 @@ void NsmAggregateFabricManagerState::updateAggregateFabricManagerState()
     operationalStatusIntf->state(state);
 }
 
-NsmFabricManagerState::NsmFabricManagerState(const std::string& name,
-                                             const std::string& type,
-                                             std::string& inventoryObjPath,
-                                             std::string& inventoryObjPathFM,
-                                             sdbusplus::bus_t& bus,
-                                             std::string& description) :
-    NsmSensor(name, type)
+NsmFabricManagerState::NsmFabricManagerState(
+    const std::string& name, const std::string& type,
+    std::string& inventoryObjPath, std::string& inventoryObjPathFM,
+    sdbusplus::bus_t& bus, std::string& description) : NsmSensor(name, type)
 {
     lg2::info("NsmFabricManagerState: {NAME}", "NAME", name.c_str());
     objPath = inventoryObjPath + name;

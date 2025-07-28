@@ -44,8 +44,8 @@ ResetStatisticsAggregator::ResetStatisticsAggregator(
     const std::string& inventoryObjPath,
     std::shared_ptr<ResetCountersIntf> resetCountersIntf,
     std::unique_ptr<AssociationDefinitionsIntf> associationDef) :
-    NsmSensorAggregator(name, type),
-    inventoryObjPath(inventoryObjPath), resetCountersIntf(resetCountersIntf),
+    NsmSensorAggregator(name, type), inventoryObjPath(inventoryObjPath),
+    resetCountersIntf(resetCountersIntf),
     associationDef(std::move(associationDef))
 {
 #ifdef NVIDIA_SHMEM

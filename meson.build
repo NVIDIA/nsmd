@@ -49,11 +49,17 @@ else
 endif
 
 if get_option('grace-spi-operations').enabled()
-    add_project_arguments('-DENABLE_GRACE_SPI_OPERATIONS', language: ['cpp', 'c'])
+    add_project_arguments(
+        '-DENABLE_GRACE_SPI_OPERATIONS',
+        language: ['cpp', 'c'],
+    )
 endif
 
 if get_option('grace-spi-operations-raw-debug-dump').enabled()
-    add_project_arguments('-DENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP', language: ['cpp', 'c'])
+    add_project_arguments(
+        '-DENABLE_GRACE_SPI_OPERATION_RAW_DEBUG_DUMP',
+        language: ['cpp', 'c'],
+    )
 endif
 
 cpp = meson.get_compiler('cpp')
@@ -71,10 +77,7 @@ conf_data.set(
     'SENSOR_POLLING_TIME_LONG_RUNNING',
     get_option('sensor-polling-time-long-running'),
 )
-conf_data.set(
-    'NUM_GPU_PER_MODULE',
-    get_option('num-gpu-per-module')
-)
+conf_data.set('NUM_GPU_PER_MODULE', get_option('num-gpu-per-module'))
 conf_data.set(
     'INSTANCE_ID_EXPIRATION_INTERVAL',
     get_option('instance-id-expiration-interval'),
@@ -88,10 +91,7 @@ conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
     get_option('response-time-out-long-running'),
 )
-conf_data.set(
-    'DEFAULT_RR_REFRESH_LIMIT_IN_MS',
-    get_option('rr-refresh-limit'),
-)
+conf_data.set('DEFAULT_RR_REFRESH_LIMIT_IN_MS', get_option('rr-refresh-limit'))
 conf_data.set(
     'ALLOWED_BUFFER_IN_MS',
     get_option('allowed-buffer-in-ms-for-polling'),
@@ -145,14 +145,16 @@ if get_option('accelerator-dbus').allowed()
 endif
 
 if get_option('tracing').enabled() and get_option('tests').enabled()
-    error('Cannot enable both features "tracing" and "tests" at a time. Please disable one of them.')
+    error(
+        'Cannot enable both features "tracing" and "tests" at a time. Please disable one of them.',
+    )
 endif
 
 if get_option('tracing').enabled()
-    summary('tracing','-DLTTNG_TRACING', section : 'Enabled Tracing')
+    summary('tracing', '-DLTTNG_TRACING', section: 'Enabled Tracing')
     conf_data.set('LTTNG_TRACING', 1)
-    liblttng = dependency('lttng-ust', required : true)
-    ldl = dependency('dl', required : true)
+    liblttng = dependency('lttng-ust', required: true)
+    ldl = dependency('dl', required: true)
 endif
 
 conf_data.set('LOCAL_EID', get_option('local-eid'))
@@ -171,7 +173,10 @@ if get_option('fixup-missing-event-notification').enabled()
 endif
 
 if get_option('nvidia-fpga-pcie-reference-clock-count').enabled()
-    add_project_arguments('-DNVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT', language: ['cpp', 'c'])
+    add_project_arguments(
+        '-DNVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT',
+        language: ['cpp', 'c'],
+    )
 endif
 
 configure_file(output: 'config.h', configuration: conf_data)
@@ -193,9 +198,7 @@ if get_option('shmem').enabled()
 endif
 
 systemd = dependency('systemd')
-systemd_system_unit_dir = systemd.get_variable(
-    pkgconfig: 'systemdsystemunitdir',
-)
+systemd_system_unit_dir = systemd.get_variable(pkgconfig: 'systemdsystemunitdir')
 
 subdir('services')
 subdir('nsmtool')

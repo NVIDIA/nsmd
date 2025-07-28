@@ -48,8 +48,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
                                  uint8_t instanceId) :
-    event(event),
-    verbose(verbose), server(server), eventReceiverEid(0),
+    event(event), verbose(verbose), server(server), eventReceiverEid(0),
     globalEventGenerationSetting(GLOBAL_EVENT_GENERATION_DISABLE),
     state({
         {}, // writeProtected
@@ -185,8 +184,7 @@ int MockupResponder::initSocket()
         return false;
     }
 
-    struct sockaddr_un addr
-    {};
+    struct sockaddr_un addr{};
 
     addr.sun_family = AF_UNIX;
     memcpy(addr.sun_path, MCTP_SOCKET_PATH, sizeof(MCTP_SOCKET_PATH) - 1);

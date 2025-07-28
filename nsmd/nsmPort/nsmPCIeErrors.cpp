@@ -39,9 +39,8 @@ namespace nsm
  */
 NsmPCIeErrors::NsmPCIeErrors(const NsmInterfaceProvider<PCIeEccIntf>& provider,
                              uint8_t deviceIndex, uint8_t groupId) :
-    NsmSensor(provider),
-    NsmInterfaceContainer<PCIeEccIntf>(provider), deviceIndex(deviceIndex),
-    groupId(groupId)
+    NsmSensor(provider), NsmInterfaceContainer<PCIeEccIntf>(provider),
+    deviceIndex(deviceIndex), groupId(groupId)
 {
 #define initHandleResponse(X)                                                  \
     {                                                                          \

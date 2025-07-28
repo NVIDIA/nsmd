@@ -27,8 +27,8 @@ namespace nsm
 NsmWriteProtectedControl::NsmWriteProtectedControl(
     const NsmInterfaceProvider<SettingsIntf>& provider,
     const diagnostics_enable_disable_wp_data_index dataIndex) :
-    NsmGroupSensor(provider),
-    NsmInterfaceContainer(provider), dataIndex(dataIndex)
+    NsmGroupSensor(provider), NsmInterfaceContainer(provider),
+    dataIndex(dataIndex)
 {}
 
 std::optional<Request> NsmWriteProtectedControl::genRequestMsg(eid_t eid,

@@ -69,8 +69,8 @@ inline std::tuple<uint16_t, std::string>
         }
     }
     // else: At present there are no specific errors for other cc
-    return {cc,
-            "Unknown Error: cc=" + std::to_string(cc) + " reason_code=" + std::to_string(reasonCode)};
+    return {cc, "Unknown Error: cc=" + std::to_string(cc) +
+                    " reason_code=" + std::to_string(reasonCode)};
 }
 
 } // namespace nsm

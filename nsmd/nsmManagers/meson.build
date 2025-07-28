@@ -1,5 +1,3 @@
-sources += [
-    'nsmManagers/nsmFabricManager.cpp',
-]
+sources += ['nsmManagers/nsmFabricManager.cpp']
 
 nsmd_headers += ['.', '..']

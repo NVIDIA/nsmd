@@ -24,8 +24,7 @@ class NsmCommandCodes : public NsmObject
   public:
     NsmCommandCodes(const std::string& name, const std::string& type,
                     NsmDevice& nsmDevice, uint8_t messageType) :
-        NsmObject(name, type),
-        messageType(messageType), nsmDevice(nsmDevice)
+        NsmObject(name, type), messageType(messageType), nsmDevice(nsmDevice)
     {}
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override
@@ -96,8 +95,7 @@ class NsmMsgTypes : public NsmObject
   public:
     NsmMsgTypes(const std::string& name, const std::string& type,
                 NsmDevice& nsmDevice) :
-        NsmObject(name, type),
-        nsmDevice(nsmDevice)
+        NsmObject(name, type), nsmDevice(nsmDevice)
     {}
 
     requester::Coroutine update(SensorManager& manager, eid_t eid) override

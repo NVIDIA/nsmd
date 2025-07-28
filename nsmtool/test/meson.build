@@ -13,13 +13,7 @@ dep_src_files = [
     '../../libnsm/requester/mctp.c',
 ]
 
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../common',
-    '../../libnsm',
-]
+dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
 
 test_src = declare_dependency(
     sources: dep_src_files,

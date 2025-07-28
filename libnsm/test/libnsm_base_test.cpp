@@ -28,8 +28,7 @@ TEST(PackNSMMessage, BadPathTest)
 	struct nsm_header_info hdr;
 	struct nsm_header_info *hdr_ptr = NULL;
 
-	struct nsm_msg_hdr msg {
-	};
+	struct nsm_msg_hdr msg{};
 
 	// header information pointer is NULL
 	auto rc = pack_nsm_header(hdr_ptr, &msg);
@@ -58,8 +57,7 @@ TEST(UnpackNSMMessage, BadPathTest)
 	auto rc = unpack_nsm_header(nullptr, &hdr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	struct nsm_msg_hdr msg {
-	};
+	struct nsm_msg_hdr msg{};
 
 	// hdr pointer is NULL
 	rc = unpack_nsm_header(&msg, nullptr);

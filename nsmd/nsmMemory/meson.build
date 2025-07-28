@@ -1,6 +1,4 @@
-sources += [
-    'nsmMemory/nsmMemory.cpp',
-]
+sources += ['nsmMemory/nsmMemory.cpp']
 
 nsmd_headers += ['.', '..']
 
