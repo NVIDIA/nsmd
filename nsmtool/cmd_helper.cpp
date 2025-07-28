@@ -57,8 +57,7 @@ int mctpSockSendRecv(const std::vector<uint8_t>& requestMsg,
     }
     Logger(verbose, "Success in creating the socket : RC = ", sockFd);
 
-    struct sockaddr_un addr
-    {};
+    struct sockaddr_un addr{};
     addr.sun_family = AF_UNIX;
 
     memcpy(addr.sun_path, devPath, sizeof(devPath) - 1);
@@ -338,7 +337,7 @@ std::tuple<int, int, std::vector<uint8_t>>
     {
         const dbus::Interfaces ifaceList{"xyz.openbmc_project.MCTP.Endpoint"};
         auto getSubTreeResponse = utils::DBusHandler().getSubtree(
-            "/xyz/openbmc_project/mctp", 0, ifaceList);
+            "/au/com/codeconstruct/mctp1", 0, ifaceList);
         for (const auto& [objPath, mapperServiceMap] : getSubTreeResponse)
         {
             for (const auto& [serviceName, interfaces] : mapperServiceMap)
@@ -346,7 +345,7 @@ std::tuple<int, int, std::vector<uint8_t>>
                 dbus::ObjectValueTree objects{};
 
                 auto method = bus.new_method_call(
-                    serviceName.c_str(), "/xyz/openbmc_project/mctp",
+                    serviceName.c_str(), "/au/com/codeconstruct/mctp1",
                     "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
                 auto reply = bus.call(method);
                 reply.read(objects);
@@ -441,8 +440,7 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
 
         CustomFD socketFd(sockFd);
 
-        struct sockaddr_un addr
-        {};
+        struct sockaddr_un addr{};
         addr.sun_family = AF_UNIX;
         memcpy(addr.sun_path, sockAddress.data(), sockAddress.size());
         rc = connect(sockFd, reinterpret_cast<struct sockaddr*>(&addr),

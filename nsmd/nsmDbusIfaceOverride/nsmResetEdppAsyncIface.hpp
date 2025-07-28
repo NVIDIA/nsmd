@@ -42,8 +42,7 @@ class NsmResetEdppAsyncIntf :
   public:
     NsmResetEdppAsyncIntf(sdbusplus::bus::bus& bus, const char* path,
                           std::shared_ptr<NsmDevice> device) :
-        ResetEdppAsyncIntf(bus, path),
-        device(device){};
+        ResetEdppAsyncIntf(bus, path), device(device) {};
 
     requester::Coroutine clearSetPoint(AsyncOperationStatusType* status)
     {

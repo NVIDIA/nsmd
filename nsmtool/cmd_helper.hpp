@@ -125,8 +125,8 @@ class CommandInterface
   public:
     explicit CommandInterface(const char* type, const char* name,
                               CLI::App* app) :
-        nsmType(type),
-        commandName(name), mctpEid(NSM_ENTITY_ID), verbose(false), instanceId(0)
+        nsmType(type), commandName(name), mctpEid(NSM_ENTITY_ID),
+        verbose(false), instanceId(0)
     {
         app->add_option("-m,--mctp_eid", mctpEid, "MCTP endpoint ID");
         app->add_flag("-v, --verbose", verbose);

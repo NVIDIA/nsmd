@@ -77,9 +77,8 @@ class Handler
                      requester::Handler<requester::Request>& handler,
                      nsm::EventManager& eventManager, Manager& manager,
                      bool verbose) :
-        handler(handler),
-        eventManager(eventManager), manager(manager), event(event),
-        verbose(verbose)
+        handler(handler), eventManager(eventManager), manager(manager),
+        event(event), verbose(verbose)
     {}
 
     virtual int registerMctpEndpoint(eid_t eid, int type, int protocol,

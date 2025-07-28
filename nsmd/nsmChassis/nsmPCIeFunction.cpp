@@ -27,19 +27,17 @@ namespace nsm
 NsmPCIeFunction::NsmPCIeFunction(
     const NsmInterfaceProvider<PCIeDeviceIntf>& provider, uint8_t deviceIndex,
     uint8_t functionId) :
-    NsmSensor(provider),
-    NsmInterfaceContainer(provider), deviceIndex(deviceIndex),
-    functionId(functionId)
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    deviceIndex(deviceIndex), functionId(functionId)
 {}
 
 NsmPCIeFunction::NsmPCIeFunction(
     const NsmInterfaceProvider<PCIeDeviceIntf>& provider, uint8_t functionId,
     uint8_t multiPortType, uint8_t multiPortIndex,
     uint8_t multiPortUpstreamPortNumber) :
-    NsmSensor(provider),
-    NsmInterfaceContainer(provider), functionId(functionId),
-    isMultiPciePortEnabled(true), multiPortType(multiPortType),
-    multiPortIndex(multiPortIndex),
+    NsmSensor(provider), NsmInterfaceContainer(provider),
+    functionId(functionId), isMultiPciePortEnabled(true),
+    multiPortType(multiPortType), multiPortIndex(multiPortIndex),
     multiPortUpstreamPortNumber(multiPortUpstreamPortNumber)
 {}
 

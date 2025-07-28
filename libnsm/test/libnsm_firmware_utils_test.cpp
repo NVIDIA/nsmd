@@ -1386,8 +1386,7 @@ TEST(QueryFirmwareSecurityVersion, testDecodeRequest)
 
 TEST(QueryFirmwareSecurityVersion, testEncodeResponse)
 {
-	struct nsm_firmware_security_version_number_resp sec_resp {
-	};
+	struct nsm_firmware_security_version_number_resp sec_resp{};
 	sec_resp.active_component_security_version = 3;
 	sec_resp.pending_component_security_version = 4;
 	sec_resp.minimum_security_version = 1;

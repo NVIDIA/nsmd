@@ -184,8 +184,7 @@ class StateChangeLogger
     void shouldLogAndUpdate(bool& stateChanged, StateChangeArg& storedValue,
                             T&& arg)
     {
-        stateChanged |= std::visit(
-            [&](auto&& value) -> bool {
+        stateChanged |= std::visit([&](auto&& value) -> bool {
             using StoredType = std::decay_t<decltype(value)>;
 
             if constexpr (std::is_same_v<StoredType, utils::Bitfield256>)
@@ -204,8 +203,7 @@ class StateChangeLogger
             // should not be reached, because of checking allowed types during
             // compilation
             return false;
-        },
-            storedValue);
+        }, storedValue);
     }
 
     template <typename... Args>
@@ -226,8 +224,8 @@ class StateChangeLogger
     void appendClearedCodes(std::string& clearedCodes,
                             const StateChangeArg& value, T&&)
     {
-        std::string codesText = std::visit(
-            [](auto& storedValue) -> std::string {
+        std::string codesText =
+            std::visit([](auto& storedValue) -> std::string {
             using StoredType = std::decay_t<decltype(storedValue)>;
             if constexpr (std::is_same_v<StoredType, utils::Bitfield256>)
             {
@@ -240,8 +238,7 @@ class StateChangeLogger
             // should not be reached, because of checking allowed types during
             // compilation
             return "";
-        },
-            value);
+        }, value);
 
         if (!codesText.empty())
         {

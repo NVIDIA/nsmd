@@ -47,10 +47,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'NVLinkManagementNICSWInventory_test',
-    'nsmFirmwareInventory_test',
-]
+tests = ['NVLinkManagementNICSWInventory_test', 'nsmFirmwareInventory_test']
 
 tests_deps = [
     test_src,

@@ -1,6 +1,4 @@
 
-sources += [
-  'nsmSPI/nsmGraceSpi.cpp',
-]
+sources += ['nsmSPI/nsmGraceSpi.cpp']
 
 nsmd_headers += ['.', '..', 'nsmSPI']

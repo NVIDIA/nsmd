@@ -42,8 +42,7 @@ class NsmAERErrorStatusIntf :
     NsmAERErrorStatusIntf(sdbusplus::bus::bus& bus, const char* path,
                           uint8_t deviceIndex,
                           std::shared_ptr<NsmDevice> device) :
-        AERErrorStatusIntf(bus, path),
-        deviceIndex(deviceIndex), device(device)
+        AERErrorStatusIntf(bus, path), deviceIndex(deviceIndex), device(device)
     {}
     sdbusplus::message::object_path clearAERStatus() override;
     requester::Coroutine clearAERError(AsyncOperationStatusType* status);

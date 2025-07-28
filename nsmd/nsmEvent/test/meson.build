@@ -42,9 +42,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'nsmEvent_test',
-]
+tests = ['nsmEvent_test']
 
 tests_deps = [
     test_src,

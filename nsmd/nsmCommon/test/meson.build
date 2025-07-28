@@ -43,9 +43,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'nsmCommon_test',
-]
+tests = ['nsmCommon_test']
 
 tests_deps = [
     test_src,

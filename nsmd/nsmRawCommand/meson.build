@@ -1,7 +1,5 @@
 
-sources += [
-  'nsmRawCommand/nsmRawCommandHandler.cpp',
-]
+sources += ['nsmRawCommand/nsmRawCommandHandler.cpp']
 
 nsmd_headers += ['.', '..', 'nsmRawCommand']
 

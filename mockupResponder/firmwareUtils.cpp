@@ -31,14 +31,8 @@ class FirmwareStateMachine
     // global states to maintain the values for testing
     static const uint64_t fixedNonce = 123456789;
     uint8_t configState = 0;
-    struct nsm_firmware_security_version_number_resp sec_respEc
-    {
-        3, 4, 0, 0
-    };
-    struct nsm_firmware_security_version_number_resp sec_respAp
-    {
-        3, 4, 1, 0
-    };
+    struct nsm_firmware_security_version_number_resp sec_respEc{3, 4, 0, 0};
+    struct nsm_firmware_security_version_number_resp sec_respAp{3, 4, 1, 0};
 
     uint16_t apActiveComponentKeyIndex = 6;
     uint16_t apPendingComponentKeyIndex = 6;
@@ -316,8 +310,7 @@ std::optional<std::vector<uint8_t>>
     {
         case QUERY_IRREVERSIBLE_CFG:
         {
-            struct nsm_firmware_irreversible_config_request_0_resp cfg_0_resp
-            {};
+            struct nsm_firmware_irreversible_config_request_0_resp cfg_0_resp{};
             cfg_0_resp.irreversible_config_state = fwStateMachine->configState;
             rc = encode_nsm_firmware_irreversible_config_request_0_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
@@ -344,8 +337,7 @@ std::optional<std::vector<uint8_t>>
         case ENABLE_IRREVERSIBLE_CFG:
         {
             fwStateMachine->configState = 1;
-            struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp
-            {};
+            struct nsm_firmware_irreversible_config_request_2_resp cfg_2_resp{};
             cfg_2_resp.nonce = fwStateMachine->fixedNonce;
             rc = encode_nsm_firmware_irreversible_config_request_2_resp(
                 requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code,
@@ -672,8 +664,7 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
     // Sample Update Min Security Version Response
-    struct nsm_firmware_update_min_sec_ver_resp sec_resp
-    {};
+    struct nsm_firmware_update_min_sec_ver_resp sec_resp{};
     uint16_t msg_size = sizeof(struct nsm_msg_hdr) +
                         sizeof(nsm_firmware_update_min_sec_ver_req_command);
     std::vector<uint8_t> response(msg_size, 0);

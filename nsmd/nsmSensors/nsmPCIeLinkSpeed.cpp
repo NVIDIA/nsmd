@@ -24,16 +24,14 @@ namespace nsm
 
 NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(const NsmObject& provider,
                                            uint8_t deviceIndex) :
-    NsmSensor(provider),
-    deviceIndex(deviceIndex)
+    NsmSensor(provider), deviceIndex(deviceIndex)
 {}
 
 NsmPCIeLinkSpeedBase::NsmPCIeLinkSpeedBase(
     const NsmObject& provider, uint8_t multiPortType, uint8_t multiPortIndex,
     uint8_t multiPortUpstreamPortNumber) :
-    NsmSensor(provider),
-    isMultiPciePortEnabled(true), multiPortType(multiPortType),
-    multiPortIndex(multiPortIndex),
+    NsmSensor(provider), isMultiPciePortEnabled(true),
+    multiPortType(multiPortType), multiPortIndex(multiPortIndex),
     multiPortUpstreamPortNumber(multiPortUpstreamPortNumber)
 {}
 

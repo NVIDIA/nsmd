@@ -39,10 +39,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'nsmDevice_test',
-    'stateChangeLogger_test',
-]
+tests = ['nsmDevice_test', 'stateChangeLogger_test']
 
 tests_deps = [
     test_src,

@@ -31,8 +31,7 @@ namespace nsm
 NsmRediscoveryEvent::NsmRediscoveryEvent(const std::string& name,
                                          const std::string& type,
                                          const NsmEventInfo info) :
-    NsmEvent(name, type),
-    info(info)
+    NsmEvent(name, type), info(info)
 {
     if (!info.messageArgs.empty())
     {

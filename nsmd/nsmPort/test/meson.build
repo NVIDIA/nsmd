@@ -47,9 +47,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = [
-    'nsmPort_test',
-]
+tests = ['nsmPort_test']
 
 tests_deps = [
     test_src,

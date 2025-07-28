@@ -1,15 +1,6 @@
-dep_src_files = [
-    '../utils.cpp',
-    '../dBusHandler.cpp',
-]
+dep_src_files = ['../utils.cpp', '../dBusHandler.cpp']
 
-dep_src_headers = [
-    '.',
-    '..',
-    '../../',
-    '../../common',
-    '../../libnsm',
-]
+dep_src_headers = ['.', '..', '../../', '../../common', '../../libnsm']
 
 test_src = declare_dependency(
     sources: dep_src_files,

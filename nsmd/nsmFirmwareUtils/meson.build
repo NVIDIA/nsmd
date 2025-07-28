@@ -3,4 +3,4 @@ sources += [
     'nsmFirmwareUtils/nsmKeyMgmt.cpp',
 ]
 
-nsmd_headers += [ '.', '..' ]
+nsmd_headers += ['.', '..']

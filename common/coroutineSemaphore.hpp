@@ -150,9 +150,8 @@ class CoroutineSemaphore
         {
             // Schedule the resumption of the next coroutine in the event loop.
 
-            if (sd_event_add_defer(
-                    event.get(), nullptr,
-                    [](sd_event_source*, void* userdata) -> int {
+            if (sd_event_add_defer(event.get(), nullptr,
+                                   [](sd_event_source*, void* userdata) -> int {
                 auto nextAwaiter =
                     static_cast<std::shared_ptr<Awaiter>*>(userdata);
                 if (!nextAwaiter || !(*nextAwaiter))
@@ -162,8 +161,7 @@ class CoroutineSemaphore
                 (*nextAwaiter)->handle.resume();
                 delete nextAwaiter; // Free memory after use
                 return 0;
-            },
-                    new std::shared_ptr<Awaiter>(nextAwaiter)) < 0)
+            }, new std::shared_ptr<Awaiter>(nextAwaiter)) < 0)
             {
                 lg2::error(
                     "Failed to schedule deferred coroutine resumption for eid: {EID}, Awaiter ID: {AWAITER_ID}",

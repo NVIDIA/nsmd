@@ -214,9 +214,9 @@ NsmHistogramFormat::NsmHistogramFormat(
     std::vector<std::tuple<std::string, std::string, std::string>>&
         associationsList,
     uint32_t histogramId, uint16_t parameter) :
-    NsmSensor(name, type),
-    formatIntf(formatIntf), bucketInfoIntf(bucketInfoIntf),
-    histogramId(histogramId), parameter(parameter)
+    NsmSensor(name, type), formatIntf(formatIntf),
+    bucketInfoIntf(bucketInfoIntf), histogramId(histogramId),
+    parameter(parameter)
 {
     lg2::debug("NsmHistogramFormat: {NAME}", "NAME", name.c_str());
     histogramName = name;
@@ -364,9 +364,9 @@ NsmHistogramData::NsmHistogramData(
     std::shared_ptr<FormatIntf>& formatIntf,
     std::shared_ptr<BucketInfoIntf>& bucketInfoIntf, uint32_t histogramId,
     uint16_t parameter) :
-    NsmSensor(name, type),
-    formatIntf(formatIntf), bucketInfoIntf(bucketInfoIntf),
-    histogramId(histogramId), parameter(parameter)
+    NsmSensor(name, type), formatIntf(formatIntf),
+    bucketInfoIntf(bucketInfoIntf), histogramId(histogramId),
+    parameter(parameter)
 {
     lg2::debug("NsmHistogramData: {NAME}", "NAME", name.c_str());
     histogramName = name;

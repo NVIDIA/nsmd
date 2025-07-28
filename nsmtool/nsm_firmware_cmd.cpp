@@ -721,8 +721,7 @@ class IrreversibleConfig : public CommandInterface
             case QUERY_IRREVERSIBLE_CFG:
             {
                 struct nsm_firmware_irreversible_config_request_0_resp
-                    cfg_0_resp
-                {};
+                    cfg_0_resp{};
                 auto rc =
                     decode_nsm_firmware_irreversible_config_request_0_resp(
                         responsePtr, payloadLength, &cc, &reason_code,
@@ -755,8 +754,7 @@ class IrreversibleConfig : public CommandInterface
             case ENABLE_IRREVERSIBLE_CFG:
             {
                 struct nsm_firmware_irreversible_config_request_2_resp
-                    cfg_2_resp
-                {};
+                    cfg_2_resp{};
                 auto rc =
                     decode_nsm_firmware_irreversible_config_request_2_resp(
                         responsePtr, payloadLength, &cc, &reason_code,

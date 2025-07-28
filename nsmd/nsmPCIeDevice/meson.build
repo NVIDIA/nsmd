@@ -1,5 +1,3 @@
-sources += [
-    'nsmPCIeDevice/nsmPCIeRetimerPD.cpp',
-]
+sources += ['nsmPCIeDevice/nsmPCIeRetimerPD.cpp']
 
 nsmd_headers += ['.', '..']

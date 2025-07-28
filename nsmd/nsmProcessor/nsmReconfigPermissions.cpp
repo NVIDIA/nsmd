@@ -30,8 +30,7 @@ NsmReconfigPermissions::NsmReconfigPermissions(
     ReconfigSettingsIntf::FeatureType feature,
     std::shared_ptr<ReconfigSettingsIntf> hostConfigIntf,
     std::shared_ptr<ReconfigSettingsIntf> doeConfigIntf) :
-    NsmSensor(name, type),
-    feature(feature), hostConfigIntf(hostConfigIntf),
+    NsmSensor(name, type), feature(feature), hostConfigIntf(hostConfigIntf),
     doeConfigIntf(doeConfigIntf), hostConfigPath(hostConfigPath),
     doeConfigPath(doeConfigPath)
 {

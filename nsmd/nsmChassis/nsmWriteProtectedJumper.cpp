@@ -26,8 +26,7 @@ namespace nsm
 
 NsmWriteProtectedJumper::NsmWriteProtectedJumper(
     const NsmInterfaceProvider<SettingsIntf>& provider) :
-    NsmSensor(provider),
-    NsmInterfaceContainer(provider)
+    NsmSensor(provider), NsmInterfaceContainer(provider)
 {}
 
 std::optional<Request> NsmWriteProtectedJumper::genRequestMsg(

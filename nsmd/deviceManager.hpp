@@ -150,9 +150,8 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
         std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
             eidTable,
         NsmDeviceTable& nsmDevices) :
-        event(event),
-        handler(handler), instanceIdDb(instanceIdDb), objServer(objServer),
-        eidTable(eidTable), nsmDevices(nsmDevices)
+        event(event), handler(handler), instanceIdDb(instanceIdDb),
+        objServer(objServer), eidTable(eidTable), nsmDevices(nsmDevices)
     {}
 
     void discoverNsmDevice(const MctpInfos& mctpInfos);

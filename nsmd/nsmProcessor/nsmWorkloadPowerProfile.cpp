@@ -30,8 +30,7 @@ namespace nsm
 NsmWorkloadProfileInfoAsyncIntf::NsmWorkloadProfileInfoAsyncIntf(
     sdbusplus::bus::bus& bus, const char* path,
     std::shared_ptr<NsmDevice> device) :
-    ProfileInfoAsyncIntf(bus, path),
-    device(device)
+    ProfileInfoAsyncIntf(bus, path), device(device)
 {}
 
 requester::Coroutine
@@ -246,9 +245,8 @@ NsmWorkLoadProfileStatus::NsmWorkLoadProfileStatus(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<OemProfileInfoIntf> profileStatusInfo,
     std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsync) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), profileStatusInfo(profileStatusInfo),
-    profileInfoAsync(profileInfoAsync)
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath),
+    profileStatusInfo(profileStatusInfo), profileInfoAsync(profileInfoAsync)
 
 {}
 
@@ -313,8 +311,7 @@ void NsmWorkLoadProfileStatus::updateReading(
 NsmWorkloadPowerProfileCollection::NsmWorkloadPowerProfileCollection(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<NsmDevice> device) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath), device(device)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 bool NsmWorkloadPowerProfileCollection::hasProfileId(uint16_t profileId)
@@ -363,8 +360,7 @@ void NsmWorkloadPowerProfileCollection::updateSupportedProfile(
 NsmWorkloadPowerProfilePageCollection::NsmWorkloadPowerProfilePageCollection(
     std::string& name, std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<NsmDevice> device) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath), device(device)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 std::shared_ptr<NsmWorkloadPowerProfilePage>
@@ -409,8 +405,7 @@ NsmWorkloadPowerProfilePage::NsmWorkloadPowerProfilePage(
     std::shared_ptr<NsmWorkloadPowerProfileCollection> profileCollection,
     std::shared_ptr<NsmWorkloadPowerProfilePageCollection> pageCollection,
     std::shared_ptr<NsmWorkLoadProfileEnum> profileMapper, uint16_t pageId) :
-    NsmSensor(name, type),
-    inventoryObjPath(inventoryObjPath), device(device),
+    NsmSensor(name, type), inventoryObjPath(inventoryObjPath), device(device),
     profileCollection(profileCollection), pageCollection(pageCollection),
     profileMapper(profileMapper), pageId(pageId)
 {}

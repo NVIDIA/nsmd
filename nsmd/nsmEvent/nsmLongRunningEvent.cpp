@@ -27,8 +27,8 @@ namespace nsm
 NsmLongRunningEvent::NsmLongRunningEvent(const std::string& name,
                                          const std::string& type,
                                          bool isLongRunning) :
-    NsmEvent(name, type + "_LongRunningEvent"),
-    isLongRunning(isLongRunning), timer(RESPONSE_TIME_OUT_LONG_RUNNING)
+    NsmEvent(name, type + "_LongRunningEvent"), isLongRunning(isLongRunning),
+    timer(RESPONSE_TIME_OUT_LONG_RUNNING)
 {}
 
 bool NsmLongRunningEvent::initAcceptInstanceId(uint8_t instanceId, uint8_t cc,

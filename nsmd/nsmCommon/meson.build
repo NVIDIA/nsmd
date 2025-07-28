@@ -1,7 +1,4 @@
-sources += [
-    'nsmCommon/nsmCommon.cpp',
-    'nsmCommon/sharedMemCommon.cpp',
-]
+sources += ['nsmCommon/nsmCommon.cpp', 'nsmCommon/sharedMemCommon.cpp']
 
 nsmd_headers += ['.', '..', 'nsmCommon']
 

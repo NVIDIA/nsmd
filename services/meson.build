@@ -1,6 +1,4 @@
-unit_files = [
-    'nsmd.service',
-]
+unit_files = ['nsmd.service']
 
 foreach unit : unit_files
 

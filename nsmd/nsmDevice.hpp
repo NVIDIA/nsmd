@@ -147,7 +147,7 @@ class NsmDevice : public StateChangeLogger
      */
     template <typename SensorType>
     void addStaticSensor(SensorType sensor)
-        [[deprecated("Use addSensor(sensor, PollingType::Static) instead")]]
+    //    [[deprecated("Use addSensor(sensor, PollingType::Static) instead")]]
     {
         addSensor(sensor, PollingType::Static);
     }
@@ -164,7 +164,7 @@ class NsmDevice : public StateChangeLogger
      */
     template <typename SensorType>
     void addSensor(SensorType sensor, bool priority, bool isLongRunning = false)
-        [[deprecated("Use addSensor(sensor, pollingType) instead")]]
+    //    [[deprecated("Use addSensor(sensor, pollingType) instead")]]
     {
         addSensor(sensor, isLongRunning ? PollingType::LongRunning
                                         : (priority ? PollingType::Priority

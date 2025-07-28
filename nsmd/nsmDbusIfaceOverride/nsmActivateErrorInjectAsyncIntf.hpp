@@ -43,8 +43,7 @@ class NsmActivateErrorInjectionPayloadIntf :
     NsmActivateErrorInjectionPayloadIntf(sdbusplus::bus::bus& bus,
                                          const char* path,
                                          std::shared_ptr<NsmDevice> device) :
-        ActivateErrorInjectionPayloadIntf(bus, path),
-        device(device)
+        ActivateErrorInjectionPayloadIntf(bus, path), device(device)
     {}
 
     requester::Coroutine doActivateErrorInjectionPayload(
