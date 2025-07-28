@@ -1755,6 +1755,11 @@ void NsmProcessorThrottleReason::updateReading(bitfield32_t flags)
         throttleReasons.push_back(ThrottleReasons::None);
     }
     processorPerformanceIntf->throttleReason(throttleReasons);
+    processorPerformanceIntf->throttleReasonHWSlowdown(flags.bits.bit1);
+    processorPerformanceIntf->throttleReasonHWThermalSlowdown(flags.bits.bit2);
+    processorPerformanceIntf->throttleReasonHWPowerBrakeSlowdown(
+        flags.bits.bit3);
+    processorPerformanceIntf->throttleReasonSyncBoost(flags.bits.bit4);
     updateMetricOnSharedMemory();
 }
 
