@@ -91,8 +91,10 @@ void printBuffer(bool isTx, const std::vector<uint8_t>& buffer, uint8_t tag,
 {
     if (!buffer.empty())
     {
-        constexpr size_t headerSize = strlen("EID: 1d, TAG: 03, Tx: ");
-        constexpr size_t hexWithSpaceSize = strlen("89 ");
+        // Length of "EID: 1d, TAG: 03, Tx: "
+        constexpr size_t headerSize = 22;
+        // Length of "89 "
+        constexpr size_t hexWithSpaceSize = 3;
         std::string output(headerSize + buffer.size() * hexWithSpaceSize, '\0');
         sprintf(output.data(), "EID: %02x, TAG: %02x, %s: ", eid, tag,
                 isTx ? "Tx" : "Rx");
