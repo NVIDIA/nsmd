@@ -33,33 +33,21 @@ find -L . -type d -name ".git" | while read gitdir; do
 done
 ```
 
-## Installing clang-format-17 for CI Usage
+## Installing clang-format-19 for CI Usage
 
-To ensure code consistency and formatting standards in the CI pipeline, `clang-format-17` needs to be installed. Follow the steps below to install `clang-format-17` on your system:
+To ensure code consistency and formatting standards in the CI pipeline, `clang-format-19` needs to be installed. Follow the steps below to install `clang-format-19` on your system:
 
 ```bash
 # Update the package list
 sudo apt update
 
-# Install wget if not already installed
-sudo apt install wget
-
-# Download the LLVM installation script
-wget https://apt.llvm.org/llvm.sh
-
-# Make the script executable
-sudo chmod +x llvm.sh
-
-# Run the script to install LLVM version 17
-sudo ./llvm.sh 17
-
-# Install clang-format-17
-sudo apt install clang-format-17
+# Install clang-format-19
+sudo apt install clang-format-19
 ```
 
-This will install `clang-format-17` on your system, enabling it for use in the CI pipeline.
+This will install `clang-format-19` on your system, enabling it for use in the CI pipeline.
 
-### Using clang-format-17 for all changed files before commit
+### Using clang-format-19 for all changed files before commit
 
 To automatically format your code before each commit, create a pre-commit hook with the following steps:
 ```
@@ -71,7 +59,7 @@ files=$(git diff --cached --name-only --diff-filter=ACMR | grep ".*\.[ch]\(pp\)\
 
 if [ -n "$files" ]; then
     # Format the files
-    clang-format-17 -i $files
+    clang-format-19 -i $files
     
     # Add the formatted files back to staging
     git add $files
