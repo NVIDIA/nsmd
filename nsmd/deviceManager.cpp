@@ -108,6 +108,19 @@ requester::Coroutine DeviceManager::discoverNsmDeviceTask()
             // update eid table [from UUID from MCTP dbus property]
             insertIntoEidTableifNotExist(
                 mctpUuid, std::make_tuple(eid, mctpMedium, mctpBinding));
+
+            auto nsmDevice = findNsmDeviceByUUID(nsmDevices, mctpUuid);
+            if (nsmDevice)
+            {
+                // if nsmDevice already exists, update its EID based on the MCTP
+                // Binding
+
+                lg2::info(
+                    "Found additional EID for existing NSM device. UUID={UUID} EID={EID}",
+                    "UUID", mctpUuid, "EID", eid);
+
+                co_await nsmDevice->setOffline();
+            }
         }
         queuedMctpInfos.pop();
     }
@@ -873,6 +886,49 @@ uint8_t DeviceManager::remapInstanceNumber(uint8_t instanceNumber,
     return instanceNumber;
 }
 
+/**
+ * @brief MCTP Medium Type priority table ordering by bandwidth
+ */
+static std::unordered_map<MctpMedium, int> mediumPriority = {
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe", 0},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.USB", 1},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.SPI", 2},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.I3C", 3},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.KCS", 4},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.Serial", 5},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.SMBus", 6}};
+
+/**
+ * @brief MCTP Binding Type priority table ordering by bandwidth
+ */
+static std::unordered_map<MctpBinding, int> bindingPriority = {
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe", 0},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.USB", 1},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.SPI", 2},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.KCS", 3},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.Serial", 4},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.SMBus", 5}};
+
+static bool isPreferred(
+    const std::tuple<eid_t, MctpMedium, MctpBinding>& currentMctpInfo,
+    const std::tuple<eid_t, MctpMedium, MctpBinding>& newMctpInfo)
+{
+    auto currentMedium = std::get<1>(currentMctpInfo);
+    auto newMedium = std::get<1>(newMctpInfo);
+    auto currentBinding = std::get<2>(currentMctpInfo);
+    auto newBinding = std::get<2>(newMctpInfo);
+
+    if (mediumPriority.at(currentMedium) == mediumPriority.at(newMedium))
+    {
+        return bindingPriority.at(currentBinding) >
+               bindingPriority.at(newBinding);
+    }
+    else
+    {
+        return mediumPriority.at(currentMedium) > mediumPriority.at(newMedium);
+    }
+}
+
 std::optional<mctp_eid_t>
     DeviceManager::searchEID(uint8_t nsmDeviceType,
                              uint8_t nsmDeviceIntanceNumber,
@@ -900,6 +956,48 @@ std::optional<mctp_eid_t>
 
     if (matchedCnt == 1 && matchedActive == true)
     {
+        // Search for all eids for matched UUID and select one based on MCTP
+        // binding priority order
+
+        std::tuple<eid_t, MctpMedium, MctpBinding> currentBindings;
+
+        auto uuidRange = eidTable.equal_range(matchedUuid);
+
+        for (auto it = uuidRange.first; it != uuidRange.second; ++it)
+        {
+            const auto& bindings = it->second;
+            const auto& [eid, medium, binding] = bindings;
+            if (eid == matchedEid)
+            {
+                currentBindings = bindings;
+                break;
+            }
+        }
+
+        for (auto it = uuidRange.first; it != uuidRange.second; ++it)
+        {
+            const auto& newBindings = it->second;
+            const auto& [eid, medium, binding] = newBindings;
+
+            if (eid != matchedEid)
+            {
+                if (isPreferred(currentBindings, newBindings))
+                {
+                    auto discoveredEID = discoveredEIDs.find(eid);
+                    if (discoveredEID != discoveredEIDs.end())
+                    {
+                        auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber,
+                               active] = discoveredEID->second;
+                        if (uuid == matchedUuid && active == true)
+                        {
+                            matchedEid = eid;
+                            currentBindings = newBindings;
+                        }
+                    }
+                }
+            }
+        }
+
         return matchedEid;
     }
     return std::nullopt;
