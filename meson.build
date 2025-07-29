@@ -42,12 +42,6 @@ if get_option('system-guid').enabled()
     add_project_arguments('-DENABLE_SYSTEM_GUID', language: ['cpp', 'c'])
 endif
 
-if get_option('mctp-eid0-filtering')
-    add_project_arguments('-DFILTER_NULL_MCTP_EID=true', language: ['cpp', 'c'])
-else
-    add_project_arguments('-DFILTER_NULL_MCTP_EID=false', language: ['cpp', 'c'])
-endif
-
 if get_option('grace-spi-operations').enabled()
     add_project_arguments(
         '-DENABLE_GRACE_SPI_OPERATIONS',
@@ -177,6 +171,13 @@ if get_option('nvidia-fpga-pcie-reference-clock-count').enabled()
         '-DNVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT',
         language: ['cpp', 'c'],
     )
+endif
+
+if get_option('mctp-eid-filtering')
+    add_project_arguments('-DFILTER_MCTP_EID=true', language: ['cpp', 'c'])
+    conf_data.set('MCTP_EID_TO_FILTER', get_option('mctp-eid-to-filter'))
+else
+    add_project_arguments('-DFILTER_MCTP_EID=false', language: ['cpp', 'c'])
 endif
 
 configure_file(output: 'config.h', configuration: conf_data)

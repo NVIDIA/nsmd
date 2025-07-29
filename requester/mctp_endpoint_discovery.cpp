@@ -15,6 +15,8 @@
  * limitations under the License.
  */
 
+#include "config.h"
+
 #include "mctp_endpoint_discovery.hpp"
 
 #include "common/types.hpp"
@@ -164,11 +166,11 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                 properties.contains("NetworkId"))
             {
                 auto eid = std::get<uint8_t>(properties.at("EID"));
-                if constexpr (FILTER_NULL_MCTP_EID)
+                if constexpr (FILTER_MCTP_EID)
                 {
                     // MCTP EID 0 is a special Null EID as per MCTP DMTF
                     // specification doc
-                    if (eid == 0)
+                    if (eid == MCTP_EID_TO_FILTER)
                     {
                         return;
                     }
@@ -301,11 +303,11 @@ requester::Coroutine
             {
                 eid = std::get<uint32_t>(allProperties.at("EID"));
             }
-            if constexpr (FILTER_NULL_MCTP_EID)
+            if constexpr (FILTER_MCTP_EID)
             {
                 // MCTP EID 0 is a special Null EID as per MCTP DMTF
                 // specification doc
-                if (eid == 0)
+                if (eid == MCTP_EID_TO_FILTER)
                 {
                     mctpQueuedSignals[objPath].pop();
                     co_return NSM_SW_SUCCESS;

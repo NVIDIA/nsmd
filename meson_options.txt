@@ -52,10 +52,16 @@ option(
     value: 1000,
 )
 option(
-    'mctp-eid0-filtering',
+    'mctp-eid-filtering',
     type: 'boolean',
     description: 'Enable MCTP filtering',
-    value: 'false',
+    value: false,
+)
+option(
+    'mctp-eid-to-filter',
+    type: 'integer',
+    description: 'MCTP EID to filter',
+    value: 0,
 )
 option(
     'num-gpu-per-module',
