@@ -175,10 +175,11 @@ endif
 
 if get_option('mctp-eid-filtering')
     add_project_arguments('-DFILTER_MCTP_EID=true', language: ['cpp', 'c'])
-    conf_data.set('MCTP_EID_TO_FILTER', get_option('mctp-eid-to-filter'))
 else
     add_project_arguments('-DFILTER_MCTP_EID=false', language: ['cpp', 'c'])
 endif
+
+conf_data.set('MCTP_EID_TO_FILTER', get_option('mctp-eid-to-filter'))
 
 configure_file(output: 'config.h', configuration: conf_data)
 
