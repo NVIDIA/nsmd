@@ -42,24 +42,84 @@ NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
     switchIntf->vendorId("");
 }
 
+// Overloaded constructor with port variables
+NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
+    sdbusplus::bus::bus& bus, const std::string& name,
+    const std::vector<utils::Association>& associations,
+    const std::string& type, std::string& inventoryObjPath, uint8_t deviceIdx,
+    uint8_t multiPortType, uint8_t multiPortIndex,
+    uint8_t multiPortUpstreamPort) :
+    NsmObject(name, type), deviceIndex(deviceIdx), multiPortType(multiPortType),
+    multiPortIndex(multiPortIndex),
+    multiPortUpstreamPort(multiPortUpstreamPort), isMultiPciePortEnabled(true)
+{
+    auto objPath = inventoryObjPath + name;
+    // initialize members
+    associationDefIntf =
+        std::make_unique<AssociationDefinitionsInft>(bus, objPath.c_str());
+    switchIntf = std::make_unique<SwitchIntf>(bus, objPath.c_str());
+
+    std::vector<std::tuple<std::string, std::string, std::string>>
+        associationsList;
+    for (const auto& association : associations)
+    {
+        associationsList.emplace_back(association.forward, association.backward,
+                                      association.absolutePath);
+    }
+    associationDefIntf->associations(associationsList);
+
+    std::vector<SwitchIntf::SwitchType> supported_protocols;
+    supported_protocols.emplace_back(SwitchIntf::SwitchType::PCIe);
+
+    switchIntf->type(SwitchIntf::SwitchType::PCIe);
+    switchIntf->supportedProtocols(supported_protocols);
+    switchIntf->deviceId("");
+    switchIntf->vendorId("");
+}
+
 requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
                                                     eid_t eid)
 {
-    Request request(sizeof(nsm_msg_hdr) +
-                    sizeof(nsm_query_scalar_group_telemetry_v1_req));
-    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-
-    auto rc = encode_query_scalar_group_telemetry_v1_req(
-        0, deviceIndex, GROUP_ID_0, requestMsg);
-    if (rc != NSM_SW_SUCCESS)
+    int rc;
+    Request request;
+    if (!isMultiPciePortEnabled)
     {
-        lg2::debug(
-            "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
-        // coverity[missing_return]
-        co_return rc;
+        Request req(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_query_scalar_group_telemetry_v1_req));
+        auto requestMsg = reinterpret_cast<struct nsm_msg*>(req.data());
+        rc = encode_query_scalar_group_telemetry_v1_req(0, deviceIndex,
+                                                        GROUP_ID_0, requestMsg);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
+                "EID", eid, "RC", rc);
+            // coverity[missing_return]
+            co_return rc;
+        }
+        request = req;
     }
-
+    else
+    {
+        Request req(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_multiport_query_scalar_group_telemetry_v2_req));
+        auto requestMsg = reinterpret_cast<struct nsm_msg*>(req.data());
+        const nsm_multiport_query_scalar_group_telemetry_v2_req_data data{
+            .upstream_port_index = multiPortUpstreamPort,
+            .type = multiPortType,
+            .index = multiPortIndex,
+            .group_index = GROUP_ID_0};
+        rc = encode_multiport_query_scalar_group_telemetry_v2_req(
+            deviceIndex, &data, requestMsg);
+        if (rc)
+        {
+            lg2::info(
+                "encode_multi_query_scalar_group_telemetry_v2_req failed. eid={EID} rc={RC}",
+                "EID", eid, "RC", rc);
+            co_return rc;
+        }
+        request = req;
+    }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
@@ -69,12 +129,10 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         // coverity[missing_return]
         co_return rc;
     }
-
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
     uint16_t dataSize = 0;
     struct nsm_query_scalar_group_telemetry_group_0 data;
-
     rc = decode_query_scalar_group_telemetry_v1_group0_resp(
         responseMsg.get(), responseLen, &cc, &dataSize, &reasonCode, &data);
 
@@ -90,11 +148,9 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
                      << data.pci_device_id;
         hexaVendorId << "0x" << std::setfill('0') << std::setw(4) << std::hex
                      << data.pci_vendor_id;
-
         switchIntf->deviceId(hexaDeviceId.str());
         switchIntf->vendorId(hexaVendorId.str());
     }
-    // coverity[missing_return]
     co_return cc ? cc : rc;
 }
 
@@ -239,44 +295,70 @@ static requester::Coroutine
         lg2::error(
             "The UUID of NSM_PCIeRetimer_Switch PDI matches no NsmDevice : UUID={UUID}, Name={NAME}, Type={TYPE}",
             "UUID", uuid, "NAME", name, "TYPE", type);
+
         // coverity[missing_return]
         co_return NSM_ERROR;
     }
 
-    auto retimerSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
-        bus, name, associations, type, inventoryObjPath, deviceIndex);
-    if (!retimerSwitchDi)
+    if (type == "NSM_PCIeRetimer_Switch")
     {
-        lg2::error(
-            "Failed to create pcie retimer switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
+        auto retimerSwitchRefClock =
+            std::make_shared<NsmPCIeRetimerSwitchGetClockState>(
+                bus, name, type, deviceInstance, inventoryObjPath);
+        if (!retimerSwitchRefClock)
+        {
+            lg2::error(
+                "Failed to create pcie retimer switch reference clock: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
+            // coverity[missing_return]
+            co_return NSM_ERROR;
+        }
+        nsmDevice->addSensor(retimerSwitchRefClock, priority);
+        auto retimerSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
+            bus, name, associations, type, inventoryObjPath, deviceIndex);
+        if (!retimerSwitchDi)
+        {
+            lg2::error(
+                "Failed to create pcie retimer switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
+            // coverity[missing_return]
+            co_return NSM_ERROR;
+        }
+        nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
+
+        // update sensor
+        nsmDevice->addStaticSensor(retimerSwitchDi);
+
         // coverity[missing_return]
-        co_return NSM_ERROR;
+        co_return NSM_SUCCESS;
     }
-    nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
-
-    // update sensor
-    nsmDevice->addStaticSensor(retimerSwitchDi);
-
-    auto retimerSwitchRefClock =
-        std::make_shared<NsmPCIeRetimerSwitchGetClockState>(
-            bus, name, type, deviceInstance, inventoryObjPath);
-    if (!retimerSwitchRefClock)
+    else if (type == "NSM_MultiPortPCIeSwitchDevice")
     {
-        lg2::error(
-            "Failed to create pcie retimer switch reference clock: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
-            "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
-        // coverity[missing_return]
+        auto multiPortSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
+            bus, name, associations, type, inventoryObjPath, deviceIndex, 0, 0,
+            0);
+        if (!multiPortSwitchDi)
+        {
+            lg2::error(
+                "Failed to create multiport switch device inventory: UUID={UUID}, Type={TYPE}, Object_Path={OBJPATH}",
+                "UUID", uuid, "TYPE", type, "OBJPATH", objPath);
+            // coverity[missing_return]
+            co_return NSM_ERROR;
+        }
+        nsmDevice->standByToDcRefreshSensors.emplace_back(multiPortSwitchDi);
+        nsmDevice->addStaticSensor(multiPortSwitchDi);
+        co_return NSM_SUCCESS;
+    }
+    else
+    {
         co_return NSM_ERROR;
     }
-
-    nsmDevice->addSensor(retimerSwitchRefClock, priority);
-    // coverity[missing_return]
-    co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(
-    CreatePCIeRetimerSwitch,
-    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch")
+dbus::Interfaces pcieRetimerSwitchInterfaces{
+    "xyz.openbmc_project.Configuration.NSM_PCIeRetimer_Switch",
+    "xyz.openbmc_project.Configuration.NSM_MultiPortPCIeSwitchDevice"};
 
+REGISTER_NSM_CREATION_FUNCTION(CreatePCIeRetimerSwitch,
+                               pcieRetimerSwitchInterfaces)
 } // namespace nsm

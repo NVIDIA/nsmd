@@ -33,12 +33,25 @@ class NsmPCIeRetimerSwitchDI : public NsmObject
                            const std::string& type,
                            std::string& inventoryObjPath, uint8_t deviceIdx);
 
+    // Overloaded constructor with port variables
+    NsmPCIeRetimerSwitchDI(sdbusplus::bus::bus& bus, const std::string& name,
+                           const std::vector<utils::Association>& associations,
+                           const std::string& type,
+                           std::string& inventoryObjPath, uint8_t deviceIdx,
+                           uint8_t multiPortType, uint8_t multiPortIndex,
+                           uint8_t multiPortUpstreamPort);
+
     requester::Coroutine update(SensorManager& manager, eid_t eid) override;
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefIntf = nullptr;
     std::unique_ptr<SwitchIntf> switchIntf = nullptr;
     uint8_t deviceIndex;
+    // Port variables
+    uint8_t multiPortType = 0;
+    uint8_t multiPortIndex = 0;
+    uint8_t multiPortUpstreamPort = 0;
+    bool isMultiPciePortEnabled = false;
 };
 
 class NsmPCIeRetimerSwitchGetClockState : public NsmSensor
