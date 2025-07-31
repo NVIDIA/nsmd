@@ -118,8 +118,8 @@ NsmPortStatus::NsmPortStatus(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::string& inventoryObjPath) :
-    NsmObject(portName, type),
-    portName(portName), portNumber(portNum), objPath(inventoryObjPath)
+    NsmObject(portName, type), portName(portName), portNumber(portNum),
+    objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortStatus: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -315,9 +315,8 @@ NsmPortCharacteristics::NsmPortCharacteristics(
     const std::string& type,
     std::shared_ptr<PortMetricsOem3Intf>& portMetricsOem3Interface,
     std::shared_ptr<IBPortIntf> iBPortIntf, std::string& inventoryObjPath) :
-    NsmSensor(portName, type),
-    portName(portName), iBPortIntf(iBPortIntf), portNumber(portNum),
-    objPath(inventoryObjPath)
+    NsmSensor(portName, type), portName(portName), iBPortIntf(iBPortIntf),
+    portNumber(portNum), objPath(inventoryObjPath)
 {
     lg2::debug("NsmPortCharacteristics: {NAME} with port number {NUM}", "NAME",
                portName.c_str(), "NUM", portNum);
@@ -598,8 +597,7 @@ NsmPortMetrics::NsmPortMetrics(
     std::shared_ptr<IBPortIntf> iBPortIntf,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
-    NsmSensor(portName, type),
-    portName(portName), iBPortIntf(iBPortIntf),
+    NsmSensor(portName, type), portName(portName), iBPortIntf(iBPortIntf),
     portMetricsOem2Intf(portMetricsOem2Intf),
     portPacketCountersIntf(portPacketCountersIntf), portNumber(portNum),
     typeOfDevice(deviceType), objPath(inventoryObjPath)
@@ -1128,8 +1126,8 @@ EthPortTelemetryAggregator::EthPortTelemetryAggregator(
     const std::string& type, std::string& inventoryObjPath,
     std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
     std::shared_ptr<PortPacketCountersIntf> portPacketCountersIntf) :
-    NsmSensorAggregator(portName, type),
-    portName(portName), portNumber(portNumber), objPath(inventoryObjPath),
+    NsmSensorAggregator(portName, type), portName(portName),
+    portNumber(portNumber), objPath(inventoryObjPath),
     portMetricsOem2Intf(portMetricsOem2Intf),
     portPacketCountersIntf(portPacketCountersIntf),
     tagToPropertyMap({
@@ -1444,8 +1442,7 @@ NsmNetworkAddressAggregator::NsmNetworkAddressAggregator(
     const std::string& objPath, const std::string& nodeGuidObjPath,
     const std::string& ethernetMacAddressObjPath,
     const std::string& permanentMacAddressObjPath, uint16_t portNumber) :
-    NsmSensorAggregator(name, type),
-    portNumber(portNumber)
+    NsmSensorAggregator(name, type), portNumber(portNumber)
 {
     linkTypeIntf = std::make_unique<LinkTypeIntf>(bus, objPath.c_str());
     portGuidIntf = std::make_unique<GuidIntf>(bus, objPath.c_str());

@@ -873,12 +873,12 @@ void convertGuid64ToString(uint64_t guid, std::string& guidString)
 }
 // Single-flight pattern implementation for single-threaded async execution
 // for EM configuration PDI properties
-#ifndef MOCK_DBUS_ASYNC_UTILS
-requester::Coroutine
-    coGetCachedBaseProperties(const std::string& objPath,
-                              const std::string& baseInterface,
-                              dbus::PropertyMap& cachedProperties)
+requester::Coroutine coGetCachedBaseProperties(
+    [[maybe_unused]] const std::string& objPath,
+    [[maybe_unused]] const std::string& baseInterface,
+    [[maybe_unused]] dbus::PropertyMap& cachedProperties)
 {
+#ifndef MOCK_DBUS_ASYNC_UTILS
     static std::unordered_map<
         std::string, std::unordered_map<std::string, dbus::PropertyMap>>
         basePropertiesCache;
@@ -984,21 +984,13 @@ requester::Coroutine
             "Failed to fetch base properties for {OBJPATH}:{INTERFACE}:{ERROR}",
             "OBJPATH", objPath, "INTERFACE", baseInterface, "ERROR", e.what());
 
-        throw;
+        co_return NSM_SW_ERROR;
     }
-}
 #else
-// Mock implementation for test mode
-requester::Coroutine coGetCachedBaseProperties(
-    [[maybe_unused]] const std::string& objPath,
-    [[maybe_unused]] const std::string& baseInterface,
-    [[maybe_unused]] dbus::PropertyMap& cachedProperties)
-{
     // In test mode, just copy the current propertyMap
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
     cachedProperties = propertyMap;
     co_return NSM_SUCCESS;
-}
 #endif
-
+}
 } // namespace utils

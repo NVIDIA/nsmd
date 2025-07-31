@@ -16,8 +16,7 @@ NsmPort::NsmPort(sdbusplus::bus::bus& bus, std::string& portName,
                  const std::string& type,
                  const std::vector<utils::Association>& associations,
                  const std::string& inventoryObjPath) :
-    NsmObject(portName, type),
-    portName(portName)
+    NsmObject(portName, type), portName(portName)
 {
     lg2::info("NsmPCIePort: create sensor:{NAME}", "NAME", portName.c_str());
     portIntf = std::make_unique<PortIntf>(bus, inventoryObjPath.c_str());
@@ -42,9 +41,8 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
                                    std::shared_ptr<PortInfoIntf> portInfoIntf,
                                    std::shared_ptr<PortWidthIntf> portWidthIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1),
-    objPath(inventoryPath), portInfoIntf(portInfoIntf),
-    portWidthIntf(portWidthIntf)
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_1), objPath(inventoryPath),
+    portInfoIntf(portInfoIntf), portWidthIntf(portWidthIntf)
 {
     lg2::info("NsmPCIeECCGroup1: {NAME}", "NAME", name.c_str());
 
@@ -176,8 +174,8 @@ NsmPCIeECCGroup2::NsmPCIeECCGroup2(const std::string& name,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2),
-    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_2), objPath(inventoryPath),
+    pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup2: {NAME}", "NAME", name.c_str());
 
@@ -271,8 +269,8 @@ NsmPCIeECCGroup3::NsmPCIeECCGroup3(const std::string& name,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3),
-    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_3), objPath(inventoryPath),
+    pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup3: {NAME}", "NAME", name.c_str());
 
@@ -339,8 +337,8 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
                                    const std::string& inventoryPath,
                                    std::shared_ptr<PCIeEccIntf> pcieEccIntf,
                                    uint8_t deviceIndex) :
-    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4),
-    objPath(inventoryPath), pcieEccIntf(pcieEccIntf)
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_4), objPath(inventoryPath),
+    pcieEccIntf(pcieEccIntf)
 {
     lg2::info("NsmPCIeECCGroup4: {NAME}", "NAME", name.c_str());
 

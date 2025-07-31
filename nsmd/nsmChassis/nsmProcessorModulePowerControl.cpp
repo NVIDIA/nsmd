@@ -47,9 +47,8 @@ NsmProcessorModulePowerControl::NsmProcessorModulePowerControl(
     const std::string& path,
     const std::vector<std::tuple<std::string, std::string, std::string>>&
         associations_list) :
-    NsmSensor(name, type),
-    ClearPowerCapAsyncIntf(bus, path.c_str()), powerCapIntf(powerCapIntf),
-    clearPowerCapIntf(clearPowerCapIntf), path(path)
+    NsmSensor(name, type), ClearPowerCapAsyncIntf(bus, path.c_str()),
+    powerCapIntf(powerCapIntf), clearPowerCapIntf(clearPowerCapIntf), path(path)
 {
     associationDefinitionsIntf =
         std::make_unique<AssociationDefinitionsInft>(bus, path.c_str());
@@ -225,8 +224,7 @@ sdbusplus::message::object_path NsmProcessorModulePowerControl::clearPowerCap()
 NsmModulePowerLimit::NsmModulePowerLimit(
     std::string& name, std::string& type, uint8_t propertyId,
     std::shared_ptr<PowerCapIntf> powerCapIntf) :
-    NsmObject(name, type),
-    propertyId(propertyId), powerCapIntf(powerCapIntf)
+    NsmObject(name, type), propertyId(propertyId), powerCapIntf(powerCapIntf)
 {
     switch (propertyId)
     {
@@ -313,8 +311,7 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
 NsmDefaultModulePowerLimit::NsmDefaultModulePowerLimit(
     const std::string& name, const std::string& type,
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf) :
-    NsmObject(name, type),
-    clearPowerCapIntf(clearPowerCapIntf)
+    NsmObject(name, type), clearPowerCapIntf(clearPowerCapIntf)
 {
     lg2::info("NsmDefaultModulePowerLimit: create sensor:{NAME}", "NAME",
               name.c_str());

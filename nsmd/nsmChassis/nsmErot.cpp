@@ -29,8 +29,7 @@ NsmBuildTypeObject::NsmBuildTypeObject(const std::string& name,
                                        const std::string& type,
                                        const uuid_t& uuid, int classification,
                                        int identifier) :
-    NsmSensor(name, type),
-    uuid(uuid)
+    NsmSensor(name, type), uuid(uuid)
 {
     nsmRequest = {.component_classification = uint16_t(classification),
                   .component_identifier = uint16_t(identifier),
@@ -60,8 +59,7 @@ uint8_t NsmBuildTypeObject::handleResponseMsg(const nsm_msg* responseMsg,
 {
     uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
-    struct ::nsm_firmware_erot_state_info_resp erotInfo
-    {};
+    struct ::nsm_firmware_erot_state_info_resp erotInfo{};
     auto rc = decode_nsm_query_get_erot_state_parameters_resp(
         responseMsg, responseLen, &cc, &reasonCode, &erotInfo);
     LG2_ERROR_FLT(

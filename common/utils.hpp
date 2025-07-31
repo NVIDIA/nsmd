@@ -774,4 +774,5 @@ bool getCachedBaseProperties(const std::string& objPath,
 void setCachedBaseProperties(const std::string& objPath,
                              const std::string& baseInterface,
                              const dbus::PropertyMap& properties);
+
 } // namespace utils

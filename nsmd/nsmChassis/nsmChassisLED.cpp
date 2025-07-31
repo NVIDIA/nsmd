@@ -34,8 +34,7 @@ namespace nsm
 NsmNvlinkLedIntf::NsmNvlinkLedIntf(sdbusplus::bus::bus& bus, std::string& name,
                                    std::string& type,
                                    std::string& inventoryObjPath) :
-    NsmObject(name, type),
-    inventoryObjPath(inventoryObjPath)
+    NsmObject(name, type), inventoryObjPath(inventoryObjPath)
 {
     nvlinkledIntf = std::make_unique<NvlinkLedIntf>(bus,
                                                     inventoryObjPath.c_str());
