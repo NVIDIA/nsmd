@@ -50,8 +50,17 @@ NsmResetRequiredEvent::NsmResetRequiredEvent(const std::string& name,
         {"REDFISH_MESSAGE_ARGS", messageArgs},
         {"REDFISH_MESSAGE_ID", info.messageId},
         {"namespace", info.loggingNamespace},
-        {"xyz.openbmc_project.Logging.Entry.EventId", info.errorId},
         {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}};
+
+    std::string errorId = nsm::getEventErrorId(info, "ResetRequired");
+    if (!errorId.empty())
+    {
+        eventData["xyz.openbmc_project.Logging.Entry.EventId"] = errorId;
+    }
+    if (!info.impactedComponent.empty())
+    {
+        eventData["DEVICE_NAME"] = info.impactedComponent;
+    }
 };
 
 int NsmResetRequiredEvent::handle(eid_t eid, NsmType /*type*/,
@@ -139,10 +148,15 @@ static requester::Coroutine
         severityStr =
             std::get<std::string>(allCurrentIfaceProperties.at("Severity"));
     }
-    if (allCurrentIfaceProperties.count("ErrorId"))
+    if (allCurrentIfaceProperties.count("EventIds"))
     {
-        info.errorId =
-            std::get<std::string>(allCurrentIfaceProperties.at("ErrorId"));
+        info.errorId = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("EventIds"));
+    }
+    if (allCurrentIfaceProperties.count("ImpactedComponent"))
+    {
+        info.impactedComponent = std::get<std::string>(
+            allCurrentIfaceProperties.at("ImpactedComponent"));
     }
 
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::

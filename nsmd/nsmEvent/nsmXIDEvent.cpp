@@ -115,6 +115,17 @@ int NsmXIDEvent::handle(eid_t eid, NsmType /*type*/, NsmEventId /*eventId*/,
         {"namespace", info.loggingNamespace},
         {"xyz.openbmc_project.Logging.Entry.Resolution", info.resolution}};
 
+    std::string xid = "XID " + std::to_string(payload.reason);
+    std::string errorId = nsm::getEventErrorId(info, xid);
+    if (!errorId.empty())
+    {
+        eventData["xyz.openbmc_project.Logging.Entry.EventId"] = errorId;
+    }
+    if (!info.impactedComponent.empty())
+    {
+        eventData["DEVICE_NAME"] = info.impactedComponent;
+    }
+
     // Launch async logging without blocking the handle method
     auto loggingTask = logEventAsync("NsmXIDEvent", info.severity, eventData);
     loggingTask.detach(); // Fire-and-forget - runs independently
@@ -181,6 +192,17 @@ static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
     {
         severityStr =
             std::get<std::string>(allCurrentIfaceProperties.at("Severity"));
+    }
+
+    if (allCurrentIfaceProperties.count("EventIds"))
+    {
+        info.errorId = std::get<std::vector<std::string>>(
+            allCurrentIfaceProperties.at("EventIds"));
+    }
+    if (allCurrentIfaceProperties.count("ImpactedComponent"))
+    {
+        info.impactedComponent = std::get<std::string>(
+            allCurrentIfaceProperties.at("ImpactedComponent"));
     }
 
     auto severityEnum = sdbusplus::common::xyz::openbmc_project::logging::
