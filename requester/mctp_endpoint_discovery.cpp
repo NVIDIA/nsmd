@@ -262,13 +262,14 @@ requester::Coroutine
         {
             auto connectivity = std::get<std::string>(prop->second);
             lg2::info(
-                "Received au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
+                "Processing au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
                 "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
                 "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
             try
             {
                 auto mapperResponse = co_await utils::coGetServiceMap(
-                    objPath, dbus::Interfaces{});
+                    objPath,
+                    dbus::Interfaces{"xyz.openbmc_project.MCTP.Endpoint"});
                 if (mapperResponse.size() == 0)
                 {
                     mctpQueuedSignals[objPath].pop();
@@ -292,7 +293,7 @@ requester::Coroutine
                 co_return NSM_SW_SUCCESS;
             }
 
-            uint32_t eid{};
+            uint8_t eid{};
             uint32_t networkId{};
             std::string mediumType{};
             std::string uuid{};
@@ -301,7 +302,7 @@ requester::Coroutine
 
             if (allProperties.contains("EID"))
             {
-                eid = std::get<uint32_t>(allProperties.at("EID"));
+                eid = std::get<uint8_t>(allProperties.at("EID"));
             }
             if constexpr (FILTER_MCTP_EID)
             {
