@@ -113,7 +113,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'The interval time of NSM instance id expiration in seconds',
-    value: 5,
+    value: 25,
 )
 option(
     'number-of-request-retries',
@@ -121,7 +121,7 @@ option(
     min: 1,
     max: 4294967295,
     description: 'The number of NSM request retries',
-    value: 2,
+    value: 9,
 )
 option(
     'response-time-out',
