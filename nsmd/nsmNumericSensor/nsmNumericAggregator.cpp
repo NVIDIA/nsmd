@@ -41,7 +41,7 @@ int NsmNumericAggregator::addSensor(
 int NsmNumericAggregator::updateSensorReading(uint8_t tag, double reading,
                                               uint64_t timestamp)
 {
-    if (!sensors[tag])
+    if (tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE || !sensors[tag])
     {
         return NSM_SW_ERROR_DATA;
     }
@@ -77,7 +77,7 @@ void NsmNumericAggregator::logFalseValid(uint8_t tag, bool valid)
 
 int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
 {
-    if (!sensors[tag])
+    if (tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE || !sensors[tag])
     {
         return NSM_SW_ERROR_DATA;
     }
