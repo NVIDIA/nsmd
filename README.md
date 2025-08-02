@@ -2,15 +2,46 @@
 
 ## How to build
 
-Source an NvBMC ARM/x86 SDK.
+### Install dependencies
 
 ```bash
-# Meson configure
-meson setup --reconfigure -Db_sanitize=address,undefined -Db_lundef=true -Dwerror=true -Dwarning_level=3 -Db_colorout=never --buildtype=debug -Dcpp_args=\"-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Werror=uninitialized -Werror=strict-aliasing\" builddir
+sudo apt install build-essential gcc-13 g++-13 python3-dev nlohmann-json3-dev
+pip install --user meson ninja
+```
+
+#### Install Boost
+
+> sudo apt install libboost1.83-all-dev # for Ubuntu 22.04
+
+or
+> sudo apt install libboost1.84-all-dev # for Ubuntu 24.04
+
+or if it not installed, download and install it from source.
+
+```bash
+wget https://downloads.sourceforge.net/project/boost/boost/1.84.0/boost_1_84_0.tar.gz
+tar -xzf boost_1_84_0.tar.gz
+cd boost_1_84_0
+./bootstrap.sh --prefix=/usr/local
+./b2 install
+```
+
+### Configure and build with Meson
+
+```bash
+# Configure Meson build with debug options and compiler flags (copied from openbmc-build-scripts repo)
+meson setup --reconfigure -Db_sanitize=address,undefined -Db_lundef=true -Dwerror=true -Dwarning_level=3 -Db_colorout=never --buildtype=debug -Dcpp_args="-Wno-error=invalid-constexpr -Wno-invalid-constexpr -Werror=uninitialized -Werror=strict-aliasing" builddir
 # Build all targets
 ninja -C builddir
+```
+
+### Build and run unit tests
+
+```bash
 # Run all unit tests
 meson test -C builddir
+# Run specific unit test
+meson test -C builddir nsmChassis_test
 ```
 
 ### Troubleshooting Build Issues
@@ -32,6 +63,59 @@ find -L . -type d -name ".git" | while read gitdir; do
     cd - > /dev/null
 done
 ```
+
+## Unit Tests Debugging
+
+### Debugging with GDB in console
+
+```bash
+# Debug all tests
+meson test -C builddir --gdb
+
+# Debug specific test
+meson test -C builddir nsmChassis_test --gdb
+```
+
+### Debugging with GDB in VSCode/Cursor
+
+1. Configure launch.json
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug file with Meson",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/builddir/${relativeFileDirname}/${fileBasenameNoExtension}",
+            "cwd": "${workspaceFolder}/builddir/${relativeFileDirname}",
+            "preLaunchTask": "Compile meson test"
+        }
+    ]
+}
+```
+
+2. Configure tasks.json
+
+```json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compile meson test",
+            "type": "shell",
+            "command": "meson compile -C builddir/${config:openbmc.buildConfig} ${fileBasenameNoExtension}",
+            "group": "build",
+        }
+    ]
+}
+```
+
+3. Open the unit test file you want to debug in VSCode/Cursor
+4. Set breakpoints in the code where needed
+5. Press F5 to start debugging the test
+
 
 ## Installing clang-format-19 for CI Usage
 
