@@ -115,72 +115,6 @@ struct coGetDbusProperty
     {}
 };
 
-struct coGetAllDbusProperty
-{
-    const std::string service;
-    const std::string objectPath;
-    const std::string interface;
-
-    /** @brief For keeping the return value.
-     */
-    dbus::PropertyMap ret;
-
-    /** @brief Returning false to make await_suspend() to be called.
-     */
-    bool await_ready() noexcept
-    {
-        return false;
-    }
-
-    /** @brief Called by co_await operator before suspending coroutine. The
-     * method will send out NSM request message, register a call back function
-     * for the event when D-Bus method done.
-     */
-    bool await_suspend(std::coroutine_handle<> handle)
-    {
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &ret = ret,
-             this](boost::system::error_code ec, dbus::PropertyMap value) {
-            if (ec)
-            {
-                lg2::error(
-                    "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}, interface={IFACE}. {ERROR_MESSAGE} ",
-                    "SERVICE", service, "OBJECT_PATH", objectPath, "IFACE",
-                    interface, "ERROR_MESSAGE", ec.message());
-            }
-            else
-            {
-                // can throw std::bad_variant_access
-                ret = value;
-            }
-            resumeHandle();
-        },
-            service.c_str(), objectPath.c_str(),
-            "org.freedesktop.DBus.Properties", "GetAll", interface);
-
-        return true;
-    }
-
-    /** @brief Called by co_await operator to get return value when awaitable
-     * object completed.
-     */
-    dbus::PropertyMap await_resume() const noexcept
-    {
-        return ret;
-    }
-
-    /** @brief Constructor of awaitable object to initialize necessary member
-     * variables.
-     */
-    coGetAllDbusProperty(const std::string& service,
-                         const std::string& objectPath,
-                         const std::string& interface = "") :
-        service(service), objectPath(objectPath), interface(interface), ret{}
-    {}
-};
-
 /** @struct coGetServiceMap
  *
  * An awaitable object needed by co_await operator to get service map which has
@@ -248,70 +182,6 @@ struct coGetServiceMap
     coGetServiceMap(const std::string& objectPath,
                     const dbus::Interfaces& ifaceList) :
         objectPath(objectPath), ifaceList(ifaceList)
-    {}
-};
-
-/* @struct coLogEvent
- *
- * An awaitable object for async D-Bus logging operations
- * e.g.
- * bool success = co_await utils::coLogEvent(service, "MessageId", level, data);
- */
-struct coLogEvent
-{
-    const std::string service;
-    const std::string messageId;
-    const Level level;
-    const std::map<std::string, std::string> data;
-    bool success = false;
-
-    /** @brief Returning false to make await_suspend() to be called.
-     */
-    bool await_ready() noexcept
-    {
-        return false;
-    }
-
-    /** @brief Called by co_await operator before suspending coroutine.
-     */
-    bool await_suspend(std::coroutine_handle<> handle)
-    {
-        auto& asioConnection = utils::DBusHandler::getAsioConnection();
-        auto severity =
-            sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
-                level);
-
-        asioConnection->async_method_call(
-            [resumeHandle = handle, &success = success,
-             messageId = messageId](boost::system::error_code ec) {
-            success = !ec;
-            if (ec)
-            {
-                lg2::error("coLogEvent failed: {ERROR}. MessageId={MSG}",
-                           "ERROR", ec.message(), "MSG", messageId);
-            }
-            resumeHandle();
-        },
-            service.c_str(), "/xyz/openbmc_project/logging",
-            "xyz.openbmc_project.Logging.Create", "Create", messageId, level,
-            data);
-        return true;
-    }
-
-    /** @brief Called by co_await operator to get return value when awaitable
-     * object completed.
-     */
-    bool await_resume() const noexcept
-    {
-        return success;
-    }
-
-    /** @brief Constructor of awaitable object to initialize necessary member
-     * variables.
-     */
-    coLogEvent(const std::string& svc, const std::string& msgId, Level lvl,
-               const std::map<std::string, std::string>& logData) :
-        service(svc), messageId(msgId), level(lvl), data(logData)
     {}
 };
 
@@ -432,6 +302,7 @@ struct coGetServiceMap
         objectPath(objectPath), ifaceList(ifaceList)
     {}
 };
+#endif
 
 struct coGetAllDbusProperty
 {
@@ -447,18 +318,48 @@ struct coGetAllDbusProperty
      */
     bool await_ready() noexcept
     {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        return false;
+#else
         auto& value = utils::MockDbusAsync::getPropertyMap();
         ret = value;
         return true;
+#endif
     }
 
     /** @brief Called by co_await operator before suspending coroutine. The
      * method will send out NSM request message, register a call back function
      * for the event when D-Bus method done.
      */
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle) noexcept
+    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle)
     {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        auto& asioConnection = utils::DBusHandler::getAsioConnection();
+
+        asioConnection->async_method_call(
+            [resumeHandle = handle, &ret = ret,
+             this](boost::system::error_code ec, dbus::PropertyMap value) {
+            if (ec)
+            {
+                lg2::error(
+                    "error while coGetAllDbusProperty.GetAll for service={SERVICE}, path={OBJECT_PATH}, interface={IFACE}. {ERROR_MESSAGE} ",
+                    "SERVICE", service, "OBJECT_PATH", objectPath, "IFACE",
+                    interface, "ERROR_MESSAGE", ec.message());
+            }
+            else
+            {
+                // can throw std::bad_variant_access
+                ret = value;
+            }
+            resumeHandle();
+        },
+            service.c_str(), objectPath.c_str(),
+            "org.freedesktop.DBus.Properties", "GetAll", interface);
+
         return true;
+#else
+        return true;
+#endif
     }
 
     /** @brief Called by co_await operator to get return value when awaitable
@@ -479,6 +380,12 @@ struct coGetAllDbusProperty
     {}
 };
 
+/* @struct coLogEvent
+ *
+ * An awaitable object for async D-Bus logging operations
+ * e.g.
+ * bool success = co_await utils::coLogEvent(service, "MessageId", level, data);
+ */
 struct coLogEvent
 {
     const std::string service;
@@ -487,19 +394,46 @@ struct coLogEvent
     const std::map<std::string, std::string> data;
     bool success = false;
 
-    /** @brief Returning true to avoid suspension in mock mode.
+    /** @brief Returning false to make await_suspend() to be called.
      */
     bool await_ready() noexcept
     {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        return false;
+#else
         success = utils::MockDbusAsync::getLogEventSuccess();
         return true;
+#endif
     }
 
-    /** @brief No-op for mock implementation.
+    /** @brief Called by co_await operator before suspending coroutine.
      */
-    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle) noexcept
+    bool await_suspend([[maybe_unused]] std::coroutine_handle<> handle)
     {
+#ifndef MOCK_DBUS_ASYNC_UTILS
+        auto& asioConnection = utils::DBusHandler::getAsioConnection();
+        auto severity =
+            sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
+                level);
+
+        asioConnection->async_method_call(
+            [resumeHandle = handle, &success = success,
+             messageId = messageId](boost::system::error_code ec) {
+            success = !ec;
+            if (ec)
+            {
+                lg2::error("coLogEvent failed: {ERROR}. MessageId={MSG}",
+                           "ERROR", ec.message(), "MSG", messageId);
+            }
+            resumeHandle();
+        },
+            service.c_str(), "/xyz/openbmc_project/logging",
+            "xyz.openbmc_project.Logging.Create", "Create", messageId, level,
+            data);
         return true;
+#else
+        return true;
+#endif
     }
 
     /** @brief Called by co_await operator to get return value when awaitable
@@ -518,7 +452,5 @@ struct coLogEvent
         service(svc), messageId(msgId), level(lvl), data(logData)
     {}
 };
-
-#endif
 
 } // namespace utils
