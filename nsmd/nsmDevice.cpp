@@ -318,4 +318,163 @@ void NsmDevice::initMsgTypesSensor()
     addSensor(msgTypesSensor, false);
 }
 
+// FruInterfaceManager method implementations
+bool FruInterfaceManager::needsRecreation(
+    const std::set<std::string>& newProperties) const
+{
+    return !initialized || (supportedProperties != newProperties);
+}
+
+void FruInterfaceManager::markInitialized(
+    const std::set<std::string>& properties)
+{
+    supportedProperties = properties;
+    initialized = true;
+}
+
+bool FruInterfaceManager::isPropertySupported(
+    const std::string& propertyName) const
+{
+    return supportedProperties.find(propertyName) != supportedProperties.end();
+}
+
+void FruInterfaceManager::reset()
+{
+    interface.reset();
+    supportedProperties.clear();
+    initialized = false;
+}
+
+void FruInterfaceManager::createAndRegisterInterface(
+    sdbusplus::asio::object_server& objServer, uint8_t eid,
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
+    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+        eidTable)
+{
+    std::string objPath = "/xyz/openbmc_project/FruDevice/" +
+                          std::to_string(eid);
+    interface = objServer.add_unique_interface(objPath,
+                                               "xyz.openbmc_project.FruDevice");
+    registerAllProperties(nsmDevice, properties, eidTable);
+    interface->initialize();
+}
+
+void FruInterfaceManager::updateAllPropertyValues(
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
+    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+        eidTable)
+{
+    if (!interface)
+        return;
+
+    if (properties.find(BOARD_PART_NUMBER) != properties.end())
+    {
+        interface->set_property(
+            "BOARD_PART_NUMBER",
+            std::get<std::string>(properties.at(BOARD_PART_NUMBER)));
+    }
+
+    if (properties.find(FRU_PART_NUMBER) != properties.end())
+    {
+        interface->set_property(
+            "FRU_PART_NUMBER",
+            std::get<std::string>(properties.at(FRU_PART_NUMBER)));
+    }
+
+    if (properties.find(SERIAL_NUMBER) != properties.end())
+    {
+        interface->set_property(
+            "SERIAL_NUMBER",
+            std::get<std::string>(properties.at(SERIAL_NUMBER)));
+    }
+
+    if (properties.find(MARKETING_NAME) != properties.end())
+    {
+        interface->set_property(
+            "MARKETING_NAME",
+            std::get<std::string>(properties.at(MARKETING_NAME)));
+    }
+
+    if (properties.find(BUILD_DATE) != properties.end())
+    {
+        interface->set_property(
+            "BUILD_DATE", std::get<std::string>(properties.at(BUILD_DATE)));
+    }
+
+    auto mctpUuid = utils::getUUIDFromEID(eidTable, nsmDevice->eid);
+    if (mctpUuid.has_value())
+    {
+        nsmDevice->uuid = *mctpUuid;
+    }
+
+    if (properties.find(DEVICE_GUID) != properties.end())
+    {
+        interface->set_property("DEVICE_UUID",
+                                std::get<uuid_t>(properties.at(DEVICE_GUID)));
+        nsmDevice->deviceUuid = std::get<uuid_t>(properties.at(DEVICE_GUID));
+    }
+
+    interface->set_property("DEVICE_TYPE", nsmDevice->getDeviceType());
+    interface->set_property("INSTANCE_NUMBER", nsmDevice->getInstanceNumber());
+    interface->set_property("UUID", nsmDevice->uuid);
+}
+
+void FruInterfaceManager::registerAllProperties(
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
+    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+        eidTable)
+{
+    if (properties.find(BOARD_PART_NUMBER) != properties.end())
+    {
+        interface->register_property(
+            "BOARD_PART_NUMBER",
+            std::get<std::string>(properties.at(BOARD_PART_NUMBER)));
+    }
+
+    if (properties.find(FRU_PART_NUMBER) != properties.end())
+    {
+        interface->register_property(
+            "FRU_PART_NUMBER",
+            std::get<std::string>(properties.at(FRU_PART_NUMBER)));
+    }
+
+    if (properties.find(SERIAL_NUMBER) != properties.end())
+    {
+        interface->register_property(
+            "SERIAL_NUMBER",
+            std::get<std::string>(properties.at(SERIAL_NUMBER)));
+    }
+
+    if (properties.find(MARKETING_NAME) != properties.end())
+    {
+        interface->register_property(
+            "MARKETING_NAME",
+            std::get<std::string>(properties.at(MARKETING_NAME)));
+    }
+
+    if (properties.find(BUILD_DATE) != properties.end())
+    {
+        interface->register_property(
+            "BUILD_DATE", std::get<std::string>(properties.at(BUILD_DATE)));
+    }
+
+    auto mctpUuid = utils::getUUIDFromEID(eidTable, nsmDevice->eid);
+    if (mctpUuid.has_value())
+    {
+        nsmDevice->uuid = *mctpUuid;
+    }
+
+    if (properties.find(DEVICE_GUID) != properties.end())
+    {
+        interface->register_property(
+            "DEVICE_UUID", std::get<uuid_t>(properties.at(DEVICE_GUID)));
+        nsmDevice->deviceUuid = std::get<uuid_t>(properties.at(DEVICE_GUID));
+    }
+
+    interface->register_property("DEVICE_TYPE", nsmDevice->getDeviceType());
+    interface->register_property("INSTANCE_NUMBER",
+                                 nsmDevice->getInstanceNumber());
+    interface->register_property("UUID", nsmDevice->uuid);
+}
+
 } // namespace nsm

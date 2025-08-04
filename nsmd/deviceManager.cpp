@@ -737,67 +737,63 @@ requester::Coroutine
         }
     }
 
-    // expose inventory information to FruDevice PDI
-    std::string objPath = "/xyz/openbmc_project/FruDevice/" +
-                          std::to_string(eid);
-    nsmDevice->fruDeviceIntf = objServer.add_unique_interface(
-        objPath, "xyz.openbmc_project.FruDevice");
+    // Determine currently supported properties by checking specific known
+    // properties
+    std::set<std::string> currentProperties;
 
+    // Check for dynamic properties that the device might support
     if (properties.find(BOARD_PART_NUMBER) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "BOARD_PART_NUMBER",
-            std::get<std::string>(properties[BOARD_PART_NUMBER]));
+        currentProperties.insert("BOARD_PART_NUMBER");
     }
-
     if (properties.find(FRU_PART_NUMBER) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "FRU_PART_NUMBER",
-            std::get<std::string>(properties[FRU_PART_NUMBER]));
+        currentProperties.insert("FRU_PART_NUMBER");
     }
-
     if (properties.find(SERIAL_NUMBER) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "SERIAL_NUMBER", std::get<std::string>(properties[SERIAL_NUMBER]));
+        currentProperties.insert("SERIAL_NUMBER");
     }
-
     if (properties.find(MARKETING_NAME) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "MARKETING_NAME",
-            std::get<std::string>(properties[MARKETING_NAME]));
+        currentProperties.insert("MARKETING_NAME");
     }
-
     if (properties.find(BUILD_DATE) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "BUILD_DATE", std::get<std::string>(properties[BUILD_DATE]));
+        currentProperties.insert("BUILD_DATE");
     }
-
-    auto mctpUuid = utils::getUUIDFromEID(eidTable, eid);
-    if (mctpUuid.has_value())
-    {
-        nsmDevice->uuid = *mctpUuid;
-    }
-
     if (properties.find(DEVICE_GUID) != properties.end())
     {
-        nsmDevice->fruDeviceIntf->register_property(
-            "DEVICE_UUID", std::get<uuid_t>(properties[DEVICE_GUID]));
-        nsmDevice->deviceUuid = std::get<uuid_t>(properties[DEVICE_GUID]);
+        currentProperties.insert("DEVICE_UUID");
     }
 
-    nsmDevice->fruDeviceIntf->register_property("DEVICE_TYPE",
-                                                nsmDevice->getDeviceType());
-    nsmDevice->fruDeviceIntf->register_property("INSTANCE_NUMBER",
-                                                nsmDevice->getInstanceNumber());
-    nsmDevice->fruDeviceIntf->register_property("UUID", nsmDevice->uuid);
+    // Always include fixed properties
+    currentProperties.insert("DEVICE_TYPE");
+    currentProperties.insert("INSTANCE_NUMBER");
+    currentProperties.insert("UUID");
 
-    nsmDevice->fruDeviceIntf->initialize();
+    // Check if interface needs recreation
+    if (nsmDevice->fruDeviceManager.needsRecreation(currentProperties))
+    {
+        lg2::info(
+            "Creating/Recreating FRU interface for eid={EID} with {COUNT} properties",
+            "EID", eid, "COUNT", currentProperties.size());
 
-    // coverity[missing_return]
+        // Create interface and register all properties
+        nsmDevice->fruDeviceManager.createAndRegisterInterface(
+            objServer, eid, nsmDevice, properties, eidTable);
+
+        nsmDevice->fruDeviceManager.markInitialized(currentProperties);
+    }
+    else
+    {
+        lg2::debug("Updating FRU property values for eid={EID}", "EID", eid);
+
+        // Just update property values
+        nsmDevice->fruDeviceManager.updateAllPropertyValues(
+            nsmDevice, properties, eidTable);
+    }
+
     co_return rc;
 }
 

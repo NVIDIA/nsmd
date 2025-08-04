@@ -19,6 +19,7 @@
 
 #include "base.h"
 #include "device-capability-discovery.h"
+#include "platform-environmental.h"
 
 #include "common/coroutineSemaphore.hpp"
 #include "common/types.hpp"
@@ -38,6 +39,7 @@
 #include <deque>
 #include <map>
 #include <ranges> // For ranges::find_if
+#include <set>
 
 #define MAX_SENSOR_UPDATE_BATCH_SIZE 10
 
@@ -66,6 +68,37 @@ enum class PollingType
     Static,                   // One time polling for static sensors
     RoundRobin,               // Round Robing polling for non-priority sensors
     LongRunning,              // Long running polling for long running sensors
+};
+
+struct FruInterfaceManager
+{
+    std::unique_ptr<sdbusplus::asio::dbus_interface> interface;
+    std::set<std::string> supportedProperties;
+    bool initialized = false;
+
+    // Public method declarations only
+    bool needsRecreation(const std::set<std::string>& newProperties) const;
+    void markInitialized(const std::set<std::string>& properties);
+    bool isPropertySupported(const std::string& propertyName) const;
+    void reset();
+    void createAndRegisterInterface(
+        sdbusplus::asio::object_server& objServer, uint8_t eid,
+        std::shared_ptr<NsmDevice> nsmDevice,
+        const InventoryProperties& properties,
+        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable);
+    void updateAllPropertyValues(
+        std::shared_ptr<NsmDevice> nsmDevice,
+        const InventoryProperties& properties,
+        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable);
+
+  private:
+    void registerAllProperties(
+        std::shared_ptr<NsmDevice> nsmDevice,
+        const InventoryProperties& properties,
+        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
+            eidTable);
 };
 
 class NsmDevice : public StateChangeLogger
@@ -97,7 +130,7 @@ class NsmDevice : public StateChangeLogger
 #endif
     }
 
-    std::unique_ptr<sdbusplus::asio::dbus_interface> fruDeviceIntf;
+    FruInterfaceManager fruDeviceManager;
     std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
 
     eid_t eid = 0;
