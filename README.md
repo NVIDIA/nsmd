@@ -26,7 +26,7 @@ cd boost_1_84_0
 ./b2 install
 ```
 
-#### Copy missing libmctp header
+#### Copy libmctp header for local development
 
 > git archive --remote=ssh://git@gitlab-master.nvidia.com:12051/dgx/bmc/libmctp.git develop libmctp-externals.h | tar -x -C common/
 
