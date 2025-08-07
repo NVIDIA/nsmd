@@ -1473,7 +1473,6 @@ std::optional<std::vector<uint8_t>>
 int NsmNetworkAddressAggregator::handleSamples(
     const std::vector<TelemetrySample>& samples)
 {
-    lg2::error("testlog NsmNetworkAddressAggregator handleSamples");
     getLinkType(samples, linkType);
     if (linkType == NSM_PORT_PROTOCOL_UNKNOWN)
     {
@@ -1483,9 +1482,6 @@ int NsmNetworkAddressAggregator::handleSamples(
     }
     for (const auto& sample : samples)
     {
-        lg2::error(
-            "testlog0 NsmNetworkAddressAggregator handleSamples sample.tag={TAG}",
-            "TAG", sample.tag);
         if (sample.tag > NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE)
         {
             continue;
@@ -1511,8 +1507,6 @@ int NsmNetworkAddressAggregator::handleSamples(
             if (sample.tag == NSM_TAG_MAC_ADDRESS)
             {
                 std::string macStr;
-                lg2::error(
-                    "testlog1 NsmNetworkAddressAggregator convertMacAddressToString ");
                 utils::convertMacAddressToString(data.mac_address,
                                                  MAC_ADDRESS_LENGTH, macStr);
                 macAddressIntf->macAddress(macStr.c_str());
@@ -1520,8 +1514,6 @@ int NsmNetworkAddressAggregator::handleSamples(
             else if (sample.tag == NSM_TAG_PERMANENT_MAC_ADDRESS)
             {
                 std::string permanentMacStr;
-                lg2::error(
-                    "testlog2 NsmNetworkAddressAggregator convertMacAddressToString ");
                 utils::convertMacAddressToString(
                     data.mac_address, MAC_ADDRESS_LENGTH, permanentMacStr);
                 permanentMacAddressIntf->macAddress(permanentMacStr.c_str());
