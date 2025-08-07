@@ -711,16 +711,17 @@ void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer)
     {
         throw std::runtime_error("writeBufferToFd - lseek failed");
     }
-    ssize_t bytesWritten = write(fd, buffer.data(), buffer.size());
-    if (bytesWritten < 0)
+    size_t totalBytesWritten = 0;
+    while (totalBytesWritten < buffer.size())
     {
-        throw std::runtime_error("writeBufferToFd - write failed: " +
-                                 std::string(strerror(errno)));
-    }
-    else if (static_cast<size_t>(bytesWritten) != buffer.size())
-    {
-        throw std::runtime_error(
-            "writeBufferToFd - Fewer bytes written than expected");
+        ssize_t bytesWritten = write(fd, buffer.data() + totalBytesWritten,
+                                     buffer.size() - totalBytesWritten);
+        if (bytesWritten < 0)
+        {
+            throw std::runtime_error("writeBufferToFd - write failed: " +
+                                     std::string(strerror(errno)));
+        }
+        totalBytesWritten += bytesWritten;
     }
     if (ftruncate(fd, buffer.size()) < 0)
     {
@@ -728,6 +729,27 @@ void writeBufferToFd(int fd, const std::vector<uint8_t>& buffer)
                                  std::string(strerror(errno)));
     }
 }
+
+void appendBufferToFd(int fd, const std::vector<uint8_t>& buffer)
+{
+    if (fd < 0)
+    {
+        throw std::runtime_error("appendBufferToFd - Invalid file descriptor");
+    }
+    size_t totalBytesWritten = 0;
+    while (totalBytesWritten < buffer.size())
+    {
+        ssize_t bytesWritten = write(fd, buffer.data() + totalBytesWritten,
+                                     buffer.size() - totalBytesWritten);
+        if (bytesWritten < 0)
+        {
+            throw std::runtime_error("appendBufferToFd - write failed: " +
+                                     std::string(strerror(errno)));
+        }
+        totalBytesWritten += bytesWritten;
+    }
+}
+
 std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg)
 {
     std::ostringstream oss;

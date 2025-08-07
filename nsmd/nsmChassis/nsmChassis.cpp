@@ -19,6 +19,7 @@
 
 #include "deviceManager.hpp"
 #include "nsmCommon.hpp"
+#include "nsmDebugInfo.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
@@ -123,6 +124,13 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         lg2::info("PCIeReferenceClockCount is not supported. "
                   "NVIDIA_FPGA_PCIE_REFERENCE_CLOCK_COUNT is disabled.");
 #endif
+    }
+    else if (type == "NSM_DeviceDiagnostics")
+    {
+        device->addStaticSensor(std::make_shared<NsmDebugInfoObject>(
+            utils::DBusHandler::getBus(), name,
+            chassisInventoryBasePath.string() + "/", type, uuid,
+                DebugDumpType::Diagnostics));
     }
     else if (type == "NSM_FPGA_Asset")
     {

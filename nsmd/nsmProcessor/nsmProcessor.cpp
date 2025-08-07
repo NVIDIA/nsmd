@@ -3155,7 +3155,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         }
 
         auto processorDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
-            bus, processorName, basePath, type, uuid);
+            bus, processorName, basePath, type, uuid, DebugDumpType::Network);
         nsmDevice->addStaticSensor(processorDebugInfoObject);
 
         auto processorEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
@@ -3167,9 +3167,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         nsmDevice->addStaticSensor(processorLogInfoObject);
 
         // Device Diagnostics(MSE DUMP) for Processor
-        auto processorDiagnosticsObject =
-            std::make_shared<NsmDeviceDiagnostics>(bus, processorName, basePath,
-                                                   type, uuid);
+        auto processorDiagnosticsObject = std::make_shared<NsmDebugInfoObject>(
+            bus, processorName, basePath, type, uuid,
+            DebugDumpType::Diagnostics);
         nsmDevice->addStaticSensor(processorDiagnosticsObject);
 
         auto gpuRevisionSensor = std::make_shared<NsmProcessorRevision>(

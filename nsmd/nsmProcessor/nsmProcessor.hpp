@@ -26,7 +26,6 @@
 #include "nsmCommon/nsmCommon.hpp"
 #include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDebugInfo.hpp"
-#include "nsmDeviceDiagnostics.hpp"
 #include "nsmEraseTrace.hpp"
 #include "nsmInterface.hpp"
 #include "nsmInventoryProperty.hpp"

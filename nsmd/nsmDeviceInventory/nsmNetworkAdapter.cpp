@@ -85,7 +85,7 @@ static requester::Coroutine
     nsmDevice->addStaticSensor(debugTokenObject);
 
     auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
-        bus, name, inventoryObjPath, type, uuid);
+        bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
     nsmDevice->addStaticSensor(networkAdapterDebugInfoObject);
 
     auto networkAdapterEraseTraceObject = std::make_shared<NsmEraseTraceObject>(
