@@ -54,29 +54,11 @@ void DeviceManager::discoverNsmDevice(const MctpInfos& mctpInfos)
     {
         auto eid = std::get<0>(mctpInfo);
         perEidQueuedMctpInfos[eid].emplace(mctpInfo);
-        if (perEidDiscoverNsmDeviceTaskHandle.find(eid) ==
-            perEidDiscoverNsmDeviceTaskHandle.end())
-        {
-            auto co = discoverNsmDeviceTask(eid);
-            perEidDiscoverNsmDeviceTaskHandle[eid] = co.handle;
-            continue;
-        }
-
-        if (perEidDiscoverNsmDeviceTaskHandle[eid])
-        {
-            if (!perEidDiscoverNsmDeviceTaskHandle[eid].done())
-            {
-                continue;
-            }
-            perEidDiscoverNsmDeviceTaskHandle[eid].destroy();
-        }
-
-        auto co = discoverNsmDeviceTask(eid);
-        perEidDiscoverNsmDeviceTaskHandle[eid] = co.handle;
-        if (perEidDiscoverNsmDeviceTaskHandle[eid].done())
-        {
-            perEidDiscoverNsmDeviceTaskHandle[eid] = nullptr;
-        }
+        requester::Coroutine::assign(perEidDiscoverNsmDeviceTaskHandle[eid],
+                                     [&, eid]() -> requester::Coroutine {
+            // coverity[missing_return]
+            co_return co_await discoverNsmDeviceTask(eid);
+        });
     }
 }
 
@@ -1224,19 +1206,11 @@ void DeviceManager::handleMctpStateTransition(const std::string objPath,
 void DeviceManager::discoverAndUpdateNsmDeviceTask(
     std::shared_ptr<NsmDevice> nsmDevice)
 {
-    if (nsmDevice->updateNsmDeviceTaskHandle)
-    {
-        if (nsmDevice->updateNsmDeviceTaskHandle.done())
-        {
-            auto co = updateNsmDeviceTask(nsmDevice);
-            nsmDevice->updateNsmDeviceTaskHandle = co.handle;
-        }
-    }
-    else
-    {
-        auto co = updateNsmDeviceTask(nsmDevice);
-        nsmDevice->updateNsmDeviceTaskHandle = co.handle;
-    }
+    requester::Coroutine::assign(nsmDevice->updateNsmDeviceTaskHandle,
+                                 [&, nsmDevice]() -> requester::Coroutine {
+        // coverity[missing_return]
+        co_return co_await updateNsmDeviceTask(nsmDevice);
+    });
 }
 
 requester::Coroutine

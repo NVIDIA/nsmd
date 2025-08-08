@@ -91,8 +91,7 @@ class MctpDiscovery
     std::map<std::string, std::queue<sdbusplus::message::message>>
         mctpQueuedSignals;
 
-    std::map<std::string, std::coroutine_handle<void>>
-        deviceStateChangeTaskHandles;
+    std::map<std::string, std::coroutine_handle<>> deviceStateChangeTaskHandles;
     requester::Coroutine deviceStateChangeTask(const std::string path);
 
     void discoverEndpoints(sdbusplus::message::message& msg);

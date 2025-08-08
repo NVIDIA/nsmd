@@ -221,8 +221,6 @@ class DeviceManager : public mctp::MctpDiscoveryHandlerIntf
     std::queue<MctpInfos> queuedMctpInfos;
     std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
     std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
-    std::coroutine_handle<> discoverNsmDeviceTaskHandle;
-    std::coroutine_handle<> deviceOfflineTaskHandle;
     NsmDeviceTable& nsmDevices;
     DiscoveredEIDs discoveredEIDs;
 };

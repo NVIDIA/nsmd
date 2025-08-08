@@ -97,17 +97,12 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
             return NSM_SW_SUCCESS;
         }
         isRediscoveryRequired = true;
-        if (rediscoveryTaskHandler)
-        {
-            if (!rediscoveryTaskHandler.done())
-            {
-                return NSM_SW_SUCCESS;
-            }
-            rediscoveryTaskHandler.destroy();
-        }
-
-        auto co = handleRediscovery(nsmDevice, eid);
-        rediscoveryTaskHandler = co.handle;
+        requester::Coroutine::assign(
+            rediscoveryTaskHandler,
+            [&, nsmDevice, eid]() -> requester::Coroutine {
+            // coverity[missing_return]
+            co_return co_await handleRediscovery(nsmDevice, eid);
+        });
     }
     else
     {

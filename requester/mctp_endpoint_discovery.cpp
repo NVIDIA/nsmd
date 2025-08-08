@@ -404,29 +404,11 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
 
         mctpQueuedSignals[objPath].emplace(msg);
 
-        if (deviceStateChangeTaskHandles.find(objPath) ==
-            deviceStateChangeTaskHandles.end())
-        {
-            auto co = deviceStateChangeTask(objPath);
-            deviceStateChangeTaskHandles[objPath] = co.handle;
-            return;
-        }
-
-        if (deviceStateChangeTaskHandles[objPath])
-        {
-            if (!deviceStateChangeTaskHandles[objPath].done())
-            {
-                return;
-            }
-            deviceStateChangeTaskHandles[objPath].destroy();
-        }
-
-        auto co = deviceStateChangeTask(objPath);
-        deviceStateChangeTaskHandles[objPath] = co.handle;
-        if (deviceStateChangeTaskHandles[objPath].done())
-        {
-            deviceStateChangeTaskHandles[objPath] = nullptr;
-        }
+        requester::Coroutine::assign(deviceStateChangeTaskHandles[objPath],
+                                     [&, objPath]() -> requester::Coroutine {
+            // coverity[missing_return]
+            co_return co_await deviceStateChangeTask(objPath);
+        });
     }
 }
 
