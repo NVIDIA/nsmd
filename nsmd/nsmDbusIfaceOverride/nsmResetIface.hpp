@@ -70,11 +70,11 @@ class NsmResetAsyncIntf : public ResetAsyncIntf, public StateChangeLogger
         }
         std::shared_ptr<const nsm_msg> responseMsg = NULL;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
-            lg2::error("postPatchNsmCommand failed for gpuFundamentalReset"
+            lg2::error("postPatchIO failed for gpuFundamentalReset"
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc_);
             // coverity[missing_return]
@@ -167,8 +167,7 @@ class NsmNetworkDeviceResetAsyncIntf :
 
     requester::Coroutine resetOnDevice(AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_reset_network_device_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -188,12 +187,12 @@ class NsmNetworkDeviceResetAsyncIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "resetOnDevice postPatchNsmCommand failed for while setting power limit for eid = {EID} rc = {RC}",
+                "resetOnDevice postPatchIO failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             // coverity[missing_return]

@@ -37,16 +37,17 @@ NsmEventSetting::NsmEventSetting(const std::string& name,
     nsmDevice(nsmDevice)
 {}
 
-requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmEventSetting::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     uint8_t rc = NSM_SW_SUCCESS;
-    rc = co_await setEventSubscription(manager, eid);
+    rc = co_await setEventSubscription(nsmDevice);
     if (rc != NSM_SW_SUCCESS)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
-                       eid, "RC", rc);
+                       nsmDevice->getEid(), "RC", rc);
         }
     }
     nsmDevice->setEventMode(eventGenerationSetting);
@@ -55,12 +56,12 @@ requester::Coroutine NsmEventSetting::update(SensorManager& manager, eid_t eid)
 }
 
 requester::Coroutine
-    NsmEventSetting::setEventSubscription(SensorManager& manager, eid_t eid)
+    NsmEventSetting::setEventSubscription(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_event_subscription_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-    auto localEid = manager.getLocalEid();
+    auto localEid = SensorManager::getInstance().getLocalEid();
     auto rc = encode_nsm_set_event_subscription_req(0, eventGenerationSetting,
                                                     localEid, requestMsg);
 
@@ -68,15 +69,15 @@ requester::Coroutine
     {
         lg2::error(
             "encode_nsm_set_event_subscription_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -90,7 +91,7 @@ requester::Coroutine
     {
         lg2::error(
             "decode_nsm_set_event_subscription_resp failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
     }
     // coverity[missing_return]
     co_return cc ? cc : rc;
@@ -102,8 +103,8 @@ NsmGetEventSetting::NsmGetEventSetting(
     NsmObject(name, type), eventSetting(eventSetting)
 {}
 
-requester::Coroutine NsmGetEventSetting::update(SensorManager& manager,
-                                                eid_t eid)
+requester::Coroutine
+    NsmGetEventSetting::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -112,24 +113,23 @@ requester::Coroutine NsmGetEventSetting::update(SensorManager& manager,
     {
         lg2::debug("encode_nsm_get_event_subscription_req failed. "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
-
-    auto localEid = manager.getLocalEid();
+    auto localEid = SensorManager::getInstance().getLocalEid();
     uint8_t cc = NSM_ERROR;
     uint16_t reason_code = ERR_NULL;
     uint8_t receiver_eid = 0;
@@ -144,11 +144,11 @@ requester::Coroutine NsmGetEventSetting::update(SensorManager& manager,
             "NsmGetEventSetting update failed, cc={CC}, rc={RC}, receiver_eid={RECEIVER_EID}, localEid={LOCAL_EID}",
             "CC", cc, "RC", rc, "RECEIVER_EID", receiver_eid, "LOCAL_EID",
             localEid);
-        rc = co_await eventSetting->setEventSubscription(manager, eid);
+        rc = co_await eventSetting->setEventSubscription(nsmDevice);
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("setEventSubscription failed, eid={EID} rc={RC}", "EID",
-                       eid, "RC", rc);
+                       nsmDevice->getEid(), "RC", rc);
         }
     }
 
@@ -205,7 +205,7 @@ static requester::Coroutine createNsmEventSetting(SensorManager& manager,
         name, type, eventGenerationSetting, nsmDevice);
     auto getEventSensor = std::make_shared<NsmGetEventSetting>(name, type,
                                                                sensor);
-    nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
+    nsmDevice->addCapabilityRefreshSensor(sensor);
 
     // update sensor
     nsmDevice->addStaticSensor(sensor);

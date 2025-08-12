@@ -35,7 +35,6 @@
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
@@ -131,11 +130,11 @@ void NsmUuidIntf::updateMetricOnSharedMemory()
 #endif
 }
 
-requester::Coroutine NsmUuidIntf::update(SensorManager& manager, eid_t eid)
+requester::Coroutine NsmUuidIntf::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    DeviceManager& deviceManager = DeviceManager::getInstance();
+    mctp::MctpDiscovery& mctpDiscovery = mctp::MctpDiscovery::getInstance();
     uuid_t deviceUuid;
-    auto rc = co_await getDeviceUUID(manager, eid, deviceManager, deviceUuid);
+    auto rc = co_await getDeviceUUID(nsmDevice, mctpDiscovery, deviceUuid);
     if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
     {
         uuidIntf->uuid(deviceUuid);
@@ -159,7 +158,8 @@ uint8_t NsmSysGuidIntf::sysGUID[8] = {0x00, 0x00, 0x00, 0x00,
                                       0x00, 0x00, 0x00, 0x00};
 bool NsmSysGuidIntf::sysGuidGenerated = false;
 
-requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmSysGuidIntf::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request readSysGuid(sizeof(nsm_msg_hdr) +
                         sizeof(struct nsm_get_system_guid_req));
@@ -170,19 +170,20 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
     {
         lg2::debug(
             "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> readSysGuidResponseMsg;
     size_t readSysGuidResponseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(
-        eid, readSysGuid, readSysGuidResponseMsg, readSysGuidResponseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), readSysGuid,
+                                      readSysGuidResponseMsg,
+                                      readSysGuidResponseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}", "RC",
-            rc, "EID", eid);
+            rc, "EID", nsmDevice->getEid());
         co_return rc;
     }
 
@@ -260,19 +261,20 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
             {
                 lg2::debug(
                     "NsmGetSysGuid encode_set_system_guid_req failed. eid={EID} rc={RC}",
-                    "EID", eid, "RC", rc);
+                    "EID", nsmDevice->getEid(), "RC", rc);
                 co_return rc;
             }
 
             std::shared_ptr<const nsm_msg> setSysGuidResponseMsg;
             size_t setSysGuidResponseLen = 0;
-            rc = co_await manager.SendRecvNsmMsg(
-                eid, setSysGuid, setSysGuidResponseMsg, setSysGuidResponseLen);
+            rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), setSysGuid,
+                                              setSysGuidResponseMsg,
+                                              setSysGuidResponseLen, false);
             if (rc)
             {
                 lg2::debug(
                     "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-                    "RC", rc, "EID", eid);
+                    "RC", rc, "EID", nsmDevice->getEid());
                 co_return rc;
             }
 
@@ -286,20 +288,20 @@ requester::Coroutine NsmSysGuidIntf::update(SensorManager& manager, eid_t eid)
             {
                 lg2::debug(
                     "NsmGetSysGuid encode_get_system_guid_req failed. eid={EID} rc={RC}",
-                    "EID", eid, "RC", rc);
+                    "EID", nsmDevice->getEid(), "RC", rc);
                 co_return rc;
             }
 
             std::shared_ptr<const nsm_msg> reReadSysGuidResponseMsg;
             size_t reReadSysGuidResponseLen = 0;
-            rc = co_await manager.SendRecvNsmMsg(eid, reReadSysGuid,
-                                                 reReadSysGuidResponseMsg,
-                                                 reReadSysGuidResponseLen);
+            rc = co_await nsmDevice->sensorIO(
+                nsmDevice->getEid(), reReadSysGuid, reReadSysGuidResponseMsg,
+                reReadSysGuidResponseLen, false);
             if (rc)
             {
                 lg2::debug(
                     "NsmGetSysGuid SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-                    "RC", rc, "EID", eid);
+                    "RC", rc, "EID", nsmDevice->getEid());
                 co_return rc;
             }
 
@@ -756,9 +758,7 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
         *status = AsyncOperationStatusType::InvalidArgument;
         co_return NSM_SW_ERROR_DATA;
     }
-
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info("patch EDPp setpoint On Device for EID: {EID}", "EID", eid);
 
     uint32_t allowableMin = eDPpIntf->allowableMin();
@@ -793,12 +793,12 @@ requester::Coroutine NsmEDPpScalingFactor::patchSetPoint(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmEDPpScalingFactor::patchSetPoint postPatchNsmCommand failed for while setting edpp setpoint "
+            "NsmEDPpScalingFactor::patchSetPoint postPatchIO failed for while setting edpp setpoint "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -837,7 +837,8 @@ NsmMaxEDPpLimit::NsmMaxEDPpLimit(std::string& name, std::string& type,
     lg2::info("NsmMaxEDPpLimit: create sensor:{NAME}", "NAME", name.c_str());
 }
 
-requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmMaxEDPpLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -850,19 +851,19 @@ requester::Coroutine NsmMaxEDPpLimit::update(SensorManager& manager, eid_t eid)
     {
         lg2::debug(
             "NsmMaxEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMaxEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         co_return rc;
     }
 
@@ -898,7 +899,8 @@ NsmMinEDPpLimit::NsmMinEDPpLimit(std::string& name, std::string& type,
     lg2::info("NsmMinEDPpLimit: create sensor:{NAME}", "NAME", name.c_str());
 }
 
-requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmMinEDPpLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -911,19 +913,19 @@ requester::Coroutine NsmMinEDPpLimit::update(SensorManager& manager, eid_t eid)
     {
         lg2::debug(
             "NsmMinEDPpLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMinEDPpLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         co_return rc;
     }
 
@@ -1132,8 +1134,8 @@ NsmDefaultBaseClockSpeed::NsmDefaultBaseClockSpeed(
               name.c_str());
 }
 
-requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
-                                                      eid_t eid)
+requester::Coroutine
+    NsmDefaultBaseClockSpeed::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -1146,20 +1148,20 @@ requester::Coroutine NsmDefaultBaseClockSpeed::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmDefaultBaseClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmDefaultBaseClockSpeed SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -1201,8 +1203,8 @@ NsmDefaultBoostClockSpeed::NsmDefaultBoostClockSpeed(
               name.c_str());
 }
 
-requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
-                                                       eid_t eid)
+requester::Coroutine
+    NsmDefaultBoostClockSpeed::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -1215,20 +1217,20 @@ requester::Coroutine NsmDefaultBoostClockSpeed::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmDefaultBoostClockSpeed: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
-            "NsmDefaultBoostClockSpeed: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "NsmDefaultBoostClockSpeed: sensorIO failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -1571,8 +1573,8 @@ NsmTotalMemorySize::NsmTotalMemorySize(
     lg2::info("NsmTotalMemorySize: create sensor:{NAME}", "NAME", name.c_str());
 }
 
-requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
-                                                eid_t eid)
+requester::Coroutine
+    NsmTotalMemorySize::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -1585,20 +1587,20 @@ requester::Coroutine NsmTotalMemorySize::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmTotalMemorySize: encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmTotalMemorySize: SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -1947,7 +1949,8 @@ void NsmMaxPowerCap::updateMetricOnSharedMemory()
 #endif
 }
 
-requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmMaxPowerCap::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -1960,20 +1963,20 @@ requester::Coroutine NsmMaxPowerCap::update(SensorManager& manager, eid_t eid)
     {
         lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMaxPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -2041,7 +2044,8 @@ void NsmMinPowerCap::updateMetricOnSharedMemory()
 #endif
 }
 
-requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmMinPowerCap::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -2054,20 +2058,20 @@ requester::Coroutine NsmMinPowerCap::update(SensorManager& manager, eid_t eid)
     {
         lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMinPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -2123,8 +2127,8 @@ void NsmDefaultPowerCap::updateValue(uint32_t value)
     lg2::debug("NsmDefaultPowerCap::updateValue {VALUE}", "VALUE", value);
 }
 
-requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
-                                                eid_t eid)
+requester::Coroutine
+    NsmDefaultPowerCap::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -2137,20 +2141,19 @@ requester::Coroutine NsmDefaultPowerCap::update(SensorManager& manager,
     {
         lg2::debug(
             "encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
-        lg2::debug(
-            "NsmDefaultPowerCap SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+        lg2::debug("NsmDefaultPowerCap sensorIO failed with RC={RC}, eid={EID}",
+                   "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -2476,14 +2479,13 @@ requester::Coroutine NsmConfidentialCompute::patchCCMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
-        lg2::error(
-            "NsmConfidentialCompute :: patchCCMode postPatchNsmCommand failed"
-            "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+        lg2::error("NsmConfidentialCompute :: patchCCMode postPatchIO failed"
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc_);
 
         *status = AsyncOperationStatusType::WriteFailure;
 
@@ -2566,14 +2568,13 @@ requester::Coroutine NsmConfidentialCompute::patchCCDevMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
-        lg2::error(
-            "NsmConfidentialCompute :: patchCCDevMode postPatchNsmCommand failed"
-            "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc_);
+        lg2::error("NsmConfidentialCompute :: patchCCDevMode postPatchIO failed"
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc_);
 
         *status = AsyncOperationStatusType::WriteFailure;
 
@@ -2729,19 +2730,19 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                           associations);
         auto associationSensor = std::make_shared<NsmProcessorAssociation>(
             bus, name, type, inventoryObjPath, associations);
-        nsmDevice->deviceSensors.push_back(associationSensor);
+        nsmDevice->getDeviceSensors().push_back(associationSensor);
 
 #ifdef ACCELERATOR_DBUS
         auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
                                                            inventoryObjPath);
-        nsmDevice->deviceSensors.push_back(sensor);
+        nsmDevice->getDeviceSensors().push_back(sensor);
 #endif
 
 #ifdef NVIDIA_RESET_METRICS
         auto resetSupportSensor =
             std::make_shared<NsmResetCountersSupportedIntf>(bus, name, type,
                                                             inventoryObjPath);
-        nsmDevice->deviceSensors.push_back(resetSupportSensor);
+        nsmDevice->getDeviceSensors().push_back(resetSupportSensor);
 #endif
 
         uuid_t deviceUuid{};
@@ -2811,7 +2812,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
                                                            inventoryObjPath);
-        nsmDevice->deviceSensors.push_back(healthSensor);
+        nsmDevice->getDeviceSensors().push_back(healthSensor);
 
         createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
         auto confidentialComputeIntf =
@@ -2895,7 +2896,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto sensor = std::make_shared<NsmLocationIntfProcessor>(
             bus, name, type, inventoryObjPath, locationType);
-        nsmDevice->deviceSensors.push_back(sensor);
+        nsmDevice->getDeviceSensors().push_back(sensor);
     }
     else if (type == "NSM_LocationCode")
     {
@@ -2908,7 +2909,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
             bus, name, type, inventoryObjPath, locationCode);
-        nsmDevice->deviceSensors.push_back(sensor);
+        nsmDevice->getDeviceSensors().push_back(sensor);
     }
     else if (type == "NSM_Asset")
     {
@@ -2951,7 +2952,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                                                  nsmDevice);
 
         nsmDevice->addSensor(sensor, priority, isLongRunning);
-        nsmDevice->setSensors.emplace_back(setMigModeEnabled);
+        nsmDevice->addSetSensor(setMigModeEnabled);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
@@ -3025,7 +3026,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
                 name, type, pcieECCIntf, pciePortIntf, deviceId,
                 inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(pciPortSensor);
+            nsmDevice->getDeviceSensors().push_back(pciPortSensor);
             nsmDevice->addSensor(sensorGroup2, priority);
             nsmDevice->addSensor(sensorGroup3, priority);
             nsmDevice->addSensor(sensorGroup4, priority);
@@ -3055,7 +3056,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             name, type, eccIntf, inventoryObjPath);
 
         nsmDevice->addSensor(eccErrorCntSensor, priority);
-        nsmDevice->setSensors.emplace_back(setEccModeEnabled);
+        nsmDevice->addSetSensor(setEccModeEnabled);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(inventoryObjPath)
@@ -3253,7 +3254,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             name, type, powerCapIntf, candidateForList, persistencyIntf,
             inventoryObjPath);
         nsmDevice->addSensor(powerCap, priority);
-        nsmDevice->capabilityRefreshSensors.emplace_back(powerCap);
+        nsmDevice->addCapabilityRefreshSensor(powerCap);
         manager.powerCapList.emplace_back(powerCap);
 
         auto defaultPowerCap = std::make_shared<NsmDefaultPowerCap>(
@@ -3423,11 +3424,11 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                     nsmDevice});
         auto controlSensor = std::make_shared<NsmPowerSmoothing>(
             name, type, inventoryObjPath, pwrSmoothingIntf);
-        nsmDevice->deviceSensors.emplace_back(controlSensor);
+        nsmDevice->getDeviceSensors().emplace_back(controlSensor);
 
         auto lifetimeCicuitrySensor = std::make_shared<NsmHwCircuitryTelemetry>(
             name, type, inventoryObjPath, pwrSmoothingIntf);
-        nsmDevice->deviceSensors.emplace_back(lifetimeCicuitrySensor);
+        nsmDevice->getDeviceSensors().emplace_back(lifetimeCicuitrySensor);
 
         std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
             std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
@@ -3478,12 +3479,12 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto adminProfileSensor =
             std::make_shared<NsmPowerSmoothingAdminOverride>(
                 name, type, adminProfileIntf, inventoryObjPath);
-        nsmDevice->deviceSensors.emplace_back(adminProfileSensor);
+        nsmDevice->getDeviceSensors().emplace_back(adminProfileSensor);
 
         auto getAllPowerProfileSensor =
             std::make_shared<NsmPowerProfileCollection>(
                 name, type, inventoryObjPath, nsmDevice);
-        nsmDevice->deviceSensors.emplace_back(getAllPowerProfileSensor);
+        nsmDevice->getDeviceSensors().emplace_back(getAllPowerProfileSensor);
 
         std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
             std::make_shared<OemCurrentPowerProfileIntf>(
@@ -3501,7 +3502,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice);
         /*,pwrSmoothingAction*/
         // nsmDevice->deviceSensors.emplace_back(currentProfileSensor);
-        nsmDevice->deviceSensors.emplace_back(pwrSmoothingAction);
+        nsmDevice->getDeviceSensors().emplace_back(pwrSmoothingAction);
 
         nsmDevice->addSensor(getAllPowerProfileSensor, priority);
         nsmDevice->addSensor(adminProfileSensor, priority);
@@ -3646,7 +3647,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     auto resetStatisticsSensor = std::make_shared<ResetStatisticsAggregator>(
         resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
         std::move(resetMetricsAssociationDef));
-    nsmDevice->deviceSensors.emplace_back(resetStatisticsSensor);
+    nsmDevice->getDeviceSensors().emplace_back(resetStatisticsSensor);
     // Add sensor to the device with priority
     nsmDevice->addSensor(resetStatisticsSensor, resetMetricsPriority);
 #endif

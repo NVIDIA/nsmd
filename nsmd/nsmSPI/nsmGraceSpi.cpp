@@ -169,7 +169,7 @@ void NsmGraceSpiObject::finishSpiOperation(
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::checkSpiStatus(SensorManager& manager, eid_t eid,
+    NsmGraceSpiObject::checkSpiStatus(std::shared_ptr<NsmDevice> device,
                                       enum nsm_spi_status* status)
 {
     lg2::debug("NsmGraceSpiObject: Check spi bus status");
@@ -197,21 +197,22 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpi encode_read_spi_status_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", device->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> spiStatusResponseMsg;
     size_t spiStatusResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(
-        eid, spiStatus, spiStatusResponseMsg, spiStatusResponseLen);
+    rc = co_await device->postPatchIO(device->getEid(), spiStatus,
+                                      spiStatusResponseMsg,
+                                      spiStatusResponseLen);
 
     if (rc)
     {
         lg2::error(
             "NsmGraceSpi postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", device->getEid());
         co_return rc;
     }
 
@@ -240,7 +241,7 @@ requester::Coroutine
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::checkIfWriteComplete(SensorManager& manager, eid_t eid,
+    NsmGraceSpiObject::checkIfWriteComplete(std::shared_ptr<NsmDevice> device,
                                             bool* writeComplete)
 {
     lg2::debug("NsmGraceSpiObject: Check spi write operation status");
@@ -250,7 +251,7 @@ requester::Coroutine
         co_return NSM_SW_ERROR_NULL;
     }
 
-    auto rc = co_await requestSpiStatusRegister(manager, eid);
+    auto rc = co_await requestSpiStatusRegister(device);
 
     Request spiStatus(sizeof(nsm_msg_hdr) + sizeof(nsm_read_spi_block_req));
 
@@ -270,21 +271,22 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpiObject encode_read_spi_block_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", device->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> spiStatusResponseMsg;
     size_t spiStatusResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(
-        eid, spiStatus, spiStatusResponseMsg, spiStatusResponseLen);
+    rc = co_await device->postPatchIO(device->getEid(), spiStatus,
+                                      spiStatusResponseMsg,
+                                      spiStatusResponseLen);
 
     if (rc)
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", device->getEid());
         co_return rc;
     }
 
@@ -316,7 +318,7 @@ requester::Coroutine
 }
 
 requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
-    SensorManager& manager, eid_t eid, uint16_t writeBytes, uint16_t readBytes)
+    std::shared_ptr<NsmDevice> device, uint16_t writeBytes, uint16_t readBytes)
 {
     lg2::debug("NsmGraceSpiObject: Executing spi transaction");
 
@@ -342,22 +344,22 @@ requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
     {
         lg2::error(
             "NsmGraceSpiObject encode_send_spi_transaction_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", device->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> spiTransactionResponseMsg;
     size_t spiTransactionResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(eid, spiTransaction,
-                                              spiTransactionResponseMsg,
-                                              spiTransactionResponseLen);
+    rc = co_await device->postPatchIO(device->getEid(), spiTransaction,
+                                      spiTransactionResponseMsg,
+                                      spiTransactionResponseLen);
 
     if (rc)
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi transaction failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", device->getEid());
         co_return rc;
     }
 
@@ -386,7 +388,7 @@ requester::Coroutine NsmGraceSpiObject::executeSpiTransaction(
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::sendSpiDataRequest(SensorManager& manager, eid_t eid,
+    NsmGraceSpiObject::sendSpiDataRequest(std::shared_ptr<NsmDevice> device,
                                           enum nsm_spi_command command)
 {
     lg2::debug("NsmGraceSpiObject: Sending spi data request {COMM}", "COMM",
@@ -394,7 +396,7 @@ requester::Coroutine
 
     enum nsm_spi_status status = NSM_SPI_ERROR;
 
-    auto rc = co_await checkSpiStatus(manager, eid, &status);
+    auto rc = co_await checkSpiStatus(device, &status);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -404,7 +406,8 @@ requester::Coroutine
 
     if (status != NSM_SPI_READY)
     {
-        lg2::error("NsmGraceSpiObject SPI not ready eid={EID} ", "EID", eid);
+        lg2::error("NsmGraceSpiObject SPI not ready eid={EID} ", "EID",
+                   device->getEid());
         co_return NSM_SW_ERROR;
     }
 
@@ -428,21 +431,22 @@ requester::Coroutine
     {
         lg2::error(
             "NsmGraceSpiObject encode_send_spi_command_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", device->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> spiCommandResponseMsg;
     size_t spiCommandResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(
-        eid, spiCommandRequest, spiCommandResponseMsg, spiCommandResponseLen);
+    rc = co_await device->postPatchIO(device->getEid(), spiCommandRequest,
+                                      spiCommandResponseMsg,
+                                      spiCommandResponseLen);
 
     if (rc)
     {
         lg2::error(
             "NsmGraceSpiObject postPatchNsmCommand for Spi Write Enable failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", device->getEid());
         co_return rc;
     }
 
@@ -467,11 +471,11 @@ requester::Coroutine
         // result
         if (command == NSM_SPI_STATUS_REG)
         {
-            rc = co_await executeSpiTransaction(manager, eid, 0x01, 0x01);
+            rc = co_await executeSpiTransaction(device, 0x01, 0x01);
         }
         else
         {
-            rc = co_await executeSpiTransaction(manager, eid, 0x01);
+            rc = co_await executeSpiTransaction(device, 0x01);
         }
     }
 
@@ -484,43 +488,46 @@ requester::Coroutine
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::setSpiWriteEnable(SensorManager& manager, eid_t eid)
+    NsmGraceSpiObject::setSpiWriteEnable(std::shared_ptr<NsmDevice> device)
 {
     lg2::debug("NsmGraceSpiObject: Enabling spi write");
-    auto rc = co_await sendSpiDataRequest(manager, eid, NSM_SPI_WRITE_ENABLE);
+    auto rc = co_await sendSpiDataRequest(device, NSM_SPI_WRITE_ENABLE);
 
     co_return rc;
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::setSpi4ByteAddressMode(SensorManager& manager, eid_t eid)
+    NsmGraceSpiObject::setSpi4ByteAddressMode(std::shared_ptr<NsmDevice> device)
 {
     lg2::debug("NsmGraceSpiObject: Setting 4 byte address mode");
-    auto rc = co_await sendSpiDataRequest(manager, eid,
-                                          NSM_SPI_4_BYTE_ADDRESS_MODE);
+    auto rc = co_await sendSpiDataRequest(device, NSM_SPI_4_BYTE_ADDRESS_MODE);
 
+    co_return rc;
+}
+
+requester::Coroutine NsmGraceSpiObject::requestSpiStatusRegister(
+    std::shared_ptr<NsmDevice> device)
+{
+    lg2::debug("NsmGraceSpiObject: Requesting status register");
+    auto rc = co_await sendSpiDataRequest(device, NSM_SPI_STATUS_REG);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmGraceSpiObject requestSpiStatusRegister failed with rc={RC}",
+            "RC", rc);
+    }
     co_return rc;
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::requestSpiStatusRegister(SensorManager& manager,
-                                                eid_t eid)
-{
-    lg2::debug("NsmGraceSpiObject: Requesting status register");
-    auto rc = co_await sendSpiDataRequest(manager, eid, NSM_SPI_STATUS_REG);
-
-    co_return rc;
-}
-
-requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
-                                                   eid_t eid,
-                                                   uint32_t blockAddress)
+    NsmGraceSpiObject::eraseBlock(std::shared_ptr<NsmDevice> device,
+                                  uint32_t blockAddress)
 {
     lg2::debug("NsmGraceSpiObject: Erasing block {BLOCK}", "BLOCK",
                blockAddress);
     enum nsm_spi_status status = NSM_SPI_ERROR;
 
-    auto rc = co_await checkSpiStatus(manager, eid, &status);
+    auto rc = co_await checkSpiStatus(device, &status);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -530,7 +537,8 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
 
     if (status != NSM_SPI_READY)
     {
-        lg2::error("NsmGraceSpiObject SPI not ready eid={EID} ", "EID", eid);
+        lg2::error("NsmGraceSpiObject SPI not ready eid={EID} ", "EID",
+                   device->getEid());
         co_return NSM_SW_ERROR;
     }
 
@@ -539,6 +547,7 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
 
     auto eraseBlockMsg = reinterpret_cast<struct nsm_msg*>(eraseBlock.data());
 
+    auto eid = device->getEid();
     rc = encode_send_spi_operation_req(0, eraseBlockMsg, blockAddress,
                                        NSM_SPI_ERASE);
 
@@ -562,13 +571,13 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
     std::shared_ptr<const nsm_msg> eraseBlockResponseMsg;
     size_t eraseBlockResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(
-        eid, eraseBlock, eraseBlockResponseMsg, eraseBlockResponseLen);
+    rc = co_await device->postPatchIO(eid, eraseBlock, eraseBlockResponseMsg,
+                                      eraseBlockResponseLen);
 
     if (rc)
     {
         lg2::error(
-            "NsmGraceSpiObject postPatchNsmCommand for set Spi operation failed with RC={RC}, eid={EID}",
+            "NsmGraceSpiObject postPatchIO for set Spi operation failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         co_return rc;
     }
@@ -590,7 +599,7 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
-        rc = co_await executeSpiTransaction(manager, eid, 0x05);
+        rc = co_await executeSpiTransaction(device, 0x05);
 
         if (rc == NSM_SW_SUCCESS)
         {
@@ -600,8 +609,7 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
                     "NsmGraceSpiObject: Checking if erase completed {COUNT}",
                     "COUNT", i);
                 bool writeComplete = false;
-                rc = co_await checkIfWriteComplete(manager, eid,
-                                                   &writeComplete);
+                rc = co_await checkIfWriteComplete(device, &writeComplete);
                 if (rc != NSM_SW_SUCCESS)
                 {
                     co_return rc;
@@ -636,9 +644,9 @@ requester::Coroutine NsmGraceSpiObject::eraseBlock(SensorManager& manager,
     co_return cc ? cc : rc;
 }
 
-requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
-                                                    eid_t eid,
-                                                    uint32_t blockAddress)
+requester::Coroutine
+    NsmGraceSpiObject::readToCache(std::shared_ptr<NsmDevice> device,
+                                   uint32_t blockAddress)
 {
     Request transferBlock(sizeof(nsm_msg_hdr) +
                           sizeof(nsm_send_spi_operation_req));
@@ -646,6 +654,7 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
     auto transferBlockMsg =
         reinterpret_cast<struct nsm_msg*>(transferBlock.data());
 
+    auto eid = device->getEid();
     auto rc = encode_send_spi_operation_req(0, transferBlockMsg, blockAddress,
                                             NSM_SPI_READ);
 
@@ -669,13 +678,13 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
     std::shared_ptr<const nsm_msg> transferBlockResponseMsg;
     size_t transferBlockResponseLen = 0;
 
-    rc = co_await manager.postPatchNsmCommand(
+    rc = co_await device->postPatchIO(
         eid, transferBlock, transferBlockResponseMsg, transferBlockResponseLen);
 
     if (rc)
     {
         lg2::error(
-            "NsmSpiRead postPatchNsmCommand for set Spi operation failed with RC={RC}, eid={EID}",
+            "NsmSpiRead postPatchIO for set Spi operation failed with RC={RC}, eid={EID}",
             "RC", rc, "EID", eid);
         co_return rc;
     }
@@ -699,8 +708,7 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         // We read one extra byte as the command byte is returned
-        rc = co_await executeSpiTransaction(manager, eid, 0x05,
-                                            SPI_READ_BLOCK_SIZE);
+        rc = co_await executeSpiTransaction(device, 0x05, SPI_READ_BLOCK_SIZE);
 
         co_return rc;
     }
@@ -714,7 +722,7 @@ requester::Coroutine NsmGraceSpiObject::readToCache(SensorManager& manager,
 }
 
 requester::Coroutine
-    NsmGraceSpiObject::transferCacheToFile(SensorManager& manager, eid_t eid,
+    NsmGraceSpiObject::transferCacheToFile(std::shared_ptr<NsmDevice> device,
                                            int fileDesc)
 {
     for (auto i = 0; i <= BLOCKS_TO_READ - 1; i++)
@@ -738,21 +746,22 @@ requester::Coroutine
         {
             lg2::error(
                 "NsmSpiRead encode_read_spi_block_req failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", device->getEid(), "RC", rc);
             co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> readBlockResponseMsg;
         size_t readBlockResponseLen = 0;
 
-        rc = co_await manager.postPatchNsmCommand(
-            eid, readBlock, readBlockResponseMsg, readBlockResponseLen);
+        rc = co_await device->postPatchIO(device->getEid(), readBlock,
+                                          readBlockResponseMsg,
+                                          readBlockResponseLen);
 
         if (rc)
         {
             lg2::error(
                 "NsmSpiRead postPatchNsmCommand for read Spi block failed with RC={RC}, eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", rc, "EID", device->getEid());
             co_return rc;
         }
 
@@ -816,17 +825,17 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmGraceSpiObject::initSpi(SensorManager& manager,
-                                                eid_t eid)
+requester::Coroutine
+    NsmGraceSpiObject::initSpi(std::shared_ptr<NsmDevice> device)
 {
-    auto rc = co_await setSpiWriteEnable(manager, eid);
+    auto rc = co_await setSpiWriteEnable(device);
 
     if (rc != NSM_SW_SUCCESS)
     {
         co_return rc;
     }
 
-    rc = co_await setSpi4ByteAddressMode(manager, eid);
+    rc = co_await setSpi4ByteAddressMode(device);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -838,11 +847,9 @@ requester::Coroutine NsmGraceSpiObject::initSpi(SensorManager& manager,
 
 requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
 
-    auto rc = co_await initSpi(manager, eid);
+    auto rc = co_await initSpi(device);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -852,7 +859,7 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SECTORS; i++)
     {
-        rc = co_await setSpiWriteEnable(manager, eid);
+        rc = co_await setSpiWriteEnable(device);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -860,7 +867,7 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
             co_return rc;
         }
 
-        rc = co_await eraseBlock(manager, eid, i * SPI_BLOCK_SIZE);
+        rc = co_await eraseBlock(device, i * SPI_BLOCK_SIZE);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -887,11 +894,10 @@ requester::Coroutine NsmGraceSpiObject::eraseSpiAsyncHandler()
 
 requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
 
-    auto rc = co_await initSpi(manager, eid);
+    auto rc = co_await initSpi(device);
 
     if (rc != NSM_SW_SUCCESS)
     {
@@ -911,7 +917,7 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
 
     for (auto i = 0; i < SPI_SIZE_BYTES; i += SPI_READ_BLOCK_SIZE)
     {
-        rc = co_await readToCache(manager, eid, i);
+        rc = co_await readToCache(device, i);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -919,7 +925,7 @@ requester::Coroutine NsmGraceSpiObject::readSpiAsyncHandler()
             co_return rc;
         }
 
-        rc = co_await transferCacheToFile(manager, eid, fileDesc);
+        rc = co_await transferCacheToFile(device, fileDesc);
 
         if (rc != NSM_SW_SUCCESS)
         {
@@ -1007,7 +1013,7 @@ static requester::Coroutine createNsmGraceSpi(SensorManager& manager,
             auto spiSensor = std::make_shared<NsmGraceSpiObject>(
                 bus, name, inventoryObjPath, type, uuid);
 
-            nsmDevice->deviceSensors.emplace_back(spiSensor);
+            nsmDevice->getDeviceSensors().emplace_back(spiSensor);
         }
     }
 

@@ -22,7 +22,6 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #if defined(ENABLE_PCIE_AER_ERROR)
 #include "nsmAERError.hpp"
 #endif
@@ -39,6 +38,7 @@
 #include "nsmPCIeLTSSMState.hpp"
 #endif
 #include "nsmPCIeLinkSpeed.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 
 #include <unordered_map>
 
@@ -46,16 +46,15 @@ namespace nsm
 {
 
 template <typename IntfType>
-requester::Coroutine NsmChassisPCIeDevice<IntfType>::update(
-    [[maybe_unused]] SensorManager& manager, [[maybe_unused]] eid_t eid)
+requester::Coroutine
+    NsmChassisPCIeDevice<IntfType>::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     if constexpr (std::is_same_v<IntfType, UuidIntf>)
     {
         // For UuidIntf, we need to get the device UUID from the device manager.
-        DeviceManager& deviceManager = DeviceManager::getInstance();
+        mctp::MctpDiscovery& mctpDiscovery = mctp::MctpDiscovery::getInstance();
         uuid_t deviceUuid;
-        auto rc = co_await getDeviceUUID(manager, eid, deviceManager,
-                                         deviceUuid);
+        auto rc = co_await getDeviceUUID(nsmDevice, mctpDiscovery, deviceUuid);
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);

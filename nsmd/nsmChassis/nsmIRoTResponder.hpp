@@ -52,7 +52,7 @@ class NsmIRoTResponder : public NsmInterfaceProvider<IntfType>
         name(name)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::string name;

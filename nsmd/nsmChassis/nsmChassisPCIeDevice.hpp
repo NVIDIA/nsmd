@@ -72,8 +72,8 @@ class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, "NSM_ChassisPCIeDevice",
                                        inventoryPaths)
     {}
-    virtual requester::Coroutine update(SensorManager& manager,
-                                        eid_t eid) override;
+    virtual requester::Coroutine
+        update(std::shared_ptr<NsmDevice> nsmDevice) override;
 };
 
 } // namespace nsm

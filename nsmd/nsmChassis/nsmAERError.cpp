@@ -92,8 +92,7 @@ uint8_t
 requester::Coroutine
     NsmAERErrorStatusIntf::clearAERError(AsyncOperationStatusType* status)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_clear_data_source_v1_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     // first argument instanceid=0 is irrelevant
@@ -112,12 +111,11 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "clearAERError postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
+            "clearAERError postPatchIO failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -138,7 +136,7 @@ requester::Coroutine
         if (aerStatusSensor)
         {
             lg2::info("refresh AER status on dbus for EID = {EID}", "EID", eid);
-            co_await aerStatusSensor->update(manager, eid);
+            co_await aerStatusSensor->update(device);
         }
     }
     else

@@ -128,10 +128,10 @@ requester::Coroutine createNsmPCIePort(SensorManager& manager,
         pdiMethod(linkStatus),
         PortStateIntf::convertLinkStatusTypeFromString(linkStatus));
 
-    device->deviceSensors.emplace_back(associationsObject);
-    device->deviceSensors.emplace_back(healthObject);
-    device->deviceSensors.emplace_back(portObject);
-    device->deviceSensors.emplace_back(portStateObject);
+    device->getDeviceSensors().emplace_back(associationsObject);
+    device->getDeviceSensors().emplace_back(healthObject);
+    device->getDeviceSensors().emplace_back(portObject);
+    device->getDeviceSensors().emplace_back(portStateObject);
     device->addSensor(pcieLinkSpeed, PCIE_PORT_LINK_SPEED_PRIORITY);
     device->addSensor(pcieErrorsGroup2, PCIE_PORT_ERRORS_PRIORITY);
     device->addSensor(pcieErrorsGroup3, PCIE_PORT_ERRORS_PRIORITY);

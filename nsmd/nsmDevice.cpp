@@ -99,7 +99,8 @@ std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,
 
     for (auto nsmDevice : nsmDevices)
     {
-        if ((nsmDevice->uuid).substr(0, UUID_LEN) == uuid.substr(0, UUID_LEN))
+        if ((nsmDevice->getUuid()).substr(0, UUID_LEN) ==
+            uuid.substr(0, UUID_LEN))
         {
             ret = nsmDevice;
             break;
@@ -137,6 +138,21 @@ bool NsmDevice::isCommandSupported(uint8_t messageType, uint8_t commandCode)
     return messageTypesToCommandCodeMatrix[messageType][commandCode];
 }
 
+void NsmDevice::updateMessageTypesToCommandCodeMatrix(
+    uint8_t messageType, const bitfield8_t supportedCommands[],
+    size_t supportedCommandsSize)
+{
+    // check applied to avoid core dump in case of supportedCommandsSize*8 is
+    // greater than NUM_COMMAND_CODES
+    auto maxCommandCode = std::min(supportedCommandsSize * 8,
+                                   static_cast<size_t>(NUM_COMMAND_CODES));
+    for (size_t i = 0; i < maxCommandCode; i++)
+    {
+        auto isSupported = supportedCommands[i / 8].byte & (1 << (i % 8));
+        messageTypesToCommandCodeMatrix[messageType][i] = isSupported;
+    }
+}
+
 void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
                               PollingType pollingType)
 {
@@ -165,15 +181,14 @@ void NsmDevice::addSensorBase(const std::shared_ptr<NsmObject>& sensor,
     sensors[pollingType].push(sensor);
 }
 
-requester::Coroutine NsmDevice::setOnline()
+/* Mark all the sensors as unrefreshed. Sleep for 10 seconds to avoid
+ * overwhelming the system*/
+requester::Coroutine NsmDevice::markSensorsUnrefreshed()
 {
-    isDeviceReady = false;
-    NsmServiceReadyIntf::getInstance().setStateStarting();
-
     uint32_t count = 0;
-    for (auto sensor : deviceSensors)
+    auto sensors = deviceSensors;
+    for (auto sensor : sensors)
     {
-        // Mark all the sensors as unrefreshed.
         sensor->isRefreshed = false;
         count++;
         if (count == MAX_SENSOR_UPDATE_BATCH_SIZE)
@@ -182,29 +197,38 @@ requester::Coroutine NsmDevice::setOnline()
             count = 0;
         }
     }
+    co_return NSM_SW_SUCCESS;
+}
+
+// Steps for transition of Device to online
+// 1. set isDeviceReady to false
+// 2. set NsmServiceReadyIntf to starting
+// 3. mark all the sensors as unrefreshed
+// 4. set isDeviceActive to true
+// 5. Refresh all the capability sensors
+
+requester::Coroutine NsmDevice::setOnline(
+    [[maybe_unused]] std::shared_ptr<StateChangeToken> token)
+{
+    isDeviceReady = false;
+    NsmServiceReadyIntf::getInstance().setStateStarting();
+    co_await markSensorsUnrefreshed();
     isDeviceActive = true;
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
         "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
+    co_await refreshCapabilitySensor();
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmDevice::setOffline()
+/* Steps to update sensors for offline
+ * Mark all the sensors as NaN
+ * Sleep for 10 seconds to avoid overwhelming the system
+ */
+requester::Coroutine NsmDevice::updateSensorsForOffline()
 {
-    isDeviceActive = false;
-    if (gpudriverSensor)
-    {
-        lg2::info(
-            "Setting GPU driver state to unknown as eid = {EID} gets offline",
-            "EID", eid);
-        gpudriverSensor->driverState = 0;
-    }
-    lg2::info(
-        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
-        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
-
     size_t sensorIndex{0};
-    auto& sensors = deviceSensors;
+    auto sensors = deviceSensors;
 
     while (sensorIndex < sensors.size())
     {
@@ -219,6 +243,30 @@ requester::Coroutine NsmDevice::setOffline()
         }
         co_await common::Sleep(event.get(), 10000, common::NonPriority);
     }
+    co_return NSM_SW_SUCCESS;
+}
+
+/* Steps for transition of Device to offline
+ * Set Device as offline
+ * Set GPU driver state to unknown
+ * Update values of sensors to NaN
+ */
+requester::Coroutine NsmDevice::setOffline(
+    [[maybe_unused]] std::shared_ptr<StateChangeToken> token)
+{
+    isDeviceActive = false;
+    if (gpudriverSensor)
+    {
+        lg2::info(
+            "Setting GPU driver state to unknown as eid = {EID} gets offline",
+            "EID", eid);
+        gpudriverSensor->driverState = 0;
+    }
+    lg2::info(
+        "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
+        "DEVTYPE", getDeviceType(), "INSTNUM", getInstanceNumber());
+
+    co_await updateSensorsForOffline();
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -339,6 +387,595 @@ void NsmDevice::initMsgTypesSensor()
     addSensor(msgTypesSensor, false);
 }
 
+requester::Coroutine
+    NsmDevice::SendRecvNsmMsg(eid_t eid, Request& request,
+                              std::shared_ptr<const nsm_msg>& responseMsg,
+                              size_t* responseLen)
+{
+    auto rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                     responseLen);
+    if (rc)
+    {
+        lg2::error("NsmDevice::SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID",
+                   eid, "RC", rc);
+    }
+    // coverity[missing_return]
+    co_return rc;
+}
+
+requester::Coroutine
+    NsmDevice::sensorIO(eid_t eid, Request& request,
+                        std::shared_ptr<const nsm_msg>& responseMsg,
+                        size_t& responseLen, bool bypassCommandCheck)
+{
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    uint8_t messageType = requestMsg->hdr.nvidia_msg_type;
+    uint8_t commandCode = requestMsg->payload[0];
+
+    // bypassCommandCheck will be true for raw command only, by default it is
+    // false
+    if (!bypassCommandCheck &&
+        (!isDeviceActive || !isCommandSupported(messageType, commandCode)))
+    {
+        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    auto rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                     &responseLen);
+    if (rc && rc != NSM_SW_ERROR_NULL)
+    {
+        lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
+                   rc);
+    }
+
+    co_return rc;
+}
+
+requester::Coroutine
+    NsmDevice::postPatchIO(eid_t eid, Request& request,
+                           std::shared_ptr<const nsm_msg>& responseMsg,
+                           size_t& responseLen)
+{
+    auto rc = co_await waitForNsmDeviceUpdate();
+    if (rc != NSM_SW_SUCCESS)
+    {
+        if (rc == NSM_SW_ERROR_TIMEOUT)
+        {
+            lg2::error(
+                "NsmDevice::postPatchIO NsmDevice update taking longer than expected for eid={EID}",
+                "EID", eid);
+        }
+        else
+        {
+            lg2::error(
+                "NsmDevice::postPatchIO unexpected arror while waiting for NsmDevice update for eid={EID}, rc={RC}",
+                "EID", eid, "RC", rc);
+        }
+        co_return rc;
+    }
+
+    if (!isDeviceActive)
+    {
+        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
+    }
+
+    rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                &responseLen);
+    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
+    // request that timedout
+    if (rc && rc != NSM_SW_ERROR_NULL)
+    {
+        lg2::error("NsmDevice::postPatchIO failed. eid={EID} rc={RC}", "EID",
+                   eid, "RC", rc);
+    }
+    co_return rc;
+}
+
+void NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
+                                           uint8_t deviceInstanceNumber)
+{
+    this->eid = eid;
+    this->uuid = uuid;
+    this->nsmDeviceInstanceNumber = deviceInstanceNumber;
+}
+
+requester::Coroutine NsmDevice::updateNsmDevice()
+{
+    discoverNsmDeviceSemaphore.acquire(eid);
+    lg2::info(
+        "NsmDevice::updateNsmDevice discoverNsmDeviceSemaphore acqired for EID = {EID}",
+        "EID", eid);
+    // Reset messageTypesToCommandCodeMatrix to all false entries
+    messageTypesToCommandCodeMatrix.assign(
+        NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false));
+
+    std::vector<uint8_t> supportedMessageTypes;
+    auto rc = co_await getSupportedNvidiaMessageType(supportedMessageTypes);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("getSupportedNvidiaMessageType() failed, rc={RC} eid={EID}",
+                   "RC", rc, "EID", eid);
+        discoverNsmDeviceSemaphore.release();
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    // Update the NsmDevice object with the retrieved message types
+    areMessageTypesRetrieved = true;
+    retrievedMessageTypes = supportedMessageTypes;
+
+    // Loop through supported message types
+    for (uint8_t messageType : supportedMessageTypes)
+    {
+        std::vector<uint8_t> supportedCommands;
+        rc = co_await getSupportedCommandCodes(messageType, supportedCommands);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "getSupportedCommands() for message type={MT} return failed, rc={RC} eid={EID}",
+                "MT", messageType, "RC", rc, "EID", eid);
+            commandCodesRetrieved[messageType] = false;
+            continue;
+        }
+
+        // Update the NsmDevice object with the retrieved command codes
+        commandCodesRetrieved[messageType] = true;
+
+        std::vector<uint8_t> supportedCommandCodes;
+        utils::convertBitMaskToVector(
+            supportedCommandCodes,
+            reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
+            SUPPORTED_COMMAND_CODE_DATA_SIZE);
+        std::stringstream ss;
+        for (uint8_t commandCode : supportedCommandCodes)
+        {
+            messageTypesToCommandCodeMatrix[messageType][commandCode] = true;
+            ss << int(commandCode) << " ";
+        }
+        lg2::info(
+            "Eid: {EID} - MessageType {ROW_NUM}: commandCodes {ROW_VALUES}",
+            "EID", eid, "ROW_NUM", messageType, "ROW_VALUES", ss.str());
+    }
+
+    // Update fruDevice interface
+    rc = co_await updateFruDeviceIntf();
+    if (rc)
+    {
+        lg2::error("updateFruDeviceIntf failed, rc={RC} eid={EID}", "RC", rc,
+                   "EID", eid);
+    }
+
+    discoverNsmDeviceSemaphore.release();
+
+    lg2::info(
+        "NsmDevice::updateNsmDevice discoverNsmDeviceSemaphore released for EID = {EID}",
+        "EID", eid);
+    // coverity[missing_return]
+    co_return rc;
+}
+
+requester::Coroutine NsmDevice::getSupportedNvidiaMessageType(
+    std::vector<uint8_t>& supportedNvidiaMessageTypes)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_supported_nvidia_message_types_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_get_supported_nvidia_message_types_req(DEFAULT_INSTANCE_ID,
+                                                            requestMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedNvidiaMessageType failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                &responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedNvidiaMessageType SendRecvNsmMsg failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE];
+    rc = decode_get_supported_nvidia_message_types_resp(
+        responseMsg.get(), responseLen, &cc, &reason_code, types);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedNvidiaMessageType decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    // convert bit matrix of types into supportedTypes
+    supportedNvidiaMessageTypes.clear();
+    for (size_t i = 0; i < SUPPORTED_MSG_TYPE_DATA_SIZE * 8; i++)
+    {
+        auto bi = i % 8;
+        auto ti = i / 8;
+        if (types[ti].byte & (1 << bi))
+        {
+            supportedNvidiaMessageTypes.push_back(i);
+        }
+    }
+
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    NsmDevice::getSupportedCommandCodes(uint8_t nvidia_message_type,
+                                        std::vector<uint8_t>& supportedCommands)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_supported_command_codes_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_get_supported_command_codes_req(
+        DEFAULT_INSTANCE_ID, nvidia_message_type, requestMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedCommandCodes failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                &responseLen);
+    if (rc)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedCommandCodes SendRecvNsmMsg failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    bitfield8_t supportedCommandCodes[SUPPORTED_COMMAND_CODE_DATA_SIZE];
+    rc = decode_get_supported_command_codes_resp(responseMsg.get(), responseLen,
+                                                 &cc, &reason_code,
+                                                 &supportedCommandCodes[0]);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "NsmDevice::getSupportedCommandCodes decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
+            "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    // copy supportedCommandCodes into supportedCommands
+    supportedCommands.resize(SUPPORTED_COMMAND_CODE_DATA_SIZE);
+    std::memcpy(supportedCommands.data(), supportedCommandCodes,
+                SUPPORTED_COMMAND_CODE_DATA_SIZE * sizeof(bitfield8_t));
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmDevice::updateFruDeviceIntf()
+{
+    // get inventory information from device
+    InventoryProperties properties{};
+    uint8_t rc = NSM_SW_SUCCESS;
+    lg2::info("NsmDevice::updateFruDeviceIntf: eid={EID} deviceType={TYPE}",
+              "EID", eid, "TYPE", getDeviceType());
+    if (isCommandSupported(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                           NSM_GET_INVENTORY_INFORMATION))
+    {
+        rc = co_await getFRU(properties, getDeviceType());
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("getFRU() return failed, rc={RC} eid={EID}", "RC", rc,
+                       "EID", eid);
+        }
+    }
+
+    // Determine currently supported properties by checking specific known
+    // properties
+    std::set<std::string> currentProperties;
+
+    // Check for dynamic properties that the device might support
+    if (properties.find(BOARD_PART_NUMBER) != properties.end())
+    {
+        currentProperties.insert("BOARD_PART_NUMBER");
+    }
+    if (properties.find(FRU_PART_NUMBER) != properties.end())
+    {
+        currentProperties.insert("FRU_PART_NUMBER");
+    }
+    if (properties.find(SERIAL_NUMBER) != properties.end())
+    {
+        currentProperties.insert("SERIAL_NUMBER");
+    }
+    if (properties.find(MARKETING_NAME) != properties.end())
+    {
+        currentProperties.insert("MARKETING_NAME");
+    }
+    if (properties.find(BUILD_DATE) != properties.end())
+    {
+        currentProperties.insert("BUILD_DATE");
+    }
+    if (properties.find(DEVICE_GUID) != properties.end())
+    {
+        currentProperties.insert("DEVICE_UUID");
+    }
+
+    // Always include fixed properties
+    currentProperties.insert("DEVICE_TYPE");
+    currentProperties.insert("INSTANCE_NUMBER");
+    currentProperties.insert("UUID");
+
+    // Check if interface needs recreation
+    if (fruDeviceManager.needsRecreation(currentProperties))
+    {
+        lg2::info(
+            "Creating/Recreating FRU interface for eid={EID} with {COUNT} properties",
+            "EID", eid, "COUNT", currentProperties.size());
+
+        // Create interface and register all properties
+        fruDeviceManager.createAndRegisterInterface(
+            objServer, eid, shared_from_this(), properties);
+
+        fruDeviceManager.markInitialized(currentProperties);
+    }
+    else
+    {
+        lg2::debug("Updating FRU property values for eid={EID}", "EID", eid);
+
+        // Just update property values
+        fruDeviceManager.updateAllPropertyValues(shared_from_this(),
+                                                 properties);
+    }
+
+    co_return rc;
+}
+
+requester::Coroutine NsmDevice::getFRU(nsm::InventoryProperties& properties,
+                                       const uint8_t& deviceType)
+{
+    // creating map to avoid sending unsupported comamnds to devices
+    // Define a map that stores property IDs based on deviceType
+    static const std::unordered_map<uint8_t, std::vector<uint8_t>>
+        devicePropertyMap = {
+            {NSM_DEV_ID_GPU,
+             {BOARD_PART_NUMBER, FRU_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+              MARKETING_NAME, BUILD_DATE}},
+            {NSM_DEV_ID_SWITCH,
+             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
+              BUILD_DATE}},
+            {NSM_DEV_ID_PCIE_BRIDGE,
+             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
+              BUILD_DATE, ASSET_TAG}},
+            {NSM_DEV_ID_BASEBOARD, {}},
+            {NSM_DEV_ID_EROT,
+             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
+              BUILD_DATE}},
+            {NSM_DEV_ID_MCTP_BRIDGE, {SERIAL_NUMBER}},
+            {NSM_DEV_ID_UNKNOWN, {}}};
+
+    // Fetch property IDs based on deviceType; fallback to an empty list if not
+    // found
+    auto it = devicePropertyMap.find(deviceType);
+    const std::vector<uint8_t>& propertyIds =
+        (it != devicePropertyMap.end())
+            ? it->second
+            : devicePropertyMap.at(NSM_DEV_ID_UNKNOWN);
+
+    for (auto propertyId : propertyIds)
+    {
+        auto rc = co_await getInventoryInformation(propertyId, properties);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "NsmDevice::getFRU getInventoryInformation failed for propertyId={PID} eid={EID} rc={RC}",
+                "PID", propertyId, "EID", eid, "RC", rc);
+        }
+    }
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    NsmDevice::getInventoryInformation(uint8_t& propertyIdentifier,
+                                       nsm::InventoryProperties& properties)
+{
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_get_inventory_information_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+    auto rc = encode_get_inventory_information_req(
+        DEFAULT_INSTANCE_ID, propertyIdentifier, requestMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "NsmDevice::getInventoryInformation encode_get_inventory_information_req failed. eid={EID} rc={RC}",
+            "EID", eid, "RC", rc);
+        // coverity[missing_return]
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
+                                                &responseLen);
+    if (rc)
+    {
+        // coverity[missing_return]
+        co_return rc;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reasonCode = ERR_NULL;
+    uint16_t dataSize = 0;
+    std::vector<uint8_t> data(65535, 0);
+
+    rc = decode_get_inventory_information_resp(responseMsg.get(), responseLen,
+                                               &cc, &reasonCode, &dataSize,
+                                               data.data());
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        // coverity[missing_return]
+        co_return cc ? cc : rc;
+    }
+
+    std::optional<nsm::InventoryPropertyData> property;
+    switch (propertyIdentifier)
+    {
+        case BOARD_PART_NUMBER:
+        case SERIAL_NUMBER:
+        case MARKETING_NAME:
+        case DEVICE_PART_NUMBER:
+        case FRU_PART_NUMBER:
+        case MEMORY_VENDOR:
+        case MEMORY_PART_NUMBER:
+        case BUILD_DATE:
+        case FIRMWARE_VERSION:
+        case INFO_ROM_VERSION:
+        {
+            property = std::string((char*)data.data(), dataSize);
+        }
+        break;
+        case DEVICE_GUID:
+        {
+            std::vector<uint8_t> nvu8ArrVal(UUID_INT_SIZE, 0);
+            if (dataSize < UUID_INT_SIZE || data.size() < UUID_INT_SIZE)
+            {
+                lg2::error(
+                    "NsmDevice::getInventoryInformation decode_get_inventory_information_resp invalid property data. eid={EID} porpertyID={PID}",
+                    "EID", eid, "PID", propertyIdentifier);
+                // coverity[missing_return]
+                co_return NSM_SW_ERROR_LENGTH;
+            }
+            memcpy(nvu8ArrVal.data(), data.data(), dataSize);
+
+            uuid_t uuidStr = utils::convertUUIDToString(nvu8ArrVal);
+            if (uuidStr.empty())
+            {
+                lg2::error(
+                    "NsmDevice::getInventoryInformation id={ID} received incorrect GUID",
+                    "ID", propertyIdentifier);
+            }
+            else
+            {
+                properties.emplace(propertyIdentifier, uuidStr);
+            }
+        }
+        break;
+        default:
+        {
+            lg2::info("NsmDevice::getInventoryInformation unsupported id={ID}",
+                      "ID", propertyIdentifier);
+        }
+        break;
+    }
+
+    if (property.has_value())
+    {
+        auto& propertyValue = property.value();
+        properties.emplace(propertyIdentifier, propertyValue);
+
+        if (const auto* propertyStringPtr =
+                std::get_if<std::string>(&propertyValue))
+        {
+            lg2::info(
+                "NsmDevice::getInventoryInformation id={ID} value={VALUE}",
+                "ID", propertyIdentifier, "VALUE",
+                (*propertyStringPtr).c_str());
+        }
+    }
+    // coverity[missing_return]
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmDevice::refreshCapabilitySensor()
+{
+    size_t sensorIndex{0};
+    auto& sensors = capabilityRefreshSensors;
+    while (sensorIndex < sensors.size())
+    {
+        auto sensor = sensors[sensorIndex];
+        co_await sensor->update(shared_from_this());
+        ++sensorIndex;
+    }
+    lg2::info("NsmDevice::refreshCapabilitySensor refreshed for EID : {EID}",
+              "EID", eid);
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine NsmDevice::refreshCommandMatrix()
+{
+    // Check if message types have already been retrieved
+    if (!areMessageTypesRetrieved)
+    {
+        // Retrieve supported message types
+        std::vector<uint8_t> supportedMessageTypes;
+        auto rc = co_await getSupportedNvidiaMessageType(supportedMessageTypes);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "Failed to get supported message types, rc={RC}, eid={EID}",
+                "RC", rc, "EID", eid);
+            co_return rc;
+        }
+
+        areMessageTypesRetrieved = true;
+        retrievedMessageTypes = supportedMessageTypes;
+    }
+
+    // Retrieve supported command codes for each message type
+    for (uint8_t messageType : retrievedMessageTypes)
+    {
+        if (!commandCodesRetrieved[messageType])
+        {
+            std::vector<uint8_t> supportedCommands;
+            auto rc = co_await getSupportedCommandCodes(messageType,
+                                                        supportedCommands);
+            if (rc == NSM_SW_SUCCESS)
+            {
+                commandCodesRetrieved[messageType] = true;
+
+                std::vector<uint8_t> supportedCommandCodes;
+                utils::convertBitMaskToVector(
+                    supportedCommandCodes,
+                    reinterpret_cast<const bitfield8_t*>(&supportedCommands[0]),
+                    SUPPORTED_COMMAND_CODE_DATA_SIZE);
+
+                for (uint8_t commandCode : supportedCommandCodes)
+                {
+                    messageTypesToCommandCodeMatrix[messageType][commandCode] =
+                        true;
+                }
+            }
+            else
+            {
+                lg2::error(
+                    "Failed to get supported commands for message type={MT}, rc={RC}, eid={EID}",
+                    "MT", messageType, "RC", rc, "EID", eid);
+                commandCodesRetrieved[messageType] = false;
+            }
+        }
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
 // FruInterfaceManager method implementations
 bool FruInterfaceManager::needsRecreation(
     const std::set<std::string>& newProperties) const
@@ -367,23 +1004,19 @@ void FruInterfaceManager::reset()
 }
 
 void FruInterfaceManager::createAndRegisterInterface(
-    sdbusplus::asio::object_server& objServer, uint8_t eid,
-    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
-    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-        eidTable)
+    std::shared_ptr<sdbusplus::asio::object_server> objServer, uint8_t eid,
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties)
 {
     std::string objPath = "/xyz/openbmc_project/FruDevice/" +
                           std::to_string(eid);
-    interface = objServer.add_unique_interface(objPath,
-                                               "xyz.openbmc_project.FruDevice");
-    registerAllProperties(nsmDevice, properties, eidTable);
+    interface = objServer->add_unique_interface(
+        objPath, "xyz.openbmc_project.FruDevice");
+    registerAllProperties(nsmDevice, properties);
     interface->initialize();
 }
 
 void FruInterfaceManager::updateAllPropertyValues(
-    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
-    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-        eidTable)
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties)
 {
     if (!interface)
         return;
@@ -422,12 +1055,6 @@ void FruInterfaceManager::updateAllPropertyValues(
             "BUILD_DATE", std::get<std::string>(properties.at(BUILD_DATE)));
     }
 
-    auto mctpUuid = utils::getUUIDFromEID(eidTable, nsmDevice->eid);
-    if (mctpUuid.has_value())
-    {
-        nsmDevice->uuid = *mctpUuid;
-    }
-
     if (properties.find(DEVICE_GUID) != properties.end())
     {
         interface->set_property("DEVICE_UUID",
@@ -437,13 +1064,11 @@ void FruInterfaceManager::updateAllPropertyValues(
 
     interface->set_property("DEVICE_TYPE", nsmDevice->getDeviceType());
     interface->set_property("INSTANCE_NUMBER", nsmDevice->getInstanceNumber());
-    interface->set_property("UUID", nsmDevice->uuid);
+    interface->set_property("UUID", nsmDevice->getUuid());
 }
 
 void FruInterfaceManager::registerAllProperties(
-    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties,
-    const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-        eidTable)
+    std::shared_ptr<NsmDevice> nsmDevice, const InventoryProperties& properties)
 {
     if (properties.find(BOARD_PART_NUMBER) != properties.end())
     {
@@ -479,12 +1104,6 @@ void FruInterfaceManager::registerAllProperties(
             "BUILD_DATE", std::get<std::string>(properties.at(BUILD_DATE)));
     }
 
-    auto mctpUuid = utils::getUUIDFromEID(eidTable, nsmDevice->eid);
-    if (mctpUuid.has_value())
-    {
-        nsmDevice->uuid = *mctpUuid;
-    }
-
     if (properties.find(DEVICE_GUID) != properties.end())
     {
         interface->register_property(
@@ -495,7 +1114,7 @@ void FruInterfaceManager::registerAllProperties(
     interface->register_property("DEVICE_TYPE", nsmDevice->getDeviceType());
     interface->register_property("INSTANCE_NUMBER",
                                  nsmDevice->getInstanceNumber());
-    interface->register_property("UUID", nsmDevice->uuid);
+    interface->register_property("UUID", nsmDevice->getUuid());
 }
 
 } // namespace nsm

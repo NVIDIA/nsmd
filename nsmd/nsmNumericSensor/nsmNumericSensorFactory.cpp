@@ -241,15 +241,15 @@ void NumericSensorFactory::makeAggregatorAndAddSensor(
             if (info.priority && !aggregator->priority)
             {
                 aggregator->priority = true;
-                std::erase(nsmDevice->deviceSensors, aggregator);
-                std::erase(nsmDevice->roundRobinSensors, aggregator);
+                std::erase(nsmDevice->getDeviceSensors(), aggregator);
+                std::erase(nsmDevice->getRoundRobinSensors(), aggregator);
                 nsmDevice->addSensor(aggregator, PollingType::Priority);
             }
         }
         else
         {
             aggregator = builder->makeAggregator(info);
-            nsmDevice->sensorAggregators.push_back(aggregator);
+            nsmDevice->addSensorAggregator(aggregator);
             lg2::info(
                 "Created NSM Sensor Aggregator : UUID={UUID}, Name={NAME}, Type={TYPE}",
                 "UUID", uuid, "NAME", info.name, "TYPE", info.type);
@@ -260,7 +260,7 @@ void NumericSensorFactory::makeAggregatorAndAddSensor(
 
     if (info.aggregated)
     {
-        nsmDevice->deviceSensors.push_back(sensor);
+        nsmDevice->getDeviceSensors().push_back(sensor);
         auto rc = aggregator->addSensor(info.sensorId,
                                         sensor->getSensorValueObject());
         if (rc == NSM_SW_SUCCESS)

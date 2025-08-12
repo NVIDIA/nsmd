@@ -16,9 +16,9 @@
  */
 
 #pragma once
-
-#include "deviceManager.hpp"
 #include "nsmEventInfo.hpp"
+#include "nsmFwSwInventory/GPUSWInventory.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 namespace nsm
@@ -37,8 +37,8 @@ class NsmRediscoveryEvent : public NsmEvent
     const NsmEventInfo info;
     std::map<std::string, std::string> eventData;
     std::string messageArgs{};
-    requester::Coroutine handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice,
-                                           eid_t eid);
+    requester::Coroutine
+        handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice);
     bool isRediscoveryRequired;
     std::coroutine_handle<> rediscoveryTaskHandler;
 };

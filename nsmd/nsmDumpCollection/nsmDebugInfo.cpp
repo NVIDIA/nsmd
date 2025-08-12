@@ -82,19 +82,17 @@ void NsmDebugInfoObject::getDebugInfoAsyncHandler(uint32_t recordHandle)
 requester::Coroutine NsmDebugInfoObject::getDebugInfoAsyncHandler(
     std::shared_ptr<Request> request)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.postPatchNsmCommand(eid, *request, responseMsg,
-                                                   responseLen);
+    auto rc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                           responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error(
-            "NsmDebugInfoObject::getDebugInfoAsyncHandler postPatchNsmCommand: "
-            "eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+        lg2::error("NsmDebugInfoObject::getDebugInfoAsyncHandler postPatchIO: "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
         finish(AsyncOperationStatusType::InternalFailure, rc);
         // coverity[missing_return]
         co_return rc;
@@ -214,16 +212,15 @@ void NsmDebugInfoObject::getDiagnosticsAsyncHandler(uint32_t recordHandle)
 requester::Coroutine NsmDebugInfoObject::getDiagnosticsAsyncHandler(
     std::shared_ptr<Request> request)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                              responseLen);
+    auto rc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                           responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmDebugInfoObject: getRequest SendRecvNsmMsg: "
+        lg2::error("NsmDebugInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         finish(AsyncOperationStatusType::InternalFailure, rc);

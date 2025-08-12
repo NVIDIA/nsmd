@@ -34,7 +34,7 @@ requester::Coroutine
                                     const std::string& interface,
                                     const std::string& objPath);
 NsmDeviceTable devices;
-std::shared_ptr<NsmDevice> baseboard;
+std::shared_ptr<MockNsmDeviceBase> baseboard;
 } // namespace nsm
 
 using namespace nsm;
@@ -103,7 +103,7 @@ TEST_F(NsmChassisPCIeSlotTest, goodTestCreateSensors)
     nsmChassisPCIeSlotCreateSensors(mockManager, basicIntfName, objPath);
 
     EXPECT_EQ(1, devices.size());
-    baseboard = devices[0];
+    baseboard = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
     EXPECT_EQ(0, baseboard->prioritySensors.size());
     EXPECT_EQ(1, baseboard->staticSensors.size());
     EXPECT_EQ(1, baseboard->roundRobinSensors.size());

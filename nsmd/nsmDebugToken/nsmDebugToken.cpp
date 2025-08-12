@@ -76,16 +76,15 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.postPatchNsmCommand(
-        eid, *request, responseMsg, responseLen);
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: disableTokens postPatchNsmCommand: "
+        lg2::error("DebugToken: disableTokens postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -137,16 +136,15 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.postPatchNsmCommand(
-        eid, *request, responseMsg, responseLen);
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: getRequest postPatchNsmCommand: "
+        lg2::error("DebugToken: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -227,18 +225,17 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = NSM_SUCCESS;
-    auto sendRc = co_await manager.postPatchNsmCommand(
-        eid, *request, responseMsg, responseLen);
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
         LG2_ERROR_FLT(
-            "DebugToken: getStatus postPatchNsmCommand failed | cc: {CC}, rc: {RC}, eid: {EID}",
+            "DebugToken: getStatus postPatchIO failed | cc: {CC}, rc: {RC}, eid: {EID}",
             "CC", nsm_completion_codes(cc), "RC", nsm_sw_codes(sendRc), "EID",
             eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -372,16 +369,15 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.postPatchNsmCommand(
-        eid, *request, responseMsg, responseLen);
+    auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                               responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: installToken postPatchNsmCommand: "
+        lg2::error("DebugToken: installToken postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", sendRc);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -595,8 +591,8 @@ sdbusplus::message::object_path
     throw Common::Error::InternalFailure();
 }
 
-requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
-                                                 eid_t eid)
+requester::Coroutine
+    NsmDebugTokenObject::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     auto request = std::make_shared<Request>(sizeof(nsm_msg_hdr) +
                                              sizeof(nsm_query_device_ids_req));
@@ -606,19 +602,19 @@ requester::Coroutine NsmDebugTokenObject::update(SensorManager& manager,
     {
         lg2::debug("DebugToken: encode_nsm_query_device_ids_req: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request, responseMsg,
-                                                  responseLen);
+    auto sendRc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *request,
+                                               responseMsg, responseLen, false);
     if (sendRc)
     {
-        lg2::debug("DebugToken: queryDeviceId SendRecvNsmMsg: "
+        lg2::debug("DebugToken: queryDeviceId sensorIO: "
                    "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+                   "EID", nsmDevice->getEid(), "RC", sendRc);
         // coverity[missing_return]
         co_return sendRc;
     }

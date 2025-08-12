@@ -225,9 +225,7 @@ requester::Coroutine createNsmThresholdEvent(SensorManager& manager,
         "Created NSM Threshold Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    device->deviceEvents.emplace_back(event);
-    device->eventDispatcher.addEvent(NSM_TYPE_NETWORK_PORT, NSM_THRESHOLD_EVENT,
-                                     event);
+    device->addDeviceEvent(event, NSM_TYPE_NETWORK_PORT, NSM_THRESHOLD_EVENT);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

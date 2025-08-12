@@ -460,8 +460,8 @@ NsmMinMemoryClockLimit::NsmMinMemoryClockLimit(
               name.c_str());
 }
 
-requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
-                                                    eid_t eid)
+requester::Coroutine
+    NsmMinMemoryClockLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -474,20 +474,20 @@ requester::Coroutine NsmMinMemoryClockLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmMinMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMinMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -530,8 +530,8 @@ NsmMaxMemoryClockLimit::NsmMaxMemoryClockLimit(
               name.c_str());
 }
 
-requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
-                                                    eid_t eid)
+requester::Coroutine
+    NsmMaxMemoryClockLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -544,20 +544,20 @@ requester::Coroutine NsmMaxMemoryClockLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmMaxMemoryClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmMaxMemoryClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -754,7 +754,7 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
             auto sensorErrorCorrection =
                 std::make_shared<NsmMemoryErrorCorrection>(
                     name, type, dimmIntf, correctionType, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensorErrorCorrection);
+            nsmDevice->getDeviceSensors().push_back(sensorErrorCorrection);
             std::string deviceType{};
             if (allCurrentIfaceProperties.count("DeviceType"))
             {
@@ -764,19 +764,19 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 
             auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
                 name, type, dimmIntf, deviceType, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensorDeviceType);
+            nsmDevice->getDeviceSensors().push_back(sensorDeviceType);
             auto sensorHealth = std::make_shared<NsmMemoryHealth>(
                 bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensorHealth);
+            nsmDevice->getDeviceSensors().push_back(sensorHealth);
             auto sensorMemoryLocation = std::make_shared<NsmLocationIntfMemory>(
                 bus, name, type, inventoryObjPath);
-            nsmDevice->deviceSensors.push_back(sensorMemoryLocation);
+            nsmDevice->getDeviceSensors().push_back(sensorMemoryLocation);
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
             auto associationSensor = std::make_shared<NsmMemoryAssociation>(
                 bus, name, type, inventoryObjPath, associations);
-            nsmDevice->deviceSensors.push_back(associationSensor);
+            nsmDevice->getDeviceSensors().push_back(associationSensor);
 
             bool priority{};
             if (allCurrentIfaceProperties.count("Priority"))

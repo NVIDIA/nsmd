@@ -39,8 +39,8 @@ class NsmSensor : public NsmObject
     virtual uint8_t handleResponseMsg(const nsm_msg* responseMsg,
                                       size_t responseLen) = 0;
 
-    virtual requester::Coroutine update(SensorManager& manager,
-                                        eid_t eid) override;
+    virtual requester::Coroutine
+        update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     virtual bool equals(const NsmSensor& other) const;
     bool operator==(const NsmSensor& other) const;

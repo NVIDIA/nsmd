@@ -23,9 +23,11 @@
 
 #include "circularQueue.hpp"
 #include "coroutineSemaphore.hpp"
+#include "instance_id.hpp"
 #include "nsmEvent.hpp"
 #include "nsmGroupSensor.hpp"
 #include "nsmInterface.hpp"
+#include "nsmMsghandler.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
 #include "requester/handler.hpp"
@@ -43,6 +45,11 @@
 #include <set>
 
 #define MAX_SENSOR_UPDATE_BATCH_SIZE 10
+
+namespace mctp
+{
+class MctpDiscovery;
+}
 
 namespace nsm
 {
@@ -91,23 +98,15 @@ struct FruInterfaceManager
     bool isPropertySupported(const std::string& propertyName) const;
     void reset();
     void createAndRegisterInterface(
-        sdbusplus::asio::object_server& objServer, uint8_t eid,
+        std::shared_ptr<sdbusplus::asio::object_server> objServer, uint8_t eid,
         std::shared_ptr<NsmDevice> nsmDevice,
-        const InventoryProperties& properties,
-        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-            eidTable);
-    void updateAllPropertyValues(
-        std::shared_ptr<NsmDevice> nsmDevice,
-        const InventoryProperties& properties,
-        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-            eidTable);
+        const InventoryProperties& properties);
+    void updateAllPropertyValues(std::shared_ptr<NsmDevice> nsmDevice,
+                                 const InventoryProperties& properties);
 
   private:
-    void registerAllProperties(
-        std::shared_ptr<NsmDevice> nsmDevice,
-        const InventoryProperties& properties,
-        const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
-            eidTable);
+    void registerAllProperties(std::shared_ptr<NsmDevice> nsmDevice,
+                               const InventoryProperties& properties);
 };
 
 enum class DeviceRemapProperty
@@ -117,44 +116,62 @@ enum class DeviceRemapProperty
     NSM_DEVICE_INSTANCE_NUMBER
 };
 
-class NsmDevice : public StateChangeLogger
+class StateChangeToken
 {
+    friend class mctp::MctpDiscovery;
+    friend class NsmDevice;
+
+  private:
+    StateChangeToken() = default;
+
+    static std::shared_ptr<StateChangeToken> create()
+    {
+        // This nested struct allows make_shared to work
+        struct EnableMakeShared : public StateChangeToken
+        {
+            EnableMakeShared() : StateChangeToken() {}
+        };
+
+        // Static variable - initialized only once
+        static std::shared_ptr<StateChangeToken> instance =
+            std::make_shared<EnableMakeShared>();
+
+        return instance; // Always return the same instance
+    }
+};
+
+class NsmDevice :
+    public StateChangeLogger,
+    public std::enable_shared_from_this<NsmDevice>
+{
+  protected:
+    NsmDevice() = default;
+
   public:
-    NsmDevice(uuid_t uuid) :
-        uuid(uuid), isDeviceActive(false),
-        longRunningEventHandler(registerLongRunningEventHandler()),
-        messageTypesToCommandCodeMatrix(
-            NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
-        eventMode(GLOBAL_EVENT_GENERATION_DISABLE)
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        initMsgTypesSensor();
-#endif
-    }
+    /**
+     * @brief Constructor for NsmDevice
+     *
+     * @param objServer - Pointer to sdbusplus::asio::object_server
+     * @param nsmMsgHandler - Pointer to NsmMessageHandler
+     * @param deviceType - Device type
+     * @param instanceNumber - Device instance number
+     * @param remapPropName - Remap property name
+     * @param remapPropValue - Remap property value
+     * @param deviceRole - Device role
+     */
 
-    NsmDevice(uint8_t deviceType, uint8_t instanceNumber,
-              uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
-        isDeviceActive(false),
-        longRunningEventHandler(registerLongRunningEventHandler()),
-        messageTypesToCommandCodeMatrix(
-            NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
-        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
-        instanceNumber(instanceNumber), deviceRole(deviceRole)
-    {
-#ifndef MOCK_DBUS_ASYNC_UTILS
-        initMsgTypesSensor();
-#endif
-    }
-
-    NsmDevice(uint8_t deviceType, uint8_t instanceNumber,
+    NsmDevice(std::shared_ptr<sdbusplus::asio::object_server> objServer,
+              std::shared_ptr<NsmMessageHandler> nsmMsgHandler,
+              uint8_t deviceType, uint8_t instanceNumber,
               std::string remapPropName, std::string remapPropValue,
               uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
-        isDeviceActive(false),
-        longRunningEventHandler(registerLongRunningEventHandler()),
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
-        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), deviceType(deviceType),
-        instanceNumber(instanceNumber), deviceRole(deviceRole)
+        eventMode(GLOBAL_EVENT_GENERATION_DISABLE), isDeviceActive(false),
+        deviceType(deviceType), instanceNumber(instanceNumber),
+        deviceRole(deviceRole), nsmMsgHandler(nsmMsgHandler),
+        objServer(objServer),
+        longRunningEventHandler(registerLongRunningEventHandler())
     {
         if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
         {
@@ -194,57 +211,44 @@ class NsmDevice : public StateChangeLogger
             LG2_ERROR("Invalid Reampping Property: {REMAP_PROP_VALUE} provided",
                       "REMAP_PROP_VALUE", remapPropValue);
         }
+        discoveryPending = false;
+        isDeviceActive = false;
 #ifndef MOCK_DBUS_ASYNC_UTILS
         initMsgTypesSensor();
 #endif
     }
 
-    FruInterfaceManager fruDeviceManager;
-    std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
-
-    eid_t eid = 0;
-    uuid_t uuid;
     uuid_t deviceUuid;
-    bool isDeviceActive;
-    bool isDeviceReady = false;
-    DeviceRemapProperty deviceRemapProp;
-    uint8_t nsmDeviceInstanceNumber;
-    bool discoveryPending = false;
-
     requester::Coroutine task, longRunningTask;
-
-    /* Lifecycle management sensors */
-    std::vector<std::shared_ptr<NsmObject>> deviceSensors;
-    std::vector<std::shared_ptr<NsmObject>> setSensors;
-    std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
-    std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
-    std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
-    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor =
-        nullptr; // for GPU driver
-    std::shared_ptr<NsmObject> msgTypesSensor = nullptr;
-
-    /* Event management */
-    EventDispatcher eventDispatcher;
-    std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
-    NsmLongRunningEventHandler& longRunningEventHandler;
-
-    const sdeventplus::Event event = sdeventplus::Event::get_default();
 
     std::shared_ptr<NsmNumericAggregator>
         findAggregatorByType(const std::string& type);
 
     void setEventMode(uint8_t mode);
     uint8_t getEventMode();
-    std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool allCommandCodesAreRetrieved();
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
+    void updateMessageTypesToCommandCodeMatrix(
+        uint8_t messageType, const bitfield8_t supportedCommands[],
+        size_t supportedCommandsSize);
     /** @brief set the nsmDevice to online state */
-    requester::Coroutine setOnline();
+    requester::Coroutine
+        setOnline([[maybe_unused]] std::shared_ptr<StateChangeToken> token);
 
     /** @brief set the nsmDevice to offline state */
-    requester::Coroutine setOffline();
+    requester::Coroutine
+        setOffline([[maybe_unused]] std::shared_ptr<StateChangeToken> token);
 
-    requester::Coroutine waitForNsmDeviceUpdate();
+    void addDeviceEvent(std::shared_ptr<NsmEvent> event, NsmType type,
+                        NsmEventId eventId)
+    {
+        deviceEvents.push_back(event);
+        eventDispatcher.addEvent(type, eventId, event);
+    }
+    EventDispatcher& getEventDispatcher()
+    {
+        return eventDispatcher;
+    }
 
     /**
      * @brief Inserts device/static sensor to to NsmDevice.
@@ -381,6 +385,22 @@ class NsmDevice : public StateChangeLogger
         addSensorBase(sensor, pollingType);
     }
 
+    requester::Coroutine updateNsmDevice();
+    void updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
+                                    uint8_t deviceInstanceNumber);
+    requester::Coroutine refreshCapabilitySensor();
+    requester::Coroutine refreshCommandMatrix();
+
+    eid_t getEid()
+    {
+        return eid;
+    }
+
+    uuid_t getUuid()
+    {
+        return uuid;
+    }
+
     /** @brief getter of deviceType */
     uint8_t getDeviceType()
     {
@@ -393,10 +413,117 @@ class NsmDevice : public StateChangeLogger
         return deviceRole;
     }
 
-    /** @brief getter of instanceNumber */
+    /** @brief getter of static instanceNumber */
     uint8_t getInstanceNumber()
     {
         return instanceNumber;
+    }
+
+    /** @brief getter of NsmDevice Instance Number */
+    uint8_t getNsmDeviceInstanceNumber()
+    {
+        return nsmDeviceInstanceNumber;
+    }
+
+    /** @brief getter of Device Remap Property */
+    DeviceRemapProperty getDeviceRemapProp()
+    {
+        return deviceRemapProp;
+    }
+
+    /** @brief getter of Device Active State*/
+    bool isOnline()
+    {
+        return isDeviceActive;
+    }
+
+    /** @brief getter of Device Ready State*/
+    bool isReady()
+    {
+        return isDeviceReady;
+    }
+
+    /** @brief mark the device as ready */
+    void changeDeviceReadyState(bool state)
+    {
+        isDeviceReady = state;
+    }
+
+    void initDeviceDiscovery()
+    {
+        discoveryPending = true;
+        isDeviceActive = false;
+    }
+    void finishDeviceDiscovery()
+    {
+        discoveryPending = false;
+    }
+    bool isDiscoveryPending()
+    {
+        return discoveryPending;
+    }
+    void addCapabilityRefreshSensor(std::shared_ptr<NsmObject> sensor)
+    {
+        capabilityRefreshSensors.emplace_back(sensor);
+    }
+    void addSetSensor(std::shared_ptr<NsmObject> sensor)
+    {
+        setSensors.emplace_back(sensor);
+    }
+    void addStandByToDcRefreshSensor(std::shared_ptr<NsmObject> sensor)
+    {
+        standByToDcRefreshSensors.emplace_back(sensor);
+    }
+    void addSensorAggregator(std::shared_ptr<NsmNumericAggregator> sensor)
+    {
+        sensorAggregators.emplace_back(sensor);
+    }
+    void addGpudriverSensor(
+        std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> sensor)
+    {
+        gpudriverSensor = sensor;
+    }
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus>
+        getGpuDriverSensor() const
+    {
+        return gpudriverSensor;
+    }
+    SensorQueue& getPrioritySensors()
+    {
+        return prioritySensors;
+    }
+    SensorQueue& getGpmSensors()
+    {
+        return gpmSensors;
+    }
+    SensorQueue& getLongRunningSensors()
+    {
+        return longRunningSensors;
+    }
+    SensorQueue& getStaticSensors()
+    {
+        return staticSensors;
+    }
+    SensorQueue& getRoundRobinSensors()
+    {
+        return roundRobinSensors;
+    }
+    std::vector<std::shared_ptr<NsmObject>>& getDeviceSensors()
+    {
+        return deviceSensors;
+    }
+
+    std::vector<std::shared_ptr<NsmObject>>& getStandByToDcRefreshSensors()
+    {
+        return standByToDcRefreshSensors;
+    }
+    PollingType& getNonPriorityPollingType()
+    {
+        return nonPriorityPollingType;
+    }
+    void setNonPriorityPollingType(PollingType& pollingType)
+    {
+        nonPriorityPollingType = pollingType;
     }
 
     /** @brief Getter for the longRunningSemaphore */
@@ -436,24 +563,51 @@ class NsmDevice : public StateChangeLogger
                                  const nsm_msg* event, size_t eventLen);
 
     std::coroutine_handle<> updateNsmDeviceTaskHandle;
+    /* sensorIO should be used for polling sensors only*/
+    virtual requester::Coroutine
+        sensorIO(eid_t eid, Request& request,
+                 std::shared_ptr<const nsm_msg>& responseMsg,
+                 size_t& responseLen, bool bypassCommandCheck = false);
+    /* postPatchIO should be used for post/patch operations on NsmDevice*/
+    virtual requester::Coroutine
+        postPatchIO(eid_t eid, Request& request,
+                    std::shared_ptr<const nsm_msg>& responseMsg,
+                    size_t& responseLen);
+
+  private:
+    std::vector<std::vector<bitfield8_t>> commands;
+    std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
+    uint8_t eventMode;
+    eid_t eid = 0;
+    uuid_t uuid;
+    bool isDeviceActive = false;
+    bool isDeviceReady = false;
+    bool discoveryPending = false;
+    uint8_t deviceType = 0;
+    uint8_t instanceNumber = 0;
+    uint8_t deviceRole = 0;
+    DeviceRemapProperty deviceRemapProp;
+    uint8_t nsmDeviceInstanceNumber;
+    std::shared_ptr<NsmMessageHandler> nsmMsgHandler;
+    std::shared_ptr<sdbusplus::asio::object_server> objServer;
+    std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
+    EventDispatcher eventDispatcher;
+    NsmLongRunningEventHandler& longRunningEventHandler;
+    std::vector<std::shared_ptr<NsmObject>> deviceSensors;
+
+    const sdeventplus::Event event = sdeventplus::Event::get_default();
+
+    NsmLongRunningEventHandler& registerLongRunningEventHandler();
+    common::CoroutineSemaphore
+        longRunningSemaphore; // Semaphore for synchronizing long running
+    // commands
     common::CoroutineSemaphore
         discoverNsmDeviceSemaphore; // Semaphore for synchronizing update nsm
                                     // device during init if mctp rediscovery
                                     // signal is also received
-
-  private:
-    std::vector<std::vector<bitfield8_t>> commands;
-    uint8_t eventMode;
-    uint8_t deviceType = 0;
-    uint8_t instanceNumber = 0;
-    uint8_t deviceRole = 0;
-    NsmLongRunningEventHandler& registerLongRunningEventHandler();
-    common::CoroutineSemaphore
-        longRunningSemaphore; // Semaphore for synchronizing long running
-                              // commands
     std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
-
-    friend class DeviceManager;
+    FruInterfaceManager fruDeviceManager;
+    std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
     // Track if NSM message types were successfully retrieved
     bool areMessageTypesRetrieved{false};
 
@@ -462,8 +616,18 @@ class NsmDevice : public StateChangeLogger
 
     // Track success status for each message type's command codes
     std::unordered_map<uint8_t, bool> commandCodesRetrieved;
+    std::vector<std::shared_ptr<NsmObject>> setSensors;
+    std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
+    std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
+    std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor =
+        nullptr; // for GPU driver
+    std::shared_ptr<NsmObject> msgTypesSensor =
+        nullptr; // Sensor for retrieving message types
 
     void initMsgTypesSensor();
+    requester::Coroutine markSensorsUnrefreshed();
+    requester::Coroutine updateSensorsForOffline();
 
     /**
      * @brief Adds dynamic sensor to NsmDevice.
@@ -473,9 +637,24 @@ class NsmDevice : public StateChangeLogger
      */
     void addSensorBase(const std::shared_ptr<NsmObject>& sensor,
                        PollingType pollingType);
+    requester::Coroutine waitForNsmDeviceUpdate();
 
-    friend class SensorManagerImpl;
-    friend class NumericSensorFactory;
+    /* To be used for updating parameters at the time of device discovery*/
+    requester::Coroutine
+        SendRecvNsmMsg(eid_t eid, Request& request,
+                       std::shared_ptr<const nsm_msg>& responseMsg,
+                       size_t* responseLen);
+    requester::Coroutine updateFruDeviceIntf();
+    requester::Coroutine getFRU(nsm::InventoryProperties& properties,
+                                const uint8_t& deviceType);
+    requester::Coroutine
+        getInventoryInformation(uint8_t& propertyIdentifier,
+                                nsm::InventoryProperties& properties);
+    requester::Coroutine getSupportedNvidiaMessageType(
+        std::vector<uint8_t>& supportedNvidiaMessageTypes);
+    requester::Coroutine
+        getSupportedCommandCodes(uint8_t nvidia_message_type,
+                                 std::vector<uint8_t>& supportedCommands);
 
     /* Polling sensors management */
     PollingType nonPriorityPollingType = PollingType::GpuPerformanceMonitoring;

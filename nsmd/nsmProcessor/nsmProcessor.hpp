@@ -24,6 +24,7 @@
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
 #include "nsmCommon/nsmCommon.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
@@ -138,7 +139,7 @@ class NsmUuidIntf : public NsmObject
     NsmUuidIntf(sdbusplus::bus::bus& bus, std::string& name, std::string& type,
                 std::string& inventoryObjPath, uuid_t uuid);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     void updateMetricOnSharedMemory() override;
 
   private:
@@ -155,7 +156,7 @@ class NsmSysGuidIntf : public NsmObject
     NsmSysGuidIntf(sdbusplus::bus::bus& bus, std::string& name,
                    std::string& type, std::string& inventoryObjPath);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::unique_ptr<SysGuidIntf> sysguidIntf = nullptr;
@@ -331,7 +332,7 @@ class NsmMaxEDPpLimit : public NsmObject
   public:
     NsmMaxEDPpLimit(std::string& name, std::string& type,
                     std::shared_ptr<EDPpLocal> eDPpIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
@@ -342,7 +343,7 @@ class NsmMinEDPpLimit : public NsmObject
   public:
     NsmMinEDPpLimit(std::string& name, std::string& type,
                     std::shared_ptr<EDPpLocal> eDPpIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<EDPpLocal> eDPpIntf = nullptr;
@@ -403,7 +404,7 @@ class NsmDefaultBaseClockSpeed : public NsmObject
     NsmDefaultBaseClockSpeed(
         std::string& name, std::string& type,
         std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
@@ -415,7 +416,7 @@ class NsmDefaultBoostClockSpeed : public NsmObject
     NsmDefaultBoostClockSpeed(
         std::string& name, std::string& type,
         std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<CpuOperatingConfigIntf> cpuOperatingConfigIntf = nullptr;
@@ -524,7 +525,7 @@ class NsmTotalMemorySize : public NsmObject
     NsmTotalMemorySize(
         std::string& name, std::string& type,
         std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<PersistentMemoryInterface> persistentMemoryInterface;
@@ -594,7 +595,7 @@ class NsmMaxPowerCap : public NsmObject
                    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
                    std::shared_ptr<PowerLimitIface> powerLimitIntf,
                    std::string& inventoryObjPath);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     void updateMetricOnSharedMemory() override;
     std::shared_ptr<NsmPowerCapIntf> getMaxPowerCapIntf() const
     {
@@ -615,7 +616,7 @@ class NsmMinPowerCap : public NsmObject
                    std::shared_ptr<NsmPowerCapIntf> powerCapIntf,
                    std::shared_ptr<PowerLimitIface> powerLimitIntf,
                    std::string& inventoryObjPath);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     void updateMetricOnSharedMemory() override;
     std::shared_ptr<NsmPowerCapIntf> getMinPowerCapIntf() const
     {
@@ -635,7 +636,7 @@ class NsmDefaultPowerCap : public NsmObject
         std::string& name, std::string& type,
         std::shared_ptr<NsmClearPowerCapIntf> powerCapIntf,
         std::shared_ptr<NsmClearPowerCapAsyncIntf> clearPowerCapAsyncIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     std::shared_ptr<NsmClearPowerCapIntf> getDefaultPowerCapIntf() const
     {
         return defaultPowerCapIntf;

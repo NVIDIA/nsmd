@@ -17,7 +17,7 @@
 
 #include "nsmLongRunningEventHandler.hpp"
 
-#include "deviceManager.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 namespace nsm
@@ -30,8 +30,8 @@ int NsmLongRunningEventHandler::handle(eid_t eid, NsmType type,
                                        NsmEventId eventId, const nsm_msg* event,
                                        size_t eventLen)
 {
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    auto nsmDevice = deviceManager.getNsmDeviceFromEid(eid);
+    auto nsmDevice =
+        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
     if (!nsmDevice)
     {
         lg2::error(

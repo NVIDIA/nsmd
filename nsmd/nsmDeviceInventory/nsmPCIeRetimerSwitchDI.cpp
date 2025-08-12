@@ -77,8 +77,8 @@ NsmPCIeRetimerSwitchDI::NsmPCIeRetimerSwitchDI(
     switchIntf->vendorId("");
 }
 
-requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
-                                                    eid_t eid)
+requester::Coroutine
+    NsmPCIeRetimerSwitchDI::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     int rc;
     Request request;
@@ -93,7 +93,7 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         {
             lg2::debug(
                 "encode_query_scalar_group_telemetry_v1_req failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", nsmDevice->getEid(), "RC", rc);
             // coverity[missing_return]
             co_return rc;
         }
@@ -115,15 +115,15 @@ requester::Coroutine NsmPCIeRetimerSwitchDI::update(SensorManager& manager,
         {
             lg2::info(
                 "encode_multi_query_scalar_group_telemetry_v2_req failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", nsmDevice->getEid(), "RC", rc);
             co_return rc;
         }
         request = req;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -324,7 +324,7 @@ static requester::Coroutine
             // coverity[missing_return]
             co_return NSM_ERROR;
         }
-        nsmDevice->standByToDcRefreshSensors.emplace_back(retimerSwitchDi);
+        nsmDevice->addStandByToDcRefreshSensor(retimerSwitchDi);
 
         // update sensor
         nsmDevice->addStaticSensor(retimerSwitchDi);
@@ -345,7 +345,7 @@ static requester::Coroutine
             // coverity[missing_return]
             co_return NSM_ERROR;
         }
-        nsmDevice->standByToDcRefreshSensors.emplace_back(multiPortSwitchDi);
+        nsmDevice->addStandByToDcRefreshSensor(multiPortSwitchDi);
         nsmDevice->addStaticSensor(multiPortSwitchDi);
         co_return NSM_SUCCESS;
     }

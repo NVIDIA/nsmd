@@ -49,8 +49,7 @@ class NsmActivateErrorInjectionPayloadIntf :
     requester::Coroutine doActivateErrorInjectionPayload(
         std::shared_ptr<AsyncStatusIntf> statusInterface)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2));
         auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
         auto rc = encode_activate_error_injection_payload_req(0, requestPtr);
@@ -67,12 +66,12 @@ class NsmActivateErrorInjectionPayloadIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await device->postPatchIO(eid, request, responseMsg,
+                                          responseLen);
         if (rc)
         {
             lg2::error(
-                "NsmActivateErrorInjectionPayload::activatePayload: postPatchNsmCommand failed."
+                "NsmActivateErrorInjectionPayload::activatePayload: postPatchIO failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
             statusInterface->status(AsyncOperationStatusType::WriteFailure);

@@ -17,8 +17,8 @@
 
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "nsmObjectFactory.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -41,7 +41,7 @@ requester::Coroutine
     }
 
     auto type = interface.substr(interface.find_last_of('.') + 1);
-    DeviceManager& deviceManager = DeviceManager::getInstance();
+    mctp::MctpDiscovery& mctpDiscovery = mctp::MctpDiscovery::getInstance();
 
     uint8_t deviceType = NSM_DEV_ID_UNKNOWN;
     uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
@@ -111,7 +111,7 @@ requester::Coroutine
 
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapInstanceNumberToInstanceNumber[deviceTypeAndRole] =
+            mctpDiscovery.mapInstanceNumberToInstanceNumber[deviceTypeAndRole] =
                 mappingArray;
         }
     }
@@ -126,7 +126,7 @@ requester::Coroutine
 
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapUuidToInstanceNumber[deviceTypeAndRole] =
+            mctpDiscovery.mapUuidToInstanceNumber[deviceTypeAndRole] =
                 mappingArray;
         }
     }
@@ -141,7 +141,7 @@ requester::Coroutine
 
         if (mappingArray.size() > 0)
         {
-            deviceManager.mapEidToInstanceNumber[deviceTypeAndRole] =
+            mctpDiscovery.mapEidToInstanceNumber[deviceTypeAndRole] =
                 mappingArray;
         }
     }

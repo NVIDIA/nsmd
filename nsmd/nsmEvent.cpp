@@ -18,8 +18,8 @@
 #include "nsmEvent.hpp"
 
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "eventHandler.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -151,7 +151,8 @@ void DelegatingEventHandler::delegate(eid_t eid, NsmType type,
                                       NsmEventId eventId, const nsm_msg* event,
                                       size_t eventLen)
 {
-    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
+    auto nsmDevice =
+        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
 
     if (!nsmDevice)
     {
@@ -162,7 +163,7 @@ void DelegatingEventHandler::delegate(eid_t eid, NsmType type,
         return;
     }
 
-    nsmDevice->eventDispatcher.handle(eid, type, eventId, event, eventLen);
+    nsmDevice->getEventDispatcher().handle(eid, type, eventId, event, eventLen);
 }
 
 } // namespace nsm

@@ -40,7 +40,8 @@ NsmNvlinkLedIntf::NsmNvlinkLedIntf(sdbusplus::bus::bus& bus, std::string& name,
                                                     inventoryObjPath.c_str());
 }
 
-requester::Coroutine NsmNvlinkLedIntf::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmNvlinkLedIntf::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request readNvLinkLed(sizeof(nsm_msg_hdr) +
                           sizeof(struct nsm_get_nvlink_agg_led_status_req));
@@ -53,21 +54,22 @@ requester::Coroutine NsmNvlinkLedIntf::update(SensorManager& manager, eid_t eid)
     {
         lg2::error(
             "NsmGetNvLinkLed encode_get_nvlink_agg_led_status_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> readNvLinkLedResponseMsg;
     size_t readNvLinkLedResponseLen = 0;
 
-    rc = co_await manager.SendRecvNsmMsg(
-        eid, readNvLinkLed, readNvLinkLedResponseMsg, readNvLinkLedResponseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), readNvLinkLed,
+                                      readNvLinkLedResponseMsg,
+                                      readNvLinkLedResponseLen, false);
 
     if (rc)
     {
         lg2::error(
             "NsmGetNvLinkLed SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         co_return rc;
     }
 

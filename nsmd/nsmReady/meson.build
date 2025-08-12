@@ -1,3 +1,3 @@
-sources += ['nsmReady/nsmReady.cpp', 'nsmReady/nsmRemapInstanceNumber.cpp']
+sources += ['nsmReady/nsmReady.cpp']
 
 nsmd_headers += ['.', '..']

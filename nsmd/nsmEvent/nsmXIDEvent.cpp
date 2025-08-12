@@ -205,9 +205,8 @@ static requester::Coroutine createNsmXIDEvent(SensorManager& manager,
     lg2::info("Created NSM XID Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
               "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceEvents.push_back(event);
-    nsmDevice->eventDispatcher.addEvent(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                                        NSM_XID_EVENT, event);
+    nsmDevice->addDeviceEvent(event, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                              NSM_XID_EVENT);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

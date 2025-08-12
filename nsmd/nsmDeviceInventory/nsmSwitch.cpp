@@ -24,7 +24,6 @@
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
@@ -50,6 +49,7 @@
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
 #ifdef NVIDIA_SHMEM
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sharedMemCommon.hpp"
 #endif
 
@@ -76,16 +76,15 @@ NsmSwitchDIReset::NsmSwitchDIReset(sdbusplus::bus::bus& bus,
 }
 
 template <typename IntfType>
-requester::Coroutine NsmSwitchDI<IntfType>::update(SensorManager& manager,
-                                                   eid_t eid)
+requester::Coroutine
+    NsmSwitchDI<IntfType>::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     if constexpr (std::is_same_v<IntfType, UuidIntf>)
     {
         // For UuidIntf, we need to get the device UUID from the device manager.
-        DeviceManager& deviceManager = DeviceManager::getInstance();
+        mctp::MctpDiscovery& mctpDiscovery = mctp::MctpDiscovery::getInstance();
         uuid_t deviceUuid;
-        auto rc = co_await getDeviceUUID(manager, eid, deviceManager,
-                                         deviceUuid);
+        auto rc = co_await getDeviceUUID(nsmDevice, mctpDiscovery, deviceUuid);
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);
@@ -116,8 +115,8 @@ nsm_power_mode_data NsmSwitchDIPowerMode::getPowerModeData()
     return powerModeData;
 }
 
-requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
-                                                  eid_t eid)
+requester::Coroutine
+    NsmSwitchDIPowerMode::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_get_power_mode_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -126,15 +125,15 @@ requester::Coroutine NsmSwitchDIPowerMode::update(SensorManager& manager,
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::debug("encode_get_power_mode_req failed. eid={EID} rc={RC}", "EID",
-                   eid, "RC", rc);
+                   nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -182,8 +181,7 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
     [[maybe_unused]] AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info("setL1PowerDevice for EID: {EID}", "EID", eid);
 
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_mode_req));
@@ -203,12 +201,12 @@ requester::Coroutine NsmSwitchDIPowerMode::setL1PowerDevice(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "setL1PowerDevice postPatchNsmCommand failed for while setting PowerMode "
+            "setL1PowerDevice postPatchIO failed for while setting PowerMode "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -454,9 +452,7 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
     {
         throw sdbusplus::error::xyz::openbmc_project::common::InvalidArgument{};
     }
-
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info("set Switch Isolation Mode On Device for EID: {EID}", "EID", eid);
 
     uint8_t isolationMode;
@@ -494,12 +490,12 @@ requester::Coroutine NsmSwitchIsolationMode::setSwitchIsolationMode(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "NsmSwitchIsolationMode::setSwitchIsolationMode postPatchNsmCommand failed for"
+            "NsmSwitchIsolationMode::setSwitchIsolationMode postPatchIO failed for"
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
@@ -595,7 +591,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         nvSwitchAssociation->invoke(pdiMethod(associations), associations_list);
         nvSwitchUuid->invoke(pdiMethod(uuid), uuid);
 
-        device->deviceSensors.emplace_back(nvSwitchIntf);
+        device->getDeviceSensors().emplace_back(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
 
@@ -623,7 +619,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         // Device Reset for NVSwitch
         auto nvSwitchResetSensor = std::make_shared<NsmSwitchDIReset>(
             bus, name, type, inventoryObjPath, device);
-        device->deviceSensors.push_back(nvSwitchResetSensor);
+        device->getDeviceSensors().push_back(nvSwitchResetSensor);
 
 #if defined(ENABLE_ERROR_INJECTION)
         createNsmErrorInjectionSensors(manager, device,
@@ -865,9 +861,8 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             name, type, fabricMgrState->getFabricManagerIntf(),
             fabricMgrState->getOperaStatusIntf(),
             fabricMgrState->getAggregateFabricManagerState());
-        device->deviceEvents.push_back(event);
-        device->eventDispatcher.addEvent(NSM_TYPE_NETWORK_PORT,
-                                         NSM_FABRIC_MANAGER_STATE_EVENT, event);
+        device->addDeviceEvent(event, NSM_TYPE_NETWORK_PORT,
+                               NSM_FABRIC_MANAGER_STATE_EVENT);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;

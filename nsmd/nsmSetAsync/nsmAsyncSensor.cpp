@@ -33,22 +33,21 @@ requester::Coroutine
 
     this->value = &value;
     this->status = status;
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
-    auto rc = co_await update(manager, eid);
+    auto rc = co_await update(device);
 
     // coverity[missing_return]
     co_return rc;
 }
 
-requester::Coroutine NsmAsyncSensor::update(SensorManager& manager, eid_t eid)
+requester::Coroutine
+    NsmAsyncSensor::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    auto requestMsg = genRequestMsg(eid, 0);
+    auto requestMsg = genRequestMsg(nsmDevice->getEid(), 0);
     if (!requestMsg.has_value())
     {
         lg2::error(
             "NsmAsyncSensor::update: genRequestMsg failed, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", eid);
+            "NAME", getName(), "EID", nsmDevice->getEid());
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
@@ -56,13 +55,13 @@ requester::Coroutine NsmAsyncSensor::update(SensorManager& manager, eid_t eid)
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen);
+    auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
+                                           responseMsg, responseLen, false);
     if (rc)
     {
         lg2::error(
-            "NsmAsyncSensor::update: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", eid);
+            "NsmAsyncSensor::update: sensorIO failed, name={NAME}, eid={EID}",
+            "NAME", getName(), "EID", nsmDevice->getEid());
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
         co_return rc;
@@ -74,7 +73,7 @@ requester::Coroutine NsmAsyncSensor::update(SensorManager& manager, eid_t eid)
     {
         lg2::error(
             "NsmAsyncSensor::update: handleResponseMsg failed, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", eid);
+            "NAME", getName(), "EID", nsmDevice->getEid());
         *status = AsyncOperationStatusType::WriteFailure;
     }
 

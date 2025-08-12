@@ -218,7 +218,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
 
         thresholdValue->updateReading(threshold);
 
-        nsmDevice->deviceSensors.push_back(std::move(thresholdValue));
+        nsmDevice->getDeviceSensors().push_back(std::move(thresholdValue));
 
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type=Static",
                   "UUID", uuid, "NAME", thresholdInfo.name);
@@ -273,7 +273,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
     if (!periodicUpdate)
     {
         nsmDevice->addStaticSensor(sensor);
-        nsmDevice->capabilityRefreshSensors.emplace_back(sensor);
+        nsmDevice->addCapabilityRefreshSensor(sensor);
         // coverity[missing_return]
         co_return NSM_SUCCESS;
     }

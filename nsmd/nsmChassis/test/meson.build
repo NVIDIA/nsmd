@@ -21,7 +21,6 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
-    '../../deviceManager.cpp',
     '../../nsmEvent.cpp',
     '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
@@ -42,6 +41,7 @@ dep_src_files = [
     '../../nsmSetAsync/nsmSetErrorInjection.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmProcessor/nsmOemResetStatistics.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 if get_option('shmem').enabled()

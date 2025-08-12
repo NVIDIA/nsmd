@@ -39,8 +39,8 @@ requester::Coroutine
                                       const std::string& interface,
                                       const std::string& objPath);
 NsmDeviceTable devices;
-std::shared_ptr<NsmDevice> gpu;
-std::shared_ptr<NsmDevice> fpga;
+std::shared_ptr<MockNsmDeviceBase> gpu;
+std::shared_ptr<MockNsmDeviceBase> fpga;
 } // namespace nsm
 
 using namespace nsm;
@@ -157,7 +157,7 @@ TEST_F(NsmChassisPCIeDeviceTest, badTestCreateDeviceSensors)
 
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = devices[0];
+    gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
     EXPECT_EQ(0, gpu->deviceSensors.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
@@ -317,13 +317,11 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
               ltssmStateSensor->deviceIndex);
     EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
     EXPECT_EQ(NVHS_CLKBUF_INDEX, nvLinkRefClock->bufferIndex);
-
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .Times(sensors)
-        .WillRepeatedly(mockSendRecvNsmMsg());
+    testing::Mock::AllowLeak(gpu.get());
+    EXPECT_CALL(*gpu, sensorIO).Times(sensors).WillRepeatedly(mockSensorIO());
     for (auto i = 0; i < sensors; i++)
     {
-        gpu->deviceSensors[i]->update(mockManager, eid).detach();
+        gpu->deviceSensors[i]->update(gpu).detach();
     }
 }
 

@@ -105,7 +105,7 @@ static requester::Coroutine CreatePowerSubSystem(SensorManager& manager,
 
     auto fpgaPowerSubSystem = std::make_shared<NsmPowerPowerSupply>(
         bus, name, associations, type, nsmPowerSubSystemPath, powerSupplyType);
-    nsmDevice->deviceSensors.emplace_back(fpgaPowerSubSystem);
+    nsmDevice->getDeviceSensors().emplace_back(fpgaPowerSubSystem);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

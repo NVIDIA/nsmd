@@ -27,17 +27,48 @@ using ::testing::ElementsAre;
 #define private public
 #define protected public
 
+#include "commonMock.hpp"
 #include "nsmDevice.hpp"
+
+#undef private
+#undef protected
 
 TEST(nsmDevice, GoodTest)
 {
     uuid_t uuid = "00000000-0000-0000-0000-000000000000";
 
-    nsm::NsmDevice nsmDevice(uuid);
-    EXPECT_EQ(nsmDevice.uuid, uuid);
+    MockNsmDeviceBase nsmDevice(1, 1, "MCTP_UUID", uuid, 1);
+    EXPECT_EQ(nsmDevice.getDeviceType(), 1);
+    EXPECT_EQ(nsmDevice.getInstanceNumber(), 1);
+    EXPECT_EQ(nsmDevice.getDeviceRole(), 1);
+    EXPECT_EQ(nsmDevice.getDeviceRemapProp(),
+              nsm::DeviceRemapProperty::MCTP_UUID);
+    EXPECT_EQ(nsmDevice.getUuid(), uuid);
+    EXPECT_EQ(nsmDevice.isDeviceActive, true);
+    EXPECT_EQ(nsmDevice.isOnline(), true);
+}
 
-    uint8_t setMode = 2;
-    nsmDevice.setEventMode(2);
-    auto getMode = nsmDevice.getEventMode();
-    EXPECT_EQ(setMode, getMode);
+TEST(nsmDevice, TestMctpEid)
+{
+    MockNsmDeviceBase nsmDeviceBase(10, 5, "MCTP_EID", "8", 2);
+
+    EXPECT_EQ(nsmDeviceBase.getDeviceType(), 10);
+    EXPECT_EQ(nsmDeviceBase.getInstanceNumber(), 5);
+    EXPECT_EQ(nsmDeviceBase.getDeviceRole(), 2);
+    EXPECT_EQ(nsmDeviceBase.getDeviceRemapProp(),
+              nsm::DeviceRemapProperty::MCTP_EID);
+    EXPECT_EQ(nsmDeviceBase.getEid(), 8);
+}
+
+TEST(nsmDevice, TestNsmDeviceInstanceNumber)
+{
+    MockNsmDeviceBase nsmDeviceBase(10, 5, "NSM_DEVICE_INSTANCE_NUMBER", "42",
+                                    2);
+
+    EXPECT_EQ(nsmDeviceBase.getDeviceType(), 10);
+    EXPECT_EQ(nsmDeviceBase.getInstanceNumber(), 5);
+    EXPECT_EQ(nsmDeviceBase.getDeviceRole(), 2);
+    EXPECT_EQ(nsmDeviceBase.getDeviceRemapProp(),
+              nsm::DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER);
+    EXPECT_EQ(nsmDeviceBase.getNsmDeviceInstanceNumber(), 42);
 }

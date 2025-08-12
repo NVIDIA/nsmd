@@ -168,9 +168,8 @@ static requester::Coroutine
         "Created NSM Reset Required Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceEvents.push_back(event);
-    nsmDevice->eventDispatcher.addEvent(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
-                                        NSM_RESET_REQUIRED_EVENT, event);
+    nsmDevice->addDeviceEvent(event, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                              NSM_RESET_REQUIRED_EVENT);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

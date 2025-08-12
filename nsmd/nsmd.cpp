@@ -17,12 +17,12 @@
 
 #include "config.h"
 
-#include "deviceManager.hpp"
 #include "eventManager.hpp"
 #include "eventTypeHandlers.hpp"
 #include "instance_id.hpp"
 #include "nsmDbusIfaceOverride/nsmLogDumpOnDemand.hpp"
 #include "nsmDevice.hpp"
+#include "nsmMsghandler.hpp"
 #include "nsmRawCommandHandler.hpp"
 #include "nsmServiceReadyInterface.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
@@ -142,15 +142,11 @@ int main(int argc, char** argv)
         // logs
         nsm::NsmLogDumpTracker::initialize(bus, "/xyz/openbmc_project/NSM");
 
-        // Initialize the DeviceManager before getting its instance
-        nsm::DeviceManager::initialize(event, reqHandler, instanceIdDb,
-                                       objServer, eidTable, nsmDevices);
-        nsm::DeviceManager& deviceManager = nsm::DeviceManager::getInstance();
-        std::unique_ptr<mctp::MctpDiscovery> mctpDiscoveryHandler =
-            std::make_unique<mctp::MctpDiscovery>(
-                bus, sockHandler,
-                std::initializer_list<mctp::MctpDiscoveryHandlerIntf*>{
-                    &deviceManager});
+        nsm::NsmMessageHandler::initialize(reqHandler);
+        auto nsmMsgHandler = nsm::NsmMessageHandler::getSharedInstance();
+
+        mctp::MctpDiscovery::initialize(bus, sockHandler, nsmMsgHandler,
+                                        eidTable, nsmDevices, objServer);
 
         // Initialize the SensorManager before getting its instance
         nsm::SensorManagerImpl::initialize(bus, event, reqHandler, instanceIdDb,

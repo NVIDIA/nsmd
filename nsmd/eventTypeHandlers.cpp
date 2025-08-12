@@ -21,8 +21,8 @@
 #include "network-ports.h"
 #include "platform-environmental.h"
 
-#include "deviceManager.hpp"
 #include "nsmDevice.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 

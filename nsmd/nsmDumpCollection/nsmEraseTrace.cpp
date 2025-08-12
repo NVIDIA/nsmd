@@ -89,9 +89,8 @@ void NsmEraseTraceObject::eraseDebugInfo(EraseInfoType infoType)
 
 requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::tuple<EraseOperationStatus, EraseStatus> result(eraseTraceStatus());
     auto& [operationStatus, eraseStatus] = result;
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_erase_trace_req));
@@ -109,11 +108,10 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmEraseTraceObject: getRequest postPatchNsmCommand: "
+        lg2::error("NsmEraseTraceObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         operationStatus = EraseOperationStatus::InternalFailure;
@@ -162,9 +160,8 @@ requester::Coroutine NsmEraseTraceObject::eraseTraceOnDevice()
 requester::Coroutine
     NsmEraseTraceObject::eraseDebugInfoOnDevice(uint8_t infoType)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::tuple<EraseOperationStatus, EraseStatus> result(
         eraseDebugInfoStatus());
     auto& [operationStatus, eraseStatus] = result;
@@ -184,11 +181,10 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmEraseDebugInfoObject: getRequest postPatchNsmCommand: "
+        lg2::error("NsmEraseDebugInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         operationStatus = EraseOperationStatus::InternalFailure;

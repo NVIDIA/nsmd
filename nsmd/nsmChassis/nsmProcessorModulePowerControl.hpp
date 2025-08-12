@@ -108,7 +108,7 @@ class NsmModulePowerLimit : public NsmObject
     NsmModulePowerLimit(std::string& name, std::string& type,
                         uint8_t propertyId,
                         std::shared_ptr<PowerCapIntf> powerCapIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::string propertyName;
@@ -122,7 +122,7 @@ class NsmDefaultModulePowerLimit : public NsmObject
     NsmDefaultModulePowerLimit(
         const std::string& name, const std::string& type,
         std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<NsmClearPowerCapIntf> clearPowerCapIntf;

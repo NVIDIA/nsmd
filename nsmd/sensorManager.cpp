@@ -24,10 +24,10 @@
 #include "libnsm/requester/mctp.h"
 
 #include "common/sleep.hpp"
-#include "deviceManager.hpp"
 #include "nsmObject.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorQueueMap.hpp"
 #include "utils.hpp"
 
@@ -225,19 +225,19 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
             {
                 // Mark all the round-robin sensors as unrefreshed.
                 // TODO: check with @aishwaryj
-                for (auto sensor : nsmDevice->roundRobinSensors)
+                for (auto sensor : nsmDevice->getRoundRobinSensors())
                 {
                     sensor->isRefreshed = false;
                 }
 
                 // Re-queue the static sensors for updation.
-                for (auto sensor : nsmDevice->standByToDcRefreshSensors)
+                for (auto sensor : nsmDevice->getStandByToDcRefreshSensors())
                 {
                     sensor->isRefreshed = false;
-                    nsmDevice->staticSensors.push(sensor);
+                    nsmDevice->getStaticSensors().push(sensor);
                 }
 
-                nsmDevice->isDeviceReady = false;
+                nsmDevice->changeDeviceReadyState(false);
             }
             checkAllDevicesReady();
         }
@@ -467,17 +467,16 @@ void SensorManagerImpl::checkAllDevicesReady()
          present in enumeration etc. For e.g. for hgxb if all 8 gpu's are not
          presnt*/
 
-        if (nsmDevice->shouldLog("checkAllDevicesReady",
-                                 nsmDevice->isDeviceReady))
+        if (nsmDevice->shouldLog("checkAllDevicesReady", nsmDevice->isReady()))
         {
             lg2::info(
                 "checkAllDevicesReady: EID: {EID}, type: {DT}, role: {ROLE}, instance: {INST}, ready: {READY}, readiness check: {CHECK}",
-                "EID", nsmDevice->eid, "DT", nsmDevice->getDeviceType(), "ROLE",
-                nsmDevice->getDeviceRole(), "INST",
-                nsmDevice->getInstanceNumber(), "READY",
-                nsmDevice->isDeviceReady, "CHECK", isReadyForReadinessCheck);
+                "EID", nsmDevice->getEid(), "DT", nsmDevice->getDeviceType(),
+                "ROLE", nsmDevice->getDeviceRole(), "INST",
+                nsmDevice->getInstanceNumber(), "READY", nsmDevice->isReady(),
+                "CHECK", isReadyForReadinessCheck);
         }
-        if (nsmDevice->isDeviceActive && !nsmDevice->isDeviceReady)
+        if (nsmDevice->isOnline() && !nsmDevice->isReady())
         {
             allDevicesReady = false;
         }
@@ -513,7 +512,7 @@ requester::Coroutine SensorManagerImpl::updateLongRunningSensor(
     std::shared_ptr<LimitedSensorQueue> sensors)
 {
     uint64_t t1 = 0;
-    co_await sensor->update(*this, nsmDevice->eid);
+    co_await sensor->update(nsmDevice);
     sensor->isRefreshed = true;
     sensors->next();
 
@@ -523,56 +522,15 @@ requester::Coroutine SensorManagerImpl::updateLongRunningSensor(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine
-    SensorManagerImpl::tryActivateDevice(std::shared_ptr<NsmDevice> nsmDevice)
-{
-    const uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS * 1000;
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    // search EID
-    auto foundEID = deviceManager.searchEID(nsmDevice->getDeviceType(),
-                                            nsmDevice->getInstanceNumber(),
-                                            nsmDevice->getDeviceRole());
-    if (foundEID.has_value())
-    {
-        lg2::info(
-            "found EID:{EID} by searchEID for nsmDevice({DT},{INST},{ROLE})",
-            "EID", *foundEID, "DT", nsmDevice->getDeviceType(), "INST",
-            nsmDevice->getInstanceNumber(), "ROLE", nsmDevice->getDeviceRole());
-        nsmDevice->eid = *foundEID;
-        co_await nsmDevice->setOnline();
-        co_await deviceManager.updateNsmDevice(nsmDevice, nsmDevice->eid);
-        co_await common::Sleep(event, 20000, common::NonPriority);
-    }
-    else
-    {
-        // Sleep. Wait for the device to get active.
-        co_await common::Sleep(event, inActiveSleepTimeInUsec,
-                               common::Priority);
-    }
-    if (nsmDevice->shouldLog(
-            "Failed to searchEID for nsmDevice({DT},{INST},{ROLE})",
-            !foundEID.has_value()))
-    {
-        LG2_ERROR("Failed to searchEID for nsmDevice({DT},{INST},{ROLE})", "DT",
-                  nsmDevice->getDeviceType(), "INST",
-                  nsmDevice->getInstanceNumber(), "ROLE",
-                  nsmDevice->getDeviceRole());
-    }
-    // coverity[missing_return]
-    co_return NSM_SW_SUCCESS;
-}
-
 requester::Coroutine SensorManagerImpl::refreshCommandMatrix(
     std::shared_ptr<NsmDevice> nsmDevice)
 {
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    auto rc = co_await deviceManager.refreshCommandMatrix(nsmDevice,
-                                                          nsmDevice->eid);
+    auto rc = co_await nsmDevice->refreshCommandMatrix();
     if (nsmDevice->shouldLog("Failed to refresh command matrix",
                              nsm_sw_codes(rc)))
     {
         LG2_ERROR("Failed to refresh command matrix, rc={RC}, eid={EID}", "RC",
-                  rc, "EID", nsmDevice->eid);
+                  rc, "EID", nsmDevice->getEid());
     }
     // coverity[missing_return]
     co_return rc;
@@ -582,16 +540,16 @@ requester::Coroutine
     SensorManagerImpl::pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice)
 {
 #ifdef LTTNG_TRACING
-    lttng_ust_tracepoint(nsmd, priority_polling_started, nsmDevice->eid);
+    lttng_ust_tracepoint(nsmd, priority_polling_started, nsmDevice->getEid());
 #endif
-    LimitedSensorQueue sensors(nsmDevice->prioritySensors);
+    LimitedSensorQueue sensors(nsmDevice->getPrioritySensors());
     while (sensors.hasSensorsToUpdate())
     {
-        co_await sensors.current()->update(*this, nsmDevice->eid);
+        co_await sensors.current()->update(nsmDevice);
         sensors.next();
     }
 #ifdef LTTNG_TRACING
-    lttng_ust_tracepoint(nsmd, priority_polling_ended, nsmDevice->eid);
+    lttng_ust_tracepoint(nsmd, priority_polling_ended, nsmDevice->getEid());
 #endif
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
@@ -616,16 +574,16 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     std::shared_ptr<NsmDevice> nsmDevice, uint64_t t0)
 {
     uint64_t t1 = 0;
-    auto longRunningQueue =
-        std::make_shared<LimitedSensorQueue>(nsmDevice->longRunningSensors);
+    auto longRunningQueue = std::make_shared<LimitedSensorQueue>(
+        nsmDevice->getLongRunningSensors());
     SensorQueueMap sensors = SensorQueueUnorderedMap({
         {PollingType::GpuPerformanceMonitoring,
-         std::make_shared<LimitedSensorQueue>(nsmDevice->gpmSensors)},
+         std::make_shared<LimitedSensorQueue>(nsmDevice->getGpmSensors())},
         {PollingType::LongRunning, longRunningQueue},
         {PollingType::Static,
-         std::make_shared<LimitedSensorQueue>(nsmDevice->staticSensors)},
-        {PollingType::RoundRobin,
-         std::make_shared<LimitedSensorQueue>(nsmDevice->roundRobinSensors)},
+         std::make_shared<LimitedSensorQueue>(nsmDevice->getStaticSensors())},
+        {PollingType::RoundRobin, std::make_shared<LimitedSensorQueue>(
+                                      nsmDevice->getRoundRobinSensors())},
     });
 
     PollingType pollingType;
@@ -634,9 +592,9 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     while (sensors.hasSensorsToUpdate() &&
            (t1 - t0) < (pollingTimeInUsec - allowedBufferInUsec))
     {
-        pollingType = nsmDevice->nonPriorityPollingType;
+        pollingType = nsmDevice->getNonPriorityPollingType();
         // Change state machine polling type to next sensor type
-        sensors.nextSensorState(nsmDevice->nonPriorityPollingType);
+        sensors.nextSensorState(nsmDevice->getNonPriorityPollingType());
 
         auto& pollingSensors = *sensors[pollingType];
         if (!pollingSensors.hasSensorsToUpdate())
@@ -652,12 +610,12 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         // ServiceReady Logic:
         // The sensor queue is circular hence encountering the first
         // refreshed sensor marks a "complete iteration" of the queue.
-        if (pollingType == PollingType::RoundRobin &&
-            !nsmDevice->isDeviceReady && sensor->isRefreshed)
+        if (pollingType == PollingType::RoundRobin && !nsmDevice->isReady() &&
+            sensor->isRefreshed)
         {
             // The Device isn't ready but we have found our first
             // refreshed sensor. Mark the device ready.
-            nsmDevice->isDeviceReady = true;
+            nsmDevice->changeDeviceReadyState(true);
             checkAllDevicesReady();
         }
 
@@ -683,14 +641,14 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         }
 
         // Update sensor
-        auto cc = co_await sensor->update(*this, nsmDevice->eid);
+        auto cc = co_await sensor->update(nsmDevice);
         sensor->isRefreshed = true;
 
         if (pollingType == PollingType::Static && cc == NSM_SUCCESS)
         {
             // Remove static sensor from the queue if it was successfully
             // updated
-            std::erase(nsmDevice->staticSensors, sensor);
+            std::erase(nsmDevice->getStaticSensors(), sensor);
         }
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
@@ -700,9 +658,9 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     // Either we were able to succesfully update all sensors in one
     // iteration or there are no sensors in the queue. Mark ready in
     // both cases.
-    if (!sensors.hasSensorsToUpdate() && !nsmDevice->isDeviceReady)
+    if (!sensors.hasSensorsToUpdate() && !nsmDevice->isReady())
     {
-        nsmDevice->isDeviceReady = true;
+        nsmDevice->changeDeviceReadyState(true);
         checkAllDevicesReady();
     }
 
@@ -720,7 +678,7 @@ requester::Coroutine
     {
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t0);
 
-        if (!nsmDevice->isDeviceActive)
+        if (!nsmDevice->isOnline())
         {
             const uint64_t inActiveSleepTimeInUsec = INACTIVE_SLEEP_TIME_IN_MS *
                                                      1000;
@@ -733,7 +691,7 @@ requester::Coroutine
             co_await refreshCommandMatrix(nsmDevice);
         }
 
-        if (nsmDevice->isDeviceActive)
+        if (nsmDevice->isOnline())
         {
             co_await pollPrioritySensors(nsmDevice);
             co_await pollNonPrioritySensors(nsmDevice, t0);
@@ -751,7 +709,7 @@ requester::Coroutine
             // The timer event for devices with no priority sensors can be
             // of low priority.
             co_await common::Sleep(event, sleepTime,
-                                   nsmDevice->prioritySensors.empty()
+                                   nsmDevice->getPrioritySensors().empty()
                                        ? common::NonPriority
                                        : common::Priority);
         }
@@ -761,117 +719,22 @@ requester::Coroutine
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine SensorManagerImpl::SendRecvNsmMsg(
-    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen, bool bypassCommandCheck)
-{
-    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
-
-    uint8_t messageType = requestMsg->hdr.nvidia_msg_type;
-    uint8_t commandCode = requestMsg->payload[0];
-
-    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
-    if (!nsmDevice)
-    {
-        LG2_ERROR("No nsmDevice found for eid={EID}", "EID", eid);
-
-        co_return NSM_ERROR;
-    }
-
-    // bypassCommandCheck will be true for raw command only, by default it is
-    // false
-    if (!bypassCommandCheck &&
-        (!nsmDevice->isDeviceActive ||
-         !nsmDevice->isCommandSupported(messageType, commandCode)))
-    {
-        // coverity[missing_return]
-        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
-    }
-
-    const nsm_msg* response = nullptr;
-    auto rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, &response, &responseLen);
-    responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
-    }); // the memory is allocated and free at sock_handler.cpp
-    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
-    // request that timedout
-    if (rc && rc != NSM_SW_ERROR_NULL)
-    {
-        lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
-                   rc);
-    }
-    // coverity[missing_return]
-    co_return rc;
-}
-
-requester::Coroutine SensorManagerImpl::postPatchNsmCommand(
-    eid_t eid, Request& request, std::shared_ptr<const nsm_msg>& responseMsg,
-    size_t& responseLen)
-{
-    auto nsmDevice = DeviceManager::getInstance().getNsmDeviceFromEid(eid);
-    if (!nsmDevice)
-    {
-        LG2_ERROR("No nsmDevice found for eid={EID}", "EID", eid);
-
-        co_return NSM_ERROR;
-    }
-
-    auto rc = co_await nsmDevice->waitForNsmDeviceUpdate();
-    if (rc != NSM_SW_SUCCESS)
-    {
-        if (rc == NSM_SW_ERROR_TIMEOUT)
-        {
-            lg2::error(
-                "SensorManager::postPatchNsmCommand NsmDevice update taking longer than expected for eid={EID}",
-                "EID", eid);
-        }
-        else
-        {
-            lg2::error(
-                "SensorManager::postPatchNsmCommand unexpected arror while waiting for NsmDevice update for eid={EID}, rc={RC}",
-                "EID", eid, "RC", rc);
-        }
-        co_return rc;
-    }
-
-    if (!nsmDevice->isDeviceActive)
-    {
-        // coverity[missing_return]
-        co_return NSM_ERR_UNSUPPORTED_COMMAND_CODE;
-    }
-
-    const nsm_msg* response = nullptr;
-    rc = co_await requester::SendRecvNsmMsg<RequesterHandler>(
-        handler, eid, request, &response, &responseLen);
-    responseMsg = std::shared_ptr<const nsm_msg>(response, [](auto) {
-    }); // the memory is allocated and free at sock_handler.cpp
-    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
-    // request that timedout
-    if (rc && rc != NSM_SW_ERROR_NULL)
-    {
-        lg2::error("NsmDevice::postPatchNsmCommand failed. eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
-    }
-    // coverity[missing_return]
-    co_return rc;
-}
-
 std::shared_ptr<NsmDevice>
     SensorManagerImpl::getNsmDevice(uint8_t deviceType, uint8_t instanceNumber,
                                     uint8_t deviceRole)
 {
-    return DeviceManager::getInstance().getNsmDeviceByIdentification(
+    return mctp::MctpDiscovery::getInstance().getNsmDeviceByIdentification(
         deviceType, instanceNumber, deviceRole);
 }
 std::shared_ptr<NsmDevice>
     SensorManagerImpl::getNsmDeviceFromStaticUUID(uuid_t uuid)
 {
-    return DeviceManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    return mctp::MctpDiscovery::getInstance().getNsmDeviceFromStaticUUID(uuid);
 }
 
 eid_t SensorManagerImpl::getEid(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    return nsmDevice->eid;
+    return nsmDevice->getEid();
 }
 
 } // namespace nsm

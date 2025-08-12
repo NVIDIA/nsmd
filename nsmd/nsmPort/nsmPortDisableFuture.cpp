@@ -18,7 +18,7 @@
 #include "nsmPortDisableFuture.hpp"
 
 #include "common/types.hpp"
-#include "deviceManager.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
@@ -30,8 +30,8 @@
 namespace nsm
 {
 
-requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
-                                                        eid_t eid)
+requester::Coroutine
+    NsmDevicePortDisableFuture::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_port_disable_future_req));
@@ -42,15 +42,15 @@ requester::Coroutine NsmDevicePortDisableFuture::update(SensorManager& manager,
     {
         lg2::debug(
             "encode_get_port_disable_future_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -82,8 +82,7 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
     bitfield8_t* mask, [[maybe_unused]] AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info("setDevicePortDisableFuture for EID: {EID}", "EID", eid);
 
     Request request(sizeof(nsm_msg_hdr) +
@@ -104,12 +103,12 @@ requester::Coroutine NsmDevicePortDisableFuture::setDevicePortDisableFuture(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "setDevicePortDisableFuture postPatchNsmCommand failed for while setting PortDisableFuture "
+            "setDevicePortDisableFuture postPatchIO failed for while setting PortDisableFuture "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;

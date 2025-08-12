@@ -4,10 +4,8 @@ dep_src_files = [
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
-    '../../deviceManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
-    '../../deviceManager.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
@@ -20,6 +18,7 @@ dep_src_files = [
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 if get_option('shmem').enabled()

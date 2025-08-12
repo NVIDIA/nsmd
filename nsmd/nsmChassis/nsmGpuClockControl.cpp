@@ -59,8 +59,7 @@ requester::Coroutine NsmClearClockLimAsyncIntf::doClearClockLimitOnDevice(
 requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
     AsyncOperationStatusType* status)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     // first argument instanceid=0 is irrelevant
@@ -80,12 +79,11 @@ requester::Coroutine NsmClearClockLimAsyncIntf::clearReqClockLimit(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "clearReqClockLimit postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
+            "clearReqClockLimit postPatchIO failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -259,8 +257,7 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
             std::get<1>(cpuOperatingConfigIntf->requestedSpeedLimits());
     }
 
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info(
         "NsmChassisClockControl::setRangeClockLimits EID : {EID}, RequestedSpeedLimitMin : {MIN_REQ_SPEED}, RequestedSpeedLimitMax : {MAX_REQ_SPEED}",
         "EID", eid, "MIN_REQ_SPEED", minReqSpeed, "MAX_REQ_SPEED", maxReqSpeed);
@@ -281,12 +278,11 @@ requester::Coroutine NsmChassisClockControl::setRangeClockLimits(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmChassisClockControl::setRangeClockLimits postPatchNsmCommand failed for while setting requested speed limit "
+            "NsmChassisClockControl::setRangeClockLimits postPatchIO failed for while setting requested speed limit "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         *status = AsyncOperationStatusType::WriteFailure;

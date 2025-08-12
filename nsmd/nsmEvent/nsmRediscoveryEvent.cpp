@@ -20,7 +20,7 @@
 #include "device-capability-discovery.h"
 
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -81,15 +81,15 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
         loggingTask.detach(); // Fire-and-forget - runs independently
     }
 
-    // Member to hold reference to DeviceManager and sensor manager
-    DeviceManager& deviceManager = DeviceManager::getInstance();
-    auto nsmDevice = deviceManager.getNsmDeviceFromEid(eid);
+    // Member to hold reference to MctpDiscovery and sensor manager
+    auto nsmDevice =
+        mctp::MctpDiscovery::getInstance().getNsmDeviceFromEid(eid);
     if (nsmDevice)
     {
         lg2::info(
             "Rediscovery event : The NSM device has been discovered for , eid={EID}",
             "EID", eid);
-        if (nsmDevice->discoveryPending)
+        if (nsmDevice->isDiscoveryPending())
         {
             lg2::info(
                 "Rediscovery event : Dropping the rediscovery process for eid={EID}, as mctp rediscovery is already in progress",
@@ -101,7 +101,7 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
             rediscoveryTaskHandler,
             [&, nsmDevice, eid]() -> requester::Coroutine {
             // coverity[missing_return]
-            co_return co_await handleRediscovery(nsmDevice, eid);
+            co_return co_await handleRediscovery(nsmDevice);
         });
     }
     else
@@ -115,15 +115,21 @@ int NsmRediscoveryEvent::handle(eid_t eid, NsmType /*type*/,
 }
 
 requester::Coroutine
-    NsmRediscoveryEvent::handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice,
-                                           eid_t eid)
+    NsmRediscoveryEvent::handleRediscovery(std::shared_ptr<NsmDevice> nsmDevice)
 {
     while (isRediscoveryRequired)
     {
         isRediscoveryRequired = false;
-        co_await DeviceManager::getInstance().updateNsmDevice(nsmDevice, eid);
-        co_await DeviceManager::getInstance().refreshCapabilitySensor(
-            nsmDevice);
+        auto gpuDriverSensor = nsmDevice->getGpuDriverSensor();
+        if (gpuDriverSensor)
+        {
+            co_await gpuDriverSensor->update(nsmDevice);
+        }
+        else
+        {
+            co_await nsmDevice->updateNsmDevice();
+            co_await nsmDevice->refreshCapabilitySensor();
+        }
     }
     co_return NSM_SW_SUCCESS;
 }
@@ -194,8 +200,7 @@ static requester::Coroutine
 
     info.severity = severityEnum.value_or(Level::Critical);
 
-    auto nsmDevice =
-        DeviceManager::getInstance().getNsmDeviceFromStaticUUID(info.uuid);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(info.uuid);
 
     if (!nsmDevice)
     {
@@ -212,9 +217,8 @@ static requester::Coroutine
         "Created NSM Rediscovery Event : UUID={UUID}, Name={NAME}, Type={TYPE}",
         "UUID", info.uuid, "NAME", name, "TYPE", type);
 
-    nsmDevice->deviceEvents.push_back(event);
-    nsmDevice->eventDispatcher.addEvent(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-                                        NSM_REDISCOVERY_EVENT, event);
+    nsmDevice->addDeviceEvent(event, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                              NSM_REDISCOVERY_EVENT);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

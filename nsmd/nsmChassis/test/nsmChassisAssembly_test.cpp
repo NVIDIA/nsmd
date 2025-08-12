@@ -32,8 +32,8 @@ requester::Coroutine
                                     const std::string& interface,
                                     const std::string& objPath);
 NsmDeviceTable devices;
-std::shared_ptr<NsmDevice> gpu;
-std::shared_ptr<NsmDevice> fpga;
+std::shared_ptr<MockNsmDeviceBase> gpu;
+std::shared_ptr<MockNsmDeviceBase> fpga;
 }; // namespace nsm
 
 using namespace nsm;
@@ -119,7 +119,7 @@ TEST_F(NsmChassisAssemblyTest, badTestCreateDeviceSensors)
 
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = devices[0];
+    gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices[0]);
     EXPECT_EQ(0, gpu->deviceSensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());

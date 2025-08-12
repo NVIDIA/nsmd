@@ -44,7 +44,7 @@ class NsmGpuPresenceAndPowerStatus :
     uint8_t handleResponse(const struct nsm_msg* responseMsg,
                            size_t responseLen) override;
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     uint8_t gpuInstanceId;

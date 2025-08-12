@@ -135,7 +135,7 @@ NsmPortStatus::NsmPortStatus(
     updateMetricOnSharedMemory();
 }
 
-requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
+requester::Coroutine NsmPortStatus::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
                                     sizeof(nsm_query_port_status_req));
@@ -144,15 +144,15 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::debug("encode_query_port_status_req failed. eid={EID} rc={RC}",
-                   "EID", eid, "RC", rc);
+                   "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), requestMsg,
+                                      responseMsg, responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -186,8 +186,8 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
                 break;
             case NSM_PORTSTATE_DOWN_LOCK:
                 portStateIntf->linkStatus(PortLinkStatus::LinkDown);
-                co_await checkPortCharactersticRCAndPopulateRuntimeErr(manager,
-                                                                       eid);
+                co_await checkPortCharactersticRCAndPopulateRuntimeErr(
+                    nsmDevice);
                 break;
             case NSM_PORTSTATE_UP:
                 portStateIntf->linkStatus(PortLinkStatus::LinkUp);
@@ -237,7 +237,7 @@ requester::Coroutine NsmPortStatus::update(SensorManager& manager, eid_t eid)
 
 requester::Coroutine
     NsmPortStatus::checkPortCharactersticRCAndPopulateRuntimeErr(
-        SensorManager& manager, eid_t eid)
+        std::shared_ptr<NsmDevice> nsmDevice)
 {
     std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
                                     sizeof(nsm_query_port_characteristics_req));
@@ -247,15 +247,15 @@ requester::Coroutine
     {
         lg2::debug(
             "encode_query_port_characteristics_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, requestMsg, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), requestMsg,
+                                      responseMsg, responseLen);
     if (rc)
     {
         // coverity[missing_return]

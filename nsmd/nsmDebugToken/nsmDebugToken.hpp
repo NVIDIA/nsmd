@@ -74,7 +74,7 @@ class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
         installTokenAsyncHandler(std::shared_ptr<Request> request,
                                  std::shared_ptr<AsyncStatusIntf> statusIntf,
                                  std::shared_ptr<AsyncValueIntf> valueIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid);
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice);
 
     uuid_t uuid;
 };

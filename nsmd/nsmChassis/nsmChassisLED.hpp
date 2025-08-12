@@ -46,7 +46,7 @@ class NsmNvlinkLedIntf : public NsmObject
     NsmNvlinkLedIntf(sdbusplus::bus::bus& bus, std::string& name,
                      std::string& type, std::string& inventoryObjPath);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::unique_ptr<NvlinkLedIntf> nvlinkledIntf = nullptr;

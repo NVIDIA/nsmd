@@ -135,7 +135,7 @@ class NsmClearPCIeCounters : public NsmObject
     NsmClearPCIeCounters(const std::string& name, const std::string& type,
                          const uint8_t groupId, uint8_t deviceIndex,
                          std::shared_ptr<ClearPCIeIntf> clearPCIeIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     void findAndUpdateCounter(CounterType counter,

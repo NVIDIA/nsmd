@@ -238,7 +238,7 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     }
 
     createNsmPCIePort(mockManager, basicIntfName, objPath);
-    auto cx7 = devices.back();
+    auto cx7 = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
 
     EXPECT_EQ(initialPriority + 0, cx7->prioritySensors.size());
     EXPECT_EQ(initialRoundRobin + 4, cx7->roundRobinSensors.size());
@@ -293,18 +293,18 @@ TEST_F(NsmPCIePortTest, goodTestCreateDeviceSensors)
     EXPECT_EQ(GROUP_ID_2, pcieErrorsGroup2->groupId);
     EXPECT_EQ(GROUP_ID_3, pcieErrorsGroup3->groupId);
     EXPECT_EQ(GROUP_ID_4, pcieErrorsGroup4->groupId);
-
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+    testing::Mock::AllowLeak(cx7.get());
+    EXPECT_CALL(*cx7, sensorIO)
         .Times(cx7->roundRobinSensors.size())
-        .WillRepeatedly(mockSendRecvNsmMsg());
+        .WillRepeatedly(mockSensorIO(NSM_SUCCESS));
     for (size_t i = initialRoundRobin; i < cx7->roundRobinSensors.size(); i++)
     {
-        cx7->roundRobinSensors[i]->update(mockManager, eid).detach();
+        cx7->roundRobinSensors[i]->update(cx7).detach();
     }
 }
-/*
+
 TEST_F(NsmPCIePortTest, TearDown)
 {
     devices.clear();
     ::testing::Mock::VerifyAndClearExpectations(&mockManager);
-} */
+}

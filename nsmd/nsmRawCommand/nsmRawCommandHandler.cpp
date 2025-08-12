@@ -91,7 +91,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         }
 
         // Acquire the semaphore before proceeding
-        co_await device->getSemaphore().acquire(device->eid);
+        co_await device->getSemaphore().acquire(device->getEid());
         // Create the long-running event handler
         auto longRunningHandler =
             std::make_shared<NsmRawLongRunningEventHandler>(
@@ -110,11 +110,11 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         encode_raw_cmd_req(0, messageType, commandCode, data.data(),
                            data.size(), requestMsg);
 
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await device->postPatchIO(eid, request, responseMsg,
+                                          responseLen);
         uint8_t cc;
         uint16_t reasonCode = 0;
         if (rc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
@@ -127,7 +127,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         else if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(std::format(
-                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchNsmCommand failed, rc={}",
+                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc={}",
                 rc));
         }
         else
@@ -242,11 +242,11 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
                                         ":" + std::to_string(instanceId) +
                                         " not found");
         }
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await device->postPatchIO(eid, request, responseMsg,
+                                          responseLen);
 
         uint8_t cc;
         uint16_t reasonCode = 0;
@@ -259,7 +259,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         else if (rc != NSM_SW_SUCCESS)
         {
             throw std::runtime_error(
-                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchNsmCommand failed, rc" +
+                "NsmRawCommandHandler::doSendLongRunningRequest: postPatchIO failed, rc" +
                 std::to_string(rc));
         }
         else

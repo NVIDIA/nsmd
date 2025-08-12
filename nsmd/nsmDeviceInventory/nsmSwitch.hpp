@@ -48,7 +48,7 @@ class NsmSwitchDI : public NsmInterfaceProvider<IntfType>
         objPath(inventoryObjPath + name)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::string objPath;
@@ -83,7 +83,7 @@ class NsmSwitchDIPowerMode : public NsmInterfaceProvider<L1PowerModeIntf>
         return objPath;
     }
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     nsm_power_mode_data getPowerModeData();
 

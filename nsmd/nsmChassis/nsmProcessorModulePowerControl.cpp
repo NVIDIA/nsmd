@@ -164,14 +164,14 @@ requester::Coroutine NsmProcessorModulePowerControl::updatePowerLimitOnModule(
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto eid = manager.getEid(nsmDevice);
+        auto eid = nsmDevice->getEid();
         lg2::info("update Power Limit On Module for eid = {EID}", "EID", eid);
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await nsmDevice->postPatchIO(eid, request, responseMsg,
+                                             responseLen);
         if (rc)
         {
             lg2::error(
-                "updatePowerLimitOnModule postPatchNsmCommand failed for while setting power limit for eid = {EID} rc = {RC}",
+                "updatePowerLimitOnModule postPatchIO failed for while setting power limit for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc);
             break;
         }
@@ -242,8 +242,8 @@ NsmModulePowerLimit::NsmModulePowerLimit(
               "NAME", name.c_str(), "PROPERTY", propertyName);
 }
 
-requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
-                                                 eid_t eid)
+requester::Coroutine
+    NsmModulePowerLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -254,19 +254,19 @@ requester::Coroutine NsmModulePowerLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmModulePowerLimit encode_get_inventory_information_req failed. eid={EID} rc={RC} property = {PROPERTY}",
-            "EID", eid, "RC", rc, "PROPERTY", propertyName);
+            "EID", nsmDevice->getEid(), "RC", rc, "PROPERTY", propertyName);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmModulePowerLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}, property = {PROPERTY}",
-            "RC", rc, "EID", eid, "PROPERTY", propertyName);
+            "RC", rc, "EID", nsmDevice->getEid(), "PROPERTY", propertyName);
         co_return rc;
     }
 
@@ -317,8 +317,8 @@ NsmDefaultModulePowerLimit::NsmDefaultModulePowerLimit(
               name.c_str());
 }
 
-requester::Coroutine NsmDefaultModulePowerLimit::update(SensorManager& manager,
-                                                        eid_t eid)
+requester::Coroutine
+    NsmDefaultModulePowerLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -330,19 +330,19 @@ requester::Coroutine NsmDefaultModulePowerLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmDefaultModulePowerLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
-            "NsmDefaultModulePowerLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "NsmDefaultModulePowerLimit sensorIO failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", nsmDevice->getEid());
         co_return rc;
     }
 

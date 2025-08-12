@@ -28,14 +28,16 @@ using namespace ::testing;
 using sdbusplus::message::unix_fd;
 
 NsmDeviceTable devices;
+std::shared_ptr<MockNsmDeviceBase> mockDevice;
 
 class NsmRawCommandHandlerTest : public Test, public SensorManagerTest
 {
   protected:
     NsmRawCommandHandlerTest() : SensorManagerTest(devices)
     {
-        mockManager.getNsmDeviceFromStaticUUID(
-            "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0");
+        mockDevice = std::dynamic_pointer_cast<MockNsmDeviceBase>(
+            mockManager.getNsmDeviceFromStaticUUID(
+                "STATIC:0:0:NSM_DEVICE_INSTANCE_NUMBER:0"));
     }
     utils::CustomFD fd{memfd_create("nsmRawCommand", 0)};
 
@@ -73,8 +75,9 @@ TEST(NsmRawCommandHandler, InitializeTest)
 
 TEST_F(NsmRawCommandHandlerTest, GoodTestSendRequest)
 {
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(response(0, 0)));
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(response(0, 0)));
     auto path = NsmRawCommandHandler::getInstance().sendRequest(
         0, 0, 0, false, 0, 0, unix_fd(fd));
     EXPECT_NE(path, sdbusplus::message::object_path{});
@@ -101,9 +104,9 @@ TEST_F(NsmRawCommandHandlerTest, BadTestNoDevice)
 }
 TEST_F(NsmRawCommandHandlerTest, BadTestUnsupportedCommand)
 {
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(response(0, 0),
-                                          NSM_ERR_UNSUPPORTED_COMMAND_CODE));
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(response(0, 0), NSM_ERR_UNSUPPORTED_COMMAND_CODE));
     const auto [rc, statusInterface, valueInterface] = sendRequest(0, 0, 0, 0,
                                                                    0);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -119,8 +122,8 @@ TEST_F(NsmRawCommandHandlerTest, BadTestUnsupportedCommand)
 
 TEST_F(NsmRawCommandHandlerTest, BadTestWriteFailure)
 {
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(response(0, 0), NSM_ERROR));
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(response(0, 0), NSM_ERROR));
     const auto [rc, statusInterface, _] = sendRequest(0, 0, 0, 0, 0);
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusInterface->status(),
@@ -131,8 +134,7 @@ TEST_F(NsmRawCommandHandlerTest, BadTestDecodeError)
     Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
     auto msg = reinterpret_cast<nsm_msg*>(response.data());
     encode_common_resp(0, NSM_ERROR, ERR_NOT_SUPPORTED, 0, 0, msg);
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(response));
+    EXPECT_CALL(*mockDevice, postPatchIO).WillOnce(mockPostPatchIO(response));
     const auto [rc, statusInterface, _] = sendRequest(0, 0, 0, 0, 0);
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
     EXPECT_EQ(statusInterface->status(),

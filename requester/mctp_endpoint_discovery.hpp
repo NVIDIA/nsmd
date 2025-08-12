@@ -18,8 +18,10 @@
 #pragma once
 
 #include "common/types.hpp"
+#include "nsmd/nsmDevice.hpp"
 #include "nsmd/socket_handler.hpp"
 
+#include <sdbusplus/asio/object_server.hpp>
 #include <sdbusplus/bus/match.hpp>
 
 #include <filesystem>
@@ -29,32 +31,16 @@
 namespace mctp
 {
 
-/** @class MctpDiscoveryHandlerIntf
- *
- * This abstract class defines the APIs for MctpDiscovery class has common
- * interface to execute function from different Manager Classes
- */
-class MctpDiscoveryHandlerIntf
-{
-  public:
-    virtual void handleMctpEndpoints(const MctpInfos& mctpInfos) = 0;
-    virtual requester::Coroutine
-        onlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
-    {
-        // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
-    }
-    virtual requester::Coroutine
-        offlineMctpEndpoint([[maybe_unused]] const MctpInfo& mctpInfo)
-    {
-        // coverity[missing_return]
-        co_return NSM_SW_SUCCESS;
-    }
-    virtual void handleMctpStateTransition(const std::string objPath,
-                                           const bool state) = 0;
-    virtual ~MctpDiscoveryHandlerIntf() {}
-};
-
+using Active = bool;
+using DeviceType = uint8_t;
+using DeviceRole = uint8_t;
+using InstanceNumber = uint8_t;
+using DiscoveredEIDs =
+    std::map<mctp_eid_t,
+             std::tuple<uuid_t, DeviceType, InstanceNumber, Active>>;
+using EidTable =
+    std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>;
+using RequesterHandler = requester::Handler<requester::Request>;
 class MctpDiscovery
 {
   public:
@@ -65,6 +51,40 @@ class MctpDiscovery
     MctpDiscovery& operator=(MctpDiscovery&&) = delete;
     ~MctpDiscovery() = default;
 
+    static MctpDiscovery& getInstance()
+    {
+        if (!instance)
+        {
+            throw std::runtime_error(
+                "MctpDiscovery instance is not initialized yet");
+        }
+        return *instance;
+    }
+
+    static void
+        initialize(sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
+                   std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
+                   EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
+                   sdbusplus::asio::object_server& objServer)
+    {
+        if (instance)
+        {
+            throw std::logic_error(
+                "Initialize called on an already initialized MctpDiscovery");
+        }
+        static MctpDiscovery inst(bus, handler, nsmMsgHandler, eidTable,
+                                  nsmDevices, objServer);
+        instance = &inst;
+    }
+
+    std::shared_ptr<nsm::NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid);
+    std::shared_ptr<nsm::NsmDevice> getNsmDeviceFromEid(eid_t eid);
+    std::shared_ptr<nsm::NsmDevice>
+        getNsmDeviceByIdentification(uint8_t deviceType, uint8_t instanceNumber,
+                                     uint8_t deviceRole);
+
+  private:
+    static MctpDiscovery* instance;
     /** @brief Constructs the MCTP Discovery object to handle discovery of
      *         MCTP enabled devices
      *
@@ -73,13 +93,16 @@ class MctpDiscovery
      */
     explicit MctpDiscovery(
         sdbusplus::bus::bus& bus, mctp_socket::Handler& handler,
-        std::initializer_list<MctpDiscoveryHandlerIntf*> list);
-
-  private:
+        std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler,
+        EidTable& eidTable, nsm::NsmDeviceTable& nsmDevices,
+        sdbusplus::asio::object_server& objServer);
     /** @brief reference to the systemd bus */
     sdbusplus::bus::bus& bus;
     mctp_socket::Handler& handler;
-
+    std::shared_ptr<nsm::NsmMessageHandler> nsmMsgHandler;
+    EidTable& eidTable;
+    nsm::NsmDeviceTable& nsmDevices;
+    sdbusplus::asio::object_server& objServer;
     /** @brief Used to watch for new MCTP endpoints */
     sdbusplus::bus::match_t mctpEndpointAddedSignal;
 
@@ -138,13 +161,54 @@ class MctpDiscovery
     static constexpr std::string_view codeConstructEndpointIntfName{
         "au.com.codeconstruct.MCTP.Endpoint1"};
 
-    std::vector<MctpDiscoveryHandlerIntf*> handlers;
+    std::queue<MctpInfos> queuedMctpInfos;
+    std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
+    std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
+    std::map<uint8_t, std::map<uint16_t, std::shared_ptr<nsm::NsmDevice>>>
+        deviceMap;
+    DiscoveredEIDs discoveredEIDs;
 
     /** @brief Helper function to invoke registered handlers
      *
      *  @param[in] mctpInfos - information of discovered MCTP endpoints
      */
     void handleMctpEndpoints(const MctpInfos& mctpInfos);
+
+    requester::Coroutine
+        SendRecvNsmMsg(eid_t eid, Request& request,
+                       std::shared_ptr<const nsm_msg>& responseMsg,
+                       size_t* responseLen);
+
+    // Discovery methods
+    bool insertIntoEidTableifNotExist(
+        uuid_t uuid, const std::tuple<eid_t, MctpMedium, MctpBinding>& value);
+    void discoverNsmDevice(const MctpInfos& mctpInfos);
+    requester::Coroutine discoverNsmDeviceTask(eid_t eid);
+    requester::Coroutine coSetdeviceStateOnlineTask(const MctpInfos& mctpInfos);
+    requester::Coroutine
+        coSetdeviceStateOfflineTask(const MctpInfos& mctpInfos);
+
+    // Discovery helper methods
+    requester::Coroutine ping(eid_t eid);
+    requester::Coroutine
+        getQueryDeviceIdentification(eid_t eid, uint8_t& deviceIdentification,
+                                     uint8_t& deviceInstance);
+    void discoverAndUpdateNsmDeviceTask(
+        std::shared_ptr<nsm::NsmDevice> nsmDevice);
+    requester::Coroutine
+        updateNsmDeviceTask(std::shared_ptr<nsm::NsmDevice> nsmDevice);
+
+    // NsmDevice Creation methods
+    std::shared_ptr<nsm::NsmDevice>
+        findOrCreateNsmDevice(uint8_t deviceType, uint8_t deviceRole,
+                              uint8_t instanceNumber, std::string remapPropName,
+                              std::string remapPropValue);
+    std::shared_ptr<nsm::NsmDevice>
+        mapNsmDeviceUsingEid(eid_t eid, uuid_t mctpUuid, uint8_t deviceType,
+                             uint8_t instanceNumber, bool active);
+    int mapMctpEIDForNsmDevice(std::shared_ptr<nsm::NsmDevice> nsmDevice);
+    void handleMctpStateTransition(const std::string objPath,
+                                   [[maybe_unused]] const bool state);
 };
 
 } // namespace mctp

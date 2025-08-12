@@ -69,8 +69,7 @@ class OemPowerProfileIntf :
 
     requester::Coroutine getProfileInfoFromDevice()
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info("getProfileInfo for EID: {EID}", "EID", eid);
 
         Request request(sizeof(nsm_msg_hdr) +
@@ -89,12 +88,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "getProfileInfo postPatchNsmCommand failed for eid = {EID} rc = {RC}",
+                "getProfileInfo postPatchIO failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
 
             co_return rc_;
@@ -161,8 +160,7 @@ class OemPowerProfileIntf :
         updateProfileInfoOnDevice(uint8_t parameterId, double paramValue,
                                   AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
 
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_setup_admin_override_req));
@@ -197,12 +195,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "updateProfileInfoOnDevice postPatchNsmCommand failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
+                "updateProfileInfoOnDevice postPatchIO failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
                 profileId, "VALUE", paramValue);
             *status = AsyncOperationStatusType::WriteFailure;
@@ -235,8 +233,7 @@ class OemPowerProfileIntf :
         resetProfileInfoOnDevice(uint8_t parameterId,
                                  AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         uint32_t paramValue = INVALID_POWER_LIMIT;
         lg2::info(
             "resetProfileInfoOnDevice for EID: {EID} parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}",
@@ -264,12 +261,12 @@ class OemPowerProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "resetProfileInfoOnDevice postPatchNsmCommand failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
+                "resetProfileInfoOnDevice postPatchIO failed(parameterId:{ID}, paramValue: {VALUE}, profileID: {PROFILEID}) for eid = {EID} rc = {RC}, Reqmsg= {MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "PROFILEID",
                 profileId, "VALUE", paramValue, "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;

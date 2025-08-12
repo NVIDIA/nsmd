@@ -38,7 +38,7 @@ class NsmGPUSWInventoryDriverVersionAndStatus : public NsmObject
         const std::vector<utils::Association>& associations,
         const std::string& type, const std::string& manufacturer);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     std::shared_ptr<NsmDevice> nsmDeviceFound = nullptr;
     enum8 driverState = 0;
     std::string driverVersion = "";

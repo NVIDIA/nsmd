@@ -443,8 +443,7 @@ requester::Coroutine NsmReconfigPermissions::setAllowPermission(
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_set_reconfiguration_permissions_v1_req));
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_set_reconfiguration_permissions_v1_req(
         0, index, configuration, value, requestPtr);
@@ -461,12 +460,11 @@ requester::Coroutine NsmReconfigPermissions::setAllowPermission(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmSetReconfigSettings::setAllowPermission: postPatchNsmCommand failed."
+            "NsmSetReconfigSettings::setAllowPermission: postPatchIO failed."
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;

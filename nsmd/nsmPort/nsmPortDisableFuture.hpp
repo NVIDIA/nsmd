@@ -46,7 +46,7 @@ class NsmDevicePortDisableFuture :
         objPath(inventoryObjPath + name)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     std::string getInventoryObjectPath()
     {

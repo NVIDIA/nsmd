@@ -50,8 +50,7 @@ requester::Coroutine setEgmModeOnDevice(bool egmMode,
                                         AsyncOperationStatusType* status,
                                         std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     uint8_t requestedEgmMode = static_cast<uint8_t>(egmMode);
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_EGM_mode_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -72,12 +71,12 @@ requester::Coroutine setEgmModeOnDevice(bool egmMode,
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "setEgmModeOnDevice postPatchNsmCommand failed for while setting EgmMode "
+            "setEgmModeOnDevice postPatchIO failed for while setting EgmMode "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;

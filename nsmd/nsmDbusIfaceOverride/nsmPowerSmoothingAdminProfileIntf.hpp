@@ -66,8 +66,7 @@ class OemAdminProfileIntf :
 
     requester::Coroutine getAdminProfileFromDevice()
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info("getAdminProfileFromDevice for EID: {EID}", "EID", eid);
 
         Request request(sizeof(nsm_msg_hdr) +
@@ -87,12 +86,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "getAdminProfileFromDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
+                "getAdminProfileFromDevice postPatchIO failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             // coverity[missing_return]
             co_return rc_;
@@ -156,8 +155,7 @@ class OemAdminProfileIntf :
         overrideAdminProfileParam(uint8_t parameterId, double paramValue,
                                   AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info(
             "overrideAdminProfileParam for EID: {EID} parameterId:{ID}, parameterValue: {PARAMVALUE}",
             "EID", eid, "ID", parameterId, "PARAMVALUE", paramValue);
@@ -192,12 +190,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "overrideAdminProfileParam postPatchNsmCommand failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "overrideAdminProfileParam postPatchIO failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
                 "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;
@@ -236,8 +234,7 @@ class OemAdminProfileIntf :
         resetAdminProfileParam(uint8_t parameterId,
                                AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         uint32_t paramValue = INVALID_POWER_LIMIT;
         lg2::info(
             "resetAdminProfileParam for EID: {EID} parameterId:{ID}, parameterValue: {PARAMVALUE}",
@@ -264,12 +261,12 @@ class OemAdminProfileIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "resetAdminProfileParam postPatchNsmCommand failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
+                "resetAdminProfileParam postPatchIO failed for eid = {EID} rc = {RC},paramId={ID}, paramValue={VAL}, NSM_Request={MSG}",
                 "EID", eid, "RC", rc_, "ID", parameterId, "VAL", paramValue,
                 "MSG", msg);
             *status = AsyncOperationStatusType::WriteFailure;

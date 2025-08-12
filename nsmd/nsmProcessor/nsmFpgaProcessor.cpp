@@ -125,7 +125,7 @@ static requester::Coroutine
             auto processorSensor = std::make_shared<NsmFpgaProcessor>(
                 bus, name, type, inventoryObjPath, associations, fpgaType,
                 locationType, health);
-            nsmDevice->deviceSensors.emplace_back(processorSensor);
+            nsmDevice->getDeviceSensors().emplace_back(processorSensor);
         }
     }
 

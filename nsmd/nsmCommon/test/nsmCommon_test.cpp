@@ -12,6 +12,8 @@ using ::testing::ElementsAreArray;
 #define private public
 #define protected public
 
+#include "../../test/commonMock.hpp"
+#include "../../test/mockSensorManager.hpp"
 #include "../nsmCommon.hpp"
 
 using namespace nsm;
@@ -23,8 +25,9 @@ std::string inventoryObjPath("/xyz/openbmc_project/inventory/dummy_device");
 
 TEST(nsmMemCapacityUtil, GoodGenReq)
 {
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    const uuid_t gpuUuid = "STATIC:0:0:MCTP_EID:28";
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
 
@@ -46,8 +49,9 @@ TEST(nsmMemCapacityUtil, GoodGenReq)
 
 TEST(nsmMemCapacityUtil, GoodHandleResp)
 {
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    const uuid_t gpuUuid = "STATIC:0:0:MCTP_EID:28";
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
 
@@ -74,8 +78,9 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
 
 TEST(nsmMemCapacityUtil, BadHandleResp)
 {
-    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    const uuid_t gpuUuid = "STATIC:0:0:MCTP_EID:28";
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto totalMemorySensor = std::make_shared<NsmTotalMemory>(sensorName,
                                                               sensorType);
 

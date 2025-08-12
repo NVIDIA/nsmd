@@ -82,14 +82,13 @@ class NsmPortStatus : public NsmObject
                   std::string& inventoryObjPath);
     NsmPortStatus() = default;
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     void updateMetricOnSharedMemory() override;
     std::string portName;
 
   private:
-    requester::Coroutine
-        checkPortCharactersticRCAndPopulateRuntimeErr(SensorManager& manager,
-                                                      eid_t eid);
+    requester::Coroutine checkPortCharactersticRCAndPopulateRuntimeErr(
+        std::shared_ptr<NsmDevice> nsmDevice);
     std::unique_ptr<PortStateIntf> portStateIntf = nullptr;
     std::shared_ptr<PortMetricsOem3Intf> portMetricsOem3Intf = nullptr;
     uint8_t portNumber;

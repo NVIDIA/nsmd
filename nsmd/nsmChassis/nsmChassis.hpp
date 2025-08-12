@@ -70,8 +70,8 @@ class NsmChassis : public NsmInterfaceProvider<IntfType>
     NsmChassis(const std::string& name, const std::shared_ptr<IntfType>& pdi) :
         NsmInterfaceProvider<IntfType>(name, "NSM_Chassis", {pdi})
     {}
-    virtual requester::Coroutine update(SensorManager& manager,
-                                        eid_t eid) override;
+    virtual requester::Coroutine
+        update(std::shared_ptr<NsmDevice> nsmDevice) override;
 };
 
 } // namespace nsm

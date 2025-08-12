@@ -105,7 +105,7 @@ static requester::Coroutine
 
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
         bus, name, associations, type, inventoryObjPath);
-    nsmDevice->deviceSensors.emplace_back(networkAdapterDI);
+    nsmDevice->getDeviceSensors().emplace_back(networkAdapterDI);
 
 #if defined(ENABLE_DEBUG_TOKEN)
     auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
@@ -135,7 +135,7 @@ static requester::Coroutine
 #if defined(ENABLE_NETWORK_ADAPTER_RESET)
     auto ntwAdpResetSensor = std::make_shared<NsmNetworkAdapterDIReset>(
         bus, name, type, inventoryObjPath, nsmDevice);
-    nsmDevice->deviceSensors.push_back(ntwAdpResetSensor);
+    nsmDevice->getDeviceSensors().push_back(ntwAdpResetSensor);
 #endif
 
     // coverity[missing_return]

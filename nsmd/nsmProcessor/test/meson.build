@@ -11,7 +11,6 @@ dep_src_files = [
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
-    '../../deviceManager.cpp',
     '../../nsmEvent.cpp',
     '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
@@ -60,6 +59,7 @@ dep_src_files = [
     '../../nsmSetAsync/nsmSetEgmMode.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 if get_option('shmem').enabled()

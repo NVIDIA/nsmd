@@ -129,7 +129,7 @@ requester::Coroutine
 {
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_enable_disable_wp_req));
 
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
     auto rc = encode_enable_disable_wp_req(0, dataIndex, value, requestPtr);
 
@@ -145,14 +145,13 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetWriteProtected::setWriteProtected: postPatchNsmCommand failed."
+                "NsmSetWriteProtected::setWriteProtected: postPatchIO failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }

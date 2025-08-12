@@ -87,8 +87,8 @@ NsmClearPCIeCounters::NsmClearPCIeCounters(
               "NAME", name, "GROUP_ID", groupId);
 }
 
-requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
-                                                  eid_t eid)
+requester::Coroutine
+    NsmClearPCIeCounters::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(
         sizeof(nsm_msg_hdr) +
@@ -101,20 +101,20 @@ requester::Coroutine NsmClearPCIeCounters::update(SensorManager& manager,
     {
         lg2::debug(
             "encode_query_available_clearable_scalar_data_sources_v1_req failed for group {A}. eid={EID} rc={RC}",
-            "A", groupId, "EID", eid, "RC", rc);
+            "A", groupId, "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
             "NsmClearPCIeCounters SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -219,8 +219,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
     AsyncOperationStatusType* status, const uint8_t deviceIndex,
     const uint8_t groupId, const uint8_t dsId)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_clear_data_source_v1_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     // first argument instanceid=0 is irrelevant
@@ -239,12 +238,12 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "clearPCIeErrorCounter postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
+            "clearPCIeErrorCounter postPatchIO failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         // coverity[missing_return]
@@ -265,7 +264,7 @@ requester::Coroutine NsmClearPCIeIntf::clearPCIeErrorCounter(
         {
             lg2::info("clearPCIeErrorCounter refreshing group id : {CTR}",
                       "CTR", groupId);
-            co_await sensor->update(manager, eid);
+            co_await sensor->update(device);
         }
         else
         {
@@ -423,7 +422,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             auto sensor = std::make_shared<NsmGpuPciePort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
-            nsmDevice->deviceSensors.emplace_back(sensor);
+            nsmDevice->getDeviceSensors().emplace_back(sensor);
             uint64_t deviceIndex{};
             if (allBaseIfaceProperties.count("DeviceIndex"))
             {
@@ -486,7 +485,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
                 name, type, pcieECCIntf, pciePortIntf, deviceIndex,
                 processorPath);
-            nsmDevice->deviceSensors.push_back(pciPortSensor);
+            nsmDevice->getDeviceSensors().push_back(pciPortSensor);
             nsmDevice->addSensor(sensorGroup2, priority);
             nsmDevice->addSensor(sensorGroup3, priority);
             nsmDevice->addSensor(sensorGroup4, priority);
@@ -528,7 +527,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
             auto portInfoSensor = std::make_shared<NsmGpuPciePortInfo>(
                 name, type, portType, portProtocol, portInfoIntf);
-            nsmDevice->deviceSensors.emplace_back(portInfoSensor);
+            nsmDevice->getDeviceSensors().emplace_back(portInfoSensor);
             auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
                 name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
                 deviceIndex);

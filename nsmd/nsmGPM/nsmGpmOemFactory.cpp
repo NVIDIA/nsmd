@@ -137,7 +137,7 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
 
     lg2::info(
         "Created NSM GPM PerInstance Metrics : UUID={UUID}, Name={NAME}, Type={TYPE}",
-        "UUID", nsmDevice->uuid, "NAME", name, "TYPE", type);
+        "UUID", nsmDevice->getUuid(), "NAME", name, "TYPE", type);
 
     nsmDevice->addSensor(gpmPerInstanceMetric,
                          PollingType::GpuPerformanceMonitoring);
@@ -354,8 +354,8 @@ static requester::Coroutine
 
         lg2::info(
             "Created NSM GPM PerPort Metric {METRIC}: UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "METRIC", metric, "UUID", nsmDevice->uuid, "NAME", name, "TYPE",
-            type);
+            "METRIC", metric, "UUID", nsmDevice->getUuid(), "NAME", name,
+            "TYPE", type);
 
         nsmDevice->addSensor(gpmPerPortMetric,
                              PollingType::GpuPerformanceMonitoring);

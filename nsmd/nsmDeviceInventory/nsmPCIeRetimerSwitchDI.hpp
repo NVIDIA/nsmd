@@ -41,7 +41,7 @@ class NsmPCIeRetimerSwitchDI : public NsmObject
                            uint8_t multiPortType, uint8_t multiPortIndex,
                            uint8_t multiPortUpstreamPort);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDefIntf = nullptr;

@@ -229,7 +229,7 @@ class NsmMinMemoryClockLimit : public NsmObject
   public:
     NsmMinMemoryClockLimit(std::string& name, std::string& type,
                            std::shared_ptr<DimmIntf> dimmIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;
@@ -240,7 +240,7 @@ class NsmMaxMemoryClockLimit : public NsmObject
   public:
     NsmMaxMemoryClockLimit(std::string& name, std::string& type,
                            std::shared_ptr<DimmIntf> dimmIntf);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::shared_ptr<DimmIntf> dimmIntf;

@@ -176,7 +176,7 @@ class NsmNumericSensor : public NsmSensor
 
     virtual std::string getSensorType() = 0;
     // Override the update function
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   protected:
     uint8_t sensorId;

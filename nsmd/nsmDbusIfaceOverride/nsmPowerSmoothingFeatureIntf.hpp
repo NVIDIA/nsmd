@@ -48,8 +48,7 @@ class OemPowerSmoothingFeatIntf :
 
     requester::Coroutine getPwrSmoothingControlsFromDevice()
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info("getPwrSmoothingControlsFromDevice for EID: {EID}", "EID",
                   eid);
 
@@ -69,12 +68,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "getPwrSmoothingControlsFromDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
+                "getPwrSmoothingControlsFromDevice postPatchIO failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             // coverity[missing_return]
             co_return rc_;
@@ -133,8 +132,7 @@ class OemPowerSmoothingFeatIntf :
         togglePowerSmoothingOnDevice(bool featureEnabled,
                                      AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info(
             "togglePowerSmoothingOnDevice for EID: {EID} to Enable = {ENABLE}",
             "EID", eid, "ENABLE", featureEnabled);
@@ -156,12 +154,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "togglePowerSmoothingOnDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
+                "togglePowerSmoothingOnDevice postPatchIO failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -215,8 +213,7 @@ class OemPowerSmoothingFeatIntf :
         toggleImmediateRampDownOnDevice(bool ramdownEnabled,
                                         AsyncOperationStatusType* status)
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
         lg2::info(
             "toggleImmediateRampDownOnDevice for EID: {EID} to Enable = {ENABLE}",
             "EID", eid, "ENABLE", ramdownEnabled);
@@ -239,12 +236,12 @@ class OemPowerSmoothingFeatIntf :
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto rc_ = co_await manager.postPatchNsmCommand(
-            eid, request, responseMsg, responseLen);
+        auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                                responseLen);
         if (rc_)
         {
             lg2::error(
-                "toggleImmediateRampDownOnDevice postPatchNsmCommand failed for eid = {EID} rc = {RC}",
+                "toggleImmediateRampDownOnDevice postPatchIO failed for eid = {EID} rc = {RC}",
                 "EID", eid, "RC", rc_);
             *status = AsyncOperationStatusType::WriteFailure;
             co_return NSM_SW_ERROR_COMMAND_FAIL;

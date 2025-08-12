@@ -22,9 +22,9 @@
 
 #define private public
 #define protected public
-#include "deviceManager.hpp"
 #include "eventManager.hpp"
 #include "instance_id.hpp"
+#include "nsmDevice.hpp"
 #include "requester/handler.hpp"
 #include "sensorManager.hpp"
 #include "socket_handler.hpp"
@@ -33,35 +33,38 @@
 #include <sdbusplus/asio/connection.hpp>
 #include <sdbusplus/asio/object_server.hpp>
 #include <sdeventplus/event.hpp>
+#undef private
+#undef protected
 
+#include "commonMock.hpp"
 using namespace nsm;
 using ::testing::NiceMock;
 
-class MockDeviceManager
+class MockMctpDiscovery
 {
   public:
-    static MockDeviceManager& getInstance(NsmDeviceTable& nsmDevices)
+    static MockMctpDiscovery& getInstance(NsmDeviceTable& nsmDevices)
     {
         if (!instance)
         {
-            instance = new MockDeviceManager(nsmDevices);
+            instance = new MockMctpDiscovery(nsmDevices);
         }
         return *instance;
     }
 
   private:
-    MockDeviceManager() = delete;
-    ~MockDeviceManager() = default;
-    MockDeviceManager(const MockDeviceManager&) = delete;
-    MockDeviceManager& operator=(const MockDeviceManager&) = delete;
-    MockDeviceManager(MockDeviceManager&&) = delete;
-    MockDeviceManager& operator=(MockDeviceManager&&) = delete;
-    MockDeviceManager(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices) {};
+    MockMctpDiscovery() = delete;
+    ~MockMctpDiscovery() = default;
+    MockMctpDiscovery(const MockMctpDiscovery&) = delete;
+    MockMctpDiscovery& operator=(const MockMctpDiscovery&) = delete;
+    MockMctpDiscovery(MockMctpDiscovery&&) = delete;
+    MockMctpDiscovery& operator=(MockMctpDiscovery&&) = delete;
+    MockMctpDiscovery(NsmDeviceTable& nsmDevices) : nsmDevices(nsmDevices) {};
     std::map<uint8_t, std::map<uint16_t, std::shared_ptr<NsmDevice>>> deviceMap;
     NsmDeviceTable& nsmDevices;
 
   public:
-    static MockDeviceManager* instance;
+    static MockMctpDiscovery* instance;
     std::shared_ptr<NsmDevice> findOrCreateNsmDevice(uint8_t deviceType,
                                                      uint8_t deviceRole,
                                                      uint8_t instanceNumber,
@@ -79,7 +82,7 @@ class MockDeviceManager
             }
         }
 
-        auto nsmDevice = std::make_shared<NsmDevice>(
+        auto nsmDevice = std::make_shared<MockNsmDeviceBase>(
             deviceType, instanceNumber, remapPropName, remapPropValue,
             deviceRole);
         lg2::info(
@@ -87,7 +90,6 @@ class MockDeviceManager
             "TYPE", deviceType, "INST", instanceNumber, "ROLE", deviceRole,
             "REMAPPNAME", remapPropName, "REMAPPVALUE", remapPropValue);
         nsmDevices.emplace_back(nsmDevice);
-        nsmDevice->isDeviceActive = false;
         deviceMap[deviceType][staticInstanceAndRole] = nsmDevice;
         return deviceMap[deviceType][staticInstanceAndRole];
     }
@@ -102,7 +104,7 @@ class MockDeviceManager
                                    remapPropName, remapPropValue) < 0)
         {
             throw std::runtime_error(
-                "MockDeviceManager::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d:s:s), UUID=" +
+                "MockMctpDiscovery::getNsmDevice: uuid in EM json is not in a valid format(STATIC:d:d:s:s), UUID=" +
                 uuid);
         }
 
@@ -128,7 +130,7 @@ class MockDeviceManager
     }
 };
 
-MockDeviceManager* MockDeviceManager::instance = nullptr;
+MockMctpDiscovery* MockMctpDiscovery::instance = nullptr;
 
 struct MockSensorManager : public SensorManager
 {
@@ -137,30 +139,30 @@ struct MockSensorManager : public SensorManager
     {
         // Ignore nsmDevices parameter for mock
     }
-    MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
-                (eid_t eid, Request& request,
-                 std::shared_ptr<const nsm_msg>& responseMsg,
-                 size_t& responseLen, bool bypassCommandCheck),
-                (override));
-    MOCK_METHOD(requester::Coroutine, postPatchNsmCommand,
-                (eid_t eid, Request& request,
-                 std::shared_ptr<const nsm_msg>& responseMsg,
-                 size_t& responseLen),
-                (override));
+    /*  MOCK_METHOD(requester::Coroutine, SendRecvNsmMsg,
+                  (eid_t eid, Request& request,
+                   std::shared_ptr<const nsm_msg>& responseMsg,
+                   size_t& responseLen, bool bypassCommandCheck),
+                  (override));
+      MOCK_METHOD(requester::Coroutine, postPatchNsmCommand,
+                  (eid_t eid, Request& request,
+                   std::shared_ptr<const nsm_msg>& responseMsg,
+                   size_t& responseLen),
+                  (override));*/
     MOCK_METHOD(eid_t, getEid, (std::shared_ptr<NsmDevice> nsmDevice),
                 (override));
     MOCK_METHOD(sdbusplus::asio::object_server&, getObjServer, (), (override));
 
     std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid) override
     {
-        return MockDeviceManager::getInstance(nsmDevices)
+        return MockMctpDiscovery::getInstance(nsmDevices)
             .getNsmDeviceFromStaticUUID(uuid);
     };
     std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,
                                             uint8_t instanceNumber,
                                             uint8_t deviceRole) override
     {
-        return MockDeviceManager::getInstance(nsmDevices)
+        return MockMctpDiscovery::getInstance(nsmDevices)
             .getNsmDeviceByIdentification(deviceType, instanceNumber,
                                           deviceRole);
     }
@@ -199,8 +201,8 @@ class SensorManagerTest
         return *reinterpret_cast<DataType*>(lastResponse.data() +
                                             lastResponseOffset);
     }
-    auto mockSendRecvNsmMsg(const Response& response,
-                            nsm_completion_codes code = NSM_SUCCESS)
+    auto mockSensorIO(const Response& response,
+                      nsm_completion_codes code = NSM_SUCCESS)
     {
         lastResponse = response;
         return [response, code](
@@ -211,18 +213,18 @@ class SensorManagerTest
             co_return code;
         };
     }
-    auto mockSendRecvNsmMsg(const Response& header, const Response& data,
-                            nsm_completion_codes code = NSM_SUCCESS)
+    auto mockSensorIO(const Response& header, const Response& data,
+                      nsm_completion_codes code = NSM_SUCCESS)
     {
-        return mockSendRecvNsmMsg(joinResponse(header, data), code);
+        return mockSensorIO(joinResponse(header, data), code);
     }
-    auto mockSendRecvNsmMsg(nsm_completion_codes code = NSM_SUCCESS)
+    auto mockSensorIO(nsm_completion_codes code = NSM_SUCCESS)
     {
-        return mockSendRecvNsmMsg(Response(), code);
+        return mockSensorIO(Response(), code);
     }
 
-    auto mockPostPatchNsmCommand(const Response& response,
-                                 nsm_completion_codes code = NSM_SUCCESS)
+    auto mockPostPatchIO(const Response& response,
+                         nsm_completion_codes code = NSM_SUCCESS)
     {
         lastResponse = response;
         return [response, code](eid_t, Request&,
@@ -233,14 +235,14 @@ class SensorManagerTest
             co_return code;
         };
     }
-    auto mockPostPatchNsmCommand(const Response& header, const Response& data,
-                                 nsm_completion_codes code = NSM_SUCCESS)
+    auto mockPostPatchIO(const Response& header, const Response& data,
+                         nsm_completion_codes code = NSM_SUCCESS)
     {
-        return mockPostPatchNsmCommand(joinResponse(header, data), code);
+        return mockPostPatchIO(joinResponse(header, data), code);
     }
-    auto mockPostPatchNsmCommand(nsm_completion_codes code = NSM_SUCCESS)
+    auto mockPostPatchIO(nsm_completion_codes code = NSM_SUCCESS)
     {
-        return mockPostPatchNsmCommand(Response(), code);
+        return mockPostPatchIO(Response(), code);
     }
 
     SensorManagerTest() = delete;

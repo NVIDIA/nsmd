@@ -63,16 +63,15 @@ void NsmLogInfoObject::getLogInfoAsyncHandler(uint32_t recordHandle)
 requester::Coroutine
     NsmLogInfoObject::getLogInfoAsyncHandler(std::shared_ptr<Request> request)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.postPatchNsmCommand(eid, *request, responseMsg,
-                                                   responseLen);
+    auto rc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                           responseLen);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("NsmLogInfoObject: getRequest postPatchNsmCommand: "
+        lg2::error("NsmLogInfoObject: getRequest postPatchIO: "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         finish(AsyncOperationStatusType::InternalFailure, rc);
@@ -92,9 +91,11 @@ requester::Coroutine
         buffer.data(), &bufferSize);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        lg2::error("NsmLogInfoObject: decode_get_network_device_log_info_resp: "
-                   "eid={EID} rc={RC} cc={CC} len={LEN}",
-                   "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen);
+        lg2::error(
+            "NsmLogInfoObject: decode_get_network_device_log_info_resp: "
+            "eid={EID} rc={RC} cc={CC} len={LEN} reasonCode={REASON_CODE}",
+            "EID", eid, "RC", rc, "CC", cc, "LEN", responseLen, "REASON_CODE",
+            reasonCode);
         finish(AsyncOperationStatusType::InternalFailure, rc);
         // coverity[missing_return]
         co_return rc;

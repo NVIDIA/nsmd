@@ -87,20 +87,20 @@ void SecurityConfiguration::updateIrreversibleConfig(bool state)
 requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
     std::shared_ptr<Request> request, uint8_t requestType)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto nsmDevice =
+        SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    auto eid = nsmDevice->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = 0;
     uint16_t reasonCode = 0;
-    auto rc = co_await manager.postPatchNsmCommand(eid, *request, responseMsg,
-                                                   responseLen);
+    auto rc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
+                                              responseLen);
 
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
-            "securityCfgAsyncHandler: postPatchNsmCommand error : eid={EID} rc={RC}",
+            "securityCfgAsyncHandler: postPatchIO error : eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
@@ -139,7 +139,7 @@ requester::Coroutine SecurityConfiguration::securityCfgAsyncHandler(
         }
         finishOperation(Progress::OperationStatus::Completed);
     }
-    rc = co_await nsmSensor.update(manager, eid);
+    rc = co_await nsmSensor.update(nsmDevice);
     // coverity[missing_return]
     co_return rc;
 }
@@ -293,18 +293,18 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     std::shared_ptr<Request> request)
 {
     SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
+    auto eid = nsmDevice->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
     uint8_t cc = 0;
     uint16_t reasonCode = 0;
-    auto rc = co_await manager.postPatchNsmCommand(eid, *request, responseMsg,
-                                                   responseLen);
+    auto rc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
+                                              responseLen);
 
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("minSecVersionAsyncHandler: postPatchNsmCommand error :"
+        lg2::error("minSecVersionAsyncHandler: postPatchIO error :"
                    " eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         errorCode(getErrorCode(NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER, rc));
@@ -332,7 +332,7 @@ requester::Coroutine MinSecurityVersion::minSecVersionAsyncHandler(
     bitfield32_t updateMethodBitfield{sec_resp.update_methods};
     updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
-    rc = co_await nsmSensor.update(manager, eid);
+    rc = co_await nsmSensor.update(nsmDevice);
     // coverity[missing_return]
     co_return rc;
 }

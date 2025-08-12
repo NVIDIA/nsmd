@@ -200,12 +200,9 @@ requester::Coroutine AsyncSetOperationDispatcher::setImpl(
 
         if (operation.sensor)
         {
-            if (operation.device->isDeviceActive)
+            if (operation.device->isOnline())
             {
-                const eid_t eid =
-                    SensorManager::getInstance().getEid(operation.device);
-                co_await operation.sensor->update(SensorManager::getInstance(),
-                                                  eid);
+                co_await operation.sensor->update(operation.device);
             }
         }
     }

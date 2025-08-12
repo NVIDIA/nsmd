@@ -22,11 +22,11 @@
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmCommon.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -37,8 +37,8 @@ namespace nsm
 {
 
 template <typename IntfType>
-requester::Coroutine NsmIRoTResponder<IntfType>::update(SensorManager& manager,
-                                                        eid_t eid)
+requester::Coroutine
+    NsmIRoTResponder<IntfType>::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     if constexpr (std::is_same_v<IntfType, NsmAssetIntf>)
     {
@@ -51,19 +51,19 @@ requester::Coroutine NsmIRoTResponder<IntfType>::update(SensorManager& manager,
         {
             lg2::debug("IRoTResponder: encode_nsm_query_device_ids_req: "
                        "eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc);
+                       "EID", nsmDevice->getEid(), "RC", rc);
             // coverity[missing_return]
             co_return rc;
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        auto sendRc = co_await manager.SendRecvNsmMsg(eid, *request,
-                                                      responseMsg, responseLen);
+        auto sendRc = co_await nsmDevice->sensorIO(
+            nsmDevice->getEid(), *request, responseMsg, responseLen, false);
         if (sendRc)
         {
-            lg2::debug("IRoTResponder: queryDeviceId SendRecvNsmMsg: "
+            lg2::debug("IRoTResponder: queryDeviceId sensorIO: "
                        "eid={EID} rc={RC}",
-                       "EID", eid, "RC", sendRc);
+                       "EID", nsmDevice->getEid(), "RC", sendRc);
             // coverity[missing_return]
             co_return sendRc;
         }
@@ -90,18 +90,17 @@ requester::Coroutine NsmIRoTResponder<IntfType>::update(SensorManager& manager,
 
     if constexpr (std::is_same_v<IntfType, UuidIntf>)
     {
-        DeviceManager& deviceManager = DeviceManager::getInstance();
+        mctp::MctpDiscovery& mctpDiscovery = mctp::MctpDiscovery::getInstance();
         uuid_t deviceUuid;
-        auto rc = co_await getDeviceUUID(manager, eid, deviceManager,
-                                         deviceUuid);
+        auto rc = co_await getDeviceUUID(nsmDevice, mctpDiscovery, deviceUuid);
         if (rc == NSM_SW_SUCCESS && !deviceUuid.empty())
         {
             this->invoke(pdiMethod(uuid), deviceUuid);
-            auto device = manager.getNsmDeviceFromStaticUUID(deviceUuid);
+
             auto spdmResponderObject =
                 std::make_shared<NsmIRoTResponder<SPDMResponderIntf>>(
                     this->name, "NSM_ChassisIRoTResponder");
-            device->addStaticSensor(spdmResponderObject);
+            nsmDevice->addStaticSensor(spdmResponderObject);
             // coverity[missing_return]
             co_return NSM_SUCCESS;
         }

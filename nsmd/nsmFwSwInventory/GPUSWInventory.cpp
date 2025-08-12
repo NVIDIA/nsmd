@@ -1,11 +1,11 @@
 #include "GPUSWInventory.hpp"
 
 #include "dBusAsyncUtils.hpp"
-#include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
+#include "requester/mctp_endpoint_discovery.hpp"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -81,9 +81,8 @@ void NsmGPUSWInventoryDriverVersionAndStatus::updateValue(
     updateMetricOnSharedMemory();
 }
 
-requester::Coroutine
-    NsmGPUSWInventoryDriverVersionAndStatus::update(SensorManager& manager,
-                                                    eid_t eid)
+requester::Coroutine NsmGPUSWInventoryDriverVersionAndStatus::update(
+    std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
@@ -92,15 +91,15 @@ requester::Coroutine
     {
         lg2::debug(
             "encode_get_driverVersion_req failed for GPU eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         // coverity[missing_return]
@@ -132,11 +131,9 @@ requester::Coroutine
     {
         lg2::info(
             "NsmGPUSWInventoryDriverVersionAndStatus: state changed eid={EID}",
-            "EID", eid);
-        DeviceManager& deviceManager = DeviceManager::getInstance();
-        co_await deviceManager.updateNsmDevice(nsmDeviceFound, eid);
-        co_await DeviceManager::getInstance().refreshCapabilitySensor(
-            nsmDeviceFound);
+            "EID", nsmDevice->getEid());
+        co_await nsmDeviceFound->updateNsmDevice();
+        co_await nsmDeviceFound->refreshCapabilitySensor();
     }
 
     // coverity[missing_return]
@@ -186,7 +183,7 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
 
     auto sensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
         bus, name, associations, type, manufacturer);
-    nsmDevice->gpudriverSensor = sensor;
+    nsmDevice->addGpudriverSensor(sensor);
     // update sensor
     nsmDevice->addSensor(sensor, false);
     sensor->nsmDeviceFound = nsmDevice;

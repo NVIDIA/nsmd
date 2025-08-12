@@ -72,14 +72,13 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetErrorInjection::setModeEnabled: postPatchNsmCommand failed."
+                "NsmSetErrorInjection::setModeEnabled: postPatchIO failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
@@ -168,14 +167,13 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         if (rc != NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             lg2::error(
-                "NsmSetErrorInjectionEnabled::setEnabled: postPatchNsmCommand failed."
+                "NsmSetErrorInjectionEnabled::setEnabled: postPatchIO failed."
                 "eid={EID} rc={RC}",
                 "EID", eid, "RC", rc);
         }
@@ -266,12 +264,11 @@ requester::Coroutine NsmSetErrorInjectionPayload::setPayload(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "NsmSetErrorInjectionPayload::setPayload: postPatchNsmCommand failed."
+            "NsmSetErrorInjectionPayload::setPayload: postPatchIO failed."
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
         status = AsyncOperationStatusType::WriteFailure;

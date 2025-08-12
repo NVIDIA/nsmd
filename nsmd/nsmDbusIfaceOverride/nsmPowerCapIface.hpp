@@ -47,8 +47,7 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
 
     requester::Coroutine getPowerCapFromDevice()
     {
-        SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
+        auto eid = device->getEid();
 
         std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                      sizeof(nsm_get_power_limit_req));
@@ -64,11 +63,11 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
         }
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await device->postPatchIO(eid, request, responseMsg,
+                                          responseLen);
         if (rc)
         {
-            lg2::error("postPatchNsmCommand failed. "
+            lg2::error("postPatchIO failed. "
                        "eid={EID} rc={RC}",
                        "EID", eid, "RC", rc);
             // coverity[missing_return]
@@ -106,9 +105,8 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
                                              AsyncOperationStatusType* status,
                                              bool persistency = true)
     {
+        auto eid = device->getEid();
         SensorManager& manager = SensorManager::getInstance();
-        auto eid = manager.getEid(device);
-
         Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_power_limit_req));
         auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
         // first argument instanceid=0 is irrelevant
@@ -127,14 +125,13 @@ class NsmPowerCapIntf : public PowerCapIntf, public StateChangeLogger
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                  responseLen);
+        rc = co_await device->postPatchIO(eid, request, responseMsg,
+                                          responseLen);
 
-        if (shouldLog("setPowerCapOnDevice postPatchNsmCommand",
-                      nsm_sw_codes(rc)))
+        if (shouldLog("setPowerCapOnDevice postPatchIO", nsm_sw_codes(rc)))
         {
             LG2_ERROR(
-                "setPowerCapOnDevice postPatchNsmCommand failed, eid = {EID}, rc = {RC}",
+                "setPowerCapOnDevice postPatchIO failed, eid = {EID}, rc = {RC}",
                 "EID", eid, "RC", rc);
         }
         if (rc)

@@ -2,10 +2,8 @@ dep_src_files = [
     '../nsmDevice.cpp',
     '../nsmSensor.cpp',
     '../sensorManager.cpp',
-    '../deviceManager.cpp',
     '../nsmObjectFactory.cpp',
     '../nsmEvent.cpp',
-    '../deviceManager.cpp',
     '../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../nsmFwSwInventory/GPUSWInventory.cpp',
     '../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
@@ -21,6 +19,7 @@ dep_src_files = [
     '../../libnsm/network-ports.c',
     '../../libnsm/requester/mctp.c',
     '../../requester/request_timeout_tracker.cpp',
+    '../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 if get_option('shmem').enabled()

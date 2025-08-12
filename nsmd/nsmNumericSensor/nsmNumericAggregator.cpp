@@ -89,27 +89,28 @@ int NsmNumericAggregator::updateSensorNotWorking(uint8_t tag, bool valid)
     return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmNumericAggregator::update(SensorManager& manager,
-                                                  eid_t eid)
+requester::Coroutine
+    NsmNumericAggregator::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    auto requestMsg = genRequestMsg(eid, 0);
+    auto requestMsg = genRequestMsg(nsmDevice->getEid(), 0);
     if (!requestMsg.has_value())
     {
         lg2::error(
             "NsmNumericAggregator::update: genRequestMsg failed, name={NAME}, eid={EID}",
-            "NAME", getName(), "EID", eid);
+            "NAME", getName(), "EID", nsmDevice->getEid());
         co_return NSM_SW_ERROR;
     }
 
 #ifdef LTTNG_TRACING
-    lttng_ust_tracepoint(nsmd, sensor_polling_request_generated, eid,
-                         requestMsg.value().data(), this->getName().c_str());
+    lttng_ust_tracepoint(nsmd, sensor_polling_request_generated,
+                         nsmDevice->getEid(), requestMsg.value().data(),
+                         this->getName().c_str());
 #endif
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen);
+    auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
+                                           responseMsg, responseLen, false);
     if (rc)
     {
         // we are relying on samples in NsmSensorAggregator to

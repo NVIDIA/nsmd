@@ -37,8 +37,7 @@ requester::Coroutine
     NsmWorkloadProfileInfoAsyncIntf::requestEnablePresetProfile(
         AsyncOperationStatusType* status, std::vector<uint8_t>& bytes)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_enable_workload_power_profile_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -61,12 +60,12 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestEnablePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "requestEnablePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}, msg={MSG}",
             "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -140,8 +139,7 @@ requester::Coroutine
     NsmWorkloadProfileInfoAsyncIntf::requestDisablePresetProfile(
         AsyncOperationStatusType* status, std::vector<uint8_t>& bytes)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_disable_workload_power_profile_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
@@ -164,12 +162,12 @@ requester::Coroutine
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestDisablePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}, msg={MSG}",
+            "requestDisablePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}, msg={MSG}",
             "EID", eid, "RC", rc_, "MSG", msg);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;

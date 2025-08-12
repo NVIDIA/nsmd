@@ -5,10 +5,8 @@ dep_src_files = [
     '../../nsmDevice.cpp',
     '../../nsmSensor.cpp',
     '../../sensorManager.cpp',
-    '../../deviceManager.cpp',
     '../../nsmObjectFactory.cpp',
     '../../nsmEvent.cpp',
-    '../../deviceManager.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmEvent/nsmLongRunningEvent.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
@@ -26,6 +24,7 @@ dep_src_files = [
     '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 dep_src_headers = [
@@ -44,7 +43,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = ['asyncOperationManager_test', 'nsmSetWriteProtected_test']
+tests = ['nsmSetWriteProtected_test', 'asyncOperationManager_test']
 
 tests_deps = [
     test_src,

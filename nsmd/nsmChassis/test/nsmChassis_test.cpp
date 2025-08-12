@@ -38,8 +38,8 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
                                              const std::string& interface,
                                              const std::string& objPath);
 NsmDeviceTable devices;
-std::shared_ptr<NsmDevice> gpu;
-std::shared_ptr<NsmDevice> fpga;
+std::shared_ptr<MockNsmDeviceBase> gpu;
+std::shared_ptr<MockNsmDeviceBase> fpga;
 }; // namespace nsm
 
 using namespace nsm;
@@ -175,7 +175,7 @@ TEST_F(NsmChassisTest, badTestCreateDeviceSensors)
 
     nsmChassisCreateSensors(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = devices.back();
+    gpu = dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     gpu->deviceType = NSM_DEV_ID_GPU;
     EXPECT_EQ(0, devices.back()->deviceSensors.size());
 }
@@ -332,7 +332,7 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
         std::get<uuid_t>(get(fpgaProperties, "DEVICE_UUID").second);
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
     EXPECT_EQ(2, devices.size());
-    fpga = devices[1];
+    fpga = dynamic_pointer_cast<MockNsmDeviceBase>(devices[1]);
     EXPECT_EQ(3, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->roundRobinSensors.size());
     EXPECT_EQ(3, fpga->deviceSensors.size());
@@ -953,11 +953,12 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
     {
         const Response presenceMsg{presence};
         const Response powerStatusMsg{power_status};
-        EXPECT_CALL(mockManager, SendRecvNsmMsg)
+        testing::Mock::AllowLeak(fpga.get());
+        EXPECT_CALL(*fpga, sensorIO)
             .Times(2)
-            .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
-            .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg));
-        sensor->update(mockManager, eid);
+            .WillOnce(mockSensorIO(diagHeader, presenceMsg))
+            .WillOnce(mockSensorIO(diagHeader, powerStatusMsg));
+        sensor->update(fpga);
     }
 };
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestRequest)
@@ -989,6 +990,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestRequest)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
     EXPECT_EQ(data_index, GET_GPU_POWER_STATUS);
 }
+
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
 {
     // "State": "Enabled" if presence=active, power=active
@@ -1001,6 +1003,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusEnabledResponse)
         EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Enabled);
     }
 }
+
 TEST_F(NsmGpuPresenceAndPowerStatusTest,
        goodTestGpuStatusUnavailableOfflineResponse)
 {
@@ -1015,6 +1018,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest,
                   StateType::UnavailableOffline);
     }
 }
+
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
 {
     init(0);
@@ -1022,34 +1026,37 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusFaultResponse)
         server::OperationalStatus::StateType;
     const Response presenceMsg{0};
     const Response powerStatusMsg{0};
+    // For error responses, we need at least 4 bytes to avoid buffer overflow
+    const Response errorResponse{0, 0, 0,
+                                 0}; // 4 bytes minimum for error response
     auto ccError = diagHeader;
     ccError[6] = NSM_ERROR;
 
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+    testing::Mock::AllowLeak(fpga.get());
+    EXPECT_CALL(*fpga, sensorIO)
         .Times(2)
-        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
-        .WillOnce(mockSendRecvNsmMsg(diagHeader, powerStatusMsg, NSM_ERROR));
-    sensor->update(mockManager, eid);
+        .WillOnce(mockSensorIO(diagHeader, presenceMsg))
+        .WillOnce(mockSensorIO(diagHeader, powerStatusMsg, NSM_ERROR));
+    sensor->update(fpga);
     EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 
     sensor->invoke(pdiMethod(state), StateType::None);
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg, NSM_ERROR));
-    sensor->update(mockManager, eid);
+    EXPECT_CALL(*fpga, sensorIO)
+        .WillOnce(mockSensorIO(diagHeader, presenceMsg, NSM_ERROR));
+    sensor->update(fpga);
     EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 
     sensor->invoke(pdiMethod(state), StateType::None);
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(ccError, presenceMsg));
-    sensor->update(mockManager, eid);
+    EXPECT_CALL(*fpga, sensorIO).WillOnce(mockSensorIO(ccError, presenceMsg));
+    sensor->update(fpga);
     EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 
     sensor->invoke(pdiMethod(state), StateType::None);
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+    EXPECT_CALL(*fpga, sensorIO)
         .Times(2)
-        .WillOnce(mockSendRecvNsmMsg(diagHeader, presenceMsg))
-        .WillOnce(mockSendRecvNsmMsg(ccError, powerStatusMsg));
-    sensor->update(mockManager, eid);
+        .WillOnce(mockSensorIO(diagHeader, presenceMsg))
+        .WillOnce(mockSensorIO(ccError, powerStatusMsg));
+    sensor->update(fpga);
     EXPECT_EQ(sensor->invoke(pdiMethod(state)), StateType::Fault);
 }
 TEST_F(NsmGpuPresenceAndPowerStatusTest, goodTestGpuStatusAbsentResponse)
@@ -1074,6 +1081,7 @@ TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestRequest)
     request = sensor->genRequestMsg(eid, NSM_INSTANCE_MAX + 1);
     EXPECT_FALSE(request.has_value());
 }
+
 TEST_F(NsmGpuPresenceAndPowerStatusTest, badTestResponseSize)
 {
     init(0);

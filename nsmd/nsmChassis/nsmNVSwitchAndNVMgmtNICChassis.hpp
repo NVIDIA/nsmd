@@ -56,7 +56,7 @@ class NsmNVSwitchAndNicChassis : public NsmInterfaceProvider<IntfType>
         NsmInterfaceProvider<IntfType>(name, type, chassisInventoryBasePath)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     std::unique_ptr<sdbusplus::asio::dbus_interface> nsmDeviceAssociationIntf;

@@ -139,7 +139,7 @@ static requester::Coroutine
             auto sensor = std::make_shared<NsmFpgaPort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
-            nsmDevice->deviceSensors.emplace_back(sensor);
+            nsmDevice->getDeviceSensors().emplace_back(sensor);
         }
         else if (type == "NSM_PortInfo")
         {
@@ -174,7 +174,7 @@ static requester::Coroutine
                 std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
             auto portInfoSensor = std::make_shared<NsmFpgaPortInfo>(
                 name, type, portType, portProtocol, portInfoIntf);
-            nsmDevice->deviceSensors.emplace_back(portInfoSensor);
+            nsmDevice->getDeviceSensors().emplace_back(portInfoSensor);
             auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
                 name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
                 deviceIndex);
@@ -192,7 +192,7 @@ static requester::Coroutine
 
             auto portStateSensor = std::make_shared<NsmFpgaPortState>(
                 bus, name, type, linkStatus, inventoryObjPath);
-            nsmDevice->deviceSensors.emplace_back(portStateSensor);
+            nsmDevice->getDeviceSensors().emplace_back(portStateSensor);
         }
         else if (type == "NSM_PCIe")
         {

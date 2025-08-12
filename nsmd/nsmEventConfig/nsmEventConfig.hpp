@@ -50,7 +50,7 @@ class NsmEventConfig : public NsmObject
                    uint8_t messageType, std::vector<uint64_t>& srcEventIds,
                    std::vector<uint64_t>& ackEventIds);
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     void convertIdsToMask(std::vector<uint64_t>& eventIds,
@@ -65,7 +65,7 @@ class NsmEventConfig : public NsmObject
      * @return Coroutine that resolves to operation status
      */
     requester::Coroutine
-        setCurrentEventSources(SensorManager& manager, eid_t eid,
+        setCurrentEventSources(std::shared_ptr<NsmDevice> nsmDevice,
                                uint8_t nvidiaMessageType,
                                std::vector<bitfield8_t>& eventIdMasks);
     /**
@@ -78,7 +78,7 @@ class NsmEventConfig : public NsmObject
      * @return Coroutine that resolves to operation status
      */
     requester::Coroutine
-        configureEventAcknowledgement(SensorManager& manager, eid_t eid,
+        configureEventAcknowledgement(std::shared_ptr<NsmDevice> nsmDevice,
                                       uint8_t nvidiaMessageType,
                                       std::vector<bitfield8_t>& eventIdMasks);
 
@@ -109,7 +109,7 @@ class NsmGetEventConfig : public NsmObject
     NsmGetEventConfig(const std::string& name, const std::string& type,
                       uint8_t messageType, std::vector<uint64_t>& srcEventIds,
                       std::shared_ptr<NsmEventConfig> eventConfig);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
     /**
      * @brief Validates configured event IDs against supported events
      *

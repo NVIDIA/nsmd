@@ -83,18 +83,17 @@ void NsmKeyMgmt::finishOperation(Progress::OperationStatus status)
 requester::Coroutine
     NsmKeyMgmt::revokeKeysAsyncHandler(std::shared_ptr<Request> request)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
-    auto eid = manager.getEid(device);
+    auto nsmDevice =
+        SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await manager.postPatchNsmCommand(
-        eid, *request, responseMsg, responseLen);
+    auto sendRc = co_await nsmDevice->postPatchIO(nsmDevice->getEid(), *request,
+                                                  responseMsg, responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
         lg2::error("KeyMgmt - revokeKeys - "
                    "postPatchNsmCommand: eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+                   "EID", nsmDevice->getEid(), "RC", sendRc);
         errorCode(getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, sendRc));
         finishOperation(Progress::OperationStatus::Aborted);
         // coverity[missing_return]
@@ -110,7 +109,8 @@ requester::Coroutine
         lg2::error("KeyMgmt - revokeKeys - "
                    "decode_nsm_code_auth_key_perm_update_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
-                   "EID", eid, "RC", decodeRc, "CC", cc, "LEN", responseLen);
+                   "EID", nsmDevice->getEid(), "RC", decodeRc, "CC", cc, "LEN",
+                   responseLen);
         errorCode(
             getErrorCode(NSM_FW_UPDATE_CODE_AUTH_KEY_PERM, cc, reasonCode));
         finishOperation(Progress::OperationStatus::Aborted);
@@ -121,7 +121,7 @@ requester::Coroutine
     updateMethod(utils::updateMethodsBitfieldToList(updateMethodBitfield));
     finishOperation(Progress::OperationStatus::Completed);
     // update the objects
-    sendRc = co_await update(manager, eid);
+    sendRc = co_await update(nsmDevice);
     if (sendRc != NSM_SW_SUCCESS)
     {
         lg2::error("UpdateCodeAuth Method is success."

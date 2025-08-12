@@ -722,17 +722,17 @@ TEST(nsmProcessorRevision, BadHandleResp)
 TEST(nsmProcessorThrottleDuration, GoodGenReq)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
                                              processorPerformanceIntf,
                                              inventoryObjPath, false, gpuPtr);
 
-    const uint8_t eid{12};
     const uint8_t instance_id{30};
 
-    auto request = sensor.genRequestMsg(eid, instance_id);
+    auto request = sensor.genRequestMsg(gpuPtr->getEid(), instance_id);
     EXPECT_EQ(request.has_value(), true);
 
     auto msg = reinterpret_cast<const nsm_msg*>(request->data());
@@ -744,7 +744,8 @@ TEST(nsmProcessorThrottleDuration, GoodGenReq)
 TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
@@ -780,7 +781,8 @@ TEST(nsmProcessorThrottleDuration, GoodHandleResp)
 TEST(nsmProcessorThrottleDuration, BadHandleResp)
 {
     const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
-    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    std::shared_ptr<MockNsmDeviceBase> gpuPtr =
+        std::make_shared<MockNsmDeviceBase>(1, 1, "MCTP_UUID", gpuUuid, 1);
     auto processorPerformanceIntf = std::make_shared<ProcessorPerformanceIntf>(
         bus, inventoryObjPath.c_str());
     nsm::NsmProcessorThrottleDuration sensor(sensorName, sensorType,
@@ -1227,7 +1229,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
                                              const std::string& interface,
                                              const std::string& objPath);
 NsmDeviceTable devices;
-std::shared_ptr<NsmDevice> gpu;
+std::shared_ptr<MockNsmDeviceBase> gpu;
 }; // namespace nsm
 
 struct NsmProcessorTest :
@@ -1354,7 +1356,7 @@ TEST_F(NsmProcessorTest, badTestTypeError)
         std::get<std::string>(get(basic, "InventoryObjPath").second);
     createNsmProcessorSensor(mockManager, basicIntfName, objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = devices.back();
+    gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     EXPECT_EQ(0, gpu->prioritySensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
     EXPECT_EQ(0, gpu->deviceSensors.size());
@@ -1381,7 +1383,6 @@ TEST_F(NsmProcessorTest, badTestNoDevideFound)
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
     EXPECT_EQ(0, gpu->deviceSensors.size());
 }
-
 TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
 {
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
@@ -1416,9 +1417,11 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     auto rc = encode_get_reconfiguration_permissions_v1_resp(
         instanceId, NSM_SUCCESS, ERR_NULL, &data, msg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+
+    testing::Mock::AllowLeak(gpu.get());
+    EXPECT_CALL(*gpu, sensorIO)
         .Times(expectedSensorsCount)
-        .WillRepeatedly(mockSendRecvNsmMsg(response));
+        .WillRepeatedly(mockSensorIO(response));
 
     for (size_t i = 0; i < expectedSensorsCount; i++)
     {
@@ -1430,7 +1433,7 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
         EXPECT_EQ(
             reconfiguration_permissions_v1_index(i),
             NsmReconfigPermissions::getIndex(reconfigPermissions->feature));
-        reconfigPermissions->update(mockManager, eid).detach();
+        reconfigPermissions->update(gpu).detach();
         EXPECT_EQ(data.host_oneshot,
                   reconfigPermissions->hostConfigIntf->allowOneShotConfig());
         EXPECT_EQ(data.host_persistent,
@@ -1544,9 +1547,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
         instanceId, NSM_SUCCESS, ERR_NULL, setEnableResponseMsg);
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(supportedResponse));
-    errorInjectionSupported->update(mockManager, eid);
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(supportedResponse));
+    errorInjectionSupported->update(gpu).detach();
 
     const auto errorInjectionBasePath = processorsInventoryBasePath / name /
                                         "ErrorInjection";
@@ -1565,14 +1567,12 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
 
     auto status = AsyncOperationStatusType::Success;
 
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(setModeResponse));
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(setModeResponse));
     setErrorInjection->errorInjectionModeEnabled(true, &status, gpu);
     EXPECT_EQ(AsyncOperationStatusType::Success, status);
 
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(modeResponse));
-    errorInjectionSensor->update(mockManager, eid);
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(modeResponse));
+    errorInjectionSensor->update(gpu).detach();
 
     EXPECT_TRUE(
         errorInjectionSensor->invoke(pdiMethod(errorInjectionModeEnabled)));
@@ -1591,10 +1591,8 @@ TEST_F(NsmProcessorTest, goodTestCreateErrorInjectionSensors)
     EXPECT_EQ(NSM_SW_SUCCESS, rc);
 
     gpu->isDeviceActive = true;
-    EXPECT_CALL(mockManager, postPatchNsmCommand)
-        .WillOnce(mockPostPatchNsmCommand(setEnableResponse));
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
-        .WillOnce(mockSendRecvNsmMsg(enableResponse));
+    EXPECT_CALL(*gpu, postPatchIO).WillOnce(mockPostPatchIO(setEnableResponse));
+    EXPECT_CALL(*gpu, sensorIO).WillOnce(mockSensorIO(enableResponse));
     const AsyncSetOperationValueType value{};
     auto dispatcher =
         AsyncOperationManager::getInstance()->getDispatcher(thermalErrorsPath);
@@ -1628,7 +1626,7 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     createNsmProcessorSensor(mockManager, basicIntfName + ".MemCapacityUtil",
                              objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = devices.back();
+    gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
     EXPECT_EQ(1, gpu->deviceSensors.size());
     EXPECT_EQ(1, gpu->longRunningSensors.size());
 
@@ -1732,13 +1730,13 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
     auto serialNumberResponse = response("NV1234567890");
     auto modelResponse = response("NVIDIA B200");
 
-    EXPECT_CALL(mockManager, SendRecvNsmMsg)
+    EXPECT_CALL(*gpu, sensorIO)
         .Times(2)
-        .WillOnce(mockSendRecvNsmMsg(serialNumberResponse))
-        .WillOnce(mockSendRecvNsmMsg(modelResponse));
+        .WillOnce(mockSensorIO(serialNumberResponse))
+        .WillOnce(mockSensorIO(modelResponse));
 
-    serialNumberSensor->update(mockManager, eid);
-    modelSensor->update(mockManager, eid);
+    serialNumberSensor->update(gpu).detach();
+    modelSensor->update(gpu).detach();
 
     EXPECT_EQ("NV1234567890",
               serialNumberSensor->invoke(pdiMethod(serialNumber)));
@@ -1807,14 +1805,27 @@ TEST(nsmTotalNvLinks, BadHandleResp)
     EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
 
-TEST_F(NsmProcessorTest, TearDown)
+// Also add this at the end of the file to clean up after all tests
+class NsmProcessorTestEnvironment : public ::testing::Environment
 {
-    // Ensure all async operations complete
-    AsyncOperationManager::getInstance()->dispatchers.clear();
+  public:
+    void TearDown() override
+    {
+        // Final cleanup after all tests
+        if (nsm::gpu)
+        {
+            // Verify any remaining expectations
+            ::testing::Mock::VerifyAndClearExpectations(nsm::gpu.get());
+        }
+        nsm::gpu.reset();
+        nsm::devices.clear();
+    }
+};
 
-    // Clear device references
-    devices.clear();
-
-    // Reset mock expectations
-    ::testing::Mock::VerifyAndClearExpectations(&mockManager);
+// Register the environment
+static bool registerEnvironment()
+{
+    ::testing::AddGlobalTestEnvironment(new NsmProcessorTestEnvironment);
+    return true;
 }
+static bool environmentRegistered = registerEnvironment();

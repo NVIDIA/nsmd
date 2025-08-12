@@ -39,8 +39,8 @@ class NsmAsyncSensor : public NsmSensor
         return value == nullptr ? T{} : std::get<T>(*value);
     }
 
-    virtual requester::Coroutine update(SensorManager& manager,
-                                        eid_t eid) override;
+    virtual requester::Coroutine
+        update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   private:
     const AsyncSetOperationValueType* value = nullptr;

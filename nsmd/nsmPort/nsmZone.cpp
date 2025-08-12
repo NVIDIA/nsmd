@@ -81,7 +81,7 @@ static requester::Coroutine createNsmZones(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    nsmDevice->deviceSensors.push_back(fabricsZoneSensor);
+    nsmDevice->getDeviceSensors().push_back(fabricsZoneSensor);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

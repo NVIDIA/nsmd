@@ -634,8 +634,7 @@ NsmPowerSmoothingAction::NsmPowerSmoothingAction(
 requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
     AsyncOperationStatusType* status, uint16_t& profileID)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     lg2::info(
         "requestActivatePresetProfile for EID: {EID}, with  profile Id: {PROFILEID}",
         "EID", eid, "PROFILEID", profileID);
@@ -657,12 +656,12 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestActivatePresetProfile postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
+            "requestActivatePresetProfile postPatchIO failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -676,7 +675,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestActivatePresetProfile(
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // updating current profile after activating a profile
-        currentProfile->update(manager, eid);
+        currentProfile->update(device);
         lg2::info("requestActivatePresetProfile for EID: {EID} completed",
                   "EID", eid);
     }
@@ -725,8 +724,7 @@ sdbusplus::message::object_path
 requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     AsyncOperationStatusType* status)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
     lg2::info("requestApplyAdminOverride for EID: {EID}", "EID", eid);
@@ -745,12 +743,12 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc_ = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                                    responseLen);
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
     if (rc_)
     {
         lg2::error(
-            "requestApplyAdminOverride postPatchNsmCommand failed for for eid = {EID} rc = {RC}",
+            "requestApplyAdminOverride postPatchIO failed for for eid = {EID} rc = {RC}",
             "EID", eid, "RC", rc_);
         *status = AsyncOperationStatusType::WriteFailure;
         co_return NSM_SW_ERROR_COMMAND_FAIL;
@@ -764,7 +762,7 @@ requester::Coroutine NsmPowerSmoothingAction::requestApplyAdminOverride(
     if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
     {
         // updating current profile after activating a profile
-        currentProfile->update(manager, eid);
+        currentProfile->update(device);
         lg2::info("requestApplyAdminOverride for EID: {EID} completed", "EID",
                   eid);
     }

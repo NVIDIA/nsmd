@@ -27,7 +27,7 @@ class NsmCommandCodes : public NsmObject
         NsmObject(name, type), messageType(messageType), nsmDevice(nsmDevice)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override
+    requester::Coroutine update(std::shared_ptr<NsmDevice> device) override
     {
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_get_supported_command_codes_req));
@@ -38,20 +38,20 @@ class NsmCommandCodes : public NsmObject
         if (rc != NSM_SW_SUCCESS)
         {
             lg2::error("getSupportedCommandCodes failed. eid={EID} rc={RC}",
-                       "EID", eid, "RC", rc);
+                       "EID", device->getEid(), "RC", rc);
             // coverity[missing_return]
             co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen, true);
+        rc = co_await device->sensorIO(device->getEid(), request, responseMsg,
+                                       responseLen, true);
         if (rc)
         {
             lg2::error(
                 "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", rc, "EID", device->getEid());
             // coverity[missing_return]
             co_return rc;
         }
@@ -66,17 +66,13 @@ class NsmCommandCodes : public NsmObject
         {
             lg2::error(
                 "get supported command code decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-                "EID", nsmDevice.eid, "CC", cc, "REASONCODE", reason_code, "RC",
-                rc);
+                "EID", device->getEid(), "CC", cc, "REASONCODE", reason_code,
+                "RC", rc);
             // coverity[missing_return]
             co_return cc ? cc : rc;
         }
-        for (size_t i = 0; i < SUPPORTED_COMMAND_CODE_DATA_SIZE * 8; i++)
-        {
-            auto isSupported = supportedCommands[i / 8].byte & (1 << (i % 8));
-            nsmDevice.messageTypesToCommandCodeMatrix[messageType][i] =
-                isSupported;
-        }
+        device->updateMessageTypesToCommandCodeMatrix(
+            messageType, supportedCommands, SUPPORTED_COMMAND_CODE_DATA_SIZE);
 
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;
@@ -98,7 +94,7 @@ class NsmMsgTypes : public NsmObject
         NsmObject(name, type), nsmDevice(nsmDevice)
     {}
 
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override
+    requester::Coroutine update(std::shared_ptr<NsmDevice> device) override
     {
         Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_get_supported_nvidia_message_types_req));
@@ -109,20 +105,20 @@ class NsmMsgTypes : public NsmObject
         {
             lg2::error(
                 "Failed to encode get supported nvidia message types request, rc={RC}, eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", rc, "EID", device->getEid());
             // coverity[missing_return]
             co_return rc;
         }
 
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen, true);
+        rc = co_await device->sensorIO(device->getEid(), request, responseMsg,
+                                       responseLen, true);
         if (rc)
         {
             lg2::error(
                 "NsmGetEventConfig SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-                "RC", rc, "EID", eid);
+                "RC", rc, "EID", device->getEid());
             // coverity[missing_return]
             co_return rc;
         }
@@ -136,8 +132,8 @@ class NsmMsgTypes : public NsmObject
         {
             lg2::error(
                 "get supported msg type decode failed. eid={EID} cc={CC} reasonCode={REASONCODE} and rc={RC}",
-                "EID", nsmDevice.eid, "CC", cc, "REASONCODE", reasonCode, "RC",
-                rc);
+                "EID", device->getEid(), "CC", cc, "REASONCODE", reasonCode,
+                "RC", rc);
             // coverity[missing_return]
             co_return cc ? cc : rc;
         }
@@ -155,7 +151,7 @@ class NsmMsgTypes : public NsmObject
                     "NSM_NVIDIA_MESSAGE_TYPE_" + std::to_string(i), nsmDevice,
                     i);
                 commandCodesSensors[i] = sensor;
-                nsmDevice.addSensor(sensor, false);
+                device->addSensor(sensor, false);
             }
         }
 

@@ -6,7 +6,6 @@ sources = [
     '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',
     '../requester/request_timeout_tracker.cpp',
-    'deviceManager.cpp',
     'sensorManager.cpp',
     'socket_handler.cpp',
     'nsmDevice.cpp',

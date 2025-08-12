@@ -55,27 +55,6 @@ class SensorManager
     {}
     virtual ~SensorManager() = default;
 
-    /** @brief Send request NSM message to eid by blocking socket API
-     * directly. The function will return when received the response message
-     * from NSM device. Unlike SendRecvNsmMsg, there is no retry of sending
-     *         request.
-     *
-     *  @param[in] eid endpoint ID
-     *  @param[in] request request NSM message
-     *  @param[out] responseMsg response NSM message
-     *  @param[out] responseLen length of response NSM message
-     *  @return return_value - nsm_requester_error_codes
-     */
-    virtual requester::Coroutine
-        SendRecvNsmMsg(eid_t eid, Request& request,
-                       std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen,
-                       bool bypassCommandCheck = false) = 0;
-    virtual requester::Coroutine
-        postPatchNsmCommand(eid_t eid, Request& request,
-                            std::shared_ptr<const nsm_msg>& responseMsg,
-                            size_t& responseLen) = 0;
-
     virtual eid_t getEid(std::shared_ptr<NsmDevice> nsmDevice) = 0;
     virtual sdbusplus::asio::object_server& getObjServer() = 0;
     eid_t getLocalEid()
@@ -183,8 +162,6 @@ class SensorManagerImpl : public SensorManager
     void gpioStatusPropertyChangedHandler(sdbusplus::message::message& msg);
 #endif
     requester::Coroutine
-        tryActivateDevice(std::shared_ptr<NsmDevice> nsmDevice);
-    requester::Coroutine
         refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice);
     requester::Coroutine
         pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice);
@@ -197,16 +174,6 @@ class SensorManagerImpl : public SensorManager
         updateLongRunningSensor(std::shared_ptr<NsmDevice> nsmDevice,
                                 std::shared_ptr<NsmObject> sensor,
                                 std::shared_ptr<LimitedSensorQueue> sensors);
-
-    requester::Coroutine
-        SendRecvNsmMsg(eid_t eid, Request& request,
-                       std::shared_ptr<const nsm_msg>& responseMsg,
-                       size_t& responseLen,
-                       bool bypassCommandCheck = false) override;
-    requester::Coroutine
-        postPatchNsmCommand(eid_t eid, Request& request,
-                            std::shared_ptr<const nsm_msg>& responseMsg,
-                            size_t& responseLen) override;
 
     std::shared_ptr<NsmDevice> getNsmDeviceFromStaticUUID(uuid_t uuid) override;
     std::shared_ptr<NsmDevice> getNsmDevice(uint8_t deviceType,

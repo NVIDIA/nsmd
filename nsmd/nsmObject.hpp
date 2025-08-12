@@ -39,7 +39,7 @@ static constexpr const uint64_t LONG_RUNNING_REFRESH_LIMIT_IN_USEC =
 namespace nsm
 {
 
-class SensorManager;
+class NsmDevice;
 class NsmObject : virtual public StateChangeLogger
 {
   public:
@@ -73,8 +73,8 @@ class NsmObject : virtual public StateChangeLogger
         return (deltaInUsec > refreshLimitInUsec);
     }
 
-    virtual requester::Coroutine update([[maybe_unused]] SensorManager& manager,
-                                        [[maybe_unused]] eid_t eid)
+    virtual requester::Coroutine
+        update([[maybe_unused]] std::shared_ptr<NsmDevice> nsmDevice)
     {
         // coverity[missing_return]
         co_return NSM_SW_SUCCESS;

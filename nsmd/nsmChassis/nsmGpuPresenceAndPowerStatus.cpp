@@ -39,7 +39,7 @@ NsmGpuPresenceAndPowerStatus::NsmGpuPresenceAndPowerStatus(
 }
 
 requester::Coroutine
-    NsmGpuPresenceAndPowerStatus::update(SensorManager& manager, eid_t eid)
+    NsmGpuPresenceAndPowerStatus::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     uint8_t rc = NSM_SW_SUCCESS;
     for (int state = int(State::GetPresence);
@@ -51,7 +51,7 @@ requester::Coroutine
             dynamic_pointer_cast<NsmGpuPresenceAndPowerStatus>(sensor)->state =
                 this->state;
         }
-        rc = co_await NsmSensor::update(manager, eid);
+        rc = co_await NsmSensor::update(nsmDevice);
     }
 
     if (rc != NSM_SW_SUCCESS)

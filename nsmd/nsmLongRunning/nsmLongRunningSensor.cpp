@@ -35,27 +35,28 @@ NsmLongRunningSensor::NsmLongRunningSensor(const std::string& name,
     device(device), messageType(messageType), commandCode(commandCode)
 {}
 
-requester::Coroutine NsmLongRunningSensor::update(SensorManager& manager,
-                                                  eid_t eid)
+requester::Coroutine
+    NsmLongRunningSensor::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     uint8_t rc = NSM_SW_SUCCESS;
 
     // Acquire the semaphore before proceeding
-    co_await device->getSemaphore().acquire(eid);
+    co_await device->getSemaphore().acquire(nsmDevice->getEid());
     // by default command will be treated as long running
     isLongRunning = true;
     // Register the active handler in the device with messageType and
     // commandCode
     device->registerLongRunningHandler(messageType, commandCode,
                                        shared_from_this());
-    rc = co_await NsmLongRunningSensor::updateLongRunningSensor(manager, eid);
+    rc = co_await NsmLongRunningSensor::updateLongRunningSensor(nsmDevice);
     if (rc == NSM_SW_SUCCESS && isLongRunning)
     {
         // if(isLongRunning) means event will be there as second response
         rc = co_await timer;
         LG2_ERROR_FLT(
             "NsmLongRunningSensor::update: LongRunning timer failed, rc={RC}, name={NAME}, eid={EID}",
-            "RC", nsm_sw_codes(rc), "NAME", NsmSensor::getName(), "EID", eid);
+            "RC", nsm_sw_codes(rc), "NAME", NsmSensor::getName(), "EID",
+            nsmDevice->getEid());
     }
 
     // Unregister the active handler in the device
@@ -68,30 +69,29 @@ requester::Coroutine NsmLongRunningSensor::update(SensorManager& manager,
 }
 
 // function for handling first response of long running request
-requester::Coroutine
-    NsmLongRunningSensor::updateLongRunningSensor(SensorManager& manager,
-                                                  eid_t eid)
+requester::Coroutine NsmLongRunningSensor::updateLongRunningSensor(
+    std::shared_ptr<NsmDevice> nsmDevice)
 {
-    auto requestMsg = genRequestMsg(eid, 0);
+    auto requestMsg = genRequestMsg(nsmDevice->getEid(), 0);
     if (!requestMsg.has_value())
     {
         lg2::error(
             "NsmLongRunningSensor::updateLongRunningSensor: genRequestMsg failed, name={NAME}, eid={EID}",
-            "NAME", NsmSensor::getName(), "EID", eid);
+            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return NSM_SW_ERROR;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto rc = co_await manager.SendRecvNsmMsg(eid, *requestMsg, responseMsg,
-                                              responseLen);
+    auto rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *requestMsg,
+                                           responseMsg, responseLen, false);
 
     if (rc)
     {
         lg2::debug(
             "NsmLongRunningSensor::updateLongRunningSensor: SendRecvNsmMsg failed, name={NAME}, eid={EID}",
-            "NAME", NsmSensor::getName(), "EID", eid);
+            "NAME", NsmSensor::getName(), "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }

@@ -20,7 +20,7 @@
 #include "pci-links.h"
 #include "platform-environmental.h"
 
-#include "deviceManager.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
 #endif
@@ -90,7 +90,7 @@ class NsmMemoryCapacityUtil :
     std::shared_ptr<NsmTotalMemory> totalMemory;
     void updateReading(const struct nsm_memory_capacity_utilization& data);
     void updateMetricOnSharedMemory();
-    requester::Coroutine update(SensorManager& manager, eid_t eid);
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice);
 };
 
 using CpuOperatingConfigIntf =
@@ -102,7 +102,7 @@ class NsmMinGraphicsClockLimit : public NsmObject
         std::string& name, std::string& type,
         std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
         std::string& inventoryObjPath);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     void updateMetricOnSharedMemory() override;
 
@@ -118,7 +118,7 @@ class NsmMaxGraphicsClockLimit : public NsmObject
         std::string& name, std::string& type,
         std::shared_ptr<CpuOperatingConfigIntf> cpuConfigIntf,
         std::string& inventoryObjPath);
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
     void updateMetricOnSharedMemory() override;
 
@@ -128,7 +128,6 @@ class NsmMaxGraphicsClockLimit : public NsmObject
 };
 
 class SensorManager;
-class DeviceManager;
 /**
  * @brief Gets the device UUID from a device at the specified EID
  *
@@ -138,13 +137,13 @@ class DeviceManager;
  *
  * @param manager Reference to the SensorManager instance
  * @param eid The endpoint ID of the device to query
- * @param deviceManager Reference to the DeviceManager instance
+ * @param mctpDiscovery Reference to the MctpDiscovery instance
  * @param[out] uuid The UUID string to be populated. Empty string on error.
  * @return Coroutine that resolves to NSM_SW_SUCCESS on success, error code
  * otherwise
  */
-requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
-                                   DeviceManager& deviceManager,
+requester::Coroutine getDeviceUUID(std::shared_ptr<NsmDevice> nsmDevice,
+                                   mctp::MctpDiscovery& mctpDiscovery,
                                    std::string& uuid);
 
 } // namespace nsm

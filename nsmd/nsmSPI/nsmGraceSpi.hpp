@@ -58,33 +58,33 @@ class NsmGraceSpiObject : public NsmObject, public SpiIntf
     uint8_t startSpiOperation();
     void finishSpiOperation(SpiProgress::OperationStatus opProgress);
 
-    requester::Coroutine checkSpiStatus(SensorManager& manager, eid_t eid,
+    requester::Coroutine checkSpiStatus(std::shared_ptr<NsmDevice> device,
                                         enum nsm_spi_status* status);
-    requester::Coroutine checkIfWriteComplete(SensorManager& manager, eid_t,
+    requester::Coroutine checkIfWriteComplete(std::shared_ptr<NsmDevice> device,
                                               bool* writeComplete);
 
-    requester::Coroutine executeSpiTransaction(SensorManager& manager,
-                                               eid_t eid, uint16_t writeBytes,
-                                               uint16_t readBytes = 0);
+    requester::Coroutine
+        executeSpiTransaction(std::shared_ptr<NsmDevice> device,
+                              uint16_t writeBytes, uint16_t readBytes = 0);
 
-    requester::Coroutine sendSpiDataRequest(SensorManager& manager, eid_t eid,
+    requester::Coroutine sendSpiDataRequest(std::shared_ptr<NsmDevice> device,
                                             enum nsm_spi_command command);
 
-    requester::Coroutine setSpiWriteEnable(SensorManager& manager, eid_t eid);
-    requester::Coroutine setSpi4ByteAddressMode(SensorManager& manager,
-                                                eid_t eid);
-    requester::Coroutine eraseBlock(SensorManager& manager, eid_t eid,
+    requester::Coroutine setSpiWriteEnable(std::shared_ptr<NsmDevice> device);
+    requester::Coroutine
+        setSpi4ByteAddressMode(std::shared_ptr<NsmDevice> device);
+    requester::Coroutine eraseBlock(std::shared_ptr<NsmDevice> device,
                                     uint32_t blockAddress);
 
-    requester::Coroutine readToCache(SensorManager& manager, eid_t eid,
+    requester::Coroutine readToCache(std::shared_ptr<NsmDevice> device,
                                      uint32_t blockAddress);
-    requester::Coroutine transferCacheToFile(SensorManager& manager, eid_t eid,
+    requester::Coroutine transferCacheToFile(std::shared_ptr<NsmDevice> device,
                                              int fileDesc);
 
-    requester::Coroutine requestSpiStatusRegister(SensorManager& manager,
-                                                  eid_t eid);
+    requester::Coroutine
+        requestSpiStatusRegister(std::shared_ptr<NsmDevice> device);
 
-    requester::Coroutine initSpi(SensorManager& manager, eid_t eid);
+    requester::Coroutine initSpi(std::shared_ptr<NsmDevice> device);
 
     requester::Coroutine eraseSpiAsyncHandler();
     requester::Coroutine readSpiAsyncHandler();

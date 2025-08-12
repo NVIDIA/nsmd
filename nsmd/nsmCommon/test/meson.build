@@ -5,7 +5,6 @@ dep_src_files = [
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
-    '../../deviceManager.cpp',
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
@@ -22,6 +21,7 @@ dep_src_files = [
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 dep_src_headers = [

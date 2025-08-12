@@ -50,7 +50,7 @@ class NsmNumericAggregator : public NsmSensorAggregator
 
     bool priority;
     // Override the update function
-    requester::Coroutine update(SensorManager& manager, eid_t eid) override;
+    requester::Coroutine update(std::shared_ptr<NsmDevice> nsmDevice) override;
 
   protected:
     int updateSensorReading(uint8_t tag, double reading,

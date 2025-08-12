@@ -30,9 +30,9 @@ enum class clockLimitFlag
 };
 
 requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
-                                              eid_t eid)
+                                              std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
+    auto eid = device->getEid();
     uint8_t propertyIdentifier = MINIMUM_GRAPHICS_CLOCK_LIMIT;
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_inventory_information_req));
@@ -50,11 +50,10 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
-        lg2::error("getMinGraphicsClockLimit: postPatchNsmCommand failed. "
+        lg2::error("getMinGraphicsClockLimit: postPatchIO failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -87,9 +86,9 @@ requester::Coroutine getMinGraphicsClockLimit(uint32_t& minClockLimit,
 }
 
 requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
-                                              eid_t eid)
+                                              std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
+    auto eid = device->getEid();
     uint8_t propertyIdentifier = MAXIMUM_GRAPHICS_CLOCK_LIMIT;
     std::vector<uint8_t> request(sizeof(nsm_msg_hdr) +
                                  sizeof(nsm_get_inventory_information_req));
@@ -107,11 +106,10 @@ requester::Coroutine getMaxGraphicsClockLimit(uint32_t& maxClockLimit,
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
-        lg2::error("getMaxGraphicsClockLimit: postPatchNsmCommand failed. "
+        lg2::error("getMaxGraphicsClockLimit: postPatchIO failed. "
                    "eid={EID} rc={RC}",
                    "EID", eid, "RC", rc);
         // coverity[missing_return]
@@ -148,14 +146,13 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
                                            AsyncOperationStatusType* status,
                                            std::shared_ptr<NsmDevice> device)
 {
-    SensorManager& manager = SensorManager::getInstance();
-    auto eid = manager.getEid(device);
+    auto eid = device->getEid();
 
     Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_set_clock_limit_req));
     auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
 
     uint32_t minClockLimit;
-    auto rc = co_await getMinGraphicsClockLimit(minClockLimit, eid);
+    auto rc = co_await getMinGraphicsClockLimit(minClockLimit, device);
     if (rc)
     {
         lg2::error(
@@ -167,7 +164,7 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
     }
 
     uint32_t maxClockLimit;
-    rc = co_await getMaxGraphicsClockLimit(maxClockLimit, eid);
+    rc = co_await getMaxGraphicsClockLimit(maxClockLimit, device);
     if (rc)
     {
         lg2::error(
@@ -218,12 +215,11 @@ requester::Coroutine setClockLimitOnDevice(uint8_t clockId, bool speedLocked,
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.postPatchNsmCommand(eid, request, responseMsg,
-                                              responseLen);
+    rc = co_await device->postPatchIO(eid, request, responseMsg, responseLen);
     if (rc)
     {
         lg2::error(
-            "setClockLimitOnDevice postPatchNsmCommand failed for while setting clock limits "
+            "setClockLimitOnDevice postPatchIO failed for while setting clock limits "
             "eid={EID} rc={RC}",
             "EID", eid, "RC", rc);
 

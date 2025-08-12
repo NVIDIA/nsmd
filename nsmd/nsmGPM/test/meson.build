@@ -6,7 +6,6 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../sensorManager.cpp',
     '../../nsmEvent.cpp',
-    '../../deviceManager.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
@@ -17,6 +16,7 @@ dep_src_files = [
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
+    '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
 if get_option('shmem').enabled()

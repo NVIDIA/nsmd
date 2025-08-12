@@ -139,7 +139,7 @@ requester::Coroutine
             name, manager, dataIndex, pdiObjPath);
         auto writeProtectControl = std::make_shared<NsmWriteProtectedControl>(
             *settingsIntf, dataIndex);
-        device->deviceSensors.emplace_back(settingsIntf);
+        device->getDeviceSensors().emplace_back(settingsIntf);
         device->addSensor(writeProtectControl, false);
 
         auto& asyncDispatcher =

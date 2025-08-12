@@ -18,13 +18,14 @@
 
 #include "platform-environmental.h"
 
-#include "deviceManager.hpp"
 #include "log.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
+#include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "stateChangeLogger.hpp"
 
+#include <nsmd/sensorManager.hpp>
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
@@ -200,11 +201,11 @@ uint8_t
 
     return cc ? cc : rc;
 }
-requester::Coroutine NsmMemoryCapacityUtil::update(SensorManager& manager,
-                                                   eid_t eid)
+requester::Coroutine
+    NsmMemoryCapacityUtil::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
-    auto rc = co_await totalMemory->update(manager, eid);
-    rc = co_await NsmLongRunningSensor::update(manager, eid);
+    auto rc = co_await totalMemory->update(nsmDevice);
+    rc = co_await NsmLongRunningSensor::update(nsmDevice);
     // coverity[missing_return]
     co_return rc;
 }
@@ -232,8 +233,8 @@ NsmMinGraphicsClockLimit::NsmMinGraphicsClockLimit(
     updateMetricOnSharedMemory();
 }
 
-requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
-                                                      eid_t eid)
+requester::Coroutine
+    NsmMinGraphicsClockLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -246,20 +247,20 @@ requester::Coroutine NsmMinGraphicsClockLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmMinGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
-            "NsmMinGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "NsmMinGraphicsClockLimit sensorIO failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -320,8 +321,8 @@ NsmMaxGraphicsClockLimit::NsmMaxGraphicsClockLimit(
     updateMetricOnSharedMemory();
 }
 
-requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
-                                                      eid_t eid)
+requester::Coroutine
+    NsmMaxGraphicsClockLimit::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
@@ -334,20 +335,20 @@ requester::Coroutine NsmMaxGraphicsClockLimit::update(SensorManager& manager,
     {
         lg2::debug(
             "NsmMaxGraphicsClockLimit encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-            "EID", eid, "RC", rc);
+            "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
 
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                         responseLen);
+    rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request, responseMsg,
+                                      responseLen, false);
     if (rc)
     {
         lg2::debug(
-            "NsmMaxGraphicsClockLimit SendRecvNsmMsg failed with RC={RC}, eid={EID}",
-            "RC", rc, "EID", eid);
+            "NsmMaxGraphicsClockLimit sensorIO failed with RC={RC}, eid={EID}",
+            "RC", rc, "EID", nsmDevice->getEid());
         // coverity[missing_return]
         co_return rc;
     }
@@ -395,11 +396,12 @@ void NsmMaxGraphicsClockLimit::updateMetricOnSharedMemory()
 #endif
 }
 
-requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
-                                   DeviceManager& deviceManager, uuid_t& uuid)
+requester::Coroutine
+    getDeviceUUID(std::shared_ptr<NsmDevice> nsmDevice,
+                  [[maybe_unused]] mctp::MctpDiscovery& mctpDiscovery,
+                  uuid_t& uuid)
 {
     static std::map<eid_t, StateChangeLogger> loggers;
-    auto nsmDevice = deviceManager.getNsmDeviceFromEid(eid);
     if (nsmDevice)
     {
         // Scenario 1:
@@ -410,8 +412,8 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
         {
             lg2::info(
                 "getDeviceUUID::baseboard/FPGA, using mctp uuid eid={EID}",
-                "EID", eid);
-            uuid = nsmDevice->uuid;
+                "EID", nsmDevice->getEid());
+            uuid = nsmDevice->getUuid();
             nsmDevice->deviceUuid = uuid;
             co_return NSM_SW_SUCCESS;
         }
@@ -428,15 +430,15 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
         {
             lg2::debug(
                 "getDeviceUUID::encode_get_inventory_information_req failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", nsmDevice->getEid(), "RC", rc);
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
         // Send request and get response
         std::shared_ptr<const nsm_msg> responseMsg;
         size_t responseLen = 0;
-        rc = co_await manager.SendRecvNsmMsg(eid, request, responseMsg,
-                                             responseLen);
+        rc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), request,
+                                          responseMsg, responseLen, false);
         if (rc)
         {
             // Scenario 2: MessageType 3 or Get Inventory is itself not
@@ -445,16 +447,15 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
             {
                 // inside this block means Get Inventory is not supported
                 // so fallback to mctp uuid
-                uuid = nsmDevice->uuid;
+                uuid = nsmDevice->getUuid();
                 nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
                 lg2::info(
-                    "getDeviceUUID::SendRecvNsmMsg failed with rc not supported, assinging mctp uuid eid={EID} rc={RC}",
-                    "EID", eid, "RC", rc);
+                    "getDeviceUUID::sensorIO failed with rc not supported, assinging mctp uuid eid={EID} rc={RC}",
+                    "EID", nsmDevice->getEid(), "RC", rc);
                 co_return NSM_SW_SUCCESS;
             }
-            lg2::error(
-                "getDeviceUUID::SendRecvNsmMsg failed. eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+            lg2::error("getDeviceUUID::sensorIO failed. eid={EID} rc={RC}",
+                       "EID", nsmDevice->getEid(), "RC", rc);
             co_return rc;
         }
 
@@ -468,13 +469,14 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
             responseMsg.get(), responseLen, &cc, &reason_code, &dataSize,
             data.data());
 
-        if (loggers[eid].shouldLog(
+        if (loggers[nsmDevice->getEid()].shouldLog(
                 "getDeviceUUID::decode_get_inventory_information_resp",
                 reason_code, cc, rc))
         {
             lg2::error(
                 "getDeviceUUID::decode_get_inventory_information_resp failed. eid={EID} cc={CC} reasonCode={REASONCODE} rc={RC}",
-                "EID", eid, "CC", cc, "REASONCODE", reason_code, "RC", rc);
+                "EID", nsmDevice->getEid(), "CC", cc, "REASONCODE", reason_code,
+                "RC", rc);
             co_return NSM_SW_ERROR_COMMAND_FAIL;
         }
 
@@ -485,7 +487,7 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
             {
                 lg2::error(
                     "getDeviceUUID::decode_get_inventory_information_resp invalid property data. eid={EID} property={PROP}",
-                    "EID", eid, "PROP", DEVICE_GUID);
+                    "EID", nsmDevice->getEid(), "PROP", DEVICE_GUID);
                 co_return NSM_SW_ERROR_LENGTH;
             }
             memcpy(nvu8ArrVal.data(), data.data(), dataSize);
@@ -494,14 +496,14 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
             {
                 lg2::error(
                     "getDeviceUUID::getInventoryInformation received incorrect GUID for property={PROP} for eid={EID}",
-                    "PROP", DEVICE_GUID, "EID", eid);
+                    "PROP", DEVICE_GUID, "EID", nsmDevice->getEid());
                 co_return NSM_SW_ERROR_COMMAND_FAIL;
             }
 
             nsmDevice->deviceUuid = uuid;
             lg2::info(
                 "getDeviceUUID::SendRecvNsmMsg pass assinging device uuid from getInventory command eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
+                "EID", nsmDevice->getEid(), "RC", rc);
             co_return NSM_SW_SUCCESS;
         }
         // Case 3: Type 3 Get Inventory information is supported but
@@ -514,8 +516,8 @@ requester::Coroutine getDeviceUUID(SensorManager& manager, eid_t eid,
             // so fallback to mctp uuid
             lg2::info(
                 "getDeviceUUID::Got CC value as invalid data, assinging mctp uuid eid={EID} rc={RC}",
-                "EID", eid, "RC", rc);
-            uuid = nsmDevice->uuid;
+                "EID", nsmDevice->getEid(), "RC", rc);
+            uuid = nsmDevice->getUuid();
             nsmDevice->deviceUuid = uuid; // falling back to mctp uuid
             co_return NSM_SW_SUCCESS;
         }
