@@ -1,4 +1,8 @@
-sources += ['nsmCommon/nsmCommon.cpp', 'nsmCommon/sharedMemCommon.cpp']
+sources += ['nsmCommon/nsmCommon.cpp']
+
+if get_option('shmem').enabled()
+    sources += 'nsmCommon/sharedMemCommon.cpp'
+endif
 
 nsmd_headers += ['.', '..', 'nsmCommon']
 

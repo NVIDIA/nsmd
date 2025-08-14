@@ -7,7 +7,6 @@ dep_src_files = [
     '../nsmEvent.cpp',
     '../deviceManager.cpp',
     '../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../nsmCommon/sharedMemCommon.cpp',
     '../nsmFwSwInventory/GPUSWInventory.cpp',
     '../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../socket_handler.cpp',
@@ -23,6 +22,10 @@ dep_src_files = [
     '../../libnsm/requester/mctp.c',
     '../../requester/request_timeout_tracker.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',

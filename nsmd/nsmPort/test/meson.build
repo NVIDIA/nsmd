@@ -12,7 +12,6 @@ dep_src_files = [
     '../../deviceManager.cpp',
     '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmHistograms/nsmHistogramInfo.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
     '../../../common/utils.cpp',
@@ -29,6 +28,10 @@ dep_src_files = [
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmSensorAggregator.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',

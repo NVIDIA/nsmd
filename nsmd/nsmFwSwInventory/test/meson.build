@@ -2,7 +2,6 @@ dep_src_files = [
     '../NVLinkManagementNICSWInventory.cpp',
     '../nsmFirmwareInventory.cpp',
     '../nsmWriteProtectedControl.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmDevice.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
@@ -27,6 +26,10 @@ dep_src_files = [
     '../../../requester/request_timeout_tracker.cpp',
     '../GPUSWInventory.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',
@@ -57,10 +60,13 @@ tests_deps = [
     sdbusplus,
     sdeventplus,
     phosphor_logging,
-    nvidia_shmem,
     gtest,
     gmock,
 ]
+
+if get_option('shmem').enabled()
+    tests_deps += dependency('nvidia-tal', required: true)
+endif
 
 foreach t : tests
     test(

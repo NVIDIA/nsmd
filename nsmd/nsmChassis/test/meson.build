@@ -11,7 +11,6 @@ dep_src_files = [
     '../nsmWriteProtectedJumper.cpp',
     '../nsmAERError.cpp',
     '../../nsmSensorAggregator.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
@@ -44,6 +43,10 @@ dep_src_files = [
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmProcessor/nsmOemResetStatistics.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',
@@ -84,10 +87,13 @@ tests_deps = [
     sdbusplus,
     sdeventplus,
     phosphor_logging,
-    nvidia_shmem,
     gtest,
     gmock,
 ]
+
+if get_option('shmem').enabled()
+    tests_deps += dependency('nvidia-tal', required: true)
+endif
 
 foreach t : tests
     test(

@@ -9,7 +9,7 @@ option(
     'shmem',
     type: 'feature',
     description: 'Use NVIDIA Shared-Memory IPC',
-    value: 'disabled',
+    value: 'enabled',
 )
 option(
     'reset-metrics',

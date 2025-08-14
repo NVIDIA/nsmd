@@ -2,7 +2,6 @@ dep_src_files = [
     '../nsmMemory.cpp',
     '../../nsmDevice.cpp',
     '../../nsmCommon/nsmCommon.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../deviceManager.cpp',
@@ -23,6 +22,10 @@ dep_src_files = [
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
 
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
+
 dep_src_headers = [
     '.',
     '..',
@@ -42,6 +45,19 @@ test_src = declare_dependency(
 )
 
 tests = ['nsmMemory_test']
+tests_deps = [
+    test_src,
+    CLI11_dep,
+    nlohmann_json,
+    sdbusplus,
+    sdeventplus,
+    phosphor_logging,
+    gtest,
+    gmock,
+]
+if get_option('shmem').enabled()
+    tests_deps += dependency('nvidia-tal', required: true)
+endif
 
 foreach t : tests
     test(
@@ -52,17 +68,7 @@ foreach t : tests
             implicit_include_directories: false,
             link_args: dynamic_linker,
             build_rpath: '',
-            dependencies: [
-                test_src,
-                CLI11_dep,
-                nlohmann_json,
-                sdbusplus,
-                sdeventplus,
-                phosphor_logging,
-                nvidia_shmem,
-                gtest,
-                gmock,
-            ],
+            dependencies: tests_deps,
         ),
         workdir: meson.current_source_dir(),
     )

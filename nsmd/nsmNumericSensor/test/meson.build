@@ -26,7 +26,6 @@ dep_src_files = [
     '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
     '../../deviceManager.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
@@ -38,6 +37,10 @@ dep_src_files = [
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',

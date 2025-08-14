@@ -25,7 +25,6 @@ dep_src_files = [
     '../../nsmChassis/nsmWriteProtectedJumper.cpp',
     '../../nsmChassis/nsmAERError.cpp',
     '../../nsmCommon/nsmCommon.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmMemory/nsmMemory.cpp',
     '../../nsmPort/nsmPortDisableFuture.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
@@ -60,6 +59,10 @@ dep_src_files = [
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
 ]
+
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
 
 dep_src_headers = [
     '.',
