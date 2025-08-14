@@ -28,8 +28,10 @@ namespace nsm_shmem_utils
  * @param smbusData smbus data for the property
  * @param propValue dbus property value
  */
+
 void updateSharedMemoryOnSuccess(
     const std::string& inventoryObjPath, const std::string& ifaceName,
     const std::string& propName, std::vector<uint8_t>& smbusData,
     nv::sensor_aggregation::DbusVariantType propValue);
+
 } // namespace nsm_shmem_utils

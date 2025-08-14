@@ -22,7 +22,9 @@
 #include "asyncOperationManager.hpp"
 #include "nsmInterface.hpp"
 #include "sensorManager.hpp"
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
+#endif
 
 #include <com/nvidia/InbandReconfigSettings/server.hpp>
 

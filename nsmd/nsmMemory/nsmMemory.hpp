@@ -3,11 +3,12 @@
 #include "platform-environmental.h"
 
 #include "nsmCommon/nsmCommon.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 #include "nsmSensor.hpp"
 
 #include <com/nvidia/MemoryRowRemapping/server.hpp>
-#include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Location/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/LocationCode/server.hpp>

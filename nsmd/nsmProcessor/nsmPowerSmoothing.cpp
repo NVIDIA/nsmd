@@ -17,9 +17,9 @@
 #include "config.h"
 
 #include "nsmPowerSmoothing.hpp"
-
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
-
+#endif
 #include <cstdint>
 
 namespace nsm

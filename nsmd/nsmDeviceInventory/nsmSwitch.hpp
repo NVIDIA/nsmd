@@ -15,7 +15,6 @@
 #include <com/nvidia/PowerMode/server.hpp>
 #include <com/nvidia/SwitchIsolation/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
-#include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Control/Reset/server.hpp>

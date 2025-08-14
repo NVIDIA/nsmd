@@ -1,7 +1,10 @@
 #pragma once
 #include "platform-environmental.h"
-
+#ifdef NVIDIA_SHMEM
 #include "../nsmCommon/sharedMemCommon.hpp"
+
+#include <telemetry_mrd_producer.hpp>
+#endif
 #include "../nsmDbusIfaceOverride/nsmAssetIntf.hpp"
 #include "globals.hpp"
 #include "nsmDevice.hpp"
@@ -10,8 +13,6 @@
 #include "utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
-#include <tal.hpp>
-#include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
 #include <xyz/openbmc_project/Software/Version/server.hpp>

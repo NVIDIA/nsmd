@@ -24,7 +24,9 @@
 #include "nsmChassis/nsmPowerControl.hpp"
 #include "nsmClearPowerCapIface.hpp"
 #include "nsmCommon/nsmCommon.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 #include "nsmDebugInfo.hpp"
 #include "nsmEraseTrace.hpp"
 #include "nsmInterface.hpp"
@@ -49,7 +51,6 @@
 #include <com/nvidia/NVLink/NvLinkTotalCount/server.hpp>
 #include <com/nvidia/ResetCounters/ResetCounterMetricsSupported/server.hpp>
 #include <com/nvidia/SMUtilization/server.hpp>
-#include <tal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Control/Power/Persistency/server.hpp>

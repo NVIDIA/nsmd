@@ -16,13 +16,13 @@
  */
 
 #include "config.h"
-
+#ifdef NVIDIA_SHMEM
 #include "utils.hpp"
 
 #include <tal.hpp>
-
 namespace nsm_shmem_utils
 {
+
 void updateSharedMemoryOnSuccess(
     [[maybe_unused]] const std::string& inventoryObjPath,
     [[maybe_unused]] const std::string& ifaceName,
@@ -30,11 +30,11 @@ void updateSharedMemoryOnSuccess(
     [[maybe_unused]] std::vector<uint8_t>& smbusData,
     [[maybe_unused]] nv::sensor_aggregation::DbusVariantType propValue)
 {
-#ifdef NVIDIA_SHMEM
     auto timestamp = utils::getCurrentSteadyClockTimestamp();
     tal::TelemetryAggregator::updateTelemetry(inventoryObjPath, ifaceName,
                                               propName, smbusData, timestamp, 0,
                                               propValue);
-#endif
 }
+
 } // namespace nsm_shmem_utils
+#endif

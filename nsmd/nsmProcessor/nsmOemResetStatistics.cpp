@@ -16,9 +16,9 @@
  */
 
 #include "nsmOemResetStatistics.hpp"
-
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
-
+#endif
 #include <phosphor-logging/lg2.hpp>
 
 #include <stdexcept>

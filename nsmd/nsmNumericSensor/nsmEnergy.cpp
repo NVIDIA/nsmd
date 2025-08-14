@@ -25,7 +25,9 @@
 #include "nsmNumericSensorFactory.hpp"
 
 #include <phosphor-logging/lg2.hpp>
+#ifdef NVIDIA_SHMEM
 #include <telemetry_mrd_producer.hpp>
+#endif
 
 namespace nsm
 {

@@ -39,7 +39,9 @@
 #include "nsmManagers/nsmFabricManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
+#endif
 
 #include <unordered_map>
 

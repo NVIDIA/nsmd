@@ -3,7 +3,6 @@
 #include "libnsm/network-ports.h"
 
 #include "common/types.hpp"
-#include "nsmCommon/sharedMemCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmHistograms/nsmHistogramInfo.hpp"
 #include "nsmObjectFactory.hpp"
@@ -13,8 +12,11 @@
 #include <com/nvidia/Common/GUID/server.hpp>
 #include <nsmSensorAggregator.hpp>
 #include <phosphor-logging/lg2.hpp>
-#include <tal.hpp>
+#ifdef NVIDIA_SHMEM
+#include "nsmCommon/sharedMemCommon.hpp"
+
 #include <telemetry_mrd_producer.hpp>
+#endif
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PortState/server.hpp>

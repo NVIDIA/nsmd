@@ -23,9 +23,9 @@
 #include "utils.hpp"
 
 #include <endian.h>
-
+#ifdef NVIDIA_SHMEM
 #include <tal.hpp>
-
+#endif
 namespace nsm
 {
 #ifdef NVIDIA_SHMEM

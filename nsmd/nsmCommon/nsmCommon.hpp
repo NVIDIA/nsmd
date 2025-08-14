@@ -21,13 +21,14 @@
 #include "platform-environmental.h"
 
 #include "deviceManager.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 #include "nsmInterface.hpp"
 #include "nsmLongRunningSensor.hpp"
 #include "nsmSensor.hpp"
 #include "sensorManager.hpp"
 
-#include <telemetry_mrd_producer.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Cpu/OperatingConfig/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/MemoryMetrics/server.hpp>
 namespace nsm

@@ -48,12 +48,15 @@
 #include "nsmSetECCMode.hpp"
 #include "nsmSetEgmMode.hpp"
 #include "nsmWorkloadPowerProfile.hpp"
-#include "sharedMemCommon.hpp"
 
 #include <stdint.h>
 
 #include <phosphor-logging/lg2.hpp>
+#ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+
 #include <telemetry_mrd_producer.hpp>
+#endif
 
 #include <cstdint>
 #include <optional>

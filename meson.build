@@ -191,6 +191,12 @@ conf_data.set('MCTP_EID_TO_FILTER', get_option('mctp-eid-to-filter'))
 
 configure_file(output: 'config.h', configuration: conf_data)
 
+add_project_arguments(
+    '-include',
+    join_paths(meson.current_build_dir(), 'config.h'),
+    language: ['c', 'cpp'],
+)
+
 dynamic_linker = []
 
 deps = [

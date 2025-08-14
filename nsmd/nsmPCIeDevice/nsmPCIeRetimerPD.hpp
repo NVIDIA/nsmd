@@ -4,15 +4,18 @@
 
 #include "common/types.hpp"
 #include "globals.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 
 #include <sdbusplus/asio/object_server.hpp>
-#include <tal.hpp>
+#ifdef NVIDIA_SHMEM
 #include <telemetry_mrd_producer.hpp>
+#endif
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>

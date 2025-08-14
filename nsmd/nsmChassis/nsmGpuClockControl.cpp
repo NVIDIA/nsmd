@@ -22,7 +22,9 @@
 #include "sensorManager.hpp"
 
 #include <nsmCommon/nsmCommon.hpp>
+#ifdef NVIDIA_SHMEM
 #include <nsmCommon/sharedMemCommon.hpp>
+#endif
 #include <phosphor-logging/lg2.hpp>
 
 #include <cmath>

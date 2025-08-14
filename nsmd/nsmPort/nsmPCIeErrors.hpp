@@ -20,13 +20,17 @@
 #include "libnsm/pci-links.h"
 
 #include "nsmInterface.hpp"
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
+#endif
 
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
 
 namespace nsm
 {
+#ifdef NVIDIA_SHMEM
 using namespace nsm_shmem_utils;
+#endif
 using sdbusplus::server::object_t;
 using PCIeEccIntf =
     object_t<sdbusplus::xyz::openbmc_project::PCIe::server::PCIeECC>;

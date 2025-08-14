@@ -6,7 +6,9 @@
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "interfaceWrapper.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 

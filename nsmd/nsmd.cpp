@@ -40,7 +40,9 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
+#ifdef NVIDIA_SHMEM
 #include <tal.hpp>
+#endif
 
 #include <iostream>
 

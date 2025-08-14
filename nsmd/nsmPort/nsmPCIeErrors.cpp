@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 #include "nsmPCIeErrors.hpp"
-
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
+#endif
 
 #include <phosphor-logging/lg2.hpp>
 

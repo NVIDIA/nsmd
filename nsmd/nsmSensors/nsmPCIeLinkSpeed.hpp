@@ -21,8 +21,9 @@
 
 #include "nsmInterface.hpp"
 #include "nsmPortInfo.hpp"
+#ifdef NVIDIA_SHMEM
 #include "sharedMemCommon.hpp"
-
+#endif
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/PCIeSlot/server.hpp>
 #include <xyz/openbmc_project/PCIe/PCIeECC/server.hpp>
@@ -30,7 +31,9 @@
 namespace nsm
 {
 using sdbusplus::server::object_t;
+#ifdef NVIDIA_SHMEM
 using namespace nsm_shmem_utils;
+#endif
 
 using PCIeDeviceIntf = object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::PCIeDevice>;

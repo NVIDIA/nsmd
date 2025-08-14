@@ -21,8 +21,6 @@
 #include "types.hpp"
 #include "utils.hpp"
 
-#include <tal.hpp>
-
 static constexpr const uint64_t INIT_TIMESTAMP =
     std::numeric_limits<uint64_t>().min();
 

@@ -3,7 +3,9 @@
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
+#endif
 
 #include <phosphor-logging/lg2.hpp>
 
