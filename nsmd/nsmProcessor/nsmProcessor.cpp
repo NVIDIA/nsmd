@@ -1660,9 +1660,11 @@ void NsmCurrentUtilization::updateMetricOnSharedMemory()
         cpuOperatingConfigIntf->utilization()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, utilizationVal);
+    nv::sensor_aggregation::DbusVariantType smUtilizationVal{
+        smUtilizationIntf->smUtilization()};
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, smUtilizationIntfName, smUtilizationPropertyName,
-        smbusData, utilizationVal);
+        smbusData, smUtilizationVal);
 #endif
 }
 
