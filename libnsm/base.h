@@ -34,6 +34,9 @@ extern "C" {
 #define OCP_VERSION 9
 #define OCP_VERSION_V2 10
 
+#define NSM_REQUEST_FORMAT_VERSION_1 1
+#define NSM_REQUEST_FORMAT_VERSION_2 2
+
 #define SUPPORTED_MSG_TYPE_DATA_SIZE 32
 #define SUPPORTED_COMMAND_CODE_DATA_SIZE 32
 
@@ -1175,6 +1178,16 @@ int decode_get_histogram_data_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
     uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size);
+
+int encode_raw_cmd_req_v2(uint8_t instanceId, uint8_t messageType,
+			  uint8_t commandCode, const uint8_t *payload,
+			  size_t dataSize, struct nsm_msg *msg);
+
+int decode_common_req_v2(const struct nsm_msg *msg, size_t msg_len);
+
+int encode_common_req_v2(uint8_t instance_id, uint8_t nvidia_msg_type,
+			 uint8_t command, struct nsm_msg *msg);
+
 #ifdef __cplusplus
 }
 #endif

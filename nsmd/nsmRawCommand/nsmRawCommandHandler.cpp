@@ -75,7 +75,7 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
     uint8_t deviceType, uint8_t instanceId, uint8_t deviceRole,
     bool isLongRunning, uint8_t messageType, uint8_t commandCode,
     int duplicateFdHandle, std::shared_ptr<AsyncStatusIntf> statusInterface,
-    std::shared_ptr<AsyncValueIntf> valueInterface)
+    std::shared_ptr<AsyncValueIntf> valueInterface, uint8_t msgFormatVersion)
 {
     utils::CustomFD fd(duplicateFdHandle);
     uint8_t rc = NSM_SW_ERROR;
@@ -104,11 +104,41 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
 
         std::vector<uint8_t> data;
         utils::readFdToBuffer(fd, data);
-        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
-                        data.size());
+        size_t requestSize = 0;
+        if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_1)
+        {
+            requestSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                          data.size();
+        }
+        else if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_2)
+        {
+            requestSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2) +
+                          data.size();
+        }
+        else
+        {
+            throw std::invalid_argument(
+                std::format("Invalid request message format version: {}",
+                            msgFormatVersion));
+        }
+        Request request(requestSize);
         auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-        encode_raw_cmd_req(0, messageType, commandCode, data.data(),
-                           data.size(), requestMsg);
+        if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_1)
+        {
+            encode_raw_cmd_req(0, messageType, commandCode, data.data(),
+                               data.size(), requestMsg);
+        }
+        else if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_2)
+        {
+            encode_raw_cmd_req_v2(0, messageType, commandCode, data.data(),
+                                  data.size(), requestMsg);
+        }
+        else
+        {
+            throw std::invalid_argument(
+                std::format("Invalid request message format version: {}",
+                            msgFormatVersion));
+        }
 
         auto eid = device->getEid();
         std::shared_ptr<const nsm_msg> responseMsg;
@@ -180,6 +210,11 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
         valueInterface->value(rc);
         statusInterface->status(AsyncOperationStatusType::Success);
     }
+    catch (const std::invalid_argument& e)
+    {
+        lg2::error(e.what());
+        statusInterface->status(AsyncOperationStatusType::InvalidArgument);
+    }
     catch (const std::runtime_error& e)
     {
         lg2::error(e.what());
@@ -220,7 +255,7 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     uint8_t deviceType, uint8_t instanceId, uint8_t deviceRole,
     uint8_t messageType, uint8_t commandCode, int duplicateFdHandle,
     std::shared_ptr<AsyncStatusIntf> statusInterface,
-    std::shared_ptr<AsyncValueIntf> valueInterface)
+    std::shared_ptr<AsyncValueIntf> valueInterface, uint8_t msgFormatVersion)
 {
     utils::CustomFD fd(duplicateFdHandle);
     uint8_t rc = NSM_SW_ERROR;
@@ -228,11 +263,41 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     {
         std::vector<uint8_t> data;
         utils::readFdToBuffer(fd, data);
-        Request request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
-                        data.size());
+        size_t requestSize = 0;
+        if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_1)
+        {
+            requestSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                          data.size();
+        }
+        else if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_2)
+        {
+            requestSize = sizeof(nsm_msg_hdr) + sizeof(nsm_common_req_v2) +
+                          data.size();
+        }
+        else
+        {
+            throw std::invalid_argument(
+                std::format("Invalid request message format version: {}",
+                            msgFormatVersion));
+        }
+        Request request(requestSize);
         auto requestMsg = reinterpret_cast<struct nsm_msg*>(request.data());
-        encode_raw_cmd_req(0, messageType, commandCode, data.data(),
-                           data.size(), requestMsg);
+        if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_1)
+        {
+            encode_raw_cmd_req(0, messageType, commandCode, data.data(),
+                               data.size(), requestMsg);
+        }
+        else if (msgFormatVersion == NSM_REQUEST_FORMAT_VERSION_2)
+        {
+            encode_raw_cmd_req_v2(0, messageType, commandCode, data.data(),
+                                  data.size(), requestMsg);
+        }
+        else
+        {
+            throw std::invalid_argument(
+                std::format("Invalid request message format version: {}",
+                            msgFormatVersion));
+        }
 
         auto& manager = SensorManager::getInstance();
         auto device = manager.getNsmDevice(deviceType, instanceId, deviceRole);
@@ -304,11 +369,10 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
     co_return rc;
 }
 
-sdbusplus::message::object_path
-    NsmRawCommandHandler::sendRequest(uint8_t deviceType, uint8_t deviceRole,
-                                      uint8_t instanceId, bool isLongRunning,
-                                      uint8_t messageType, uint8_t commandCode,
-                                      sdbusplus::message::unix_fd fd)
+sdbusplus::message::object_path NsmRawCommandHandler::sendRequest(
+    uint8_t deviceType, uint8_t deviceRole, uint8_t instanceId,
+    bool isLongRunning, uint8_t messageType, uint8_t commandCode,
+    sdbusplus::message::unix_fd fd, uint8_t msgFormatVersion)
 {
     if (deviceType > NSM_DEV_ID_MCTP_BRIDGE || messageType > NSM_TYPE_FIRMWARE)
     {
@@ -327,13 +391,15 @@ sdbusplus::message::object_path
     {
         doSendLongRunningRequest(deviceType, instanceId, deviceRole,
                                  isLongRunning, messageType, commandCode,
-                                 dup(fd), statusInterface, valueInterface)
+                                 dup(fd), statusInterface, valueInterface,
+                                 msgFormatVersion)
             .detach();
     }
     else
     {
         doSendRequest(deviceType, instanceId, deviceRole, messageType,
-                      commandCode, dup(fd), statusInterface, valueInterface)
+                      commandCode, dup(fd), statusInterface, valueInterface,
+                      msgFormatVersion)
             .detach();
     }
 
