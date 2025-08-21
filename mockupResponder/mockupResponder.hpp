@@ -334,6 +334,13 @@ class MockupResponder
         eraseDebugInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
                                        size_t requestLen);
 

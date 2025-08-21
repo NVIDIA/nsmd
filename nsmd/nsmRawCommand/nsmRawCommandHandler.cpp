@@ -133,12 +133,6 @@ requester::Coroutine NsmRawCommandHandler::doSendLongRunningRequest(
             encode_raw_cmd_req_v2(0, messageType, commandCode, data.data(),
                                   data.size(), requestMsg);
         }
-        else
-        {
-            throw std::invalid_argument(
-                std::format("Invalid request message format version: {}",
-                            msgFormatVersion));
-        }
 
         auto eid = device->getEid();
         std::shared_ptr<const nsm_msg> responseMsg;
@@ -291,12 +285,6 @@ requester::Coroutine NsmRawCommandHandler::doSendRequest(
         {
             encode_raw_cmd_req_v2(0, messageType, commandCode, data.data(),
                                   data.size(), requestMsg);
-        }
-        else
-        {
-            throw std::invalid_argument(
-                std::format("Invalid request message format version: {}",
-                            msgFormatVersion));
         }
 
         auto& manager = SensorManager::getInstance();

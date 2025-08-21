@@ -1190,6 +1190,177 @@ class EraseDebugInfo : public CommandInterface
     uint8_t infoType;
 };
 
+class GetDeviceDebugParameters : public CommandInterface
+{
+  public:
+    ~GetDeviceDebugParameters() = default;
+    GetDeviceDebugParameters() = delete;
+    GetDeviceDebugParameters(const GetDeviceDebugParameters&) = delete;
+    GetDeviceDebugParameters(GetDeviceDebugParameters&&) = default;
+    GetDeviceDebugParameters&
+        operator=(const GetDeviceDebugParameters&) = delete;
+    GetDeviceDebugParameters& operator=(GetDeviceDebugParameters&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetDeviceDebugParameters(const char* type, const char* name,
+                                      CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto getDeviceDebugParametersOptionGroup = app->add_option_group(
+            "Required", "Get device debug parameters options.");
+
+        debugConfigurationType = 0;
+        portNumber = 0;
+        parameterIndex = 0;
+        parameterSubIndex = 0;
+        getDeviceDebugParametersOptionGroup->add_option(
+            "-t, --configType", debugConfigurationType,
+            "Debug configuration type [0-Network interface mode]");
+        getDeviceDebugParametersOptionGroup->add_option(
+            "-p, --portNumber", portNumber, "Port number");
+        getDeviceDebugParametersOptionGroup->add_option(
+            "-i, --parameterIndex", parameterIndex, "Parameter index (ID)");
+        getDeviceDebugParametersOptionGroup->add_option(
+            "-s, --parameterSubId", parameterSubIndex, "Parameter sub ID");
+        getDeviceDebugParametersOptionGroup->require_option(4);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_req));
+
+        struct nsm_debug_parameter_id parameterId;
+        nsm_debug_parameter_sub_id_bitfield parameterSubId;
+        parameterId.port_number = portNumber;
+        parameterId.index = parameterIndex;
+        parameterSubId.value = parameterSubIndex;
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_device_debug_parameters_req(
+            instanceId, debugConfigurationType, parameterId, parameterSubId,
+            request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t dataSize = 0;
+        std::vector<uint8_t> data(65535, 0);
+
+        auto rc = decode_get_device_debug_parameters_resp(
+            responsePtr, payloadLength, &cc, &dataSize, data.data());
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Data size"] = static_cast<uint16_t>(dataSize);
+        result["Debug Data"] = nsmtool::helper::bytesToHexString(data.data(),
+                                                                 dataSize);
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t debugConfigurationType;
+    uint16_t portNumber;
+    uint8_t parameterIndex;
+    uint32_t parameterSubIndex;
+};
+
+class SetDeviceDebugParameters : public CommandInterface
+{
+  public:
+    ~SetDeviceDebugParameters() = default;
+    SetDeviceDebugParameters() = delete;
+    SetDeviceDebugParameters(const SetDeviceDebugParameters&) = delete;
+    SetDeviceDebugParameters(SetDeviceDebugParameters&&) = default;
+    SetDeviceDebugParameters&
+        operator=(const SetDeviceDebugParameters&) = delete;
+    SetDeviceDebugParameters& operator=(SetDeviceDebugParameters&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit SetDeviceDebugParameters(const char* type, const char* name,
+                                      CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto setDeviceDebugParametersOptionGroup = app->add_option_group(
+            "Required", "Set device debug parameters options.");
+
+        debugConfigurationType = 0;
+        portNumber = 0;
+        parameterIndex = 0;
+        parameterSubIndex = 0;
+        dataSize = 0;
+        data = {};
+        setDeviceDebugParametersOptionGroup->add_option(
+            "-t, --configType", debugConfigurationType,
+            "Debug configuration type [0-Network interface mode]");
+        setDeviceDebugParametersOptionGroup->add_option(
+            "-p, --portNumber", portNumber, "Port number");
+        setDeviceDebugParametersOptionGroup->add_option(
+            "-i, --parameterIndex", parameterIndex, "Parameter index (ID)");
+        setDeviceDebugParametersOptionGroup->add_option(
+            "-s, --parameterSubId", parameterSubIndex, "Parameter sub ID");
+        setDeviceDebugParametersOptionGroup->add_option("-d, --data", data,
+                                                        "Data");
+        setDeviceDebugParametersOptionGroup->require_option(5);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_set_device_debug_parameters_req) +
+            data.size() - sizeof(uint8_t));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+
+        struct nsm_debug_parameter_id parameterId;
+        nsm_debug_parameter_sub_id_bitfield parameterSubId;
+        parameterId.port_number = portNumber;
+        parameterId.index = parameterIndex;
+        parameterSubId.value = parameterSubIndex;
+        dataSize = data.size();
+        auto rc = encode_set_device_debug_parameters_req(
+            instanceId, debugConfigurationType, parameterId, parameterSubId,
+            dataSize, data.data(), request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+
+        auto rc = decode_set_device_debug_parameters_resp(responsePtr,
+                                                          payloadLength, &cc);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint8_t debugConfigurationType;
+    uint16_t portNumber;
+    uint8_t parameterIndex;
+    uint32_t parameterSubIndex;
+    uint8_t dataSize;
+    std::vector<uint8_t> data;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto diag = app.add_subcommand("diag", "Diagnostics type command");
@@ -1257,6 +1428,16 @@ void registerCommand(CLI::App& app)
                                                      "Get Device Diagnostics");
     commands.push_back(std::make_unique<GetDeviceDiagnostics>(
         "diag", "GetDeviceDiagnostics", getDeviceDiagnostics));
+
+    auto getDeviceDebugParameters = diag->add_subcommand(
+        "GetDeviceDebugParameters", "Get Device Debug Parameters");
+    commands.push_back(std::make_unique<GetDeviceDebugParameters>(
+        "diag", "GetDeviceDebugParameters", getDeviceDebugParameters));
+
+    auto setDeviceDebugParameters = diag->add_subcommand(
+        "SetDeviceDebugParameters", "Set Device Debug Parameters");
+    commands.push_back(std::make_unique<SetDeviceDebugParameters>(
+        "diag", "SetDeviceDebugParameters", setDeviceDebugParameters));
 }
 
 } // namespace diag

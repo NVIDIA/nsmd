@@ -630,6 +630,10 @@ std::optional<Response>
                     return getNetworkDeviceLogInfoHandler(request, requestLen);
                 case NSM_ERASE_DEBUG_INFO:
                     return eraseDebugInfoHandler(request, requestLen);
+                case NSM_GET_DEVICE_DEBUG_PARAMETERS:
+                    return getDeviceDebugParametersHandler(request, requestLen);
+                case NSM_SET_DEVICE_DEBUG_PARAMETERS:
+                    return setDeviceDebugParametersHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -849,7 +853,9 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_RESET_NETWORK_DEVICE,
                    NSM_QUERY_TOKEN_PARAMETERS, NSM_ERASE_DEBUG_INFO,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
-                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS,
+                   NSM_GET_DEVICE_DEBUG_PARAMETERS,
+                   NSM_SET_DEVICE_DEBUG_PARAMETERS}},
                  {5, {3, 4, 5, 6, 7, 128, 129}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
@@ -6767,4 +6773,200 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDeviceDebugParametersHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint8_t debug_configuration_type = 0;
+    struct nsm_debug_parameter_id parameter_id = {
+        .reserved = 0, .port_number = 0, .index = 0};
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {.value = 0};
+
+    auto rc = decode_get_device_debug_parameters_req(
+        requestMsg, requestLen, &debug_configuration_type, &parameter_id,
+        &parameter_sub_id);
+    uint8_t debug_configuration_type_log = debug_configuration_type;
+    uint8_t parameter_id_index_log = parameter_id.index;
+    uint8_t parameter_sub_id_value_log = parameter_sub_id.bits.sub_id;
+    uint16_t parameter_id_port_number_log = parameter_id.port_number;
+    lg2::debug("decode_get_device_debug_parameters_req: rc={RC} DCT={DCT} "
+               "PID={PID} PSUBID={PSUBID} PNB={PNB}",
+               "RC", rc, "DCT", debug_configuration_type_log, "PID",
+               parameter_id_index_log, "PSUBID", parameter_sub_id_value_log,
+               "PNB", parameter_id_port_number_log);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_debug_parameters_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("getDeviceDebugParametersHandler: debug_config_type={TYPE}, "
+                  "port={PORT}, index={INDEX}, sub_id={SUBID}",
+                  "TYPE", debug_configuration_type, "PORT",
+                  static_cast<uint16_t>(parameter_id.port_number), "INDEX",
+                  parameter_id.index, "SUBID", parameter_sub_id.value);
+    }
+
+    std::vector<uint8_t> mockData = {
+        0x00,
+    };
+    uint16_t dataSize = 1;
+
+    switch (parameter_id.index)
+    {
+        case NSM_DEBUG_PARAMETER_ID_MLPC:
+            mockData = {0x12, 0x34, 0x56, 0x78};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLC:
+            mockData = {0xAB, 0xCD, 0xEF, 0x01};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLS:
+            mockData = {0x11, 0x22, 0x33, 0x44};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPI:
+            mockData = {0x55, 0x66, 0x77, 0x88};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPHI:
+            mockData = {0x99, 0xAA, 0xBB, 0xCC};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPC:
+            mockData = {0xDD, 0xEE, 0xFF, 0x00};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPCNT:
+            switch (parameter_sub_id.bits.sub_id)
+            {
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L0_GENERAL_COUNTERS:
+                    mockData = {0x01, 0x02, 0x03, 0x04};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_GENERAL_COUNTERS:
+                    mockData = {0x05, 0x06, 0x07, 0x08};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_STAT_COUNTERS:
+                    mockData = {0x09, 0x0A, 0x0B, 0x0C};
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case NSM_DEBUG_PARAMETER_ID_MPSCR:
+            mockData = {0x10, 0x20, 0x30, 0x40};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLG:
+            switch (parameter_sub_id.bits.sub_id)
+            {
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CAPABILITIES_AND_STATUS:
+                    mockData = {0x50, 0x51, 0x52, 0x53};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CONFIGURATION:
+                    mockData = {0x54, 0x55, 0x56, 0x57};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_DEBUG:
+                    mockData = {0x58, 0x59, 0x5A, 0x5B};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_CAPABILITIES_AND_STATUS:
+                    mockData = {0x5C, 0x5D, 0x5E, 0x5F};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_DEBUG:
+                    mockData = {0x60, 0x61, 0x62, 0x63};
+                    break;
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    dataSize = mockData.size();
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_resp) - 1 +
+            dataSize,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t dataSize_log = dataSize;
+    std::string data_log = requestMsgToHexString(mockData);
+    uint16_t dataDataSize_log = mockData.size();
+    lg2::debug("encode_get_device_debug_parameters_resp: dataSize={SIZE} "
+               "data={DATA} dataSize={DATASIZE}",
+               "SIZE", dataSize_log, "DATA", data_log, "DATASIZE",
+               dataDataSize_log);
+
+    rc = encode_get_device_debug_parameters_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &dataSize,
+        mockData.data(), responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_debug_parameters_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDeviceDebugParametersHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint8_t debug_configuration_type = 0;
+    struct nsm_debug_parameter_id parameter_id = {
+        .reserved = 0, .port_number = 0, .index = 0};
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {.value = 0};
+    uint8_t data_size = 0;
+    uint8_t* data = nullptr;
+
+    auto rc = decode_set_device_debug_parameters_req(
+        requestMsg, requestLen, &debug_configuration_type, &parameter_id,
+        &parameter_sub_id, &data_size, &data);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_debug_parameters_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "setDeviceDebugParametersHandler: debug_config_type={TYPE}, "
+            "port={PORT}, index={INDEX}, sub_id={SUBID}, data_size={SIZE}",
+            "TYPE", debug_configuration_type, "PORT",
+            static_cast<uint16_t>(parameter_id.port_number), "INDEX",
+            parameter_id.index, "SUBID", parameter_sub_id.value, "SIZE",
+            data_size);
+    }
+
+    // For mockup, we return success for a valid set request
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_cc_only_resp(requestMsg->hdr.instance_id, NSM_TYPE_DIAGNOSTIC,
+                             NSM_SET_DEVICE_DEBUG_PARAMETERS, NSM_SUCCESS,
+                             ERR_NULL, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_cc_only_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
 } // namespace MockupResponder

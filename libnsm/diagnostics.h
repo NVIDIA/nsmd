@@ -28,6 +28,8 @@ typedef uint8_t enum8;
 
 enum diagnostics_command {
 	NSM_GET_DEVICE_RESET_STATISTICS = 0x00,
+	NSM_GET_DEVICE_DEBUG_PARAMETERS = 0x04,
+	NSM_SET_DEVICE_DEBUG_PARAMETERS = 0x05,
 	NSM_GET_DEVICE_DIAGNOSTICS = 0x40,
 	NSM_GET_NETWORK_DEVICE_DEBUG_INFO = 0x50,
 	NSM_ERASE_TRACE = 0x51,
@@ -112,6 +114,87 @@ struct nsm_get_device_diagnostics_resp {
 	struct nsm_common_resp hdr;
 	uint8_t next_segment_id;
 	uint8_t segment_data[1];
+} __attribute__((packed));
+
+enum nsm_debug_configuration_type {
+	DEBUG_CONFIGURATION_TYPE_L1_POWER_DATA = 0,
+};
+
+enum nsm_debug_parameter_id_l1_power_data {
+	NSM_DEBUG_PARAMETER_ID_MLPC =
+	    0, // Management L1 Performance Counter Register
+	NSM_DEBUG_PARAMETER_ID_PPSLC =
+	    1, // Port Power Saving L1 Configuration Register
+	NSM_DEBUG_PARAMETER_ID_PPSLS =
+	    2, // Port Power Saving L1 Status Register
+	NSM_DEBUG_PARAMETER_ID_PPSPI =
+	    3, // Port Power Saving L1 Prediction Info Register
+	NSM_DEBUG_PARAMETER_ID_PPSPHI =
+	    4, // Port Power Saving L1 Prediction Histogram Info Register
+	NSM_DEBUG_PARAMETER_ID_PPSPC =
+	    5, // Port Power Saving L1 Prediction Config Register
+	NSM_DEBUG_PARAMETER_ID_PPCNT = 6, // Ports Performance Counters Register
+					  // (uses Counter Group sub ID)
+	NSM_DEBUG_PARAMETER_ID_MPSCR =
+	    7, // Management Power Saving L1 Configuration Register
+	NSM_DEBUG_PARAMETER_ID_PPSLG = 8, // Port Power Saving L1 General
+					  // Register (uses Page Select sub ID)
+};
+
+enum nsm_debug_parameter_sub_id_l1_power_data {
+	NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CAPABILITIES_AND_STATUS =
+	    0, // Page Select L1 Capabilities and Status
+	NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CONFIGURATION =
+	    1, // Page Select L1 Configuration
+	NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_DEBUG =
+	    2, // Page Select L1 Debug
+	NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_CAPABILITIES_AND_STATUS =
+	    3, // Page Select L0 Capabilities and Status
+	NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_DEBUG =
+	    4, // Page Select L0 Debug
+	NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L0_GENERAL_COUNTERS =
+	    0x1D, // Counter Group L0 General Counters
+	NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_GENERAL_COUNTERS =
+	    0x1E, // Counter Group L1 General Counters
+	NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_STAT_COUNTERS =
+	    0x27, // Counter Group L1 Stat Counters
+};
+
+struct nsm_debug_parameter_id {
+	uint8_t reserved;
+	uint16_t port_number;
+	uint8_t index;
+} __attribute__((packed));
+
+typedef union {
+	struct {
+		uint32_t sub_id : 6;
+		uint32_t reserved : 26;
+	} __attribute__((packed)) bits;
+	uint32_t value;
+} nsm_debug_parameter_sub_id_bitfield;
+
+struct nsm_get_device_debug_parameters_req {
+	struct nsm_common_req_v2 hdr;
+	uint8_t debug_configuration_type;
+	uint8_t reserved[3];
+	struct nsm_debug_parameter_id parameter_id;
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id;
+} __attribute__((packed));
+
+struct nsm_get_device_debug_parameters_resp {
+	struct nsm_common_resp hdr;
+	uint8_t data[1];
+} __attribute__((packed));
+
+struct nsm_set_device_debug_parameters_req {
+	struct nsm_common_req_v2 hdr;
+	uint8_t debug_configuration_type;
+	uint8_t data_size;
+	uint8_t reserved[2];
+	struct nsm_debug_parameter_id parameter_id;
+	nsm_debug_parameter_sub_id_bitfield parameter_sub_id;
+	uint8_t data[1];
 } __attribute__((packed));
 
 enum nsm_erase_trace_status {
@@ -779,6 +862,108 @@ int decode_reset_count_256data(const uint8_t *data, size_t data_len,
  */
 int decode_get_device_reset_statistics_req(const struct nsm_msg *msg,
 					   size_t msg_len);
+
+/** @brief Encode a Get Device Debug Parameters request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] debug_configuration_type - Debug configuration type
+ *  @param[in] parameter_id - Parameter ID
+ *  @param[in] parameter_sub_id - Parameter sub ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_debug_parameters_req(
+    uint8_t instance_id, uint8_t debug_configuration_type,
+    struct nsm_debug_parameter_id parameter_id,
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Debug Parameters request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] debug_configuration_type - Debug configuration type
+ *  @param[out] parameter_id - Parameter ID
+ *  @param[out] parameter_sub_id - Parameter sub ID
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_debug_parameters_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    uint8_t *debug_configuration_type,
+    struct nsm_debug_parameter_id *parameter_id,
+    nsm_debug_parameter_sub_id_bitfield *parameter_sub_id);
+
+/** @brief Encode a Get Device Debug Parameters response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] data_size - Data size
+ *  @param[in] data - Data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_device_debug_parameters_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    uint16_t *data_size, uint8_t *data,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a Get Device Debug Parameters response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] data_size - Data size
+ *  @param[out] data - Data
+ *  @return nsm_completion_codes
+ */
+int decode_get_device_debug_parameters_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *data_size, uint8_t *data);
+
+/** @brief Encode a Set Device Debug Parameters request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] debug_configuration_type - Debug configuration type
+ *  @param[in] parameter_id - Parameter ID
+ *  @param[in] parameter_sub_id - Parameter sub ID
+ *  @param[in] data_size - Data size
+ *  @param[in] data - Data
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_device_debug_parameters_req(
+    uint8_t instance_id, uint8_t debug_configuration_type,
+    struct nsm_debug_parameter_id parameter_id,
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id, uint8_t data_size,
+    uint8_t *data, struct nsm_msg *msg);
+
+/** @brief Decode a Set Device Debug Parameters request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] debug_configuration_type - Debug configuration type
+ *  @param[out] parameter_id - Parameter ID
+ *  @param[out] parameter_sub_id - Parameter sub ID
+ *  @param[out] data_size - Data size
+ *  @param[out] data - Data
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_debug_parameters_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    uint8_t *debug_configuration_type,
+    struct nsm_debug_parameter_id *parameter_id,
+    nsm_debug_parameter_sub_id_bitfield *parameter_sub_id, uint8_t *data_size,
+    uint8_t **data);
+
+/** @brief Decode a Set Device Debug Parameters response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @return nsm_completion_codes
+ */
+int decode_set_device_debug_parameters_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc);
 
 #ifdef __cplusplus
 }
