@@ -38,7 +38,7 @@ dep_src_files = [
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
-    '../../nsmSensors/nsmErrorInjection.cpp',
+    '../../nsmErrorInjection/nsmErrorInjection.cpp',
     '../../nsmSetAsync/nsmSetErrorInjection.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmProcessor/nsmOemResetStatistics.cpp',

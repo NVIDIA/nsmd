@@ -18,11 +18,21 @@
 #include "nsmNetworkAdapter.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
+#endif
+#if defined(ENABLE_DEBUG_TOKEN)
 #include "nsmDebugToken.hpp"
+#endif
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmEraseTrace.hpp"
-#include "nsmErrorInjectionCommon.hpp"
+#endif
+#if defined(ENABLE_ERROR_INJECTION)
+#include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
+#endif
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmLogInfo.hpp"
+#endif
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -97,10 +107,13 @@ static requester::Coroutine
         bus, name, associations, type, inventoryObjPath);
     nsmDevice->deviceSensors.emplace_back(networkAdapterDI);
 
+#if defined(ENABLE_DEBUG_TOKEN)
     auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
         bus, name, associations, type, uuid);
     nsmDevice->addStaticSensor(debugTokenObject);
+#endif
 
+#if defined(ENABLE_DEBUG_INFO)
     auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
         bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
     nsmDevice->addStaticSensor(networkAdapterDebugInfoObject);
@@ -112,18 +125,24 @@ static requester::Coroutine
     auto networkAdapterLogInfoObject = std::make_shared<NsmLogInfoObject>(
         bus, name, inventoryObjPath, type, uuid);
     nsmDevice->addStaticSensor(networkAdapterLogInfoObject);
+#endif
 
+#if defined(ENABLE_ERROR_INJECTION)
     createNsmErrorInjectionSensors(manager, nsmDevice,
                                    path(inventoryObjPath) / name);
+#endif
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
     auto ntwAdpResetSensor = std::make_shared<NsmNetworkAdapterDIReset>(
         bus, name, type, inventoryObjPath, nsmDevice);
     nsmDevice->deviceSensors.push_back(ntwAdpResetSensor);
+#endif
 
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
 NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
@@ -139,6 +158,7 @@ NsmNetworkAdapterDIReset::NsmNetworkAdapterDIReset(
     resetAsyncIntf = std::make_shared<NsmNetworkDeviceResetAsyncIntf>(
         bus, objPath.c_str(), device);
 }
+#endif
 
 REGISTER_NSM_CREATION_FUNCTION(
     createNSMNetworkAdapter,

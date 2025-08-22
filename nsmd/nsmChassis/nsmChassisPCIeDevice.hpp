@@ -21,13 +21,19 @@
 #include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
 
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 #include <com/nvidia/NVLink/NVLinkRefClock/server.hpp>
+#endif
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/Common/UUID/server.hpp>
 #include <xyz/openbmc_project/Inventory/Decorator/Asset/server.hpp>
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
+#endif
 #include <xyz/openbmc_project/Inventory/Item/PCIeDevice/server.hpp>
+#if defined(ENABLE_PCIE_LTSSM_STATE)
 #include <xyz/openbmc_project/PCIe/LTSSMState/server.hpp>
+#endif
 #include <xyz/openbmc_project/State/Decorator/Health/server.hpp>
 #include <xyz/openbmc_project/State/Decorator/OperationalStatus/server.hpp>
 
@@ -37,14 +43,18 @@ namespace nsm
 using namespace sdbusplus::xyz::openbmc_project;
 using sdbusplus::server::object_t;
 using UuidIntf = object_t<Common::server::UUID>;
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 using NVLinkRefClockIntf =
     object_t<sdbusplus::com::nvidia::NVLink::server::NVLinkRefClock>;
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
+#endif
 using AssociationDefinitionsIntf = object_t<Association::server::Definitions>;
 using HealthIntf = object_t<State::Decorator::server::Health>;
 using PCIeDeviceIntf = object_t<Inventory::Item::server::PCIeDevice>;
+#if defined(ENABLE_PCIE_LTSSM_STATE)
 using LTSSMStateIntf =
     object_t<sdbusplus::xyz::openbmc_project::PCIe::server::LTSSMState>;
+#endif
 
 template <typename IntfType>
 class NsmChassisPCIeDevice : public NsmInterfaceProvider<IntfType>

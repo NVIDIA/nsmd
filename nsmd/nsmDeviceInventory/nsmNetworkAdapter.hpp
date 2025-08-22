@@ -2,7 +2,9 @@
 
 #include "libnsm/diagnostics.h"
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
 #include "nsmDbusIfaceOverride/nsmResetIface.hpp"
+#endif
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmSensor.hpp"
@@ -40,6 +42,7 @@ class NsmNetworkAdapterDI : public NsmObject
     std::unique_ptr<NetworkInterfaceIntf> networkInterfaceIntf = nullptr;
 };
 
+#if defined(ENABLE_NETWORK_ADAPTER_RESET)
 class NsmNetworkAdapterDIReset : public NsmObject
 {
   public:
@@ -53,4 +56,5 @@ class NsmNetworkAdapterDIReset : public NsmObject
     std::shared_ptr<NsmNetworkDeviceResetAsyncIntf> resetAsyncIntf = nullptr;
     std::string objPath;
 };
+#endif
 } // namespace nsm

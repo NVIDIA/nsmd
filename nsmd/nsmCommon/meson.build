@@ -1,4 +1,8 @@
-sources += ['nsmCommon/nsmCommon.cpp']
+sources += [
+    'nsmCommon/nsmCommon.cpp',
+    'nsmCommon/nsmPcieGroup.cpp',
+    'nsmCommon/nsmPciePortIntf.cpp',
+]
 
 if get_option('shmem').enabled()
     sources += 'nsmCommon/sharedMemCommon.cpp'

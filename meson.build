@@ -112,8 +112,50 @@ if get_option('reset-metrics').enabled()
     conf_data.set('NVIDIA_RESET_METRICS', 0)
 endif
 
-if get_option('enable-histogram').enabled()
+cx8_features = get_option('cx8-features')
+
+if get_option('enable-histogram').enabled() and not cx8_features
     conf_data.set('NVIDIA_HISTOGRAM', 1)
+endif
+
+if get_option('enable-debug-token').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_DEBUG_TOKEN', language: ['cpp', 'c'])
+endif
+
+if get_option('enable-debug-info').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_DEBUG_INFO', language: ['cpp', 'c'])
+endif
+
+if get_option('enable-network-adapter-reset').enabled() and not cx8_features
+    add_project_arguments(
+        '-DENABLE_NETWORK_ADAPTER_RESET',
+        language: ['cpp', 'c'],
+    )
+endif
+
+if get_option('enable-pcie-aer-error').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_PCIE_AER_ERROR', language: ['cpp', 'c'])
+endif
+
+if get_option('enable-clock-output-state').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_CLOCK_OUTPUT_STATE', language: ['cpp', 'c'])
+endif
+
+if get_option('enable-pcie-ltssm-state').enabled() and not cx8_features
+    add_project_arguments('-DENABLE_PCIE_LTSSM_STATE', language: ['cpp', 'c'])
+endif
+
+effective_sensors_all = get_option('nsm-sensors-all')
+if cx8_features
+    effective_sensors_all = false
+endif
+
+if (get_option('enable-error-injection').enabled() and not cx8_features) or get_option(
+    'nsm-sensors-include',
+).contains(
+    'error-injection',
+) or effective_sensors_all
+    add_project_arguments('-DENABLE_ERROR_INJECTION', language: ['cpp', 'c'])
 endif
 
 if get_option('aer-error-status-priority')

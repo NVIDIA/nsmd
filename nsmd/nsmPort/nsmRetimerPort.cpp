@@ -1,9 +1,12 @@
 #include "nsmRetimerPort.hpp"
 
+#include "libnsm/pci-links.h"
+
 #include "common/types.hpp"
 #include "dBusAsyncUtils.hpp"
-#include "nsmProcessor/nsmProcessor.hpp"
-
+#ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+#endif
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>

@@ -23,15 +23,21 @@
 #include "../../common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
+#if defined(ENABLE_PCIE_AER_ERROR)
 #include "nsmAERError.hpp"
+#endif
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 #include "nsmClockOutputEnableState.hpp"
+#endif
 #include "nsmCommon.hpp"
 #include "nsmDevice.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPCIeFunction.hpp"
+#if defined(ENABLE_PCIE_LTSSM_STATE)
 #include "nsmPCIeLTSSMState.hpp"
+#endif
 #include "nsmPCIeLinkSpeed.hpp"
 
 #include <unordered_map>
@@ -198,6 +204,7 @@ requester::Coroutine
         }
         if (device->getDeviceType() == NSM_DEV_ID_GPU)
         {
+#if defined(ENABLE_PCIE_AER_ERROR)
             const std::string inventoyObjPath =
                 chassisInventoryBasePath / chassisName / "PCIeDevices" / name;
             auto aerErrorIntf = std::make_shared<NsmAERErrorStatusIntf>(
@@ -207,6 +214,7 @@ requester::Coroutine
                 name, "PCIeAerErrorStatus", aerErrorIntf, 0);
             aerErrorIntf->linkAerStatusSensor(aerErrorSensor);
             device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
+#endif
         }
     }
     else if (type == "NSM_MultiPortPCIeDevice")
@@ -232,6 +240,7 @@ requester::Coroutine
     }
     else if (type == "NSM_LTSSMState")
     {
+#if defined(ENABLE_PCIE_LTSSM_STATE)
         uint64_t deviceIndex{};
         if (allCurrentIfaceProperties.count("DeviceIndex"))
         {
@@ -255,9 +264,11 @@ requester::Coroutine
         device->addSensor(
             std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
             priority);
+#endif
     }
     else if (type == "NSM_ClockOutputEnableState")
     {
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
         uint64_t instanceNumber{};
         if (allCurrentIfaceProperties.count("InstanceNumber"))
         {
@@ -286,6 +297,7 @@ requester::Coroutine
             device->addSensor(nvLinkRefClock,
                               CLOCK_OUTPUT_ENABLE_STATE_PRIORITY);
         }
+#endif
     }
 
     // coverity[missing_return]

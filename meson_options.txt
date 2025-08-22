@@ -241,6 +241,27 @@ option(
 )
 
 option(
+    'enable-debug-token',
+    type: 'feature',
+    description: 'Enable Debug Token objects and interfaces',
+    value: 'enabled',
+)
+
+option(
+    'enable-debug-info',
+    type: 'feature',
+    description: 'Enable Debug Info, Log, and EraseTrace objects',
+    value: 'enabled',
+)
+
+option(
+    'enable-error-injection',
+    type: 'feature',
+    description: 'Enable Error Injection sensors and interfaces',
+    value: 'disabled',
+)
+
+option(
     'tracing',
     type: 'feature',
     description: 'Enable UST tracing with LTTng',
@@ -252,4 +273,167 @@ option(
     type: 'feature',
     value: 'enabled',
     description: 'Enable PCIE reference clock count',
+)
+
+
+# nsmEvent controls: by default only LongRunning is included
+option(
+    'nsm-event-all',
+    type: 'boolean',
+    description: 'Include all NSM event sources',
+    value: true,
+)
+option(
+    'nsm-event-include',
+    type: 'array',
+    description: 'List of NSM events to include (rediscovery, xid, threshold, reset-required, fabric-manager-state)',
+    value: [],
+)
+
+# nsmSetAsync controls: by default only infra sources are included
+option(
+    'nsm-set-async-all',
+    type: 'boolean',
+    description: 'Include all nsmSetAsync operation sources',
+    value: true,
+)
+option(
+    'nsm-set-async-include',
+    type: 'array',
+    description: 'List of nsmSetAsync operations to include (error-injection, mig-mode, ecc-mode, cpu-operating-config, write-protected, egm-mode)',
+    value: [],
+)
+
+# nsmPort controls: by default only infra sources are included
+option(
+    'nsm-port-all',
+    type: 'boolean',
+    description: 'Include all nsmPort sources',
+    value: true,
+)
+option(
+    'nsm-port-include',
+    type: 'array',
+    description: 'List of nsmPort sources to include (retimer, fpga, gpu-pcie, nvlink-port, pcie-port, zone, endpoint, port-disable)',
+    value: [],
+)
+
+# nsmChassis controls: by default only infra sources are included
+option(
+    'nsm-chassis-all',
+    type: 'boolean',
+    description: 'Include all nsmChassis sources',
+    value: true,
+)
+option(
+    'nsm-chassis-include',
+    type: 'array',
+    description: 'List of nsmChassis sources to include (nv-nic-chassis, nv-nic-chassis-assembly, pcie-retimer, led, pcie-device, pcie-slot, clock-output-enable, power-supply-status, gpu-presence-power, pcie-function, pcie-ltssm, power-control, gpu-clock-control, power-subsystem, write-protected-jumper, aer-error, erot, security-rbp, processor-module-power-control, irot-responder)',
+    value: [],
+)
+
+# nsmSensors controls: by default only infra sources are included
+option(
+    'nsm-sensors-all',
+    type: 'boolean',
+    description: 'Include all nsmSensors sources',
+    value: true,
+)
+
+# nsmDbusIfaceOverride controls
+option(
+    'nsm-dbus-override-all',
+    type: 'boolean',
+    description: 'Include all nsmDbusIfaceOverride sources',
+    value: true,
+)
+option(
+    'nsm-dbus-override-include',
+    type: 'array',
+    description: 'List of nsmDbusIfaceOverride sources to include (asset, nvlink-topology)',
+    value: [],
+)
+option(
+    'nsm-sensors-include',
+    type: 'array',
+    description: 'List of nsmSensors sources to include (inventory-property, pcie-link-speed, error-injection)',
+    value: [],
+)
+
+# nsmd subdirectory toggles (default: disabled)
+option(
+    'nsmd-subdirs-all',
+    type: 'boolean',
+    value: true,
+    description: 'Include all nsmd subdirectories by default',
+)
+option(
+    'nsmd-subdirs-include',
+    type: 'array',
+    value: [],
+    description: 'Explicit list of nsmd subdirectories to include when nsmd-subdirs-all=false',
+)
+
+# nsmDeviceInventory controls: by default only infra sources are included
+option(
+    'nsm-device-inventory-all',
+    type: 'boolean',
+    description: 'Include all nsmDeviceInventory sources',
+    value: true,
+)
+option(
+    'nsm-device-inventory-include',
+    type: 'array',
+    description: 'List of nsmDeviceInventory sources to include (switch, pcie-retimer-fabrics, pcie-retimer-switch, network-adapter)',
+    value: [],
+)
+
+# libnsm controls
+option(
+    'libnsm-all',
+    type: 'boolean',
+    description: 'Include all libnsm C sources (except where owned by other modules)',
+    value: true,
+)
+option(
+    'libnsm-include',
+    type: 'array',
+    description: 'List of libnsm modules to include (debug-token, firmware-utils, device-capability-discovery, device-configuration, diagnostics, platform-environmental, pci-links, network-ports)',
+    value: [],
+)
+
+option(
+    'enable-pcie-aer-error',
+    type: 'feature',
+    description: 'Enable PCIe AER error status sensor/object',
+    value: 'enabled',
+)
+
+option(
+    'enable-clock-output-state',
+    type: 'feature',
+    description: 'Enable clock output state sensor/object',
+    value: 'enabled',
+)
+
+option(
+    'enable-pcie-ltssm-state',
+    type: 'feature',
+    description: 'Enable PCIe LTSSM state sensor/object',
+    value: 'enabled',
+)
+
+# CX-8 feature profile toggle
+option(
+    'cx8-features',
+    type: 'boolean',
+    description: 'Enable CX-8 feature profile (sets includes and disables debug/histogram/error-injection)',
+    value: false,
+)
+
+option(
+    'enable-network-adapter-reset',
+    type: 'feature',
+    description: 'Enable Network Adapter Reset sensor/object',
+    value: 'enabled',
 )

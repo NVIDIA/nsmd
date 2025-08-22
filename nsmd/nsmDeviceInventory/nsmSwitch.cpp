@@ -26,16 +26,26 @@
 #include "dBusAsyncUtils.hpp"
 #include "deviceManager.hpp"
 #include "nsmAssetIntf.hpp"
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
+#endif
+#if defined(ENABLE_DEBUG_TOKEN)
 #include "nsmDebugToken.hpp"
+#endif
 #include "nsmDevice.hpp"
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmEraseTrace.hpp"
-#include "nsmErrorInjection.hpp"
-#include "nsmErrorInjectionCommon.hpp"
+#endif
+#if defined(ENABLE_ERROR_INJECTION)
+#include "nsmErrorInjection/nsmErrorInjection.hpp"
+#include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
+#endif
 #include "nsmEvent/nsmFabricManagerStateEvent.hpp"
 #include "nsmHistograms/nsmHistogramInfo.hpp"
 #include "nsmInventoryProperty.hpp"
+#if defined(ENABLE_DEBUG_INFO)
 #include "nsmLogInfo.hpp"
+#endif
 #include "nsmManagers/nsmFabricManager.hpp"
 #include "nsmObjectFactory.hpp"
 #include "nsmPort/nsmPortDisableFuture.hpp"
@@ -589,11 +599,14 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
 
+#if defined(ENABLE_DEBUG_TOKEN)
         auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
             bus, name, associations, type, uuid);
         device->addStaticSensor(debugTokenObject);
+#endif
 
-        // NetIR dump for NVSwitch
+// NetIR dump for NVSwitch
+#if defined(ENABLE_DEBUG_INFO)
         auto nvSwitchDebugInfoObject = std::make_shared<NsmDebugInfoObject>(
             bus, name, inventoryObjPath, type, uuid, DebugDumpType::Network);
         device->addStaticSensor(nvSwitchDebugInfoObject);
@@ -605,14 +618,17 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         auto nvSwitchLogInfoObject = std::make_shared<NsmLogInfoObject>(
             bus, name, inventoryObjPath, type, uuid);
         device->addStaticSensor(nvSwitchLogInfoObject);
+#endif
 
         // Device Reset for NVSwitch
         auto nvSwitchResetSensor = std::make_shared<NsmSwitchDIReset>(
             bus, name, type, inventoryObjPath, device);
         device->deviceSensors.push_back(nvSwitchResetSensor);
 
+#if defined(ENABLE_ERROR_INJECTION)
         createNsmErrorInjectionSensors(manager, device,
                                        path(inventoryObjPath) / name);
+#endif
 
         std::string dbusObjPath = inventoryObjPath + name;
         auto isolationModeIntf =

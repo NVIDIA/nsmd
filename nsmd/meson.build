@@ -2,13 +2,6 @@ sources = [
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
     '../libnsm/base.c',
-    '../libnsm/debug-token.c',
-    '../libnsm/firmware-utils.c',
-    '../libnsm/device-capability-discovery.c',
-    '../libnsm/device-configuration.c',
-    '../libnsm/diagnostics.c',
-    '../libnsm/platform-environmental.c',
-    '../libnsm/pci-links.c',
     '../libnsm/instance-id.c',
     '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',
@@ -21,11 +14,67 @@ sources = [
     'nsmd.cpp',
     'nsmSensorAggregator.cpp',
     'nsmSensor.cpp',
-    'nsmNumericSensor/nsmNumericSensorComposite.cpp',
     'eventTypeHandlers.cpp',
     'nsmEvent.cpp',
-    'nsmFwSwInventory/GPUSWInventory.cpp',
 ]
+
+# libnsm conditional includes
+libnsm_all = get_option('libnsm-all')
+libnsm_include = get_option('libnsm-include')
+cx8_features = get_option('cx8-features')
+if cx8_features
+    libnsm_all = false
+    libnsm_include = [
+        'device-capability-discovery',
+        'platform-environmental',
+        'pci-links',
+        'network-ports',
+    ]
+endif
+
+valid_libnsm = [
+    'debug-token',
+    'firmware-utils',
+    'device-capability-discovery',
+    'device-configuration',
+    'diagnostics',
+    'platform-environmental',
+    'pci-links',
+    'network-ports',
+]
+foreach name : libnsm_include
+    if not valid_libnsm.contains(name)
+        warning('Unknown libnsm-include: ' + name)
+    endif
+endforeach
+
+if libnsm_all or libnsm_include.contains('debug-token')
+    sources += ['../libnsm/debug-token.c']
+endif
+if libnsm_all or libnsm_include.contains('firmware-utils')
+    sources += ['../libnsm/firmware-utils.c']
+endif
+if libnsm_all or libnsm_include.contains('network-ports')
+    sources += ['../libnsm/network-ports.c']
+endif
+if libnsm_all or libnsm_include.contains('device-capability-discovery')
+    sources += ['../libnsm/device-capability-discovery.c']
+endif
+if libnsm_all or libnsm_include.contains('device-configuration')
+    sources += ['../libnsm/device-configuration.c']
+endif
+if libnsm_all or libnsm_include.contains('diagnostics')
+    sources += ['../libnsm/diagnostics.c']
+endif
+if libnsm_all or libnsm_include.contains('platform-environmental')
+    sources += ['../libnsm/platform-environmental.c']
+endif
+if libnsm_all or libnsm_include.contains('pci-links')
+    sources += ['../libnsm/pci-links.c']
+endif
+if libnsm_all or libnsm_include.contains('network-ports')
+    sources += ['../libnsm/network-ports.c']
+endif
 
 nsmd_headers = [
     '.',
@@ -36,30 +85,76 @@ nsmd_headers = [
     'nsmDbusIfaceOverride',
 ]
 
-subdir('nsmNumericSensor')
-subdir('nsmFwSwInventory')
-subdir('nsmProcessor')
-subdir('nsmEventConfig')
-subdir('nsmChassis')
-subdir('nsmDebugToken')
-subdir('nsmPort')
-subdir('nsmDbusIfaceOverride')
-subdir('nsmSetAsync')
-subdir('nsmSPI')
-subdir('nsmMemory')
-subdir('nsmCommon')
-subdir('nsmPCIeDevice')
-subdir('nsmDeviceInventory')
-subdir('nsmDumpCollection')
-subdir('nsmSensors')
-subdir('nsmEvent')
-subdir('nsmGPM')
-subdir('nsmFirmwareUtils')
 subdir('nsmRawCommand')
-subdir('nsmManagers')
-subdir('nsmHistograms')
-subdir('nsmReady')
 subdir('nsmLongRunning')
+subdir('nsmEvent')
+subdir('nsmSetAsync')
+subdir('nsmCommon')
+
+nsmd_subdirs_all = get_option('nsmd-subdirs-all')
+nsmd_subdirs_include = get_option('nsmd-subdirs-include')
+if cx8_features
+    nsmd_subdirs_all = false
+    nsmd_subdirs_include = [
+        'nsmChassis',
+        'nsmSensors',
+        'nsmDbusIfaceOverride',
+        'nsmCommon',
+        'nsmPort',
+        'nsmDeviceInventory',
+    ]
+endif
+debug_token_enabled = get_option('enable-debug-token').enabled()
+
+valid_nsmd_subdirs = [
+    'nsmNumericSensor',
+    'nsmFwSwInventory',
+    'nsmProcessor',
+    'nsmEventConfig',
+    'nsmChassis',
+    'nsmDebugToken',
+    'nsmPort',
+    'nsmDbusIfaceOverride',
+    'nsmSPI',
+    'nsmErrorInjection',
+    'nsmMemory',
+    'nsmPCIeDevice',
+    'nsmDeviceInventory',
+    'nsmDumpCollection',
+    'nsmSensors',
+    'nsmGPM',
+    'nsmFirmwareUtils',
+    'nsmManagers',
+    'nsmHistograms',
+    'nsmReady',
+]
+
+foreach name : nsmd_subdirs_include
+    if not valid_nsmd_subdirs.contains(name)
+        warning('Unknown nsmd-subdirs-include: ' + name)
+    endif
+endforeach
+
+foreach d : valid_nsmd_subdirs
+    if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDumpCollection' and not get_option(
+        'enable-debug-info',
+    ).enabled())
+        if nsmd_subdirs_include.contains(d)
+            warning(
+                d + ' requested but required feature option is disabled; skipping',
+            )
+        endif
+        continue
+    endif
+    if nsmd_subdirs_all or nsmd_subdirs_include.contains(d)
+        subdir(d)
+        if d == 'nsmNumericSensor'
+            sources += ['nsmNumericSensor/nsmNumericSensorComposite.cpp']
+        elif d == 'nsmFwSwInventory'
+            sources += ['nsmFwSwInventory/GPUSWInventory.cpp']
+        endif
+    endif
+endforeach
 
 if get_option('tracing').enabled()
     deps += [liblttng, ldl]

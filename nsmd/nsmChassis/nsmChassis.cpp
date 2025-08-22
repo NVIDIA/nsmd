@@ -22,7 +22,7 @@
 #include "nsmCommon.hpp"
 #include "nsmDebugInfo.hpp"
 #include "nsmDevice.hpp"
-#include "nsmErrorInjectionCommon.hpp"
+#include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"

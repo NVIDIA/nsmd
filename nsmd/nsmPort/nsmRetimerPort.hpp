@@ -1,11 +1,12 @@
 #pragma once
 
 #include "libnsm/network-ports.h"
+#include "libnsm/pci-links.h"
 
 #include "common/types.hpp"
+#include "nsmCommon/nsmPcieGroup.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
-#include "nsmProcessor/nsmProcessor.hpp"
 #include "nsmSensor.hpp"
 #include "utils.hpp"
 

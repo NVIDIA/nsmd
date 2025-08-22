@@ -14,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#pragma once
 #include "asyncOperationManager.hpp"
+#include "nsmCommon/nsmPcieGroup.hpp"
+#include "nsmCommon/nsmPciePortIntf.hpp"
 #include "nsmRetimerPort.hpp"
 
 #include <xyz/openbmc_project/Inventory/Decorator/PortInfo/server.hpp>

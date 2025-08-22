@@ -17,12 +17,15 @@
 
 #include "nsmGpuPciePort.hpp"
 
+#include "libnsm/pci-links.h"
 #include "nsmPriorityMapping.h"
 
 #include "../../common/coroutine.hpp"
 #include "../../common/utils.hpp"
 #include "asyncOperationManager.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmCommon/nsmPcieGroup.hpp"
+#include "nsmCommon/nsmPciePortIntf.hpp"
 #include "nsmInterface.hpp"
 #include "nsmPCIeLinkSpeed.hpp"
 
@@ -457,7 +460,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
 
             bool priority = false;
             auto pcieECCIntf =
-                std::make_shared<PCieEccIntf>(bus, processorPath.c_str());
+                std::make_shared<PCIeEccIntf>(bus, processorPath.c_str());
             auto pcieDeviceProvider =
                 NsmInterfaceProvider(name, type, processorPath, pcieECCIntf);
 
@@ -467,7 +470,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 priority);
 
             auto pciePortIntf =
-                std::make_shared<PCieEccIntf>(bus, inventoryObjPath.c_str());
+                std::make_shared<PCIeEccIntf>(bus, inventoryObjPath.c_str());
 
             auto pciPortSensor = std::make_shared<NsmPciePortIntf>(
                 bus, name, type, inventoryObjPath);

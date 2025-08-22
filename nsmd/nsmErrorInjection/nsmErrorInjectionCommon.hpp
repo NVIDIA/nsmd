@@ -20,8 +20,8 @@
 #include "nsmPriorityMapping.h"
 
 #include "nsmDevice.hpp"
-#include "nsmErrorInjection.hpp"
-#include "nsmSetErrorInjection.hpp"
+#include "nsmErrorInjection/nsmErrorInjection.hpp"
+#include "nsmSetAsync/nsmSetErrorInjection.hpp"
 #include "sensorManager.hpp"
 
 namespace nsm
@@ -95,6 +95,7 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
                 errorInjectionEnabled, device});
         device->deviceSensors.emplace_back(setErrorInjectionEnabled);
     }
+    return;
 }
 
 inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
@@ -184,6 +185,7 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
                 setErrorInjectionPayloadSensor.get()),
             errorInjectionPayload, device});
     device->setSensors.emplace_back(setErrorInjectionPayloadSensor);
+    return;
 }
 
 } // namespace nsm
