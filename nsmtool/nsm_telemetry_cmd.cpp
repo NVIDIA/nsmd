@@ -2357,9 +2357,19 @@ class GetEccErrorCounts : public CommandInterface
 
         ordered_json result;
         result["Completion Code"] = cc;
-        result["ueCount"] = errorCounts.sram_uncorrected_parity +
-                            errorCounts.sram_uncorrected_secded;
-        result["ecCount"] = (int)errorCounts.sram_corrected;
+        result["SRAM_ERROR_THRESHOLD_EXCEEDED"] =
+            (int)errorCounts.flags.bits.bit0;
+        result["SRAM_CORRECTED_ERROR_COUNT"] =
+            (uint32_t)errorCounts.sram_corrected;
+        result["SRAM_UNCORRECTED_PARITY_ERROR_COUNT"] =
+            (uint32_t)errorCounts.sram_uncorrected_parity;
+        result["SRAM_UNCORRECTED_SECDED_ERROR_COUNT"] =
+            (uint32_t)errorCounts.sram_uncorrected_secded;
+        result["DRAM_CORRECTED_TOTAL_ERROR_COUNT"] =
+            (uint32_t)errorCounts.dram_corrected;
+        result["DRAM_UNCORRECTED_TOTAL_ERROR_COUNT"] =
+            (uint32_t)errorCounts.dram_uncorrected;
+
         nsmtool::helper::DisplayInJson(result);
     }
 };
