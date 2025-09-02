@@ -16,12 +16,16 @@
  */
 #pragma once
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 
 #include "asyncOperationManager.hpp"
 #include "nsmObjectFactory.hpp"
+#include "nsmPowerSmoothingAdminProfileIntf-v2.hpp"
 #include "nsmPowerSmoothingAdminProfileIntf.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
+#include "nsmPowerSmoothingFeatureIntf-v2.hpp"
 #include "nsmPowerSmoothingFeatureIntf.hpp"
+#include "nsmPowerSmoothingPowerProfileIntf-v2.hpp"
 #include "nsmPowerSmoothingPowerProfileIntf.hpp"
 #include "nsmSensor.hpp"
 
@@ -29,25 +33,37 @@
 
 namespace nsm
 {
-
 //  Power Smoothing Control :  Feature Info
+
 class NsmPowerSmoothing : public NsmSensor
 {
   public:
     NsmPowerSmoothing(
         std::string& name, std::string& type, std::string& inventoryObjPath,
-        std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf);
+        std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf,
+        std::shared_ptr<NsmDevice> device);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t eid,
+                                                      uint8_t instanceId);
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+                              size_t responseLen);
     void updateReading(struct nsm_pwr_smoothing_featureinfo_data* data);
     void updateMetricOnSharedMemory() override;
+
+    std::shared_ptr<NsmDevice> getDevice()
+    {
+        return device;
+    }
+
+    std::shared_ptr<OemPowerSmoothingFeatIntf> getPwrSmoothingIntf()
+    {
+        return pwrSmoothingIntf;
+    }
 
   private:
     std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf;
     std::string inventoryObjPath;
+    std::shared_ptr<NsmDevice> device;
 };
 
 //  Power Smoothing Control:  HW circuitry %Lifetime Usage telemetry
@@ -77,18 +93,28 @@ class NsmPowerSmoothingAdminOverride : public NsmSensor
     NsmPowerSmoothingAdminOverride(
         std::string& name, std::string& type,
         std::shared_ptr<OemAdminProfileIntf> adminProfileIntf,
-        std::string& inventoryObjPath);
+        std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t eid,
+                                                      uint8_t instanceId);
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+                              size_t responseLen);
     void updateReading(struct nsm_admin_override_data* data);
     std::string getInventoryObjPath();
+
+    std::shared_ptr<NsmDevice> getDevice()
+    {
+        return device;
+    }
+    std::shared_ptr<OemAdminProfileIntf> getAdminProfileIntf()
+    {
+        return adminProfileIntf;
+    }
 
   private:
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf;
     std::string inventoryObjPath;
+    std::shared_ptr<NsmDevice> device;
 };
 
 //  Get Preset Profile Information
@@ -105,10 +131,10 @@ class NsmPowerProfileCollection : public NsmSensor
                               std::string& inventoryObjPath,
                               std::shared_ptr<NsmDevice> device);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t eid,
+                                                      uint8_t instanceId);
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+                              size_t responseLen);
     std::shared_ptr<OemPowerProfileIntf>
         getSupportedProfileById(uint8_t profileId);
     bool hasProfileId(uint8_t profileId);
@@ -117,6 +143,16 @@ class NsmPowerProfileCollection : public NsmSensor
     void updateSupportedProfile(std::shared_ptr<OemPowerProfileIntf> obj,
                                 nsm_preset_profile_data* data);
     std::string getProfilePathByProfileId(uint8_t profileId);
+
+    std::shared_ptr<NsmDevice> getDevice()
+    {
+        return device;
+    }
+
+    std::string getInventoryObjPath()
+    {
+        return inventoryObjPath;
+    }
 };
 
 // Power Smoothing Control: Apply Admin Override and Activate a preset profile
@@ -163,15 +199,26 @@ class NsmCurrentPowerSmoothingProfile : public NsmSensor
         std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf,
         std::shared_ptr<NsmPowerProfileCollection>
             pwrSmoothingSupportedCollection,
-        std::shared_ptr<NsmPowerSmoothingAdminOverride> adminProfileSensor);
+        std::shared_ptr<NsmPowerSmoothingAdminOverride> adminProfileSensor,
+        std::shared_ptr<NsmDevice> device);
 
-    std::optional<std::vector<uint8_t>>
-        genRequestMsg(eid_t eid, uint8_t instanceId) override;
+    std::optional<std::vector<uint8_t>> genRequestMsg(eid_t eid,
+                                                      uint8_t instanceId);
     uint8_t handleResponseMsg(const struct nsm_msg* responseMsg,
-                              size_t responseLen) override;
+                              size_t responseLen);
     void updateReading(struct nsm_get_current_profile_data* data);
     std::string getProfilePath(uint8_t profileId);
     void updateMetricOnSharedMemory() override;
+
+    std::shared_ptr<NsmDevice> getDevice()
+    {
+        return device;
+    }
+
+    std::shared_ptr<OemCurrentPowerProfileIntf> getPwrSmoothingCurProfileIntf()
+    {
+        return pwrSmoothingCurProfileIntf;
+    }
 
   private:
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf;
@@ -179,6 +226,7 @@ class NsmCurrentPowerSmoothingProfile : public NsmSensor
         pwrSmoothingSupportedCollectionSensor;
     std::shared_ptr<NsmPowerSmoothingAdminOverride> adminProfileSensor;
     std::string inventoryObjPath;
+    std::shared_ptr<NsmDevice> device;
 };
 
 } // namespace nsm

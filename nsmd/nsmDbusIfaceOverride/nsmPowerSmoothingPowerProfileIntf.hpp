@@ -64,6 +64,10 @@ class OemPowerProfileIntf :
     {
         return inventoryObjPath;
     }
+    uint8_t getProfileId()
+    {
+        return profileId;
+    }
 
     requester::Coroutine getProfileInfoFromDevice()
     {

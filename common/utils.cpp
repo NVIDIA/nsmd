@@ -46,6 +46,7 @@ namespace utils
 
 static const boost::regex invalidDBusNameSubString{"[^a-zA-Z0-9._/]+"};
 static const uint32_t INVALID_UINT32_VALUE = 0xFFFFFFFF;
+static const uint8_t INVALID_UINT8_VALUE = 0xFF;
 uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr)
 {
     if (uuidIntArr.size() != UUID_INT_SIZE)
@@ -766,6 +767,18 @@ double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor)
     if (value == INVALID_UINT32_VALUE)
     {
         return static_cast<double>(INVALID_UINT32_VALUE);
+    }
+    else
+    {
+        return static_cast<double>(value) / scaleFactor;
+    }
+}
+
+double convertAndScaleDownUint8ToDouble(uint8_t value, double scaleFactor)
+{
+    if (value == INVALID_UINT8_VALUE)
+    {
+        return static_cast<double>(INVALID_UINT8_VALUE);
     }
     else
     {

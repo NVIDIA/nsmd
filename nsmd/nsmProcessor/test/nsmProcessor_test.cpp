@@ -1095,7 +1095,7 @@ TEST(nsmPowerSmoothing, GoodGenReq)
     auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
         bus, inventoryObjPath, nullptr);
     NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
-                                    featIntf);
+                                    featIntf, nullptr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -1114,7 +1114,7 @@ TEST(nsmPowerSmoothing, GoodHandleResp)
     auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
         bus, inventoryObjPath, nullptr);
     NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
-                                    featIntf);
+                                    featIntf, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
         0);
@@ -1135,7 +1135,7 @@ TEST(nsmPowerSmoothing, BadHandleResp)
     auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
         bus, inventoryObjPath, nullptr);
     NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
-                                    featIntf);
+                                    featIntf, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
         0);
@@ -1159,7 +1159,7 @@ TEST(nsmPowerSmoothing, GoodUpdateReading)
     auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
         bus, inventoryObjPath, nullptr);
     NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
-                                    featIntf);
+                                    featIntf, nullptr);
     struct nsm_pwr_smoothing_featureinfo_data feat;
     feat.feature_flag = 7;
     controlSensor.updateReading(&feat);
@@ -1250,7 +1250,7 @@ TEST(nsmPowerSmoothingAdminOverride, GoodGenReq)
     auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
                                                           nullptr);
     NsmPowerSmoothingAdminOverride adminProfileSensor(
-        sensorName, sensorType, featIntf, inventoryObjPath);
+        sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -1269,7 +1269,7 @@ TEST(nsmPowerSmoothingAdminOverride, GoodHandleResp)
     auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
                                                           nullptr);
     NsmPowerSmoothingAdminOverride adminProfileSensor(
-        sensorName, sensorType, featIntf, inventoryObjPath);
+        sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -1289,7 +1289,7 @@ TEST(nsmPowerSmoothingAdminOverride, BadHandleResp)
     auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
                                                           nullptr);
     NsmPowerSmoothingAdminOverride adminProfileSensor(
-        sensorName, sensorType, featIntf, inventoryObjPath);
+        sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
@@ -1312,7 +1312,7 @@ TEST(nsmPowerSmoothingAdminOverride, GoodUpdateReading)
     auto featIntf = std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
                                                           nullptr);
     NsmPowerSmoothingAdminOverride adminProfileSensor(
-        sensorName, sensorType, featIntf, inventoryObjPath);
+        sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
     struct nsm_admin_override_data adminProfileData;
     adminProfileData.admin_override_percent_tmp_floor = 0;
     adminProfileSensor.updateReading(&adminProfileData);
@@ -1407,7 +1407,7 @@ TEST(nsmCurrentPowerSmoothingProfile, GoodGenReq)
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
         std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
     auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
-        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
         std::make_shared<OemCurrentPowerProfileIntf>(
             bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
@@ -1416,7 +1416,7 @@ TEST(nsmCurrentPowerSmoothingProfile, GoodGenReq)
         sensorName, sensorType, inventoryObjPath, nullptr);
     NsmCurrentPowerSmoothingProfile currentProfileSensor(
         sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
-        getAllPowerProfileSensor, adminProfileSensor);
+        getAllPowerProfileSensor, adminProfileSensor, nullptr);
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -1436,7 +1436,7 @@ TEST(nsmCurrentPowerSmoothingProfile, GoodHandleResp)
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
         std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
     auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
-        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
         std::make_shared<OemCurrentPowerProfileIntf>(
             bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
@@ -1445,7 +1445,7 @@ TEST(nsmCurrentPowerSmoothingProfile, GoodHandleResp)
         sensorName, sensorType, inventoryObjPath, nullptr);
     NsmCurrentPowerSmoothingProfile currentProfileSensor(
         sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
-        getAllPowerProfileSensor, adminProfileSensor);
+        getAllPowerProfileSensor, adminProfileSensor, nullptr);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
@@ -1467,7 +1467,7 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
         std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath, nullptr);
     auto adminProfileSensor = std::make_shared<NsmPowerSmoothingAdminOverride>(
-        sensorName, sensorType, adminProfileIntf, inventoryObjPath);
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, nullptr);
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
         std::make_shared<OemCurrentPowerProfileIntf>(
             bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
@@ -1476,7 +1476,7 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
         sensorName, sensorType, inventoryObjPath, nullptr);
     NsmCurrentPowerSmoothingProfile currentProfileSensor(
         sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
-        getAllPowerProfileSensor, adminProfileSensor);
+        getAllPowerProfileSensor, adminProfileSensor, nullptr);
 
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
@@ -1495,6 +1495,478 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
     rc = currentProfileSensor.handleResponseMsg(response, msg_len - 1);
     EXPECT_EQ(rc, NSM_SW_ERROR_COMMAND_FAIL);
 }
+
+TEST(nsmPowerSmoothingV2, GoodGenReq)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntf>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 controlSensor(sensorName, sensorType, inventoryObjPath,
+                                      featIntf, gpuPtr);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = controlSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerSmoothingV2, GoodHandleResp)
+{
+    // response data for get_feature_info_v2
+    std::vector<uint8_t> response_data = {
+        0x07, 0x05, 0x40, 0x0d, 0x03, 0x00, 0x06, 0x05, 0xa0, 0x86, 0x01,
+        0x00, 0x05, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x04, 0x03, 0x02, 0x00,
+        0x03, 0x03, 0x5f, 0x00, 0x02, 0x05, 0x40, 0x0d, 0x03, 0x00, 0x01,
+        0x05, 0xa0, 0x86, 0x01, 0x00, 0x00, 0x05, 0x07, 0x00, 0x00, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 controlSensor(sensorName, sensorType, inventoryObjPath,
+                                      featIntf, gpuPtr);
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    uint8_t rc = encode_get_powersmoothing_featinfo_v2_resp(0, NSM_SUCCESS, 8,
+                                                            response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = controlSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingV2, BadHandleResp)
+{
+    // response data for get_feature_info_v2
+    std::vector<uint8_t> response_data = {
+        0x07, 0x05, 0x40, 0x0d, 0x03, 0x00, 0x06, 0x05, 0xa0, 0x86, 0x01,
+        0x00, 0x05, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x04, 0x03, 0x02, 0x00,
+        0x03, 0x03, 0x5f, 0x00, 0x02, 0x05, 0x40, 0x0d, 0x03, 0x00, 0x01,
+        0x05, 0xa0, 0x86, 0x01, 0x00, 0x00, 0x05, 0x07, 0x00, 0x00, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+
+    auto featIntf = std::make_shared<OemPowerSmoothingFeatIntfV2>(
+        bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingV2 controlSensor(sensorName, sensorType, inventoryObjPath,
+                                      featIntf, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = controlSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, GoodGenReq)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 adminProfileSensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+
+    auto request = adminProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command, NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, GoodHandleResp)
+{
+    // response data for get_admin_override_profile_info_v2
+    std::vector<uint8_t> response_data = {
+        0x07, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x06, 0x01, 0x14, 0x05,
+        0x01, 0x14, 0x04, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x03, 0x05,
+        0xa0, 0x86, 0x01, 0x00, 0x02, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x01, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x00, 0x03, 0x64, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 adminProfileSensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = encode_get_admin_override_profile_info_v2_resp(0, NSM_SUCCESS,
+                                                                8, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = adminProfileSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerSmoothingAdminOverrideV2, BadHandleResp)
+{
+    // response data for get_admin_override_profile_info_v2
+    std::vector<uint8_t> response_data = {
+        0x07, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x06, 0x01, 0x14, 0x05,
+        0x01, 0x14, 0x04, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x03, 0x05,
+        0xa0, 0x86, 0x01, 0x00, 0x02, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x01, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x00, 0x03, 0x64, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    auto adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    NsmPowerSmoothingAdminOverrideV2 adminProfileSensor(
+        sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = encode_get_admin_override_profile_info_v2_resp(0, NSM_SUCCESS,
+                                                                8, response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = adminProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(nsmPowerProfileCollectionV2, GoodGenReq)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    NsmPowerProfileCollectionV2 getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, gpuPtr);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+    auto request = getAllPowerProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command,
+              NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmPowerProfileCollectionV2, GoodHandleResp)
+{
+    // response data for get_preset_profile
+    std::vector<uint8_t> response_data = {
+        0x01, 0x03, 0x64, 0x00, 0x09, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x11, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x19, 0x05, 0xa0, 0x86,
+        0x01, 0x00, 0x21, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x29, 0x01,
+        0x14, 0x31, 0x01, 0x14, 0x39, 0x05, 0xa0, 0x86, 0x01, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(512);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    NsmPowerProfileCollectionV2 getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, gpuPtr);
+    uint8_t rc = encode_get_preset_profile_info_v2_resp(0, NSM_SUCCESS, 8,
+                                                        response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    size_t msg_len = responseMsg.size();
+    rc = getAllPowerProfileSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmPowerProfileCollectionV2, BadHandleResp)
+{
+    // response data for get_preset_profile
+    std::vector<uint8_t> response_data = {
+        0x01, 0x03, 0x64, 0x00, 0x09, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x11, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x19, 0x05, 0xa0, 0x86,
+        0x01, 0x00, 0x21, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x29, 0x01,
+        0x14, 0x31, 0x01, 0x14, 0x39, 0x05, 0xa0, 0x86, 0x01, 0x00};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(512);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    NsmPowerProfileCollectionV2 getAllPowerProfileSensor(
+        sensorName, sensorType, inventoryObjPath, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = getAllPowerProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, GoodGenReq)
+{
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    const uint8_t eid{12};
+    const uint8_t instance_id{30};
+    auto request = currentProfileSensor.genRequestMsg(eid, instance_id);
+    EXPECT_EQ(request.has_value(), true);
+    auto msg = reinterpret_cast<const nsm_msg*>(request->data());
+    auto command = reinterpret_cast<const nsm_common_req*>(msg->payload);
+    EXPECT_EQ(command->command,
+              NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2);
+    EXPECT_EQ(command->data_size, 0);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, GoodHandleResp)
+{
+    // response data for get_current_profile_info_v2
+    std::vector<uint8_t> response_data = {
+        0x09, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x08, 0x01, 0x14, 0x07, 0x01, 0x14,
+        0x06, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x05, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x04, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x03, 0x05, 0xa0, 0x86, 0x00, 0x00,
+        0x02, 0x03, 0xa0, 0x86, 0x01, 0x03, 0xa0, 0x86, 0x00, 0x01, 0x01};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = encode_get_current_profile_info_v2_resp(0, NSM_SUCCESS, 10,
+                                                         response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = currentProfileSensor.handleResponseMsg(response, msg_len);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(nsmCurrentPowerSmoothingProfileV2, BadHandleResp)
+{
+    // response data for get_current_profile_info_v2
+    std::vector<uint8_t> response_data = {
+        0x0a, 0x00, 0x09, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x08, 0x01,
+        0x14, 0x07, 0x01, 0x14, 0x06, 0x05, 0xa0, 0x86, 0x01, 0x00,
+        0x05, 0x05, 0xa0, 0x86, 0x01, 0x00, 0x04, 0x05, 0xa0, 0x86,
+        0x01, 0x00, 0x03, 0x05, 0xa0, 0x86, 0x00, 0x00, 0x02, 0x03,
+        0xa0, 0x86, 0x01, 0x03, 0xa0, 0x86, 0x00, 0x01, 0x01};
+    std::vector<uint8_t> responseMsg(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    responseMsg.reserve(256);
+    responseMsg.insert(responseMsg.end(), response_data.begin(),
+                       response_data.end());
+    auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
+    const uuid_t gpuUuid = "992b3ec1-e468-f145-8686-409009062aa8";
+    std::shared_ptr<NsmDevice> gpuPtr = std::make_shared<NsmDevice>(gpuUuid);
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2] = true;
+    gpuPtr->messageTypesToCommandCodeMatrix
+        [NSM_TYPE_PLATFORM_ENVIRONMENTAL]
+        [NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2] = true;
+    std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
+        std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath, gpuPtr);
+    auto adminProfileSensor =
+        std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+            sensorName, sensorType, adminProfileIntf, inventoryObjPath, gpuPtr);
+    std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
+        std::make_shared<OemCurrentPowerProfileIntf>(
+            bus, inventoryObjPath, adminProfileIntf->getInventoryObjPath(),
+            gpuPtr);
+    auto getAllPowerProfileSensor =
+        std::make_shared<NsmPowerProfileCollectionV2>(sensorName, sensorType,
+                                                      inventoryObjPath, gpuPtr);
+    NsmCurrentPowerSmoothingProfileV2 currentProfileSensor(
+        sensorName, sensorType, inventoryObjPath, pwrSmoothingCurProfileIntf,
+        getAllPowerProfileSensor, adminProfileSensor, gpuPtr);
+    size_t msg_len = responseMsg.size();
+    uint8_t rc = encode_get_current_profile_info_v2_resp(0, NSM_SUCCESS, 10,
+                                                         response);
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    rc = currentProfileSensor.handleResponseMsg(NULL, msg_len);
+    EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
 struct NsmProcessorTest :
     public testing::Test,
     public utils::DBusTest,

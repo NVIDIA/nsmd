@@ -38,6 +38,7 @@ dep_src_files = [
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
+    '../../../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/network-ports.c',
     '../../../libnsm/device-configuration.c',

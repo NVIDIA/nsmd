@@ -8,6 +8,7 @@ sources = [
     '../libnsm/device-configuration.c',
     '../libnsm/diagnostics.c',
     '../libnsm/platform-environmental.c',
+    '../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../libnsm/pci-links.c',
     '../libnsm/instance-id.c',
     '../libnsm/requester/mctp.c',

@@ -32,6 +32,7 @@
 #include "nsmLogInfo.hpp"
 #include "nsmLongRunningSensor.hpp"
 #include "nsmPowerCapIface.hpp"
+#include "nsmPowerSmoothing-v2.hpp"
 #include "nsmPowerSmoothing.hpp"
 #include "nsmPowerSmoothingCurrentProfileIface.hpp"
 #include "nsmPowerSmoothingFeatureIntf.hpp"

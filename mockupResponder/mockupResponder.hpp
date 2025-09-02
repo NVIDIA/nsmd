@@ -22,6 +22,7 @@
 #include "diagnostics.h"
 #include "network-ports.h"
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 #include "requester/mctp.h"
 
 #include "types.hpp"
@@ -44,6 +45,81 @@ const std::unordered_map<uint8_t, uint64_t> resetMetricsMockTable = {
     {5, 25},  // FundamentalResetExitCount
     {6, 10},  // IRoTResetExitCount
     {7, 2}    // LastResetType (enum8: e.g., 2 = Fundamental)
+};
+
+const std::unordered_map<uint8_t, uint64_t> powerSmoothingFeatureInfoMockTable =
+    {
+        {0, 15},     // Feature Flag
+        {1, 100000}, // Current TMP Setting
+        {2, 200000}, // Current TMP Floor Setting
+        {3, 95},     // Max TMP Floor Setting in Percent
+        {4, 2},      // Min TMP Floor Setting in Percent
+        {5, 100000}, // Current Primary Floor window multiplier
+        {6, 100000}, // Min Primary Floor activation offset
+        {7, 200000}  // Min Primary Floor target window multiplier
+};
+
+const std::unordered_map<uint8_t, uint64_t> currentProfileInfoMockTable = {
+    {0, 1},      // Active preset profile
+    {1, 100000}, // Admin override mask
+    {2, 100},    // Current Percent TMP Floor
+    {3, 100000}, // Current RampUp Rate in Milliwatts per Second
+    {4, 100000}, // Current Rampdown Rate in Milliwatts per Second
+    {5, 100000}, // Current Hysteresis Value in Milliseconds
+    {6, 100000}, // Current Secondary Floor Setting
+    {7, 20},     // Current Primary Floor Activation window multiplier
+    {8, 20},     // Current Primary Floor target Window Multiplier
+    {9, 100000}  // Current Primary Floor activation offset
+};
+
+const std::unordered_map<uint8_t, uint64_t> presetProfileInfoMockTable = {
+    // Profile 0
+    {0, 100},     // TMP Floor Setting in Percent
+    {8, 100000},  // Ramp-up rate in Milliwatts per Second
+    {16, 100000}, // Ramp-down rate in Milliwatts per Third
+    {24, 100000}, // Hysteresis for ramp down in Milliseconds
+    {32, 100000}, // Current secondary floor setting
+    {40, 20},     // Current primary floor activation window multiplier
+    {48, 20},     // Current primary floor target window multiplier
+    {56, 100000}, // Current primary floor activation offset
+    // Profile 1
+    {1, 110},     // TMP Floor Setting in Percent
+    {9, 110000},  // Ramp-up rate in Milliwatts per Second
+    {17, 110000}, // Ramp-down rate in Milliwatts per Third
+    {25, 110000}, // Hysteresis for ramp down in Milliseconds
+    {33, 110000}, // Current secondary floor setting
+    {41, 21},     // Current primary floor activation window multiplier
+    {49, 21},     // Current primary floor target window multiplier
+    {57, 110000}, // Current primary floor activation offset
+    // Profile 2
+    {2, 120},     // TMP Floor Setting in Percent
+    {10, 120000}, // Ramp-up rate in Milliwatts per Second
+    {18, 120000}, // Ramp-down rate in Milliwatts per Third
+    {26, 120000}, // Hysteresis for ramp down in Milliseconds
+    {34, 120000}, // Current secondary floor setting
+    {42, 22},     // Current primary floor activation window multiplier
+    {50, 22},     // Current primary floor target window multiplier
+    {58, 120000}, // Current primary floor activation offset
+    // Profile 3
+    {3, 130},     // TMP Floor Setting in Percent
+    {11, 130000}, // Ramp-up rate in Milliwatts per Second
+    {19, 130000}, // Ramp-down rate in Milliwatts per Third
+    {27, 130000}, // Hysteresis for ramp down in Milliseconds
+    {35, 130000}, // Current secondary floor setting
+    {43, 23},     // Current primary floor activation window multiplier
+    {51, 23},     // Current primary floor target window multiplier
+    {59, 130000}  // Current primary floor activation offset
+};
+
+const std::unordered_map<uint8_t, uint64_t> adminOverrideMockTable = {
+    {0, 100},    // TMP Floor Setting in Percent
+    {1, 100000}, // Ramp-up rate in Milliwatts per Second
+    {2, 100000}, // Ramp-down rate in Milliwatts per Third
+    {3, 100000}, // Hysteresis for ramp down in Milliseconds
+    {4, 100000}, // Current secondary floor setting
+    {5, 20},     // Current primary floor activation window multiplier
+    {6, 20},     // Current primary floor target window multiplier
+    {7, 100000}  // Current primary floor activation offset
 };
 
 constexpr uint8_t MCTP_MSG_TYPE_VDM = 0x7e;
@@ -360,13 +436,22 @@ class MockupResponder
         getPowerSmoothingFeatureInfo(const nsm_msg* requestMsg,
                                      size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getPowerSmoothingFeatureInfoV2(const nsm_msg* requestMsg,
+                                       size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getHwCircuiteryUsage(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         getCurrentProfileInfo(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getCurrentProfileInfoV2(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getQueryAdminOverride(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getQueryAdminOverrideV2(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         setActivePresetProfile(const nsm_msg* requestMsg, size_t requestLen);
@@ -385,6 +470,9 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         getPresetProfileInfo(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getPresetProfileInfoV2(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         updatePresetProfileParams(const nsm_msg* requestMsg, size_t requestLen);

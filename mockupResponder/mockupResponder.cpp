@@ -25,6 +25,7 @@
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 
 #include "gpmMetricsList.hpp"
 #include "types.hpp"
@@ -517,12 +518,18 @@ std::optional<Response>
                     return toggleFeatureState(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_FEATURE_INFO:
                     return getPowerSmoothingFeatureInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2:
+                    return getPowerSmoothingFeatureInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE:
                     return getHwCircuiteryUsage(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION:
                     return getCurrentProfileInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2:
+                    return getCurrentProfileInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE:
                     return getQueryAdminOverride(request, requestLen);
+                case NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2:
+                    return getQueryAdminOverrideV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE:
                     return setActivePresetProfile(request, requestLen);
                 case NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE:
@@ -533,6 +540,8 @@ std::optional<Response>
                     return toggleImmediateRampDown(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION:
                     return getPresetProfileInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2:
+                    return getPresetProfileInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS:
                     return updatePresetProfileParams(request, requestLen);
                 /*
@@ -833,10 +842,11 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
-                      15,  16,  17,  69,  70,  71,  73,  74,  77,  78,  79,
-                      97,  118, 113, 114, 115, 116, 117, 119, 120, 121, 122,
-                      123, 124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
+                 {3,
+                  {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,  15,
+                   16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  97,  114,
+                   115, 116, 117, 119, 121, 123, 124, 125, 126, 127, 163, 164,
+                   165, 166, 167, 168, 169, 170, 172, 173, 118, 113, 122, 120}},
                  {4,
                   {0, NSM_GET_DEVICE_DIAGNOSTICS,
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
@@ -2323,6 +2333,102 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getPowerSmoothingFeatureInfoV2(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPowerSmoothingFeatureInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_powersmoothing_featinfo_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_powersmoothing_featinfo_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock power smoothing feature info data
+    for (const auto& [tag, mockValue] : powerSmoothingFeatureInfoMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeFeatureFlagSample(static_cast<uint32_t>(mockValue),
+                                         reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentTMPSettingSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentTMPFloorSettingSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeMaxTmpFloorSettingSample(
+                static_cast<uint16_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeMinTmpFloorSettingSample(
+                static_cast<uint16_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeFloorWindowMultiplierSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeMinPrimaryFloorActivationOffset(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeMinPrimaryFloorActivationPoint(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_powersmoothing_featinfo_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getHwCircuiteryUsage(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
@@ -2415,6 +2521,112 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentProfileInfoV2(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getCurrentProfileInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_current_profile_info_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_current_profile_info_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock current profile info data
+    for (const auto& [tag, mockValue] : currentProfileInfoMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeActivePresetProfileSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeAdminOverrideMaskSample(static_cast<uint16_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint16_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 8)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 9)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_current_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getQueryAdminOverride(const nsm_msg* requestMsg,
                                            size_t requestLen)
 {
@@ -2454,6 +2666,104 @@ std::optional<std::vector<uint8_t>>
                    rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getQueryAdminOverrideV2(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getQueryAdminOverrideV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_admin_override_profile_info_v2_req(requestMsg,
+                                                            requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_get_admin_override_profile_info_v2_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock admin override profile info data
+    for (const auto& [tag, mockValue] : adminOverrideMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_admin_override_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
     return response;
 }
 
@@ -2721,6 +3031,103 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_get_preset_profile_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPresetProfileInfoV2(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPresetProfileInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_preset_profile_info_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_preset_profile_info_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(512);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock preset profile info data
+    for (const auto& [tmpTag, mockValue] : presetProfileInfoMockTable)
+    {
+        ++samplesCount;
+        uint8_t tag = tmpTag >> 3;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tmpTag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_preset_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
     return response;
 }
 

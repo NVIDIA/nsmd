@@ -3696,9 +3696,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         auto priority = co_await utils::coGetDbusProperty<bool>(
             objPath.c_str(), "Priority", interface.c_str());
 
-        std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf =
-            std::make_shared<OemPowerSmoothingFeatIntf>(bus, inventoryObjPath,
-                                                        nsmDevice);
+        std::shared_ptr<OemPowerSmoothingFeatIntfV2> pwrSmoothingIntf =
+            std::make_shared<OemPowerSmoothingFeatIntfV2>(bus, inventoryObjPath,
+                                                          nsmDevice);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(pwrSmoothingIntf->getInventoryObjPath())
@@ -3707,7 +3707,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 "PowerSmoothingEnabled",
                 AsyncSetOperationInfo{
                     std::bind_front(
-                        &OemPowerSmoothingFeatIntf::setPowerSmoothingEnabled,
+                        &OemPowerSmoothingFeatIntfV2::setPowerSmoothingEnabled,
                         pwrSmoothingIntf),
                     {},
                     nsmDevice});
@@ -3718,22 +3718,22 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 pwrSmoothingIntf->PowerSmoothingIntf::interface,
                 "ImmediateRampDownEnabled",
                 AsyncSetOperationInfo{
-                    std::bind_front(
-                        &OemPowerSmoothingFeatIntf::setImmediateRampDownEnabled,
-                        pwrSmoothingIntf),
+                    std::bind_front(&OemPowerSmoothingFeatIntfV2::
+                                        setImmediateRampDownEnabled,
+                                    pwrSmoothingIntf),
                     {},
                     nsmDevice});
-        auto controlSensor = std::make_shared<NsmPowerSmoothing>(
-            name, type, inventoryObjPath, pwrSmoothingIntf);
+        auto controlSensor = std::make_shared<NsmPowerSmoothingV2>(
+            name, type, inventoryObjPath, pwrSmoothingIntf, nsmDevice);
         nsmDevice->deviceSensors.emplace_back(controlSensor);
 
         auto lifetimeCicuitrySensor = std::make_shared<NsmHwCircuitryTelemetry>(
             name, type, inventoryObjPath, pwrSmoothingIntf);
         nsmDevice->deviceSensors.emplace_back(lifetimeCicuitrySensor);
 
-        std::shared_ptr<OemAdminProfileIntf> adminProfileIntf =
-            std::make_shared<OemAdminProfileIntf>(bus, inventoryObjPath,
-                                                  nsmDevice);
+        std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
+            std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath,
+                                                    nsmDevice);
 
         AsyncOperationManager::getInstance()
             ->getDispatcher(adminProfileIntf->getInventoryObjPath())
@@ -3741,7 +3741,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 adminProfileIntf->AdminPowerProfileIntf::interface,
                 "TMPFloorPercent",
                 AsyncSetOperationInfo{
-                    std::bind_front(&OemAdminProfileIntf::setTmpFloorPercent,
+                    std::bind_front(&OemAdminProfileIntfV2::setTmpFloorPercent,
                                     adminProfileIntf),
                     {},
                     nsmDevice});
@@ -3751,7 +3751,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 adminProfileIntf->AdminPowerProfileIntf::interface,
                 "RampUpRate",
                 AsyncSetOperationInfo{
-                    std::bind_front(&OemAdminProfileIntf::setRampUpRate,
+                    std::bind_front(&OemAdminProfileIntfV2::setRampUpRate,
                                     adminProfileIntf),
                     {},
                     nsmDevice});
@@ -3762,7 +3762,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 adminProfileIntf->AdminPowerProfileIntf::interface,
                 "RampDownRate",
                 AsyncSetOperationInfo{
-                    std::bind_front(&OemAdminProfileIntf::setRampDownRate,
+                    std::bind_front(&OemAdminProfileIntfV2::setRampDownRate,
                                     adminProfileIntf),
                     {},
                     nsmDevice});
@@ -3772,18 +3772,64 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 adminProfileIntf->AdminPowerProfileIntf::interface,
                 "RampDownHysteresis",
                 AsyncSetOperationInfo{
-                    std::bind_front(&OemAdminProfileIntf::setRampDownHysteresis,
+                    std::bind_front(
+                        &OemAdminProfileIntfV2::setRampDownHysteresis,
+                        adminProfileIntf),
+                    {},
+                    nsmDevice});
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(adminProfileIntf->getInventoryObjPath())
+            ->addAsyncSetOperation(
+                adminProfileIntf->AdminPowerProfileIntf::interface,
+                "SecondaryPowerFloorSetting",
+                AsyncSetOperationInfo{
+                    std::bind_front(
+                        &OemAdminProfileIntfV2::setSecondaryPowerFloor,
+                        adminProfileIntf),
+                    {},
+                    nsmDevice});
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(adminProfileIntf->getInventoryObjPath())
+            ->addAsyncSetOperation(
+                adminProfileIntf->AdminPowerProfileIntf::interface,
+                "PrimaryFloorActivationWindowMultiplier",
+                AsyncSetOperationInfo{
+                    std::bind_front(
+                        &OemAdminProfileIntfV2::
+                            setPrimaryFloorActivationWindowMultiplier,
+                        adminProfileIntf),
+                    {},
+                    nsmDevice});
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(adminProfileIntf->getInventoryObjPath())
+            ->addAsyncSetOperation(
+                adminProfileIntf->AdminPowerProfileIntf::interface,
+                "PrimaryFloorTargetWindowMultiplier",
+                AsyncSetOperationInfo{
+                    std::bind_front(&OemAdminProfileIntfV2::
+                                        setPrimaryFloorTargetWindowMultiplier,
                                     adminProfileIntf),
+                    {},
+                    nsmDevice});
+        AsyncOperationManager::getInstance()
+            ->getDispatcher(adminProfileIntf->getInventoryObjPath())
+            ->addAsyncSetOperation(
+                adminProfileIntf->AdminPowerProfileIntf::interface,
+                "PrimaryFloorActivationOffset",
+                AsyncSetOperationInfo{
+                    std::bind_front(
+                        &OemAdminProfileIntfV2::setPrimaryFloorActivationOffset,
+                        adminProfileIntf),
                     {},
                     nsmDevice});
 
         auto adminProfileSensor =
-            std::make_shared<NsmPowerSmoothingAdminOverride>(
-                name, type, adminProfileIntf, inventoryObjPath);
+            std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
+                name, type, adminProfileIntf, inventoryObjPath, nsmDevice);
         nsmDevice->deviceSensors.emplace_back(adminProfileSensor);
 
         auto getAllPowerProfileSensor =
-            std::make_shared<NsmPowerProfileCollection>(
+            std::make_shared<NsmPowerProfileCollectionV2>(
                 name, type, inventoryObjPath, nsmDevice);
         nsmDevice->deviceSensors.emplace_back(getAllPowerProfileSensor);
 
@@ -3793,9 +3839,9 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 nsmDevice);
 
         auto currentProfileSensor =
-            std::make_shared<NsmCurrentPowerSmoothingProfile>(
+            std::make_shared<NsmCurrentPowerSmoothingProfileV2>(
                 name, type, inventoryObjPath, pwrSmoothingCurProfileIntf,
-                getAllPowerProfileSensor, adminProfileSensor);
+                getAllPowerProfileSensor, adminProfileSensor, nsmDevice);
 
         std::shared_ptr<NsmPowerSmoothingAction> pwrSmoothingAction =
             std::make_shared<NsmPowerSmoothingAction>(
@@ -3804,6 +3850,17 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
         /*,pwrSmoothingAction*/
         // nsmDevice->deviceSensors.emplace_back(currentProfileSensor);
         nsmDevice->deviceSensors.emplace_back(pwrSmoothingAction);
+        // power smoothing supported version
+        std::string revisionPath = inventoryObjPath +
+                                   "/power_smoothing_metadata";
+        std::shared_ptr<RevisionIntf> revisionIntf =
+            std::make_shared<RevisionIntf>(bus, revisionPath.c_str());
+        auto pwrSmoothingSupportedVersionSensor =
+            std::make_shared<NsmPowerSmoothingSupportedVersion>(
+                name, type, revisionPath, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+                revisionIntf);
+        revisionIntf->version("nan");
+        nsmDevice->addStaticSensor(pwrSmoothingSupportedVersionSensor);
 
         nsmDevice->addSensor(getAllPowerProfileSensor, priority);
         nsmDevice->addSensor(adminProfileSensor, priority);

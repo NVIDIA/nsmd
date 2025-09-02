@@ -616,6 +616,13 @@ std::string requestMsgToHexString(std::vector<uint8_t>& requestMsg);
 double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor);
 
 /**
+ * @brief Convert uint8 to double with safe check.
+ *
+ * @param uint8_t value to be converted to double
+ */
+double convertAndScaleDownUint8ToDouble(uint8_t value, double scaleFactor);
+
+/**
  * @brief Convert uint64 to double with safe check.
  *
  * @param uint64_t value to be converted to double
