@@ -529,3 +529,393 @@ TEST(decode_nsm_get_event_log_record_resp, testGoodDecodeResponse)
 	EXPECT_EQ(payload_len, 0);
 	EXPECT_TRUE(payload == NULL);
 }
+
+TEST(encode_nsm_get_device_capabilities_v2_req, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_get_device_capabilities_v2_req(0, request);
+
+	struct nsm_get_device_capabilities_v2_req *req =
+	    reinterpret_cast<struct nsm_get_device_capabilities_v2_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SUCCESS);
+
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+		  request->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_DEVICE_CAPABILITIES_V2, req->hdr.command);
+	EXPECT_EQ(0, req->hdr.data_size);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_req, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x80, // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_CAPABILITIES_V2,	  // command
+	    0x00				  // data_size
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_nsm_get_device_capabilities_v2_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SUCCESS);
+}
+
+TEST(encode_nsm_get_device_capabilities_v2_resp, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_resp) -
+	    1 + NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE);
+
+	enum8 timestamp_generation = 1;
+	uint32_t maximum_input_buffer_size = 0x12345678;
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto rc = encode_nsm_get_device_capabilities_v2_resp(
+	    0, NSM_SUCCESS, 0, timestamp_generation, maximum_input_buffer_size,
+	    response);
+
+	struct nsm_get_device_capabilities_v2_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_capabilities_v2_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+		  response->hdr.nvidia_msg_type);
+
+	EXPECT_EQ(NSM_GET_DEVICE_CAPABILITIES_V2, resp->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp->hdr.completion_code);
+	EXPECT_EQ(2, resp->hdr.telemetry_count);
+
+	// Verify the tagged data format
+	uint8_t *data = &(resp->payload[0]);
+
+	// First tag: NSM_TAG_TIMESTAMP_GENERATION (0)
+	EXPECT_EQ(0, data[0]);	  // tag
+	EXPECT_EQ(0x01, data[1]); // valid=1, length=0, reserved=0
+	EXPECT_EQ(timestamp_generation, data[2]); // value
+
+	// Second tag: NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE (1)
+	EXPECT_EQ(1, data[3]);	  // tag
+	EXPECT_EQ(0x05, data[4]); // valid=1, length=2, reserved=0
+	EXPECT_EQ(0x78, data[5]); // value (little endian)
+	EXPECT_EQ(0x56, data[6]);
+	EXPECT_EQ(0x34, data[7]);
+	EXPECT_EQ(0x12, data[8]);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE, // PCI VID: NVIDIA 0x10DE
+	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89, // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
+	    NSM_GET_DEVICE_CAPABILITIES_V2,	  // command
+	    NSM_SUCCESS,			  // completion code
+	    2,
+	    0,	  // telemetry_count (2 tags)
+	    0,	  // NSM_TAG_TIMESTAMP_GENERATION tag
+	    0x01, // valid=1, length=0, reserved=0
+	    2,	  // timestamp_generation value
+	    1,	  // NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE tag
+	    0x05, // valid=1, length=2, reserved=0
+	    0x78,
+	    0x56,
+	    0x34,
+	    0x12 // maximum_input_buffer_size (little endian)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, msg_len, &cc, &reason_code, &timestamp_generation,
+	    &maximum_input_buffer_size);
+
+	EXPECT_EQ(rc, NSM_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(timestamp_generation,
+		  NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_MONOTONIC_TIME);
+	EXPECT_EQ(maximum_input_buffer_size, 0x12345678);
+}
+
+TEST(encode_nsm_get_device_capabilities_v2_req, testNullPointer)
+{
+	auto rc = encode_nsm_get_device_capabilities_v2_req(0, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_req, testNullPointer)
+{
+	auto rc = decode_nsm_get_device_capabilities_v2_req(NULL, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_req, testInvalidLength)
+{
+	std::vector<uint8_t> requestMsg{0x10, 0xDE}; // Too short
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = decode_nsm_get_device_capabilities_v2_req(request,
+							    requestMsg.size());
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(encode_nsm_get_device_capabilities_v2_resp, testNullPointer)
+{
+	auto rc = encode_nsm_get_device_capabilities_v2_resp(0, NSM_SUCCESS, 0,
+							     1, 1024, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testNullPointers)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,
+	    0x00,
+	    0x89,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_DEVICE_CAPABILITIES_V2,
+	    NSM_SUCCESS,
+	    0,
+	    0,
+	    2,
+	    0,	  // telemetry_count (2 tags)
+	    0,	  // NSM_TAG_TIMESTAMP_GENERATION tag
+	    0x01, // valid=1, length=0, reserved=0
+	    2,	  // timestamp_generation value
+	    1,	  // NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE tag
+	    0x05, // valid=1, length=2, reserved=0
+	    0x78,
+	    0x56,
+	    0x34,
+	    0x12};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Test NULL cc
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), NULL, &reason_code,
+	    &timestamp_generation, &maximum_input_buffer_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL reason_code
+	uint8_t cc = 0;
+	rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, NULL, &timestamp_generation,
+	    &maximum_input_buffer_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL timestamp_generation
+	rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code, NULL,
+	    &maximum_input_buffer_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test NULL maximum_input_buffer_size
+	rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &timestamp_generation, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testInvalidLength)
+{
+	std::vector<uint8_t> responseMsg{0x10, 0xDE}; // Too short
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &timestamp_generation, &maximum_input_buffer_size);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(encode_decode_nsm_get_device_capabilities_v2_resp, testRoundTrip)
+{
+	// Test that encode and decode work together correctly
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_resp) +
+	    -1 + NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE);
+
+	enum8 original_timestamp_generation =
+	    NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_MONOTONIC_TIME;
+	uint32_t original_maximum_input_buffer_size = 0x12345678;
+
+	// Encode the response
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	auto encode_rc = encode_nsm_get_device_capabilities_v2_resp(
+	    0, NSM_SUCCESS, 0, original_timestamp_generation,
+	    original_maximum_input_buffer_size, response);
+
+	EXPECT_EQ(encode_rc, NSM_SUCCESS);
+
+	// Decode the response
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 decoded_timestamp_generation = 0;
+	uint32_t decoded_maximum_input_buffer_size = 0;
+
+	auto decode_rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &decoded_timestamp_generation, &decoded_maximum_input_buffer_size);
+
+	EXPECT_EQ(decode_rc, NSM_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(decoded_timestamp_generation, original_timestamp_generation);
+	EXPECT_EQ(decoded_maximum_input_buffer_size,
+		  original_maximum_input_buffer_size);
+}
+
+TEST(encode_nsm_get_device_capabilities_v2_resp, testErrorResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_resp) -
+	    1 + NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE);
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Test with error completion code
+	auto rc = encode_nsm_get_device_capabilities_v2_resp(
+	    0, NSM_ERR_INVALID_DATA, 0x1234, 1, 1024, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify the response contains the error code
+	struct nsm_get_device_capabilities_v2_resp *resp =
+	    reinterpret_cast<struct nsm_get_device_capabilities_v2_resp *>(
+		response->payload);
+	EXPECT_EQ(resp->hdr.completion_code, NSM_ERR_INVALID_DATA);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testInvalidTagValue)
+{
+	// Test with invalid tag value
+	std::vector<uint8_t> responseMsg{0x10,
+					 0xDE,
+					 0x00,
+					 0x89,
+					 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+					 NSM_GET_DEVICE_CAPABILITIES_V2,
+					 NSM_SUCCESS,
+					 2,
+					 0, // telemetry_count = 2
+					 0xFF,
+					 0x01,
+					 2, // Invalid tag 0xFF
+					 1,
+					 0x05,
+					 0x78,
+					 0x56,
+					 0x34,
+					 0x12};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &timestamp_generation, &maximum_input_buffer_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testInvalidValidFlag)
+{
+	// Test with invalid valid flag (should be 1)
+	std::vector<uint8_t> responseMsg{0x10,
+					 0xDE,
+					 0x00,
+					 0x89,
+					 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+					 NSM_GET_DEVICE_CAPABILITIES_V2,
+					 NSM_SUCCESS,
+					 2,
+					 0, // telemetry_count = 2
+					 0,
+					 0x00,
+					 2, // valid=0 (invalid)
+					 1,
+					 0x05,
+					 0x78,
+					 0x56,
+					 0x34,
+					 0x12};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &timestamp_generation, &maximum_input_buffer_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_DATA);
+}
+
+TEST(decode_nsm_get_device_capabilities_v2_resp, testInsufficientTelemetryCount)
+{
+	// Test with telemetry_count < 2
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,
+	    0x00,
+	    0x89,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_DEVICE_CAPABILITIES_V2,
+	    NSM_SUCCESS,
+	    1,
+	    0, // telemetry_count = 1 (should be >= 2)
+	    3,
+	    0, // data_size = 3 (only one tag)
+	    0,
+	    0x01,
+	    2 // Only one tag
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	enum8 timestamp_generation = 0;
+	uint32_t maximum_input_buffer_size = 0;
+
+	auto rc = decode_nsm_get_device_capabilities_v2_resp(
+	    response, responseMsg.size(), &cc, &reason_code,
+	    &timestamp_generation, &maximum_input_buffer_size);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}

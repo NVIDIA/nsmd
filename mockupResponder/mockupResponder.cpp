@@ -397,6 +397,8 @@ std::optional<Response>
                     return getHistogramFormatHandler(request, requestLen);
                 case NSM_GET_HISTOGRAM_DATA:
                     return getHistogramDataHandler(request, requestLen);
+                case NSM_GET_DEVICE_CAPABILITIES_V2:
+                    return getDeviceCapabilitiesV2Handler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -837,7 +839,8 @@ std::optional<std::vector<uint8_t>>
              {
                  {0,
                   {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
-                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
+                   NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 8, 9, 10, 11, 14, 68, 69}},
                  {2, {4}},
                  {3, {12}},
@@ -851,7 +854,7 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
-                 {0, {0, 1, 2, 5, 6, 7, 9, 10}},
+                 {0, {0, 1, 2, 5, 6, 7, 9, 10, NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
                    NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS}},
@@ -873,7 +876,8 @@ std::optional<std::vector<uint8_t>>
              {
                  {0,
                   {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
-                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
+                   NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
@@ -889,7 +893,7 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_EROT,
              {
-                 {0, {0, 1, 2, 9}},
+                 {0, {0, 1, 2, 9, NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {6,
                   {NSM_FW_GET_EROT_STATE_INFORMATION,
                    NSM_FW_IRREVERSABLE_CONFIGURATION,
@@ -6281,6 +6285,46 @@ std::optional<Response>
                    "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceCapabilitiesV2Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    static const uint32_t maxInputBufferSize = 4096;
+
+    if (verbose)
+    {
+        lg2::info("getDeviceCapabilitiesV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_nsm_get_device_capabilities_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_device_capabilities_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_resp) - 1 +
+            NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_nsm_get_device_capabilities_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_EPOCH_TIME,
+        maxInputBufferSize, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_get_device_capabilities_v2_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 

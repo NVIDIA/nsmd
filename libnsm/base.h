@@ -94,7 +94,8 @@ enum nsm_device_capability_discovery_commands {
 	NSM_GET_DEVICE_CAPABILITIES = 0x0B,
 	NSM_DISCOVER_HISTOGRAM = 0x0C,
 	NSM_GET_HISTOGRAM_FORMAT = 0x0D,
-	NSM_GET_HISTOGRAM_DATA = 0x0E
+	NSM_GET_HISTOGRAM_DATA = 0x0E,
+	NSM_GET_DEVICE_CAPABILITIES_V2 = 0x11,
 };
 
 /** @brief NSM Debug Token Commands

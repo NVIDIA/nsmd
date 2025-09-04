@@ -17,6 +17,7 @@
 
 #include "device-capability-discovery.h"
 #include "base.h"
+#include "firmware-utils.h"
 #include <endian.h>
 #include <stdio.h>
 #include <string.h>
@@ -525,4 +526,159 @@ int decode_nsm_rediscovery_event(const struct nsm_msg *msg, size_t msg_len,
 	*event_state = le16toh(event->event_state);
 
 	return NSM_SUCCESS;
+}
+
+int encode_nsm_get_device_capabilities_v2_req(uint8_t instance_id,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_capabilities_v2_req *request =
+	    (struct nsm_get_device_capabilities_v2_req *)msg->payload;
+	request->hdr.command = NSM_GET_DEVICE_CAPABILITIES_V2;
+	request->hdr.data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_get_device_capabilities_v2_req(const struct nsm_msg *msg,
+					      size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_capabilities_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_get_device_capabilities_v2_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t timestamp_generation, uint32_t maximum_input_buffer_size,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_CAPABILITIES_V2, msg);
+	}
+
+	struct nsm_get_device_capabilities_v2_resp *response =
+	    (struct nsm_get_device_capabilities_v2_resp *)msg->payload;
+	response->hdr.command = NSM_GET_DEVICE_CAPABILITIES_V2;
+	response->hdr.completion_code = cc;
+
+	uint16_t telemetry_count = 0;
+	uint16_t msg_size = sizeof(struct nsm_common_telemetry_resp);
+
+	uint8_t *data = &(response->payload[0]);
+	encode_nsm_firmware_aggregate_tag_uint8(
+	    &data, NSM_TAG_TIMESTAMP_GENERATION, timestamp_generation,
+	    &msg_size);
+	++telemetry_count;
+	encode_nsm_firmware_aggregate_tag_uint32(
+	    &data, NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE, maximum_input_buffer_size,
+	    &msg_size);
+	++telemetry_count;
+	response->hdr.telemetry_count = htole16(telemetry_count);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_get_device_capabilities_v2_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t *timestamp_generation,
+    uint32_t *maximum_input_buffer_size)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    timestamp_generation == NULL || maximum_input_buffer_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_firmware_aggregate_tag)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_capabilities_v2_resp *response =
+	    (struct nsm_get_device_capabilities_v2_resp *)msg->payload;
+	if (response->hdr.telemetry_count < 2) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	uint16_t telemetry_count = le16toh(response->hdr.telemetry_count);
+	uint8_t *data = &(response->payload[0]);
+	uint16_t data_len = (uint16_t)msg_len - sizeof(struct nsm_msg_hdr) -
+			    sizeof(struct nsm_common_telemetry_resp);
+	uint8_t tag = 0;
+	uint8_t valid = 0;
+	bool rc_ok = false;
+
+	while ((data_len >= sizeof(struct nsm_firmware_aggregate_tag)) &&
+	       (telemetry_count > 0)) {
+		struct nsm_firmware_aggregate_tag *field =
+		    (struct nsm_firmware_aggregate_tag *)data;
+		tag = field->tag;
+		if (tag == NSM_TAG_TIMESTAMP_GENERATION) {
+			uint8_t value8 = 0;
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    &data, &tag, &valid, &value8, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+				*timestamp_generation = value8;
+			}
+		} else if (tag == NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE) {
+			uint32_t value32 = 0;
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint32(
+			    &data, &tag, &valid, &value32, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+				*maximum_input_buffer_size = value32;
+			}
+		} else {
+			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
+			    &data, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+			}
+		}
+		if (!rc_ok || !valid) {
+			return NSM_SW_ERROR_DATA;
+		}
+	}
+
+	return NSM_SW_SUCCESS;
 }

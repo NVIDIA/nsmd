@@ -30,6 +30,7 @@ extern "C" {
 #define NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE 9
 #define NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE 9
 #define NSM_GET_EVENT_LOG_RECORD_RESP_MIN_DATA_SIZE 14
+#define NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE 9
 
 #define EVENT_SOURCES_LENGTH 8
 #define EVENT_ACKNOWLEDGEMENT_MASK_LENGTH EVENT_SOURCES_LENGTH
@@ -46,6 +47,14 @@ typedef enum {
 	GLOBAL_EVENT_GENERATION_ENABLE_POLLING = 1,
 	GLOBAL_EVENT_GENERATION_ENABLE_PUSH = 2
 } NsmGlobalEventGenerationSetting;
+
+/** @brief NSM device capability timestamp generation
+ */
+enum nsm_device_capability_timestamp_generation {
+	NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_NONE = 0,
+	NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_EPOCH_TIME = 1,
+	NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_MONOTONIC_TIME = 2,
+};
 
 /** @struct nsm_get_supported_event_source_req
  *
@@ -169,6 +178,30 @@ struct nsm_configure_event_acknowledgement_resp {
 	struct nsm_common_resp hdr;
 	bitfield8_t new_event_sources_acknowledgement_mask
 	    [EVENT_ACKNOWLEDGEMENT_MASK_LENGTH];
+} __attribute__((packed));
+
+/** @brief NSM device capabilities v2 tag values
+ */
+enum nsm_device_capabilities_v2_tag {
+	NSM_TAG_TIMESTAMP_GENERATION = 0,
+	NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE = 1,
+};
+
+/** @struct nsm_get_device_capabilities_v2_req
+ *
+ *  Structure representing NSM get device capabilities v2 request
+ */
+struct nsm_get_device_capabilities_v2_req {
+	struct nsm_common_req hdr;
+} __attribute__((packed));
+
+/** @struct nsm_get_device_capabilities_v2_resp
+ *
+ *  Structure representing NSM get device capabilities v2 response
+ */
+struct nsm_get_device_capabilities_v2_resp {
+	struct nsm_common_telemetry_resp hdr;
+	uint8_t payload[1];
 } __attribute__((packed));
 
 /** @brief Create a get supported event sources request message
@@ -429,6 +462,52 @@ int encode_nsm_rediscovery_event(uint8_t instance_id, bool ackr,
  */
 int decode_nsm_rediscovery_event(const struct nsm_msg *msg, size_t msg_len,
 				 uint8_t *event_class, uint16_t *event_state);
+
+/** @brief Create a get device capabilities v2 request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_device_capabilities_v2_req(uint8_t instance_id,
+					      struct nsm_msg *msg);
+
+/** @brief Decode a get device capabilities v2 request message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_device_capabilities_v2_req(const struct nsm_msg *msg,
+					      size_t msg_len);
+
+/** @brief Create a get device capabilities v2 response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_device_capabilities_v2_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t timestamp_generation, uint32_t maximum_input_buffer_size,
+    struct nsm_msg *msg);
+
+/** @brief Decode a get device capabilities v2 response message
+ *
+ *  @param[in] msg - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Completion code
+ *  @param[out] reason_code - Reason code
+ *  @param[out] timestamp_generation - Timestamp generation
+ *  @param[out] maximum_input_buffer_size - Maximum input buffer size
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_device_capabilities_v2_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t *timestamp_generation,
+    uint32_t *maximum_input_buffer_size);
 
 #ifdef __cplusplus
 }

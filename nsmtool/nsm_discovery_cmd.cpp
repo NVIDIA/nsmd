@@ -18,6 +18,7 @@
 #include "nsm_discovery_cmd.hpp"
 
 #include "base.h"
+#include "device-capability-discovery.h"
 
 #include "cmd_helper.hpp"
 
@@ -632,6 +633,72 @@ class GetHistogramData : public CommandInterface
     uint8_t parameter;
 };
 
+class GetDeviceCapabilitiesV2 : public CommandInterface
+{
+  public:
+    ~GetDeviceCapabilitiesV2() = default;
+    GetDeviceCapabilitiesV2() = delete;
+    GetDeviceCapabilitiesV2(const GetDeviceCapabilitiesV2&) = delete;
+    GetDeviceCapabilitiesV2(GetDeviceCapabilitiesV2&&) = default;
+    GetDeviceCapabilitiesV2& operator=(const GetDeviceCapabilitiesV2&) = delete;
+    GetDeviceCapabilitiesV2& operator=(GetDeviceCapabilitiesV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_get_device_capabilities_v2_req(instanceId,
+                                                            request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reasonCode = ERR_NULL;
+        uint8_t timestampGeneration = 0;
+        uint32_t maximumInputBufferSize = 0;
+
+        auto rc = decode_nsm_get_device_capabilities_v2_resp(
+            responsePtr, payloadLength, &cc, &reasonCode, &timestampGeneration,
+            &maximumInputBufferSize);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+        result["Timestamp generation"] =
+            timestampGenerationToString(timestampGeneration);
+        result["Maximum input buffer size"] = maximumInputBufferSize;
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    std::string timestampGenerationToString(uint8_t timestampGeneration)
+    {
+        switch (timestampGeneration)
+        {
+            case NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_NONE:
+                return "Device does not support generating timestamps";
+            case NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_EPOCH_TIME:
+                return "Device reports epoch-based timestamps";
+            case NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_MONOTONIC_TIME:
+                return "Device reports monotonic timer-based timestamps";
+            default:
+                return "Unknown value: " + std::to_string(timestampGeneration);
+        }
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto discovery = app.add_subcommand(
@@ -669,6 +736,11 @@ void registerCommand(CLI::App& app)
         "GetHistogramData", "get histogram data for the histograms");
     commands.push_back(std::make_unique<GetHistogramData>(
         "discovery", "GetHistogramData", getHistogramData));
+
+    auto getDeviceCapabilitiesV2 = discovery->add_subcommand(
+        "GetDeviceCapabilitiesV2", "get device capabilities v2");
+    commands.push_back(std::make_unique<GetDeviceCapabilitiesV2>(
+        "discovery", "GetDeviceCapabilitiesV2", getDeviceCapabilitiesV2));
 }
 
 } // namespace discovery

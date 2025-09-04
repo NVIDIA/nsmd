@@ -15,6 +15,7 @@ dep_src_files = [
     '../../libnsm/device-capability-discovery.c',
     '../../libnsm/device-configuration.c',
     '../../libnsm/diagnostics.c',
+    '../../libnsm/firmware-utils.c',
     '../../libnsm/platform-environmental.c',
     '../../libnsm/network-ports.c',
     '../../libnsm/requester/mctp.c',

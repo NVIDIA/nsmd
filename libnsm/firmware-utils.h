@@ -364,6 +364,159 @@ struct nsm_code_auth_key_perm_update_resp {
 	uint32_t update_method;
 } __attribute__((packed));
 
+/** @struct nsm_firmware_aggregate_tag
+ *
+ *  Structure representing firmware aggregate tag format
+ */
+struct nsm_firmware_aggregate_tag {
+	uint8_t tag;
+	uint8_t valid : 1;
+	uint8_t length : 3;
+	uint8_t reserved : 4;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint8 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint8 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint8(uint8_t **buffer, uint8_t tag,
+					     uint8_t value,
+					     uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint16 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint16 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint16(uint8_t **buffer, uint8_t tag,
+					      uint16_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint32 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint32 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t tag,
+					      uint32_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint64 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint64 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t tag,
+					      uint64_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint8 array value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint8 array value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
+						   uint8_t tag, uint8_t *value,
+						   uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint8 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint8 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint8(uint8_t **buffer, uint8_t *tag,
+					     uint8_t *valid, uint8_t *value,
+					     uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint16 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint16 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint16(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint16_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint32 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint32 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint32_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint64 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint64 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint64_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint8 array value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint8 array value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
+						   uint8_t *tag, uint8_t *valid,
+						   uint8_t *value,
+						   uint16_t *buffer_size);
+
+/**
+ * @brief Skip nsm firmware aggregate tag by advancing buffer pointer
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_skip(uint8_t **buffer,
+					    uint16_t *buffer_size);
+
 /**
  * @brief Decode nsm query request erot state parameters message.
  *

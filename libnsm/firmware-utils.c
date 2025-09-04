@@ -26,14 +26,6 @@
 #define DBGW(x)
 #define DBGE(x) x
 
-struct nsm_firmware_aggregate_tag {
-	uint8_t tag;
-	uint8_t valid : 1;
-	uint8_t length : 3;
-	uint8_t reserved : 4;
-	uint8_t data[1];
-} __attribute__((packed));
-
 void printArrayAsHex(const uint8_t *array, size_t size)
 {
 	for (size_t i = 0; i < size; ++i) {
