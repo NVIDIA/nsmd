@@ -1361,6 +1361,283 @@ class SetDeviceDebugParameters : public CommandInterface
     std::vector<uint8_t> data;
 };
 
+class InstallToken : public CommandInterface
+{
+  public:
+    InstallToken() = delete;
+    InstallToken(const InstallToken&) = delete;
+    InstallToken(InstallToken&&) = default;
+    InstallToken& operator=(const InstallToken&) = delete;
+    InstallToken& operator=(InstallToken&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit InstallToken(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup =
+            app->add_option_group("Required", "Install specified token chunk");
+        ccOptionGroup->add_option("-b,--bufferSize", bufferSize,
+                                  "buffer size of the target device");
+        ccOptionGroup->add_option("-f,--file", filePath,
+                                  "path to the token file");
+        ccOptionGroup->require_option(2);
+    }
+
+    ~InstallToken()
+    {
+        if (fd >= 0)
+        {
+            close(fd);
+        }
+    }
+
+    std::vector<uint8_t> createChunk()
+    {
+        size_t toRead = std::min(chunkSize, remaining);
+        std::vector<uint8_t> data(toRead);
+        auto bytesRead = read(fd, data.data(), toRead);
+        if (bytesRead < 0)
+        {
+            close(fd);
+            fd = -1;
+            throw std::runtime_error("Failed to read token file: " +
+                                     std::string(strerror(errno)));
+        }
+        data.resize(bytesRead);
+        return data;
+    }
+
+    std::pair<int, std::vector<uint8_t>> createChunkRequestMsg()
+    {
+        std::vector<uint8_t> data = createChunk();
+        if (data.empty())
+        {
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        sentChunkSize = data.size();
+        remaining -= data.size();
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_install_token_req) - 1 +
+                                        data.size());
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_install_token_req(instanceId, offset, data.size(),
+                                               remaining, data.data(), request);
+        offset += data.size();
+        return std::make_pair(rc, requestMsg);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        if (bufferSize == 0)
+        {
+            std::cerr << "Buffer size is 0" << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        if (bufferSize > std::numeric_limits<uint16_t>::max())
+        {
+            std::cerr << "Buffer size is too large (max is "
+                      << std::numeric_limits<uint16_t>::max()
+                      << "): " << bufferSize << std::endl;
+            return std::make_pair(NSM_SW_ERROR_LENGTH, std::vector<uint8_t>());
+        }
+        fd = open(filePath.c_str(), O_RDONLY);
+        if (fd < 0)
+        {
+            std::cerr << "open error: " << strerror(errno) << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        int rc = lseek(fd, 0, SEEK_SET);
+        if (rc < 0)
+        {
+            std::cerr << "lseek error: " << rc << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        struct stat fileStat;
+        rc = fstat(fd, &fileStat);
+        if (rc < 0)
+        {
+            std::cerr << "fstat error: " << strerror(errno) << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        if (fileStat.st_size < 0)
+        {
+            std::cerr << "Invalid file size in fd" << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        remaining = fileStat.st_size;
+        chunkSize = NSM_DEBUG_TOKEN_INSTALL_CHUNK_SIZE(bufferSize);
+        return createChunkRequestMsg();
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_nsm_install_token_resp(responsePtr, payloadLength, &cc,
+                                                &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << std::endl;
+            return;
+        }
+
+        nlohmann::ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+        result["Chunk size"] = sentChunkSize;
+        result["Remaining"] = remaining;
+
+        nsmtool::helper::DisplayInJson(result);
+
+        if (remaining > 0)
+        {
+            auto [rc, requestMsg] = createChunkRequestMsg();
+            if (rc != NSM_SW_SUCCESS)
+            {
+                return;
+            }
+            requestQueue.push_back(std::move(requestMsg));
+        }
+    }
+
+  private:
+    std::string filePath;
+    int fd{-1};
+    uint32_t bufferSize{0};
+    uint32_t chunkSize{0};
+    uint32_t offset{0};
+    uint32_t remaining{0};
+    uint32_t sentChunkSize{0};
+};
+
+class EraseToken : public CommandInterface
+{
+  public:
+    ~EraseToken() = default;
+    EraseToken() = delete;
+    EraseToken(const EraseToken&) = delete;
+    EraseToken(EraseToken&&) = default;
+    EraseToken& operator=(const EraseToken&) = delete;
+    EraseToken& operator=(EraseToken&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit EraseToken(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto eraseTokenOptionGroup =
+            app->add_option_group("Required", "Erase specified token");
+        eraseTokenOptionGroup->add_option("-t,--type", tokenType, "token type");
+        eraseTokenOptionGroup->require_option(1);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_erase_token_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_erase_token_req(instanceId, tokenType, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+
+        auto rc = decode_nsm_erase_token_resp(responsePtr, payloadLength, &cc,
+                                              &reasonCode);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << std::endl;
+            return;
+        }
+
+        nlohmann::ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint32_t tokenType;
+};
+
+class QueryToken : public CommandInterface
+{
+  public:
+    ~QueryToken() = default;
+    QueryToken() = delete;
+    QueryToken(const QueryToken&) = delete;
+    QueryToken(QueryToken&&) = default;
+    QueryToken& operator=(const QueryToken&) = delete;
+    QueryToken& operator=(QueryToken&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_query_token_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_query_token_req(instanceId, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        std::vector<uint8_t> payload;
+        size_t payloadSize = 0;
+        auto rc = decode_nsm_query_token_resp(responsePtr, payloadLength, &cc,
+                                              &reasonCode, nullptr,
+                                              &payloadSize);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reasonCode << std::endl;
+            return;
+        }
+
+        if (payloadSize > 0)
+        {
+            payload.resize(payloadSize);
+            rc = decode_nsm_query_token_resp(responsePtr, payloadLength, &cc,
+                                             &reasonCode, payload.data(),
+                                             &payloadSize);
+            if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+            {
+                std::cerr << "Response message error: "
+                          << "rc=" << rc << ", cc=" << (int)cc
+                          << ", reasonCode=" << (int)reasonCode << std::endl;
+                return;
+            }
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reasonCode;
+        result["Data size"] = payloadSize;
+        if (payloadSize == 0)
+        {
+            nsmtool::helper::DisplayInJson(result);
+            return;
+        }
+        result["Raw data"] = bytesToHexString(payload.data(), payloadSize);
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto diag = app.add_subcommand("diag", "Diagnostics type command");
@@ -1438,6 +1715,18 @@ void registerCommand(CLI::App& app)
         "SetDeviceDebugParameters", "Set Device Debug Parameters");
     commands.push_back(std::make_unique<SetDeviceDebugParameters>(
         "diag", "SetDeviceDebugParameters", setDeviceDebugParameters));
+
+    auto installToken = diag->add_subcommand("InstallToken", "Install token");
+    commands.push_back(
+        std::make_unique<InstallToken>("diag", "InstallToken", installToken));
+
+    auto eraseToken = diag->add_subcommand("EraseToken", "Erase token");
+    commands.push_back(
+        std::make_unique<EraseToken>("diag", "EraseToken", eraseToken));
+
+    auto queryToken = diag->add_subcommand("QueryToken", "Query token");
+    commands.push_back(
+        std::make_unique<QueryToken>("diag", "QueryToken", queryToken));
 }
 
 } // namespace diag

@@ -104,6 +104,9 @@ enum nsm_device_capability_discovery_commands {
 /** @brief NSM Debug Token Commands
  */
 enum nsm_debug_token_commands {
+	NSM_INSTALL_TOKEN = 0x01,
+	NSM_ERASE_TOKEN = 0x02,
+	NSM_QUERY_TOKEN = 0x03,
 	NSM_QUERY_TOKEN_PARAMETERS = 0x54,
 	NSM_PROVIDE_TOKEN = 0x55,
 	NSM_DISABLE_TOKENS = 0x56,

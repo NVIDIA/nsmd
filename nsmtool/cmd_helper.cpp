@@ -301,25 +301,39 @@ void parseBitfieldVar(ordered_json& res, const std::string& key,
 void CommandInterface::exec()
 {
     instanceId = 0;
-    auto [rc, requestMsg] = createRequestMsg();
+    auto [rc, requestMsgs] = createRequestMsgs();
     if (rc != NSM_SW_SUCCESS)
     {
         std::cerr << "Failed to encode request message for " << nsmType << ":"
                   << commandName << " rc = " << rc << "\n";
         return;
     }
-
-    std::vector<uint8_t> responseMsg;
-    rc = nsmSendRecv(requestMsg, responseMsg);
-
-    if (rc != NSM_SW_SUCCESS)
+    for (auto& msg : requestMsgs)
     {
-        std::cerr << "nsmSendRecv: Failed to receive RC = " << rc << "\n";
+        requestQueue.push_back(std::move(msg));
+    }
+    if (requestQueue.empty())
+    {
+        std::cerr << "No request messages to send for " << nsmType << ":"
+                  << commandName << "\n";
         return;
     }
+    while (!requestQueue.empty())
+    {
+        std::vector<uint8_t> request = std::move(requestQueue.front());
+        requestQueue.pop_front();
 
-    auto responsePtr = reinterpret_cast<struct nsm_msg*>(responseMsg.data());
-    parseResponseMsg(responsePtr, responseMsg.size());
+        std::vector<uint8_t> response;
+        int rc2 = nsmSendRecv(request, response);
+        if (rc2 != NSM_SW_SUCCESS)
+        {
+            std::cerr << "nsmSendRecv: Failed to receive RC = " << rc2 << "\n";
+            return;
+        }
+
+        auto responsePtr = reinterpret_cast<struct nsm_msg*>(response.data());
+        parseResponseMsg(responsePtr, response.size());
+    }
 }
 
 std::tuple<int, int, std::vector<uint8_t>>
@@ -511,5 +525,6 @@ int CommandInterface::nsmSendRecv(std::vector<uint8_t>& requestMsg,
     }
     return NSM_SW_SUCCESS;
 }
+
 } // namespace helper
 } // namespace nsmtool
