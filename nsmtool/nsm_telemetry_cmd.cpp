@@ -343,14 +343,14 @@ class GetPortTelemetryCounter : public CommandInterface
 
         if (portData->supported_counter.unintentional_link_down_count)
         {
-            result[key].push_back(31);
+            result[key].push_back(30);
             countersResult["Unintentional Link Down Count"] =
                 static_cast<uint64_t>(portData->unintentional_link_down_count);
         }
 
         if (portData->supported_counter.intentional_link_down_count)
         {
-            result[key].push_back(32);
+            result[key].push_back(31);
             countersResult["Intentional Link Down Count"] =
                 static_cast<uint64_t>(portData->intentional_link_down_count);
         }
