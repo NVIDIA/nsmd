@@ -211,8 +211,13 @@ requester::Coroutine NsmDevice::setOnline(
     [[maybe_unused]] std::shared_ptr<StateChangeToken> token)
 {
     isDeviceReady = false;
+    auto tmpEid = eid;
     NsmServiceReadyIntf::getInstance().setStateStarting();
     co_await markSensorsUnrefreshed();
+    if (tmpEid != eid)
+    {
+        co_return NSM_SW_SUCCESS;
+    }
     isDeviceActive = true;
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets online",
@@ -472,20 +477,58 @@ requester::Coroutine
     co_return rc;
 }
 
-void NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
-                                           uint8_t deviceInstanceNumber)
+bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
+                                           uint8_t deviceInstanceNumber,
+                                           std::string& mctpMedium,
+                                           std::string& mctpBinding)
 {
-    this->eid = eid;
-    this->uuid = uuid;
-    this->nsmDeviceInstanceNumber = deviceInstanceNumber;
+    bool isPreferred = true;
+    if (this->uuid.size() > 0)
+    {
+        isPreferred = utils::isPreferred(
+            std::make_tuple(this->mctpMedium, this->mctpBinding),
+            std::make_tuple(mctpMedium, mctpBinding));
+    }
+
+    if (isPreferred)
+    {
+        if (this->eid != eid && this->uuid.size() != 0)
+        {
+            fruDeviceManager.reset();
+        }
+        this->eid = eid;
+        this->uuid = uuid;
+        this->mctpMedium = mctpMedium;
+        this->mctpBinding = mctpBinding;
+        this->nsmDeviceInstanceNumber = deviceInstanceNumber;
+        lg2::info(
+            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING} deviceInstanceNumber = {DEVICE_INSTANCE_NUMBER}",
+            "TYPE", getDeviceType(), "INST", getInstanceNumber(), "ROLE",
+            getDeviceRole(), "EID", eid, "UUID", uuid, "MCTP_MEDIUM",
+            mctpMedium, "MCTP_BINDING", mctpBinding, "DEVICE_INSTANCE_NUMBER",
+            deviceInstanceNumber);
+    }
+    else
+    {
+        lg2::info(
+            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is not updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING}, as device is already on EID={EXISTING_EID} medium={EXISTING_MEDIUM} and binding={EXISTING_BINDING}",
+            "TYPE", getDeviceType(), "INST", getInstanceNumber(), "ROLE",
+            getDeviceRole(), "EID", eid, "UUID", uuid, "MCTP_MEDIUM",
+            mctpMedium, "MCTP_BINDING", mctpBinding, "EXISTING_EID", this->eid,
+            "EXISTING_MEDIUM", this->mctpMedium, "EXISTING_BINDING",
+            this->mctpBinding);
+    }
+
+    return isPreferred;
 }
 
 requester::Coroutine NsmDevice::updateNsmDevice()
 {
-    discoverNsmDeviceSemaphore.acquire(eid);
+    auto localEid = eid;
+    discoverNsmDeviceSemaphore.acquire(localEid);
     lg2::info(
         "NsmDevice::updateNsmDevice discoverNsmDeviceSemaphore acqired for EID = {EID}",
-        "EID", eid);
+        "EID", localEid);
     // Reset messageTypesToCommandCodeMatrix to all false entries
     messageTypesToCommandCodeMatrix.assign(
         NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false));
@@ -550,7 +593,7 @@ requester::Coroutine NsmDevice::updateNsmDevice()
 
     lg2::info(
         "NsmDevice::updateNsmDevice discoverNsmDeviceSemaphore released for EID = {EID}",
-        "EID", eid);
+        "EID", localEid);
     // coverity[missing_return]
     co_return rc;
 }

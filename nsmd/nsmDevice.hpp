@@ -163,7 +163,8 @@ class NsmDevice :
     NsmDevice(std::shared_ptr<sdbusplus::asio::object_server> objServer,
               std::shared_ptr<NsmMessageHandler> nsmMsgHandler,
               uint8_t deviceType, uint8_t instanceNumber,
-              std::string remapPropName, std::string remapPropValue,
+              std::string remapPropName,
+              std::vector<std::string> remapPropValues,
               uint8_t deviceRole = NSM_DEV_ROLE_RESERVED) :
         messageTypesToCommandCodeMatrix(
             NUM_NSM_TYPES, std::vector<bool>(NUM_COMMAND_CODES, false)),
@@ -176,40 +177,57 @@ class NsmDevice :
         if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
         {
             deviceRemapProp = DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER;
-            try
+            std::vector<uint8_t> values;
+            for (const auto& remapPropValue : remapPropValues)
             {
-                nsmDeviceInstanceNumber = std::stoi(remapPropValue);
+                try
+                {
+                    values.emplace_back(
+                        static_cast<uint8_t>(std::stoi(remapPropValue)));
+                }
+                catch (const std::invalid_argument& e)
+                {
+                    LG2_ERROR(
+                        "Got Error E : {E}, while converting Remapping Property Value: {REMAP_PROP_VALUE} to NsmDeviceInstanceNumber",
+                        "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
+                };
             }
-            catch (const std::invalid_argument& e)
-            {
-                LG2_ERROR(
-                    "Got Error E : {E}, while converting Reampping Property Value: {REMAP_PROP_VALUE} to NsmDeviceInstanceNumber",
-                    "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
-            };
+            deviceRemapValues = values;
         }
         else if (remapPropName == "MCTP_EID")
         {
             deviceRemapProp = DeviceRemapProperty::MCTP_EID;
-            try
+            std::vector<eid_t> values;
+            for (const auto& remapPropValue : remapPropValues)
             {
-                eid = std::stoi(remapPropValue);
+                try
+                {
+                    values.emplace_back(
+                        static_cast<eid_t>(std::stoi(remapPropValue)));
+                }
+                catch (const std::invalid_argument& e)
+                {
+                    LG2_ERROR(
+                        "Got Error E : {E}, while converting Reampping Property Value: {REMAP_PROP_VALUE} to EID",
+                        "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
+                };
             }
-            catch (const std::invalid_argument& e)
-            {
-                LG2_ERROR(
-                    "Got Error E : {E}, while converting Reampping Property Value: {REMAP_PROP_VALUE} to EID",
-                    "E", e.what(), "REMAP_PROP_VALUE", remapPropValue);
-            };
+            deviceRemapValues = values;
         }
         else if (remapPropName == "MCTP_UUID")
         {
             deviceRemapProp = DeviceRemapProperty::MCTP_UUID;
-            uuid = remapPropValue;
+            std::vector<uuid_t> values;
+            for (const auto& remapPropValue : remapPropValues)
+            {
+                values.emplace_back(remapPropValue);
+            }
+            deviceRemapValues = values;
         }
         else
         {
-            LG2_ERROR("Invalid Reampping Property: {REMAP_PROP_VALUE} provided",
-                      "REMAP_PROP_VALUE", remapPropValue);
+            LG2_ERROR("Invalid Reampping Property: {REMAP_PROP_NAME} provided",
+                      "REMAP_PROP_NAME", remapPropName);
         }
         discoveryPending = false;
         isDeviceActive = false;
@@ -386,8 +404,10 @@ class NsmDevice :
     }
 
     requester::Coroutine updateNsmDevice();
-    void updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
-                                    uint8_t deviceInstanceNumber);
+    bool updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
+                                    uint8_t deviceInstanceNumber,
+                                    std::string& mctpMedium,
+                                    std::string& mctpBinding);
     requester::Coroutine refreshCapabilitySensor();
     requester::Coroutine refreshCommandMatrix();
 
@@ -429,6 +449,12 @@ class NsmDevice :
     DeviceRemapProperty getDeviceRemapProp()
     {
         return deviceRemapProp;
+    }
+
+    std::variant<std::vector<uint8_t>, std::vector<uuid_t>>
+        getDeviceRemapValues()
+    {
+        return deviceRemapValues;
     }
 
     /** @brief getter of Device Active State*/
@@ -587,6 +613,9 @@ class NsmDevice :
     uint8_t instanceNumber = 0;
     uint8_t deviceRole = 0;
     DeviceRemapProperty deviceRemapProp;
+    std::variant<std::vector<uint8_t>, std::vector<uuid_t>> deviceRemapValues;
+    std::string mctpMedium;
+    std::string mctpBinding;
     uint8_t nsmDeviceInstanceNumber;
     std::shared_ptr<NsmMessageHandler> nsmMsgHandler;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;

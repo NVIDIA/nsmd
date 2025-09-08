@@ -41,9 +41,21 @@ class MockNsmDeviceBase : public nsm::NsmDevice
                       std::string remapProp, std::string remapPropValue,
                       uint8_t deviceRole) :
         NsmDevice(nullptr, nullptr, deviceType, instanceNumber, remapProp,
-                  remapPropValue, deviceRole)
+                  std::vector<std::string>{remapPropValue}, deviceRole)
     {
         isDeviceActive = true;
+        if (remapProp == "NSM_DEVICE_INSTANCE_NUMBER")
+        {
+            nsmDeviceInstanceNumber = std::stoi(remapPropValue);
+        }
+        else if (remapProp == "MCTP_EID")
+        {
+            eid = std::stoi(remapPropValue);
+        }
+        else if (remapProp == "MCTP_UUID")
+        {
+            uuid = remapPropValue;
+        }
     }
 
     // Mock the pure virtual functions
