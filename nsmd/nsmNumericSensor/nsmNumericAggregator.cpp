@@ -127,7 +127,7 @@ requester::Coroutine
     rc = handleResponseMsg(responseMsg.get(), responseLen);
 
 #ifdef LTTNG_TRACING
-    lttng_ust_tracepoint(nsmd, dbus_sensor_reading_updated, eid,
+    lttng_ust_tracepoint(nsmd, dbus_sensor_reading_updated, nsmDevice->getEid(),
                          responseMsg.get(), this->getName().c_str());
 #endif
 
