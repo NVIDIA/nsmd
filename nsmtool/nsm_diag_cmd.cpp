@@ -22,6 +22,9 @@
 
 #include "base.h"
 #include "debug-token.h"
+#include "debug-token/error.h"
+#include "debug-token/tlv.h"
+#include "debug-token/types.h"
 #include "diagnostics.h"
 #include "platform-environmental.h"
 
@@ -1481,7 +1484,9 @@ class InstallToken : public CommandInterface
         {
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
-                      << ", reasonCode=" << (int)reasonCode << std::endl;
+                      << ", reasonCode=" << (int)reasonCode << ", error="
+                      << debug_token::Error(reasonCode).to_string()
+                      << std::endl;
             return;
         }
 
@@ -1555,7 +1560,9 @@ class EraseToken : public CommandInterface
         {
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
-                      << ", reasonCode=" << (int)reasonCode << std::endl;
+                      << ", reasonCode=" << (int)reasonCode << ", error="
+                      << debug_token::Error(reasonCode).to_string()
+                      << std::endl;
             return;
         }
 
@@ -1604,7 +1611,9 @@ class QueryToken : public CommandInterface
         {
             std::cerr << "Response message error: "
                       << "rc=" << rc << ", cc=" << (int)cc
-                      << ", reasonCode=" << (int)reasonCode << std::endl;
+                      << ", reasonCode=" << (int)reasonCode << ", error="
+                      << debug_token::Error(reasonCode).to_string()
+                      << std::endl;
             return;
         }
 
@@ -1618,7 +1627,9 @@ class QueryToken : public CommandInterface
             {
                 std::cerr << "Response message error: "
                           << "rc=" << rc << ", cc=" << (int)cc
-                          << ", reasonCode=" << (int)reasonCode << std::endl;
+                          << ", reasonCode=" << (int)reasonCode << ", error="
+                          << debug_token::Error(reasonCode).to_string()
+                          << std::endl;
                 return;
             }
         }
@@ -1633,6 +1644,54 @@ class QueryToken : public CommandInterface
             return;
         }
         result["Raw data"] = bytesToHexString(payload.data(), payloadSize);
+        auto tlv = debug_token::tlv_decoder::Structure(payload);
+        auto types = tlv.getTypes();
+        for (const auto& type : types)
+        {
+            if (type == debug_token::types::Common::InstallationStatus)
+            {
+                auto value = tlv.get(type).getValue<uint8_t>();
+                result[debug_token::tlv_decoder::Item::getTypeName(type)] =
+                    static_cast<bool>(value);
+            }
+            else if (type == debug_token::types::Common::ProcessingStatus)
+            {
+                auto value = tlv.get(type).getValue<uint8_t>();
+                result[debug_token::tlv_decoder::Item::getTypeName(type)] =
+                    static_cast<bool>(value);
+            }
+            else if (type == debug_token::types::Common::TokenTypeSubtypeList)
+            {
+                auto value = tlv.get(type).getValue<std::vector<uint32_t>>();
+                if (value.size() % 2 != 0)
+                {
+                    std::cerr << "Token type subtype list size is not even"
+                              << std::endl;
+                    auto value = tlv.get(type).getRawValue();
+                    result[debug_token::tlv_decoder::Item::getTypeName(type)] =
+                        bytesToHexString(value.data(), value.size());
+                }
+                else
+                {
+                    ordered_json array;
+                    for (size_t i = 0; i < value.size(); i += 2)
+                    {
+                        ordered_json pair;
+                        pair.push_back(value[i]);
+                        pair.push_back(value[i + 1]);
+                        array.push_back(pair);
+                    }
+                    result[debug_token::tlv_decoder::Item::getTypeName(type)] =
+                        array;
+                }
+            }
+            else
+            {
+                auto value = tlv.get(type).getRawValue();
+                result[debug_token::tlv_decoder::Item::getTypeName(type)] =
+                    bytesToHexString(value.data(), value.size());
+            }
+        }
 
         nsmtool::helper::DisplayInJson(result);
     }

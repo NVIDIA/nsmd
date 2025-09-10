@@ -19,6 +19,8 @@ sources = [
     '../libnsm/requester/mctp.c',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
+    '../debug-token/tlv_decoder.cpp',
+    '../debug-token/tlv_encoder.cpp',
 ]
 
 nsmtool_headers = ['.', '..', '../libnsm', '../common']
