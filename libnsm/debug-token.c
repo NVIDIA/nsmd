@@ -493,11 +493,12 @@ int encode_nsm_query_device_ids_req(uint8_t instance_id, struct nsm_msg *msg)
 	return NSM_SW_SUCCESS;
 }
 
-int decode_nsm_query_device_ids_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE])
+int decode_nsm_query_device_ids_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint8_t *device_id, size_t *device_id_len)
 {
-	if (msg == NULL || cc == NULL || reason_code == NULL) {
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    device_id_len == NULL) {
 		return NSM_SW_ERROR_NULL;
 	}
 
@@ -508,23 +509,29 @@ int decode_nsm_query_device_ids_resp(
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
 			  sizeof(struct nsm_query_device_ids_resp)) {
-		return NSM_SW_ERROR_DATA;
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_query_device_ids_resp *resp =
 	    (struct nsm_query_device_ids_resp *)msg->payload;
-	memcpy(device_id, resp->device_id, NSM_DEBUG_TOKEN_DEVICE_ID_SIZE);
+	*device_id_len = le16toh(resp->hdr.data_size);
+	if (device_id != NULL) {
+		memcpy(device_id, resp->data, *device_id_len);
+	}
 
 	return NSM_SW_SUCCESS;
 }
 
-int encode_nsm_query_device_ids_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    const uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE],
-    struct nsm_msg *msg)
+int encode_nsm_query_device_ids_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     const uint8_t *device_id,
+				     size_t device_id_len, struct nsm_msg *msg)
 {
-	if (msg == NULL) {
+	if (msg == NULL || device_id == NULL) {
 		return NSM_SW_ERROR_NULL;
+	}
+	if (device_id_len == 0) {
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_header_info header = {0};
@@ -546,8 +553,8 @@ int encode_nsm_query_device_ids_resp(
 	    (struct nsm_query_device_ids_resp *)msg->payload;
 	response->hdr.command = NSM_QUERY_DEVICE_IDS;
 	response->hdr.completion_code = cc;
-	response->hdr.data_size = htole16(NSM_DEBUG_TOKEN_DEVICE_ID_SIZE);
-	memcpy(response->device_id, device_id, NSM_DEBUG_TOKEN_DEVICE_ID_SIZE);
+	response->hdr.data_size = htole16(device_id_len);
+	memcpy(response->data, device_id, device_id_len);
 
 	return NSM_SW_SUCCESS;
 }

@@ -21,9 +21,6 @@
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
 #endif
-#if defined(ENABLE_DEBUG_TOKEN)
-#include "nsmDebugToken.hpp"
-#endif
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmEraseTrace.hpp"
 #endif
@@ -106,12 +103,6 @@ static requester::Coroutine
     auto networkAdapterDI = std::make_shared<NsmNetworkAdapterDI>(
         bus, name, associations, type, inventoryObjPath);
     nsmDevice->getDeviceSensors().emplace_back(networkAdapterDI);
-
-#if defined(ENABLE_DEBUG_TOKEN)
-    auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
-        bus, name, associations, type, uuid);
-    nsmDevice->addStaticSensor(debugTokenObject);
-#endif
 
 #if defined(ENABLE_DEBUG_INFO)
     auto networkAdapterDebugInfoObject = std::make_shared<NsmDebugInfoObject>(

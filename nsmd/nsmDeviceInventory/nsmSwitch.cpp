@@ -28,9 +28,6 @@
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmDebugInfo.hpp"
 #endif
-#if defined(ENABLE_DEBUG_TOKEN)
-#include "nsmDebugToken.hpp"
-#endif
 #include "nsmDevice.hpp"
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmEraseTrace.hpp"
@@ -761,12 +758,6 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
             createNsmSwitchL1PredictionMode(device, bus, inventoryObjPath, type,
                                             name);
         }
-
-#if defined(ENABLE_DEBUG_TOKEN)
-        auto debugTokenObject = std::make_shared<NsmDebugTokenObject>(
-            bus, name, associations, type, uuid);
-        device->addStaticSensor(debugTokenObject);
-#endif
 
 // NetIR dump for NVSwitch
 #if defined(ENABLE_DEBUG_INFO)

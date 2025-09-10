@@ -24,15 +24,23 @@ extern "C" {
 
 #include "base.h"
 
-#define NSM_DEBUG_TOKEN_DEVICE_ID_SIZE 8
 #define NSM_DEBUG_TOKEN_DATA_MAX_SIZE 65535
 
 #define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS 0xFFFFFFFF
 #define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS_INCREMENT_RATCHET_COUNTER 0xFFFFFFFE
 
+/** @brief Calculate the optimal chunk size for token installation based on the
+ * maximum input buffer size. The chunk size is calculated by subtracting the
+ * size of the fixed size variables present in the install token request header
+ * from the maximum input buffer size.
+ *
+ *  @param[in] buffer_size - Maximum input buffer size
+ *  @return Optimal chunk size
+ */
 #define NSM_DEBUG_TOKEN_INSTALL_CHUNK_SIZE(buffer_size)                        \
-	(buffer_size - (sizeof(struct nsm_install_token_req) -                 \
-			sizeof(struct nsm_common_req_v2) - sizeof(uint8_t)))
+	(buffer_size - ((sizeof(struct nsm_install_token_req) -                \
+			 sizeof(struct nsm_common_req_v2) -                    \
+			 sizeof(((struct nsm_install_token_req *)0)->data))))
 
 /** @brief NSM debug token type
  */
@@ -209,7 +217,7 @@ typedef struct nsm_common_req nsm_query_device_ids_req;
  */
 struct nsm_query_device_ids_resp {
 	struct nsm_common_resp hdr;
-	uint8_t device_id[8];
+	uint8_t data[1];
 } __attribute__((packed));
 
 /** @struct nsm_install_token_req
@@ -494,9 +502,9 @@ int encode_nsm_query_device_ids_req(uint8_t instance_id, struct nsm_msg *msg);
  * @param[out] device_id - Pointer to store the device ID
  * @return nsm_completion_codes
  */
-int decode_nsm_query_device_ids_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE]);
+int decode_nsm_query_device_ids_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint8_t *device_id, size_t *device_id_len);
 
 /**
  * @brief Encode a Query device IDs response message
@@ -508,10 +516,10 @@ int decode_nsm_query_device_ids_resp(
  * @param[out] msg - Message will be written to this
  * @return nsm_completion_codes
  */
-int encode_nsm_query_device_ids_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    const uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE],
-    struct nsm_msg *msg);
+int encode_nsm_query_device_ids_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     const uint8_t *device_id,
+				     size_t device_id_len, struct nsm_msg *msg);
 
 /**
  * @brief Decode a Install token request message

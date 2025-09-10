@@ -212,13 +212,15 @@ std::optional<std::vector<uint8_t>>
         return std::nullopt;
     }
 
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_query_device_ids_resp), 0);
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) +
+                                      sizeof(nsm_query_device_ids_resp) +
+                                      sizeof(uuid) - 1,
+                                  0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
     rc = encode_nsm_query_device_ids_resp(requestMsg->hdr.instance_id,
                                           NSM_SUCCESS, reason_code, uuid,
-                                          responseMsg);
+                                          sizeof(uuid), responseMsg);
     assert(rc == NSM_SW_SUCCESS);
     if (rc)
     {

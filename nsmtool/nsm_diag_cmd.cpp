@@ -672,10 +672,22 @@ class QueryDeviceIds : public CommandInterface
     {
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
-        uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE];
+        size_t device_id_len;
 
-        auto rc = decode_nsm_query_device_ids_resp(
-            responsePtr, payloadLength, &cc, &reason_code, device_id);
+        auto rc = decode_nsm_query_device_ids_resp(responsePtr, payloadLength,
+                                                   &cc, &reason_code, nullptr,
+                                                   &device_id_len);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+        std::vector<uint8_t> device_id(device_id_len);
+        rc = decode_nsm_query_device_ids_resp(responsePtr, payloadLength, &cc,
+                                              &reason_code, device_id.data(),
+                                              &device_id_len);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -687,8 +699,7 @@ class QueryDeviceIds : public CommandInterface
         nlohmann::ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        result["Device ID"] = bytesToHexString(device_id,
-                                               NSM_DEBUG_TOKEN_DEVICE_ID_SIZE);
+        result["Device ID"] = bytesToHexString(device_id.data(), device_id_len);
 
         DisplayInJson(result);
     }

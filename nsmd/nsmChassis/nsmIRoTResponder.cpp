@@ -31,6 +31,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <format>
+#include <sstream>
 #include <unordered_map>
 
 namespace nsm
@@ -69,23 +70,37 @@ requester::Coroutine
         }
         uint8_t cc = NSM_ERROR;
         uint16_t reasonCode = ERR_NULL;
-        uint8_t deviceId[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE] = {0};
+        size_t deviceIdLen = 0;
         rc = decode_nsm_query_device_ids_resp(responseMsg.get(), responseLen,
-                                              &cc, &reasonCode, deviceId);
-        LG2_ERROR_FLT(
-            "decode_nsm_query_device_ids_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-            "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+                                              &cc, &reasonCode, nullptr,
+                                              &deviceIdLen);
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
+            LG2_ERROR_FLT("decode_nsm_query_device_ids_resp failure"
+                          "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                          "REASONCODE", reasonCode, "CC", cc, "RC", rc);
             // coverity[missing_return]
             co_return cc ? cc : rc;
         }
-        std::string serialHex = "0x";
-        for (auto i = 0; i < NSM_DEBUG_TOKEN_DEVICE_ID_SIZE; ++i)
+        std::vector<uint8_t> deviceId(deviceIdLen);
+        rc = decode_nsm_query_device_ids_resp(responseMsg.get(), responseLen,
+                                              &cc, &reasonCode, deviceId.data(),
+                                              &deviceIdLen);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
-            serialHex += std::format("{:02X}", deviceId[i]);
+            LG2_ERROR_FLT("decode_nsm_query_device_ids_resp failure"
+                          "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                          "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+            // coverity[missing_return]
+            co_return cc ? cc : rc;
         }
-        this->invoke(pdiMethod(serialNumber), serialHex);
+        std::stringstream oss;
+        oss << "0x";
+        for (const auto& byte : deviceId)
+        {
+            oss << std::format("{:02X}", byte);
+        }
+        this->invoke(pdiMethod(serialNumber), oss.str());
     }
 
     if constexpr (std::is_same_v<IntfType, UuidIntf>)

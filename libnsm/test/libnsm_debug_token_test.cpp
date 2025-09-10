@@ -354,6 +354,74 @@ TEST(queryDeviceIDs, testGoodEncodeRequest)
 	EXPECT_EQ(0, req->data_size);
 }
 
+TEST(queryDeviceIDs, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_query_device_ids_resp) + 8);
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t device_id[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+
+	auto rc = encode_nsm_query_device_ids_resp(0, cc, reason_code,
+						   device_id, 8, response);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+
+	nsm_query_device_ids_resp *resp =
+	    (nsm_query_device_ids_resp *)response->payload;
+	EXPECT_EQ(NSM_QUERY_DEVICE_IDS, resp->hdr.command);
+	EXPECT_EQ(cc, resp->hdr.completion_code);
+	EXPECT_EQ(8, le16toh(resp->hdr.data_size));
+	EXPECT_EQ(0, memcmp(device_id, resp->data, 8));
+}
+
+TEST(queryDeviceIDs, testBadEncodeResponse)
+{
+	uint8_t device_id[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+
+	// null message
+	auto rc = encode_nsm_query_device_ids_resp(0, NSM_SUCCESS, ERR_NULL,
+						   device_id, 8, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// null device_id
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_query_device_ids_resp) + 8);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	rc = encode_nsm_query_device_ids_resp(0, NSM_SUCCESS, ERR_NULL, nullptr,
+					      8, response);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// zero device_id_len
+	rc = encode_nsm_query_device_ids_resp(0, NSM_SUCCESS, ERR_NULL,
+					      device_id, 0, response);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(queryDeviceIDs, testEncodeResponseWithError)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_query_device_ids_resp) + 8);
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = NSM_ERR_INVALID_DATA;
+	uint8_t device_id[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+
+	auto rc = encode_nsm_query_device_ids_resp(0, cc, reason_code,
+						   device_id, 8, response);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_DIAGNOSTIC, response->hdr.nvidia_msg_type);
+}
+
 TEST(queryDeviceIDs, testGoodDecodeResponse)
 {
 	std::vector<uint8_t> responseMsg{
@@ -365,30 +433,32 @@ TEST(queryDeviceIDs, testGoodDecodeResponse)
 	    NSM_QUERY_DEVICE_IDS, // command
 	    NSM_SUCCESS,	  // completion code
 	    0,
-	    0,				    // reserved
-	    NSM_DEBUG_TOKEN_DEVICE_ID_SIZE, // data size
-	    0,				    // data size
-	    0x01,			    // ID
-	    0x02,			    // ID
-	    0x03,			    // ID
-	    0x04,			    // ID
-	    0x05,			    // ID
-	    0x06,			    // ID
-	    0x07,			    // ID
-	    0x08,			    // ID
+	    0,	  // reserved
+	    8,	  // data size (little endian)
+	    0,	  // data size
+	    0x01, // ID
+	    0x02, // ID
+	    0x03, // ID
+	    0x04, // ID
+	    0x05, // ID
+	    0x06, // ID
+	    0x07, // ID
+	    0x08, // ID
 	};
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
 	size_t msg_len = responseMsg.size();
 	uint8_t cc = 0;
 	uint16_t reason_code = ERR_NULL;
-	uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE];
+	uint8_t device_id[8];
+	size_t device_id_len = 0;
 
-	auto rc = decode_nsm_query_device_ids_resp(response, msg_len, &cc,
-						   &reason_code, device_id);
+	auto rc = decode_nsm_query_device_ids_resp(
+	    response, msg_len, &cc, &reason_code, device_id, &device_id_len);
 
-	EXPECT_EQ(NSM_SUCCESS, rc);
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
 	EXPECT_EQ(NSM_SUCCESS, cc);
 	EXPECT_EQ(0, reason_code);
+	EXPECT_EQ(8, device_id_len);
 	EXPECT_EQ(0x01, device_id[0]);
 	EXPECT_EQ(0x02, device_id[1]);
 	EXPECT_EQ(0x03, device_id[2]);
@@ -397,6 +467,110 @@ TEST(queryDeviceIDs, testGoodDecodeResponse)
 	EXPECT_EQ(0x06, device_id[5]);
 	EXPECT_EQ(0x07, device_id[6]);
 	EXPECT_EQ(0x08, device_id[7]);
+}
+
+TEST(queryDeviceIDs, testDecodeResponseWithNullDeviceId)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		  // PCI VID: NVIDIA 0x10DE
+	    0x00,		  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,  // NVIDIA_MSG_TYPE
+	    NSM_QUERY_DEVICE_IDS, // command
+	    NSM_SUCCESS,	  // completion code
+	    0,
+	    0,	  // reserved
+	    8,	  // data size (little endian)
+	    0,	  // data size
+	    0x01, // ID
+	    0x02, // ID
+	    0x03, // ID
+	    0x04, // ID
+	    0x05, // ID
+	    0x06, // ID
+	    0x07, // ID
+	    0x08, // ID
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	size_t device_id_len = 0;
+
+	// Test with null device_id pointer (should still work)
+	auto rc = decode_nsm_query_device_ids_resp(
+	    response, msg_len, &cc, &reason_code, nullptr, &device_id_len);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(0, reason_code);
+	EXPECT_EQ(8, device_id_len);
+}
+
+TEST(queryDeviceIDs, testBadDecodeResponse)
+{
+	uint8_t cc;
+	uint16_t reason_code;
+	uint8_t device_id[8];
+	size_t device_id_len;
+
+	// null message
+	auto rc = decode_nsm_query_device_ids_resp(
+	    nullptr, 100, &cc, &reason_code, device_id, &device_id_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// null parameters
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_query_device_ids_resp) + 8);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc = decode_nsm_query_device_ids_resp(response, responseMsg.size(),
+					      nullptr, &reason_code, device_id,
+					      &device_id_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_nsm_query_device_ids_resp(response, responseMsg.size(), &cc,
+					      nullptr, device_id,
+					      &device_id_len);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	rc = decode_nsm_query_device_ids_resp(response, responseMsg.size(), &cc,
+					      &reason_code, device_id, nullptr);
+	EXPECT_EQ(NSM_SW_ERROR_NULL, rc);
+
+	// insufficient message length
+	rc = decode_nsm_query_device_ids_resp(response, 10, &cc, &reason_code,
+					      device_id, &device_id_len);
+	EXPECT_EQ(NSM_SW_ERROR_LENGTH, rc);
+}
+
+TEST(queryDeviceIDs, testDecodeResponseWithError)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		  // PCI VID: NVIDIA 0x10DE
+	    0x00,		  // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,		  // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_DIAGNOSTIC,  // NVIDIA_MSG_TYPE
+	    NSM_QUERY_DEVICE_IDS, // command
+	    NSM_ERROR,		  // completion code
+	    ERR_TIMEOUT,	  // reason code
+	    0,
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+	uint8_t cc = 0;
+	uint16_t reason_code = ERR_NULL;
+	uint8_t device_id[8];
+	size_t device_id_len = 0;
+
+	auto rc = decode_nsm_query_device_ids_resp(
+	    response, msg_len, &cc, &reason_code, device_id, &device_id_len);
+
+	EXPECT_EQ(NSM_SW_SUCCESS, rc);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(ERR_TIMEOUT, reason_code);
 }
 
 TEST(installToken, testGoodEncodeRequest)
