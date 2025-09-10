@@ -64,7 +64,7 @@ struct NsmChassisAssemblyTest : public testing::Test, public utils::DBusTest
     const PropertyValuesCollection basic = {
         {"ChassisName", chassisName},    {"Name", name},
         {"Type", "NSM_ChassisAssembly"}, {"UUID", gpuUuid},
-        {"AssemblyType", "Device"},
+        {"DeviceAssembly", true},
     };
     const PropertyValuesCollection area = {
         {"Type", "NSM_Area"},
@@ -173,7 +173,7 @@ TEST_F(NsmChassisAssemblyTest, goodTestCreateStaticSensors)
     values.push(objPath, get(basic, "UUID"));
     values.push(objPath, get(asset, "Vendor"));
     values.push(objPath, get(asset, "Name"));
-    values.push(objPath, get(basic, "AssemblyType"));
+    values.push(objPath, get(basic, "DeviceAssembly"));
     nsmChassisAssemblyCreateSensors(mockManager, basicIntfName + ".Asset",
                                     objPath);
     EXPECT_EQ(0, fpga.prioritySensors.size());

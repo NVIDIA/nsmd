@@ -893,9 +893,6 @@ std::vector<uint8_t> MockupResponder::getProperty(uint8_t propertyIdentifier)
         case BOARD_PART_NUMBER:
             populateFrom(property, "MCX750500B-0D00_DK");
             break;
-        case FRU_PART_NUMBER:
-            populateFrom(property, "FRU50500B-0D00_DK");
-            break;
         case SERIAL_NUMBER:
             populateFrom(property, "SN123456789");
             break;

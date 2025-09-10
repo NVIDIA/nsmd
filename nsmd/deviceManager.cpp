@@ -386,21 +386,20 @@ requester::Coroutine DeviceManager::getFRU(eid_t eid,
     // creating map to avoid sending unsupported comamnds to devices
     // Define a map that stores property IDs based on deviceType
     static const std::unordered_map<uint8_t, std::vector<uint8_t>>
-        devicePropertyMap = {
-            {NSM_DEV_ID_GPU,
-             {BOARD_PART_NUMBER, FRU_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
-              MARKETING_NAME, BUILD_DATE}},
-            {NSM_DEV_ID_SWITCH,
-             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
-              BUILD_DATE}},
-            {NSM_DEV_ID_PCIE_BRIDGE,
-             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
-              BUILD_DATE}},
-            {NSM_DEV_ID_BASEBOARD, {}},
-            {NSM_DEV_ID_EROT,
-             {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID, MARKETING_NAME,
-              BUILD_DATE}},
-            {NSM_DEV_ID_UNKNOWN, {}}};
+        devicePropertyMap = {{NSM_DEV_ID_GPU,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_SWITCH,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_PCIE_BRIDGE,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_BASEBOARD, {}},
+                             {NSM_DEV_ID_EROT,
+                              {BOARD_PART_NUMBER, SERIAL_NUMBER, DEVICE_GUID,
+                               MARKETING_NAME, BUILD_DATE}},
+                             {NSM_DEV_ID_UNKNOWN, {}}};
 
     // Fetch property IDs based on deviceType; fallback to an empty list if not
     // found
@@ -727,13 +726,6 @@ requester::Coroutine
         nsmDevice->fruDeviceIntf->register_property(
             "BOARD_PART_NUMBER",
             std::get<std::string>(properties[BOARD_PART_NUMBER]));
-    }
-
-    if (properties.find(FRU_PART_NUMBER) != properties.end())
-    {
-        nsmDevice->fruDeviceIntf->register_property(
-            "FRU_PART_NUMBER",
-            std::get<std::string>(properties[FRU_PART_NUMBER]));
     }
 
     if (properties.find(SERIAL_NUMBER) != properties.end())

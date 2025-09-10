@@ -148,7 +148,7 @@ requester::Coroutine nsmChassisCreateSensors(SensorManager& manager,
         chassisAsset.pdi().manufacturer(manufacturer);
         // create sensor
         auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            chassisAsset, FRU_PART_NUMBER);
+            chassisAsset, BOARD_PART_NUMBER);
         auto serialNumber =
             std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(chassisAsset,
                                                                  SERIAL_NUMBER);
