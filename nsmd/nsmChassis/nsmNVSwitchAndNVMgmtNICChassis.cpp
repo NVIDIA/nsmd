@@ -60,6 +60,121 @@ requester::Coroutine NsmNVSwitchAndNicChassis<IntfType>::update(
     co_return NSM_SUCCESS;
 }
 
+void createChassisAsset(std::shared_ptr<NsmDevice> device, std::string& name,
+                        const std::string& baseType)
+{
+    std::string manufacturer = CHASSIS_ASSET_MANUFACTURER_NVIDIA;
+
+    auto chassisAsset = NsmNVSwitchAndNicChassis<NsmAssetIntf>(name, baseType);
+    chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
+
+    auto partNumberSensor =
+        std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+            chassisAsset, DEVICE_PART_NUMBER);
+    auto serialNumberSensor =
+        std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(chassisAsset,
+                                                             SERIAL_NUMBER);
+    auto modelSensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        chassisAsset, MARKETING_NAME);
+    device->addStaticSensor(partNumberSensor);
+    device->addStaticSensor(serialNumberSensor);
+    device->addStaticSensor(modelSensor);
+}
+
+void createChassisType(std::shared_ptr<NsmDevice> device, std::string& name,
+                       const std::string& baseType,
+                       dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string chassisType =
+        std::get<std::string>(allCurrentIfaceProperties.at("ChassisType"));
+
+    auto chassis =
+        std::make_shared<NsmNVSwitchAndNicChassis<ChassisIntf>>(name, baseType);
+    chassis->invoke(pdiMethod(type),
+                    ChassisIntf::convertChassisTypeFromString(chassisType));
+    device->addStaticSensor(chassis);
+}
+
+void createChassisHealth(std::shared_ptr<NsmDevice> device, std::string& name,
+                         const std::string& baseType)
+{
+    std::string health = HEALTH_TYPE_OK;
+
+    auto chassisHealth =
+        std::make_shared<NsmNVSwitchAndNicChassis<HealthIntf>>(name, baseType);
+    chassisHealth->invoke(pdiMethod(health),
+                          HealthIntf::convertHealthTypeFromString(health));
+    device->addStaticSensor(chassisHealth);
+}
+
+void createLocationType(std::shared_ptr<NsmDevice> device, std::string& name,
+                        const std::string& baseType,
+                        dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationType{};
+    if (allCurrentIfaceProperties.count("LocationType"))
+    {
+        locationType =
+            std::get<std::string>(allCurrentIfaceProperties.at("LocationType"));
+    }
+
+    auto chassisLocation =
+        std::make_shared<NsmNVSwitchAndNicChassis<LocationIntf>>(name,
+                                                                 baseType);
+    chassisLocation->invoke(
+        pdiMethod(locationType),
+        LocationIntf::convertLocationTypesFromString(locationType));
+    device->addStaticSensor(chassisLocation);
+}
+
+void createLocationCode(std::shared_ptr<NsmDevice> device, std::string& name,
+                        const std::string& baseType,
+                        dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationCode{};
+    locationCode =
+        std::get<std::string>(allCurrentIfaceProperties.at("LocationCode"));
+
+    auto chassisLocationCode =
+        std::make_shared<NsmNVSwitchAndNicChassis<LocationCodeIntf>>(name,
+                                                                     baseType);
+    chassisLocationCode->invoke(pdiMethod(locationCode), locationCode);
+    device->addStaticSensor(chassisLocationCode);
+}
+
+void createPrettyName(std::shared_ptr<NsmDevice> device, std::string& name,
+                      const std::string& baseType,
+                      dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string prettyName{};
+    prettyName = std::get<std::string>(
+        allCurrentIfaceProperties.at("PrettyNameForChassis"));
+
+    auto chassisPrettyName =
+        std::make_shared<NsmNVSwitchAndNicChassis<ItemIntf>>(name, baseType);
+    chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
+    device->addStaticSensor(chassisPrettyName);
+}
+
+void createAssetTag(std::shared_ptr<NsmDevice> device, std::string& name,
+                    const std::string& baseType)
+{
+    auto assetTagIntf = NsmNVSwitchAndNicChassis<AssetTagIntf>(name, baseType);
+    auto assetTag = std::make_shared<NsmInventoryProperty<AssetTagIntf>>(
+        assetTagIntf, ASSET_TAG);
+    device->addStaticSensor(assetTag);
+}
+
+void createChassisVersion(std::shared_ptr<NsmDevice> device, std::string& name,
+                          const std::string& baseType)
+{
+    auto revisionObject = NsmNVSwitchAndNicChassis<RevisionIntf>(name,
+                                                                 baseType);
+    auto versionSensor = std::make_shared<NsmInventoryProperty<RevisionIntf>>(
+        revisionObject, INFO_ROM_VERSION);
+    device->addStaticSensor(versionSensor);
+}
+
 requester::Coroutine createNsmChassis(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath,
@@ -113,145 +228,35 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
         // add sensor
         device->addStaticSensor(chassisUuid);
     }
-    else if (type == "NSM_Chassis")
+    else if (type == "NSM_NVSwitch_Chassis_Attributes")
     {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
-                   name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
-                   type.c_str());
-        auto chassis = std::make_shared<NsmNVSwitchAndNicChassis<ChassisIntf>>(
-            name, baseType);
-        std::string chassisType{};
+        createChassisAsset(device, name, baseType);
+        createChassisHealth(device, name, baseType);
         if (allCurrentIfaceProperties.count("ChassisType"))
         {
-            chassisType = std::get<std::string>(
-                allCurrentIfaceProperties.at("ChassisType"));
+            createChassisType(device, name, baseType,
+                              allCurrentIfaceProperties);
         }
-
-        // initial value update
-        chassis->invoke(pdiMethod(type),
-                        ChassisIntf::convertChassisTypeFromString(chassisType));
-
-        device->addStaticSensor(chassis);
-    }
-    else if (type == "NSM_Asset")
-    {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
-                   name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
-                   type.c_str());
-        auto chassisAsset = NsmNVSwitchAndNicChassis<NsmAssetIntf>(name,
-                                                                   baseType);
-
-        std::string manufacturer{};
-        if (allCurrentIfaceProperties.count("Manufacturer"))
-        {
-            manufacturer = std::get<std::string>(
-                allCurrentIfaceProperties.at("Manufacturer"));
-        }
-
-        // initial value update
-        chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
-
-        // create sensor
-        auto partNumberSensor =
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-                chassisAsset, DEVICE_PART_NUMBER);
-        auto serialNumberSensor =
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(chassisAsset,
-                                                                 SERIAL_NUMBER);
-        auto modelSensor = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            chassisAsset, MARKETING_NAME);
-        device->addStaticSensor(partNumberSensor);
-        device->addStaticSensor(serialNumberSensor);
-        device->addStaticSensor(modelSensor);
-    }
-    else if (type == "NSM_Health")
-    {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
-                   name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
-                   type.c_str());
-        auto chassisHealth =
-            std::make_shared<NsmNVSwitchAndNicChassis<HealthIntf>>(name,
-                                                                   baseType);
-        std::string health{};
-        if (allCurrentIfaceProperties.count("Health"))
-        {
-            health =
-                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
-        }
-
-        // initial value update
-        chassisHealth->invoke(pdiMethod(health),
-                              HealthIntf::convertHealthTypeFromString(health));
-        device->addStaticSensor(chassisHealth);
-    }
-    else if (type == "NSM_Location")
-    {
-        lg2::debug("createNsmChassis: {NAME}, {BTYPE}_{TYPE}", "NAME",
-                   name.c_str(), "BTYPE", baseType.c_str(), "TYPE",
-                   type.c_str());
-        auto chassisLocation =
-            std::make_shared<NsmNVSwitchAndNicChassis<LocationIntf>>(name,
-                                                                     baseType);
-
-        std::string locationType{};
         if (allCurrentIfaceProperties.count("LocationType"))
         {
-            locationType = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationType"));
+            createLocationType(device, name, baseType,
+                               allCurrentIfaceProperties);
         }
-
-        // initial value update
-        chassisLocation->invoke(
-            pdiMethod(locationType),
-            LocationIntf::convertLocationTypesFromString(locationType));
-        device->addStaticSensor(chassisLocation);
-    }
-    else if (type == "NSM_LocationCode")
-    {
-        std::string locationCode{};
         if (allCurrentIfaceProperties.count("LocationCode"))
         {
-            locationCode = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationCode"));
+            createLocationCode(device, name, baseType,
+                               allCurrentIfaceProperties);
         }
-
-        auto chassisLocationCode =
-            std::make_shared<NsmNVSwitchAndNicChassis<LocationCodeIntf>>(
-                name, baseType);
-        chassisLocationCode->invoke(pdiMethod(locationCode), locationCode);
-        device->addStaticSensor(chassisLocationCode);
-    }
-    else if (type == "NSM_PrettyName")
-    {
-        std::string prettyName{};
-        if (allCurrentIfaceProperties.count("Name"))
+        if (allCurrentIfaceProperties.count("PrettyNameForChassis"))
         {
-            prettyName =
-                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+            createPrettyName(device, name, baseType, allCurrentIfaceProperties);
         }
-
-        auto chassisPrettyName =
-            std::make_shared<NsmNVSwitchAndNicChassis<ItemIntf>>(name,
-                                                                 baseType);
-        chassisPrettyName->invoke(pdiMethod(prettyName), prettyName);
-        device->addStaticSensor(chassisPrettyName);
-    }
-    else if (type == "NSM_AssetTag")
-    {
-        auto assetTagIntf = NsmNVSwitchAndNicChassis<AssetTagIntf>(name,
-                                                                   baseType);
-        auto assetTag = std::make_shared<NsmInventoryProperty<AssetTagIntf>>(
-            assetTagIntf, ASSET_TAG);
-        device->addStaticSensor(assetTag);
-    }
-    else if (type == "NSM_ChassisVersion")
-    {
-        auto revisionObject = NsmNVSwitchAndNicChassis<RevisionIntf>(name,
-                                                                     baseType);
-        auto versionSensor =
-            std::make_shared<NsmInventoryProperty<RevisionIntf>>(
-                revisionObject, INFO_ROM_VERSION);
-        device->addStaticSensor(versionSensor);
+        if (device->getDeviceType() == NSM_DEV_ID_PCIE_BRIDGE &&
+            device->getDeviceRole() == NSM_PCIE_BRIDGE_DEV_ROLE_CX8)
+        {
+            createAssetTag(device, name, baseType);
+            createChassisVersion(device, name, baseType);
+        }
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -279,21 +284,11 @@ requester::Coroutine createNsmNVLinkMgmtNicChassis(SensorManager& manager,
 
 std::vector<std::string> nvSwitchChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Asset",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Chassis",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Health",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.PrettyName",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.Location"};
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch_Chassis.ChassisAttributes"};
 
 std::vector<std::string> nvLinkMgmtNicChassisInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Asset",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.AssetTag",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Chassis",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Health",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.Location",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.LocationCode",
-    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.ChassisVersion"};
+    "xyz.openbmc_project.Configuration.NSM_NVLinkMgmtNic_Chassis.ChassisAttributes"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmNVSwitchChassis,
                                nvSwitchChassisInterfaces)

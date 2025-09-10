@@ -73,6 +73,10 @@ using PropertyValuesCollection =
 #define UUID_LEN 36
 #define MAC_ADDRESS_DATA_LEN 6
 
+#define CHASSIS_ASSET_MANUFACTURER_NVIDIA "NVIDIA"
+#define HEALTH_TYPE_OK                                                         \
+    "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+
 // Largest safe integer for double precision (2^53 - 1)
 const uint64_t MAX_SAFE_INTEGER_IN_DOUBLE = (1ULL << 53) - 1;
 
