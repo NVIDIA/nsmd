@@ -6,9 +6,9 @@
 #include "nsmCommon/nsmPcieGroup.hpp"
 
 #include "libnsm/pci-links.h"
-
+#ifdef NVIDIA_SHMEM
 #include "nsmCommon/sharedMemCommon.hpp"
-
+#endif
 #include <phosphor-logging/lg2.hpp>
 
 namespace nsm
