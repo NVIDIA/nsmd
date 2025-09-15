@@ -120,6 +120,9 @@ class MctpDiscovery
     requester::Coroutine deviceStateChangeTask(const std::string path);
 
     void discoverEndpoints(sdbusplus::message::message& msg);
+    requester::Coroutine
+        handleDiscoverEndpoints(sdbusplus::message::message& msg,
+                                MctpInfos& mctpInfos);
 
     /**
      * @brief matcher rule for property changes of
@@ -129,7 +132,12 @@ class MctpDiscovery
 
     /** @brief handler for mctpEndpointRemovedSignal */
     void cleanEndpoints(sdbusplus::message::message& msg);
+    requester::Coroutine handleCleanEndpoints(sdbusplus::message::message& msg,
+                                              MctpInfos& mctpInfos);
 
+    requester::Coroutine
+        handleRefreshEndpoints(sdbusplus::message::message& msg,
+                               MctpInfos& mctpInfos);
     /**
      * @brief A callback for propertiesChanges signal enabled matches matcher
      * rule to invoke registered handlers (online/offline mctp endpoint)
@@ -143,7 +151,7 @@ class MctpDiscovery
      *  @param[out] mctpInfos - MCTP info for NSM discovery
      */
     void populateMctpInfo(const dbus::InterfaceMap& interfaces,
-                          MctpInfos& mctpInfos);
+                          const std::string& objPath, MctpInfos& mctpInfos);
 
     static constexpr uint8_t mctpTypeVDM = 0x7e;
 
@@ -164,6 +172,7 @@ class MctpDiscovery
         "au.com.codeconstruct.MCTP.Endpoint1"};
 
     std::queue<MctpInfos> queuedMctpInfos;
+    std::map<std::string, MctpInfo> cachedMctpInfoByPath;
     std::map<eid_t, std::queue<MctpInfo>> perEidQueuedMctpInfos;
     std::map<eid_t, std::coroutine_handle<>> perEidDiscoverNsmDeviceTaskHandle;
     std::map<uint8_t, std::map<uint16_t, std::shared_ptr<nsm::NsmDevice>>>

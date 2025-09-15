@@ -95,7 +95,7 @@ MctpDiscovery::MctpDiscovery(
             reply.read(objects);
             for (const auto& [objectPath, interfaces] : objects)
             {
-                populateMctpInfo(interfaces, mctpInfos);
+                populateMctpInfo(interfaces, objectPath.str, mctpInfos);
 
                 // watch PropertiesChanged signal from
                 // au.com.codeconstruct.MCTP.Endpoint1 PDI
@@ -123,6 +123,7 @@ MctpDiscovery::MctpDiscovery(
 }
 
 void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
+                                     const std::string& objPath,
                                      MctpInfos& mctpInfos)
 {
     uuid_t uuid{};
@@ -203,8 +204,9 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                               mctpTypeVDM) != mctpTypes.end())
                 {
                     handler.registerMctpEndpoint(eid, type, protocol, address);
-                    mctpInfos.emplace_back(std::make_tuple(
-                        eid, uuid, mediumType, networkId, bindingType, active));
+                    cachedMctpInfoByPath[objPath] = std::make_tuple(
+                        eid, uuid, mediumType, networkId, bindingType, active);
+                    mctpInfos.emplace_back(cachedMctpInfoByPath[objPath]);
                 }
             }
         }
@@ -215,17 +217,61 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
     }
 }
 
-void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
+void MctpDiscovery::handleMctpEndpoints(const MctpInfos& mctpInfos)
+{
+    discoverNsmDevice(mctpInfos);
+}
+
+requester::Coroutine
+    MctpDiscovery::deviceStateChangeTask(const std::string objPath)
+{
+    while (!mctpQueuedSignals[objPath].empty())
+    {
+        MctpInfos mctpInfos{};
+        sdbusplus::message::message& msg = mctpQueuedSignals[objPath].front();
+        lg2::info(
+            "deviceStateChangeTask mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
+            "OBJ_PATH", objPath, "SIZE", mctpQueuedSignals[objPath].size());
+        auto member = msg.get_member();
+        sd_bus_message_rewind(msg.get(), true);
+        if (strcmp(member, "PropertiesChanged") == 0)
+        {
+            co_await handleRefreshEndpoints(msg, mctpInfos);
+        }
+        else if (strcmp(member, "InterfacesAdded") == 0)
+        {
+            co_await handleDiscoverEndpoints(msg, mctpInfos);
+        }
+        else if (strcmp(member, "InterfacesRemoved") == 0)
+        {
+            co_await handleCleanEndpoints(msg, mctpInfos);
+        }
+        else
+        {
+            lg2::error(
+                "deviceStateChangeTask: unknown member={MEMBER} for PATH={OBJ_PATH}",
+                "MEMBER", member, "OBJ_PATH", objPath);
+        }
+        discoverNsmDevice(mctpInfos);
+        mctpQueuedSignals[objPath].pop();
+        lg2::info(
+            "deviceStateChangeTask: mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
+            "OBJ_PATH", objPath, "SIZE", mctpQueuedSignals[objPath].size());
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
+requester::Coroutine
+    MctpDiscovery::handleDiscoverEndpoints(sdbusplus::message::message& msg,
+                                           MctpInfos& mctpInfos)
 {
     constexpr std::string_view mctpEndpointIntfName{
         "xyz.openbmc_project.MCTP.Endpoint"};
-    MctpInfos mctpInfos{};
 
     sdbusplus::message::object_path objPath;
     dbus::InterfaceMap interfaces;
     msg.read(objPath, interfaces);
-
-    populateMctpInfo(interfaces, mctpInfos);
+    populateMctpInfo(interfaces, objPath.str, mctpInfos);
 
     // watch PropertiesChanged signal from au.com.codeconstruct.MCTP.Endpoint1
     // PDI
@@ -239,139 +285,144 @@ void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
                     objPath.str, "au.com.codeconstruct.MCTP.Endpoint1"),
                 std::bind_front(&MctpDiscovery::refreshEndpoints, this)));
     }
-    discoverNsmDevice(mctpInfos);
+    co_return NSM_SW_SUCCESS;
 }
 
-void MctpDiscovery::handleMctpEndpoints(const MctpInfos& mctpInfos)
+void MctpDiscovery::discoverEndpoints(sdbusplus::message::message& msg)
 {
-    discoverNsmDevice(mctpInfos);
+    sdbusplus::message::object_path objPath;
+    dbus::InterfaceMap interfaces;
+    msg.read(objPath, interfaces);
+    sd_bus_message_rewind(msg.get(), true);
+
+    if (interfaces.find(std::string(mctpEndpointIntfName)) != interfaces.end())
+    {
+        lg2::info(
+            "MctpDiscovery: Recieved InterfacesAdded signal for objPath={OBJ_PATH}",
+            "OBJ_PATH", objPath.str);
+        mctpQueuedSignals[objPath.str].emplace(msg);
+        requester::Coroutine::assign(deviceStateChangeTaskHandles[objPath.str],
+                                     [&, objPath]() -> requester::Coroutine {
+            // coverity[missing_return]
+            co_return co_await deviceStateChangeTask(objPath.str);
+        });
+    }
 }
 
 requester::Coroutine
-    MctpDiscovery::deviceStateChangeTask(const std::string objPath)
+    MctpDiscovery::handleRefreshEndpoints(sdbusplus::message::message& msg,
+                                          MctpInfos& mctpInfos)
 {
-    while (!mctpQueuedSignals[objPath].empty())
+    std::string interface;
+    dbus::PropertyMap properties;
+    dbus::PropertyMap allProperties;
+    std::string sender = msg.get_sender();
+    std::string objPath = msg.get_path();
+
+    msg.read(interface, properties);
+    auto prop = properties.find("Connectivity");
+    if (prop != properties.end())
     {
-        sdbusplus::message::message& msg = mctpQueuedSignals[objPath].front();
+        auto connectivity = std::get<std::string>(prop->second);
         lg2::info(
-            "deviceStateChangeTask mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
-            "OBJ_PATH", objPath, "SIZE", mctpQueuedSignals[objPath].size());
-
-        std::string interface;
-        dbus::PropertyMap properties;
-        dbus::PropertyMap allProperties;
-        std::string sender = msg.get_sender();
-
-        msg.read(interface, properties);
-        auto prop = properties.find("Connectivity");
-        if (prop != properties.end())
+            "Processing au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
+            "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
+            "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
+        handleMctpStateTransition(objPath, (connectivity == "Available"));
+        try
         {
-            auto connectivity = std::get<std::string>(prop->second);
-            lg2::info(
-                "Processing au.com.codeconstruct.MCTP.Endpoint1 propertiesChanged signal for "
-                "Connectivity=={CONN} at PATH={OBJ_PATH} from sender={SENDER}",
-                "CONN", connectivity, "OBJ_PATH", objPath, "SENDER", sender);
-            handleMctpStateTransition(objPath, (connectivity == "Available"));
-            try
-            {
-                dbus::Interfaces interfaces{
-                    "xyz.openbmc_project.MCTP.Endpoint"};
-                auto mapperResponse =
-                    co_await utils::coGetServiceMap(objPath, interfaces);
-                if (mapperResponse.size() == 0)
-                {
-                    mctpQueuedSignals[objPath].pop();
-                    lg2::error(
-                        "deviceStateChangeTask: coGetServiceMap failed for PATH={OBJ_PATH}",
-                        "OBJ_PATH", objPath);
-                    co_return NSM_SW_SUCCESS;
-                }
-                std::string service = mapperResponse.begin()->first;
-                lg2::info("service of PATH={OBJ_PATH} is {SERVICE}", "OBJ_PATH",
-                          objPath, "SERVICE", service);
-                allProperties = co_await utils::coGetAllDbusProperty(service,
-                                                                     objPath);
-            }
-            catch (const std::exception& e)
+            dbus::Interfaces interfaces{"xyz.openbmc_project.MCTP.Endpoint"};
+            auto mapperResponse = co_await utils::coGetServiceMap(objPath,
+                                                                  interfaces);
+            if (mapperResponse.size() == 0)
             {
                 lg2::error(
-                    "refreshEndpoints: failed to get MctpInfo from PATH={OBJ_PATH},{ERROR}",
-                    "OBJ_PATH", objPath, "ERROR", e);
-                mctpQueuedSignals[objPath].pop();
-                co_return NSM_SW_SUCCESS;
+                    "handleRefreshEndpoints: coGetServiceMap failed for PATH={OBJ_PATH}",
+                    "OBJ_PATH", objPath);
+                co_return NSM_SW_ERROR;
             }
+            std::string service = mapperResponse.begin()->first;
+            lg2::info("service of PATH={OBJ_PATH} is {SERVICE}", "OBJ_PATH",
+                      objPath, "SERVICE", service);
+            allProperties = co_await utils::coGetAllDbusProperty(service,
+                                                                 objPath);
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error(
+                "handleRefreshEndpoints: failed to get MctpInfo from PATH={OBJ_PATH},{ERROR}",
+                "OBJ_PATH", objPath, "ERROR", e);
+            co_return NSM_SW_ERROR;
+        }
 
-            uint8_t eid{};
-            uint32_t networkId{};
-            std::string mediumType{};
-            std::string uuid{};
-            std::string bindingType{};
-            std::vector<uint8_t> mctpTypes{};
+        uint8_t eid{};
+        uint32_t networkId{};
+        std::string mediumType{};
+        std::string uuid{};
+        std::string bindingType{};
+        std::vector<uint8_t> mctpTypes{};
 
-            if (allProperties.contains("EID"))
+        if (allProperties.contains("EID"))
+        {
+            eid = std::get<uint8_t>(allProperties.at("EID"));
+        }
+        if constexpr (FILTER_MCTP_EID)
+        {
+            // MCTP EID 0 is a special Null EID as per MCTP DMTF
+            // specification doc
+            if (eid == MCTP_EID_TO_FILTER)
             {
-                eid = std::get<uint8_t>(allProperties.at("EID"));
+                co_return NSM_SW_ERROR;
             }
-            if constexpr (FILTER_MCTP_EID)
-            {
-                // MCTP EID 0 is a special Null EID as per MCTP DMTF
-                // specification doc
-                if (eid == MCTP_EID_TO_FILTER)
-                {
-                    mctpQueuedSignals[objPath].pop();
-                    co_return NSM_SW_SUCCESS;
-                }
-            }
+        }
 
-            if (allProperties.contains("NetworkId"))
-            {
-                networkId = std::get<uint32_t>(allProperties.at("NetworkId"));
-            }
-            if (allProperties.contains("MediumType"))
-            {
-                mediumType =
-                    std::get<std::string>(allProperties.at("MediumType"));
-            }
-            if (allProperties.contains("UUID"))
+        if (allProperties.contains("NetworkId"))
+        {
+            networkId = std::get<uint32_t>(allProperties.at("NetworkId"));
+        }
+        if (allProperties.contains("MediumType"))
+        {
+            mediumType = std::get<std::string>(allProperties.at("MediumType"));
+        }
+        if (allProperties.contains("UUID"))
 
-            {
-                uuid = std::get<std::string>(allProperties.at("UUID"));
-            }
-            if (allProperties.contains("BindingType"))
-            {
-                bindingType =
-                    std::get<std::string>(allProperties.at("BindingType"));
-            }
-            if (allProperties.contains("SupportedMessageTypes"))
-            {
-                mctpTypes = std::get<std::vector<uint8_t>>(
-                    allProperties.at("SupportedMessageTypes"));
-            }
+        {
+            uuid = std::get<std::string>(allProperties.at("UUID"));
+        }
+        if (allProperties.contains("BindingType"))
+        {
+            bindingType =
+                std::get<std::string>(allProperties.at("BindingType"));
+        }
+        if (allProperties.contains("SupportedMessageTypes"))
+        {
+            mctpTypes = std::get<std::vector<uint8_t>>(
+                allProperties.at("SupportedMessageTypes"));
+        }
 
-            MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType,
-                                                networkId, bindingType,
-                                                (connectivity == "Available"));
-            MctpInfos mctpInfos{mctpInfo};
-
-            if (connectivity == "Available")
+        MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
+                                            bindingType,
+                                            (connectivity == "Available"));
+        cachedMctpInfoByPath[objPath] = mctpInfo;
+        if (connectivity == "Available")
+        {
+            if (std::find(mctpTypes.begin(), mctpTypes.end(), mctpTypeVDM) !=
+                mctpTypes.end())
             {
-                if (std::find(mctpTypes.begin(), mctpTypes.end(),
-                              mctpTypeVDM) != mctpTypes.end())
-                {
-                    discoverNsmDevice(mctpInfos);
-                }
+                mctpInfos.push_back(mctpInfo);
             }
             else
             {
-                discoverNsmDevice(mctpInfos);
+                lg2::info(
+                    "handleRefreshEndpoints: mctpTypeVDM command not supported for PATH={OBJ_PATH}",
+                    "OBJ_PATH", objPath);
             }
         }
-        mctpQueuedSignals[objPath].pop();
-        lg2::info("mctpQueuedSignals for PATH={OBJ_PATH} size= {SIZE}",
-                  "OBJ_PATH", objPath, "SIZE",
-                  mctpQueuedSignals[objPath].size());
+        else
+        {
+            mctpInfos.push_back(mctpInfo);
+        }
     }
-    // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
 
@@ -405,11 +456,47 @@ void MctpDiscovery::refreshEndpoints(sdbusplus::message::message& msg)
     }
 }
 
+requester::Coroutine
+    MctpDiscovery::handleCleanEndpoints(sdbusplus::message::message& msg,
+                                        MctpInfos& mctpInfos)
+{
+    sdbusplus::message::object_path objPath;
+    std::vector<std::string> interfaces;
+    msg.read(objPath, interfaces);
+    if (cachedMctpInfoByPath.find(objPath.str) != cachedMctpInfoByPath.end())
+    {
+        mctpInfos.push_back(cachedMctpInfoByPath[objPath.str]);
+        std::get<5>(mctpInfos[0]) = false;
+    }
+    else
+    {
+        lg2::error("MctpDiscovery: No MctpInfos cached for objPath={OBJ_PATH}",
+                   "OBJ_PATH", objPath.str);
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 void MctpDiscovery::cleanEndpoints(
     [[maybe_unused]] sdbusplus::message::message& msg)
 {
-    // place holder: implement the function once mctp-ctrl service support
-    // the InterfacesRemoved signal
+    lg2::info("MctpDiscovery: Recieved InterfacesRemoved signal");
+    sdbusplus::message::object_path objPath;
+    std::vector<std::string> interfaces;
+    msg.read(objPath, interfaces);
+    sd_bus_message_rewind(msg.get(), true);
+    if (std::find(interfaces.begin(), interfaces.end(),
+                  std::string(mctpEndpointIntfName)) != interfaces.end())
+    {
+        lg2::info(
+            "MctpDiscovery: Recieved InterfacesRemoved signal for objPath={OBJ_PATH}",
+            "OBJ_PATH", objPath.str);
+        mctpQueuedSignals[objPath.str].emplace(msg);
+        requester::Coroutine::assign(deviceStateChangeTaskHandles[objPath.str],
+                                     [&, objPath]() -> requester::Coroutine {
+            // coverity[missing_return]
+            co_return co_await deviceStateChangeTask(objPath.str);
+        });
+    }
 }
 
 requester::Coroutine
