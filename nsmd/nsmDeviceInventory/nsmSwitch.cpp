@@ -983,19 +983,14 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
 
         device->addSensor(nvSwitchObject, false);
     }
-    else if (type == "NSM_Asset")
+    else if (type == "NSM_Chassis_Attributes")
     {
-        auto nvSwitchAsset =
+        auto nvSwitchChassisAttributes =
             std::make_shared<NsmSwitchDI<NsmAssetIntf>>(name, inventoryObjPath);
-        std::string manufacturer{};
-        if (allCurrentIfaceProperties.count("Manufacturer"))
-        {
-            manufacturer = std::get<std::string>(
-                allCurrentIfaceProperties.at("Manufacturer"));
-        }
-
-        nvSwitchAsset->invoke(pdiMethod(manufacturer), manufacturer);
-        device->addStaticSensor(nvSwitchAsset);
+        std::string manufacturer = MANUFACTURER_NVIDIA;
+        nvSwitchChassisAttributes->invoke(pdiMethod(manufacturer),
+                                          manufacturer);
+        device->addStaticSensor(nvSwitchChassisAttributes);
     }
     else if (type == "NSM_FabricManager")
     {
@@ -1039,7 +1034,7 @@ std::vector<std::string> nvSwitchInterfaces{
     "xyz.openbmc_project.Configuration.NSM_NVSwitch",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.PortDisableFuture",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.PowerMode",
-    "xyz.openbmc_project.Configuration.NSM_NVSwitch.Asset",
+    "xyz.openbmc_project.Configuration.NSM_NVSwitch.ChassisAttributes",
     "xyz.openbmc_project.Configuration.NSM_NVSwitch.FabricManager"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmSwitchDI, nvSwitchInterfaces)

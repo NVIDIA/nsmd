@@ -63,7 +63,7 @@ requester::Coroutine NsmNVSwitchAndNicChassis<IntfType>::update(
 void createChassisAsset(std::shared_ptr<NsmDevice> device, std::string& name,
                         const std::string& baseType)
 {
-    std::string manufacturer = CHASSIS_ASSET_MANUFACTURER_NVIDIA;
+    std::string manufacturer = MANUFACTURER_NVIDIA;
 
     auto chassisAsset = NsmNVSwitchAndNicChassis<NsmAssetIntf>(name, baseType);
     chassisAsset.invoke(pdiMethod(manufacturer), manufacturer);
@@ -228,7 +228,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
         // add sensor
         device->addStaticSensor(chassisUuid);
     }
-    else if (type == "NSM_NVSwitch_Chassis_Attributes")
+    else if (type == "NSM_Chassis_Attributes")
     {
         createChassisAsset(device, name, baseType);
         createChassisHealth(device, name, baseType);

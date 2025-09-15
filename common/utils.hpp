@@ -73,7 +73,7 @@ using PropertyValuesCollection =
 #define UUID_LEN 36
 #define MAC_ADDRESS_DATA_LEN 6
 
-#define CHASSIS_ASSET_MANUFACTURER_NVIDIA "NVIDIA"
+#define MANUFACTURER_NVIDIA "NVIDIA"
 #define HEALTH_TYPE_OK                                                         \
     "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
 
