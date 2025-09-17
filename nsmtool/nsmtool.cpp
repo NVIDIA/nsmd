@@ -23,6 +23,8 @@
 #include "nsm_passthrough_cmd.hpp"
 #include "nsm_telemetry_cmd.hpp"
 
+#include <dbus/dbus.h>
+
 #include <CLI/CLI.hpp>
 
 namespace nsmtool
@@ -79,11 +81,59 @@ void registerCommand(CLI::App& app)
 } // namespace raw
 } // namespace nsmtool
 
+bool isNsmdServiceActive()
+{
+    DBusConnection* conn = dbus_bus_get(DBUS_BUS_SYSTEM, nullptr);
+    if (!conn)
+        return false;
+
+    DBusMessage* msg = dbus_message_new_method_call(
+        "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+        "NameHasOwner");
+    if (!msg)
+    {
+        dbus_connection_unref(conn);
+        return false;
+    }
+
+    const char* service = "xyz.openbmc_project.NSM";
+    dbus_message_append_args(msg, DBUS_TYPE_STRING, &service,
+                             DBUS_TYPE_INVALID);
+
+    DBusMessage* reply = dbus_connection_send_with_reply_and_block(conn, msg,
+                                                                   -1, nullptr);
+    dbus_message_unref(msg);
+    dbus_connection_unref(conn);
+
+    if (!reply)
+        return false;
+
+    dbus_bool_t hasOwner = FALSE;
+    dbus_message_get_args(reply, nullptr, DBUS_TYPE_BOOLEAN, &hasOwner,
+                          DBUS_TYPE_INVALID);
+    dbus_message_unref(reply);
+
+    return hasOwner == TRUE;
+}
+
 int main(int argc, char** argv)
 {
     try
     {
         CLI::App app{"NSM requester tool for OpenBMC"};
+
+        // Check if nsmd is running first - prevent conflicts
+        if (isNsmdServiceActive())
+        {
+            std::cerr
+                << "Error: NSM daemon (nsmd) is currently active.\n\n"
+                << "Concurrent use of nsmtool is not permitted while nsmd is running,"
+                << " as this would interrupt crucial NSM operations.\n\n"
+                << "To proceed with nsmtool, please Stop the nsmd service first: systemctl stop nsmd\n\n"
+                << "Note: nsmtool is intended for internal use. For production or "
+                << "automated workflows, out-of-band methods are recommended.\n";
+            return -1;
+        }
         app.require_subcommand(1)->ignore_case();
 
         nsmtool::raw::registerCommand(app);
