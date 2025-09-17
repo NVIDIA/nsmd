@@ -111,6 +111,73 @@ requester::Coroutine
     co_return NSM_SUCCESS;
 }
 
+void createIRoTResponderAsset(std::shared_ptr<NsmDevice> device,
+                              std::string& name, const std::string& baseType,
+                              dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    auto assetObject =
+        std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(name, baseType);
+    std::string assetName{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        assetName = std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
+    std::string assetManufacturer = MANUFACTURER_NVIDIA;
+
+    assetObject->invoke(pdiMethod(name), assetName);
+    assetObject->invoke(pdiMethod(manufacturer), assetManufacturer);
+    device->addStaticSensor(assetObject);
+
+    auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        *assetObject, BUILD_DATE);
+    auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        *assetObject, MARKETING_NAME);
+    auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        *assetObject, DEVICE_PART_NUMBER);
+    device->addStaticSensor(buildDate);
+    device->addStaticSensor(model);
+    device->addStaticSensor(partNumber);
+}
+
+void createIRoTResponderHealth(std::shared_ptr<NsmDevice> device,
+                               std::string& name, const std::string& baseType)
+{
+    std::string health = HEALTH_TYPE_OK;
+    auto healthObject =
+        std::make_shared<NsmIRoTResponder<HealthIntf>>(name, baseType);
+    healthObject->invoke(pdiMethod(health),
+                         HealthIntf::convertHealthTypeFromString(health));
+    device->addStaticSensor(healthObject);
+}
+
+void createIRoTResponderLocation(std::shared_ptr<NsmDevice> device,
+                                 std::string& name, const std::string& baseType,
+                                 dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    auto locationObject =
+        std::make_shared<NsmIRoTResponder<LocationIntf>>(name, baseType);
+    std::string locationType =
+        std::get<std::string>(allCurrentIfaceProperties.at("LocationType"));
+
+    locationObject->invoke(
+        pdiMethod(locationType),
+        LocationIntf::convertLocationTypesFromString(locationType));
+    device->addStaticSensor(locationObject);
+}
+void createIRoTResponderChassis(std::shared_ptr<NsmDevice> device,
+                                std::string& name, const std::string& baseType,
+                                dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    auto chassisObject =
+        std::make_shared<NsmIRoTResponder<ChassisIntf>>(name, baseType);
+    std::string chassisType =
+        std::get<std::string>(allCurrentIfaceProperties.at("ChassisType"));
+    chassisObject->invoke(
+        pdiMethod(type),
+        ChassisIntf::convertChassisTypeFromString(chassisType));
+    device->addStaticSensor(chassisObject);
+}
+
 static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                                                    const std::string& interface,
                                                    const std::string& objPath)
@@ -171,102 +238,28 @@ static requester::Coroutine createNsmIRoTResponder(SensorManager& manager,
                                    utils::getAssociations(associations));
         device->addStaticSensor(associationsObject);
     }
-    else if (type == "NSM_Asset")
+    else if (type == "NSM_Chassis_Attributes")
     {
-        lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
-                   "TYPE", type.c_str());
-        auto assetObject =
-            std::make_shared<NsmIRoTResponder<NsmAssetIntf>>(name, baseType);
-        std::string assetName{};
-        if (allCurrentIfaceProperties.count("Name"))
-        {
-            assetName =
-                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-        }
-        std::string assetManufacturer{};
-        if (allCurrentIfaceProperties.count("Manufacturer"))
-        {
-            assetManufacturer = std::get<std::string>(
-                allCurrentIfaceProperties.at("Manufacturer"));
-        }
-
-        assetObject->invoke(pdiMethod(name), assetName);
-        assetObject->invoke(pdiMethod(manufacturer), assetManufacturer);
-        device->addStaticSensor(assetObject);
-
-        auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            *assetObject, BUILD_DATE);
-        auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            *assetObject, MARKETING_NAME);
-        auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            *assetObject, DEVICE_PART_NUMBER);
-        device->addStaticSensor(buildDate);
-        device->addStaticSensor(model);
-        device->addStaticSensor(partNumber);
-    }
-    else if (type == "NSM_Chassis")
-    {
-        lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
-                   "TYPE", type.c_str());
-        auto chassisObject =
-            std::make_shared<NsmIRoTResponder<ChassisIntf>>(name, baseType);
-        std::string chassisType{};
-        if (allCurrentIfaceProperties.count("ChassisType"))
-        {
-            chassisType = std::get<std::string>(
-                allCurrentIfaceProperties.at("ChassisType"));
-        }
-
-        chassisObject->invoke(
-            pdiMethod(type),
-            ChassisIntf::convertChassisTypeFromString(chassisType));
-        device->addStaticSensor(chassisObject);
-    }
-    else if (type == "NSM_Health")
-    {
-        lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
-                   "TYPE", type.c_str());
-        auto healthObject =
-            std::make_shared<NsmIRoTResponder<HealthIntf>>(name, baseType);
-        std::string health{};
-        if (allCurrentIfaceProperties.count("Health"))
-        {
-            health =
-                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
-        }
-
-        healthObject->invoke(pdiMethod(health),
-                             HealthIntf::convertHealthTypeFromString(health));
-        device->addStaticSensor(healthObject);
-    }
-    else if (type == "NSM_Location")
-    {
-        lg2::debug("IRoTResponder: {NAME}, {TYPE}", "NAME", name.c_str(),
-                   "TYPE", type.c_str());
-        auto locationObject =
-            std::make_shared<NsmIRoTResponder<LocationIntf>>(name, baseType);
-        std::string locationType{};
+        createIRoTResponderAsset(device, name, baseType,
+                                 allCurrentIfaceProperties);
+        createIRoTResponderHealth(device, name, baseType);
         if (allCurrentIfaceProperties.count("LocationType"))
         {
-            locationType = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationType"));
+            createIRoTResponderLocation(device, name, baseType,
+                                        allCurrentIfaceProperties);
         }
-
-        locationObject->invoke(
-            pdiMethod(locationType),
-            LocationIntf::convertLocationTypesFromString(locationType));
-        device->addStaticSensor(locationObject);
+        if (allCurrentIfaceProperties.count("ChassisType"))
+        {
+            createIRoTResponderChassis(device, name, baseType,
+                                       allCurrentIfaceProperties);
+        }
     }
-
     co_return NSM_SUCCESS;
 }
 
 std::vector<std::string> IRoTResponderInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder",
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Asset",
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Chassis",
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Health",
-    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.Location"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisIRoTResponder.ChassisAttributes"};
 
 REGISTER_NSM_CREATION_FUNCTION(createNsmIRoTResponder, IRoTResponderInterfaces)
 
