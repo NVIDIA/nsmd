@@ -32,6 +32,108 @@
 namespace nsm
 {
 
+void createChassisAssemblyArea(std::shared_ptr<NsmDevice> device,
+                               const std::string& chassisName,
+                               const std::string& name,
+                               dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string physicalContext =
+        std::get<std::string>(allCurrentIfaceProperties.at("PhysicalContext"));
+
+    auto chassisArea =
+        std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
+    chassisArea->invoke(
+        pdiMethod(physicalContext),
+        AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
+    device->addStaticSensor(chassisArea);
+}
+
+void createChassisAssemblyAsset(std::shared_ptr<NsmDevice> device,
+                                const std::string& chassisName,
+                                const std::string& name,
+                                dbus::PropertyMap& allCurrentIfaceProperties,
+                                dbus::PropertyMap& allBaseIfaceProperties)
+{
+    std::string assetsName{};
+    if (allCurrentIfaceProperties.count("Name"))
+    {
+        assetsName =
+            std::get<std::string>(allCurrentIfaceProperties.at("Name"));
+    }
+    // default part number for asset is Board part number
+    std::string assemblyType{};
+    if (allBaseIfaceProperties.count("AssemblyType"))
+    {
+        assemblyType =
+            std::get<std::string>(allBaseIfaceProperties.at("AssemblyType"));
+    }
+
+    auto partNumberId = BOARD_PART_NUMBER;
+    if (assemblyType == "Device")
+    {
+        partNumberId = DEVICE_PART_NUMBER;
+    }
+    else if (assemblyType == "Board")
+    {
+        partNumberId = BOARD_PART_NUMBER;
+    }
+    else if (assemblyType == "FRU")
+    {
+        partNumberId = FRU_PART_NUMBER;
+    }
+    else
+    {
+        lg2::debug(
+            "NSM_Asset: Invalid AssemblyType={VAL} using default value BOARD_PART_NUMBER.",
+            "VAL", assemblyType);
+    }
+    std::string vendor = MANUFACTURER_NVIDIA;
+
+    auto assetObject = NsmChassisAssembly<NsmAssetIntf>(chassisName, name);
+    assetObject.invoke(pdiMethod(manufacturer), vendor);
+    assetObject.invoke(pdiMethod(name), assetsName);
+    //  create sensor
+    auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        assetObject, partNumberId);
+    auto serialNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        assetObject, SERIAL_NUMBER);
+    auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        assetObject, MARKETING_NAME);
+    auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
+        assetObject, BUILD_DATE);
+    device->addStaticSensor(partNumber);
+    device->addStaticSensor(serialNumber);
+    device->addStaticSensor(model);
+    device->addStaticSensor(buildDate);
+}
+
+void createChassisAssemblyHealth(std::shared_ptr<NsmDevice> device,
+                                 const std::string& chassisName,
+                                 const std::string& name)
+{
+    std::string health = HEALTH_TYPE_OK;
+    auto healthObject =
+        std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
+    healthObject->invoke(pdiMethod(health),
+                         HealthIntf::convertHealthTypeFromString(health));
+    device->addStaticSensor(healthObject);
+}
+
+void createChassisAssemblyLocation(std::shared_ptr<NsmDevice> device,
+                                   const std::string& chassisName,
+                                   const std::string& name,
+                                   dbus::PropertyMap& allCurrentIfaceProperties)
+{
+    std::string locationType =
+        std::get<std::string>(allCurrentIfaceProperties.at("LocationType"));
+    auto locationObject =
+        std::make_shared<NsmChassisAssembly<LocationIntf>>(chassisName, name);
+    locationObject->invoke(
+        pdiMethod(locationType),
+        LocationIntf::convertLocationTypesFromString(locationType));
+    device->addStaticSensor(locationObject);
+}
+
 requester::Coroutine
     nsmChassisAssemblyCreateSensors(SensorManager& manager,
                                     const std::string& interface,
@@ -82,113 +184,22 @@ requester::Coroutine
                                                                name);
         device->addStaticSensor(assemblyObject);
     }
-    else if (type == "NSM_Area")
+    else if (type == "NSM_Chassis_Attributes")
     {
-        std::string physicalContext{};
+        createChassisAssemblyAsset(device, chassisName, name,
+                                   allCurrentIfaceProperties,
+                                   allBaseIfaceProperties);
+        createChassisAssemblyHealth(device, chassisName, name);
         if (allCurrentIfaceProperties.count("PhysicalContext"))
         {
-            physicalContext = std::get<std::string>(
-                allCurrentIfaceProperties.at("PhysicalContext"));
+            createChassisAssemblyArea(device, chassisName, name,
+                                      allCurrentIfaceProperties);
         }
-
-        auto chassisArea =
-            std::make_shared<NsmChassisAssembly<AreaIntf>>(chassisName, name);
-        chassisArea->invoke(
-            pdiMethod(physicalContext),
-            AreaIntf::convertPhysicalContextTypeFromString(physicalContext));
-        device->addStaticSensor(chassisArea);
-    }
-    else if (type == "NSM_Asset")
-    {
-        std::string vendor{};
-        if (allCurrentIfaceProperties.count("Vendor"))
-        {
-            vendor =
-                std::get<std::string>(allCurrentIfaceProperties.at("Vendor"));
-        }
-        std::string assetsName{};
-        if (allCurrentIfaceProperties.count("Name"))
-        {
-            assetsName =
-                std::get<std::string>(allCurrentIfaceProperties.at("Name"));
-        }
-        // default part number for asset is Board part number
-        std::string assemblyType{};
-        if (allBaseIfaceProperties.count("AssemblyType"))
-        {
-            assemblyType = std::get<std::string>(
-                allBaseIfaceProperties.at("AssemblyType"));
-        }
-
-        auto partNumberId = BOARD_PART_NUMBER;
-        if (assemblyType == "Device")
-        {
-            partNumberId = DEVICE_PART_NUMBER;
-        }
-        else if (assemblyType == "Board")
-        {
-            partNumberId = BOARD_PART_NUMBER;
-        }
-        else if (assemblyType == "FRU")
-        {
-            partNumberId = FRU_PART_NUMBER;
-        }
-        else
-        {
-            lg2::debug(
-                "NSM_Asset: Invalid AssemblyType={VAL} using default value BOARD_PART_NUMBER.",
-                "VAL", assemblyType);
-        }
-
-        auto assetObject = NsmChassisAssembly<NsmAssetIntf>(chassisName, name);
-        assetObject.invoke(pdiMethod(manufacturer), vendor);
-        assetObject.invoke(pdiMethod(name), assetsName);
-        //  create sensor
-        auto partNumber = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            assetObject, partNumberId);
-        auto serialNumber =
-            std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(assetObject,
-                                                                 SERIAL_NUMBER);
-        auto model = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            assetObject, MARKETING_NAME);
-        auto buildDate = std::make_shared<NsmInventoryProperty<NsmAssetIntf>>(
-            assetObject, BUILD_DATE);
-        device->addStaticSensor(partNumber);
-        device->addStaticSensor(serialNumber);
-        device->addStaticSensor(model);
-        device->addStaticSensor(buildDate);
-    }
-    else if (type == "NSM_Health")
-    {
-        std::string health{};
-        if (allCurrentIfaceProperties.count("Health"))
-        {
-            health =
-                std::get<std::string>(allCurrentIfaceProperties.at("Health"));
-        }
-
-        auto healthObject =
-            std::make_shared<NsmChassisAssembly<HealthIntf>>(chassisName, name);
-        healthObject->invoke(pdiMethod(health),
-                             HealthIntf::convertHealthTypeFromString(health));
-        device->addStaticSensor(healthObject);
-    }
-    else if (type == "NSM_Location")
-    {
-        std::string locationType{};
         if (allCurrentIfaceProperties.count("LocationType"))
         {
-            locationType = std::get<std::string>(
-                allCurrentIfaceProperties.at("LocationType"));
+            createChassisAssemblyLocation(device, chassisName, name,
+                                          allCurrentIfaceProperties);
         }
-
-        auto locationObject =
-            std::make_shared<NsmChassisAssembly<LocationIntf>>(chassisName,
-                                                               name);
-        locationObject->invoke(
-            pdiMethod(locationType),
-            LocationIntf::convertLocationTypesFromString(locationType));
-        device->addStaticSensor(locationObject);
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
@@ -196,10 +207,7 @@ requester::Coroutine
 
 std::vector<std::string> chassisAssemblyInterfaces{
     "xyz.openbmc_project.Configuration.NSM_ChassisAssembly",
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.Area",
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.Asset",
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.Health",
-    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.Location"};
+    "xyz.openbmc_project.Configuration.NSM_ChassisAssembly.ChassisAttributes"};
 REGISTER_NSM_CREATION_FUNCTION(nsmChassisAssemblyCreateSensors,
                                chassisAssemblyInterfaces)
 
