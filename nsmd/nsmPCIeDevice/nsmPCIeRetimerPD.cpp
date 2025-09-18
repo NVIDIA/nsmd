@@ -72,7 +72,9 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
                                        association.absolutePath);
     }
     associationDefIntf->associations(associations_list);
-    pcieDeviceIntf->deviceType(deviceType);
+    pcieDeviceIntf->deviceType(
+        sdbusplus::common::xyz::openbmc_project::inventory::item::
+            convertPCIeTypesFromString(deviceType));
     updateMetricOnSharedMemory();
 }
 
