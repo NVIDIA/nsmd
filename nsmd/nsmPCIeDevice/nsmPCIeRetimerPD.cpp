@@ -73,8 +73,7 @@ NsmPCIeDeviceQueryScalarTelemetry::NsmPCIeDeviceQueryScalarTelemetry(
     }
     associationDefIntf->associations(associations_list);
     pcieDeviceIntf->deviceType(
-        sdbusplus::common::xyz::openbmc_project::inventory::item::
-            convertPCIeTypesFromString(deviceType));
+        PCIeDeviceIntf::convertDeviceTypesFromString(deviceType));
     updateMetricOnSharedMemory();
 }
 
