@@ -1325,6 +1325,9 @@ struct NsmProcessorTest :
         {"UUID", gpuUuid},    {"InventoryObjPath", memoryObjPath},
         {"Priority", false},
     };
+    const PropertyValuesCollection memoryAttributes = {
+        {"Type", "NSM_Memory_Attributes"},
+    };
     const PropertyValuesCollection asset = {
         {"Name", name},
         {"Type", "NSM_Asset"},
@@ -1638,19 +1641,33 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     // Set up properties for second memory sensor
     propertyMap["Name"] = std::get<std::string>(get(memory, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(memory, "UUID").second);
-    propertyMap["Type"] = std::get<std::string>(get(memory, "Type").second);
+    propertyMap["Type"] =
+        std::get<std::string>(get(memoryAttributes, "Type").second);
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(memory, "InventoryObjPath").second);
     propertyMap["Priority"] = std::get<bool>(get(memory, "Priority").second);
-    createNsmMemorySensor(mockManager, memoryBasicIntfName + ".MemCapacityUtil",
-                          memoryObjPath);
+    createNsmMemorySensor(
+        mockManager, memoryBasicIntfName + ".MemoryAttributes", memoryObjPath);
 
-    // Check if the sensors isn't duplicated
-    EXPECT_EQ(1, gpu->deviceSensors.size());
-    EXPECT_EQ(1, gpu->longRunningSensors.size());
-    EXPECT_EQ(memoryCapacityUtilSensor.get(), gpu->deviceSensors.back().get());
+    uint8_t memCapacityUtilSensorCount = 0;
+    // Find the MemCapacityUtil sensor among the created sensors
+    std::shared_ptr<NsmMemoryCapacityUtil> foundMemCapacityUtilSensor = nullptr;
+    for (uint8_t sensorIndex = 0; sensorIndex < gpu->deviceSensors.size();
+         sensorIndex++)
+    {
+        const auto& sensor = gpu->deviceSensors[sensorIndex];
+        auto memCapUtil = dynamic_pointer_cast<NsmMemoryCapacityUtil>(sensor);
+        if (memCapUtil)
+        {
+            foundMemCapacityUtilSensor = memCapUtil;
+            memCapacityUtilSensorCount++;
+        }
+    }
+    EXPECT_EQ(1, memCapacityUtilSensorCount);
+    EXPECT_NE(nullptr, foundMemCapacityUtilSensor);
+    EXPECT_EQ(memoryCapacityUtilSensor.get(), foundMemCapacityUtilSensor.get());
     // Check if the sensor interface is moved as expected
-    EXPECT_EQ(2, memoryCapacityUtilSensor->interfaces.size());
+    EXPECT_EQ(2, foundMemCapacityUtilSensor->interfaces.size());
 }
 TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
 {
