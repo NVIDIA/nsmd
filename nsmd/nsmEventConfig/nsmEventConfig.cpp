@@ -208,11 +208,11 @@ requester::Coroutine
     Request request(sizeof(nsm_msg_hdr) +
                     sizeof(nsm_get_inventory_information_req));
     auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
-    auto rc = encode_nsm_get_supported_event_source_req(
-        nsmDevice->getEid(), messageType, requestPtr);
+    auto rc = encode_nsm_get_current_event_source_req(0, messageType,
+                                                      requestPtr);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::debug("encode_nsm_get_supported_event_source_req failed. "
+        lg2::debug("encode_nsm_get_current_event_source_req failed. "
                    "eid={EID} rc={RC}",
                    "EID", nsmDevice->getEid(), "RC", rc);
         // coverity[missing_return]
@@ -232,20 +232,19 @@ requester::Coroutine
     }
 
     uint8_t cc = NSM_ERROR;
-    uint16_t reason_code = ERR_NULL;
-    bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH];
-    rc = decode_nsm_get_supported_event_source_resp(
-        responseMsg.get(), responseLen, &cc, &reason_code,
-        &supported_event_sources[0]);
+    uint16_t reasonCode = ERR_NULL;
+    bitfield8_t eventSources[EVENT_SOURCES_LENGTH];
+    rc = decode_nsm_get_event_source_resp(responseMsg.get(), responseLen, &cc,
+                                          &reasonCode, eventSources);
 
     LG2_ERROR_FLT(
-        "decode_nsm_get_supported_event_source_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+        "decode_nsm_get_event_source_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
 
     if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
     {
         bool validationPassed = validateEventIds(nsmDevice->getEid(),
-                                                 supported_event_sources);
+                                                 eventSources);
         if (!validationPassed)
         {
             co_await eventConfig->update(nsmDevice);
@@ -256,40 +255,38 @@ requester::Coroutine
 }
 
 bool NsmGetEventConfig::validateEventIds(
-    eid_t eid, bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH])
+    eid_t eid, bitfield8_t eventSources[EVENT_SOURCES_LENGTH])
 {
-    bool validateEventSource = true;
+    bool anyOfEventIdNotSupported = false;
 
     for (size_t byteIndex = 0; byteIndex < EVENT_SOURCES_LENGTH; byteIndex++)
     {
-        uint8_t byte = srcEventMask[byteIndex].byte;
         for (uint8_t bitOffset = 0; bitOffset < 8; bitOffset++)
         {
-            if (byte & (1 << bitOffset))
+            // skip if event id is not configured
+            if (!(srcEventMask[byteIndex].byte & (1 << bitOffset)))
             {
-                uint64_t eventId = (byteIndex * 8) + bitOffset;
-
-                // Check if this configured event is supported
-                uint8_t supportedByte = supported_event_sources[byteIndex].byte;
-                bool validateEventSourceForEventId =
-                    !(supportedByte & (1 << bitOffset));
-                if (validateEventSourceForEventId)
-                {
-                    validateEventSource = false;
-                }
-                if (shouldLog("NsmGetEventConfig::validateEventIds " +
-                                  std::to_string(eventId),
-                              validateEventSourceForEventId))
-                {
-                    LG2_ERROR(
-                        "EID: {EID} Configured event ID {ID} for Message Type {MSG_TYPE} is not supported",
-                        "EID", eid, "ID", eventId, "MSG_TYPE", messageType);
-                }
+                continue;
+            }
+            uint64_t eventId = (byteIndex * 8) + bitOffset;
+            // Check if this configured event is supported
+            bool isNotSupported = eventSources[byteIndex].byte &
+                                  (1 << bitOffset);
+            anyOfEventIdNotSupported |= isNotSupported;
+            const auto clearloggerMsg =
+                std::format("Validation of Event ID {} for Message Type {}",
+                            eventId, messageType);
+            if (shouldLog(clearloggerMsg, isNotSupported))
+            {
+                LG2_ERROR(
+                    "Event ID {ID} for Message Type {MSG_TYPE} is not supported, EID: {EID}",
+                    "ID", eventId, "MSG_TYPE", messageType, "EID", eid);
             }
         }
     }
 
-    return validateEventSource;
+    // return false if any of event id is not supported
+    return !anyOfEventIdNotSupported;
 }
 
 static requester::Coroutine createNsmEventConfig(SensorManager& manager,

@@ -52,6 +52,31 @@ std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable = {
     {4, 1}   // PCIe_Tx_Amplitude
 };
 
+EventSource::EventSource(const std::vector<uint64_t>& events)
+{
+    for (auto& event : events)
+    {
+        if (event >= EVENT_SOURCES_LENGTH * 8)
+        {
+            lg2::warning("Ignoring unsupported event id {ID}", "ID", event);
+            continue;
+        }
+        auto index = static_cast<size_t>(event) >> 3;
+        auto offset = static_cast<uint8_t>(event & 0x7);
+        this->events[index].byte |= (1u << offset);
+    }
+}
+std::unordered_map<uint8_t, EventSource>
+    MockupResponder::supportedEventSources = {
+        {NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+         std::vector<uint64_t>{NSM_REDISCOVERY_EVENT, NSM_LONG_RUNNING_EVENT}},
+        {NSM_TYPE_NETWORK_PORT,
+         std::vector<uint64_t>{NSM_THRESHOLD_EVENT,
+                               NSM_FABRIC_MANAGER_STATE_EVENT}},
+        {NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+         std::vector<uint64_t>{NSM_RESET_REQUIRED_EVENT, NSM_XID_EVENT}},
+};
+
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
@@ -116,9 +141,10 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
              {
                  {EI_FATAL_ERRORS, false},
              }},
-        }, // errorInjection
-        0, // migMode
-        0, // eccMode
+        },  // errorInjection
+        0,  // migMode
+        0,  // eccMode
+        {}, // eventSources
     })
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -397,6 +423,10 @@ std::optional<Response>
                     return getEventSubscription(request, requestLen);
                 case NSM_SET_EVENT_SUBSCRIPTION:
                     return setEventSubscription(request, requestLen);
+                case NSM_GET_SUPPORTED_EVENT_SOURCES:
+                    return getSupportedEventSources(request, requestLen);
+                case NSM_GET_CURRENT_EVENT_SOURCES:
+                    return getCurrentEventSources(request, requestLen);
                 case NSM_SET_CURRENT_EVENT_SOURCES:
                     return setCurrentEventSources(request, requestLen);
                 case NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT:
@@ -854,7 +884,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                  {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 8, 9, 10, 11, 14, 68, 69}},
@@ -895,7 +925,7 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_GPU,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                  {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
                    NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
@@ -929,7 +959,7 @@ std::optional<std::vector<uint8_t>>
                       NSM_PING,
                       NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,
                       NSM_SUPPORTED_COMMAND_CODES,
-                      NSM_SUPPORTED_EVENT_SOURCES,
+                      NSM_GET_SUPPORTED_EVENT_SOURCES,
                       NSM_QUERY_DEVICE_IDENTIFICATION,
                       NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT,
                   }},
@@ -2335,6 +2365,64 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getSupportedEventSources(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getSupportedEventSources: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint8_t nvidia_message_type = 0;
+    auto rc = decode_nsm_get_event_source_req(requestMsg, requestLen,
+                                              &nvidia_message_type);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_source_req failed RC={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_source_resp),
+                      0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_get_supported_event_source_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        supportedEventSources[nvidia_message_type].events.data(), responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentEventSources(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getCurrentEventSources: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint8_t nvidia_message_type = 0;
+    auto rc = decode_nsm_get_event_source_req(requestMsg, requestLen,
+                                              &nvidia_message_type);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_source_req failed RC={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_source_resp),
+                      0);
+
+    auto& currentEventSources = state.eventSources[nvidia_message_type];
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_get_current_event_source_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        currentEventSources.data(), responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
     MockupResponder::setCurrentEventSources(const nsm_msg* requestMsg,
                                             size_t requestLen)
 {
@@ -2345,14 +2433,19 @@ std::optional<std::vector<uint8_t>>
     }
 
     uint8_t nvidiaMessageType = 0;
-    bitfield8_t* event_sources;
-
-    auto rc = decode_nsm_set_current_event_source_req(
-        requestMsg, requestLen, &nvidiaMessageType, &event_sources);
-    if (rc != NSM_SUCCESS)
+    bitfield8_t eventSources[EVENT_SOURCES_LENGTH] = {0};
+    auto rc = decode_nsm_set_current_event_sources_req(
+        requestMsg, requestLen, &nvidiaMessageType, eventSources);
+    if (rc != NSM_SUCCESS || nvidiaMessageType > NSM_TYPE_FIRMWARE)
     {
-        lg2::error("decode_nsm_set_current_event_source_req failed RC={RC}",
+        lg2::error("decode_nsm_set_current_event_sources_req failed RC={RC}",
                    "RC", rc);
+    }
+    for (int i = 0; i < EVENT_SOURCES_LENGTH; i++)
+    {
+        state.eventSources[nvidiaMessageType][i].byte =
+            supportedEventSources[nvidiaMessageType].events[i].byte &
+            eventSources[i].byte;
     }
 
     std::vector<uint8_t> response(

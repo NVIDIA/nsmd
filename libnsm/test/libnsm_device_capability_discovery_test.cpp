@@ -20,75 +20,127 @@
 #include "device-capability-discovery.h"
 #include <gtest/gtest.h>
 
-TEST(encode_nsm_get_supported_event_source_req, testGoodEncodeRequest)
+TEST(nsm_get_supported_event, testRequest)
 {
-	std::vector<uint8_t> requestMsg(
-	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_supported_event_source_req));
-
-	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
-	auto rc = encode_nsm_get_supported_event_source_req(
-	    0, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, request);
-
-	struct nsm_get_supported_event_source_req *req =
-	    reinterpret_cast<struct nsm_get_supported_event_source_req *>(
-		request->payload);
-
-	EXPECT_EQ(rc, NSM_SUCCESS);
-
-	EXPECT_EQ(1, request->hdr.request);
-	EXPECT_EQ(0, request->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-		  request->hdr.nvidia_msg_type);
-
-	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES, req->hdr.command);
-	EXPECT_EQ(NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE,
-		  req->hdr.data_size);
+	const uint8_t expectedNvidiaMessageType = NSM_TYPE_NETWORK_PORT;
+	uint8_t nvidiaMessageType;
+	auto encodeNsmGetSupportedEventReq =
+	    [](uint8_t instanceId, const uint8_t *nvidiaMessageType,
+	       struct nsm_msg *msg) {
+		    if (nvidiaMessageType == nullptr) {
+			    return (int)NSM_SW_ERROR_NULL;
+		    }
+		    return encode_nsm_get_supported_event_source_req(
+			instanceId, *nvidiaMessageType, msg);
+	    };
+	testEncodeRequest<uint8_t>(
+	    encodeNsmGetSupportedEventReq, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_SUPPORTED_EVENT_SOURCES, expectedNvidiaMessageType,
+	    nvidiaMessageType);
+	testDecodeRequest<uint8_t>(decode_nsm_get_event_source_req,
+				   NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+				   NSM_GET_SUPPORTED_EVENT_SOURCES,
+				   expectedNvidiaMessageType,
+				   nvidiaMessageType);
+	EXPECT_EQ(expectedNvidiaMessageType, nvidiaMessageType);
 }
 
-TEST(decode_nsm_get_supported_event_source_resp, testGoodDecodeResponse)
+TEST(nsm_get_supported_event, testResponse)
 {
-	std::vector<uint8_t> responseMsg{
-	    0x10,
-	    0xDE, // PCI VID: NVIDIA 0x10DE
-	    0x00, // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
-	    0x89, // OCP_TYPE=8, OCP_VER=9
-	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, // NVIDIA_MSG_TYPE
-	    NSM_GET_CURRENT_EVENT_SOURCES,	  // command
-	    NSM_SUCCESS,			  // completion code
-	    0,
-	    0, // reserved
-	    8,
-	    0, // data size
-	    1,
-	    2,
-	    3,
-	    4,
-	    5,
-	    6,
-	    7,
-	    8 // event_sources
+	const bitfield8_t expectedEventSources[EVENT_SOURCES_LENGTH] = {
+	    0, 1, 2, 3, 4, 5, 6, 7};
+	bitfield8_t eventSources[EVENT_SOURCES_LENGTH];
+	auto encodeNsmGetSupportedEventSourceResp =
+	    [](uint8_t instanceId, uint8_t cc, uint16_t reasonCode,
+	       bitfield8_t *const *data, nsm_msg *msg) {
+		    return encode_nsm_get_supported_event_source_resp(
+			instanceId, cc, reasonCode,
+			reinterpret_cast<const bitfield8_t *>(data), msg);
+	    };
+	auto decodeNsmGetEventSourceResp = [](const nsm_msg *msg, size_t msgLen,
+					      uint8_t *cc, uint16_t *reasonCode,
+					      bitfield8_t **eventSources) {
+		return decode_nsm_get_event_source_resp(
+		    msg, msgLen, cc, reasonCode,
+		    reinterpret_cast<bitfield8_t *>(eventSources));
 	};
+	testEncodeResponse<bitfield8_t *>(
+	    encodeNsmGetSupportedEventSourceResp,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_SUPPORTED_EVENT_SOURCES,
+	    reinterpret_cast<bitfield8_t *const &>(expectedEventSources),
+	    reinterpret_cast<bitfield8_t *&>(eventSources),
+	    sizeof(eventSources));
+	testDecodeResponse<bitfield8_t *>(
+	    decodeNsmGetEventSourceResp, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_SUPPORTED_EVENT_SOURCES,
+	    reinterpret_cast<bitfield8_t *const &>(expectedEventSources),
+	    reinterpret_cast<bitfield8_t *&>(eventSources),
+	    sizeof(eventSources));
+	EXPECT_EQ(
+	    memcmp(expectedEventSources, eventSources, sizeof(eventSources)),
+	    0);
+}
 
-	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
-	size_t msg_len = responseMsg.size();
+TEST(nsm_get_current_event_sources, testRequest)
+{
+	const uint8_t expectedNvidiaMessageType =
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+	uint8_t nvidiaMessageType;
+	auto encodeNsmGetCurrentEventSourcesReq =
+	    [](uint8_t instanceId, const uint8_t *nvidiaMessageType,
+	       struct nsm_msg *msg) {
+		    if (nvidiaMessageType == nullptr) {
+			    return (int)NSM_SW_ERROR_NULL;
+		    }
+		    return encode_nsm_get_current_event_source_req(
+			instanceId, *nvidiaMessageType, msg);
+	    };
+	testEncodeRequest<uint8_t>(
+	    encodeNsmGetCurrentEventSourcesReq,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, NSM_GET_CURRENT_EVENT_SOURCES,
+	    expectedNvidiaMessageType, nvidiaMessageType);
+	testDecodeRequest<uint8_t>(
+	    decode_nsm_get_event_source_req,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, NSM_GET_CURRENT_EVENT_SOURCES,
+	    expectedNvidiaMessageType, nvidiaMessageType);
+	EXPECT_EQ(expectedNvidiaMessageType, nvidiaMessageType);
+}
 
-	uint8_t cc = 0;
-	uint16_t reason_code = 0;
-	bitfield8_t event_sources[EVENT_SOURCES_LENGTH];
-	auto rc = decode_nsm_get_supported_event_source_resp(
-	    response, msg_len, &cc, &reason_code, &event_sources[0]);
-
-	EXPECT_EQ(rc, NSM_SUCCESS);
-	EXPECT_EQ(cc, NSM_SUCCESS);
-	EXPECT_TRUE(event_sources != NULL);
-	EXPECT_EQ(event_sources[0].byte, 1);
-	EXPECT_EQ(event_sources[1].byte, 2);
-	EXPECT_EQ(event_sources[2].byte, 3);
-	EXPECT_EQ(event_sources[3].byte, 4);
-	EXPECT_EQ(event_sources[4].byte, 5);
-	EXPECT_EQ(event_sources[5].byte, 6);
-	EXPECT_EQ(event_sources[6].byte, 7);
-	EXPECT_EQ(event_sources[7].byte, 8);
+TEST(nsm_get_current_event_sources, testResponse)
+{
+	const bitfield8_t expectedEventSources[EVENT_SOURCES_LENGTH] = {
+	    0, 1, 2, 3, 4, 5, 6, 7};
+	bitfield8_t eventSources[EVENT_SOURCES_LENGTH];
+	auto encodeNsmGetCurrentEventSourceResp =
+	    [](uint8_t instanceId, uint8_t cc, uint16_t reasonCode,
+	       bitfield8_t *const *data, nsm_msg *msg) {
+		    return encode_nsm_get_current_event_source_resp(
+			instanceId, cc, reasonCode,
+			reinterpret_cast<const bitfield8_t *>(data), msg);
+	    };
+	auto decodeNsmGetEventSourceResp = [](const nsm_msg *msg, size_t msgLen,
+					      uint8_t *cc, uint16_t *reasonCode,
+					      bitfield8_t **eventSources) {
+		return decode_nsm_get_event_source_resp(
+		    msg, msgLen, cc, reasonCode,
+		    reinterpret_cast<bitfield8_t *>(eventSources));
+	};
+	testEncodeResponse<bitfield8_t *>(
+	    encodeNsmGetCurrentEventSourceResp,
+	    NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, NSM_GET_CURRENT_EVENT_SOURCES,
+	    reinterpret_cast<bitfield8_t *const &>(expectedEventSources),
+	    reinterpret_cast<bitfield8_t *&>(eventSources),
+	    sizeof(eventSources));
+	testDecodeResponse<bitfield8_t *>(
+	    decodeNsmGetEventSourceResp, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+	    NSM_GET_CURRENT_EVENT_SOURCES,
+	    reinterpret_cast<bitfield8_t *const &>(expectedEventSources),
+	    reinterpret_cast<bitfield8_t *&>(eventSources),
+	    sizeof(eventSources));
+	EXPECT_EQ(
+	    memcmp(expectedEventSources, eventSources, sizeof(eventSources)),
+	    0);
 }
 
 TEST(nsm_get_event_subscription, testRequest)
@@ -405,7 +457,7 @@ TEST(encode_nsm_set_current_event_sources_req, testGoodEncodeRequest)
 		  req->hdr.data_size);
 }
 
-TEST(decode_nsm_set_current_event_source_req, testGoodDecodeRequest)
+TEST(decode_nsm_set_current_event_sources_req, testGoodDecodeRequest)
 {
 	std::vector<uint8_t> requestMsg{
 	    0x10,
@@ -430,14 +482,13 @@ TEST(decode_nsm_set_current_event_source_req, testGoodDecodeRequest)
 	size_t msg_len = requestMsg.size();
 
 	uint8_t nvidia_message_type = 0;
-	bitfield8_t *event_sources = NULL;
+	bitfield8_t event_sources[EVENT_SOURCES_LENGTH] = {0};
 
-	auto rc = decode_nsm_set_current_event_source_req(
-	    request, msg_len, &nvidia_message_type, &event_sources);
+	auto rc = decode_nsm_set_current_event_sources_req(
+	    request, msg_len, &nvidia_message_type, event_sources);
 
 	EXPECT_EQ(rc, NSM_SUCCESS);
 	EXPECT_EQ(nvidia_message_type, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY);
-	EXPECT_TRUE(event_sources != NULL);
 	EXPECT_EQ(event_sources[0].byte, 0x1);
 	EXPECT_EQ(event_sources[1].byte, 0x2);
 	EXPECT_EQ(event_sources[2].byte, 0x3);

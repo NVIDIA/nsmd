@@ -18,6 +18,7 @@
 #pragma once
 
 #include "base.h"
+#include "device-capability-discovery.h"
 #include "device-configuration.h"
 #include "diagnostics.h"
 #include "network-ports.h"
@@ -61,6 +62,12 @@ struct HeaderType
     uint8_t type;
 };
 
+struct EventSource
+{
+    std::array<bitfield8_t, EVENT_SOURCES_LENGTH> events;
+    EventSource() = default;
+    EventSource(const std::vector<uint64_t>& events);
+};
 class MockupResponder
 {
   public:
@@ -125,6 +132,10 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getSupportedEventSources(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getCurrentEventSources(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setCurrentEventSources(const nsm_msg* requestMsg, size_t requestLen);
 
@@ -514,6 +525,7 @@ class MockupResponder
     std::unique_ptr<sdeventplus::source::IO> io;
     eid_t eventReceiverEid;
     uint8_t globalEventGenerationSetting;
+    static std::unordered_map<uint8_t, EventSource> supportedEventSources;
     struct State
     {
         nsm_fpga_diagnostics_settings_wp writeProtected;
@@ -527,6 +539,9 @@ class MockupResponder
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;
+        std::unordered_map<uint8_t,
+                           std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
+            eventSources;
     } state;
 };
 

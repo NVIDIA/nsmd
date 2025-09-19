@@ -25,7 +25,7 @@ extern "C" {
 #include "base.h"
 #include <stdbool.h>
 
-#define NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE 1
+#define NSM_GET_EVENT_SOURCES_REQ_DATA_SIZE 1
 #define NSM_SET_EVENT_SUBSCRIPTION_REQ_DATA_SIZE 2
 #define NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE 9
 #define NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT_REQ_DATA_SIZE 9
@@ -56,39 +56,22 @@ enum nsm_device_capability_timestamp_generation {
 	NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_MONOTONIC_TIME = 2,
 };
 
-/** @struct nsm_get_supported_event_source_req
+/** @struct nsm_get_event_source_req
  *
- *  Structure representing NSM get supported event source request
+ *  Structure representing NSM get supported/current event source request
  */
-struct nsm_get_supported_event_source_req {
+struct nsm_get_event_source_req {
 	struct nsm_common_req hdr;
 	uint8_t nvidia_message_type;
 } __attribute__((packed));
 
-/** @struct nsm_get_supported_event_source_resp
+/** @struct nsm_get_event_source_resp
  *
- *  Structure representing NSM get supported event source respones
+ *  Structure representing NSM get supported/current event source respones
  */
-struct nsm_get_supported_event_source_resp {
+struct nsm_get_event_source_resp {
 	struct nsm_common_resp hdr;
-	bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH];
-} __attribute__((packed));
-
-/** @struct nsm_get_current_event_source_req
- *
- *  Structure representing NSM get current event source request
- */
-struct nsm_get_current_event_source_req {
-	struct nsm_common_req hdr;
-	uint8_t nvidia_message_type;
-} __attribute__((packed));
-
-/** @struct nsm_get_current_event_source_resp
- *
- *  Structure representing NSM get current event source respones
- */
-struct nsm_get_current_event_source_resp {
-	struct nsm_common_resp hdr;
+	bitfield8_t event_sources[EVENT_SOURCES_LENGTH];
 } __attribute__((packed));
 
 /** @struct nsm_set_supported_event_source_req
@@ -216,18 +199,71 @@ int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
 					      uint8_t nvidia_message_type,
 					      struct nsm_msg *msg);
 
-/** @brief Decode a get supported event source response message
+/** @brief Create a get current event sources request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] nvidia_message_type - message type for which event IDS are
+ * requested
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_current_event_source_req(uint8_t instance_id,
+					    uint8_t nvidia_message_type,
+					    struct nsm_msg *msg);
+
+/** @brief Decode a get supported/current event source request message
+ *
+ *  @param[in] msg - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] nvidia_message_type - message type for supported/current event
+ * source
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_get_event_source_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *nvidia_message_type);
+
+/** @brief Encode a get supported event source response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[in] event_sources - pointer to array bitfield8_t[8], each bit
+ * represents whether the given event ID is supported for the NVIDIA Message
+ * Type.
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_supported_event_source_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg);
+
+/** @brief Encode a get current event source response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - Completion code
+ *  @param[in] reason_code - Reason code
+ *  @param[in] event_sources - pointer to array bitfield8_t[8], each bit
+ * represents whether the given event ID will generate the NVIDIA Message Type
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_get_current_event_source_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg);
+
+/** @brief Decode a get supported/current event source response message
  *
  *  @param[in] msg - response message
  *  @param[in] msg_len - Length of response message
  *  @param[out] cc - pointer to completion code
- *  @param[out] supported_event_sources  - pointer to array bitfield8_t[8], each
- * bit represents whether the given event ID is supported for the NVIDIA Message
+ *  @param[out] reason_code - pointer to reason code
+ *  @param[out] event_sources  - pointer to array bitfield8_t[8], each
+ * bit represents whether the given event ID will generate the NVIDIA Message
  * Type
  *
  *  @return nsm_completion_codes
  */
-int decode_nsm_get_supported_event_source_resp(
+int decode_nsm_get_event_source_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, bitfield8_t event_sources[EVENT_SOURCES_LENGTH]);
 
@@ -235,29 +271,27 @@ int decode_nsm_get_supported_event_source_resp(
  *
  *  @param[in] instance_id - NSM instance ID
  *  @param[in] nvidia_message_type - message type for current event source
- *  @param[in] supported_event_sources - pointer to array bitfield8_t[8], each
+ *  @param[in] event_sources - pointer to array bitfield8_t[8], each
  * bit represents whether the given event ID is supported for the NVIDIA Message
  * type
  *  @param[out] msg - Message will be written to this
  *  @return nsm_completion_codes
  */
-int encode_nsm_set_current_event_sources_req(uint8_t instance_id,
-					     uint8_t nvidia_message_type,
-					     bitfield8_t *event_sources,
-					     struct nsm_msg *msg);
+int encode_nsm_set_current_event_sources_req(
+    uint8_t instance_id, uint8_t nvidia_message_type,
+    bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg);
 
 /** @brief Decode a set current event sources request message
  *
  *  @param[in] msg    - request message
  *  @param[in] msg_len - Length of request message
  *  @param[out] nvidia_message_type - message type for current event source
- *  @param[out] event_sources - a pointer to event_source array
+ *  @param[out] event_sources - a pointer to event_sources array
  *  @return nsm_completion_codes
  */
-int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
-					    size_t msg_len,
-					    uint8_t *nvidia_message_type,
-					    bitfield8_t **event_sources);
+int decode_nsm_set_current_event_sources_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *nvidia_message_type,
+    bitfield8_t event_sources[EVENT_SOURCES_LENGTH]);
 
 /** @brief Decode a set current event source response message
  *
