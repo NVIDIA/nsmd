@@ -1291,7 +1291,6 @@ struct NsmProcessorTest :
     };
     const PropertyValuesCollection prcKnobs = {
         {"Type", "NSM_ReconfigPermissions"},
-        {"Priority", false},
         {"Features", // features are not propertly sorted and some are
                      // duplicated
          std::vector<std::string>{
@@ -1321,9 +1320,10 @@ struct NsmProcessorTest :
          }},
     };
     const PropertyValuesCollection memory = {
-        {"Name", memoryName}, {"Type", "NSM_MemCapacityUtil"},
-        {"UUID", gpuUuid},    {"InventoryObjPath", memoryObjPath},
-        {"Priority", false},
+        {"Name", memoryName},
+        {"Type", "NSM_MemCapacityUtil"},
+        {"UUID", gpuUuid},
+        {"InventoryObjPath", memoryObjPath},
     };
     const PropertyValuesCollection memoryAttributes = {
         {"Type", "NSM_Memory_Attributes"},
@@ -1399,7 +1399,6 @@ TEST_F(NsmProcessorTest, goodTestCreateInbandReconfigPermissionsSensors)
     propertyMap["Type"] = std::get<std::string>(get(prcKnobs, "Type").second);
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(basic, "InventoryObjPath").second);
-    propertyMap["Priority"] = std::get<bool>(get(prcKnobs, "Priority").second);
     propertyMap["Features"] =
         std::get<std::vector<std::string>>(get(prcKnobs, "Features").second);
 
@@ -1621,20 +1620,33 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
 
-    // Set up interface-specific properties for MemCapacityUtil
-    propertyMap["Type"] = std::get<std::string>(get(memory, "Type").second);
+    // Set up interface-specific properties for ProcessorAttributes
+    // (MemCapacityUtil is now handled here)
+    propertyMap["Type"] = "NSM_Processor_Attributes";
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(basic, "InventoryObjPath").second);
-    propertyMap["Priority"] = std::get<bool>(get(basic, "Priority").second);
-    createNsmProcessorSensor(mockManager, basicIntfName + ".MemCapacityUtil",
-                             objPath);
+    propertyMap["MemCapacityUtilSupported"] = true;
+    createNsmProcessorSensor(mockManager,
+                             basicIntfName + ".ProcessorAttributes", objPath);
     EXPECT_EQ(1, devices.size());
     gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
-    EXPECT_EQ(1, gpu->deviceSensors.size());
+    // ProcessorAttributes creates: 3 Asset static sensors + 1 MemCapacityUtil
+    // device sensor
+    EXPECT_EQ(3, gpu->staticSensors.size()); // Asset sensors
+    EXPECT_EQ(4, gpu->deviceSensors.size()); // MemCapacityUtil sensor
     EXPECT_EQ(1, gpu->longRunningSensors.size());
 
-    auto memoryCapacityUtilSensor =
-        dynamic_pointer_cast<NsmMemoryCapacityUtil>(gpu->deviceSensors.back());
+    // Find the MemoryCapacityUtil sensor among the created sensors
+    std::shared_ptr<NsmMemoryCapacityUtil> memoryCapacityUtilSensor = nullptr;
+    for (const auto& sensor : gpu->deviceSensors)
+    {
+        auto memCapUtil = dynamic_pointer_cast<NsmMemoryCapacityUtil>(sensor);
+        if (memCapUtil)
+        {
+            memoryCapacityUtilSensor = memCapUtil;
+            break;
+        }
+    }
     EXPECT_NE(nullptr, memoryCapacityUtilSensor);
     EXPECT_EQ(1, memoryCapacityUtilSensor->interfaces.size());
 
@@ -1678,13 +1690,14 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
     propertyMap["Name"] = std::get<std::string>(get(asset, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(asset, "UUID").second);
 
-    // Set up interface-specific properties for Asset
-    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    // Set up interface-specific properties for ProcessorAttributes (Asset is
+    // now handled here)
+    propertyMap["Type"] = "NSM_Processor_Attributes";
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(asset, "InventoryObjPath").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(asset, "Manufacturer").second);
-    createNsmProcessorSensor(mockManager, basicIntfName + ".Asset", objPath);
+    // Manufacturer is now hardcoded to NVIDIA in code, no need to set in config
+    createNsmProcessorSensor(mockManager,
+                             basicIntfName + ".ProcessorAttributes", objPath);
     EXPECT_EQ(1, devices.size());
     EXPECT_EQ(3, gpu->deviceSensors.size());
     EXPECT_EQ(0, gpu->longRunningSensors.size());
