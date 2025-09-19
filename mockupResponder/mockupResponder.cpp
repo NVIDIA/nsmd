@@ -31,6 +31,7 @@
 #include "utils.hpp"
 
 #include <endian.h>
+#include <linux/mctp.h>
 #include <sys/socket.h>
 
 #include <phosphor-logging/lg2.hpp>
@@ -208,62 +209,39 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
 
 int MockupResponder::initSocket()
 {
+    auto fd = socket(AF_MCTP, SOCK_DGRAM, 0);
+
+    int rc = 0;
+    if (fd == -1)
+    {
+        rc = -errno;
+        lg2::error("Failed to create the socket, RC={RC}, EID={ED}", "RC",
+                   strerror(-rc), "ED", mockEid);
+        return rc;
+    }
+
+    struct sockaddr_mctp addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.smctp_family = AF_MCTP;
+    addr.smctp_network = MCTP_NET_ANY;
+    addr.smctp_addr.s_addr = mockEid;
+    addr.smctp_tag = MCTP_TAG_OWNER;
+    addr.smctp_type = MCTP_MSG_TYPE_PCI_VDM;
+
+    rc = bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+    if (rc == -1)
+    {
+        rc = -errno;
+        lg2::error(
+            "Error while binding the socket to NSM Msg Type, RC={RC}, EID={ED}",
+            "RC", strerror(-rc), "ED", mockEid);
+        return rc;
+    }
+
     if (verbose)
     {
         lg2::info("connect to Mockup EID({EID})", "EID", mockEid);
-    }
-
-    auto fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (fd == -1)
-    {
-        return false;
-    }
-
-    struct sockaddr_un addr{};
-
-    addr.sun_family = AF_UNIX;
-    memcpy(addr.sun_path, MCTP_SOCKET_PATH, sizeof(MCTP_SOCKET_PATH) - 1);
-
-    if (::connect(fd, (struct sockaddr*)&addr,
-                  sizeof(MCTP_SOCKET_PATH) + sizeof(addr.sun_family) - 1) == -1)
-    {
-        lg2::error(
-            "connect() error to mctp-demux-daemon, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", std::strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    uint8_t prefix = MCTP_MSG_EMU_PREFIX;
-    uint8_t type = MCTP_MSG_TYPE_VDM;
-
-    ssize_t ret = ::write(fd, &prefix, sizeof(uint8_t));
-    if (ret < 0)
-    {
-        lg2::error(
-            "Failed to write mockup prefix code to socket, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    ret = ::write(fd, &type, sizeof(uint8_t));
-    if (ret < 0)
-    {
-        lg2::error(
-            "Failed to write VDM type code to socket, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    ret = ::write(fd, &mockEid, sizeof(uint8_t));
-    if (ret == -1)
-    {
-        lg2::error("Failed to write eid to socket, errno = {ERROR}, {STRERROR}",
-                   "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
     }
 
     auto callback = [this](sdeventplus::source::IO& io, int fd,
@@ -284,9 +262,18 @@ int MockupResponder::initSocket()
             return;
         }
 
-        std::vector<uint8_t> requestMsg(peekedLength);
-        auto recvDataLength = recv(fd, static_cast<void*>(requestMsg.data()),
-                                   peekedLength, 0);
+        struct sockaddr_mctp addr;
+        memset(&addr, 0, sizeof(addr));
+
+        socklen_t addrlen = sizeof(addr);
+        size_t requestMsgSize = peekedLength;
+        Request requestMsg(requestMsgSize);
+        uint8_t* requestMsgData = requestMsg.data();
+
+        ssize_t recvDataLength = recvfrom(
+            fd, static_cast<void*>(requestMsgData), peekedLength, MSG_TRUNC,
+            reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+
         if (recvDataLength != peekedLength)
         {
             lg2::error("Failure to read peeked length packet. peekedLength="
@@ -296,53 +283,49 @@ int MockupResponder::initSocket()
             return;
         }
 
-        if (requestMsg[2] != MCTP_MSG_TYPE_VDM)
+        if (addr.smctp_type != MCTP_MSG_TYPE_VDM)
         {
             lg2::error("Received non VDM message type={TYPE}", "TYPE",
-                       requestMsg[2]);
+                       addr.smctp_type);
             return;
         }
 
         if (verbose)
         {
-            utils::printBuffer(utils::Rx, &requestMsg[3], requestMsg.size() - 3,
-                               requestMsg[0], requestMsg[1]);
+            utils::printBuffer(utils::Rx, requestMsgData, requestMsgSize,
+                               addr.smctp_tag, addr.smctp_addr.s_addr);
         }
-
-        // Outgoing message.
-        iovec iov[2]{};
-        // This structure contains the parameter information for the
-        // response message.
-        msghdr msg{};
 
         // process message and send response
         std::optional<Response> longRunningEvent;
         auto response = processRxMsg(requestMsg, longRunningEvent);
         if (response)
         {
+            struct sockaddr_mctp destAddr;
+            memset(&destAddr, 0, sizeof(destAddr));
+
+            destAddr.smctp_family = AF_MCTP;
+            destAddr.smctp_network = addr.smctp_network;
+            destAddr.smctp_addr.s_addr = addr.smctp_addr.s_addr;
+            destAddr.smctp_type = MCTP_MSG_TYPE_VDM;
+
             constexpr uint8_t tagOwnerBitPos = 3;
             constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
-            // Set tag owner bit to 0 for NSM responses
-            requestMsg[0] = requestMsg[0] & tagOwnerMask;
-            iov[0].iov_base = &requestMsg[0];
-            iov[0].iov_len = sizeof(requestMsg[0]) + sizeof(requestMsg[1]) +
-                             sizeof(requestMsg[2]);
-            iov[1].iov_base = (*response).data();
-            iov[1].iov_len = (*response).size();
+            destAddr.smctp_tag = addr.smctp_tag & tagOwnerMask;
 
-            msg.msg_iov = iov;
-            msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
-
+            ssize_t rc = sendto(fd, response->data(), response->size(), 0,
+                                reinterpret_cast<struct sockaddr*>(&destAddr),
+                                sizeof(destAddr));
+            if (rc == -1)
+            {
+                auto returnCode = -errno;
+                lg2::error("sendmsg system call failed, RC={RC}", "RC",
+                           returnCode);
+            }
             if (verbose)
             {
-                utils::printBuffer(utils::Tx, *response, requestMsg[0],
-                                   requestMsg[1]);
-            }
-
-            int result = sendmsg(fd, &msg, 0);
-            if (result < 0)
-            {
-                lg2::error("sendmsg system call failed");
+                utils::printBuffer(utils::Tx, *response, destAddr.smctp_tag,
+                                   destAddr.smctp_addr.s_addr);
             }
         }
         if (longRunningEvent)
@@ -367,8 +350,7 @@ std::optional<Response>
                                   std::optional<Request>& longRunningEvent)
 {
     nsm_header_info hdrFields{};
-    auto hdr =
-        reinterpret_cast<const nsm_msg_hdr*>(rxMsg.data() + MCTP_DEMUX_PREFIX);
+    auto hdr = reinterpret_cast<const nsm_msg_hdr*>(rxMsg.data());
     if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
         lg2::error("Empty NSM request header");
@@ -4730,7 +4712,6 @@ std::optional<std::vector<uint8_t>>
     fpga_diagnostics_settings_data_index data_index;
     [[maybe_unused]] auto rc = decode_get_fpga_diagnostics_settings_req(
         requestMsg, requestLen, &data_index);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
