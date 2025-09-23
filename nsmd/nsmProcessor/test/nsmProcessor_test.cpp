@@ -1265,6 +1265,7 @@ struct NsmProcessorTest :
             gpu->prioritySensors.clear();
             gpu->roundRobinSensors.clear();
             gpu->longRunningSensors.clear();
+            gpu->staticSensors.clear();
         }
         AsyncOperationManager::getInstance()->dispatchers.clear();
     }
@@ -1337,9 +1338,8 @@ struct NsmProcessorTest :
     };
     const PropertyValuesCollection chassisAsset = {
         {"Name", chassisName},
-        {"Type", "NSM_Asset"},
+        {"Type", "NSM_Chassis_Attributes"},
         {"UUID", gpuUuid},
-        {"Manufacturer", "NVIDIA"},
         {"InventoryObjPath", chassisObjPath},
     };
 };
@@ -1626,14 +1626,21 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(basic, "InventoryObjPath").second);
     propertyMap["MemCapacityUtilSupported"] = true;
+    propertyMap["CpuOperatingConfigSupported"] = false;
+    propertyMap["EDPpScalingFactorSupported"] = false;
+    propertyMap["MNNVLTopologySupported"] = false;
+    propertyMap["ECCModeSupported"] = false;
+    propertyMap["PowerSmoothingSupported"] = false;
+    propertyMap["MIGModeSupported"] = false;
+    propertyMap["TotalNvLinksCountSupported"] = false;
+    propertyMap["EGMSupported"] = false;
+    propertyMap["PortDisableFutureSupported"] = false;
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ProcessorAttributes", objPath);
     EXPECT_EQ(1, devices.size());
-    gpu = std::dynamic_pointer_cast<MockNsmDeviceBase>(devices.back());
-    // ProcessorAttributes creates: 3 Asset static sensors + 1 MemCapacityUtil
-    // device sensor
-    EXPECT_EQ(3, gpu->staticSensors.size()); // Asset sensors
-    EXPECT_EQ(4, gpu->deviceSensors.size()); // MemCapacityUtil sensor
+    EXPECT_EQ(3, gpu->staticSensors.size()); // 3 Asset sensors
+    EXPECT_EQ(4,
+              gpu->deviceSensors.size()); // 3 Asset + 1 MemCapacityUtil sensors
     EXPECT_EQ(1, gpu->longRunningSensors.size());
 
     // Find the MemoryCapacityUtil sensor among the created sensors
@@ -1657,7 +1664,6 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
         std::get<std::string>(get(memoryAttributes, "Type").second);
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(memory, "InventoryObjPath").second);
-    propertyMap["Priority"] = std::get<bool>(get(memory, "Priority").second);
     createNsmMemorySensor(
         mockManager, memoryBasicIntfName + ".MemoryAttributes", memoryObjPath);
 
@@ -1681,34 +1687,44 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     // Check if the sensor interface is moved as expected
     EXPECT_EQ(2, foundMemCapacityUtilSensor->interfaces.size());
 }
-TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
+TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
 {
     auto& propertyMap = utils::MockDbusAsync::getPropertyMap();
     propertyMap.clear();
 
-    // Set up base properties that coGetCachedBaseProperties needs
     propertyMap["Name"] = std::get<std::string>(get(asset, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(asset, "UUID").second);
 
-    // Set up interface-specific properties for ProcessorAttributes (Asset is
-    // now handled here)
     propertyMap["Type"] = "NSM_Processor_Attributes";
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(asset, "InventoryObjPath").second);
-    // Manufacturer is now hardcoded to NVIDIA in code, no need to set in config
+    propertyMap["MemCapacityUtilSupported"] = false;
+    propertyMap["CpuOperatingConfigSupported"] = false;
+    propertyMap["EDPpScalingFactorSupported"] = false;
+    propertyMap["MNNVLTopologySupported"] = false;
+    propertyMap["ECCModeSupported"] = false;
+    propertyMap["PowerSmoothingSupported"] = false;
+    propertyMap["MIGModeSupported"] = false;
+    propertyMap["TotalNvLinksCountSupported"] = false;
+    propertyMap["EGMSupported"] = false;
+    propertyMap["PortDisableFutureSupported"] = false;
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ProcessorAttributes", objPath);
     EXPECT_EQ(1, devices.size());
-    EXPECT_EQ(3, gpu->deviceSensors.size());
-    EXPECT_EQ(0, gpu->longRunningSensors.size());
+    // When all features are disabled, only 3 Asset sensors are created (all
+    // static)
+    EXPECT_EQ(3, gpu->deviceSensors
+                     .size()); // 3 Asset sensors in deviceSensors (superset)
+    EXPECT_EQ(3, gpu->staticSensors.size());      // 3 Asset sensors (static)
+    EXPECT_EQ(0, gpu->longRunningSensors.size()); // No long-running sensors
     auto devicePartNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu->deviceSensors[0]);
+            gpu->staticSensors[0]);
     auto serialNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu->deviceSensors[1]);
+            gpu->staticSensors[1]);
     auto modelSensor = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu->deviceSensors[2]);
+        gpu->staticSensors[2]);
     EXPECT_NE(nullptr, devicePartNumberSensor);
     EXPECT_NE(nullptr, serialNumberSensor);
     EXPECT_NE(nullptr, modelSensor);
@@ -1727,24 +1743,31 @@ TEST_F(NsmProcessorTest, gootCreateModelAndSerialNumberWithoutDuplicate)
         std::get<std::string>(get(chassisAsset, "Type").second);
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(chassisAsset, "InventoryObjPath").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(chassisAsset, "Manufacturer").second);
-    nsmChassisCreateSensors(mockManager, chassisBasicIntfName + ".Asset",
+    propertyMap["AssetInformationAvailable"] = true;
+    nsmChassisCreateSensors(mockManager,
+                            chassisBasicIntfName + ".ChassisAttributes",
                             chassisObjPath);
 
-    // only BOARD_PART_NUMBER shall be added as new sensor
-    EXPECT_EQ(4, gpu->deviceSensors.size());
+    // Chassis creates 3 asset sensors + 1 health sensor, but SERIAL_NUMBER and
+    // MARKETING_NAME merge with processor sensors. Final result:
+    // - DEVICE_PART_NUMBER (processor only)
+    // - FRU_PART_NUMBER (chassis only)
+    // - SERIAL_NUMBER (merged: processor + chassis interfaces)
+    // - MARKETING_NAME (merged: processor + chassis interfaces)
+    // - Health (chassis only)
+    // Total: 5 sensors
+    EXPECT_EQ(5, gpu->deviceSensors.size());
     auto partNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu->deviceSensors[3]);
+            gpu->deviceSensors[3]); // New FRU_PART_NUMBER sensor
     EXPECT_NE(nullptr, partNumberSensor);
     EXPECT_EQ(1, partNumberSensor->interfaces.size());
     EXPECT_EQ(FRU_PART_NUMBER, partNumberSensor->property);
 
-    // Check if the sensor interface is moved as expected
-    EXPECT_EQ(1, partNumberSensor->interfaces.size());
-    EXPECT_EQ(2, serialNumberSensor->interfaces.size());
-    EXPECT_EQ(2, modelSensor->interfaces.size());
+    // Check if the processor serial/model sensors now have merged interfaces
+    EXPECT_EQ(
+        2, serialNumberSensor->interfaces.size()); // Processor + chassis merged
+    EXPECT_EQ(2, modelSensor->interfaces.size());  // Processor + chassis merged
 
     auto response = [](std::string data) {
         Response response(sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN +

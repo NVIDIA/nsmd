@@ -97,37 +97,19 @@ struct NsmChassisTest :
         {"INSTANCE_NUMBER", uint64_t(0)},
     };
     const PropertyValuesCollection fpgaAsset = {
-        {"Type", "NSM_FPGA_Asset"},
-        {"Manufacturer", "NVIDIA"},
+        {"Type", "NSM_FPGA_Attributes"},
     };
     const PropertyValuesCollection asset = {
-        {"Type", "NSM_Asset"},
-        {"Manufacturer", "NVIDIA"},
-    };
-    const PropertyValuesCollection chassisType = {
-        {"Type", "NSM_ChassisType"},
+        {"Type", "NSM_Chassis_Attributes"},
+        {"AssetInformationAvailable", true},
+        {"WriteProtectSupported", true},
         {"ChassisType",
          "xyz.openbmc_project.Inventory.Item.Chassis.ChassisType.Module"},
-    };
-    const PropertyValuesCollection dimension = {
-        {"Type", "NSM_Dimension"},
-    };
-    const PropertyValuesCollection location = {
-        {"Type", "NSM_Location"},
+        {"DimensionSupported", true},
+        {"PowerLimitSupported", true},
         {"LocationType",
          "xyz.openbmc_project.Inventory.Decorator.Location.LocationTypes.Embedded"},
-    };
-    const PropertyValuesCollection locationCode = {
-        {"Type", "NSM_LocationCode"},
         {"LocationCode", "SXM2"},
-    };
-    const PropertyValuesCollection health = {
-        {"Type", "NSM_Health"},
-        {"Health", "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"},
-    };
-    const PropertyValuesCollection powerLimit = {
-        {"Type", "NSM_PowerLimit"},
-        {"Priority", false},
     };
     const PropertyValuesCollection powerState = {
         {"Type", "NSM_PowerState"},
@@ -137,10 +119,6 @@ struct NsmChassisTest :
              objPath,
              objPath + "/PCIeDevices/Device1",
          }},
-        {"Priority", false},
-    };
-    const PropertyValuesCollection writeProtect = {
-        {"Type", "NSM_WriteProtect"},
     };
     const PropertyValuesCollection association = {
         {"Forward", "pciedevice"},
@@ -205,36 +183,22 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
         std::get<std::string>(get(association, "AbsolutePath").second);
     nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
 
-    // Second call: NSM_ChassisType
-    propertyMap["Type"] =
-        std::get<std::string>(get(chassisType, "Type").second);
+    // Second call: NSM_Chassis_Attributes
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["AssetInformationAvailable"] =
+        std::get<bool>(get(asset, "AssetInformationAvailable").second);
     propertyMap["ChassisType"] =
-        std::get<std::string>(get(chassisType, "ChassisType").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisType",
-                            objPath);
-
-    // Third call: NSM_Health
-    propertyMap["Type"] = std::get<std::string>(get(health, "Type").second);
-    propertyMap["Health"] = std::get<std::string>(get(health, "Health").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Health", objPath);
-
-    // Fourth call: NSM_Location
-    propertyMap["Type"] = std::get<std::string>(get(location, "Type").second);
+        std::get<std::string>(get(asset, "ChassisType").second);
     propertyMap["LocationType"] =
-        std::get<std::string>(get(location, "LocationType").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Location", objPath);
-
-    // Fifth call: NSM_LocationCode
-    propertyMap["Type"] =
-        std::get<std::string>(get(locationCode, "Type").second);
+        std::get<std::string>(get(asset, "LocationType").second);
     propertyMap["LocationCode"] =
-        std::get<std::string>(get(locationCode, "LocationCode").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".LocationCode",
+        std::get<std::string>(get(asset, "LocationCode").second);
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
     EXPECT_EQ(1, devices.size());
-    EXPECT_EQ(7, gpu->staticSensors.size());
+    EXPECT_EQ(10, gpu->staticSensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(7, gpu->deviceSensors.size());
+    EXPECT_EQ(10, gpu->deviceSensors.size());
 
     auto sensors = 0;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
@@ -249,15 +213,17 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
         nullptr,
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
             gpu->deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
-                           gpu->deviceSensors[sensors++]));
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-                           gpu->deviceSensors[sensors++]));
+    // Skip asset inventory property sensors (partNumber, serialNumber, model)
+    sensors += 3;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                            gpu->deviceSensors[sensors++]));
     EXPECT_NE(nullptr,
               dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
                   gpu->deviceSensors[sensors++]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
+                           gpu->deviceSensors[sensors++]));
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+                           gpu->deviceSensors[sensors++]));
 
     sensors = 0;
     EXPECT_EQ(gpuDeviceUuid,
@@ -274,6 +240,24 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
             ->invoke(pdiMethod(associations))
             .size());
 
+    // Skip asset inventory property sensors (partNumber, serialNumber, model)
+    sensors += 3;
+
+    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
+                           gpu->deviceSensors[sensors]));
+    EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
+              dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
+                  gpu->deviceSensors[sensors++])
+                  ->invoke(pdiMethod(locationType)));
+
+    EXPECT_NE(nullptr,
+              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
+                  gpu->deviceSensors[sensors]));
+    EXPECT_EQ(std::get<std::string>(get(asset, "LocationCode").second),
+              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
+                  gpu->deviceSensors[sensors++])
+                  ->invoke(pdiMethod(locationCode)));
+
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<ChassisIntf>>(
                            gpu->deviceSensors[sensors]));
     EXPECT_EQ(ChassisIntf::ChassisType::Module,
@@ -288,24 +272,10 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
                   gpu->deviceSensors[sensors++])
                   ->invoke(pdiMethod(health)));
 
-    EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                           gpu->deviceSensors[sensors]));
-    EXPECT_EQ(LocationIntf::LocationTypes::Embedded,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationType)));
-
-    EXPECT_NE(nullptr,
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu->deviceSensors[sensors]));
-    EXPECT_EQ(get<std::string>(locationCode, "LocationCode"),
-              dynamic_pointer_cast<NsmInterfaceProvider<LocationCodeIntf>>(
-                  gpu->deviceSensors[sensors++])
-                  ->invoke(pdiMethod(locationCode)));
-
     gpu->deviceSensors.clear();
     gpu->prioritySensors.clear();
     gpu->roundRobinSensors.clear();
+    gpu->staticSensors.clear();
 }
 
 TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
@@ -336,15 +306,14 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     EXPECT_EQ(3, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->roundRobinSensors.size());
     EXPECT_EQ(3, fpga->deviceSensors.size());
-    // Second call: NSM_Asset
+    // Second call: NSM_Chassis_Attributes
     propertyMap["Type"] = std::get<std::string>(get(fpgaAsset, "Type").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(fpgaAsset, "Manufacturer").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
+                            objPath);
     EXPECT_EQ(2, devices.size());
-    EXPECT_EQ(3, fpga->staticSensors.size());
+    EXPECT_EQ(4, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->roundRobinSensors.size());
-    EXPECT_EQ(4, fpga->deviceSensors.size());
+    EXPECT_EQ(5, fpga->deviceSensors.size());
 
     auto sensors = 0;
 
@@ -361,7 +330,7 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     EXPECT_NE(nullptr, mctpUuid);
     EXPECT_NE(nullptr, pcieRefClock);
     EXPECT_NE(nullptr, chassisAsset);
-    EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
+    EXPECT_EQ(MANUFACTURER_NVIDIA,
               chassisAsset->invoke(pdiMethod(manufacturer)));
 
     EXPECT_EQ(fpgaUuid, chassisUuid->invoke(pdiMethod(uuid)));
@@ -373,53 +342,55 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     propertyMap.clear();
 
     // Set up base properties that coGetCachedBaseProperties needs
-    propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
-    propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
-
-    // First call: NSM_Asset
-    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(asset, "Manufacturer").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Asset", objPath);
-
-    // Second call: NSM_Dimension
-    propertyMap["Type"] = std::get<std::string>(get(dimension, "Type").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".Dimension", objPath);
-
-    // Third call: NSM_WriteProtect (for FPGA)
     propertyMap["Name"] =
         std::get<std::string>(get(fpgaProperties, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(fpgaProperties, "UUID").second);
+
+    // First call: NSM_Chassis (create FPGA device)
     propertyMap["Type"] =
-        std::get<std::string>(get(writeProtect, "Type").second);
+        std::get<std::string>(get(fpgaProperties, "Type").second);
     propertyMap["DeviceType"] =
         std::get<uint64_t>(get(fpgaProperties, "DeviceType").second);
+    propertyMap["DEVICE_UUID"] =
+        std::get<uuid_t>(get(fpgaProperties, "DEVICE_UUID").second);
     propertyMap["INSTANCE_NUMBER"] =
         std::get<uint64_t>(get(fpgaProperties, "INSTANCE_NUMBER").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".Chassis", objPath);
+    EXPECT_EQ(2, devices.size());
+
+    // Second call: NSM_Chassis_Attributes (for FPGA)
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["AssetInformationAvailable"] =
+        std::get<bool>(get(asset, "AssetInformationAvailable").second);
+    propertyMap["DimensionSupported"] =
+        std::get<bool>(get(asset, "DimensionSupported").second);
+    propertyMap["WriteProtectSupported"] =
+        std::get<bool>(get(asset, "WriteProtectSupported").second);
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
 
     EXPECT_EQ(2, devices.size());
-    EXPECT_EQ(6, gpu->staticSensors.size());
-    EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(6, gpu->deviceSensors.size());
+    fpga = dynamic_pointer_cast<MockNsmDeviceBase>(devices[1]);
+    EXPECT_EQ(10, fpga->staticSensors.size());
+    EXPECT_EQ(1, fpga->roundRobinSensors.size());
+    EXPECT_EQ(11, fpga->deviceSensors.size());
 
     auto sensors = 0;
+    sensors += 3;
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu->deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     auto serialNumber =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-            gpu->deviceSensors[sensors++]);
+            fpga->deviceSensors[sensors++]);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
-        gpu->deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
+    sensors += 1;
     auto depth = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-        gpu->deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     auto width = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-        gpu->deviceSensors[sensors++]);
+        fpga->deviceSensors[sensors++]);
     auto height = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
-        gpu->deviceSensors[sensors++]);
-    EXPECT_EQ(sensors, gpu->deviceSensors.size());
-
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, partNumber);
     EXPECT_NE(nullptr, serialNumber);
     EXPECT_NE(nullptr, model);
@@ -433,14 +404,11 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
     EXPECT_EQ(PRODUCT_LENGTH, depth->property);
     EXPECT_EQ(PRODUCT_WIDTH, width->property);
     EXPECT_EQ(PRODUCT_HEIGHT, height->property);
-    EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              model->invoke(pdiMethod(manufacturer)));
+    EXPECT_EQ(MANUFACTURER_NVIDIA, model->invoke(pdiMethod(manufacturer)));
 
     EXPECT_EQ(0, fpga->prioritySensors.size());
-    sensors = 0;
     auto writeProtectedJumper = dynamic_pointer_cast<NsmWriteProtectedJumper>(
-        fpga->deviceSensors[sensors++]);
-    EXPECT_EQ(sensors, fpga->deviceSensors.size());
+        fpga->deviceSensors.back());
     EXPECT_NE(nullptr, writeProtectedJumper);
 }
 
@@ -453,11 +421,11 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
     propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
 
-    // First call: NSM_PowerLimit
-    propertyMap["Type"] = std::get<std::string>(get(powerLimit, "Type").second);
-    propertyMap["Priority"] =
-        std::get<bool>(get(powerLimit, "Priority").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerLimit",
+    // First call: NSM_Chassis_Attributes
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["PowerLimitSupported"] =
+        std::get<bool>(get(asset, "PowerLimitSupported").second);
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
 
     // Second call: NSM_PowerState (for FPGA)
@@ -471,15 +439,13 @@ TEST_F(NsmChassisTest, goodTestCreateDynamicSensors)
         std::get<uint64_t>(get(powerState, "InstanceNumber").second);
     propertyMap["InventoryObjPaths"] = std::get<std::vector<std::string>>(
         get(powerState, "InventoryObjPaths").second);
-    propertyMap["Priority"] =
-        std::get<bool>(get(powerState, "Priority").second);
     nsmChassisCreateSensors(mockManager, basicIntfName + ".PowerState",
                             objPath);
 
     EXPECT_EQ(1, fpga->roundRobinSensors.size());
     EXPECT_EQ(1, fpga->deviceSensors.size());
     EXPECT_EQ(2, gpu->roundRobinSensors.size());
-    EXPECT_EQ(2, gpu->deviceSensors.size());
+    EXPECT_EQ(3, gpu->deviceSensors.size());
 }
 
 TEST_F(NsmChassisTest, badTestCreateStaticSensors)
@@ -493,11 +459,12 @@ TEST_F(NsmChassisTest, badTestCreateStaticSensors)
     propertyMap["UUID"] = std::get<uuid_t>(get(fpgaProperties, "UUID").second);
 
     // Set up interface-specific properties with mismatched device type
-    propertyMap["Type"] =
-        std::get<std::string>(get(writeProtect, "Type").second);
+    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
+    propertyMap["WriteProtectSupported"] =
+        std::get<bool>(get(asset, "WriteProtectSupported").second);
     propertyMap["DeviceType"] =
         std::get<uint64_t>(get(basic, "DeviceType").second);
-    nsmChassisCreateSensors(mockManager, basicIntfName + ".WriteProtect",
+    nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
 }
 
@@ -851,7 +818,6 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
         {"InventoryObjPaths",
          std::vector<std::string>{objPath,
                                   processorsInventoryBasePath / "GPU_SXM_1"}},
-        {"Priority", true},
     };
     std::shared_ptr<NsmGpuPresenceAndPowerStatus> sensor,
         chassisOperationalStatus;
@@ -875,8 +841,7 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
             std::get<uint64_t>(get(operationalStatus, "InstanceNumber").second);
         propertyMap["InventoryObjPaths"] = std::get<std::vector<std::string>>(
             get(operationalStatus, "InventoryObjPaths").second);
-        propertyMap["Priority"] =
-            std::get<bool>(get(operationalStatus, "Priority").second);
+        propertyMap["Priority"] = true;
         nsmChassisCreateSensors(mockManager,
                                 basicIntfName + ".OperationalStatus", objPath);
 
@@ -913,8 +878,7 @@ struct NsmGpuPresenceAndPowerStatusTest : public NsmChassisTest
             propertyMap["InventoryObjPaths"] =
                 std::get<std::vector<std::string>>(
                     get(gpuOperationalStatus, "InventoryObjPaths").second);
-            propertyMap["Priority"] =
-                std::get<bool>(get(gpuOperationalStatus, "Priority").second);
+            propertyMap["Priority"] = true;
             nsmChassisCreateSensors(
                 mockManager, basicIntfName + ".OperationalStatus", gpuPath);
         }
