@@ -274,9 +274,10 @@ requester::Coroutine
             handleMctpStateTransition(objPath, (connectivity == "Available"));
             try
             {
-                auto mapperResponse = co_await utils::coGetServiceMap(
-                    objPath,
-                    dbus::Interfaces{"xyz.openbmc_project.MCTP.Endpoint"});
+                dbus::Interfaces interfaces{
+                    "xyz.openbmc_project.MCTP.Endpoint"};
+                auto mapperResponse =
+                    co_await utils::coGetServiceMap(objPath, interfaces);
                 if (mapperResponse.size() == 0)
                 {
                     mctpQueuedSignals[objPath].pop();
