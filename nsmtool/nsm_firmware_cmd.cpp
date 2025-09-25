@@ -25,11 +25,27 @@
 
 #include <CLI/CLI.hpp>
 
+#include <algorithm>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+
 namespace nsmtool::firmware
 {
 
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
+
+// DOT CAK/LAK key size constants
+constexpr size_t ECDSA_KEY_SIZE =
+    96; // Total ECDSA key size (x + y coordinates)
+constexpr size_t ECDSA_COORDINATE_SIZE = 48; // Each coordinate (x or y) size
+constexpr size_t LMS_KEY_SIZE = 48;          // LMS public key size
+constexpr size_t AUTH_SCHEME_SIZE =
+    4; // Authentication scheme field size (NvU32)
+constexpr size_t CRYPTO_PCP_SIZE = AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
+                                   ECDSA_COORDINATE_SIZE +
+                                   LMS_KEY_SIZE; // 148 bytes total
 
 class GetRotInformation : public CommandInterface
 {
@@ -895,6 +911,403 @@ class SetRoTProperty : public CommandInterface
     static constexpr uint8_t DEFAULT_VALUE = 255;
 };
 
+class DotCAKInstall : public CommandInterface
+{
+  public:
+    ~DotCAKInstall() = default;
+    DotCAKInstall() = delete;
+    DotCAKInstall(const DotCAKInstall&) = delete;
+    DotCAKInstall(DotCAKInstall&&) = default;
+    DotCAKInstall& operator=(const DotCAKInstall&) = delete;
+    DotCAKInstall& operator=(DotCAKInstall&&) = default;
+
+    explicit DotCAKInstall(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup =
+            app->add_option_group("Required", "Parameters for DotCAKInstall");
+
+        // CAK Key Auth Scheme - must be 0 or 1
+        ccOptionGroup
+            ->add_option(
+                "--cak_key_auth_scheme", cakKeyAuthScheme,
+                "Valid values are 0 and 1, 0-DOT_LOCK allowed, 1 not allowed")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        // CAK Key ECDSA file - must be valid file path and exactly 96 bytes
+        ccOptionGroup
+            ->add_option("--cak_ecdsa_key", cakKeyEcdsaKeyFile,
+                         "File containing 96 Bytes of ECDSA data (raw bytes)")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, ECDSA_KEY_SIZE, "CAK key");
+        });
+
+        // CAK LMS file - optional, only required for hybrid auth scheme (1)
+        // For ECDSA-only auth scheme (0), LMS will be filled with 48 bytes of
+        // zeros
+        app->add_option(
+               "--cak_lms_key", cakLmsKeyFile,
+               "File containing 48 Bytes (raw bytes) - required only for hybrid auth scheme (1)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, LMS_KEY_SIZE, "CAK LMS");
+        });
+
+        // LAK Key Auth Scheme - must be 0 or 1
+        ccOptionGroup
+            ->add_option("--lak_key_auth_scheme", lakKeyAuthScheme,
+                         "LAK key authentication scheme (0 or 1)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        // LAK Key ECDSA file - must be valid file path and exactly 96 bytes
+        ccOptionGroup
+            ->add_option("--lak_ecdsa_key", lakKeyEcdsaKeyFile,
+                         "File containing 96 Bytes LAK key (raw bytes)")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, ECDSA_KEY_SIZE, "LAK key");
+        });
+
+        // LAK LMS file - optional, only required for hybrid auth scheme (1)
+        // For ECDSA-only auth scheme (0), LMS will be filled with 48 bytes of
+        // zeros
+        app->add_option(
+               "--lak_lms_key", lakLmsKeyFile,
+               "File containing 48 Bytes LAK LMS (raw bytes) - required only for hybrid auth scheme (1)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, LMS_KEY_SIZE, "LAK LMS");
+        });
+
+        // Lock Disable - must be 0 or 1 (default: 0 = lock enabled)
+        ccOptionGroup
+            ->add_option("--lock_disable", lockDisable,
+                         "Contains state for lock allowing (default: 0)")
+            ->default_val(0)
+            ->check(CLI::Range(0, 1));
+
+        // Min SVN - must be valid uint32_t (0 to UINT32_MAX)
+        ccOptionGroup
+            ->add_option("--min_svn", minSvn,
+                         "Minimum Firmware Security Version")
+            ->required()
+            ->check(CLI::Range(0U, UINT32_MAX));
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        // Read CAK key from file
+        std::vector<uint8_t> cakKey = readFileAsBytes(cakKeyEcdsaKeyFile);
+        if (cakKey.empty())
+        {
+            std::cerr << "Error: Failed to read CAK key file: "
+                      << cakKeyEcdsaKeyFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        // Read CAK LMS from file (only for Hybrid auth scheme)
+        std::vector<uint8_t> cakLms;
+        if (cakKeyAuthScheme == 1) // Hybrid (ECDSA + LMS)
+        {
+            if (cakLmsKeyFile.empty())
+            {
+                std::cerr
+                    << "Error: CAK LMS key file required for hybrid auth scheme\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            cakLms = readFileAsBytes(cakLmsKeyFile);
+            if (cakLms.empty())
+            {
+                std::cerr << "Error: Failed to read CAK LMS file: "
+                          << cakLmsKeyFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+        else // ECDSA only - fill with zeros
+        {
+            cakLms.resize(LMS_KEY_SIZE, 0);
+        }
+
+        // Read LAK key from file
+        std::vector<uint8_t> lakKey = readFileAsBytes(lakKeyEcdsaKeyFile);
+        if (lakKey.empty())
+        {
+            std::cerr << "Error: Failed to read LAK key file: "
+                      << lakKeyEcdsaKeyFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        // Read LAK LMS from file (only for Hybrid auth scheme)
+        std::vector<uint8_t> lakLms;
+        if (lakKeyAuthScheme == 1) // Hybrid (ECDSA + LMS)
+        {
+            if (lakLmsKeyFile.empty())
+            {
+                std::cerr
+                    << "Error: LAK LMS key file required for hybrid auth scheme\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            lakLms = readFileAsBytes(lakLmsKeyFile);
+            if (lakLms.empty())
+            {
+                std::cerr << "Error: Failed to read LAK LMS file: "
+                          << lakLmsKeyFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+        else // ECDSA only - fill with zeros
+        {
+            lakLms.resize(LMS_KEY_SIZE, 0);
+        }
+
+        // Create CAK 148-byte key authentication data per spec:
+        // auth_scheme(4) + u8_x(48) + u8_y(48) + lms(48)
+        std::vector<uint8_t> cakCryptoPcp(CRYPTO_PCP_SIZE, 0);
+
+        // auth_scheme: 4 bytes (NvU32) - 0 for ECDSA, 1 for Hybrid
+        uint32_t cakAuthScheme = static_cast<uint32_t>(cakKeyAuthScheme);
+        memcpy(cakCryptoPcp.data(), &cakAuthScheme, AUTH_SCHEME_SIZE);
+
+        // u8_x: 48 bytes (first half of ECDSA key)
+        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE, cakKey.data(),
+               ECDSA_COORDINATE_SIZE);
+
+        // u8_y: 48 bytes (second half of ECDSA key)
+        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE,
+               cakKey.data() + ECDSA_COORDINATE_SIZE, ECDSA_COORDINATE_SIZE);
+
+        // lms: 48 bytes (LMS public key or zeros for ECDSA-only)
+        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
+                   ECDSA_COORDINATE_SIZE,
+               cakLms.data(), LMS_KEY_SIZE);
+
+        // Create LAK 148-byte key authentication data per spec:
+        // auth_scheme(4) + u8_x(48) + u8_y(48) + lms(48)
+        std::vector<uint8_t> lakCryptoPcp(CRYPTO_PCP_SIZE, 0);
+
+        // auth_scheme: 4 bytes (NvU32) - 0 for ECDSA, 1 for Hybrid
+        uint32_t lakAuthScheme = static_cast<uint32_t>(lakKeyAuthScheme);
+        memcpy(lakCryptoPcp.data(), &lakAuthScheme, AUTH_SCHEME_SIZE);
+
+        // u8_x: 48 bytes (first half of ECDSA key)
+        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE, lakKey.data(),
+               ECDSA_COORDINATE_SIZE);
+
+        // u8_y: 48 bytes (second half of ECDSA key)
+        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE,
+               lakKey.data() + ECDSA_COORDINATE_SIZE, ECDSA_COORDINATE_SIZE);
+
+        // lms: 48 bytes (LMS public key or zeros for ECDSA-only)
+        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
+                   ECDSA_COORDINATE_SIZE,
+               lakLms.data(), LMS_KEY_SIZE);
+
+        // Display key authentication data in hex format (only when verbose is
+        // enabled)
+        if (isVerbose())
+        {
+            std::cout << "CAK key authentication data (" << CRYPTO_PCP_SIZE
+                      << " bytes): ";
+            for (size_t i = 0; i < cakCryptoPcp.size(); ++i)
+            {
+                std::cout << "0x" << std::hex << std::setw(2)
+                          << std::setfill('0')
+                          << static_cast<int>(cakCryptoPcp[i]);
+                if (i < cakCryptoPcp.size() - 1)
+                    std::cout << ", ";
+            }
+            std::cout << std::dec << std::endl;
+
+            std::cout << "LAK key authentication data (" << CRYPTO_PCP_SIZE
+                      << " bytes): ";
+            for (size_t i = 0; i < lakCryptoPcp.size(); ++i)
+            {
+                std::cout << "0x" << std::hex << std::setw(2)
+                          << std::setfill('0')
+                          << static_cast<int>(lakCryptoPcp[i]);
+                if (i < lakCryptoPcp.size() - 1)
+                    std::cout << ", ";
+            }
+            std::cout << std::dec << std::endl;
+        }
+
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+        nsm_dot_cak_install_req nsm_req;
+
+        // Copy CAK key authentication data (148 bytes per spec)
+        memcpy(nsm_req.cak_pub, cakCryptoPcp.data(), CRYPTO_PCP_SIZE);
+
+        // Copy LAK key authentication data (148 bytes per spec)
+        memcpy(nsm_req.lak_pub, lakCryptoPcp.data(), CRYPTO_PCP_SIZE);
+
+        nsm_req.lock_disable = lockDisable;
+        nsm_req.min_svn = htole32(minSvn);
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_cak_install_req(instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        // Validate input parameters
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        if (payloadLength < sizeof(nsm_dot_cak_install_resp_command))
+        {
+            std::cerr << "Error: Payload length too small, expected at least "
+                      << sizeof(nsm_dot_cak_install_resp_command)
+                      << " bytes, got " << payloadLength << " bytes\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        struct nsm_dot_cak_install_resp dot_cak_resp;
+
+        auto rc = decode_nsm_dot_cak_install_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &dot_cak_resp);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        // Validate response data types
+        if (dot_cak_resp.command_code != NSM_FW_DOT_CAK_INSTALL)
+        {
+            std::cerr << "Warning: Unexpected command code in response: 0x"
+                      << std::hex << (int)dot_cak_resp.command_code
+                      << ", expected: 0x" << (int)NSM_FW_DOT_CAK_INSTALL
+                      << std::dec << "\n";
+        }
+
+        // Output response fields according to spec
+        ordered_json result;
+
+        // Add NSM header info as hex bytes
+        std::stringstream nsmHeaderHex;
+        for (int i = 0; i < 5; i++)
+        {
+            nsmHeaderHex << std::hex << std::setw(2) << std::setfill('0')
+                         << (int)((uint8_t*)&responsePtr->hdr)[i];
+            if (i < 4)
+                nsmHeaderHex << " ";
+        }
+        result["nsm_header"] = nsmHeaderHex.str();
+
+        std::stringstream cmdCode, compCode, res;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)dot_cak_resp.command_code;
+        compCode << std::hex << std::setw(2) << std::setfill('0')
+                 << (int)dot_cak_resp.completion_code;
+        res << std::hex << std::setw(2) << std::setfill('0')
+            << (int)dot_cak_resp.reserved;
+
+        result["command_code"] = cmdCode.str();
+        result["completion_code"] = compCode.str();
+        result["reserved"] = res.str();
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint8_t cakKeyAuthScheme;
+    std::string cakKeyEcdsaKeyFile;
+    std::string cakLmsKeyFile;
+    uint8_t lakKeyAuthScheme;
+    std::string lakKeyEcdsaKeyFile;
+    std::string lakLmsKeyFile;
+    uint8_t lockDisable;
+    uint32_t minSvn;
+
+    // Helper function to validate file size
+    std::string validateFileSize(const std::string& filename,
+                                 size_t expectedSize,
+                                 const std::string& fileType)
+    {
+        std::ifstream file(filename, std::ios::binary);
+        if (!file)
+        {
+            return "Cannot open " + fileType + " file: " + filename;
+        }
+
+        file.seekg(0, std::ios::end);
+        size_t actualSize = file.tellg();
+        file.close();
+
+        if (actualSize != expectedSize)
+        {
+            return fileType + " file must contain exactly " +
+                   std::to_string(expectedSize) + " bytes, got " +
+                   std::to_string(actualSize) + " bytes";
+        }
+
+        return ""; // Empty string means validation passed
+    }
+
+    std::vector<uint8_t> readFileAsBytes(const std::string& filename)
+    {
+        // Validate filename
+        if (filename.empty())
+        {
+            std::cerr << "Error: Filename is empty\n";
+            return {};
+        }
+
+        std::ifstream file(filename, std::ios::binary);
+        if (!file)
+        {
+            std::cerr << "Error: Cannot open file " << filename << "\n";
+            return {};
+        }
+
+        file.seekg(0, std::ios::end);
+        size_t size = file.tellg();
+        file.seekg(0, std::ios::beg);
+
+        // Validate file size
+        if (size == 0)
+        {
+            std::cerr << "Error: File " << filename << " is empty\n";
+            return {};
+        }
+
+        if (size > SIZE_MAX)
+        {
+            std::cerr << "Error: File " << filename
+                      << " is too large (size: " << size << " bytes)\n";
+            return {};
+        }
+
+        std::vector<uint8_t> buffer(size);
+        file.read(reinterpret_cast<char*>(buffer.data()), size);
+
+        // Validate read operation
+        if (file.gcount() != static_cast<std::streamsize>(size))
+        {
+            std::cerr << "Error: Failed to read complete file " << filename
+                      << " (expected: " << size
+                      << " bytes, read: " << file.gcount() << " bytes)\n";
+            return {};
+        }
+
+        return buffer;
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -934,5 +1347,9 @@ void registerCommand(CLI::App& app)
                                                    "Set RoT Property");
     commands.push_back(std::make_unique<SetRoTProperty>(
         "firmware", "SetRoTProperty", setRoTProperty));
+    auto dotCAKInstall = firmware->add_subcommand(
+        "DotCAKInstall", "Cak install command in uninitialized state");
+    commands.push_back(std::make_unique<DotCAKInstall>(
+        "firmware", "DotCAKInstall", dotCAKInstall));
 }
 } // namespace nsmtool::firmware

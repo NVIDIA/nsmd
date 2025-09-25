@@ -732,6 +732,8 @@ std::optional<Response>
                     return queryFirmwareSecurityVersion(request, requestLen);
                 case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
                     return updateMinSecurityVersion(request, requestLen);
+                case NSM_FW_DOT_CAK_INSTALL:
+                    return dotCAKInstallHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -814,9 +816,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_get_supported_nvidia_message_types_resp),
         0);
 
-    // this is to mock that type-0, 1, 2, 3, 4 and 5 are supported
+    // this is to mock that type-0, 1, 2, 3, 4, 5 and 6 are supported
     bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE] = {
-        0x3F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x7F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     uint8_t cc = NSM_SUCCESS;
@@ -861,7 +863,7 @@ std::optional<std::vector<uint8_t>>
                  {3, {0, 2, 3, 4, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
-                 {6, {1}},
+                 {6, {1, NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -921,7 +923,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
-                 {6, {1, 2, 3, 4, 5, 6}},
+                 {6, {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_EROT,
              {
@@ -932,7 +934,8 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_QUERY_CODE_AUTH_KEY_PERM,
                    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
-                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER}},
+                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
+                   NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {
@@ -3266,7 +3269,7 @@ int MockupResponder::mctpSockSend(uint8_t destEid,
 
     if (verbose)
     {
-        utils::printBuffer(utils::Tx, requestMsg, prefix[0], prefix[1]);
+        utils::printBuffer(utils::Rx, requestMsg, prefix[0], prefix[1]);
     }
 
     auto rc = sendmsg(sockFd, &msg, 0);
@@ -7237,6 +7240,57 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_cc_only_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotCAKInstallHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT CAK Install request");
+    }
+
+    // Decode the request
+    struct nsm_dot_cak_install_req dot_cak_req;
+    auto rc = decode_nsm_dot_cak_install_req(requestMsg, requestLen,
+                                             &dot_cak_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_cak_install_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Install request decoded successfully");
+        lg2::info("Lock disable: {LOCK_DISABLE}", "LOCK_DISABLE",
+                  static_cast<int>(dot_cak_req.lock_disable));
+        lg2::info("Min SVN: {MIN_SVN}", "MIN_SVN",
+                  static_cast<int>(dot_cak_req.min_svn));
+    }
+
+    // For mock implementation, we'll always return success
+    // In a real implementation, this would perform the actual CAK installation
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_cak_install_resp(requestMsg->hdr.instance_id,
+                                         NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_cak_install_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Install response encoded successfully");
     }
 
     return response;

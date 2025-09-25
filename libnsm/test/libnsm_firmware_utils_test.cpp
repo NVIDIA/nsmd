@@ -1584,3 +1584,499 @@ TEST(UpdateFirmwareSecurityVersion, testEncodeRequest)
 	rc = encode_nsm_firmware_update_sec_ver_req(0, &nsm_req, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 }
+
+TEST(DotCAKInstall, testGoodEncodeRequest)
+{
+	// Create test data for CAK and LAK
+	nsm_dot_cak_install_req dot_req;
+	// Fill CAK with pattern 0x01-0x94 (148 bytes)
+	for (int i = 0; i < 148; i++) {
+		dot_req.cak_pub[i] = (i % 256);
+	}
+	// Fill LAK with pattern 0xA0-0xFF cycling (148 bytes)
+	for (int i = 0; i < 148; i++) {
+		dot_req.lak_pub[i] = ((i + 0xA0) % 256);
+	}
+	dot_req.lock_disable = 0;
+	dot_req.min_svn = 0x12345678;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Check NSM header
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(OCP_VERSION_V2, request->hdr.ocp_version);
+
+	// Check command header
+	nsm_dot_cak_install_req_command *req =
+	    (nsm_dot_cak_install_req_command *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_dot_cak_install_req), le16toh(req->hdr.data_size));
+
+	// Verify data
+	for (int i = 0; i < 148; i++) {
+		EXPECT_EQ((i % 256), req->dot_cak_install_req.cak_pub[i]);
+	}
+	for (int i = 0; i < 148; i++) {
+		EXPECT_EQ(((i + 0xA0) % 256),
+			  req->dot_cak_install_req.lak_pub[i]);
+	}
+	EXPECT_EQ(0, req->dot_cak_install_req.lock_disable);
+	EXPECT_EQ(0x12345678, le32toh(req->dot_cak_install_req.min_svn));
+}
+
+TEST(DotCAKInstall, testGoodDecodeRequest)
+{
+	// Build a valid request message
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	// Fill header
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	// Fill payload
+	nsm_dot_cak_install_req_command *req_cmd =
+	    (nsm_dot_cak_install_req_command *)request->payload;
+	req_cmd->hdr.command = NSM_FW_DOT_CAK_INSTALL;
+	req_cmd->hdr.data_size = htole16(sizeof(nsm_dot_cak_install_req));
+
+	// Fill CAK and LAK with test data
+	for (int i = 0; i < 148; i++) {
+		req_cmd->dot_cak_install_req.cak_pub[i] = (i % 256);
+		req_cmd->dot_cak_install_req.lak_pub[i] = ((i + 0xA0) % 256);
+	}
+	req_cmd->dot_cak_install_req.lock_disable = 1;
+	req_cmd->dot_cak_install_req.min_svn = htole32(0xAABBCCDD);
+
+	// Decode
+	nsm_dot_cak_install_req dot_req;
+	auto rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
+						 &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify data
+	for (int i = 0; i < 148; i++) {
+		EXPECT_EQ((i % 256), dot_req.cak_pub[i]);
+		EXPECT_EQ(((i + 0xA0) % 256), dot_req.lak_pub[i]);
+	}
+	EXPECT_EQ(1, dot_req.lock_disable);
+	EXPECT_EQ(0xAABBCCDD, dot_req.min_svn);
+}
+
+TEST(DotCAKInstall, testShortDecodeRequest)
+{
+	// Create a message that's too short
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 10);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_dot_cak_install_req dot_req;
+	auto rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
+						 &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotCAKInstall, testNullDecodeRequest)
+{
+	nsm_dot_cak_install_req dot_req;
+
+	// Null message pointer
+	auto rc = decode_nsm_dot_cak_install_req(NULL, 100, &dot_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointer
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(), NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotCAKInstall, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t reason_code = ERR_NULL;
+	auto rc = encode_nsm_dot_cak_install_resp(0, NSM_SUCCESS, reason_code,
+						  response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Check NSM header
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
+
+	// Check response data
+	nsm_dot_cak_install_resp_command *resp_cmd =
+	    (nsm_dot_cak_install_resp_command *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL, resp_cmd->hdr.command);
+	EXPECT_EQ(NSM_SUCCESS, resp_cmd->hdr.completion_code);
+	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL,
+		  resp_cmd->dot_cak_install_resp.command_code);
+	EXPECT_EQ(NSM_SUCCESS, resp_cmd->dot_cak_install_resp.completion_code);
+	EXPECT_EQ(0, resp_cmd->dot_cak_install_resp.reserved);
+}
+
+TEST(DotCAKInstall, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		    // PCI VID: NVIDIA 0x10DE
+	    0x00,		    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		    // OCP_TYPE=8, OCP_VER=10 (V2)
+	    NSM_TYPE_FIRMWARE,	    // NVIDIA_MSG_TYPE
+	    NSM_FW_DOT_CAK_INSTALL, // command
+	    NSM_SUCCESS,	    // completion code
+	    0x00,
+	    0x00, // reserved (uint16_t)
+	    0x04,
+	    0x00,		    // data size (4 bytes for inner response)
+	    NSM_FW_DOT_CAK_INSTALL, // response command_code
+	    NSM_SUCCESS,	    // response completion_code
+	    0x00,
+	    0x00 // reserved (uint16_t)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0xFFFF;
+	auto rc = decode_nsm_dot_cak_install_resp(response, msg_len, &cc,
+						  &reason_code, NULL);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+}
+
+TEST(DotCAKInstall, testBadDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		    // PCI VID: NVIDIA 0x10DE
+	    0x00,		    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		    // OCP_TYPE=8, OCP_VER=10 (V2)
+	    NSM_TYPE_FIRMWARE,	    // NVIDIA_MSG_TYPE
+	    NSM_FW_DOT_CAK_INSTALL, // command
+	    NSM_ERROR,		    // completion code (error)
+	    0x12,
+	    0x34 // reason code 0x3412 (little endian)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	auto rc = decode_nsm_dot_cak_install_resp(response, msg_len, &cc,
+						  &reason_code, NULL);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x3412, reason_code);
+}
+
+TEST(DotCAKInstall, testEncodeDecodeRoundTrip)
+{
+	// Create original request
+	nsm_dot_cak_install_req original_req;
+	for (int i = 0; i < 148; i++) {
+		original_req.cak_pub[i] = i & 0xFF;
+		original_req.lak_pub[i] = (i + 100) & 0xFF;
+	}
+	original_req.lock_disable = 1;
+	original_req.min_svn = 0xDEADBEEF;
+
+	// Encode
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_dot_cak_install_req(5, &original_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode
+	nsm_dot_cak_install_req decoded_req;
+	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
+					    &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify round-trip
+	for (int i = 0; i < 148; i++) {
+		EXPECT_EQ(original_req.cak_pub[i], decoded_req.cak_pub[i]);
+		EXPECT_EQ(original_req.lak_pub[i], decoded_req.lak_pub[i]);
+	}
+	EXPECT_EQ(original_req.lock_disable, decoded_req.lock_disable);
+	EXPECT_EQ(original_req.min_svn, decoded_req.min_svn);
+}
+
+TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
+{
+	// Test successful response round-trip
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t original_reason_code = ERR_NULL;
+	uint8_t original_cc = NSM_SUCCESS;
+
+	// Encode success response
+	auto rc = encode_nsm_dot_cak_install_resp(
+	    7, original_cc, original_reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode the encoded response
+	uint8_t decoded_cc = 0;
+	uint16_t decoded_reason_code = 0xFFFF;
+	nsm_dot_cak_install_resp decoded_resp;
+
+	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(),
+					     &decoded_cc, &decoded_reason_code,
+					     &decoded_resp);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify round-trip for success case
+	EXPECT_EQ(original_cc, decoded_cc);
+	EXPECT_EQ(original_reason_code, decoded_reason_code);
+	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL, decoded_resp.command_code);
+	EXPECT_EQ(NSM_SUCCESS, decoded_resp.completion_code);
+	EXPECT_EQ(0, decoded_resp.reserved);
+
+	// Test error response round-trip
+	std::vector<uint8_t> errorResponseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
+	auto error_response =
+	    reinterpret_cast<nsm_msg *>(errorResponseMsg.data());
+
+	uint16_t error_reason_code = 0xABCD;
+	uint8_t error_cc = NSM_ERROR;
+
+	// Encode error response (uses V2 header now)
+	rc = encode_nsm_dot_cak_install_resp(3, error_cc, error_reason_code,
+					     error_response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode the encoded error response
+	uint8_t decoded_error_cc = 0;
+	uint16_t decoded_error_reason_code = 0;
+
+	rc = decode_nsm_dot_cak_install_resp(
+	    error_response, errorResponseMsg.size(), &decoded_error_cc,
+	    &decoded_error_reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify round-trip for error case
+	EXPECT_EQ(error_cc, decoded_error_cc);
+	EXPECT_EQ(error_reason_code, decoded_error_reason_code);
+}
+
+TEST(DotCAKInstall, testNullPointerHandling)
+{
+	// Test encode with null message pointer
+	nsm_dot_cak_install_req dot_req;
+	for (int i = 0; i < 148; i++) {
+		dot_req.cak_pub[i] = i;
+		dot_req.lak_pub[i] = i + 100;
+	}
+	dot_req.lock_disable = 0;
+	dot_req.min_svn = 0x12345678;
+
+	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test encode with null request pointer
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = encode_nsm_dot_cak_install_req(0, NULL, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test encode response with null message pointer
+	rc = encode_nsm_dot_cak_install_resp(0, NSM_SUCCESS, ERR_NULL, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test decode response with null message pointer
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	nsm_dot_cak_install_resp resp;
+	rc = decode_nsm_dot_cak_install_resp(NULL, 100, &cc, &reason_code,
+					     &resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test decode response with null cc pointer
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// First encode a valid response for testing
+	rc =
+	    encode_nsm_dot_cak_install_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Now test with null cc pointer
+	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(), NULL,
+					     &reason_code, &resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test decode response with null reason_code pointer
+	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(), &cc,
+					     NULL, &resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test decode response with null resp pointer (should succeed -
+	// optional parameter)
+	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(), &cc,
+					     &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(DotCAKInstall, testDataIntegrity)
+{
+	// Test with various key patterns to ensure no data corruption
+	const struct {
+		const char *name;
+		uint8_t cak_pattern_start;
+		uint8_t lak_pattern_start;
+		uint8_t lock_disable;
+		uint32_t min_svn;
+	} test_cases[] = {
+	    {"all_zeros", 0x00, 0x00, 0, 0x00000000},
+	    {"all_ones", 0xFF, 0xFF, 1, 0xFFFFFFFF},
+	    {"alternating", 0xAA, 0x55, 1, 0xAAAAAAAA},
+	    {"sequential", 0x00, 0x00, 0, 0x12345678},
+	    {"random", 0x42, 0xDE, 1, 0xDEADBEEF},
+	};
+
+	for (const auto &test : test_cases) {
+		// Create request with specific pattern
+		nsm_dot_cak_install_req original_req;
+		for (int i = 0; i < 148; i++) {
+			original_req.cak_pub[i] =
+			    (test.cak_pattern_start + i) & 0xFF;
+			original_req.lak_pub[i] =
+			    (test.lak_pattern_start + i) & 0xFF;
+		}
+		original_req.lock_disable = test.lock_disable;
+		original_req.min_svn = test.min_svn;
+
+		// Encode
+		std::vector<uint8_t> requestMsg(
+		    sizeof(nsm_msg_hdr) +
+		    sizeof(nsm_dot_cak_install_req_command));
+		auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+		auto rc =
+		    encode_nsm_dot_cak_install_req(0, &original_req, request);
+		ASSERT_EQ(rc, NSM_SW_SUCCESS)
+		    << "Encoding failed for test case: " << test.name;
+
+		// Decode
+		nsm_dot_cak_install_req decoded_req;
+		rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
+						    &decoded_req);
+		ASSERT_EQ(rc, NSM_SW_SUCCESS)
+		    << "Decoding failed for test case: " << test.name;
+
+		// Verify data integrity
+		for (int i = 0; i < 148; i++) {
+			EXPECT_EQ(original_req.cak_pub[i],
+				  decoded_req.cak_pub[i])
+			    << "CAK mismatch at byte " << i
+			    << " for test case: " << test.name;
+			EXPECT_EQ(original_req.lak_pub[i],
+				  decoded_req.lak_pub[i])
+			    << "LAK mismatch at byte " << i
+			    << " for test case: " << test.name;
+		}
+		EXPECT_EQ(original_req.lock_disable, decoded_req.lock_disable)
+		    << "lock_disable mismatch for test case: " << test.name;
+		EXPECT_EQ(original_req.min_svn, decoded_req.min_svn)
+		    << "min_svn mismatch for test case: " << test.name;
+	}
+}
+
+TEST(DotCAKInstall, testBoundaryConditions)
+{
+	// Test minimum valid message size
+	nsm_dot_cak_install_req dot_req;
+	memset(&dot_req, 0, sizeof(dot_req));
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Test decode with exact minimum size
+	nsm_dot_cak_install_req decoded_req;
+	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
+					    &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Test decode with size too small by 1 byte
+	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size() - 1,
+					    &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test decode with just the header (way too small)
+	rc = decode_nsm_dot_cak_install_req(request, sizeof(nsm_msg_hdr),
+					    &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test decode response boundary conditions
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	rc =
+	    encode_nsm_dot_cak_install_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+	nsm_dot_cak_install_resp resp;
+
+	// Valid size
+	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(), &cc,
+					     &reason_code, &resp);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Error response - manually create to test decode with proper V2 format
+	std::vector<uint8_t> errorMsg{
+	    0x10,
+	    0xDE,		    // PCI VID: NVIDIA 0x10DE
+	    0x00,		    // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		    // OCP_TYPE=8, OCP_VER=10 (V2)
+	    NSM_TYPE_FIRMWARE,	    // NVIDIA_MSG_TYPE
+	    NSM_FW_DOT_CAK_INSTALL, // command
+	    NSM_ERROR,		    // completion code (error)
+	    0x34,
+	    0x12 // reason code 0x1234 (little endian)
+	};
+	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	rc = decode_nsm_dot_cak_install_resp(error_response, errorMsg.size(),
+					     &cc, &reason_code, NULL);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x1234, reason_code);
+}

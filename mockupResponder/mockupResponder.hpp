@@ -510,6 +510,9 @@ class MockupResponder
         setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        dotCAKInstallHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     std::optional<Request>
         getQueryScalarGroupTelemetryResponse(uint8_t requestInstanceId,

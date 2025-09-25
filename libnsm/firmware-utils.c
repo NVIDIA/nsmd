@@ -1757,3 +1757,130 @@ int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_nsm_dot_cak_install_req(
+    uint8_t instance_id, const struct nsm_dot_cak_install_req *dot_cak_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || dot_cak_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_cak_install_req_command *request =
+	    (struct nsm_dot_cak_install_req_command *)msg->payload;
+	request->hdr.command = NSM_FW_DOT_CAK_INSTALL;
+	request->hdr.reserved1 = 0;
+	request->hdr.reserved2 = 0;
+
+	request->hdr.data_size =
+	    htole16(sizeof(struct nsm_dot_cak_install_req));
+
+	memcpy(&(request->dot_cak_install_req), dot_cak_req,
+	       sizeof(struct nsm_dot_cak_install_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_install_req(const struct nsm_msg *msg, size_t msg_len,
+				   struct nsm_dot_cak_install_req *dot_cak_req)
+{
+	if (msg == NULL || dot_cak_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_cak_install_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_cak_install_req_command *request =
+	    (struct nsm_dot_cak_install_req_command *)msg->payload;
+	// data_size validation removed - not required for this function
+
+	*dot_cak_req = request->dot_cak_install_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_cak_install_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_DOT_CAK_INSTALL, msg);
+	}
+
+	struct nsm_dot_cak_install_resp_command *response =
+	    (struct nsm_dot_cak_install_resp_command *)msg->payload;
+	response->hdr.command = NSM_FW_DOT_CAK_INSTALL;
+	response->hdr.completion_code = cc;
+
+	uint16_t msg_size = sizeof(struct nsm_dot_cak_install_resp);
+	response->hdr.data_size = htole16(msg_size);
+
+	// Set response fields according to spec
+	response->dot_cak_install_resp.command_code = NSM_FW_DOT_CAK_INSTALL;
+	response->dot_cak_install_resp.completion_code = cc;
+	response->dot_cak_install_resp.reserved = 0; // Always zero per spec
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_install_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_dot_cak_install_resp *dot_cak_resp)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	// For success case, set reason_code to ERR_NULL
+	*reason_code = ERR_NULL;
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_cak_install_resp_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_cak_install_resp_command *resp =
+	    (struct nsm_dot_cak_install_resp_command *)msg->payload;
+
+	if (dot_cak_resp != NULL) {
+		dot_cak_resp->command_code =
+		    resp->dot_cak_install_resp.command_code;
+		dot_cak_resp->completion_code =
+		    resp->dot_cak_install_resp.completion_code;
+		dot_cak_resp->reserved = resp->dot_cak_install_resp.reserved;
+	}
+
+	return NSM_SW_SUCCESS;
+}
