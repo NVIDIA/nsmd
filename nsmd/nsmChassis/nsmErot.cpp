@@ -19,6 +19,7 @@
 
 #include "dBusAsyncUtils.hpp"
 #include "nsmKeyMgmt.hpp"
+#include "nsmRoTProperty.hpp"
 #include "nsmSecurityRBP.hpp"
 #include "sensorManager.hpp"
 
@@ -164,6 +165,8 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         std::shared_ptr<ProgressIntf> ecProgressIntf = nullptr;
         std::shared_ptr<NsmKeyMgmt> ecKeyMgmt = nullptr;
         std::shared_ptr<NsmMinSecVersionObject> ecMinSecVersion = nullptr;
+        std::shared_ptr<NsmInbandUpdatePolicyObject> inbandUpdatePolicy =
+            nullptr;
 
         for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
         {
@@ -286,6 +289,15 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 {
                     rotProgressIntf = ecProgressIntf;
                 }
+            }
+
+            if (inbandUpdatePolicy == nullptr)
+            {
+                inbandUpdatePolicy =
+                    std::make_shared<NsmInbandUpdatePolicyObject>(
+                        bus, name, uuid, classification, identifier,
+                        static_cast<uint8_t>(index));
+                device->addSensor(inbandUpdatePolicy, false);
             }
         }
         if (apFirmwareType)

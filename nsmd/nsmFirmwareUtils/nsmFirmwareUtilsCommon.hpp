@@ -64,10 +64,18 @@ inline std::tuple<uint16_t, std::string>
                 return {cc, "Invalid MinimumSecurityVersion"};
             case NSM_FW_UPDATE_CODE_AUTH_KEY_PERM:
                 return {cc, "Invalid KeyIndexes"};
+            case NSM_FW_SET_ROT_PROPERTY:
+                return {cc, "Invalid In-band Update Policy"};
             default:
                 return {cc, "Unknown Error: cc=" + std::to_string(cc)};
         }
     }
+
+    if (cc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
+    {
+        return {cc, "Unsupported Command Code"};
+    }
+
     // else: At present there are no specific errors for other cc
     return {cc, "Unknown Error: cc=" + std::to_string(cc) +
                     " reason_code=" + std::to_string(reasonCode)};

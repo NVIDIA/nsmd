@@ -99,7 +99,7 @@ if include_all_chassis or include_chassis_list.contains('aer-error')
     sources += ['nsmChassis/nsmAERError.cpp']
 endif
 if include_all_chassis or include_chassis_list.contains('erot')
-    sources += ['nsmChassis/nsmErot.cpp']
+    sources += ['nsmChassis/nsmErot.cpp', 'nsmChassis/nsmRoTProperty.cpp']
 endif
 if include_all_chassis or include_chassis_list.contains('security-rbp')
     sources += ['nsmChassis/nsmSecurityRBP.cpp']
