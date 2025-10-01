@@ -93,7 +93,7 @@ class GetRotInformation : public CommandInterface
         ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        result["Background copy policy"] = mapEnumToString(
+        result["Background copy policy persistent"] = mapEnumToString(
             static_cast<uint32_t>(erot_info.fq_resp_hdr.background_copy_policy),
             bgCopyPolicyMap);
         result["Active Slot"] =
@@ -102,12 +102,16 @@ class GetRotInformation : public CommandInterface
             static_cast<uint32_t>(erot_info.fq_resp_hdr.active_keyset);
         result["Minimum security version"] = static_cast<uint32_t>(
             erot_info.fq_resp_hdr.minimum_security_version);
-        result["Update policy"] =
+        result["Inband update policy persistent"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.inband_update_policy);
         result["Boot status code"] =
             static_cast<uint64_t>(erot_info.fq_resp_hdr.boot_status_code);
         result["Firmware slot count"] =
             static_cast<uint32_t>(erot_info.fq_resp_hdr.firmware_slot_count);
+        result["Inband update policy current"] = static_cast<uint32_t>(
+            erot_info.fq_resp_hdr.inband_update_policy_current);
+        result["Background copy policy current"] = static_cast<uint32_t>(
+            erot_info.fq_resp_hdr.background_copy_policy_current);
 
         std::vector<ordered_json> slots;
         for (int i = 0; i < erot_info.fq_resp_hdr.firmware_slot_count; i++)
@@ -782,6 +786,115 @@ class IrreversibleConfig : public CommandInterface
     uint8_t requestType;
 };
 
+class SetRoTProperty : public CommandInterface
+{
+  public:
+    ~SetRoTProperty() = default;
+    SetRoTProperty() = delete;
+    SetRoTProperty(const SetRoTProperty&) = delete;
+    SetRoTProperty(SetRoTProperty&&) = default;
+    SetRoTProperty& operator=(const SetRoTProperty&) = delete;
+    SetRoTProperty& operator=(SetRoTProperty&&) = default;
+
+    explicit SetRoTProperty(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for Set RoT Property");
+        ccOptionGroup->add_option("-c,--classification", classification,
+                                  "Component classification");
+        ccOptionGroup->add_option("-i,--identifier", identifier,
+                                  "Component identifier");
+        ccOptionGroup->add_option("-d,--index", index, "Component index");
+        ccOptionGroup
+            ->add_option(
+                "-p,--property", property,
+                "Property (0: Redundancy Policy, 1: In-band Update Policy)")
+            ->check(CLI::Range(0, 1))
+            ->required();
+        ccOptionGroup
+            ->add_option(
+                "-r,--redundancy-policy", redundancyPolicy,
+                "Redundancy Policy (0: Manual Background Copy, 1: Automatic Background Copy) - only for Property 0")
+            ->check(CLI::Range(0, 1));
+        ccOptionGroup
+            ->add_option(
+                "-u,--update-policy", updatePolicy,
+                "In-band Update Policy (0: Disable, 1: Enable) - only for Property 1")
+            ->check(CLI::Range(0, 1));
+        ccOptionGroup
+            ->add_option(
+                "-l,--lifespan", lifespan,
+                "Lifespan (0: Persistent, 1: One-shot for Property 0, Volatile for Property 1)")
+            ->check(CLI::Range(0, 1));
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) +
+            sizeof(nsm_firmware_set_rot_property_req_command));
+        nsm_firmware_set_rot_property_req nsm_req;
+        nsm_req.component_classification = htole16(classification);
+        nsm_req.component_classification_index = index;
+        nsm_req.component_identifier = htole16(identifier);
+        nsm_req.property = property;
+        nsm_req.argument_length =
+            ARGUMENT_DATA_LENGTH; // Fixed length for both properties
+
+        // Populate argument data based on property value
+        if (property == 0)
+        {
+            // Property 0: Redundancy Policy + Lifespan
+            nsm_req.argument_data[0] = redundancyPolicy;
+            nsm_req.argument_data[1] = lifespan;
+        }
+        else if (property == 1)
+        {
+            // Property 1: In-band Update Policy + Lifespan
+            nsm_req.argument_data[0] = updatePolicy;
+            nsm_req.argument_data[1] = lifespan;
+        }
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_firmware_set_rot_property_req(instanceId, &nsm_req,
+                                                           request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        auto rc = decode_nsm_firmware_set_rot_property_resp(
+            responsePtr, payloadLength, &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion code"] = cc;
+        result["Reason code"] = reason_code;
+        DisplayInJson(result);
+    }
+
+  private:
+    uint16_t classification{DEFAULT_VALUE};
+    uint16_t identifier{DEFAULT_VALUE};
+    uint8_t index{DEFAULT_VALUE};
+    uint8_t property{};
+    uint8_t redundancyPolicy{DEFAULT_VALUE};
+    uint8_t updatePolicy{DEFAULT_VALUE};
+    uint8_t lifespan{};
+
+    static constexpr uint8_t ARGUMENT_DATA_LENGTH = 2;
+    static constexpr uint8_t DEFAULT_VALUE = 255;
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -817,5 +930,9 @@ void registerCommand(CLI::App& app)
         "UpdateMinSecurityVersion", "Update Minimum Firmware Security Version");
     commands.push_back(std::make_unique<UpdateMinSecurityVersion>(
         "firmware", "UpdateMinSecurityVersion", updateMinSecurityVersion));
+    auto setRoTProperty = firmware->add_subcommand("SetRoTProperty",
+                                                   "Set RoT Property");
+    commands.push_back(std::make_unique<SetRoTProperty>(
+        "firmware", "SetRoTProperty", setRoTProperty));
 }
 } // namespace nsmtool::firmware

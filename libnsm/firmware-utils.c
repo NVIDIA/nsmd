@@ -356,7 +356,7 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 	uint8_t *ptr = &(response->payload[0]);
 
 	encode_nsm_firmware_aggregate_tag_uint8(
-	    &ptr, NSM_FIRMWARE_BACKGROUND_COPY_POLICY,
+	    &ptr, NSM_FIRMWARE_BACKGROUND_COPY_POLICY_PERSISTENT,
 	    fw_info->fq_resp_hdr.background_copy_policy, &msg_size);
 	telemetry_count++;
 	encode_nsm_firmware_aggregate_tag_uint8(
@@ -372,7 +372,7 @@ int encode_nsm_query_get_erot_state_parameters_resp(
 	    fw_info->fq_resp_hdr.minimum_security_version, &msg_size);
 	telemetry_count++;
 	encode_nsm_firmware_aggregate_tag_uint8(
-	    &ptr, NSM_FIRMWARE_INBAND_UPDATE_POLICY,
+	    &ptr, NSM_FIRMWARE_INBAND_UPDATE_POLICY_PERSISTENT,
 	    fw_info->fq_resp_hdr.inband_update_policy, &msg_size);
 	telemetry_count++;
 	encode_nsm_firmware_aggregate_tag_uint64(
@@ -447,7 +447,7 @@ int decode_nsm_query_firmware_header_information(
 		    (struct nsm_firmware_aggregate_tag *)*ptr;
 		tag = field->tag;
 
-		if (tag == NSM_FIRMWARE_BACKGROUND_COPY_POLICY) {
+		if (tag == NSM_FIRMWARE_BACKGROUND_COPY_POLICY_PERSISTENT) {
 			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
 			    ptr, &tag, &valid,
 			    &(fw_info_hdr->background_copy_policy),
@@ -456,7 +456,8 @@ int decode_nsm_query_firmware_header_information(
 				(*telemetry_count)--;
 				DBG2(printf(
 					 "Decoded "
-					 "NSM_FIRMWARE_BACKGROUND_COPY_POLICY, "
+					 "NSM_FIRMWARE_BACKGROUND_COPY_POLICY_"
+					 "PERSISTENT, "
 					 "value = 0x%02x\n",
 					 fw_info_hdr->background_copy_policy);)
 			}
@@ -497,14 +498,16 @@ int decode_nsm_query_firmware_header_information(
 					"NUMBER, value = 0x%04x\n",
 					fw_info_hdr->minimum_security_version);)
 			}
-		} else if (tag == NSM_FIRMWARE_INBAND_UPDATE_POLICY) {
+		} else if (tag ==
+			   NSM_FIRMWARE_INBAND_UPDATE_POLICY_PERSISTENT) {
 			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
 			    ptr, &tag, &valid,
 			    &(fw_info_hdr->inband_update_policy), payload_size);
 			if (rc_ok) {
 				(*telemetry_count)--;
 				DBG2(printf("Decoded "
-					    "NSM_FIRMWARE_INBAND_UPDATE_POLICY,"
+					    "NSM_FIRMWARE_INBAND_UPDATE_POLICY_"
+					    "PERSISTENT,"
 					    " value = 0x%02x\n",
 					    fw_info_hdr->inband_update_policy);)
 			}
@@ -532,6 +535,36 @@ int decode_nsm_query_firmware_header_information(
 				break;
 			}
 			rc_ok = false;
+		} else if (tag == NSM_FIRMWARE_INBAND_UPDATE_POLICY_CURRENT) {
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    ptr, &tag, &valid,
+			    &(fw_info_hdr->inband_update_policy_current),
+			    payload_size);
+			if (rc_ok) {
+				(*telemetry_count)--;
+				DBG2(
+				    printf("Decoded "
+					   "NSM_FIRMWARE_INBAND_UPDATE_POLICY_"
+					   "CURRENT, "
+					   "value = 0x%02x\n",
+					   fw_info_hdr
+					       ->inband_update_policy_current);)
+			}
+		} else if (tag == NSM_FIRMWARE_BACKGROUND_COPY_POLICY_CURRENT) {
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    ptr, &tag, &valid,
+			    &(fw_info_hdr->background_copy_policy_current),
+			    payload_size);
+			if (rc_ok) {
+				(*telemetry_count)--;
+				DBG2(printf(
+					 "Decoded "
+					 "NSM_FIRMWARE_BACKGROUND_COPY_POLICY_"
+					 "CURRENT, "
+					 "value = 0x%02x\n",
+					 fw_info_hdr
+					     ->background_copy_policy_current);)
+			}
 		} else {
 			/* Skip unsupported tag */
 			DBG2(printf(
@@ -1671,6 +1704,56 @@ int decode_nsm_firmware_update_sec_ver_resp(
 
 	memcpy(sec_resp, &(resp->sec_ver_resp),
 	       sizeof(struct nsm_firmware_update_min_sec_ver_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_firmware_set_rot_property_req(
+    uint8_t instance_id, const struct nsm_firmware_set_rot_property_req *fw_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_firmware_set_rot_property_req_command *request =
+	    (struct nsm_firmware_set_rot_property_req_command *)msg->payload;
+	request->hdr.command = NSM_FW_SET_ROT_PROPERTY;
+	request->hdr.data_size =
+	    sizeof(struct nsm_firmware_set_rot_property_req);
+	memcpy(&request->rot_property_req, fw_req,
+	       sizeof(struct nsm_firmware_set_rot_property_req));
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_firmware_set_rot_property_resp_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
 	return NSM_SW_SUCCESS;
 }

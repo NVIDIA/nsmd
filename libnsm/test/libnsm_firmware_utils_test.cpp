@@ -576,7 +576,7 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	    0,				       // completion code
 	    26,
 	    0, // number of tags
-	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY,
+	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY_PERSISTENT,
 	    1,
 	    1,
 	    NSM_FIRMWARE_ACTIVE_KEY_SET,
@@ -586,7 +586,7 @@ TEST(GetRotInformation, testBadDecodeResponse)
 	    3,
 	    0xC0,
 	    0xC1,
-	    NSM_FIRMWARE_INBAND_UPDATE_POLICY,
+	    NSM_FIRMWARE_INBAND_UPDATE_POLICY_PERSISTENT,
 	    1,
 	    99,
 	    NSM_FIRMWARE_BOOT_STATUS_CODE,
@@ -790,7 +790,7 @@ TEST(GetRotInformation, testDecodeResponseWithUnsupportedTag)
 	    0,				       // completion code
 	    27,
 	    0, // number of tags
-	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY,
+	    NSM_FIRMWARE_BACKGROUND_COPY_POLICY_PERSISTENT,
 	    1,
 	    1,
 	    NSM_FIRMWARE_ACTIVE_KEY_SET,
@@ -800,7 +800,7 @@ TEST(GetRotInformation, testDecodeResponseWithUnsupportedTag)
 	    3,
 	    0xC0,
 	    0xC1,
-	    NSM_FIRMWARE_INBAND_UPDATE_POLICY,
+	    NSM_FIRMWARE_INBAND_UPDATE_POLICY_PERSISTENT,
 	    1,
 	    99,
 	    NSM_FIRMWARE_BOOT_STATUS_CODE,
