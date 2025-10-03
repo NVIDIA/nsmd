@@ -422,7 +422,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             auto sensor = std::make_shared<NsmGpuPciePort>(
                 bus, name, type, health, chasisState, associations,
                 inventoryObjPath);
-            nsmDevice->getDeviceSensors().emplace_back(sensor);
+            nsmDevice->addDeviceSensors(sensor);
             uint64_t deviceIndex{};
             if (allBaseIfaceProperties.count("DeviceIndex"))
             {
@@ -485,7 +485,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
             auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
                 name, type, pcieECCIntf, pciePortIntf, deviceIndex,
                 processorPath);
-            nsmDevice->getDeviceSensors().push_back(pciPortSensor);
+            nsmDevice->addDeviceSensors(pciPortSensor);
             nsmDevice->addSensor(sensorGroup2, priority);
             nsmDevice->addSensor(sensorGroup3, priority);
             nsmDevice->addSensor(sensorGroup4, priority);
@@ -527,7 +527,7 @@ static requester::Coroutine createNsmGpuPcieSensor(SensorManager& manager,
                 std::make_shared<PortWidthIntf>(bus, inventoryObjPath.c_str());
             auto portInfoSensor = std::make_shared<NsmGpuPciePortInfo>(
                 name, type, portType, portProtocol, portInfoIntf);
-            nsmDevice->getDeviceSensors().emplace_back(portInfoSensor);
+            nsmDevice->addDeviceSensors(portInfoSensor);
             auto pcieECCIntfSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
                 name, type, inventoryObjPath, portInfoIntf, portWidthIntf,
                 deviceIndex);

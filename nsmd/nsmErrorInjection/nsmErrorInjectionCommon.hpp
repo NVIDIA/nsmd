@@ -35,7 +35,7 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
                                                                     objPath);
     auto errorInjectionSensor =
         std::make_shared<NsmErrorInjection>(*setErrorInjection);
-    device->getDeviceSensors().emplace_back(setErrorInjection);
+    device->addDeviceSensors(setErrorInjection);
     device->addSensor(errorInjectionSensor, ERROR_INJECTION_PRIORITY);
 
     auto& errorInjectionDispatcher =
@@ -93,7 +93,7 @@ inline void createNsmErrorInjectionSensors(SensorManager& manager,
                 std::bind_front(&NsmSetErrorInjectionEnabled::enabled,
                                 setErrorInjectionEnabled.get()),
                 errorInjectionEnabled, device});
-        device->getDeviceSensors().emplace_back(setErrorInjectionEnabled);
+        device->addDeviceSensors(setErrorInjectionEnabled);
     }
     return;
 }
@@ -106,7 +106,7 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
                                                                     objPath);
     auto errorInjectionSensor =
         std::make_shared<NsmErrorInjection>(*setErrorInjection);
-    device->getDeviceSensors().emplace_back(setErrorInjection);
+    device->addDeviceSensors(setErrorInjection);
     device->addSensor(errorInjectionSensor, ERROR_INJECTION_PRIORITY);
 
     auto& errorInjectionDispatcher =
@@ -170,7 +170,7 @@ inline void createNsmMCUErrorInjectionSensors(SensorManager& manager,
             std::bind_front(&NsmSetErrorInjectionEnabled::enabled,
                             setErrorInjectionEnabled.get()),
             mcuErrorInjectionEnabled, device});
-    device->getDeviceSensors().emplace_back(setErrorInjectionEnabled);
+    device->addDeviceSensors(setErrorInjectionEnabled);
     // Set Error Injection Payload
     auto setErrorInjectionPayloadSensor =
         std::make_shared<NsmSetErrorInjectionPayload>(

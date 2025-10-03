@@ -102,7 +102,7 @@ static requester::Coroutine createNsmResetSensor(SensorManager& manager,
         }
         auto resetSensor = std::make_shared<NsmReset>(
             bus, name, type, inventoryObjPath, nsmDevice, deviceIndex);
-        nsmDevice->getDeviceSensors().push_back(resetSensor);
+        nsmDevice->addDeviceSensors(resetSensor);
     }
     catch (const std::exception& e)
     {

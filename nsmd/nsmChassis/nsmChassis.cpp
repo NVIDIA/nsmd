@@ -73,7 +73,7 @@ static void createFPGAAsset(std::shared_ptr<NsmDevice> device,
     }
 
     chassisAsset->invoke(pdiMethod(manufacturer), manufacturer);
-    device->getDeviceSensors().emplace_back(chassisAsset);
+    device->addDeviceSensors(chassisAsset);
 }
 
 static void createDimension(std::shared_ptr<NsmDevice> device,

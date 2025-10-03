@@ -206,7 +206,7 @@ static requester::Coroutine
         std::move(shmemSensor)
 #endif
     );
-    nsmDevice->getDeviceSensors().emplace_back(fpgaTotalGpuPower);
+    nsmDevice->addDeviceSensors(fpgaTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGATotalGPUPowerSensorPath] =
         fpgaTotalGpuPower;
     // coverity[missing_return]

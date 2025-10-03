@@ -218,7 +218,7 @@ requester::Coroutine NsmThresholdFactory::createNsmThreshold(
 
         thresholdValue->updateReading(threshold);
 
-        nsmDevice->getDeviceSensors().push_back(std::move(thresholdValue));
+        nsmDevice->addDeviceSensors(std::move(thresholdValue));
 
         lg2::info("Created NSM Sensor : UUID={UUID}, Name={NAME}, Type=Static",
                   "UUID", uuid, "NAME", thresholdInfo.name);

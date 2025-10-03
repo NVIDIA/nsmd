@@ -81,7 +81,7 @@ static requester::Coroutine
 
     auto retimerFabricsDi = std::make_shared<NsmPCIeRetimerFabricDI>(
         bus, name, associations, type, fabricType);
-    nsmDevice->getDeviceSensors().emplace_back(retimerFabricsDi);
+    nsmDevice->addDeviceSensors(retimerFabricsDi);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

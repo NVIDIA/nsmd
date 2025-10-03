@@ -707,7 +707,7 @@ void createNSMMemory(std::shared_ptr<NsmDevice> nsmDevice,
 
     auto sensorErrorCorrection = std::make_shared<NsmMemoryErrorCorrection>(
         name, type, dimmIntf, correctionType, inventoryObjPath);
-    nsmDevice->getDeviceSensors().push_back(sensorErrorCorrection);
+    nsmDevice->addDeviceSensors(sensorErrorCorrection);
     std::string deviceType{};
     if (allCurrentIfaceProperties.count("DeviceType"))
     {
@@ -717,16 +717,16 @@ void createNSMMemory(std::shared_ptr<NsmDevice> nsmDevice,
 
     auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
         name, type, dimmIntf, deviceType, inventoryObjPath);
-    nsmDevice->getDeviceSensors().push_back(sensorDeviceType);
+    nsmDevice->addDeviceSensors(sensorDeviceType);
     auto sensorHealth = std::make_shared<NsmMemoryHealth>(bus, name, type,
                                                           inventoryObjPath);
-    nsmDevice->getDeviceSensors().push_back(sensorHealth);
+    nsmDevice->addDeviceSensors(sensorHealth);
     auto sensorMemoryLocation = std::make_shared<NsmLocationIntfMemory>(
         bus, name, type, inventoryObjPath);
-    nsmDevice->getDeviceSensors().push_back(sensorMemoryLocation);
+    nsmDevice->addDeviceSensors(sensorMemoryLocation);
     auto associationSensor = std::make_shared<NsmMemoryAssociation>(
         bus, name, type, inventoryObjPath, associations);
-    nsmDevice->getDeviceSensors().push_back(associationSensor);
+    nsmDevice->addDeviceSensors(associationSensor);
 
     bool priority = false;
     if (allCurrentIfaceProperties.count("Priority"))

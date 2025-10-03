@@ -464,9 +464,9 @@ class NsmDevice :
     {
         gpuDriverSensor = sensor;
     }
-    std::vector<std::shared_ptr<NsmObject>>& getDeviceSensors()
+    void addDeviceSensors(std::shared_ptr<NsmObject> sensor)
     {
-        return deviceSensors;
+        deviceSensors.push_back(sensor);
     }
 
     /** @brief Getter for the longRunningSemaphore */

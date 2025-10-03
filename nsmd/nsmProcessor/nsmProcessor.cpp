@@ -326,14 +326,13 @@ static void createPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
                     pwrSmoothingIntf),
                 {},
                 nsmDevice});
-
     auto controlSensor = std::make_shared<NsmPowerSmoothingV2>(
         name, type, inventoryObjPath, pwrSmoothingIntf, nsmDevice);
-    nsmDevice->getDeviceSensors().emplace_back(controlSensor);
+    nsmDevice->addDeviceSensors(controlSensor);
 
     auto lifetimeCicuitrySensor = std::make_shared<NsmHwCircuitryTelemetry>(
         name, type, inventoryObjPath, pwrSmoothingIntf);
-    nsmDevice->getDeviceSensors().emplace_back(lifetimeCicuitrySensor);
+    nsmDevice->addDeviceSensors(lifetimeCicuitrySensor);
 
     std::shared_ptr<OemAdminProfileIntfV2> adminProfileIntf =
         std::make_shared<OemAdminProfileIntfV2>(bus, inventoryObjPath,
@@ -425,12 +424,12 @@ static void createPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
     auto adminProfileSensor =
         std::make_shared<NsmPowerSmoothingAdminOverrideV2>(
             name, type, adminProfileIntf, inventoryObjPath, nsmDevice);
-    nsmDevice->getDeviceSensors().emplace_back(adminProfileSensor);
+    nsmDevice->addDeviceSensors(adminProfileSensor);
 
     auto getAllPowerProfileSensor =
         std::make_shared<NsmPowerProfileCollectionV2>(
             name, type, inventoryObjPath, nsmDevice);
-    nsmDevice->getDeviceSensors().emplace_back(getAllPowerProfileSensor);
+    nsmDevice->addDeviceSensors(getAllPowerProfileSensor);
 
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf =
         std::make_shared<OemCurrentPowerProfileIntf>(
@@ -446,7 +445,7 @@ static void createPowerSmoothing(std::shared_ptr<NsmDevice> nsmDevice,
         std::make_shared<NsmPowerSmoothingAction>(
             bus, name, type, inventoryObjPath, currentProfileSensor, nsmDevice);
 
-    nsmDevice->getDeviceSensors().emplace_back(pwrSmoothingAction);
+    nsmDevice->addDeviceSensors(pwrSmoothingAction);
     // power smoothing supported version
     std::string revisionPath = inventoryObjPath + "/power_smoothing_metadata";
     std::shared_ptr<RevisionIntf> revisionIntf =
@@ -540,7 +539,7 @@ static void createPCIe(std::shared_ptr<NsmDevice> nsmDevice,
             name, type, pcieECCIntf, pciePortIntf, deviceId, inventoryObjPath);
         auto sensorGroup4 = std::make_shared<NsmPciGroup4>(
             name, type, pcieECCIntf, pciePortIntf, deviceId, inventoryObjPath);
-        nsmDevice->getDeviceSensors().push_back(pciPortSensor);
+        nsmDevice->addDeviceSensors(pciPortSensor);
         nsmDevice->addSensor(sensorGroup2, priority);
         nsmDevice->addSensor(sensorGroup3, priority);
         nsmDevice->addSensor(sensorGroup4, priority);
@@ -3468,19 +3467,19 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                                           associations);
         auto associationSensor = std::make_shared<NsmProcessorAssociation>(
             bus, name, type, inventoryObjPath, associations);
-        nsmDevice->getDeviceSensors().push_back(associationSensor);
+        nsmDevice->addDeviceSensors(associationSensor);
 
 #ifdef ACCELERATOR_DBUS
         auto sensor = std::make_shared<NsmAcceleratorIntf>(bus, name, type,
                                                            inventoryObjPath);
-        nsmDevice->getDeviceSensors().push_back(sensor);
+        nsmDevice->addDeviceSensors(sensor);
 #endif
 
 #ifdef NVIDIA_RESET_METRICS
         auto resetSupportSensor =
             std::make_shared<NsmResetCountersSupportedIntf>(bus, name, type,
                                                             inventoryObjPath);
-        nsmDevice->getDeviceSensors().push_back(resetSupportSensor);
+        nsmDevice->addDeviceSensors(resetSupportSensor);
 #endif
 
         uuid_t deviceUuid{};
@@ -3550,7 +3549,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
 
         auto healthSensor = std::make_shared<NsmGpuHealth>(bus, name, type,
                                                            inventoryObjPath);
-        nsmDevice->getDeviceSensors().push_back(healthSensor);
+        nsmDevice->addDeviceSensors(healthSensor);
 
         createNsmErrorInjectionSensors(manager, nsmDevice, inventoryObjPath);
         auto confidentialComputeIntf =
@@ -3612,7 +3611,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 allCurrentIfaceProperties.at("LocationType"));
             auto sensor = std::make_shared<NsmLocationIntfProcessor>(
                 bus, name, type, inventoryObjPath, locationType);
-            nsmDevice->getDeviceSensors().push_back(sensor);
+            nsmDevice->addDeviceSensors(sensor);
         }
         if (allCurrentIfaceProperties.count("LocationCode"))
         {
@@ -3620,7 +3619,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
                 allCurrentIfaceProperties.at("LocationCode"));
             auto sensor = std::make_shared<NsmLocationCodeIntfProcessor>(
                 bus, name, type, inventoryObjPath, locationCode);
-            nsmDevice->getDeviceSensors().push_back(sensor);
+            nsmDevice->addDeviceSensors(sensor);
         }
 
         if (allCurrentIfaceProperties.count("MIGModeSupported") &&
@@ -3750,7 +3749,7 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
     auto resetStatisticsSensor = std::make_shared<ResetStatisticsAggregator>(
         resetMetricsName, "NSM_ResetStatistics", resetPath, resetCountersObj,
         std::move(resetMetricsAssociationDef));
-    nsmDevice->getDeviceSensors().emplace_back(resetStatisticsSensor);
+    nsmDevice->addDeviceSensors(resetStatisticsSensor);
     // Add sensor to the device with priority
     nsmDevice->addSensor(resetStatisticsSensor, resetMetricsPriority);
 #endif

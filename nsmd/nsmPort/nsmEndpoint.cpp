@@ -92,7 +92,7 @@ static requester::Coroutine createNsmEndpoints(SensorManager& manager,
         co_return NSM_ERROR;
     }
 
-    nsmDevice->getDeviceSensors().push_back(fabricsEndpointSensor);
+    nsmDevice->addDeviceSensors(fabricsEndpointSensor);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

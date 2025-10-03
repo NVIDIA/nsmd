@@ -109,7 +109,7 @@ static requester::Coroutine
 
     auto retimer_chassis =
         std::make_shared<NsmPCIeRetimerChassis>(bus, name, associations, type);
-    nsmDevice->getDeviceSensors().emplace_back(retimer_chassis);
+    nsmDevice->addDeviceSensors(retimer_chassis);
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }

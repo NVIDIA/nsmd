@@ -747,7 +747,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         nvSwitchAssociation->invoke(pdiMethod(associations), associations_list);
         nvSwitchUuid->invoke(pdiMethod(uuid), uuid);
 
-        device->getDeviceSensors().emplace_back(nvSwitchIntf);
+        device->addDeviceSensors(nvSwitchIntf);
         device->addStaticSensor(nvSwitchUuid);
         device->addStaticSensor(nvSwitchAssociation);
 
@@ -777,7 +777,7 @@ requester::Coroutine createNsmSwitchDI(SensorManager& manager,
         // Device Reset for NVSwitch
         auto nvSwitchResetSensor = std::make_shared<NsmSwitchDIReset>(
             bus, name, type, inventoryObjPath, device);
-        device->getDeviceSensors().push_back(nvSwitchResetSensor);
+        device->addDeviceSensors(nvSwitchResetSensor);
 
 #if defined(ENABLE_ERROR_INJECTION)
         createNsmErrorInjectionSensors(manager, device,

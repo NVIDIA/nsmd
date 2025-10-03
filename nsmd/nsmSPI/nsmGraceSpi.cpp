@@ -1013,7 +1013,7 @@ static requester::Coroutine createNsmGraceSpi(SensorManager& manager,
             auto spiSensor = std::make_shared<NsmGraceSpiObject>(
                 bus, name, inventoryObjPath, type, uuid);
 
-            nsmDevice->getDeviceSensors().emplace_back(spiSensor);
+            nsmDevice->addDeviceSensors(spiSensor);
         }
     }
 

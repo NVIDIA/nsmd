@@ -255,7 +255,7 @@ static requester::Coroutine CreateControlGpuPower(SensorManager& manager,
     auto fpgaControlTotalGpuPower = std::make_shared<NsmPowerControl>(
         bus, name, associations, type, nsmFPGAControlTotalGPUPowerPath,
         physicalContext);
-    nsmDevice->getDeviceSensors().emplace_back(fpgaControlTotalGpuPower);
+    nsmDevice->addDeviceSensors(fpgaControlTotalGpuPower);
     manager.objectPathToSensorMap[nsmFPGAControlTotalGPUPowerPath] =
         fpgaControlTotalGpuPower;
 
