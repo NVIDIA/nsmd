@@ -129,11 +129,7 @@ class Handler
 
                 // Note2: timeoutTracker code should be above request->stop() or
                 // any operation that can change requestMsg as part of cleanup
-                nsm::DeviceRequestTimeOutTracker& timeoutTracker =
-                    nsm::TimeOutTracker::getInstance().getDeviceTimeOutTracker(
-                        eid);
-                std::string msg = request->requestMsgToString();
-                timeoutTracker.handleTimeout(msg);
+                DeviceRequestTimeOutTracker::pushWithTimeout(*request);
 
                 request->stop();
                 auto rc = timerInstance->stop();
@@ -324,11 +320,7 @@ class Handler
 
                 // Note2: timeoutTracker code should be above request->stop() or
                 // any operation that can change requestMsg as part of cleanup
-                nsm::DeviceRequestTimeOutTracker& timeoutTracker =
-                    nsm::TimeOutTracker::getInstance().getDeviceTimeOutTracker(
-                        eid);
-                std::string msg = request->requestMsgToString();
-                timeoutTracker.handleNoTimeout(msg);
+                DeviceRequestTimeOutTracker::pushWithoutTimeout(*request);
 
                 request->stop();
                 auto rc = timerInstance->stop();

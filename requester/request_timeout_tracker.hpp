@@ -29,62 +29,30 @@
 #include <string>
 #include <system_error>
 
-namespace nsm
+namespace requester
 {
 
-class DeviceRequestTimeOutTracker
+class DeviceRequestTimeOutTracker : protected std::deque<RequestBase>
 {
   public:
-    static std::unordered_map<eid_t,
-                              std::shared_ptr<DeviceRequestTimeOutTracker>>
-        instances;
-    static DeviceRequestTimeOutTracker& getInstance(eid_t eid);
-
-    bool isEmpty();
-    bool isFull();
-    void push(std::string nsm_request);
-    void pop();
-    std::string front();
-    void emptyQueue();
-
-    void handleTimeout(std::string nsm_request);
-    void handleNoTimeout(std::string nsm_request);
-    void logTimeOutFailure();
-
-    static void logFailuresForAllEids();
+    static void pushWithTimeout(const RequestBase& request);
+    static void pushWithoutTimeout(const RequestBase& request);
+    static void logFailures();
 
   private:
+    inline static std::unordered_map<
+        eid_t, std::shared_ptr<DeviceRequestTimeOutTracker>>
+        instances;
+    static DeviceRequestTimeOutTracker& instance(eid_t eid);
+    void push(const RequestBase& request);
+    void logTimeOutFailure() const;
     explicit DeviceRequestTimeOutTracker(eid_t eid);
     DeviceRequestTimeOutTracker(const DeviceRequestTimeOutTracker&) = delete;
     DeviceRequestTimeOutTracker&
         operator=(const DeviceRequestTimeOutTracker&) = delete;
     static const size_t MAXSIZE = 1;
-    std::deque<std::string> messages;
-    std::optional<std::string> firstTimeoutMessage;
+    std::optional<RequestBase> timeoutMessage;
     eid_t eid;
 };
 
-/** @class
- *  @brief Implementation of NSM TimeoutTracker
- */
-class TimeOutTracker
-{
-  public:
-    static TimeOutTracker& getInstance()
-    {
-        static TimeOutTracker instance;
-        return instance;
-    }
-
-    DeviceRequestTimeOutTracker& getDeviceTimeOutTracker(eid_t eid)
-    {
-        return DeviceRequestTimeOutTracker::getInstance(eid);
-    }
-
-  private:
-    TimeOutTracker() = default;
-    TimeOutTracker(const TimeOutTracker&) = delete;
-    TimeOutTracker& operator=(const TimeOutTracker&) = delete;
-};
-
-} // namespace nsm
+} // namespace requester

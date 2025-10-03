@@ -27,15 +27,12 @@
 #include <string>
 #include <system_error>
 
-namespace nsm
+namespace requester
 {
-// Define static member
-std::unordered_map<eid_t, std::shared_ptr<DeviceRequestTimeOutTracker>>
-    DeviceRequestTimeOutTracker::instances;
 DeviceRequestTimeOutTracker::DeviceRequestTimeOutTracker(eid_t eid) : eid(eid)
 {}
 
-DeviceRequestTimeOutTracker& DeviceRequestTimeOutTracker::getInstance(eid_t eid)
+DeviceRequestTimeOutTracker& DeviceRequestTimeOutTracker::instance(eid_t eid)
 {
     if (instances.find(eid) == instances.end())
     {
@@ -44,7 +41,7 @@ DeviceRequestTimeOutTracker& DeviceRequestTimeOutTracker::getInstance(eid_t eid)
     }
     return *instances[eid];
 }
-void DeviceRequestTimeOutTracker::logFailuresForAllEids()
+void DeviceRequestTimeOutTracker::logFailures()
 {
     for (const auto& pair : instances)
     {
@@ -52,86 +49,60 @@ void DeviceRequestTimeOutTracker::logFailuresForAllEids()
     }
 }
 
-bool DeviceRequestTimeOutTracker::isEmpty()
-{
-    return messages.empty();
-}
-
-bool DeviceRequestTimeOutTracker::isFull()
-{
-    return messages.size() == MAXSIZE;
-}
 // push on a full queue, will remove the oldest message
-void DeviceRequestTimeOutTracker::push(std::string nsm_request)
+void DeviceRequestTimeOutTracker::push(const RequestBase& request)
 {
-    if (isFull())
+    if (size() == MAXSIZE)
     {
-        messages.pop_front();
+        pop_front();
     }
-    messages.push_back(nsm_request);
+    push_back(request);
 }
 
-void DeviceRequestTimeOutTracker::pop()
+void DeviceRequestTimeOutTracker::pushWithTimeout(const RequestBase& request)
 {
-    if (isEmpty())
-    {
-        return;
-    }
-    messages.pop_front();
-}
-
-std::string DeviceRequestTimeOutTracker::front()
-{
-    std::string nsm_request;
-    if (isEmpty())
-    {
-        return nsm_request;
-    }
-    nsm_request = messages.front();
-    return nsm_request;
-}
-
-void DeviceRequestTimeOutTracker::handleTimeout(std::string nsm_request)
-{
-    if (firstTimeoutMessage.has_value())
+    auto& tracker = instance(request.eid);
+    if (tracker.timeoutMessage.has_value())
     {
         // skip further timeout messages as first timeout request has been
         // recorded
         return;
     }
-    firstTimeoutMessage = nsm_request;
+    tracker.timeoutMessage = request;
 }
-void DeviceRequestTimeOutTracker::handleNoTimeout(std::string nsm_request)
+
+void DeviceRequestTimeOutTracker::pushWithoutTimeout(const RequestBase& request)
 {
-    if (firstTimeoutMessage.has_value())
+    auto& tracker = instance(request.eid);
+    if (tracker.timeoutMessage.has_value())
     {
         // device responded after a timeout, reset tracker params
-        firstTimeoutMessage = std::nullopt;
-        emptyQueue();
+        tracker.timeoutMessage = std::nullopt;
+        tracker.clear();
     }
-    push(nsm_request);
+    tracker.push(request);
 }
 
-void DeviceRequestTimeOutTracker::emptyQueue()
-{
-    messages.clear();
-}
-
-void DeviceRequestTimeOutTracker::logTimeOutFailure()
+void DeviceRequestTimeOutTracker::logTimeOutFailure() const
 {
     lg2::error("******Start logTimeOutFailure: EID={EID}*****", "EID", eid);
-    if (firstTimeoutMessage.has_value())
+    if (timeoutMessage.has_value())
     {
-        for (const auto& message : messages)
+        for (const auto& message : *this)
         {
             lg2::error(
                 "logTimeOutFailure: EID={EID}, Last(n) NSM request msg before timeout: {REQ} ",
-                "EID", eid, "REQ", message);
+                "EID", eid, "REQ",
+                utils::convertMsgToString(true, message.requestMsg, message.tag,
+                                          message.eid));
         }
         lg2::error(
             "logTimeOutFailure: EID={EID}, Timeout for NSM request: {REQ}",
-            "EID", eid, "REQ", *firstTimeoutMessage);
+            "EID", eid, "REQ",
+            utils::convertMsgToString(true, timeoutMessage->requestMsg,
+                                      timeoutMessage->tag,
+                                      timeoutMessage->eid));
     }
     lg2::error("******End logTimeOutFailure: EID={EID}*****", "EID", eid);
 }
-} // namespace nsm
+} // namespace requester

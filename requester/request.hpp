@@ -143,6 +143,22 @@ class RequestRetryTimer
     }
 };
 
+using RequestMsg = ::Request; // vector<uint8_t>
+
+class RequestBase
+{
+  protected:
+    friend class DeviceRequestTimeOutTracker;
+    eid_t eid;             //!< endpoint ID of the remote MCTP endpoint
+    uint8_t tag;           //!< tag mctp message tag to be used
+    RequestMsg requestMsg; //!< NSM request message
+
+  public:
+    RequestBase(eid_t eid, uint8_t tag, RequestMsg&& requestMsg) :
+        eid(eid), tag(tag), requestMsg(std::move(requestMsg))
+    {}
+};
+
 /** @class Request
  *
  *  The concrete implementation of RequestIntf. This class implements the send()
@@ -152,7 +168,7 @@ class RequestRetryTimer
  *  time to wait between each retry. It provides APIs to start and stop the
  *  request flow.
  */
-class Request final : public RequestRetryTimer
+class Request final : public RequestBase, public RequestRetryTimer
 {
   public:
     Request() = delete;
@@ -174,10 +190,10 @@ class Request final : public RequestRetryTimer
      */
     explicit Request(int fd, eid_t eid, uint8_t tag, sdeventplus::Event& event,
                      const mctp_socket::Handler* handler,
-                     std::vector<uint8_t>&& requestMsg, uint8_t numRetries,
+                     RequestMsg&& requestMsg, uint8_t numRetries,
                      std::chrono::milliseconds timeout, bool verbose) :
-        RequestRetryTimer(event, numRetries, timeout), fd(fd), eid(eid),
-        tag(tag), requestMsg(std::move(requestMsg)), verbose(verbose),
+        RequestBase(eid, tag, std::move(requestMsg)),
+        RequestRetryTimer(event, numRetries, timeout), fd(fd), verbose(verbose),
         socketHandler(handler)
     {}
 
@@ -193,23 +209,9 @@ class Request final : public RequestRetryTimer
         nsmMsg->hdr.instance_id = instanceId;
     }
 
-    std::string requestMsgToString() const
-    {
-        std::ostringstream oss;
-        for (const auto& byte : requestMsg)
-        {
-            oss << std::setfill('0') << std::setw(2) << std::hex
-                << static_cast<int>(byte) << " ";
-        }
-        return oss.str();
-    }
-
   private:
-    int fd;      //!< file descriptor of MCTP communications socket
-    eid_t eid;   //!< endpoint ID of the remote MCTP endpoint
-    uint8_t tag; //!< tag mctp message tag to be used
-    std::vector<uint8_t> requestMsg;           //!< NSM request message
-    bool verbose;                              //!< verbose tracing flag
+    int fd;       //!< file descriptor of MCTP communications socket
+    bool verbose; //!< verbose tracing flag
     const mctp_socket::Handler* socketHandler; // MCTP socket handler
 
     /** @brief Sends the NSM request message on the socket

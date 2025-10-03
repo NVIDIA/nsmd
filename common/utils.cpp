@@ -108,26 +108,38 @@ std::string convertHexToString(const std::vector<uint8_t>& data,
     return result;
 }
 
+std::string convertMsgToString(bool isTx, const std::vector<uint8_t>& buffer,
+                               uint8_t tag, eid_t eid)
+{
+    if (buffer.empty())
+    {
+        return "";
+    }
+    // Length of "EID: 1d, TAG: 03, Tx: "
+    constexpr size_t headerSize = 22;
+    // Length of "89 "
+    constexpr size_t hexWithSpaceSize = 3;
+    std::string output(headerSize + buffer.size() * hexWithSpaceSize, '\0');
+    sprintf(output.data(), "EID: %02x, TAG: %02x, %s: ", eid, tag,
+            isTx ? "Tx" : "Rx");
+    for (size_t i = 0; i < buffer.size(); i++)
+    {
+        snprintf(&output[headerSize + i * hexWithSpaceSize],
+                 hexWithSpaceSize + 1, "%02x ", buffer[i]);
+    }
+    // Remove trailing space
+    output.pop_back();
+
+    return output;
+}
+
 void printBuffer(bool isTx, const std::vector<uint8_t>& buffer, uint8_t tag,
                  eid_t eid)
 {
     if (!buffer.empty())
     {
-        // Length of "EID: 1d, TAG: 03, Tx: "
-        constexpr size_t headerSize = 22;
-        // Length of "89 "
-        constexpr size_t hexWithSpaceSize = 3;
-        std::string output(headerSize + buffer.size() * hexWithSpaceSize, '\0');
-        sprintf(output.data(), "EID: %02x, TAG: %02x, %s: ", eid, tag,
-                isTx ? "Tx" : "Rx");
-        for (size_t i = 0; i < buffer.size(); i++)
-        {
-            sprintf(&output[headerSize + i * hexWithSpaceSize], "%02x ",
-                    buffer[i]);
-        }
-        // Changing last trailing space to string null terminator
-        output.back() = '\0';
-        lg2::info("{OUTPUT}", "OUTPUT", output);
+        lg2::info("{OUTPUT}", "OUTPUT",
+                  convertMsgToString(isTx, buffer, tag, eid));
     }
 }
 

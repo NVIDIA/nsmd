@@ -41,7 +41,7 @@ class NsmLogDumpIntf : public LogDumpIntf
     {
         nsm::SensorManagerImpl::dumpReadinessLogs();
         nsm::SensorManagerImpl::dumpNsmDevicesInfo();
-        nsm::DeviceRequestTimeOutTracker::logFailuresForAllEids();
+        requester::DeviceRequestTimeOutTracker::logFailures();
     }
 };
 
