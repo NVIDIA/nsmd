@@ -30,6 +30,7 @@
 #include "nsmMsghandler.hpp"
 #include "nsmObject.hpp"
 #include "nsmSensor.hpp"
+#include "progressCounters.hpp"
 #include "requester/handler.hpp"
 #include "stateChangeLogger.hpp"
 #include "types.hpp"
@@ -172,7 +173,8 @@ class NsmDevice :
         deviceType(deviceType), instanceNumber(instanceNumber),
         deviceRole(deviceRole), nsmMsgHandler(nsmMsgHandler),
         objServer(objServer),
-        longRunningEventHandler(registerLongRunningEventHandler())
+        longRunningEventHandler(registerLongRunningEventHandler()),
+        progressCounters(*this)
     {
         if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
         {
@@ -600,6 +602,8 @@ class NsmDevice :
                     std::shared_ptr<const nsm_msg>& responseMsg,
                     size_t& responseLen);
 
+    void dumpNsmDeviceInfo();
+
   private:
     std::vector<std::vector<bitfield8_t>> commands;
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
@@ -699,6 +703,9 @@ class NsmDevice :
     SensorQueue& longRunningSensors = sensors[PollingType::LongRunning];
     SensorQueue& staticSensors = sensors[PollingType::Static];
     SensorQueue& roundRobinSensors = sensors[PollingType::RoundRobin];
+    friend class SensorManagerImpl;
+    friend class DelegatingEventHandler;
+    ProgressCounters progressCounters;
 };
 
 std::shared_ptr<NsmDevice> findNsmDeviceByUUID(NsmDeviceTable& nsmDevices,

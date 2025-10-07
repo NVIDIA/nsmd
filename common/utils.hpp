@@ -171,28 +171,20 @@ struct CustomFD
     CustomFD(CustomFD&&) = delete;
     CustomFD& operator=(CustomFD&&) = delete;
 
-    CustomFD(int fd) : fd(fd) {}
+    CustomFD(int fd);
+    ~CustomFD();
 
-    ~CustomFD()
-    {
-        if (fd >= 0)
-        {
-            close(fd);
-        }
-    }
+    int operator()() const;
+    operator int() const;
 
-    int operator()() const
-    {
-        return fd;
-    }
-
-    operator int() const
-    {
-        return fd;
-    }
+    size_t getFileSize() const;
+    size_t size() const;
+    bool write(const off_t pos, const uint8_t* data, const size_t size);
+    bool read(const off_t pos, uint8_t* data, const size_t size);
 
   private:
     int fd = -1;
+    size_t fileSize = 0;
 };
 
 /**
@@ -474,6 +466,12 @@ std::string getCurrentSystemTime();
  *  @return - uint64_t equivalent of the system time
  */
 uint64_t getCurrentSteadyClockTimestamp();
+
+/** @brief Get the current system time in microseconds
+ *
+ *  @return - uint64_t equivalent of the system time
+ */
+uint64_t getCurrentSteadyClockTimestampUs();
 
 /** @brief Get UUID from the eid
  *

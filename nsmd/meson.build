@@ -129,6 +129,7 @@ valid_nsmd_subdirs = [
     'nsmManagers',
     'nsmHistograms',
     'nsmReady',
+    'nsmProgressCounters',
 ]
 
 foreach name : nsmd_subdirs_include
@@ -173,3 +174,16 @@ executable(
     install: true,
     install_dir: get_option('bindir'),
 )
+
+if get_option('progressCounter').enabled()
+    executable(
+        'nsmProgressCountersReader',
+        'nsmProgressCounters/progressCounterReader.cpp',
+        '../common/utils.cpp',
+        '../common/dBusHandler.cpp',
+        include_directories: include_directories(['../common', '../libnsm']),
+        dependencies: [phosphor_logging, sdbusplus],
+        install: true,
+        install_dir: get_option('bindir'),
+    )
+endif

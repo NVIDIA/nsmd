@@ -40,6 +40,7 @@ class NsmLogDumpIntf : public LogDumpIntf
     void logDump() override
     {
         nsm::SensorManagerImpl::dumpReadinessLogs();
+        nsm::SensorManagerImpl::dumpNsmDevicesInfo();
         nsm::DeviceRequestTimeOutTracker::logFailuresForAllEids();
     }
 };

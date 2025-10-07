@@ -9,6 +9,8 @@ dep_src_files = [
     '../../nsmObjectFactory.cpp',
     '../../sensorManager.cpp',
     '../../nsmEvent.cpp',
+    '../../nsmProgressCounters/progressCounters.cpp',
+    '../../nsmProgressCounters/counterProducer.cpp',
     '../../socket_handler.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
     '../../nsmHistograms/nsmHistogramInfo.cpp',
@@ -40,10 +42,11 @@ dep_src_headers = [
     '../../nsmEvent',
     '../../nsmCommon',
     '../../nsmSensors',
+    '../../nsmDbusIfaceOverride',
+    '../../nsmProgressCounters',
     '../../../',
     '../../../common',
     '../../../libnsm',
-    '../../nsmDbusIfaceOverride',
 ]
 
 test_src = declare_dependency(

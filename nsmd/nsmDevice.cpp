@@ -24,6 +24,7 @@
 #include "nsmLongRunning/nsmLongRunningSensor.hpp"
 #include "nsmMsgTypesSensor.hpp"
 #include "nsmNumericSensor/nsmNumericAggregator.hpp"
+#include "progressCounters.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
 
@@ -428,7 +429,7 @@ requester::Coroutine
 
     auto rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
                                                      &responseLen);
-    if (rc && rc != NSM_SW_ERROR_NULL)
+    if (rc && rc != NSM_SW_ERROR_TIMEOUT)
     {
         lg2::error("SendRecvNsmMsg failed. eid={EID} rc={RC}", "EID", eid, "RC",
                    rc);
@@ -467,13 +468,15 @@ requester::Coroutine
 
     rc = co_await nsmMsgHandler->SendRecvNsmMsg(eid, request, responseMsg,
                                                 &responseLen);
-    // NSM_SW_ERROR_NULL: indicates no nsm response which is possible for
+    // NSM_SW_ERROR_TIMEOUT: indicates no nsm response which is possible for
     // request that timedout
-    if (rc && rc != NSM_SW_ERROR_NULL)
+    if (rc && rc != NSM_SW_ERROR_TIMEOUT)
     {
         lg2::error("NsmDevice::postPatchIO failed. eid={EID} rc={RC}", "EID",
                    eid, "RC", rc);
     }
+    progressCounters.increment(ProgressCounterType::PostPatch, rc,
+                               utils::getCurrentSteadyClockTimestampUs());
     co_return rc;
 }
 
@@ -1017,6 +1020,45 @@ requester::Coroutine NsmDevice::refreshCommandMatrix()
     }
 
     co_return NSM_SW_SUCCESS;
+}
+
+void NsmDevice::dumpNsmDeviceInfo()
+{
+    lg2::error(
+        "###### NsmDevice::dumpNsmDeviceInfo: deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
+        "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
+        getInstanceNumber());
+    lg2::error(
+        "EID: {EID}, UUID: {UUID}, , Device Instance Number: {DEVICE_INSTANCE_NUMBER}, Device UUID: {DEVICE_UUID}, MCTP Medium: {MCTP_MEDIUM}, MCTP Binding: {MCTP_BINDING}",
+        "EID", eid, "UUID", getUuid(), "DEVICE_UUID", deviceUuid, "MCTP_MEDIUM",
+        mctpMedium, "MCTP_BINDING", mctpBinding, "DEVICE_INSTANCE_NUMBER",
+        nsmDeviceInstanceNumber);
+    lg2::error(
+        "Device Active: {DEVICE_ACTIVE}, Device Ready: {DEVICE_READY}, Discovery Pending: {DISCOVERY_PENDING}",
+        "DEVICE_ACTIVE", isDeviceActive, "DEVICE_READY", isDeviceReady,
+        "DISCOVERY_PENDING", discoveryPending);
+
+    for (size_t messageType = 0;
+         messageType < messageTypesToCommandCodeMatrix.size(); messageType++)
+    {
+        std::stringstream ss;
+        for (size_t commandCode = 0;
+             commandCode < messageTypesToCommandCodeMatrix[messageType].size();
+             commandCode++)
+        {
+            if (messageTypesToCommandCodeMatrix[messageType][commandCode])
+            {
+                ss << commandCode << " ";
+            }
+        }
+        lg2::error(
+            "EID: {EID} Message Type: {MESSAGE_TYPE}, Command Codes: {COMMAND_CODES}",
+            "EID", eid, "MESSAGE_TYPE", messageType, "COMMAND_CODES", ss.str());
+    }
+    lg2::error(
+        "###### NsmDevice::dumpNsmDeviceInfo End for deviceType={DT}, deviceRole={ROLE}, static instanceNumber={INST} ######",
+        "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
+        getInstanceNumber());
 }
 
 // FruInterfaceManager method implementations

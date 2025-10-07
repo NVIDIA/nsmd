@@ -442,16 +442,24 @@ bool SensorManagerImpl::isNSMPollReady()
 void SensorManagerImpl::dumpReadinessLogs()
 {
     lg2::error("******dumpReadinesLogs Start*****");
-    for (std::map<std::string, std::string>::const_iterator it =
-             readynessFailureMap.begin();
-         it != readynessFailureMap.end(); ++it)
+    for (auto& [fname, flog] : readynessFailureMap)
     {
-        std::string fname = it->first;
-        std::string flog = it->second;
         lg2::error("dumpReadinessLogs {FNAME}: {LOGMSG}", "FNAME", fname,
                    "LOGMSG", flog);
     }
     lg2::error("******dumpReadinesLogs End*****");
+}
+
+void SensorManagerImpl::dumpNsmDevicesInfo()
+{
+    auto& nsmDevices =
+        dynamic_cast<SensorManagerImpl&>(getInstance()).nsmDevices;
+    lg2::error("******dumpNsmDevicesInfo Start*****");
+    for (auto nsmDevice : nsmDevices)
+    {
+        nsmDevice->dumpNsmDeviceInfo();
+    }
+    lg2::error("******dumpNsmDevicesInfo End*****");
 }
 
 /*
@@ -514,12 +522,13 @@ requester::Coroutine SensorManagerImpl::updateLongRunningSensor(
     std::shared_ptr<LimitedSensorQueue> sensors)
 {
     uint64_t t1 = 0;
-    co_await sensor->update(nsmDevice);
+    auto rc = co_await sensor->update(nsmDevice);
     sensor->isRefreshed = true;
     sensors->next();
 
     sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
     sensor->setLastUpdatedTimeStamp(t1);
+    nsmDevice->progressCounters.increment(PollingType::LongRunning, rc, t1);
     // coverity[missing_return]
     co_return NSM_SW_SUCCESS;
 }
@@ -538,17 +547,34 @@ requester::Coroutine SensorManagerImpl::refreshCommandMatrix(
     co_return rc;
 }
 
+/**
+ * @brief The desired polling interval in microseconds. This is the time
+ * between each polling cycle.
+ */
+static const uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
+
 requester::Coroutine
-    SensorManagerImpl::pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice)
+    SensorManagerImpl::pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
+                                           const uint64_t& t0)
 {
+    uint64_t t1 = 0;
 #ifdef LTTNG_TRACING
     lttng_ust_tracepoint(nsmd, priority_polling_started, nsmDevice->getEid());
 #endif
     LimitedSensorQueue sensors(nsmDevice->getPrioritySensors());
     while (sensors.hasSensorsToUpdate())
     {
-        co_await sensors.current()->update(nsmDevice);
+        auto rc = co_await sensors.current()->update(nsmDevice);
         sensors.next();
+
+        // Update progress counters
+        sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
+        nsmDevice->progressCounters.increment(PollingType::Priority, rc, t1);
+        if ((t1 - t0) > pollingTimeInUsec)
+        {
+            nsmDevice->progressCounters.increment(
+                ProgressCounterType::PriorityTimeExceeded, rc, t1);
+        }
     }
 #ifdef LTTNG_TRACING
     lttng_ust_tracepoint(nsmd, priority_polling_ended, nsmDevice->getEid());
@@ -566,14 +592,8 @@ requester::Coroutine
  */
 static const uint64_t allowedBufferInUsec = ALLOWED_BUFFER_IN_MS * 1000;
 
-/**
- * @brief The desired polling interval in microseconds. This is the time
- * between each polling cycle.
- */
-static const uint64_t pollingTimeInUsec = SENSOR_POLLING_TIME * 1000;
-
 requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
-    std::shared_ptr<NsmDevice> nsmDevice, uint64_t t0)
+    std::shared_ptr<NsmDevice> nsmDevice, const uint64_t& t0)
 {
     uint64_t t1 = 0;
     auto longRunningQueue = std::make_shared<LimitedSensorQueue>(
@@ -643,10 +663,10 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         }
 
         // Update sensor
-        auto cc = co_await sensor->update(nsmDevice);
+        auto rc = co_await sensor->update(nsmDevice);
         sensor->isRefreshed = true;
 
-        if (pollingType == PollingType::Static && cc == NSM_SUCCESS)
+        if (pollingType == PollingType::Static && rc == NSM_SUCCESS)
         {
             // Remove static sensor from the queue if it was successfully
             // updated
@@ -655,6 +675,8 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
         sensor->setLastUpdatedTimeStamp(t1);
+
+        nsmDevice->progressCounters.increment(pollingType, rc, t1);
     }
 
     // Either we were able to succesfully update all sensors in one
@@ -695,7 +717,7 @@ requester::Coroutine
 
         if (nsmDevice->isOnline())
         {
-            co_await pollPrioritySensors(nsmDevice);
+            co_await pollPrioritySensors(nsmDevice, t0);
             co_await pollNonPrioritySensors(nsmDevice, t0);
         }
 

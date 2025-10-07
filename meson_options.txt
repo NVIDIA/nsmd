@@ -12,6 +12,12 @@ option(
     value: 'enabled',
 )
 option(
+    'progressCounter',
+    type: 'feature',
+    description: 'Enable sensors progress counter functionality with memfd',
+    value: 'enabled',
+)
+option(
     'reset-metrics',
     type: 'feature',
     description: 'Enable reset metrics feature',
@@ -42,6 +48,30 @@ option(
     max: 4294967295,
     description: 'The interval time of sensor polling in milliseconds',
     value: 150,
+)
+option(
+    'sensor-progress-counters-dump-count-threshold',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'The count threshold for sensor progress counter dumps',
+    value: 100000,
+)
+option(
+    'sensor-progress-counters-dump-time-threshold',
+    type: 'integer',
+    min: 1,
+    max: 4294967295,
+    description: 'The time threshold for sensor progress counter dumps in microseconds',
+    value: 600000000,
+)
+option(
+    'sensor-progress-counters-memfd-size',
+    type: 'integer',
+    min: 4096,
+    max: 16777216,
+    description: 'The memfd size in bytes for sensor progress counter dumps',
+    value: 65536,
 )
 option(
     'sensor-polling-time-gpm',

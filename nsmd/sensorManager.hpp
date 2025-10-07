@@ -66,6 +66,7 @@ class SensorManager
                                                     uint8_t deviceRole) = 0;
     virtual std::shared_ptr<NsmDevice>
         getNsmDeviceFromStaticUUID(uuid_t uuid) = 0;
+
     // Static method to access the instance of the class
     static SensorManager& getInstance()
     {
@@ -148,6 +149,7 @@ class SensorManagerImpl : public SensorManager
         mctp_socket::Manager& sockManager, bool verbose);
     ~SensorManagerImpl();
     static void dumpReadinessLogs();
+    static void dumpNsmDevicesInfo();
 
     static bool isEMReady();
     static void markEMReady();
@@ -164,10 +166,11 @@ class SensorManagerImpl : public SensorManager
     requester::Coroutine
         refreshCommandMatrix(std::shared_ptr<NsmDevice> nsmDevice);
     requester::Coroutine
-        pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice);
+        pollPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
+                            const uint64_t& t0);
     requester::Coroutine
         pollNonPrioritySensors(std::shared_ptr<NsmDevice> nsmDevice,
-                               uint64_t t0);
+                               const uint64_t& t0);
 
     requester::Coroutine deviceTask(std::shared_ptr<NsmDevice> nsmDevice);
     requester::Coroutine

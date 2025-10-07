@@ -278,6 +278,13 @@ uint64_t getCurrentSteadyClockTimestamp()
         .count();
 }
 
+uint64_t getCurrentSteadyClockTimestampUs()
+{
+    return std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
+
 eid_t getEidFromUUID(
     const std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>&
         eidTable,
@@ -1085,6 +1092,101 @@ int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
     }
 
     return 0;
+}
+
+CustomFD::CustomFD(int fd) : fd(fd)
+{
+    if (fd < 0)
+    {
+        throw std::runtime_error(std::format(
+            "CustomFD - Invalid file descriptor: {}", strerror(errno)));
+    }
+    fileSize = getFileSize();
+}
+
+CustomFD::~CustomFD()
+{
+    if (fd >= 0)
+    {
+        close(fd);
+    }
+}
+
+int CustomFD::operator()() const
+{
+    return fd;
+}
+
+CustomFD::operator int() const
+{
+    return fd;
+}
+size_t CustomFD::getFileSize() const
+{
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) < 0)
+    {
+        return 0;
+    }
+    return fileStat.st_size;
+}
+
+size_t CustomFD::size() const
+{
+    return fileSize;
+}
+
+bool CustomFD::write(off_t pos, const uint8_t* data, const size_t size)
+{
+    if (static_cast<size_t>(pos) > fileSize || !data || !size ||
+        lseek(fd, pos, SEEK_SET) < 0)
+    {
+        return false;
+    }
+    size_t totalWritten = 0;
+    while (totalWritten < size)
+    {
+        ssize_t written = ::write(fd, data + totalWritten, size - totalWritten);
+        if (written < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            return false;
+        }
+        totalWritten += written;
+    }
+    fileSize = std::max(fileSize, static_cast<size_t>(pos + size));
+    return true;
+}
+
+bool CustomFD::read(const off_t pos, uint8_t* data, const size_t size)
+{
+    if ((pos + size) > fileSize || !data || !size ||
+        lseek(fd, pos, SEEK_SET) < 0)
+    {
+        return false;
+    }
+    size_t totalRead = 0;
+    while (totalRead < size)
+    {
+        ssize_t bytesRead = ::read(fd, data + totalRead, size - totalRead);
+        if (bytesRead < 0)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            return false;
+        }
+        if (bytesRead == 0)
+        {
+            return false; // EOF
+        }
+        totalRead += bytesRead;
+    }
+    return true;
 }
 
 } // namespace utils

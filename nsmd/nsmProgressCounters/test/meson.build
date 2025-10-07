@@ -1,39 +1,35 @@
 dep_src_files = [
-    '../asyncOperationManager.cpp',
-    '../nsmAsyncSensor.cpp',
-    '../nsmSetWriteProtected.cpp',
+    '../counterProducer.cpp',
+    '../progressCounters.cpp',
     '../../nsmDevice.cpp',
-    '../../nsmSensor.cpp',
-    '../../sensorManager.cpp',
     '../../nsmObjectFactory.cpp',
+    '../../sensorManager.cpp',
+    '../../nsmSensor.cpp',
     '../../nsmEvent.cpp',
-    '../../nsmProgressCounters/progressCounters.cpp',
-    '../../nsmProgressCounters/counterProducer.cpp',
     '../../nsmEvent/nsmLongRunningEventHandler.cpp',
-    '../../nsmEvent/nsmLongRunningEvent.cpp',
-    '../../nsmLongRunning/nsmLongRunningSensor.cpp',
-    '../../nsmLongRunning/nsmAsyncLongRunningSensor.cpp',
     '../../../common/utils.cpp',
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
-    '../../../libnsm/instance-id.c',
-    '../../../libnsm/device-configuration.c',
     '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/diagnostics.c',
+    '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
-    '../nsmSetEgmMode.cpp',
-    '../../nsmCommon/sharedMemCommon.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../../requester/mctp_endpoint_discovery.cpp',
 ]
 
+if get_option('shmem').enabled()
+    dep_src_files += '../../nsmCommon/sharedMemCommon.cpp'
+endif
+
 dep_src_headers = [
+    '.',
     '..',
     '../../',
     '../../nsmEvent',
-    '../../nsmLongRunning/',
+    '../../nsmCommon',
+    '../../test/',
     '../../nsmDbusIfaceOverride',
     '../../nsmProgressCounters',
     '../../../',
@@ -46,7 +42,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = ['nsmSetWriteProtected_test', 'asyncOperationManager_test']
+tests = ['counterProducer_test', 'progressCounters_test']
 
 tests_deps = [
     test_src,

@@ -32,6 +32,8 @@ const path fabricsInventoryBasePath =
 const path firmwareInventoryBasePath = "/xyz/openbmc_project/software";
 const path sotwareInventoryBasePath = "/xyz/openbmc_project/inventory_software";
 const path debugTokenObjectBasePath = "/xyz/openbmc_project/debug_token";
+const path progressCountersObjectBasePath =
+    "/xyz/openbmc_project/progress_counters";
 
 const std::string nullDate = "0000-00-00T00:00:00Z";
 

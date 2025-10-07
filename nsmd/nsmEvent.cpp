@@ -19,6 +19,7 @@
 
 #include "dBusAsyncUtils.hpp"
 #include "eventHandler.hpp"
+#include "progressCounters.hpp"
 #include "requester/mctp_endpoint_discovery.hpp"
 #include "sensorManager.hpp"
 #include "utils.hpp"
@@ -163,7 +164,11 @@ void DelegatingEventHandler::delegate(eid_t eid, NsmType type,
         return;
     }
 
-    nsmDevice->getEventDispatcher().handle(eid, type, eventId, event, eventLen);
+    uint8_t rc = nsmDevice->eventDispatcher.handle(eid, type, eventId, event,
+                                                   eventLen);
+    nsmDevice->progressCounters.increment(
+        ProgressCounterType::Event, rc,
+        utils::getCurrentSteadyClockTimestampUs());
 }
 
 } // namespace nsm

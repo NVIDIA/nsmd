@@ -88,6 +88,18 @@ conf_data.set(
     'NUMBER_OF_REQUEST_RETRIES',
     get_option('number-of-request-retries'),
 )
+conf_data.set(
+    'SENSOR_PROGRESS_COUNTERS_DUMP_COUNT_THRESHOLD',
+    get_option('sensor-progress-counters-dump-count-threshold'),
+)
+conf_data.set(
+    'SENSOR_PROGRESS_COUNTERS_DUMP_TIME_THRESHOLD',
+    get_option('sensor-progress-counters-dump-time-threshold'),
+)
+conf_data.set(
+    'SENSOR_PROGRESS_COUNTERS_MEMFD_SIZE',
+    get_option('sensor-progress-counters-memfd-size'),
+)
 conf_data.set('RESPONSE_TIME_OUT', get_option('response-time-out'))
 conf_data.set(
     'RESPONSE_TIME_OUT_LONG_RUNNING',
@@ -104,6 +116,9 @@ conf_data.set(
 )
 if get_option('shmem').enabled()
     conf_data.set('NVIDIA_SHMEM', 0)
+endif
+if get_option('progressCounter').enabled()
+    conf_data.set('NVIDIA_PROGRESS_COUNTER', 0)
 endif
 if get_option('stanbyToDC').enabled()
     conf_data.set('NVIDIA_STANDBYTODC', 0)

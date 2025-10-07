@@ -502,7 +502,9 @@ struct SendRecvNsmMsg
     {
         if (response == nullptr || !length)
         {
-            rc = NSM_SW_ERROR_NULL;
+            // All retry attempts have been exhausted and instance ID timer
+            // expired, indicating a complete request timeout
+            rc = NSM_SW_ERROR_TIMEOUT;
         }
         else
         {
