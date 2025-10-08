@@ -18,6 +18,7 @@
 #pragma once
 
 #include "base.h"
+#include "device-capability-discovery.h"
 #include "device-configuration.h"
 #include "diagnostics.h"
 #include "network-ports.h"
@@ -61,6 +62,12 @@ struct HeaderType
     uint8_t type;
 };
 
+struct EventSource
+{
+    std::array<bitfield8_t, EVENT_SOURCES_LENGTH> events;
+    EventSource() = default;
+    EventSource(const std::vector<uint64_t>& events);
+};
 class MockupResponder
 {
   public:
@@ -126,6 +133,10 @@ class MockupResponder
         setEventSubscription(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getSupportedEventSources(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getCurrentEventSources(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         setCurrentEventSources(const nsm_msg* requestMsg, size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
@@ -135,6 +146,9 @@ class MockupResponder
         getHistogramFormatHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getHistogramDataHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        getDeviceCapabilitiesV2Handler(const nsm_msg* requestMsg,
+                                       size_t requestLen);
 
     // type3 handlers
     std::optional<std::vector<uint8_t>>
@@ -209,7 +223,10 @@ class MockupResponder
 
     std::optional<std::vector<uint8_t>>
         setPowerLimitHandler(const nsm_msg* requestMsg, size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getPciePortConfigHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setPciePortConfigHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<Response>
         getViolationDurationHandler(const nsm_msg* requestMsg,
                                     size_t requestLen, bool isLongRunning,
@@ -329,6 +346,13 @@ class MockupResponder
         eraseTraceHandler(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
         eraseDebugInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        getDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                        size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
         enableDisableGpuIstModeHandler(const nsm_msg* requestMsg,
@@ -471,7 +495,9 @@ class MockupResponder
     std::optional<Request>
         getListAvailablePciePortsHandler(const nsm_msg* requestMsg,
                                          size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getEthPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
@@ -480,6 +506,9 @@ class MockupResponder
                                        size_t requestLen);
     std::optional<std::vector<uint8_t>>
         getPortEccCountersHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                     size_t requestLen);
 
   private:
     std::optional<Request>
@@ -496,6 +525,7 @@ class MockupResponder
     std::unique_ptr<sdeventplus::source::IO> io;
     eid_t eventReceiverEid;
     uint8_t globalEventGenerationSetting;
+    static std::unordered_map<uint8_t, EventSource> supportedEventSources;
     struct State
     {
         nsm_fpga_diagnostics_settings_wp writeProtected;
@@ -505,9 +535,13 @@ class MockupResponder
             prcKnobs;
         nsm_error_injection_mode_v1 errorInjectionMode;
         nsm_error_injection_payload errorInjectionPayload;
+        uint8_t l1_prediction_mode;
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;
+        std::unordered_map<uint8_t,
+                           std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
+            eventSources;
     } state;
 };
 

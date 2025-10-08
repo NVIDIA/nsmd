@@ -23,8 +23,12 @@
 
 #include <com/nvidia/DebugToken/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
+#include <sdbusplus/message/types.hpp>
 
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace nsm
 {
@@ -37,12 +41,11 @@ using DebugTokenIntf = object_t<server::DebugToken>;
 constexpr const auto successReasonCode = 0;
 constexpr const auto tokenAlreadyActiveReasonCode = 1;
 
-class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
+class NsmDebugTokenNICObject : public NsmObject, public DebugTokenIntf
 {
   public:
-    NsmDebugTokenObject(sdbusplus::bus::bus& bus, const std::string& name,
-                        const std::vector<utils::Association>& associations,
-                        const std::string& type, const uuid_t& uuid);
+    NsmDebugTokenNICObject(sdbusplus::bus::bus& bus, const std::string& name,
+                           const uuid_t& uuid);
 
     sdbusplus::message::object_path disableTokens();
     sdbusplus::message::object_path
@@ -52,12 +55,6 @@ class NsmDebugTokenObject : public NsmObject, public DebugTokenIntf
         installToken(std::vector<uint8_t> tokenData);
 
   private:
-    static std::string getParentChassisPath(
-        const std::vector<utils::Association>& associations);
-    static std::string
-        getName(const std::vector<utils::Association>& associations,
-                const std::string& name);
-
     requester::Coroutine
         disableTokensAsyncHandler(std::shared_ptr<Request> request,
                                   std::shared_ptr<AsyncStatusIntf> statusIntf,

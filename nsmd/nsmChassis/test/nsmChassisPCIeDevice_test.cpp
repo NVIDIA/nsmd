@@ -88,10 +88,9 @@ struct NsmChassisPCIeDeviceTest :
         {"Type", "NSM_ChassisPCIeDevice"}, {"UUID", gpuUuid},
         {"DEVICE_UUID", gpuDeviceUuid},
     };
-    const PropertyValuesCollection asset = {
-        {"Type", "NSM_Asset"},
+    const PropertyValuesCollection chassisAttributes = {
+        {"Type", "NSM_Chassis_Attributes"},
         {"Name", "HGX_GPU_SXM_1"},
-        {"Manufacturer", "NVIDIA"},
     };
     const PropertyValuesCollection associations[2] = {
         {
@@ -107,19 +106,12 @@ struct NsmChassisPCIeDeviceTest :
              "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
         },
     };
-    const PropertyValuesCollection health = {
-        {"Type", "NSM_Health"},
-        {"Health", "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"},
-    };
     const PropertyValuesCollection pcieDevice = {
         {"Type", "NSM_PCIeDevice"},
-        {"DeviceType", "GPU"},
-        {"Functions", std::vector<uint64_t>{0}},
     };
     const PropertyValuesCollection ltssmState = {
         {"Type", "NSM_LTSSMState"},
         {"DeviceIndex", uint64_t(1)},
-        {"Priority", false},
         {"InventoryObjPath",
          "/xyz/openbmc_project/inventory/system/fabrics/HGX_PCIeRetimerTopology_0/Switches/PCIeRetimer_0/Ports/Down_0"},
     };
@@ -188,16 +180,11 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
         std::get<std::string>(get(associations[0], "AbsolutePath").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName, objPath);
 
-    // Second call: NSM_Health
-    propertyMap["Type"] = std::get<std::string>(get(health, "Type").second);
-    propertyMap["Health"] = std::get<std::string>(get(health, "Health").second);
-    nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Health",
-                                      objPath);
     EXPECT_EQ(1, devices.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(3, gpu->staticSensors.size());
+    EXPECT_EQ(2, gpu->staticSensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(3, gpu->deviceSensors.size());
+    EXPECT_EQ(2, gpu->deviceSensors.size());
 
     auto sensor = 0;
     auto uuidObject = dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
@@ -205,17 +192,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateDeviceSensors)
     auto associationsObject =
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsIntf>>(
             gpu->deviceSensors[sensor++]);
-    auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
-        gpu->deviceSensors[sensor++]);
 
     EXPECT_NE(nullptr, uuidObject);
     EXPECT_NE(nullptr, associationsObject);
-    EXPECT_NE(nullptr, healthObject);
 
     EXPECT_EQ(gpuDeviceUuid, uuidObject->invoke(pdiMethod(uuid)));
     EXPECT_EQ(2, associationsObject->invoke(pdiMethod(associations)).size());
-    EXPECT_EQ(HealthIntf::HealthType::OK,
-              healthObject->invoke(pdiMethod(health)));
 }
 
 TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
@@ -229,19 +211,14 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     propertyMap["Name"] = std::get<std::string>(get(basic, "Name").second);
     propertyMap["UUID"] = std::get<uuid_t>(get(basic, "UUID").second);
 
-    // First call: NSM_Asset
-    propertyMap["Type"] = std::get<std::string>(get(asset, "Type").second);
-    propertyMap["Manufacturer"] =
-        std::get<std::string>(get(asset, "Manufacturer").second);
-    nsmChassisPCIeDeviceCreateSensors(mockManager, basicIntfName + ".Asset",
-                                      objPath);
+    // First call: NSM_Chassis_Attributes
+    propertyMap["Type"] =
+        std::get<std::string>(get(chassisAttributes, "Type").second);
+    nsmChassisPCIeDeviceCreateSensors(
+        mockManager, basicIntfName + ".ChassisAttributes", objPath);
 
     // Second call: NSM_PCIeDevice
     propertyMap["Type"] = std::get<std::string>(get(pcieDevice, "Type").second);
-    propertyMap["DeviceType"] =
-        std::get<std::string>(get(pcieDevice, "DeviceType").second);
-    propertyMap["Functions"] =
-        std::get<std::vector<uint64_t>>(get(pcieDevice, "Functions").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager,
                                       basicIntfName + ".PCIeDevice", objPath);
 
@@ -249,8 +226,6 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     propertyMap["Type"] = std::get<std::string>(get(ltssmState, "Type").second);
     propertyMap["DeviceIndex"] =
         std::get<uint64_t>(get(ltssmState, "DeviceIndex").second);
-    propertyMap["Priority"] =
-        std::get<bool>(get(ltssmState, "Priority").second);
     propertyMap["InventoryObjPath"] =
         std::get<std::string>(get(ltssmState, "InventoryObjPath").second);
     nsmChassisPCIeDeviceCreateSensors(mockManager,
@@ -268,11 +243,12 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
 
     EXPECT_EQ(1, devices.size());
     EXPECT_EQ(0, gpu->prioritySensors.size());
-    EXPECT_EQ(4, gpu->staticSensors.size());
+    EXPECT_EQ(5, gpu->staticSensors.size());
     EXPECT_EQ(5, gpu->roundRobinSensors.size());
-    EXPECT_EQ(9, gpu->deviceSensors.size());
+    EXPECT_EQ(10, gpu->deviceSensors.size());
 
     auto sensors = 0;
+    // Asset sensors (indices 0-2: partNumber, serialNumber, model)
     auto partNumber = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu->deviceSensors[sensors++]);
     auto serialNumber =
@@ -280,17 +256,31 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
             gpu->deviceSensors[sensors++]);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         gpu->deviceSensors[sensors++]);
+
+    // Health sensor (index 3)
+    auto healthObject = dynamic_pointer_cast<NsmInterfaceProvider<HealthIntf>>(
+        gpu->deviceSensors[sensors++]);
+
+    // PCIeDevice sensor (index 4)
     auto pcieDeviceObject =
         dynamic_pointer_cast<NsmPCIeLinkSpeed<PCIeDeviceIntf>>(
             gpu->deviceSensors[sensors++]);
+
+    // Function sensor (index 5)
     auto functionSensor =
         dynamic_pointer_cast<NsmPCIeFunction>(gpu->deviceSensors[sensors++]);
     sensors++;
+
+    // LTSSMState sensor (index 7)
     auto ltssmStateSensor =
         dynamic_pointer_cast<NsmPCIeLTSSMState>(gpu->deviceSensors[sensors++]);
+
+    // PCIeRefClock sensor (index 8)
     auto pcieRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<PCIeRefClockIntf>>(
             gpu->deviceSensors[sensors++]);
+
+    // NVLinkRefClock sensor (index 9)
     auto nvLinkRefClock =
         dynamic_pointer_cast<NsmClockOutputEnableState<NVLinkRefClockIntf>>(
             gpu->deviceSensors[sensors++]);
@@ -299,6 +289,7 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_NE(nullptr, partNumber);
     EXPECT_NE(nullptr, serialNumber);
     EXPECT_NE(nullptr, model);
+    EXPECT_NE(nullptr, healthObject);
     EXPECT_NE(nullptr, pcieDeviceObject);
     EXPECT_NE(nullptr, functionSensor);
 
@@ -309,9 +300,10 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(DEVICE_PART_NUMBER, partNumber->property);
     EXPECT_EQ(SERIAL_NUMBER, serialNumber->property);
     EXPECT_EQ(MARKETING_NAME, model->property);
-    EXPECT_EQ(get<std::string>(asset, "Manufacturer"),
-              model->invoke(pdiMethod(manufacturer)));
-    EXPECT_EQ(get<std::string>(pcieDevice, "DeviceType"),
+    EXPECT_EQ(MANUFACTURER_NVIDIA, model->invoke(pdiMethod(manufacturer)));
+    EXPECT_EQ(HealthIntf::HealthType::OK,
+              healthObject->invoke(pdiMethod(health)));
+    EXPECT_EQ(PCIE_DEVICE_TYPE_SINGLE_FUNCTION,
               pcieDeviceObject->invoke(pdiMethod(deviceType)));
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               ltssmStateSensor->deviceIndex);

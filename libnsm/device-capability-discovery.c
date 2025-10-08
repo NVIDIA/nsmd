@@ -17,64 +17,153 @@
 
 #include "device-capability-discovery.h"
 #include "base.h"
+#include "firmware-utils.h"
 #include <endian.h>
 #include <stdio.h>
 #include <string.h>
 
-int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
-					      uint8_t nvidia_message_type,
-					      struct nsm_msg *msg)
+static int encode_nsm_get_event_source_req(uint8_t command, uint8_t instance_id,
+					   uint8_t nvidia_message_type,
+					   struct nsm_msg *msg)
 {
 	if (msg == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
-	struct nsm_header_info header = {0};
-	header.nsm_msg_type = NSM_REQUEST;
-	header.instance_id = instance_id & 0x1f;
-	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
-
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY};
 	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
 	if (rc != NSM_SUCCESS) {
 		return rc;
 	}
 
-	struct nsm_get_supported_event_source_req *request =
-	    (struct nsm_get_supported_event_source_req *)msg->payload;
+	struct nsm_get_event_source_req *request =
+	    (struct nsm_get_event_source_req *)msg->payload;
 
-	request->hdr.command = NSM_GET_CURRENT_EVENT_SOURCES;
-	request->hdr.data_size = NSM_GET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE;
+	request->hdr.command = command;
+	request->hdr.data_size = NSM_GET_EVENT_SOURCES_REQ_DATA_SIZE;
 	request->nvidia_message_type = nvidia_message_type;
 
-	return NSM_SUCCESS;
+	return NSM_SW_SUCCESS;
 }
 
-int decode_nsm_get_supported_event_source_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code,
-    bitfield8_t supported_event_sources[EVENT_SOURCES_LENGTH])
+int encode_nsm_get_supported_event_source_req(uint8_t instance_id,
+					      uint8_t nvidia_message_type,
+					      struct nsm_msg *msg)
 {
-	if (msg == NULL || cc == NULL) {
-		return NSM_ERR_INVALID_DATA;
+	return encode_nsm_get_event_source_req(NSM_GET_SUPPORTED_EVENT_SOURCES,
+					       instance_id, nvidia_message_type,
+					       msg);
+}
+
+int encode_nsm_get_current_event_source_req(uint8_t instance_id,
+					    uint8_t nvidia_message_type,
+					    struct nsm_msg *msg)
+{
+	return encode_nsm_get_event_source_req(NSM_GET_CURRENT_EVENT_SOURCES,
+					       instance_id, nvidia_message_type,
+					       msg);
+}
+
+int decode_nsm_get_event_source_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *nvidia_message_type)
+{
+	if (msg == NULL || nvidia_message_type == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_get_supported_event_source_resp)) {
-		return NSM_ERR_INVALID_DATA;
+			  sizeof(struct nsm_get_event_source_req)) {
+		return NSM_SW_ERROR_LENGTH;
 	}
 
-	struct nsm_get_supported_event_source_resp *response =
-	    (struct nsm_get_supported_event_source_resp *)msg->payload;
+	struct nsm_get_event_source_req *request =
+	    (struct nsm_get_event_source_req *)msg->payload;
+
+	*nvidia_message_type = request->nvidia_message_type;
+
+	return NSM_SW_SUCCESS;
+}
+
+static int encode_nsm_get_event_source_resp(
+    uint8_t command, uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg)
+{
+	if (msg == NULL || event_sources == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_RESPONSE, instance_id,
+					 NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY};
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, command, msg);
+	}
+
+	struct nsm_get_event_source_resp *response =
+	    (struct nsm_get_event_source_resp *)msg->payload;
+
+	response->hdr.command = command;
+	response->hdr.completion_code = cc;
+	response->hdr.data_size = EVENT_SOURCES_LENGTH;
+	memcpy(response->event_sources, event_sources, EVENT_SOURCES_LENGTH);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_get_supported_event_source_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg)
+{
+	return encode_nsm_get_event_source_resp(NSM_GET_SUPPORTED_EVENT_SOURCES,
+						instance_id, cc, reason_code,
+						event_sources, msg);
+}
+
+int encode_nsm_get_current_event_source_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    const bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg)
+{
+	return encode_nsm_get_event_source_resp(NSM_GET_CURRENT_EVENT_SOURCES,
+						instance_id, cc, reason_code,
+						event_sources, msg);
+}
+
+int decode_nsm_get_event_source_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, bitfield8_t event_sources[EVENT_SOURCES_LENGTH])
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    event_sources == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
 
 	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
 	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
 		return rc;
 	}
 
-	memcpy(supported_event_sources, response->supported_event_sources,
-	       EVENT_SOURCES_LENGTH);
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_event_source_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
 
-	return NSM_SUCCESS;
+	struct nsm_get_event_source_resp *response =
+	    (struct nsm_get_event_source_resp *)msg->payload;
+
+	memcpy(event_sources, response->event_sources, EVENT_SOURCES_LENGTH);
+
+	return NSM_SW_SUCCESS;
 }
 
 int encode_nsm_get_event_subscription_req(uint8_t instance_id,
@@ -356,13 +445,12 @@ int decode_nsm_configure_event_acknowledgement_resp(
 	return NSM_SUCCESS;
 }
 
-int encode_nsm_set_current_event_sources_req(uint8_t instance_id,
-					     uint8_t nvidia_message_type,
-					     bitfield8_t *event_sources,
-					     struct nsm_msg *msg)
+int encode_nsm_set_current_event_sources_req(
+    uint8_t instance_id, uint8_t nvidia_message_type,
+    bitfield8_t event_sources[EVENT_SOURCES_LENGTH], struct nsm_msg *msg)
 {
 	if (event_sources == NULL || msg == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
 	struct nsm_header_info header = {0};
@@ -386,19 +474,18 @@ int encode_nsm_set_current_event_sources_req(uint8_t instance_id,
 	return NSM_SUCCESS;
 }
 
-int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
-					    size_t msg_len,
-					    uint8_t *nvidia_message_type,
-					    bitfield8_t **event_sources)
+int decode_nsm_set_current_event_sources_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *nvidia_message_type,
+    bitfield8_t event_sources[EVENT_SOURCES_LENGTH])
 {
 	if (msg == NULL || nvidia_message_type == NULL ||
 	    event_sources == NULL) {
-		return NSM_ERR_INVALID_DATA;
+		return NSM_SW_ERROR_NULL;
 	}
 
 	if (msg_len < sizeof(struct nsm_msg_hdr) +
 			  sizeof(struct nsm_set_current_event_source_req)) {
-		return NSM_ERR_INVALID_DATA_LENGTH;
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	struct nsm_set_current_event_source_req *request =
@@ -406,11 +493,11 @@ int decode_nsm_set_current_event_source_req(const struct nsm_msg *msg,
 
 	if (request->hdr.data_size !=
 	    NSM_SET_CURRENT_EVENT_SOURCES_REQ_DATA_SIZE) {
-		return NSM_ERR_INVALID_DATA_LENGTH;
+		return NSM_SW_ERROR_LENGTH;
 	}
 
 	*nvidia_message_type = request->nvidia_message_type;
-	*event_sources = request->event_sources;
+	memcpy(event_sources, request->event_sources, EVENT_SOURCES_LENGTH);
 
 	return NSM_SUCCESS;
 }
@@ -525,4 +612,159 @@ int decode_nsm_rediscovery_event(const struct nsm_msg *msg, size_t msg_len,
 	*event_state = le16toh(event->event_state);
 
 	return NSM_SUCCESS;
+}
+
+int encode_nsm_get_device_capabilities_v2_req(uint8_t instance_id,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_capabilities_v2_req *request =
+	    (struct nsm_get_device_capabilities_v2_req *)msg->payload;
+	request->hdr.command = NSM_GET_DEVICE_CAPABILITIES_V2;
+	request->hdr.data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_get_device_capabilities_v2_req(const struct nsm_msg *msg,
+					      size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_capabilities_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_get_device_capabilities_v2_resp(
+    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
+    uint8_t timestamp_generation, uint32_t maximum_input_buffer_size,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_CAPABILITIES_V2, msg);
+	}
+
+	struct nsm_get_device_capabilities_v2_resp *response =
+	    (struct nsm_get_device_capabilities_v2_resp *)msg->payload;
+	response->hdr.command = NSM_GET_DEVICE_CAPABILITIES_V2;
+	response->hdr.completion_code = cc;
+
+	uint16_t telemetry_count = 0;
+	uint16_t msg_size = sizeof(struct nsm_common_telemetry_resp);
+
+	uint8_t *data = &(response->payload[0]);
+	encode_nsm_firmware_aggregate_tag_uint8(
+	    &data, NSM_TAG_TIMESTAMP_GENERATION, timestamp_generation,
+	    &msg_size);
+	++telemetry_count;
+	encode_nsm_firmware_aggregate_tag_uint32(
+	    &data, NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE, maximum_input_buffer_size,
+	    &msg_size);
+	++telemetry_count;
+	response->hdr.telemetry_count = htole16(telemetry_count);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_get_device_capabilities_v2_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, uint8_t *timestamp_generation,
+    uint32_t *maximum_input_buffer_size)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    timestamp_generation == NULL || maximum_input_buffer_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_firmware_aggregate_tag)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_capabilities_v2_resp *response =
+	    (struct nsm_get_device_capabilities_v2_resp *)msg->payload;
+	if (response->hdr.telemetry_count < 2) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	uint16_t telemetry_count = le16toh(response->hdr.telemetry_count);
+	uint8_t *data = &(response->payload[0]);
+	uint16_t data_len = (uint16_t)msg_len - sizeof(struct nsm_msg_hdr) -
+			    sizeof(struct nsm_common_telemetry_resp);
+	uint8_t tag = 0;
+	uint8_t valid = 0;
+	bool rc_ok = false;
+
+	while ((data_len >= sizeof(struct nsm_firmware_aggregate_tag)) &&
+	       (telemetry_count > 0)) {
+		struct nsm_firmware_aggregate_tag *field =
+		    (struct nsm_firmware_aggregate_tag *)data;
+		tag = field->tag;
+		if (tag == NSM_TAG_TIMESTAMP_GENERATION) {
+			uint8_t value8 = 0;
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint8(
+			    &data, &tag, &valid, &value8, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+				*timestamp_generation = value8;
+			}
+		} else if (tag == NSM_TAG_MAXIMUM_INPUT_BUFFER_SIZE) {
+			uint32_t value32 = 0;
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint32(
+			    &data, &tag, &valid, &value32, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+				*maximum_input_buffer_size = value32;
+			}
+		} else {
+			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
+			    &data, &data_len);
+			if (rc_ok) {
+				--telemetry_count;
+			}
+		}
+		if (!rc_ok || !valid) {
+			return NSM_SW_ERROR_DATA;
+		}
+	}
+
+	return NSM_SW_SUCCESS;
 }

@@ -22,6 +22,255 @@
 
 #include "common-tests.hpp"
 
+TEST(getPCIePortConfig, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_get_port_config_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	uint8_t port_number = 1;
+	uint8_t port_type = NSM_PORT_TYPE_UPSTREAM;
+	uint8_t port_index = 1;
+
+	auto rc = encode_get_pcie_port_config_req(0, port_number, port_type,
+						  port_index, request);
+
+	struct nsm_get_port_config_req *req =
+	    reinterpret_cast<struct nsm_get_port_config_req *>(
+		request->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_PORT_CONFIGURATION, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_get_port_config_req) - sizeof(nsm_common_req),
+		  req->hdr.data_size);
+	EXPECT_EQ(port_number, req->port_number);
+	EXPECT_EQ(port_type, req->port_type);
+	EXPECT_EQ(port_index, req->port_index);
+
+	// bad encode request test case
+	rc = encode_get_pcie_port_config_req(0, 0, 0, 0, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPCIePortConfig, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{0x10,
+					0xDE,		   // pci_vendor_id
+					0x80,		   // instance_id
+					0x89,		   // ocp_version
+					NSM_TYPE_PCI_LINK, // nvidia_msg_type
+					NSM_GET_PORT_CONFIGURATION, // command
+					0x02,			    // data_size
+					0x01,			    // port_type
+					0x00}; // port_index
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t port_number = 0;
+	uint8_t port_type = 0;
+	uint8_t port_index = 0;
+	auto rc = decode_get_pcie_port_config_req(
+	    request, msg_len, &port_number, &port_type, &port_index);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, port_number);
+	EXPECT_EQ(0, port_type);
+	EXPECT_EQ(0, port_index);
+
+	// bad decode request test case
+	rc = decode_get_pcie_port_config_req(NULL, msg_len, &port_number,
+					     &port_type, &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_pcie_port_config_req(request, msg_len - 1, &port_number,
+					     &port_type, &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_get_pcie_port_config_req(request, msg_len, NULL, &port_type,
+					     &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_pcie_port_config_req(request, msg_len, &port_number,
+					     NULL, &port_index);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_get_pcie_port_config_req(request, msg_len, &port_number,
+					     &port_type, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(getPCIePortConfig, testGoodEncodeResponse)
+{
+	// good encode response test case
+	std::vector<uint8_t> sampleMsg{0x04, 0x01, 0x01};
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_get_port_config_aggregate_resp),
+	    0);
+	responseMsg.reserve(256);
+	responseMsg.insert(responseMsg.end(), sampleMsg.begin(),
+			   sampleMsg.end());
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_get_port_config_aggregate_resp(
+	    0, NSM_GET_PORT_CONFIGURATION, NSM_SUCCESS, 1, response);
+
+	struct nsm_get_port_config_aggregate_resp *resp =
+	    reinterpret_cast<struct nsm_get_port_config_aggregate_resp *>(
+		response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PCI_LINK, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_GET_PORT_CONFIGURATION, resp->command);
+	EXPECT_EQ(0, resp->completion_code);
+	EXPECT_EQ(1, resp->telemetry_count);
+
+	// bad encode response test case
+	rc = encode_get_port_config_aggregate_resp(
+	    0, NSM_GET_PORT_CONFIGURATION, NSM_SUCCESS, 1, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setPCIePortConfig, testEncodeRequest)
+{
+	std::vector<uint8_t> sampleMsg{
+	    0x04, // tag_TxAmplitude
+	    0x01, // data_size & bit field
+	    0x01, // data
+	    0x03, // tag_Gen3Preset
+	    0x01, // data_size & bit field
+	    0x11, // data
+	    0x02, // tag_Gen4Preset
+	    0x01, // data_size & bit field
+	    0x11, // data
+	    0x01, // tag_Gen5Preset
+	    0x01, // data_size & bit field
+	    0x11, // data
+	    0x00, // tag_Gen6Preset
+	    0x01, // data_size & bit field
+	    0x11  // data
+	};
+	// Initialize the request message with the minimum size
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_set_port_config_aggregate_req) -
+		1 + sampleMsg.size(),
+	    0);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	uint8_t port_number = 0;
+	uint8_t port_type = NSM_PORT_TYPE_UPSTREAM;
+	uint8_t port_index = 0;
+	uint16_t sample_count = 5;
+	auto rc = encode_set_port_config_aggregate_req(
+	    0, port_number, port_type, port_index, sample_count,
+	    sampleMsg.data(), sampleMsg.size(), request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	struct nsm_set_port_config_aggregate_req *req =
+	    reinterpret_cast<struct nsm_set_port_config_aggregate_req *>(
+		request->payload);
+	EXPECT_EQ(NSM_SET_PORT_CONFIGURATION, req->hdr.command);
+	EXPECT_EQ(port_number, req->port_number);
+	EXPECT_EQ(port_type, req->port_type);
+	EXPECT_EQ(port_index, req->port_index);
+	EXPECT_EQ(sample_count, req->sample_count);
+
+	// bad encode request test case
+	rc = encode_set_port_config_aggregate_req(
+	    0, port_number, port_type, port_index, sample_count, NULL,
+	    requestMsg.size(), request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_set_port_config_aggregate_req(
+	    0, port_number, port_type, port_index, sample_count,
+	    requestMsg.data(), requestMsg.size(), NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setPCIePortConfig, testDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{0x10,
+					0xDE,		   // pci_vendor_id
+					0x80,		   // instance_id
+					0x89,		   // ocp_version
+					NSM_TYPE_PCI_LINK, // nvidia_msg_type
+					NSM_SET_PORT_CONFIGURATION, // command
+					0x07,			    // data_size
+					0x01,			    // port_type
+					0x00,  // port_index
+					0x01,  // sample_count
+					0x00,  // sample_data_size
+					0x04,  // sample_data[0]
+					0x01,  // sample_data[1]
+					0x00}; // sample_data[2]
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t port_number = 0;
+	uint8_t port_type = 0;
+	uint8_t port_index = 0;
+	uint16_t sample_count = 0;
+	const uint8_t *sample_data = NULL;
+	size_t sample_data_len = 0;
+
+	auto rc = decode_set_port_config_aggregate_req(
+	    request, msg_len, &port_number, &port_type, &port_index,
+	    &sample_count, &sample_data, &sample_data_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(1, port_number);
+	EXPECT_EQ(NSM_PORT_TYPE_UPSTREAM, port_type);
+	EXPECT_EQ(0, port_index);
+	EXPECT_EQ(1, sample_count);
+	EXPECT_EQ(3, sample_data_len);
+
+	// bad decode request test case
+	rc = decode_set_port_config_aggregate_req(
+	    NULL, msg_len, &port_number, &port_type, &port_index, &sample_count,
+	    &sample_data, &sample_data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_port_config_aggregate_req(
+	    request, msg_len, &port_number, &port_type, &port_index,
+	    &sample_count, NULL, &sample_data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_set_port_config_aggregate_req(
+	    request, msg_len, &port_number, &port_type, &port_index,
+	    &sample_count, &sample_data, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(setPCIePortConfig, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc =
+	    encode_set_port_config_aggregate_resp(0, NSM_SUCCESS, 0, response);
+
+	struct nsm_common_resp *resp =
+	    reinterpret_cast<struct nsm_common_resp *>(response->payload);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SET_PORT_CONFIGURATION, resp->command);
+	EXPECT_EQ(0, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+	EXPECT_EQ(0, resp->data_size);
+
+	// bad encode response test case
+	rc = encode_set_port_config_aggregate_resp(0, NSM_SUCCESS, 0, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
 TEST(queryScalarGroupTelemetryV1, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(

@@ -32,7 +32,8 @@ enum nsm_firmware_commands {
 	NSM_FW_QUERY_CODE_AUTH_KEY_PERM = 0x03,
 	NSM_FW_UPDATE_CODE_AUTH_KEY_PERM = 0x04,
 	NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER = 0x05,
-	NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER = 0x06
+	NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER = 0x06,
+	NSM_FW_SET_ROT_PROPERTY = 0x08,
 };
 
 /** @struct nsm_firmware_state_information_fields
@@ -41,22 +42,24 @@ enum nsm_firmware_commands {
  *   of msg type 6.
  */
 enum nsm_firmware_state_information_fields {
-	NSM_FIRMWARE_BACKGROUND_COPY_POLICY = 1,	   // Enum8
-	NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT = 2,		   // NvU8
-	NSM_FIRMWARE_ACTIVE_KEY_SET = 3,		   // NvU8
-	NSM_FIRMWARE_WRITE_PROTECT_STATE = 4,		   // Enum8
-	NSM_FIRMWARE_FIRMWARE_SLOT_COUNT = 5,		   // NvU8
-	NSM_FIRMWARE_FIRMWARE_SLOT_ID = 6,		   // NvU8
-	NSM_FIRMWARE_FIRMWARE_VERSION_STRING = 7,	   // char[]
-	NSM_FIRMWARE_VERSION_COMPARISON_STAMP = 8,	   // NvU32
-	NSM_FIRMWARE_BUILD_TYPE = 9,			   // Enum8
-	NSM_FIRMWARE_SIGNING_TYPE = 10,			   // Enum8
-	NSM_FIRMWARE_FIRMWARE_STATE = 11,		   // Enum8
-	NSM_FIRMWARE_SECURITY_VERSION_NUMBER = 12,	   // NvU16
-	NSM_FIRMWARE_MINIMUM_SECURITY_VERSION_NUMBER = 13, // NvU16
-	NSM_FIRMWARE_SIGNING_KEY_INDEX = 14,		   // NvU16
-	NSM_FIRMWARE_INBAND_UPDATE_POLICY = 15,		   // Enum8
-	NSM_FIRMWARE_BOOT_STATUS_CODE = 16,		   // NvU64
+	NSM_FIRMWARE_BACKGROUND_COPY_POLICY_PERSISTENT = 1, // Enum8
+	NSM_FIRMWARE_ACTIVE_FIRMWARE_SLOT = 2,		    // NvU8
+	NSM_FIRMWARE_ACTIVE_KEY_SET = 3,		    // NvU8
+	NSM_FIRMWARE_WRITE_PROTECT_STATE = 4,		    // Enum8
+	NSM_FIRMWARE_FIRMWARE_SLOT_COUNT = 5,		    // NvU8
+	NSM_FIRMWARE_FIRMWARE_SLOT_ID = 6,		    // NvU8
+	NSM_FIRMWARE_FIRMWARE_VERSION_STRING = 7,	    // char[]
+	NSM_FIRMWARE_VERSION_COMPARISON_STAMP = 8,	    // NvU32
+	NSM_FIRMWARE_BUILD_TYPE = 9,			    // Enum8
+	NSM_FIRMWARE_SIGNING_TYPE = 10,			    // Enum8
+	NSM_FIRMWARE_FIRMWARE_STATE = 11,		    // Enum8
+	NSM_FIRMWARE_SECURITY_VERSION_NUMBER = 12,	    // NvU16
+	NSM_FIRMWARE_MINIMUM_SECURITY_VERSION_NUMBER = 13,  // NvU16
+	NSM_FIRMWARE_SIGNING_KEY_INDEX = 14,		    // NvU16
+	NSM_FIRMWARE_INBAND_UPDATE_POLICY_PERSISTENT = 15,  // Enum8
+	NSM_FIRMWARE_BOOT_STATUS_CODE = 16,		    // NvU64
+	NSM_FIRMWARE_INBAND_UPDATE_POLICY_CURRENT = 17,	    // Enum8
+	NSM_FIRMWARE_BACKGROUND_COPY_POLICY_CURRENT = 18,   // Enum8
 };
 
 /** @brief NSM code authentication key permissions request type
@@ -64,6 +67,41 @@ enum nsm_firmware_state_information_fields {
 enum nsm_code_auth_key_perm_request_type {
 	NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_MOST_RESTRICTIVE_VALUE = 0,
 	NSM_CODE_AUTH_KEY_PERM_REQUEST_TYPE_SPECIFIED_VALUE = 1,
+};
+
+/** @brief NSM RoT Property values
+ */
+enum nsm_rot_property_values {
+	NSM_ROT_PROPERTY_REDUNDANCY_POLICY = 0,
+	NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY = 1,
+};
+
+/** @brief NSM RoT Redundancy Policy values (Property = 0)
+ */
+enum nsm_rot_redundancy_policy {
+	NSM_ROT_REDUNDANCY_POLICY_MANUAL_BACKGROUND_COPY = 0,
+	NSM_ROT_REDUNDANCY_POLICY_AUTOMATIC_BACKGROUND_COPY = 1,
+};
+
+/** @brief NSM RoT Redundancy Policy Lifespan values
+ */
+enum nsm_rot_redundancy_policy_lifespan {
+	NSM_ROT_REDUNDANCY_POLICY_LIFESPAN_PERSISTENT = 0,
+	NSM_ROT_REDUNDANCY_POLICY_LIFESPAN_ONE_SHOT = 1,
+};
+
+/** @brief NSM RoT In-band Update Policy Lifespan values
+ */
+enum nsm_rot_inband_update_policy_lifespan {
+	NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_PERSISTENT = 0,
+	NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_VOLATILE = 1,
+};
+
+/** @brief NSM RoT In-band Update Policy values (Property = 1)
+ */
+enum nsm_rot_inband_update_policy {
+	NSM_ROT_INBAND_UPDATE_POLICY_DISABLE = 0,
+	NSM_ROT_INBAND_UPDATE_POLICY_ENABLE = 1,
 };
 
 /** @brief NSM EFUSE update method
@@ -92,6 +130,8 @@ struct nsm_firmware_erot_state_info_hdr_resp {
 	uint8_t inband_update_policy;
 	uint8_t firmware_slot_count;
 	uint64_t boot_status_code;
+	uint8_t inband_update_policy_current;
+	uint8_t background_copy_policy_current;
 };
 
 /* This is the maximum string length for firmware
@@ -229,6 +269,52 @@ struct nsm_firmware_update_min_sec_ver_req_command {
 } __attribute__((packed));
 
 /**
+ * @struct Structure representing NSM firmware set RoT property request
+ * parameters
+ *
+ * This structure contains the parameters needed to set Root of Trust (RoT)
+ * properties for firmware components. The property field determines which RoT
+ * property is being set (redundancy policy or in-band update policy), and the
+ * argument_data contains the specific value for that property.
+ *
+ * @note For Property 0 (redundancy policy): argument_data[0] = policy,
+ * argument_data[1] = lifespan
+ * @note For Property 1 (in-band update policy): argument_data[0] = policy,
+ * argument_data[1] = lifespan
+ */
+struct nsm_firmware_set_rot_property_req {
+	uint16_t component_classification;
+	uint16_t component_identifier;
+	uint8_t component_classification_index;
+	uint8_t property;
+	uint8_t argument_length;
+	uint8_t argument_data[2]; // Policy value and lifespan
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing NSM firmware set RoT property request command
+ *
+ * This structure wraps the RoT property request parameters in a complete
+ * command structure that includes the common request header and the specific
+ * RoT property request data.
+ */
+struct nsm_firmware_set_rot_property_req_command {
+	struct nsm_common_req hdr;
+	struct nsm_firmware_set_rot_property_req rot_property_req;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing NSM firmware set RoT property response command
+ *
+ * This structure represents the response to a RoT property set request. It
+ * contains only the common response header, indicating success or failure of
+ * the operation.
+ */
+struct nsm_firmware_set_rot_property_resp_command {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/**
  * @struct Structure representing nsm update firmware security version number
  * response parameter
  */
@@ -363,6 +449,159 @@ struct nsm_code_auth_key_perm_update_resp {
 	struct nsm_common_resp hdr;
 	uint32_t update_method;
 } __attribute__((packed));
+
+/** @struct nsm_firmware_aggregate_tag
+ *
+ *  Structure representing firmware aggregate tag format
+ */
+struct nsm_firmware_aggregate_tag {
+	uint8_t tag;
+	uint8_t valid : 1;
+	uint8_t length : 3;
+	uint8_t reserved : 4;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint8 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint8 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint8(uint8_t **buffer, uint8_t tag,
+					     uint8_t value,
+					     uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint16 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint16 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint16(uint8_t **buffer, uint8_t tag,
+					      uint16_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint32 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint32 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t tag,
+					      uint32_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint64 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint64 value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t tag,
+					      uint64_t value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Encode nsm firmware aggregate tag with uint8 array value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in] tag - Tag value
+ * @param[in] value - uint8 array value to encode
+ * @param[in,out] buffer_size - Pointer to buffer size
+ */
+void encode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
+						   uint8_t tag, uint8_t *value,
+						   uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint8 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint8 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint8(uint8_t **buffer, uint8_t *tag,
+					     uint8_t *valid, uint8_t *value,
+					     uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint16 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint16 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint16(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint16_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint32 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint32 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint32(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint32_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint64 value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint64 value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint64(uint8_t **buffer, uint8_t *tag,
+					      uint8_t *valid, uint64_t *value,
+					      uint16_t *buffer_size);
+
+/**
+ * @brief Decode nsm firmware aggregate tag with uint8 array value
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[out] tag - Tag value
+ * @param[out] valid - Valid flag
+ * @param[out] value - uint8 array value decoded
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_uint8_array(uint8_t **buffer,
+						   uint8_t *tag, uint8_t *valid,
+						   uint8_t *value,
+						   uint16_t *buffer_size);
+
+/**
+ * @brief Skip nsm firmware aggregate tag by advancing buffer pointer
+ *
+ * @param[in,out] buffer - Pointer to buffer pointer
+ * @param[in,out] buffer_size - Pointer to buffer size
+ * @return true on success, false on failure
+ */
+bool decode_nsm_firmware_aggregate_tag_skip(uint8_t **buffer,
+					    uint16_t *buffer_size);
 
 /**
  * @brief Decode nsm query request erot state parameters message.
@@ -839,6 +1078,32 @@ int decode_nsm_firmware_update_sec_ver_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code,
     struct nsm_firmware_update_min_sec_ver_resp *sec_resp);
+
+/**
+ * @brief Encode nsm firmware set rot property req
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] fw_req - firmware set rot property request
+ * @param[out] msg - nsm message
+ * @return int
+ */
+int encode_nsm_firmware_set_rot_property_req(
+    uint8_t instance_id, const struct nsm_firmware_set_rot_property_req *fw_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware set rot property resp
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] resp - firmware set rot property response
+ * @return int
+ */
+int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
+					      size_t msg_len, uint8_t *cc,
+					      uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

@@ -268,6 +268,7 @@ endif
 
 if get_option('tests').enabled()
     subdir('common/test')
+    subdir('debug-token/test')
     subdir('libnsm/test')
     subdir('mockupResponder/test')
     subdir('nsmtool/test')

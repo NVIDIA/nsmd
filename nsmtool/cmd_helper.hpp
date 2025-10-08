@@ -28,6 +28,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cstring>
+#include <deque>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -72,14 +73,56 @@ void Logger(bool verbose, const char* msg, const T& data)
 static inline std::string bytesToHexString(const uint8_t* data, size_t len)
 {
     std::stringstream ss;
-    ss << std::hex;
-
     for (size_t i = 0; i < len; ++i)
     {
-        ss << std::setw(2) << std::setfill('0') << (int)data[i];
+        ss << std::format("{:02x}", data[i]);
     }
 
     return ss.str();
+}
+
+/** @brief Convert hexadecimal string into a byte array.
+ *
+ *  @param[in]  str - hexadecimal string to be converted
+ *
+ *  @return - Byte array representation of the input string.
+ */
+static inline std::vector<uint8_t> hexStringToBytes(const std::string& str)
+{
+    if (str.empty())
+    {
+        return std::vector<uint8_t>();
+    }
+    size_t start = 0;
+    if (str.length() >= 2 && str.substr(0, 2) == "0x")
+    {
+        start = 2;
+    }
+    if (str.find_first_not_of("0123456789abcdefABCDEF", start) !=
+        std::string::npos)
+    {
+        std::cerr << "String contains invalid characters: " << str << std::endl;
+        return std::vector<uint8_t>();
+    }
+    if (str.length() % 2 != 0)
+    {
+        std::cerr << "String length is not even: " << str << std::endl;
+        return std::vector<uint8_t>();
+    }
+    std::vector<uint8_t> result;
+    for (size_t i = start; i < str.length(); i += 2)
+    {
+        try
+        {
+            result.push_back(std::stoi(str.substr(i, 2), nullptr, 16) & 0xFF);
+        }
+        catch (const std::exception&)
+        {
+            std::cerr << "Invalid hex value in string: " << str << std::endl;
+            return std::vector<uint8_t>();
+        }
+    }
+    return result;
 }
 
 /** @brief Display in JSON format.
@@ -137,6 +180,19 @@ class CommandInterface
 
     virtual std::pair<int, std::vector<uint8_t>> createRequestMsg() = 0;
 
+    // Optional: override to create multiple request messages in one run
+    // Default implementation will call createRequestMsg() once.
+    virtual std::pair<int, std::vector<std::vector<uint8_t>>>
+        createRequestMsgs()
+    {
+        auto [rc, single] = createRequestMsg();
+        if (rc != 0)
+        {
+            return {rc, {}};
+        }
+        return {rc, {std::move(single)}};
+    }
+
     virtual void parseResponseMsg(struct nsm_msg* responsePtr,
                                   size_t payloadLength) = 0;
 
@@ -175,6 +231,25 @@ class CommandInterface
 
   protected:
     uint8_t instanceId;
+
+    // Queue support so response handlers can schedule follow-up requests
+    void enqueueRequest(const std::vector<uint8_t>& requestMsg)
+    {
+        if (!requestMsg.empty())
+        {
+            requestQueue.push_back(requestMsg);
+        }
+    }
+
+    void enqueueRequests(const std::vector<std::vector<uint8_t>>& requestMsgs)
+    {
+        for (const auto& msg : requestMsgs)
+        {
+            enqueueRequest(msg);
+        }
+    }
+
+    std::deque<std::vector<uint8_t>> requestQueue;
 };
 
 } // namespace helper

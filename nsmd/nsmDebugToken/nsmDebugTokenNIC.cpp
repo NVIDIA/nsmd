@@ -15,63 +15,38 @@
  * limitations under the License.
  */
 
-#include "nsmDebugToken.hpp"
+#include "nsmDebugTokenNIC.hpp"
 
 #include "debug-token.h"
 
 #include "globals.hpp"
 #include "nsmDevice.hpp"
-#include "nsmSensor.hpp"
+#include "sensorManager.hpp"
 
+#include <sys/mman.h>
 #include <unistd.h>
 
 #include <phosphor-logging/lg2.hpp>
+#include <sdbusplus/message/types.hpp>
 
+#include <cstring>
+#include <format>
 #include <sstream>
 
 namespace nsm
 {
 
-std::string NsmDebugTokenObject::getParentChassisPath(
-    const std::vector<utils::Association>& associations)
+NsmDebugTokenNICObject::NsmDebugTokenNICObject(sdbusplus::bus::bus& bus,
+                                               const std::string& name,
+                                               const uuid_t& uuid) :
+    NsmObject(name, "NSM_DebugTokenNIC"),
+    DebugTokenIntf(bus, (debugTokenObjectBasePath / name).c_str()), uuid(uuid)
 {
-    std::string parent;
-    for (const auto& assoc : associations)
-    {
-        if (assoc.forward == "parent_chassis")
-        {
-            parent = assoc.absolutePath;
-            std::replace(parent.begin(), parent.end(), ' ', '_');
-        }
-    }
-    return parent;
+    lg2::info("DebugToken: create NIC object: {PATH}", "PATH",
+              debugTokenObjectBasePath / name);
 }
 
-std::string NsmDebugTokenObject::getName(
-    const std::vector<utils::Association>& associations,
-    const std::string& name)
-{
-    std::string chassisPath = getParentChassisPath(associations);
-    if (chassisPath.empty())
-    {
-        return debugTokenObjectBasePath / name;
-    }
-    return debugTokenObjectBasePath /
-           chassisPath.substr(chassisPath.find_last_of('/') + 1);
-}
-
-NsmDebugTokenObject::NsmDebugTokenObject(
-    sdbusplus::bus::bus& bus, const std::string& name,
-    const std::vector<utils::Association>& associations,
-    const std::string& type, const uuid_t& uuid) :
-    NsmObject(name, type),
-    DebugTokenIntf(bus, getName(associations, name).c_str()), uuid(uuid)
-{
-    std::string objectPath{getName(associations, name)};
-    lg2::info("DebugToken: create object: {PATH}", "PATH", objectPath.c_str());
-}
-
-requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
+requester::Coroutine NsmDebugTokenNICObject::disableTokensAsyncHandler(
     std::shared_ptr<Request> request,
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
@@ -84,9 +59,9 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
                                                responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: disableTokens postPatchIO: "
-                   "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+        LG2_ERROR_FLT("DebugToken: disableTokens postPatchIO failed "
+                      "| rc: {RC}, eid: {EID}",
+                      "RC", nsm_sw_codes(sendRc), "EID", eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
@@ -131,7 +106,7 @@ requester::Coroutine NsmDebugTokenObject::disableTokensAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
+requester::Coroutine NsmDebugTokenNICObject::getRequestAsyncHandler(
     std::shared_ptr<Request> request,
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
@@ -144,9 +119,9 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
                                                responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: getRequest postPatchIO: "
-                   "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+        LG2_ERROR_FLT("DebugToken: getRequest postPatchIO failed "
+                      "| rc: {RC}, eid: {EID}",
+                      "RC", nsm_sw_codes(sendRc), "EID", eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
@@ -220,7 +195,7 @@ requester::Coroutine NsmDebugTokenObject::getRequestAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
+requester::Coroutine NsmDebugTokenNICObject::getStatusAsyncHandler(
     std::shared_ptr<Request> request,
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
@@ -229,15 +204,13 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
     auto eid = device->getEid();
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    uint8_t cc = NSM_SUCCESS;
     auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
                                                responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        LG2_ERROR_FLT(
-            "DebugToken: getStatus postPatchIO failed | cc: {CC}, rc: {RC}, eid: {EID}",
-            "CC", nsm_completion_codes(cc), "RC", nsm_sw_codes(sendRc), "EID",
-            eid);
+        LG2_ERROR_FLT("DebugToken: getStatus postPatchIO failed "
+                      "| rc: {RC}, eid: {EID}",
+                      "RC", nsm_sw_codes(sendRc), "EID", eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
@@ -253,6 +226,7 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
         co_return sendRc;
     }
 
+    uint8_t cc = NSM_SUCCESS;
     uint16_t reasonCode = ERR_NULL;
     nsm_debug_token_status status;
     nsm_debug_token_status_additional_info additionalInfo;
@@ -364,7 +338,7 @@ requester::Coroutine NsmDebugTokenObject::getStatusAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
+requester::Coroutine NsmDebugTokenNICObject::installTokenAsyncHandler(
     std::shared_ptr<Request> request,
     std::shared_ptr<AsyncStatusIntf> statusIntf,
     std::shared_ptr<AsyncValueIntf> valueIntf)
@@ -377,9 +351,9 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
                                                responseLen);
     if (sendRc != NSM_SW_SUCCESS)
     {
-        lg2::error("DebugToken: installToken postPatchIO: "
-                   "eid={EID} rc={RC}",
-                   "EID", eid, "RC", sendRc);
+        LG2_ERROR_FLT("DebugToken: installToken postPatchIO failed "
+                      "| rc: {RC}, eid: {EID}",
+                      "RC", nsm_sw_codes(sendRc), "EID", eid);
         if (sendRc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
         {
             auto error = std::make_tuple(static_cast<uint16_t>(sendRc),
@@ -443,7 +417,7 @@ requester::Coroutine NsmDebugTokenObject::installTokenAsyncHandler(
     co_return NSM_SW_SUCCESS;
 }
 
-sdbusplus::message::object_path NsmDebugTokenObject::disableTokens()
+sdbusplus::message::object_path NsmDebugTokenNICObject::disableTokens()
 {
     const auto [objPath, statusIntf, valueIntf] =
         AsyncOperationManager::getInstance()->getNewStatusValueInterface();
@@ -467,7 +441,7 @@ sdbusplus::message::object_path NsmDebugTokenObject::disableTokens()
 }
 
 sdbusplus::message::object_path
-    NsmDebugTokenObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
+    NsmDebugTokenNICObject::getRequest(DebugToken::TokenOpcodes tokenOpcode)
 {
     nsm_debug_token_opcode opcode;
     switch (tokenOpcode)
@@ -511,7 +485,7 @@ sdbusplus::message::object_path
 }
 
 sdbusplus::message::object_path
-    NsmDebugTokenObject::getStatus(DebugToken::TokenTypes tokenType)
+    NsmDebugTokenNICObject::getStatus(DebugToken::TokenTypes tokenType)
 {
     nsm_debug_token_type type;
     switch (tokenType)
@@ -561,7 +535,7 @@ sdbusplus::message::object_path
 }
 
 sdbusplus::message::object_path
-    NsmDebugTokenObject::installToken(std::vector<uint8_t> tokenData)
+    NsmDebugTokenNICObject::installToken(std::vector<uint8_t> tokenData)
 {
     if (tokenData.size() == 0 ||
         tokenData.size() > NSM_DEBUG_TOKEN_DATA_MAX_SIZE)
@@ -592,8 +566,9 @@ sdbusplus::message::object_path
 }
 
 requester::Coroutine
-    NsmDebugTokenObject::update(std::shared_ptr<NsmDevice> nsmDevice)
+    NsmDebugTokenNICObject::update(std::shared_ptr<NsmDevice> nsmDevice)
 {
+    auto eid = nsmDevice->getEid();
     auto request = std::make_shared<Request>(sizeof(nsm_msg_hdr) +
                                              sizeof(nsm_query_device_ids_req));
     auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
@@ -602,41 +577,54 @@ requester::Coroutine
     {
         lg2::debug("DebugToken: encode_nsm_query_device_ids_req: "
                    "eid={EID} rc={RC}",
-                   "EID", nsmDevice->getEid(), "RC", rc);
+                   "EID", eid, "RC", rc);
         // coverity[missing_return]
         co_return rc;
     }
     std::shared_ptr<const nsm_msg> responseMsg;
     size_t responseLen = 0;
-    auto sendRc = co_await nsmDevice->sensorIO(nsmDevice->getEid(), *request,
-                                               responseMsg, responseLen, false);
+    auto sendRc = co_await nsmDevice->postPatchIO(eid, *request, responseMsg,
+                                                  responseLen);
     if (sendRc)
     {
-        lg2::debug("DebugToken: queryDeviceId sensorIO: "
+        lg2::debug("DebugToken: queryDeviceId postPatchIO: "
                    "eid={EID} rc={RC}",
-                   "EID", nsmDevice->getEid(), "RC", sendRc);
+                   "EID", eid, "RC", sendRc);
         // coverity[missing_return]
         co_return sendRc;
     }
     uint8_t cc = NSM_ERROR;
     uint16_t reasonCode = ERR_NULL;
-    uint8_t deviceId[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE] = {0};
+    size_t deviceIdLen = 0;
     rc = decode_nsm_query_device_ids_resp(responseMsg.get(), responseLen, &cc,
-                                          &reasonCode, deviceId);
-    LG2_ERROR_FLT(
-        "decode_nsm_query_device_ids_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
-        "REASONCODE", reasonCode, "CC", cc, "RC", rc);
+                                          &reasonCode, nullptr, &deviceIdLen);
     if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
+        LG2_ERROR_FLT("decode_nsm_query_device_ids_resp failure "
+                      "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                      "REASONCODE", reasonCode, "CC", cc, "RC",
+                      nsm_sw_codes(rc));
         // coverity[missing_return]
         co_return cc ? cc : rc;
     }
-    std::ostringstream oss;
-    oss << "0x";
-    oss << std::hex << std::uppercase << std::setfill('0');
-    for (auto i = 0; i < NSM_DEBUG_TOKEN_DEVICE_ID_SIZE; ++i)
+    std::vector<uint8_t> deviceId(deviceIdLen);
+    rc = decode_nsm_query_device_ids_resp(responseMsg.get(), responseLen, &cc,
+                                          &reasonCode, deviceId.data(),
+                                          &deviceIdLen);
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
     {
-        oss << std::setw(2) << static_cast<int>(deviceId[i]);
+        LG2_ERROR_FLT("decode_nsm_query_device_ids_resp failure "
+                      "| reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+                      "REASONCODE", reasonCode, "CC", cc, "RC",
+                      nsm_sw_codes(rc));
+        // coverity[missing_return]
+        co_return cc ? cc : rc;
+    }
+    std::stringstream oss;
+    oss << "0x";
+    for (const auto& byte : deviceId)
+    {
+        oss << std::format("{:02X}", byte);
     }
     tokenDeviceID(oss.str());
     // coverity[missing_return]

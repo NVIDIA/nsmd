@@ -44,6 +44,39 @@ using namespace utils;
 namespace MockupResponder
 {
 
+std::unordered_map<uint8_t, uint8_t> pciePortConfigMockTable = {
+    {0, 17}, // PCIe_Gen_3_Preset
+    {1, 17}, // PCIe_Gen_4_Preset
+    {2, 17}, // PCIe_Gen_5_Preset
+    {3, 17}, // PCIe_Gen_6_Preset
+    {4, 1}   // PCIe_Tx_Amplitude
+};
+
+EventSource::EventSource(const std::vector<uint64_t>& events)
+{
+    for (auto& event : events)
+    {
+        if (event >= EVENT_SOURCES_LENGTH * 8)
+        {
+            lg2::warning("Ignoring unsupported event id {ID}", "ID", event);
+            continue;
+        }
+        auto index = static_cast<size_t>(event) >> 3;
+        auto offset = static_cast<uint8_t>(event & 0x7);
+        this->events[index].byte |= (1u << offset);
+    }
+}
+std::unordered_map<uint8_t, EventSource>
+    MockupResponder::supportedEventSources = {
+        {NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+         std::vector<uint64_t>{NSM_REDISCOVERY_EVENT, NSM_LONG_RUNNING_EVENT}},
+        {NSM_TYPE_NETWORK_PORT,
+         std::vector<uint64_t>{NSM_THRESHOLD_EVENT,
+                               NSM_FABRIC_MANAGER_STATE_EVENT}},
+        {NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+         std::vector<uint64_t>{NSM_RESET_REQUIRED_EVENT, NSM_XID_EVENT}},
+};
+
 MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                  sdbusplus::asio::object_server& server,
                                  eid_t eid, uint8_t deviceType,
@@ -88,6 +121,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
             0, // error_injection_id
             0, // fault_reason_bit_map
         },     // errorInjectionPayload
+        0,
         {
             {NSM_DEV_ID_GPU,
              {
@@ -107,9 +141,10 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
              {
                  {EI_FATAL_ERRORS, false},
              }},
-        }, // errorInjection
-        0, // migMode
-        0, // eccMode
+        },  // errorInjection
+        0,  // migMode
+        0,  // eccMode
+        {}, // eventSources
     })
 {
     std::string path = "/xyz/openbmc_project/NSM/" + std::to_string(eid);
@@ -388,6 +423,10 @@ std::optional<Response>
                     return getEventSubscription(request, requestLen);
                 case NSM_SET_EVENT_SUBSCRIPTION:
                     return setEventSubscription(request, requestLen);
+                case NSM_GET_SUPPORTED_EVENT_SOURCES:
+                    return getSupportedEventSources(request, requestLen);
+                case NSM_GET_CURRENT_EVENT_SOURCES:
+                    return getCurrentEventSources(request, requestLen);
                 case NSM_SET_CURRENT_EVENT_SOURCES:
                     return setCurrentEventSources(request, requestLen);
                 case NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT:
@@ -396,6 +435,8 @@ std::optional<Response>
                     return getHistogramFormatHandler(request, requestLen);
                 case NSM_GET_HISTOGRAM_DATA:
                     return getHistogramDataHandler(request, requestLen);
+                case NSM_GET_DEVICE_CAPABILITIES_V2:
+                    return getDeviceCapabilitiesV2Handler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -577,6 +618,10 @@ std::optional<Response>
                                                             requestLen);
                 case NSM_ASSERT_PCIE_FUNDAMENTAL_RESET:
                     return pcieFundamentalResetHandler(request, requestLen);
+                case NSM_GET_PORT_CONFIGURATION:
+                    return getPciePortConfigHandler(request, requestLen);
+                case NSM_SET_PORT_CONFIGURATION:
+                    return setPciePortConfigHandler(request, requestLen);
                 case NSM_CLEAR_DATA_SOURCE_V1:
                     return clearScalarDataSourceHandler(request, requestLen);
                 case NSM_QUERY_AVAILABLE_CLEARABLE_SCALAR_DATA_SOURCES:
@@ -627,6 +672,10 @@ std::optional<Response>
                     return getNetworkDeviceLogInfoHandler(request, requestLen);
                 case NSM_ERASE_DEBUG_INFO:
                     return eraseDebugInfoHandler(request, requestLen);
+                case NSM_GET_DEVICE_DEBUG_PARAMETERS:
+                    return getDeviceDebugParametersHandler(request, requestLen);
+                case NSM_SET_DEVICE_DEBUG_PARAMETERS:
+                    return setDeviceDebugParametersHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -674,6 +723,10 @@ std::optional<Response>
                 case NSM_GET_FPGA_DIAGNOSTICS_SETTINGS:
                     return getFpgaDiagnosticsSettingsHandler(request,
                                                              requestLen);
+                case NSM_GET_DEVICE_MODE_SETTING:
+                    return getDevicemodeSettingsHandler(request, requestLen);
+                case NSM_SET_DEVICE_MODE_SETTING:
+                    return setDevicemodeSettingsHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -831,8 +884,9 @@ std::optional<std::vector<uint8_t>>
             {NSM_DEV_ID_SWITCH,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
-                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
+                  {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
+                   NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 8, 9, 10, 11, 14, 68, 69}},
                  {2, {4}},
                  {3, {12}},
@@ -841,12 +895,14 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_RESET_NETWORK_DEVICE,
                    NSM_QUERY_TOKEN_PARAMETERS, NSM_ERASE_DEBUG_INFO,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
-                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {3, 4, 5, 6, 7}},
+                   NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS,
+                   NSM_GET_DEVICE_DEBUG_PARAMETERS,
+                   NSM_SET_DEVICE_DEBUG_PARAMETERS}},
+                 {5, {3, 4, 5, 6, 7, 128, 129}},
              }},
             {NSM_DEV_ID_PCIE_BRIDGE,
              {
-                 {0, {0, 1, 2, 5, 6, 7, 9, 10}},
+                 {0, {0, 1, 2, 5, 6, 7, 9, 10, NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1,
                   {1, NSM_GET_ETH_PORT_TELEMETRY_COUNTER,
                    NSM_GET_NETWORK_ADDRESSES, NSM_GET_PORT_ECC_COUNTERS}},
@@ -855,6 +911,8 @@ std::optional<std::vector<uint8_t>>
                       NSM_QUERY_SCALAR_GROUP_TELEMETRY_V1,
                       NSM_LIST_AVAILABLE_PCIE_PORTS,
                       NSM_MULTIPORT_QUERY_SCALAR_GROUP_TELEMETRY_V2,
+                      NSM_GET_PORT_CONFIGURATION,
+                      NSM_SET_PORT_CONFIGURATION,
                   }},
                  {3, {12, 14, 97}},
                  {4,
@@ -862,13 +920,14 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_QUERY_TOKEN_PARAMETERS,
                    NSM_PROVIDE_TOKEN, NSM_DISABLE_TOKENS,
                    NSM_QUERY_TOKEN_STATUS, NSM_QUERY_DEVICE_IDS}},
-                 {5, {3, 4, 5, 6, 7}},
+                 {5, {3, 4, 5, 6, 7, 128, 129}},
              }},
             {NSM_DEV_ID_GPU,
              {
                  {0,
-                  {0, 1, 2, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
-                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA}},
+                  {0, 1, 2, 3, 4, 5, 6, 7, 9, 10, NSM_DISCOVER_HISTOGRAM,
+                   NSM_GET_HISTOGRAM_FORMAT, NSM_GET_HISTOGRAM_DATA,
+                   NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
                  {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
@@ -884,7 +943,7 @@ std::optional<std::vector<uint8_t>>
              }},
             {NSM_DEV_ID_EROT,
              {
-                 {0, {0, 1, 2, 9}},
+                 {0, {0, 1, 2, 9, NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {6,
                   {NSM_FW_GET_EROT_STATE_INFORMATION,
                    NSM_FW_IRREVERSABLE_CONFIGURATION,
@@ -900,7 +959,7 @@ std::optional<std::vector<uint8_t>>
                       NSM_PING,
                       NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES,
                       NSM_SUPPORTED_COMMAND_CODES,
-                      NSM_SUPPORTED_EVENT_SOURCES,
+                      NSM_GET_SUPPORTED_EVENT_SOURCES,
                       NSM_QUERY_DEVICE_IDENTIFICATION,
                       NSM_CONFIGURE_EVENT_ACKNOWLEDGEMENT,
                   }},
@@ -2306,6 +2365,64 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getSupportedEventSources(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getSupportedEventSources: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint8_t nvidia_message_type = 0;
+    auto rc = decode_nsm_get_event_source_req(requestMsg, requestLen,
+                                              &nvidia_message_type);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_source_req failed RC={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_source_resp),
+                      0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_get_supported_event_source_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        supportedEventSources[nvidia_message_type].events.data(), responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentEventSources(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getCurrentEventSources: request length={LEN}", "LEN",
+                  requestLen);
+    }
+    uint8_t nvidia_message_type = 0;
+    auto rc = decode_nsm_get_event_source_req(requestMsg, requestLen,
+                                              &nvidia_message_type);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_event_source_req failed RC={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_get_event_source_resp),
+                      0);
+
+    auto& currentEventSources = state.eventSources[nvidia_message_type];
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_nsm_get_current_event_source_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        currentEventSources.data(), responseMsg);
+    assert(rc == NSM_SUCCESS);
+    return response;
+}
+std::optional<std::vector<uint8_t>>
     MockupResponder::setCurrentEventSources(const nsm_msg* requestMsg,
                                             size_t requestLen)
 {
@@ -2316,14 +2433,19 @@ std::optional<std::vector<uint8_t>>
     }
 
     uint8_t nvidiaMessageType = 0;
-    bitfield8_t* event_sources;
-
-    auto rc = decode_nsm_set_current_event_source_req(
-        requestMsg, requestLen, &nvidiaMessageType, &event_sources);
-    if (rc != NSM_SUCCESS)
+    bitfield8_t eventSources[EVENT_SOURCES_LENGTH] = {0};
+    auto rc = decode_nsm_set_current_event_sources_req(
+        requestMsg, requestLen, &nvidiaMessageType, eventSources);
+    if (rc != NSM_SUCCESS || nvidiaMessageType > NSM_TYPE_FIRMWARE)
     {
-        lg2::error("decode_nsm_set_current_event_source_req failed RC={RC}",
+        lg2::error("decode_nsm_set_current_event_sources_req failed RC={RC}",
                    "RC", rc);
+    }
+    for (int i = 0; i < EVENT_SOURCES_LENGTH; i++)
+    {
+        state.eventSources[nvidiaMessageType][i].byte =
+            supportedEventSources[nvidiaMessageType].events[i].byte &
+            eventSources[i].byte;
     }
 
     std::vector<uint8_t> response(
@@ -5209,6 +5331,190 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getPciePortConfigHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPciePortConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t port_number;
+    uint8_t port_type;
+    uint8_t port_index;
+
+    auto rc = decode_get_pcie_port_config_req(
+        requestMsg, requestLen, &port_number, &port_type, &port_index);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_pcie_port_config_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock reset metric data
+    for (const auto& [tag, mockValue] : pciePortConfigMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+        if (tag <= 3) // PCIe_Gen_Preset tags (0-3)
+        {
+            rc = encode_preset_PCIe_data(static_cast<uint8_t>(mockValue),
+                                         reading, &sample_len);
+        }
+        else if (tag == 4) // PCIe_Tx_Amplitude tag
+        {
+            rc = encode_PCIe_TxAmplitude_data(static_cast<uint8_t>(mockValue),
+                                              reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Unexpected tag value: {TAG}", "TAG", tag);
+            continue;
+        }
+        // Encode the sample into the response
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("encode_aggregate_resp_sample failed: rc={RC}", "RC",
+                       rc);
+        }
+        assert(rc == NSM_SW_SUCCESS);
+
+        // Add the sample to the response vector
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    // Finalize the aggregate response
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_port_config_aggregate_resp(
+        requestMsg->hdr.instance_id, NSM_GET_PORT_CONFIGURATION, NSM_SUCCESS,
+        samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setPciePortConfigHandler(const nsm_msg* requestMsg,
+                                              size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setPciePortConfigHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t port_number;
+    uint8_t port_type;
+    uint8_t port_index;
+    uint16_t sample_count;
+    const uint8_t* sample_data;
+    size_t sample_data_len;
+
+    auto rc = decode_set_port_config_aggregate_req(
+        requestMsg, requestLen, &port_number, &port_type, &port_index,
+        &sample_count, &sample_data, &sample_data_len);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_port_config_aggregate_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    size_t consumed_len{};
+    // Decode sample data and set to mock values
+    while (sample_count--)
+    {
+        uint8_t tag;
+        bool valid;
+        const uint8_t* data;
+        size_t data_len;
+
+        sample_data += consumed_len;
+        sample_data_len -= consumed_len;
+        auto sample =
+            reinterpret_cast<const nsm_aggregate_resp_sample*>(sample_data);
+
+        rc = decode_aggregate_resp_sample(sample, sample_data_len,
+                                          &consumed_len, &tag, &valid, &data,
+                                          &data_len);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error("decode_aggregate_resp_sample failed: rc={RC}", "RC",
+                       rc);
+        }
+        assert(rc == NSM_SW_SUCCESS);
+        if (valid)
+        {
+            if (tag <= 3) // PCIe_Gen_Preset tags (0-3)
+            {
+                uint8_t preset_0 = 0;
+                uint8_t preset_1 = 0;
+                rc = decode_preset_PCIe_data(data, data_len, &preset_0,
+                                             &preset_1);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error("decode_preset_PCIe_data failed: rc={RC}", "RC",
+                               rc);
+                }
+                lg2::info(
+                    "decode_preset_PCIe_data: tag={TAG}, preset_0={PRESET_0}, preset_1={PRESET_1}",
+                    "TAG", tag, "PRESET_0", preset_0, "PRESET_1", preset_1);
+                assert(rc == NSM_SW_SUCCESS);
+                pciePortConfigMockTable[tag] = preset_0 | (preset_1 << 4);
+            }
+            else if (tag == 4) // PCIe_Tx_Amplitude tag
+            {
+                uint8_t tx_amplitude = 0;
+                rc = decode_PCIe_TxAmplitude_data(data, data_len,
+                                                  &tx_amplitude);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    lg2::error("decode_PCIe_TxAmplitude_data failed: rc={RC}",
+                               "RC", rc);
+                }
+                lg2::info(
+                    "decode_PCIe_TxAmplitude_data: tag={TAG}, tx_amplitude={TX_AMPLITUDE}",
+                    "TAG", tag, "TX_AMPLITUDE", tx_amplitude);
+                assert(rc == NSM_SW_SUCCESS);
+                pciePortConfigMockTable[tag] = tx_amplitude;
+            }
+            else
+            {
+                lg2::error("Unexpected tag value: {TAG}", "TAG", tag);
+                continue;
+            }
+        }
+    }
+
+    Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_port_config_aggregate_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::queryAggregatedResetMetrics(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {
@@ -6280,6 +6586,46 @@ std::optional<Response>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceCapabilitiesV2Handler(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    static const uint32_t maxInputBufferSize = 4096;
+
+    if (verbose)
+    {
+        lg2::info("getDeviceCapabilitiesV2Handler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_nsm_get_device_capabilities_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_get_device_capabilities_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_capabilities_v2_resp) - 1 +
+            NSM_GET_DEVICE_CAPABILITIES_V2_DATA_SIZE,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_nsm_get_device_capabilities_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, ERR_NULL,
+        NSM_DEVICE_CAPABILITY_TIMESTAMP_GENERATION_EPOCH_TIME,
+        maxInputBufferSize, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_get_device_capabilities_v2_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getEthPortTelemetryCounterHandler(
         const nsm_msg* requestMsg, size_t requestLen)
 {
@@ -6637,4 +6983,281 @@ std::optional<std::vector<uint8_t>>
     return response;
 }
 
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDevicemodeSettingsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t data_index = 0;
+    auto rc = decode_get_device_mode_setting_req(requestMsg, requestLen,
+                                                 &data_index);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_mode_setting_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint8_t device_mode = state.l1_prediction_mode; // Mock device mode
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_mode_setting_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_device_mode_settings_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              device_mode, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_mode_settings_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDevicemodeSettingsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t device_mode_index = 0;
+    enum nsm_l1_prediction_mode_config device_mode =
+        nsm_l1_prediction_mode_config::ENABLED;
+
+    auto rc = decode_set_device_mode_settings_req(
+        requestMsg, requestLen, &device_mode_index, &device_mode);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_mode_settings_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    state.l1_prediction_mode = static_cast<uint8_t>(device_mode);
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    rc = encode_set_device_mode_settings_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_set_device_mode_settings_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getDeviceDebugParametersHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint8_t debug_configuration_type = 0;
+    struct nsm_debug_parameter_id parameter_id = {
+        .reserved = 0, .port_number = 0, .index = 0};
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {.value = 0};
+
+    auto rc = decode_get_device_debug_parameters_req(
+        requestMsg, requestLen, &debug_configuration_type, &parameter_id,
+        &parameter_sub_id);
+    uint8_t debug_configuration_type_log = debug_configuration_type;
+    uint8_t parameter_id_index_log = parameter_id.index;
+    uint8_t parameter_sub_id_value_log = parameter_sub_id.bits.sub_id;
+    uint16_t parameter_id_port_number_log = parameter_id.port_number;
+    lg2::debug("decode_get_device_debug_parameters_req: rc={RC} DCT={DCT} "
+               "PID={PID} PSUBID={PSUBID} PNB={PNB}",
+               "RC", rc, "DCT", debug_configuration_type_log, "PID",
+               parameter_id_index_log, "PSUBID", parameter_sub_id_value_log,
+               "PNB", parameter_id_port_number_log);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_device_debug_parameters_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("getDeviceDebugParametersHandler: debug_config_type={TYPE}, "
+                  "port={PORT}, index={INDEX}, sub_id={SUBID}",
+                  "TYPE", debug_configuration_type, "PORT",
+                  static_cast<uint16_t>(parameter_id.port_number), "INDEX",
+                  parameter_id.index, "SUBID", parameter_sub_id.value);
+    }
+
+    std::vector<uint8_t> mockData = {
+        0x00,
+    };
+    uint16_t dataSize = 1;
+
+    switch (parameter_id.index)
+    {
+        case NSM_DEBUG_PARAMETER_ID_MLPC:
+            mockData = {0x12, 0x34, 0x56, 0x78};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLC:
+            mockData = {0xAB, 0xCD, 0xEF, 0x01};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLS:
+            mockData = {0x11, 0x22, 0x33, 0x44};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPI:
+            mockData = {0x55, 0x66, 0x77, 0x88};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPHI:
+            mockData = {0x99, 0xAA, 0xBB, 0xCC};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSPC:
+            mockData = {0xDD, 0xEE, 0xFF, 0x00};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPCNT:
+            switch (parameter_sub_id.bits.sub_id)
+            {
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L0_GENERAL_COUNTERS:
+                    mockData = {0x01, 0x02, 0x03, 0x04};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_GENERAL_COUNTERS:
+                    mockData = {0x05, 0x06, 0x07, 0x08};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPCNT_GROUP_L1_STAT_COUNTERS:
+                    mockData = {0x09, 0x0A, 0x0B, 0x0C};
+                    break;
+                default:
+                    break;
+            }
+            break;
+        case NSM_DEBUG_PARAMETER_ID_MPSCR:
+            mockData = {0x10, 0x20, 0x30, 0x40};
+            break;
+        case NSM_DEBUG_PARAMETER_ID_PPSLG:
+            switch (parameter_sub_id.bits.sub_id)
+            {
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CAPABILITIES_AND_STATUS:
+                    mockData = {0x50, 0x51, 0x52, 0x53};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_CONFIGURATION:
+                    mockData = {0x54, 0x55, 0x56, 0x57};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L1_DEBUG:
+                    mockData = {0x58, 0x59, 0x5A, 0x5B};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_CAPABILITIES_AND_STATUS:
+                    mockData = {0x5C, 0x5D, 0x5E, 0x5F};
+                    break;
+                case NSM_DEBUG_PARAMETER_SUB_ID_PPSLG_PAGE_L0_DEBUG:
+                    mockData = {0x60, 0x61, 0x62, 0x63};
+                    break;
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    dataSize = mockData.size();
+    uint16_t reason_code = ERR_NULL;
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_device_debug_parameters_resp) - 1 +
+            dataSize,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t dataSize_log = dataSize;
+    std::string data_log = requestMsgToHexString(mockData);
+    uint16_t dataDataSize_log = mockData.size();
+    lg2::debug("encode_get_device_debug_parameters_resp: dataSize={SIZE} "
+               "data={DATA} dataSize={DATASIZE}",
+               "SIZE", dataSize_log, "DATA", data_log, "DATASIZE",
+               dataDataSize_log);
+
+    rc = encode_get_device_debug_parameters_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, &dataSize,
+        mockData.data(), responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_device_debug_parameters_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setDeviceDebugParametersHandler(const nsm_msg* requestMsg,
+                                                     size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("setDeviceDebugParametersHandler: request length={LEN}",
+                  "LEN", requestLen);
+    }
+
+    uint8_t debug_configuration_type = 0;
+    struct nsm_debug_parameter_id parameter_id = {
+        .reserved = 0, .port_number = 0, .index = 0};
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id = {.value = 0};
+    uint8_t data_size = 0;
+    uint8_t* data = nullptr;
+
+    auto rc = decode_set_device_debug_parameters_req(
+        requestMsg, requestLen, &debug_configuration_type, &parameter_id,
+        &parameter_sub_id, &data_size, &data);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_set_device_debug_parameters_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "setDeviceDebugParametersHandler: debug_config_type={TYPE}, "
+            "port={PORT}, index={INDEX}, sub_id={SUBID}, data_size={SIZE}",
+            "TYPE", debug_configuration_type, "PORT",
+            static_cast<uint16_t>(parameter_id.port_number), "INDEX",
+            parameter_id.index, "SUBID", parameter_sub_id.value, "SIZE",
+            data_size);
+    }
+
+    // For mockup, we return success for a valid set request
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_cc_only_resp(requestMsg->hdr.instance_id, NSM_TYPE_DIAGNOSTIC,
+                             NSM_SET_DEVICE_DEBUG_PARAMETERS, NSM_SUCCESS,
+                             ERR_NULL, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_cc_only_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
 } // namespace MockupResponder

@@ -1346,3 +1346,193 @@ int decode_set_EGM_mode_resp(const struct nsm_msg *msg, size_t msg_len,
 {
 	return decode_common_resp(msg, msg_len, cc, data_size, reason_code);
 }
+
+int encode_set_device_mode_setting_req(
+    uint8_t instance_id, uint8_t device_mode_index,
+    enum nsm_l1_prediction_mode_config device_mode, struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_DEVICE_MODE_SETTING, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_device_mode_setting_req *request =
+	    (struct nsm_set_device_mode_setting_req *)msg->payload;
+
+	request->hdr.data_size =
+	    sizeof(struct nsm_set_device_mode_setting_req) -
+	    sizeof(struct nsm_common_req);
+	request->device_mode_index = device_mode_index;
+	request->device_mode = device_mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_device_mode_settings_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *device_mode_index,
+    enum nsm_l1_prediction_mode_config *device_mode)
+{
+	if (msg == NULL || device_mode_index == NULL || device_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_set_device_mode_setting_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_device_mode_setting_req *request =
+	    (struct nsm_set_device_mode_setting_req *)msg->payload;
+
+	if (request->hdr.data_size !=
+	    sizeof(struct nsm_set_device_mode_setting_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_mode_index = request->device_mode_index;
+	*device_mode = request->device_mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_mode_settings_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_DEVICE_MODE_SETTING, msg);
+}
+
+int decode_set_device_mode_setting_resp(const struct nsm_msg *msg,
+					size_t msg_len, uint8_t *cc,
+					uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
+
+int encode_get_device_mode_setting_req(uint8_t instance_id,
+				       uint8_t device_mode_index,
+				       struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_device_mode_setting_req *request =
+	    (struct nsm_get_device_mode_setting_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_DEVICE_MODE_SETTING;
+	request->hdr.data_size = 1;
+	request->device_mode_index = device_mode_index;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_mode_setting_req(const struct nsm_msg *msg,
+				       size_t msg_len,
+				       uint8_t *device_mode_index)
+{
+	if (msg == NULL || device_mode_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_mode_setting_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_mode_setting_req *request =
+	    (struct nsm_get_device_mode_setting_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(struct nsm_get_device_mode_setting_req) -
+		sizeof(struct nsm_common_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*device_mode_index = request->device_mode_index;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_mode_settings_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 uint8_t device_mode,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CONFIGURATION;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_MODE_SETTING, msg);
+	}
+
+	struct nsm_get_device_mode_setting_resp *resp =
+	    (struct nsm_get_device_mode_setting_resp *)msg->payload;
+
+	uint16_t data_size =
+	    htole16(sizeof(struct nsm_get_device_mode_setting_resp) -
+		    sizeof(struct nsm_common_resp));
+	resp->hdr.data_size = htole16(data_size);
+	resp->hdr.command = NSM_GET_DEVICE_MODE_SETTING;
+	resp->hdr.completion_code = cc;
+	resp->device_mode = device_mode;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_mode_setting_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, enum nsm_l1_prediction_mode_config *device_mode)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL ||
+	    device_mode == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_mode_setting_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_device_mode_setting_resp *resp =
+	    (struct nsm_get_device_mode_setting_resp *)msg->payload;
+
+	*device_mode = resp->device_mode;
+
+	return NSM_SW_SUCCESS;
+}

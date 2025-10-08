@@ -922,3 +922,242 @@ int decode_multiport_query_scalar_group_telemetry_v1_req(
 	*data = request->data;
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_pcie_port_config_req(uint8_t instance_id, uint8_t port_number,
+				    uint8_t port_type, uint8_t port_index,
+				    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_PCI_LINK};
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (port_type > NSM_PORT_TYPE_DOWNSTREAM) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_get_port_config_req *request =
+	    (struct nsm_get_port_config_req *)msg->payload;
+
+	request->hdr.command = NSM_GET_PORT_CONFIGURATION;
+	request->hdr.data_size = sizeof(struct nsm_get_port_config_req) -
+				 sizeof(struct nsm_common_req);
+	request->port_number = port_number & 0x7f;
+	request->port_type = port_type & 0x1;
+	request->port_index = port_index;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_pcie_port_config_req(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *port_number, uint8_t *port_type,
+				    uint8_t *port_index)
+{
+	if (msg == NULL || port_number == NULL || port_type == NULL ||
+	    port_index == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len != sizeof(struct nsm_msg_hdr) +
+			   sizeof(struct nsm_get_port_config_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_get_port_config_req *request =
+	    (struct nsm_get_port_config_req *)msg->payload;
+
+	*port_number = request->port_number;
+	*port_type = request->port_type;
+	*port_index = request->port_index;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_preset_PCIe_data(uint8_t preset, uint8_t *data, size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	*data = preset;
+	*data_len = sizeof(uint8_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_preset_PCIe_data(const uint8_t *data, size_t data_len,
+			    uint8_t *preset_0, uint8_t *preset_1)
+{
+	if (data == NULL || preset_0 == NULL || preset_1 == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*preset_0 = *data & 0x0f;
+	*preset_1 = *data >> 4;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_PCIe_TxAmplitude_data(const uint8_t *data, size_t data_len,
+				 uint8_t *tx_amplitude)
+{
+	if (data == NULL || tx_amplitude == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (data_len != sizeof(uint8_t)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	*tx_amplitude = *data & 0x07;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_PCIe_TxAmplitude_data(uint8_t tx_amplitude, uint8_t *data,
+				 size_t *data_len)
+{
+	if (data == NULL || data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	*data = tx_amplitude & 0x07;
+	*data_len = sizeof(uint8_t);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_port_config_aggregate_resp(uint8_t instance_id, uint8_t command,
+					  uint8_t cc, uint16_t telemetry_count,
+					  struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & 0x1f;
+	header.nvidia_msg_type = NSM_TYPE_PCI_LINK;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_port_config_aggregate_resp *response =
+	    (struct nsm_get_port_config_aggregate_resp *)msg->payload;
+
+	response->command = command;
+	response->telemetry_count = htole16(telemetry_count);
+	response->completion_code = cc;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_port_config_aggregate_req(uint8_t instance_id, uint8_t port_id,
+					 uint8_t port_type, uint8_t port_index,
+					 uint16_t sample_count,
+					 const uint8_t *sample_data,
+					 size_t sample_data_len,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (sample_data == NULL && sample_count > 0) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (port_type > NSM_PORT_TYPE_DOWNSTREAM) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 NSM_TYPE_PCI_LINK};
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_port_config_aggregate_req *request =
+	    (struct nsm_set_port_config_aggregate_req *)msg->payload;
+
+	request->hdr.command = NSM_SET_PORT_CONFIGURATION;
+	request->hdr.data_size = sizeof(request->port_index) +
+				 sizeof(request->sample_count) +
+				 sample_data_len + 1;
+	request->port_number = port_id & 0x7f;
+	request->port_type = port_type & 0x1;
+	request->port_index = port_index;
+	request->sample_count = sample_count;
+	if (sample_data != NULL && sample_data_len > 0) {
+		memcpy(request->sample_data, sample_data, sample_data_len);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_port_config_aggregate_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *port_number,
+    uint8_t *port_type, uint8_t *port_index, uint16_t *sample_count,
+    const uint8_t **sample_data, size_t *sample_data_len)
+{
+	if (msg == NULL || port_number == NULL || port_type == NULL ||
+	    port_index == NULL || sample_count == NULL || sample_data == NULL ||
+	    sample_data_len == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_port_config_aggregate_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_set_port_config_aggregate_req *request =
+	    (struct nsm_set_port_config_aggregate_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    sizeof(request->port_index) + sizeof(request->sample_count) + 1) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*port_number = request->port_number;
+	*port_type = request->port_type;
+	*port_index = request->port_index;
+	*sample_count = request->sample_count;
+	*sample_data = request->sample_data;
+	*sample_data_len = request->hdr.data_size -
+			   sizeof(request->port_index) -
+			   sizeof(request->sample_count) - 1;
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_port_config_aggregate_resp(uint8_t instance_id, uint8_t cc,
+					  uint16_t reason_code,
+					  struct nsm_msg *msg)
+{
+	return encode_cc_only_resp(instance_id, NSM_TYPE_PCI_LINK,
+				   NSM_SET_PORT_CONFIGURATION, cc, reason_code,
+				   msg);
+}
+
+int decode_set_port_config_aggregate_resp(const struct nsm_msg *msg,
+					  size_t msg_len, uint8_t *cc,
+					  uint16_t *reason_code)
+{
+	return decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+}

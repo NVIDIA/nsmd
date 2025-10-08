@@ -19,6 +19,8 @@ sources = [
     '../libnsm/requester/mctp.c',
     '../common/utils.cpp',
     '../common/dBusHandler.cpp',
+    '../debug-token/tlv_decoder.cpp',
+    '../debug-token/tlv_encoder.cpp',
 ]
 
 nsmtool_headers = ['.', '..', '../libnsm', '../common']
@@ -28,7 +30,13 @@ executable(
     sources,
     implicit_include_directories: false,
     include_directories: include_directories(nsmtool_headers),
-    dependencies: [CLI11_dep, nlohmann_json, sdbusplus, phosphor_logging],
+    dependencies: [
+        CLI11_dep,
+        nlohmann_json,
+        sdbusplus,
+        phosphor_logging,
+        dependency('dbus-1'),
+    ],
     install: true,
     install_dir: get_option('bindir'),
 )

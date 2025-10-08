@@ -685,6 +685,123 @@ void NsmMemCapacity::updateReading(
     dimmIntf->memorySizeInKB(*maximumMemoryCapacity * 1024);
 }
 
+void createNSMMemory(std::shared_ptr<NsmDevice> nsmDevice,
+                     SensorManager& manager, sdbusplus::bus::bus& bus,
+                     std::string& name, std::string& type,
+                     std::string& inventoryObjPath,
+                     const dbus::PropertyMap& allCurrentIfaceProperties,
+                     const std::vector<utils::Association>& associations)
+{
+    auto sensorObjectPath = inventoryObjPath +
+                            "/xyz.openbmc_project.Inventory.Item.Dimm";
+
+    std::shared_ptr<DimmIntf> dimmIntf = getInterfaceOnObjectPath<DimmIntf>(
+        sensorObjectPath, manager, bus, inventoryObjPath.c_str());
+
+    std::string correctionType{};
+    if (allCurrentIfaceProperties.count("ErrorCorrection"))
+    {
+        correctionType = std::get<std::string>(
+            allCurrentIfaceProperties.at("ErrorCorrection"));
+    }
+
+    auto sensorErrorCorrection = std::make_shared<NsmMemoryErrorCorrection>(
+        name, type, dimmIntf, correctionType, inventoryObjPath);
+    nsmDevice->getDeviceSensors().push_back(sensorErrorCorrection);
+    std::string deviceType{};
+    if (allCurrentIfaceProperties.count("DeviceType"))
+    {
+        deviceType =
+            std::get<std::string>(allCurrentIfaceProperties.at("DeviceType"));
+    }
+
+    auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
+        name, type, dimmIntf, deviceType, inventoryObjPath);
+    nsmDevice->getDeviceSensors().push_back(sensorDeviceType);
+    auto sensorHealth = std::make_shared<NsmMemoryHealth>(bus, name, type,
+                                                          inventoryObjPath);
+    nsmDevice->getDeviceSensors().push_back(sensorHealth);
+    auto sensorMemoryLocation = std::make_shared<NsmLocationIntfMemory>(
+        bus, name, type, inventoryObjPath);
+    nsmDevice->getDeviceSensors().push_back(sensorMemoryLocation);
+    auto associationSensor = std::make_shared<NsmMemoryAssociation>(
+        bus, name, type, inventoryObjPath, associations);
+    nsmDevice->getDeviceSensors().push_back(associationSensor);
+
+    bool priority = false;
+    if (allCurrentIfaceProperties.count("Priority"))
+    {
+        priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
+    }
+
+    dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
+    auto minMemoryClockSensor =
+        std::make_shared<NsmMinMemoryClockLimit>(name, type, dimmIntf);
+    nsmDevice->addStaticSensor(minMemoryClockSensor);
+    auto maxMemoryClockSensor =
+        std::make_shared<NsmMaxMemoryClockLimit>(name, type, dimmIntf);
+    nsmDevice->addStaticSensor(maxMemoryClockSensor);
+
+    auto currClockFreqSensor = std::make_shared<NsmMemCurrClockFreq>(
+        name, type, dimmIntf, inventoryObjPath);
+
+    nsmDevice->addSensor(currClockFreqSensor, priority);
+    auto memCapacitySensor = std::make_shared<NsmMemCapacity>(name, type,
+                                                              dimmIntf);
+    nsmDevice->addStaticSensor(memCapacitySensor);
+}
+
+void createMemoryRowRemapping(std::shared_ptr<NsmDevice> nsmDevice,
+                              sdbusplus::bus::bus& bus, std::string& name,
+                              std::string& type, std::string& inventoryObjPath)
+{
+    auto rowRemapIntf =
+        std::make_shared<MemoryRowRemappingIntf>(bus, inventoryObjPath.c_str());
+    bool priority = false;
+
+    auto sensorRowRemapState = std::make_shared<NsmRowRemapState>(
+        name, type, rowRemapIntf, inventoryObjPath);
+    auto sensorRowRemappingCounts = std::make_shared<NsmRowRemappingCounts>(
+        name, type, rowRemapIntf, inventoryObjPath);
+    auto remappingAvailabilitySensor =
+        std::make_shared<NsmRemappingAvailabilityBankCount>(
+            name, type, rowRemapIntf, inventoryObjPath);
+
+    nsmDevice->addSensor(sensorRowRemapState, priority);
+    nsmDevice->addSensor(sensorRowRemappingCounts, priority);
+    nsmDevice->addSensor(remappingAvailabilitySensor, priority);
+}
+
+void createMemoryECCMode(std::shared_ptr<NsmDevice> nsmDevice,
+                         sdbusplus::bus::bus& bus, std::string& name,
+                         std::string& type, std::string& inventoryObjPath)
+{
+    bool priority = false;
+
+    auto eccModeIntf =
+        std::make_shared<EccModeIntfDram>(bus, inventoryObjPath.c_str());
+    auto sensor = std::make_shared<NsmEccErrorCountsDram>(
+        name, type, eccModeIntf, inventoryObjPath);
+
+    nsmDevice->addSensor(sensor, priority);
+}
+
+void createMemoryMemCapacityUtil(std::shared_ptr<NsmDevice> nsmDevice,
+                                 std::string& name, std::string& type,
+                                 std::string& inventoryObjPath)
+{
+    bool priority = false;
+
+    auto isLongRunning = true;
+
+    auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name, type);
+    auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
+        name, type, dbus::Interfaces{inventoryObjPath});
+    auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
+        provider, totalMemorySensor, isLongRunning, nsmDevice);
+    nsmDevice->addSensor(sensor, priority, isLongRunning);
+}
+
 requester::Coroutine createNsmMemorySensor(SensorManager& manager,
                                            const std::string& interface,
                                            const std::string& objPath)
@@ -737,144 +854,30 @@ requester::Coroutine createNsmMemorySensor(SensorManager& manager,
 
         if (type == "NSM_Memory")
         {
-            auto sensorObjectPath = inventoryObjPath +
-                                    "/xyz.openbmc_project.Inventory.Item.Dimm";
-
-            std::shared_ptr<DimmIntf> dimmIntf =
-                getInterfaceOnObjectPath<DimmIntf>(
-                    sensorObjectPath, manager, bus, inventoryObjPath.c_str());
-
-            std::string correctionType{};
-            if (allCurrentIfaceProperties.count("ErrorCorrection"))
-            {
-                correctionType = std::get<std::string>(
-                    allCurrentIfaceProperties.at("ErrorCorrection"));
-            }
-
-            auto sensorErrorCorrection =
-                std::make_shared<NsmMemoryErrorCorrection>(
-                    name, type, dimmIntf, correctionType, inventoryObjPath);
-            nsmDevice->getDeviceSensors().push_back(sensorErrorCorrection);
-            std::string deviceType{};
-            if (allCurrentIfaceProperties.count("DeviceType"))
-            {
-                deviceType = std::get<std::string>(
-                    allCurrentIfaceProperties.at("DeviceType"));
-            }
-
-            auto sensorDeviceType = std::make_shared<NsmMemoryDeviceType>(
-                name, type, dimmIntf, deviceType, inventoryObjPath);
-            nsmDevice->getDeviceSensors().push_back(sensorDeviceType);
-            auto sensorHealth = std::make_shared<NsmMemoryHealth>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->getDeviceSensors().push_back(sensorHealth);
-            auto sensorMemoryLocation = std::make_shared<NsmLocationIntfMemory>(
-                bus, name, type, inventoryObjPath);
-            nsmDevice->getDeviceSensors().push_back(sensorMemoryLocation);
             std::vector<utils::Association> associations{};
             co_await utils::coGetAssociations(
                 objPath, interface + ".Associations", associations);
-            auto associationSensor = std::make_shared<NsmMemoryAssociation>(
-                bus, name, type, inventoryObjPath, associations);
-            nsmDevice->getDeviceSensors().push_back(associationSensor);
-
-            bool priority{};
-            if (allCurrentIfaceProperties.count("Priority"))
-            {
-                priority =
-                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-            }
-
-            dimmIntf->allowedSpeedsMT(std::vector<uint16_t>(2, 0));
-            auto minMemoryClockSensor =
-                std::make_shared<NsmMinMemoryClockLimit>(name, type, dimmIntf);
-            nsmDevice->addStaticSensor(minMemoryClockSensor);
-            auto maxMemoryClockSensor =
-                std::make_shared<NsmMaxMemoryClockLimit>(name, type, dimmIntf);
-            nsmDevice->addStaticSensor(maxMemoryClockSensor);
-
-            auto currClockFreqSensor = std::make_shared<NsmMemCurrClockFreq>(
-                name, type, dimmIntf, inventoryObjPath);
-
-            nsmDevice->addSensor(currClockFreqSensor, priority);
-            auto memCapacitySensor =
-                std::make_shared<NsmMemCapacity>(name, type, dimmIntf);
-            nsmDevice->addStaticSensor(memCapacitySensor);
+            createNSMMemory(nsmDevice, manager, bus, name, type,
+                            inventoryObjPath, allCurrentIfaceProperties,
+                            associations);
         }
-        else if (type == "NSM_RowRemapping")
+        else if (type == "NSM_Memory_Attributes")
         {
-            auto rowRemapIntf = std::make_shared<MemoryRowRemappingIntf>(
-                bus, inventoryObjPath.c_str());
-            bool priority{};
-            if (allCurrentIfaceProperties.count("Priority"))
-            {
-                priority =
-                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-            }
-
-            auto sensorRowRemapState = std::make_shared<NsmRowRemapState>(
-                name, type, rowRemapIntf, inventoryObjPath);
-            auto sensorRowRemappingCounts =
-                std::make_shared<NsmRowRemappingCounts>(
-                    name, type, rowRemapIntf, inventoryObjPath);
-            auto remappingAvailabilitySensor =
-                std::make_shared<NsmRemappingAvailabilityBankCount>(
-                    name, type, rowRemapIntf, inventoryObjPath);
-
-            nsmDevice->addSensor(sensorRowRemapState, priority);
-            nsmDevice->addSensor(sensorRowRemappingCounts, priority);
-            nsmDevice->addSensor(remappingAvailabilitySensor, priority);
-        }
-        else if (type == "NSM_ECC")
-        {
-            bool priority{};
-            if (allCurrentIfaceProperties.count("Priority"))
-            {
-                priority =
-                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-            }
-
-            auto eccModeIntf = std::make_shared<EccModeIntfDram>(
-                bus, inventoryObjPath.c_str());
-            auto sensor = std::make_shared<NsmEccErrorCountsDram>(
-                name, type, eccModeIntf, inventoryObjPath);
-
-            nsmDevice->addSensor(sensor, priority);
-        }
-        else if (type == "NSM_MemCapacityUtil")
-        {
-            bool priority{};
-            if (allCurrentIfaceProperties.count("Priority"))
-            {
-                priority =
-                    std::get<bool>(allCurrentIfaceProperties.at("Priority"));
-            }
-
-            auto isLongRunning = true;
-
-            auto totalMemorySensor = std::make_shared<NsmTotalMemory>(name,
-                                                                      type);
-            auto provider = NsmInterfaceProvider<DimmMemoryMetricsIntf>(
-                name, type, dbus::Interfaces{inventoryObjPath});
-            auto sensor = std::make_shared<NsmMemoryCapacityUtil>(
-                provider, totalMemorySensor, isLongRunning, nsmDevice);
-            nsmDevice->addSensor(sensor, priority, isLongRunning);
+            createMemoryRowRemapping(nsmDevice, bus, name, type,
+                                     inventoryObjPath);
+            createMemoryECCMode(nsmDevice, bus, name, type, inventoryObjPath);
+            createMemoryMemCapacityUtil(nsmDevice, name, type,
+                                        inventoryObjPath);
         }
     }
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
 
-REGISTER_NSM_CREATION_FUNCTION(createNsmMemorySensor,
-                               "xyz.openbmc_project.Configuration.NSM_Memory")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmMemorySensor,
-    "xyz.openbmc_project.Configuration.NSM_Memory.ECCMode")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmMemorySensor,
-    "xyz.openbmc_project.Configuration.NSM_Memory.RowRemapping")
-REGISTER_NSM_CREATION_FUNCTION(
-    createNsmMemorySensor,
-    "xyz.openbmc_project.Configuration.NSM_Memory.MemCapacityUtil")
+dbus::Interfaces memoryInterfaces{
+    "xyz.openbmc_project.Configuration.NSM_Memory",
+    "xyz.openbmc_project.Configuration.NSM_Memory.MemoryAttributes"};
+
+REGISTER_NSM_CREATION_FUNCTION(createNsmMemorySensor, memoryInterfaces)
 
 } // namespace nsm

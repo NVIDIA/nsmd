@@ -25,6 +25,7 @@ endforeach
 
 if include_all_ports or include_port_list.contains('retimer')
     sources += ['nsmPort/nsmRetimerPort.cpp']
+    sources += ['nsmPort/nsmPortConfigurationInfo.cpp']
 endif
 if include_all_ports or include_port_list.contains('nvlink-port')
     sources += ['nsmPort/nsmPort.cpp']

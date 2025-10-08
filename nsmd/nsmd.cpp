@@ -141,6 +141,8 @@ int main(int argc, char** argv)
         // Initialize the singleton instance for on demand logging of critical
         // logs
         nsm::NsmLogDumpTracker::initialize(bus, "/xyz/openbmc_project/NSM");
+        sdbusplus::server::manager::manager sensorsObjManager(
+            bus, "/xyz/openbmc_project/sensors");
 
         nsm::NsmMessageHandler::initialize(reqHandler);
         auto nsmMsgHandler = nsm::NsmMessageHandler::getSharedInstance();

@@ -992,3 +992,213 @@ int decode_erase_debug_info_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_device_debug_parameters_req(
+    uint8_t instance_id, uint8_t debug_configuration_type,
+    struct nsm_debug_parameter_id parameter_id,
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint8_t rc = encode_common_req_v2(instance_id, NSM_TYPE_DIAGNOSTIC,
+					  NSM_GET_DEVICE_DEBUG_PARAMETERS, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	struct nsm_get_device_debug_parameters_req *request =
+	    (struct nsm_get_device_debug_parameters_req *)msg->payload;
+	request->hdr.data_size =
+	    sizeof(struct nsm_get_device_debug_parameters_req) -
+	    sizeof(struct nsm_common_req_v2);
+	request->debug_configuration_type = debug_configuration_type;
+	request->reserved[0] = 0;
+	request->reserved[1] = 0;
+	request->reserved[2] = 0;
+	request->parameter_id.reserved = 0;
+	request->parameter_id.port_number = htole16(parameter_id.port_number);
+	request->parameter_id.index = parameter_id.index;
+	request->parameter_sub_id.value = htole32(parameter_sub_id.value);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_debug_parameters_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    uint8_t *debug_configuration_type,
+    struct nsm_debug_parameter_id *parameter_id,
+    nsm_debug_parameter_sub_id_bitfield *parameter_sub_id)
+{
+	if (msg == NULL || debug_configuration_type == NULL ||
+	    parameter_id == NULL || parameter_sub_id == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	int rc = decode_common_req_v2(msg, msg_len);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	const struct nsm_get_device_debug_parameters_req *request =
+	    (const struct nsm_get_device_debug_parameters_req *)msg->payload;
+	if (request->reserved[0] != 0 || request->reserved[1] != 0 ||
+	    request->reserved[2] != 0 || request->parameter_id.reserved != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*debug_configuration_type = request->debug_configuration_type;
+	parameter_id->port_number = le16toh(request->parameter_id.port_number);
+	parameter_id->reserved = request->parameter_id.reserved;
+	parameter_id->index = request->parameter_id.index;
+	parameter_sub_id->value = le32toh(request->parameter_sub_id.value);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_device_debug_parameters_resp(uint8_t instance_id, uint8_t cc,
+					    uint16_t reason_code,
+					    uint16_t *data_size, uint8_t *data,
+					    struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL || data_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_DIAGNOSTIC;
+
+	uint8_t rc = pack_nsm_header(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_GET_DEVICE_DEBUG_PARAMETERS, msg);
+	}
+
+	struct nsm_get_device_debug_parameters_resp *resp =
+	    (struct nsm_get_device_debug_parameters_resp *)msg->payload;
+	resp->hdr.command = NSM_GET_DEVICE_DEBUG_PARAMETERS;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size = htole16(*data_size);
+	memcpy(resp->data, data, *data_size);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_device_debug_parameters_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc,
+					    uint16_t *data_size, uint8_t *data)
+{
+	if (msg == NULL || cc == NULL || data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_device_debug_parameters_resp) -
+			  1) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_get_device_debug_parameters_resp *resp =
+	    (const struct nsm_get_device_debug_parameters_resp *)msg->payload;
+
+	*cc = resp->hdr.completion_code;
+	*data_size = le16toh(resp->hdr.data_size);
+
+	// Validate data_size against available message buffer
+	size_t available_data_size = msg_len - sizeof(struct nsm_msg_hdr) -
+				     sizeof(struct nsm_common_resp);
+	if (*data_size > available_data_size) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	memcpy(data, resp->data, *data_size);
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_device_debug_parameters_req(
+    uint8_t instance_id, uint8_t debug_configuration_type,
+    struct nsm_debug_parameter_id parameter_id,
+    nsm_debug_parameter_sub_id_bitfield parameter_sub_id, uint8_t data_size,
+    uint8_t *data, struct nsm_msg *msg)
+{
+	if (msg == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	uint8_t rc = encode_common_req_v2(instance_id, NSM_TYPE_DIAGNOSTIC,
+					  NSM_SET_DEVICE_DEBUG_PARAMETERS, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_device_debug_parameters_req *request =
+	    (struct nsm_set_device_debug_parameters_req *)msg->payload;
+	request->hdr.data_size =
+	    sizeof(struct nsm_set_device_debug_parameters_req) -
+	    sizeof(struct nsm_common_req_v2) + data_size - sizeof(uint8_t);
+	request->debug_configuration_type = debug_configuration_type;
+	request->data_size = data_size;
+	request->reserved[0] = 0;
+	request->reserved[1] = 0;
+	request->parameter_id.reserved = 0;
+	request->parameter_id.port_number = htole16(parameter_id.port_number);
+	request->parameter_id.index = parameter_id.index;
+	request->parameter_sub_id.value = htole32(parameter_sub_id.value);
+	memcpy(request->data, data, data_size);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_device_debug_parameters_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    uint8_t *debug_configuration_type,
+    struct nsm_debug_parameter_id *parameter_id,
+    nsm_debug_parameter_sub_id_bitfield *parameter_sub_id, uint8_t *data_size,
+    uint8_t **data)
+{
+	if (msg == NULL || debug_configuration_type == NULL ||
+	    parameter_id == NULL || parameter_sub_id == NULL ||
+	    data_size == NULL || data == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_common_req_v2(msg, msg_len);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	const struct nsm_set_device_debug_parameters_req *request =
+	    (const struct nsm_set_device_debug_parameters_req *)msg->payload;
+
+	if (request->reserved[0] != 0 || request->reserved[1] != 0 ||
+	    request->parameter_id.reserved != 0) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*debug_configuration_type = request->debug_configuration_type;
+	parameter_id->port_number = le16toh(request->parameter_id.port_number);
+	parameter_id->reserved = request->parameter_id.reserved;
+	parameter_id->index = request->parameter_id.index;
+	parameter_sub_id->value = le32toh(request->parameter_sub_id.value);
+	*data_size = request->data_size;
+	memcpy(data, request->data, *data_size);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_device_debug_parameters_resp(const struct nsm_msg *msg,
+					    size_t msg_len, uint8_t *cc)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_common_resp *resp =
+	    (const struct nsm_common_resp *)msg->payload;
+	*cc = resp->completion_code;
+	return NSM_SW_SUCCESS;
+}

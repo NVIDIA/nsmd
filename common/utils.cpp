@@ -46,6 +46,25 @@
 namespace utils
 {
 
+bool isPreferred(const std::tuple<MctpMedium, MctpBinding>& currentMctpInfo,
+                 const std::tuple<MctpMedium, MctpBinding>& newMctpInfo)
+{
+    auto currentMedium = std::get<0>(currentMctpInfo);
+    auto newMedium = std::get<0>(newMctpInfo);
+    auto currentBinding = std::get<1>(currentMctpInfo);
+    auto newBinding = std::get<1>(newMctpInfo);
+
+    if (mediumPriority.at(currentMedium) == mediumPriority.at(newMedium))
+    {
+        return bindingPriority.at(currentBinding) >=
+               bindingPriority.at(newBinding);
+    }
+    else
+    {
+        return mediumPriority.at(currentMedium) >= mediumPriority.at(newMedium);
+    }
+}
+
 static const boost::regex invalidDBusNameSubString{"[^a-zA-Z0-9._/]+"};
 static const uint32_t INVALID_UINT32_VALUE = 0xFFFFFFFF;
 uuid_t convertUUIDToString(const std::vector<uint8_t>& uuidIntArr)
@@ -1003,7 +1022,7 @@ requester::Coroutine coGetCachedBaseProperties(
 
 int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
                     uint8_t& deviceRole, std::string& remapPropName,
-                    std::string& remapPropValue)
+                    std::vector<std::string>& remapPropValues)
 {
     int n1 = -1;
     int n2 = -1;
@@ -1030,7 +1049,28 @@ int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
     utils::getDeviceTypeAndRole(n1, &deviceType, &deviceRole);
     instanceNumber = static_cast<uint8_t>(n2);
     remapPropName = std::string(propName);
-    remapPropValue = std::string(propValue);
+    // Check if there are more values (contains another colon)
+    if (strchr(propValue, ':') == nullptr)
+    {
+        // Single value - fast path
+        remapPropValues.clear();
+        remapPropValues.reserve(1); // Avoid reallocation
+        remapPropValues.emplace_back(propValue);
+        return 0;
+    }
+
+    // Multiple values - parse the remainder
+    remapPropValues.clear();
+    remapPropValues.reserve(2); // Pre-allocate for common cases
+
+    // Parse firstValue which contains multiple colon-separated values
+    char* token = strtok(propValue, ":");
+    while (token != nullptr)
+    {
+        remapPropValues.emplace_back(token);
+        token = strtok(nullptr, ":");
+    }
+
     return 0;
 }
 

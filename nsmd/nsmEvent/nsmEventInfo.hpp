@@ -30,9 +30,32 @@ struct NsmEventInfo
     Level severity;
     std::string loggingNamespace;
     std::string resolution;
-    std::string errorId;
+    std::vector<std::string> errorId;
+    std::string impactedComponent;
     std::vector<std::string> messageArgs;
     bool logging;
 };
 
+inline std::string getEventErrorId(const NsmEventInfo& info,
+                                   const std::string& errorIdKey)
+{
+    if (info.errorId.size() % 2 == 0)
+    {
+        auto it = std::find(info.errorId.begin(), info.errorId.end(),
+                            errorIdKey);
+        if (it != info.errorId.end() && (it + 1) != info.errorId.end())
+        {
+            std::string errorIdStr = *(it + 1);
+            return errorIdStr;
+        }
+        lg2::debug(
+            "NSM_Event getEventErrorId : no errorId found for errorIdKey = {EID}, uuid = {UUID}",
+            "EID", errorIdKey, "UUID", info.uuid);
+        return "";
+    }
+    lg2::error(
+        "NSM_Event getEventErrorId : Invalid ErrorId Map Size when getting errorIdKey = {EID}, uuid = {UUID}",
+        "EID", errorIdKey, "UUID", info.uuid);
+    return "";
+}
 }; // namespace nsm

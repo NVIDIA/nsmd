@@ -73,6 +73,11 @@ using PropertyValuesCollection =
 #define UUID_LEN 36
 #define MAC_ADDRESS_DATA_LEN 6
 
+#define MANUFACTURER_NVIDIA "NVIDIA"
+#define HEALTH_TYPE_OK                                                         \
+    "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
+#define PCIE_DEVICE_TYPE_SINGLE_FUNCTION "SingleFunction"
+
 // Largest safe integer for double precision (2^53 - 1)
 const uint64_t MAX_SAFE_INTEGER_IN_DOUBLE = (1ULL << 53) - 1;
 
@@ -85,6 +90,32 @@ constexpr auto dbusProperties = "org.freedesktop.DBus.Properties";
 constexpr auto mapperService = "xyz.openbmc_project.ObjectMapper";
 constexpr auto mapperPath = "/xyz/openbmc_project/object_mapper";
 constexpr auto mapperInterface = "xyz.openbmc_project.ObjectMapper";
+
+/**
+ * @brief MCTP Medium Type priority table ordering by bandwidth
+ */
+static std::unordered_map<MctpMedium, int> mediumPriority = {
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.PCIe", 0},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.USB", 1},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.SPI", 2},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.I3C", 3},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.KCS", 4},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.Serial", 5},
+    {"xyz.openbmc_project.MCTP.Endpoint.MediaTypes.SMBus", 6}};
+
+/**
+ * @brief MCTP Binding Type priority table ordering by bandwidth
+ */
+static std::unordered_map<MctpBinding, int> bindingPriority = {
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.PCIe", 0},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.USB", 1},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.SPI", 2},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.KCS", 3},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.Serial", 4},
+    {"xyz.openbmc_project.MCTP.Binding.BindingTypes.SMBus", 5}};
+
+bool isPreferred(const std::tuple<MctpMedium, MctpBinding>& currentMctpInfo,
+                 const std::tuple<MctpMedium, MctpBinding>& newMctpInfo);
 
 struct Association
 {
@@ -783,5 +814,5 @@ void setCachedBaseProperties(const std::string& objPath,
 
 int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
                     uint8_t& deviceRole, std::string& remapPropName,
-                    std::string& remapPropValue);
+                    std::vector<std::string>& remapPropValues);
 } // namespace utils

@@ -65,11 +65,10 @@ class MockMctpDiscovery
 
   public:
     static MockMctpDiscovery* instance;
-    std::shared_ptr<NsmDevice> findOrCreateNsmDevice(uint8_t deviceType,
-                                                     uint8_t deviceRole,
-                                                     uint8_t instanceNumber,
-                                                     std::string remapPropName,
-                                                     std::string remapPropValue)
+    std::shared_ptr<NsmDevice>
+        findOrCreateNsmDevice(uint8_t deviceType, uint8_t deviceRole,
+                              uint8_t instanceNumber, std::string remapPropName,
+                              std::vector<std::string>& remapPropValue)
     {
         uint16_t staticInstanceAndRole = (deviceRole >> 8) | instanceNumber;
 
@@ -83,12 +82,12 @@ class MockMctpDiscovery
         }
 
         auto nsmDevice = std::make_shared<MockNsmDeviceBase>(
-            deviceType, instanceNumber, remapPropName, remapPropValue,
+            deviceType, instanceNumber, remapPropName, remapPropValue[0],
             deviceRole);
         lg2::info(
             "Creating new NsmDevice for deviceType:{TYPE} instanceNumber:{INST} deviceRole:{ROLE} remapPropName:{REMAPPNAME} remapPropValue:{REMAPPVALUE}",
             "TYPE", deviceType, "INST", instanceNumber, "ROLE", deviceRole,
-            "REMAPPNAME", remapPropName, "REMAPPVALUE", remapPropValue);
+            "REMAPPNAME", remapPropName, "REMAPPVALUE", remapPropValue[0]);
         nsmDevices.emplace_back(nsmDevice);
         deviceMap[deviceType][staticInstanceAndRole] = nsmDevice;
         return deviceMap[deviceType][staticInstanceAndRole];
@@ -99,7 +98,7 @@ class MockMctpDiscovery
         uint8_t instanceNumber = 0xff;
         uint8_t deviceRole = NSM_DEV_ROLE_RESERVED;
         std::string remapPropName;
-        std::string remapPropValue;
+        std::vector<std::string> remapPropValue;
         if (utils::parseStaticUuid(uuid, deviceType, instanceNumber, deviceRole,
                                    remapPropName, remapPropValue) < 0)
         {

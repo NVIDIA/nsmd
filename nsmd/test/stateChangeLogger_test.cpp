@@ -166,11 +166,16 @@ TEST_F(StateChangeLoggerTest, GoodTestLogResponseWithSize)
 
 TEST_F(StateChangeLoggerTest, GoodTestBoolOnly)
 {
-    const auto fName = "GoodTestBoolOnly";
-    EXPECT_TRUE(shouldLog(fName, true));
-    EXPECT_FALSE(shouldLog(fName, true));
-    EXPECT_FALSE(shouldLog(fName, true));
-    EXPECT_FALSE(shouldLog(fName, true));
-    EXPECT_FALSE(shouldLog(fName, true));
-    EXPECT_FALSE(shouldLog(fName, false));
+    const auto clearLoggerMsg1 = "GoodTestBoolOnly 1";
+    const auto clearLoggerMsg2 = "GoodTestBoolOnly 2";
+    EXPECT_TRUE(shouldLog(clearLoggerMsg1, true));
+    EXPECT_TRUE(shouldLog(clearLoggerMsg2, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg1, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg2, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg1, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg2, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg1, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg2, true));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg1, false));
+    EXPECT_FALSE(shouldLog(clearLoggerMsg2, false));
 }

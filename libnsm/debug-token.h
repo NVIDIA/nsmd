@@ -24,8 +24,23 @@ extern "C" {
 
 #include "base.h"
 
-#define NSM_DEBUG_TOKEN_DEVICE_ID_SIZE 8
 #define NSM_DEBUG_TOKEN_DATA_MAX_SIZE 65535
+
+#define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS 0xFFFFFFFF
+#define NSM_DEBUG_TOKEN_ERASE_ALL_TOKENS_INCREMENT_RATCHET_COUNTER 0xFFFFFFFE
+
+/** @brief Calculate the optimal chunk size for token installation based on the
+ * maximum input buffer size. The chunk size is calculated by subtracting the
+ * size of the fixed size variables present in the install token request header
+ * from the maximum input buffer size.
+ *
+ *  @param[in] buffer_size - Maximum input buffer size
+ *  @return Optimal chunk size
+ */
+#define NSM_DEBUG_TOKEN_INSTALL_CHUNK_SIZE(buffer_size)                        \
+	(buffer_size - ((sizeof(struct nsm_install_token_req) -                \
+			 sizeof(struct nsm_common_req_v2) -                    \
+			 sizeof(((struct nsm_install_token_req *)0)->data))))
 
 /** @brief NSM debug token type
  */
@@ -202,7 +217,57 @@ typedef struct nsm_common_req nsm_query_device_ids_req;
  */
 struct nsm_query_device_ids_resp {
 	struct nsm_common_resp hdr;
-	uint8_t device_id[8];
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_install_token_req
+ *
+ *  Structure representing NSM install token request.
+ */
+struct nsm_install_token_req {
+	struct nsm_common_req_v2 hdr;
+	uint32_t chunk_offset;
+	uint32_t chunk_length;
+	uint32_t length_remaining;
+	uint8_t data[1];
+} __attribute__((packed));
+
+/** @struct nsm_install_token_resp
+ *
+ *  Structure representing NSM install token response.
+ *  Contains only success / error information.
+ */
+typedef struct nsm_common_resp nsm_install_token_resp;
+
+/** @struct nsm_erase_token_req
+ *
+ *  Structure representing NSM erase token request.
+ */
+struct nsm_erase_token_req {
+	struct nsm_common_req hdr;
+	uint32_t token_type;
+} __attribute__((packed));
+
+/** @struct nsm_erase_token_resp
+ *
+ *  Structure representing NSM erase token response.
+ *  Contains only success / error information.
+ */
+typedef struct nsm_common_resp nsm_erase_token_resp;
+
+/** @struct nsm_query_token_req
+ *
+ *  Structure representing NSM query token request.
+ */
+typedef struct nsm_common_req nsm_query_token_req;
+
+/** @struct nsm_query_token_resp
+ *
+ *  Structure representing NSM query token response.
+ */
+struct nsm_query_token_resp {
+	struct nsm_common_resp hdr;
+	uint8_t tlv_payload[1];
 } __attribute__((packed));
 
 /** @brief Decode a Query token parameters request message
@@ -437,9 +502,9 @@ int encode_nsm_query_device_ids_req(uint8_t instance_id, struct nsm_msg *msg);
  * @param[out] device_id - Pointer to store the device ID
  * @return nsm_completion_codes
  */
-int decode_nsm_query_device_ids_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE]);
+int decode_nsm_query_device_ids_resp(const struct nsm_msg *msg, size_t msg_len,
+				     uint8_t *cc, uint16_t *reason_code,
+				     uint8_t *device_id, size_t *device_id_len);
 
 /**
  * @brief Encode a Query device IDs response message
@@ -451,10 +516,160 @@ int decode_nsm_query_device_ids_resp(
  * @param[out] msg - Message will be written to this
  * @return nsm_completion_codes
  */
-int encode_nsm_query_device_ids_resp(
-    uint8_t instance_id, uint8_t cc, uint16_t reason_code,
-    const uint8_t device_id[NSM_DEBUG_TOKEN_DEVICE_ID_SIZE],
-    struct nsm_msg *msg);
+int encode_nsm_query_device_ids_resp(uint8_t instance_id, uint8_t cc,
+				     uint16_t reason_code,
+				     const uint8_t *device_id,
+				     size_t device_id_len, struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Install token request message
+ *
+ * @param[in] msg - Request message
+ * @param[in] msg_len - Length of request message
+ * @param[out] chunk_offset - Pointer to store the chunk offset
+ * @param[out] chunk_length - Pointer to store the chunk length
+ * @param[out] length_remaining - Pointer to store the length remaining
+ * @param[out] data - Pointer to store the data
+ * @return nsm_completion_codes
+ */
+int decode_nsm_install_token_req(const struct nsm_msg *msg, size_t msg_len,
+				 uint32_t *chunk_offset, uint32_t *chunk_length,
+				 uint32_t *length_remaining, uint8_t *data);
+
+/**
+ * @brief Encode a Install token request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] chunk_offset - Chunk offset
+ * @param[in] chunk_length - Chunk length
+ * @param[in] length_remaining - Length remaining
+ * @param[in] data - Data
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_install_token_req(uint8_t instance_id, uint32_t chunk_offset,
+				 uint32_t chunk_length,
+				 uint32_t length_remaining, const uint8_t *data,
+				 struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Install token response message
+ *
+ * @param[in] msg - Response message
+ * @param[in] msg_len - Length of response message
+ * @param[out] cc - Completion code
+ * @param[out] reason_code - Reason code
+ * @return nsm_completion_codes
+ */
+int decode_nsm_install_token_resp(const struct nsm_msg *msg, size_t msg_len,
+				  uint8_t *cc, uint16_t *reason_code);
+
+/**
+ * @brief Encode a Install token response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_install_token_resp(uint8_t instance_id, uint8_t cc,
+				  uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Erase token request message
+ *
+ * @param[in] msg - Request message
+ * @param[in] msg_len - Length of request message
+ * @param[out] token_type - Pointer to store the token type
+ * @return nsm_completion_codes
+ */
+int decode_nsm_erase_token_req(const struct nsm_msg *msg, size_t msg_len,
+			       uint32_t *token_type);
+
+/**
+ * @brief Encode a Erase token request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] token_type - Token type
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_erase_token_req(uint8_t instance_id, uint32_t token_type,
+			       struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Erase token response message
+ *
+ * @param[in] msg - Response message
+ * @param[in] msg_len - Length of response message
+ * @param[out] cc - Completion code
+ * @param[out] reason_code - Reason code
+ * @return nsm_completion_codes
+ */
+int decode_nsm_erase_token_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code);
+
+/**
+ * @brief Encode a Erase token response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_erase_token_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Query token request message
+ *
+ * @param[in] msg - Request message
+ * @param[in] msg_len - Length of request message
+ * @return nsm_completion_codes
+ */
+int decode_nsm_query_token_req(const struct nsm_msg *msg, size_t msg_len);
+
+/**
+ * @brief Encode a Query token request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_query_token_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/**
+ * @brief Decode a Query token response message
+ *
+ * @param[in] msg - Response message
+ * @param[in] msg_len - Length of response message
+ * @param[out] cc - Completion code
+ * @param[out] reason_code - Reason code
+ * @param[out] tlv_payload - Pointer to store the TLV payload
+ * @param[out] tlv_payload_len - Pointer to store the length of the TLV payload
+ * @return nsm_completion_codes
+ */
+int decode_nsm_query_token_resp(const struct nsm_msg *msg, size_t msg_len,
+				uint8_t *cc, uint16_t *reason_code,
+				uint8_t *tlv_payload, size_t *tlv_payload_len);
+
+/**
+ * @brief Encode a Query token response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code
+ * @param[in] tlv_payload - TLV payload
+ * @param[in] tlv_payload_len - Length of the TLV payload
+ * @param[out] msg - Message will be written to this
+ * @return nsm_completion_codes
+ */
+int encode_nsm_query_token_resp(uint8_t instance_id, uint8_t cc,
+				uint16_t reason_code,
+				const uint8_t *tlv_payload,
+				size_t tlv_payload_len, struct nsm_msg *msg);
 
 #ifdef __cplusplus
 }

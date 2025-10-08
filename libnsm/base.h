@@ -34,6 +34,9 @@ extern "C" {
 #define OCP_VERSION 9
 #define OCP_VERSION_V2 10
 
+#define NSM_REQUEST_FORMAT_VERSION_1 1
+#define NSM_REQUEST_FORMAT_VERSION_2 2
+
 #define SUPPORTED_MSG_TYPE_DATA_SIZE 32
 #define SUPPORTED_COMMAND_CODE_DATA_SIZE 32
 
@@ -83,7 +86,7 @@ enum nsm_device_capability_discovery_commands {
 	NSM_PING = 0x00,
 	NSM_SUPPORTED_NVIDIA_MESSAGE_TYPES = 0x01,
 	NSM_SUPPORTED_COMMAND_CODES = 0x02,
-	NSM_SUPPORTED_EVENT_SOURCES = 0x03,
+	NSM_GET_SUPPORTED_EVENT_SOURCES = 0x03,
 	NSM_GET_CURRENT_EVENT_SOURCES = 0x04,
 	NSM_SET_CURRENT_EVENT_SOURCES = 0x05,
 	NSM_SET_EVENT_SUBSCRIPTION = 0x06,
@@ -94,12 +97,16 @@ enum nsm_device_capability_discovery_commands {
 	NSM_GET_DEVICE_CAPABILITIES = 0x0B,
 	NSM_DISCOVER_HISTOGRAM = 0x0C,
 	NSM_GET_HISTOGRAM_FORMAT = 0x0D,
-	NSM_GET_HISTOGRAM_DATA = 0x0E
+	NSM_GET_HISTOGRAM_DATA = 0x0E,
+	NSM_GET_DEVICE_CAPABILITIES_V2 = 0x11,
 };
 
 /** @brief NSM Debug Token Commands
  */
 enum nsm_debug_token_commands {
+	NSM_INSTALL_TOKEN = 0x01,
+	NSM_ERASE_TOKEN = 0x02,
+	NSM_QUERY_TOKEN = 0x03,
 	NSM_QUERY_TOKEN_PARAMETERS = 0x54,
 	NSM_PROVIDE_TOKEN = 0x55,
 	NSM_DISABLE_TOKENS = 0x56,
@@ -1174,6 +1181,16 @@ int decode_get_histogram_data_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint16_t *data_size, uint8_t *bucket_data_type,
     uint16_t *num_of_buckets, uint8_t *bucket_data, uint32_t *bucket_data_size);
+
+int encode_raw_cmd_req_v2(uint8_t instanceId, uint8_t messageType,
+			  uint8_t commandCode, const uint8_t *payload,
+			  size_t dataSize, struct nsm_msg *msg);
+
+int decode_common_req_v2(const struct nsm_msg *msg, size_t msg_len);
+
+int encode_common_req_v2(uint8_t instance_id, uint8_t nvidia_msg_type,
+			 uint8_t command, struct nsm_msg *msg);
+
 #ifdef __cplusplus
 }
 #endif

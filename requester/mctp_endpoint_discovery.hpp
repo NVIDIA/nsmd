@@ -35,9 +35,11 @@ using Active = bool;
 using DeviceType = uint8_t;
 using DeviceRole = uint8_t;
 using InstanceNumber = uint8_t;
+using MctpMedium = std::string;
+using MctpBinding = std::string;
 using DiscoveredEIDs =
-    std::map<mctp_eid_t,
-             std::tuple<uuid_t, DeviceType, InstanceNumber, Active>>;
+    std::map<eid_t, std::tuple<uuid_t, DeviceType, InstanceNumber, Active,
+                               MctpMedium, MctpBinding>>;
 using EidTable =
     std::multimap<uuid_t, std::tuple<eid_t, MctpMedium, MctpBinding>>;
 using RequesterHandler = requester::Handler<requester::Request>;
@@ -202,10 +204,16 @@ class MctpDiscovery
     std::shared_ptr<nsm::NsmDevice>
         findOrCreateNsmDevice(uint8_t deviceType, uint8_t deviceRole,
                               uint8_t instanceNumber, std::string remapPropName,
-                              std::string remapPropValue);
+                              std::vector<std::string>& remapPropValues);
+    template <typename T>
+    bool containsValue(
+        const T& value,
+        const std::variant<std::vector<uint8_t>, std::vector<uuid_t>>&
+            remapPropValues) const;
     std::shared_ptr<nsm::NsmDevice>
         mapNsmDeviceUsingEid(eid_t eid, uuid_t mctpUuid, uint8_t deviceType,
-                             uint8_t instanceNumber, bool active);
+                             uint8_t instanceNumber, bool active,
+                             MctpMedium mctpMedium, MctpBinding mctpBinding);
     int mapMctpEIDForNsmDevice(std::shared_ptr<nsm::NsmDevice> nsmDevice);
     void handleMctpStateTransition(const std::string objPath,
                                    [[maybe_unused]] const bool state);

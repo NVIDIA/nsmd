@@ -893,6 +893,46 @@ int decode_common_req(const struct nsm_msg *msg, size_t msg_len)
 	return NSM_SW_SUCCESS;
 }
 
+int encode_common_req_v2(uint8_t instance_id, uint8_t nvidia_msg_type,
+			 uint8_t command, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {NSM_REQUEST, instance_id,
+					 nvidia_msg_type};
+	uint8_t rc = pack_nsm_header_v2(&header, &(msg->hdr));
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_common_req_v2 *request =
+	    (struct nsm_common_req_v2 *)msg->payload;
+	request->command = command;
+	request->data_size = 0;
+	return NSM_SW_SUCCESS;
+}
+
+int decode_common_req_v2(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	uint8_t rc = unpack_nsm_header(&msg->hdr, &header);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_req_v2)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return NSM_SW_SUCCESS;
+}
+
 int encode_common_resp(uint8_t instance_id, uint8_t cc, uint16_t reason_code,
 		       uint8_t nvidia_msg_type, uint8_t command,
 		       struct nsm_msg *msg)
@@ -1139,6 +1179,30 @@ int encode_raw_cmd_req(uint8_t instanceId, uint8_t messageType,
 	struct nsm_common_req *request = (struct nsm_common_req *)msg->payload;
 	request->data_size = dataSize;
 
+	return NSM_SW_SUCCESS;
+}
+
+int encode_raw_cmd_req_v2(uint8_t instanceId, uint8_t messageType,
+			  uint8_t commandCode, const uint8_t *payload,
+			  size_t dataSize, struct nsm_msg *msg)
+{
+	if (!msg || (dataSize > 0 && !payload)) {
+		return NSM_SW_ERROR_NULL;
+	}
+	uint8_t rc =
+	    encode_common_req_v2(instanceId, messageType, commandCode, msg);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+	// Copy the command data into the payload after the common request
+	if (dataSize > 0) {
+		memcpy(msg->payload + sizeof(struct nsm_common_req_v2), payload,
+		       dataSize);
+	}
+	// Set the data_size to the size of the command data
+	struct nsm_common_req_v2 *request =
+	    (struct nsm_common_req_v2 *)msg->payload;
+	request->data_size = dataSize;
 	return NSM_SW_SUCCESS;
 }
 

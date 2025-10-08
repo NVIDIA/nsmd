@@ -5,6 +5,8 @@ dep_src_files = [
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
+    '../../libnsm/device-capability-discovery.c',
+    '../../libnsm/firmware-utils.c',
     '../../libnsm/platform-environmental.c',
     '../../libnsm/device-configuration.c',
     '../../libnsm/diagnostics.c',
