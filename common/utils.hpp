@@ -76,7 +76,8 @@ using PropertyValuesCollection =
 #define MANUFACTURER_NVIDIA "NVIDIA"
 #define HEALTH_TYPE_OK                                                         \
     "xyz.openbmc_project.State.Decorator.Health.HealthType.OK"
-#define PCIE_DEVICE_TYPE_SINGLE_FUNCTION "SingleFunction"
+#define PCIE_DEVICE_TYPE_SINGLE_FUNCTION                                       \
+    "xyz.openbmc_project.Inventory.Item.PCIeDevice.SingleFunction"
 
 // Largest safe integer for double precision (2^53 - 1)
 const uint64_t MAX_SAFE_INTEGER_IN_DOUBLE = (1ULL << 53) - 1;
