@@ -3616,8 +3616,8 @@ requester::Coroutine createNsmProcessorSensor(SensorManager& manager,
             createTotalNvLinksCount(nsmDevice, bus, name, type,
                                     inventoryObjPath);
         }
-        if (allCurrentIfaceProperties.count("EGMSupported") &&
-            std::get<bool>(allCurrentIfaceProperties.at("EGMSupported")))
+        if (allCurrentIfaceProperties.count("EGMModeSupported") &&
+            std::get<bool>(allCurrentIfaceProperties.at("EGMModeSupported")))
         {
             createEGMMode(nsmDevice, bus, name, type, inventoryObjPath);
         }

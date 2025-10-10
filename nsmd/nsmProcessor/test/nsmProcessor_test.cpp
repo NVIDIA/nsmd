@@ -1633,7 +1633,7 @@ TEST_F(NsmProcessorTest, goodCreateMemCapacityUtilWithoutDuplicate)
     propertyMap["PowerSmoothingSupported"] = false;
     propertyMap["MIGModeSupported"] = false;
     propertyMap["TotalNvLinksCountSupported"] = false;
-    propertyMap["EGMSupported"] = false;
+    propertyMap["EGMModeSupported"] = false;
     propertyMap["PortDisableFutureSupported"] = false;
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ProcessorAttributes", objPath);
@@ -1706,7 +1706,7 @@ TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
     propertyMap["PowerSmoothingSupported"] = false;
     propertyMap["MIGModeSupported"] = false;
     propertyMap["TotalNvLinksCountSupported"] = false;
-    propertyMap["EGMSupported"] = false;
+    propertyMap["EGMModeSupported"] = false;
     propertyMap["PortDisableFutureSupported"] = false;
     createNsmProcessorSensor(mockManager,
                              basicIntfName + ".ProcessorAttributes", objPath);
