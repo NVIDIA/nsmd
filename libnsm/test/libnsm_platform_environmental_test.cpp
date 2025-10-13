@@ -18,6 +18,7 @@
 #include "base.h"
 #include "common-tests.hpp"
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -6302,4 +6303,112 @@ TEST(LongRunningGetEccMode, testEncodeDecode)
 	testDecodeLongRunningResponse<bitfield8_t>(
 	    &decode_get_ECC_mode_event_resp, NSM_TYPE_PLATFORM_ENVIRONMENTAL,
 	    NSM_GET_ECC_MODE, expected, flags);
+}
+
+TEST(encode4ByteOfUint32Sample, testGoodEncode)
+{
+	uint32_t sample = 123456789;
+	uint8_t data[4];
+	size_t data_len = 0;
+
+	auto rc = encode4ByteOfUint32Sample(sample, data, &data_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data_len, 4);
+	EXPECT_EQ(data[0], 0x15);
+	EXPECT_EQ(data[1], 0xcd);
+	EXPECT_EQ(data[2], 0x5b);
+	EXPECT_EQ(data[3], 0x07);
+}
+
+TEST(encode4ByteOfUint32Sample, testBadEncode)
+{
+	uint32_t sample = 123456789;
+	uint8_t data[4];
+	size_t data_len = 0;
+
+	auto rc = encode4ByteOfUint32Sample(sample, NULL, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode4ByteOfUint32Sample(sample, data, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode4ByteOfUint32Sample, testGoodDecode)
+{
+	uint8_t data[4] = {0xE8, 0x03, 0x00, 0x00};
+	size_t data_len = 4;
+	uint32_t sample = 0;
+
+	auto rc = decode4ByteOfUint32Sample(data, data_len, &sample);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sample, 1000);
+}
+
+TEST(decode4ByteOfUint32Sample, testBadDecode)
+{
+	uint8_t data[4] = {0xE8, 0x03, 0x00, 0x00};
+	size_t data_len = 4;
+	uint32_t sample = 0;
+
+	auto rc = decode4ByteOfUint32Sample(NULL, data_len, &sample);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode4ByteOfUint32Sample(data, data_len, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode4ByteOfUint32Sample(data, data_len - 1, &sample);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(encode2ByteOfUint16Sample, testGoodEncode)
+{
+	uint16_t sample = 12345;
+	uint8_t data[2];
+	size_t data_len = 0;
+
+	auto rc = encode2ByteOfUint16Sample(sample, data, &data_len);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(data_len, 2);
+	EXPECT_EQ(data[0], 0x39);
+	EXPECT_EQ(data[1], 0x30);
+}
+
+TEST(encode2ByteOfUint16Sample, testBadEncode)
+{
+	uint16_t sample = 12345;
+	uint8_t data[2];
+	size_t data_len = 0;
+
+	auto rc = encode2ByteOfUint16Sample(sample, NULL, &data_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode2ByteOfUint16Sample(sample, data, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(decode2ByteOfUint16Sample, testGoodDecode)
+{
+	uint8_t data[2] = {0x03, 0x00};
+	size_t data_len = 2;
+	uint16_t sample = 0;
+
+	auto rc = decode2ByteOfUint16Sample(data, data_len, &sample);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(sample, 3);
+}
+
+TEST(decode2ByteOfUint16Sample, testBadDecode)
+{
+	uint8_t data[2] = {0x00, 0x03};
+	size_t data_len = 2;
+	uint16_t sample = 0;
+
+	auto rc = decode2ByteOfUint16Sample(NULL, data_len, &sample);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode2ByteOfUint16Sample(data, data_len, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode2ByteOfUint16Sample(data, data_len - 1, &sample);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }

@@ -7,6 +7,7 @@ dep_src_files = [
     '../diagnostics.c',
     '../firmware-utils.c',
     '../platform-environmental.c',
+    '../powersmoothing-powerprofile-api-v2.c',
     '../network-ports.c',
     '../pci-links.c',
 ]
