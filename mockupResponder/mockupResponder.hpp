@@ -601,6 +601,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getPresetProfileInfoV2(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        dotCAKBypassHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
     std::optional<Request>
         getQueryScalarGroupTelemetryResponse(uint8_t requestInstanceId,

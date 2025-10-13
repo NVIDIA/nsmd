@@ -1884,3 +1884,93 @@ int decode_nsm_dot_cak_install_resp(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_nsm_dot_cak_bypass_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_dot_cak_bypass_req *request =
+	    (nsm_dot_cak_bypass_req *)msg->payload;
+	request->command = NSM_FW_DOT_CAK_BYPASS;
+	request->reserved1 = 0;
+	request->reserved2 = 0;
+	request->data_size = 0; // No additional data
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_bypass_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_dot_cak_bypass_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_cak_bypass_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_DOT_CAK_BYPASS, msg);
+	}
+
+	nsm_dot_cak_bypass_resp *response =
+	    (nsm_dot_cak_bypass_resp *)msg->payload;
+	response->command = NSM_FW_DOT_CAK_BYPASS;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_bypass_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	// For success case, set reason_code to ERR_NULL
+	*reason_code = ERR_NULL;
+
+	return NSM_SW_SUCCESS;
+}

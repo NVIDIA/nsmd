@@ -2080,3 +2080,285 @@ TEST(DotCAKInstall, testBoundaryConditions)
 	EXPECT_EQ(NSM_ERROR, cc);
 	EXPECT_EQ(0x1234, reason_code);
 }
+
+TEST(DotCAKBypass, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_bypass_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_bypass_req(0, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Check NSM header
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+	EXPECT_EQ(OCP_VERSION_V2, request->hdr.ocp_version);
+
+	// Check command header
+	nsm_dot_cak_bypass_req *req =
+	    (nsm_dot_cak_bypass_req *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_BYPASS, req->command);
+	EXPECT_EQ(0, le16toh(req->data_size)); // No data
+}
+
+TEST(DotCAKBypass, testGoodDecodeRequest)
+{
+	// Build a valid request message
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_bypass_req));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	// Fill header
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+
+	// Fill command
+	nsm_dot_cak_bypass_req *req =
+	    (nsm_dot_cak_bypass_req *)request->payload;
+	req->command = NSM_FW_DOT_CAK_BYPASS;
+	req->data_size = 0;
+
+	auto rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(DotCAKBypass, testShortDecodeRequest)
+{
+	// Test with too short message
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 2);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size());
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotCAKBypass, testNullDecodeRequest)
+{
+	auto rc = decode_nsm_dot_cak_bypass_req(nullptr, 100);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotCAKBypass, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc =
+	    encode_nsm_dot_cak_bypass_resp(0, NSM_SUCCESS, ERR_NULL, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Check NSM header
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
+	EXPECT_EQ(OCP_VERSION_V2, response->hdr.ocp_version);
+
+	// Check response
+	nsm_common_resp *resp = (nsm_common_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_BYPASS, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+	EXPECT_EQ(0, le16toh(resp->data_size));
+}
+
+TEST(DotCAKBypass, testGoodDecodeResponse)
+{
+	// Manually construct a valid success response with V2 header
+	std::vector<uint8_t> responseMsg = {
+	    0x15,
+	    0x68,		   // PCI Vendor ID (little endian)
+	    0x00,		   // Request=0, Datagram=0, Instance=0
+	    0x8A,		   // OCP_VER=10 (V2), Nvidia msg type=6
+	    0x06,		   // Nvidia msg type (firmware)
+	    NSM_FW_DOT_CAK_BYPASS, // command
+	    NSM_SUCCESS,	   // completion code
+	    0x04,
+	    0x00,		   // data_size = 4 (sizeof response fields)
+	    NSM_FW_DOT_CAK_BYPASS, // response command_code
+	    NSM_SUCCESS,	   // response completion_code
+	    0x00,
+	    0x00 // reserved = 0
+	};
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc = NSM_ERROR;
+	uint16_t reason_code = 0xFFFF;
+
+	auto rc = decode_nsm_dot_cak_bypass_resp(response, responseMsg.size(),
+						 &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+}
+
+TEST(DotCAKBypass, testBadDecodeResponse)
+{
+	// Manually construct an error response with V2 header
+	std::vector<uint8_t> errorMsg = {
+	    0x15,
+	    0x68,		   // PCI Vendor ID (little endian)
+	    0x00,		   // Request=0, Datagram=0, Instance=0
+	    0x8A,		   // OCP_VER=10 (V2), Nvidia msg type=6
+	    0x06,		   // Nvidia msg type (firmware)
+	    NSM_FW_DOT_CAK_BYPASS, // command
+	    NSM_ERROR,		   // completion code (error)
+	    0x34,
+	    0x12 // reason code 0x1234 (little endian)
+	};
+	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	uint8_t cc = NSM_SUCCESS;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_nsm_dot_cak_bypass_resp(
+	    error_response, errorMsg.size(), &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x1234, reason_code);
+}
+
+TEST(DotCAKBypass, testEncodeDecodeRoundTrip)
+{
+	// Test request round-trip
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_bypass_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_bypass_req(5, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(5, request->hdr.instance_id);
+}
+
+TEST(DotCAKBypass, testEncodeDecodeResponseRoundTrip)
+{
+	// Test success response round-trip
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t original_instance_id = 7;
+	uint8_t original_cc = NSM_SUCCESS;
+	uint16_t original_reason_code = ERR_NULL;
+
+	auto rc = encode_nsm_dot_cak_bypass_resp(
+	    original_instance_id, original_cc, original_reason_code, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_cc = NSM_ERROR;
+	uint16_t decoded_reason_code = 0xFFFF;
+
+	rc = decode_nsm_dot_cak_bypass_resp(response, responseMsg.size(),
+					    &decoded_cc, &decoded_reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(original_cc, decoded_cc);
+	EXPECT_EQ(original_reason_code, decoded_reason_code);
+
+	// Test error response round-trip
+	std::vector<uint8_t> errorMsg(sizeof(nsm_msg_hdr) +
+				      sizeof(nsm_common_non_success_resp));
+	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	uint16_t error_reason_code = 0xABCD;
+	rc = encode_nsm_dot_cak_bypass_resp(original_instance_id, NSM_ERROR,
+					    error_reason_code, error_response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_error_cc = NSM_SUCCESS;
+	uint16_t decoded_error_reason_code = ERR_NULL;
+
+	rc = decode_nsm_dot_cak_bypass_resp(error_response, errorMsg.size(),
+					    &decoded_error_cc,
+					    &decoded_error_reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, decoded_error_cc);
+	EXPECT_EQ(error_reason_code, decoded_error_reason_code);
+}
+
+TEST(DotCAKBypass, testNullPointerHandling)
+{
+	// Test null message in encode
+	auto rc = encode_nsm_dot_cak_bypass_req(0, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test null message in decode
+	rc = decode_nsm_dot_cak_bypass_req(nullptr, 100);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test null response message in encode
+	rc = encode_nsm_dot_cak_bypass_resp(0, NSM_SUCCESS, ERR_NULL, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test null parameters in decode response
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	rc = decode_nsm_dot_cak_bypass_resp(nullptr, responseMsg.size(), &cc,
+					    &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_cak_bypass_resp(response, responseMsg.size(),
+					    nullptr, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_cak_bypass_resp(response, responseMsg.size(), &cc,
+					    nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotCAKBypass, testBoundaryConditions)
+{
+	// Test minimum valid message size for request
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_bypass_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_bypass_req(0, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode with exact size - should succeed
+	rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size());
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode with one byte less - should fail
+	rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size() - 1);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test error response message handling
+	std::vector<uint8_t> errorMsg = {
+	    0x15,
+	    0x68,		   // PCI Vendor ID (little endian)
+	    0x00,		   // Request=0, Datagram=0, Instance=0
+	    0x8A,		   // OCP_VER=10 (V2), Nvidia msg type=6
+	    0x06,		   // Nvidia msg type (firmware)
+	    NSM_FW_DOT_CAK_BYPASS, // command
+	    NSM_ERROR,		   // completion code (error)
+	    0x34,
+	    0x12 // reason code 0x1234 (little endian)
+	};
+	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	rc = decode_nsm_dot_cak_bypass_resp(error_response, errorMsg.size(),
+					    &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(0x1234, reason_code);
+}

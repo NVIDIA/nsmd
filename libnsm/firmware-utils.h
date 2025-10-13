@@ -42,7 +42,8 @@ enum nsm_firmware_commands {
 	NSM_FW_DOT_DISABLE = 0x25,
 	NSM_FW_DOT_OVERRIDE = 0x26,
 	NSM_FW_DOT_UNLOCK_CHALLENGE = 0x27,
-	NSM_FW_DOT_RECOVERY = 0x28
+	NSM_FW_DOT_RECOVERY = 0x28,
+	NSM_FW_DOT_CAK_BYPASS = 0x29
 };
 
 /** @struct nsm_firmware_state_information_fields
@@ -518,6 +519,20 @@ struct nsm_dot_cak_install_resp_command {
 	struct nsm_common_resp hdr;
 	struct nsm_dot_cak_install_resp dot_cak_install_resp;
 } __attribute__((packed));
+
+/** @struct nsm_dot_cak_bypass_req
+ *
+ *  Structure representing DotCAKBypass request.
+ *  Request contains only command (no additional data).
+ */
+typedef struct nsm_common_req_v2 nsm_dot_cak_bypass_req;
+
+/** @struct nsm_dot_cak_bypass_resp
+ *
+ *  Structure representing DotCAKBypass response.
+ *  Contains only success / error information.
+ */
+typedef struct nsm_common_resp nsm_dot_cak_bypass_resp;
 
 /** @struct nsm_firmware_aggregate_tag
  *
@@ -1230,6 +1245,56 @@ int encode_nsm_dot_cak_install_resp(uint8_t instance_id, uint8_t cc,
 int decode_nsm_dot_cak_install_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, struct nsm_dot_cak_install_resp *dot_cak_resp);
+
+/**
+ * @brief Encode nsm DotCAKBypass request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_cak_bypass_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DotCAKBypass request message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int decode_nsm_dot_cak_bypass_req(const struct nsm_msg *msg, size_t msg_len);
+
+/**
+ * @brief Encode nsm DotCAKBypass response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Command completion code
+ * @param[in] reason_code - Reason code
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_cak_bypass_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DotCAKBypass response message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ * @param[out] cc - Command completion code
+ * @param[out] reason_code - Reason code
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int decode_nsm_dot_cak_bypass_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code);
 
 #ifdef __cplusplus
 }

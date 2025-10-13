@@ -1216,9 +1216,9 @@ class DotCAKInstall : public CommandInterface
         res << std::hex << std::setw(2) << std::setfill('0')
             << (int)dot_cak_resp.reserved;
 
-        result["command_code"] = cmdCode.str();
-        result["completion_code"] = compCode.str();
-        result["reserved"] = res.str();
+        result["Command code"] = cmdCode.str();
+        result["Completion code"] = compCode.str();
+        result["Reserved"] = res.str();
 
         DisplayInJson(result);
     }
@@ -1308,6 +1308,107 @@ class DotCAKInstall : public CommandInterface
     }
 };
 
+class DotCAKBypass : public CommandInterface
+{
+  public:
+    ~DotCAKBypass() = default;
+    DotCAKBypass() = delete;
+    DotCAKBypass(const DotCAKBypass&) = delete;
+    DotCAKBypass(DotCAKBypass&&) = default;
+    DotCAKBypass& operator=(const DotCAKBypass&) = delete;
+    DotCAKBypass& operator=(DotCAKBypass&&) = default;
+
+    explicit DotCAKBypass(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        // No parameters required for this command
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_cak_bypass_req));
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_cak_bypass_req(instanceId, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (payloadLength < sizeof(nsm_common_resp))
+        {
+            std::cerr << "Response payload length too short\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_nsm_dot_cak_bypass_resp(responsePtr, payloadLength,
+                                                 &cc, &reason_code);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        // Output response fields according to spec
+        ordered_json result;
+
+        // Add NSM header info as hex bytes
+        std::stringstream nsmHeaderHex;
+        for (int i = 0; i < 5; i++)
+        {
+            nsmHeaderHex << std::hex << std::setw(2) << std::setfill('0')
+                         << (int)((uint8_t*)&responsePtr->hdr)[i];
+            if (i < 4)
+                nsmHeaderHex << " ";
+        }
+        result["nsm_header"] = nsmHeaderHex.str();
+
+        // For error responses, show reason code instead of detailed fields
+        if (cc != NSM_SUCCESS)
+        {
+            std::stringstream cmdCode;
+            cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                    << (int)NSM_FW_DOT_CAK_BYPASS;
+            result["Command code"] = cmdCode.str();
+
+            std::stringstream compCode;
+            compCode << std::hex << std::setw(2) << std::setfill('0')
+                     << (int)cc;
+            result["Completion code"] = compCode.str();
+
+            std::stringstream reasonCode;
+            reasonCode << std::hex << std::setw(4) << std::setfill('0')
+                       << (int)reason_code;
+            result["reasonCode"] = reasonCode.str();
+        }
+        else
+        {
+            // Success case - show all fields per spec
+            auto* resp =
+                reinterpret_cast<nsm_common_resp*>(responsePtr->payload);
+            std::stringstream cmdCode, compCode, res;
+            cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                    << (int)resp->command;
+            compCode << std::hex << std::setw(2) << std::setfill('0')
+                     << (int)resp->completion_code;
+            res << std::hex << std::setw(4) << std::setfill('0')
+                << (int)le16toh(resp->reserved);
+
+            result["Command code"] = cmdCode.str();
+            result["Completion code"] = compCode.str();
+            result["Reserved"] = res.str();
+        }
+
+        DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -1351,5 +1452,9 @@ void registerCommand(CLI::App& app)
         "DotCAKInstall", "Cak install command in uninitialized state");
     commands.push_back(std::make_unique<DotCAKInstall>(
         "firmware", "DotCAKInstall", dotCAKInstall));
+    auto dotCAKBypass = firmware->add_subcommand(
+        "DotCAKBypass", "Bypass DOT CAK install and continue boot");
+    commands.push_back(std::make_unique<DotCAKBypass>(
+        "firmware", "DotCAKBypass", dotCAKBypass));
 }
 } // namespace nsmtool::firmware

@@ -376,7 +376,7 @@ std::optional<Response>
         }
     }
     auto request = reinterpret_cast<const nsm_msg*>(hdr);
-    size_t requestLen = rxMsg.size() - MCTP_DEMUX_PREFIX;
+    size_t requestLen = rxMsg.size();
 
     auto nvidiaMsgType = request->hdr.nvidia_msg_type;
     auto command = request->payload[0];
@@ -743,6 +743,8 @@ std::optional<Response>
                     return updateMinSecurityVersion(request, requestLen);
                 case NSM_FW_DOT_CAK_INSTALL:
                     return dotCAKInstallHandler(request, requestLen);
+                case NSM_FW_DOT_CAK_BYPASS:
+                    return dotCAKBypassHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -872,7 +874,7 @@ std::optional<std::vector<uint8_t>>
                  {3, {0, 2, 3, 4, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
-                 {6, {1, NSM_FW_DOT_CAK_INSTALL}},
+                 {6, {1, NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_CAK_BYPASS}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -933,7 +935,9 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
-                 {6, {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL}},
+                 {6,
+                  {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL,
+                   NSM_FW_DOT_CAK_BYPASS}},
              }},
             {NSM_DEV_ID_EROT,
              {
@@ -945,7 +949,7 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
                    NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
-                   NSM_FW_DOT_CAK_INSTALL}},
+                   NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_CAK_BYPASS}},
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {
@@ -7698,6 +7702,52 @@ std::optional<std::vector<uint8_t>>
     if (verbose)
     {
         lg2::info("DOT CAK Install response encoded successfully");
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotCAKBypassHandler(const nsm_msg* requestMsg,
+                                         size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT CAK Bypass request");
+    }
+
+    // Decode the request (simple validation)
+    auto rc = decode_nsm_dot_cak_bypass_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_cak_bypass_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Bypass request decoded successfully");
+    }
+
+    // For mock implementation, we'll always return success
+    // In a real implementation, this would bypass the DOT CAK installation
+    // and allow the system to continue booting
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_cak_bypass_resp(requestMsg->hdr.instance_id,
+                                        NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_cak_bypass_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Bypass response encoded successfully");
     }
 
     return response;
