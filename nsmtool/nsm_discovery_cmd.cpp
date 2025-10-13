@@ -665,6 +665,7 @@ class GetDeviceCapabilitiesV2 : public CommandInterface
         auto rc = decode_nsm_get_device_capabilities_v2_resp(
             responsePtr, payloadLength, &cc, &reasonCode, &timestampGeneration,
             &maximumInputBufferSize);
+
         if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -697,6 +698,106 @@ class GetDeviceCapabilitiesV2 : public CommandInterface
                 return "Unknown value: " + std::to_string(timestampGeneration);
         }
     }
+};
+
+class GetGpioState : public CommandInterface
+{
+  public:
+    ~GetGpioState() = default;
+    GetGpioState() = delete;
+    GetGpioState(const GetGpioState&) = delete;
+    GetGpioState(GetGpioState&&) = default;
+    GetGpioState& operator=(const GetGpioState&) = delete;
+    GetGpioState& operator=(GetGpioState&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetGpioState(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto gpioStateOptionGroup = app->add_option_group(
+            "Required", "GPIO offset and length parameters");
+
+        offset = 0;
+        length = 0;
+        gpioStateOptionGroup
+            ->add_option("-o, --offset", offset,
+                         "Starting GPIO index offset (0-65535)")
+            ->required();
+        gpioStateOptionGroup
+            ->add_option("-l, --length", length,
+                         "Number of GPIO states to retrieve (1-65535)")
+            ->required();
+        gpioStateOptionGroup->require_option(2);
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_get_gpio_state_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_gpio_state_req(instanceId, offset, length,
+                                            request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_ERROR;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t resp_offset;
+        uint16_t resp_length;
+        std::vector<uint8_t> gpioValues(65535, 0);
+        uint32_t gpioValuesSize;
+
+        auto rc = decode_get_gpio_state_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &resp_offset,
+            &resp_length, gpioValues.data(), &gpioValuesSize);
+        if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+        {
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+            return;
+        }
+
+        ordered_json result;
+        result["Completion Code"] = cc;
+        result["Offset"] = resp_offset;
+        result["Length"] = resp_length;
+        result["GPIO Values Size (bytes)"] = gpioValuesSize;
+
+        // Parse GPIO values bit by bit
+        ordered_json gpioStates = ordered_json::array();
+        for (uint32_t byteIndex = 0; byteIndex < gpioValuesSize; ++byteIndex)
+        {
+            uint8_t byteValue = gpioValues[byteIndex];
+            for (uint8_t bitIndex = 0; bitIndex < 8; ++bitIndex)
+            {
+                uint16_t gpioIndex = resp_offset + (byteIndex * 8) + bitIndex;
+
+                // Only process up to resp_length GPIOs
+                if ((byteIndex * 8 + bitIndex) >= resp_length)
+                {
+                    break;
+                }
+
+                bool bitValue = (byteValue >> bitIndex) & 0x01;
+                ordered_json gpioEntry;
+                gpioEntry["GPIO Index"] = gpioIndex;
+                gpioEntry["Value"] = bitValue ? "HIGH" : "LOW";
+                gpioEntry["Binary"] = bitValue ? 1 : 0;
+                gpioStates.push_back(gpioEntry);
+            }
+        }
+        result["GPIO States"] = gpioStates;
+
+        nsmtool::helper::DisplayInJson(result);
+    }
+
+  private:
+    uint16_t offset;
+    uint16_t length;
 };
 
 void registerCommand(CLI::App& app)
@@ -741,6 +842,11 @@ void registerCommand(CLI::App& app)
         "GetDeviceCapabilitiesV2", "get device capabilities v2");
     commands.push_back(std::make_unique<GetDeviceCapabilitiesV2>(
         "discovery", "GetDeviceCapabilitiesV2", getDeviceCapabilitiesV2));
+
+    auto getGpioState = discovery->add_subcommand(
+        "GetGpioState", "get GPIO states for specified offset and length");
+    commands.push_back(std::make_unique<GetGpioState>(
+        "discovery", "GetGpioState", getGpioState));
 }
 
 } // namespace discovery

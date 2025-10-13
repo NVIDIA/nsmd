@@ -133,6 +133,7 @@ valid_nsmd_subdirs = [
     'nsmDeviceInventory',
     'nsmDumpCollection',
     'nsmSensors',
+    'nsmGPIO',
     'nsmGPM',
     'nsmFirmwareUtils',
     'nsmManagers',

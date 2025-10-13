@@ -20,6 +20,7 @@
 #include "firmware-utils.h"
 #include <endian.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int encode_nsm_get_event_source_req(uint8_t command, uint8_t instance_id,
@@ -767,4 +768,100 @@ int decode_nsm_get_device_capabilities_v2_resp(
 	}
 
 	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_gpio_state_change_event(
+    uint8_t instance_id, bool ackr,
+    const struct nsm_gpio_state_change_event_payload *payload,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	size_t payload_size =
+	    sizeof(struct nsm_gpio_state_change_event_payload) -
+	    sizeof(struct nsm_gpio_event) +
+	    (payload->num_gpio_events * sizeof(struct nsm_gpio_event));
+
+	uint8_t event_data[NSM_EVENT_DATA_MAX_LEN];
+	struct nsm_gpio_state_change_event_payload temp_payload = *payload;
+	temp_payload.timestamp_low = htole32(temp_payload.timestamp_low);
+	temp_payload.timestamp_high = htole32(temp_payload.timestamp_high);
+	temp_payload.num_gpio_events = htole16(temp_payload.num_gpio_events);
+
+	// Copy the fixed part (timestamps and num_gpio_events)
+	size_t cpySize = sizeof(struct nsm_gpio_state_change_event_payload) -
+			 sizeof(struct nsm_gpio_event);
+	memcpy(event_data, &temp_payload, cpySize);
+
+	// Copy and convert each gpio_event
+	for (uint16_t i = 0; i < payload->num_gpio_events; i++) {
+		uint16_t gpio_event_raw;
+		memcpy(&gpio_event_raw, &payload->gpio_events[i],
+		       sizeof(uint16_t));
+		gpio_event_raw = htole16(gpio_event_raw);
+		memcpy(event_data + cpySize + i * sizeof(struct nsm_gpio_event),
+		       &gpio_event_raw, sizeof(uint16_t));
+	}
+
+	return encode_nsm_event(
+	    instance_id, NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY, ackr,
+	    NSM_EVENT_VERSION, NSM_GPIO_STATE_CHANGE_EVENT,
+	    NSM_GENERAL_EVENT_CLASS, 0, payload_size, event_data, msg);
+}
+
+int decode_nsm_gpio_state_change_event(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
+    uint16_t *event_state, struct nsm_gpio_state_change_event_payload **payload)
+{
+	if (msg == NULL || event_class == NULL || event_state == NULL ||
+	    payload == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) + NSM_EVENT_MIN_LEN) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_event *event = (struct nsm_event *)msg->payload;
+
+	/* Minimum payload size: timestamp + num_gpio_events */
+	if (event->data_size <
+	    (sizeof(struct nsm_gpio_state_change_event_payload) -
+	     sizeof(struct nsm_gpio_event))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*event_class = event->event_class;
+	*event_state = le16toh(event->event_state);
+
+	*payload = (struct nsm_gpio_state_change_event_payload *)event->data;
+
+	/* Convert from little endian */
+	(*payload)->timestamp_low = le32toh((*payload)->timestamp_low);
+	(*payload)->timestamp_high = le32toh((*payload)->timestamp_high);
+	(*payload)->num_gpio_events = le16toh((*payload)->num_gpio_events);
+
+	/* Verify the payload size matches the expected size */
+	size_t expected_size =
+	    sizeof(struct nsm_gpio_state_change_event_payload) -
+	    sizeof(struct nsm_gpio_event) +
+	    ((*payload)->num_gpio_events * sizeof(struct nsm_gpio_event));
+	if (event->data_size != expected_size) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	/* Convert GPIO events from little endian */
+	for (uint16_t i = 0; i < (*payload)->num_gpio_events; i++) {
+		/* Convert the 16-bit GPIO event data from little endian */
+		uint16_t gpio_data;
+		memcpy(&gpio_data, &(*payload)->gpio_events[i],
+		       sizeof(uint16_t));
+		gpio_data = le16toh(gpio_data);
+		memcpy(&(*payload)->gpio_events[i], &gpio_data,
+		       sizeof(uint16_t));
+	}
+
+	return NSM_SUCCESS;
 }

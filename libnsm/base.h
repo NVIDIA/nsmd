@@ -78,6 +78,7 @@ enum nsm_type {
 	NSM_TYPE_DIAGNOSTIC = 4,
 	NSM_TYPE_DEVICE_CONFIGURATION = 5,
 	NSM_TYPE_FIRMWARE = 6,
+	NSM_TYPE_UNKNOWN = 0xFF,
 };
 
 /** @brief NSM Type0 Device Capability Discovery Commands
@@ -98,6 +99,8 @@ enum nsm_device_capability_discovery_commands {
 	NSM_DISCOVER_HISTOGRAM = 0x0C,
 	NSM_GET_HISTOGRAM_FORMAT = 0x0D,
 	NSM_GET_HISTOGRAM_DATA = 0x0E,
+	NSM_GET_GPIO_STATE = 0x0F,
+	NSM_SET_GPIO_STATE = 0x10,
 	NSM_GET_DEVICE_CAPABILITIES_V2 = 0x11,
 };
 
@@ -668,6 +671,53 @@ struct nsm_get_histogram_data_resp {
 	uint8_t bucket_data[1];
 } __attribute__((packed));
 
+/** @struct nsm_get_gpio_state_req
+ *
+ *  Structure representing NSM Get GPIO State request.
+ */
+struct nsm_get_gpio_state_req {
+	struct nsm_common_req_v2 hdr;
+	uint16_t offset;
+	uint16_t length;
+} __attribute__((packed));
+
+/** @struct nsm_get_gpio_state_resp
+ *
+ *  Structure representing NSM Get GPIO State response.
+ *  Contains the common response header, offset, length, and an array to store
+ * GPIO values.
+ */
+struct nsm_get_gpio_state_resp {
+	struct nsm_common_resp hdr;
+	uint16_t offset;
+	uint16_t length;
+	uint8_t gpio_values[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_gpio_state_req
+ *
+ *  Structure representing NSM Set GPIO State request.
+ */
+struct nsm_set_gpio_state_req {
+	struct nsm_common_req_v2 hdr;
+	uint16_t offset;
+	uint16_t length;
+	uint8_t gpio_values[1];
+} __attribute__((packed));
+
+/** @struct nsm_set_gpio_state_resp
+ *
+ *  Structure representing NSM Set GPIO State response.
+ *  Contains the common response header, offset, length, and an array to store
+ * GPIO values.
+ */
+struct nsm_set_gpio_state_resp {
+	struct nsm_common_resp hdr;
+	uint16_t offset;
+	uint16_t length;
+	uint8_t gpio_values[1];
+} __attribute__((packed));
+
 /**
  * @brief Populate the NSM message with the NSM header.The caller of this API
  *        allocates buffer for the NSM header when forming the NSM message.
@@ -1204,6 +1254,126 @@ int decode_common_req_v2(const struct nsm_msg *msg, size_t msg_len);
 
 int encode_common_req_v2(uint8_t instance_id, uint8_t nvidia_msg_type,
 			 uint8_t command, struct nsm_msg *msg);
+
+/** @brief Encode a Get GPIO State request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] offset - GPIO offset
+ *  @param[in] length - Number of GPIOs to get
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_gpio_state_req(uint8_t instance_id, uint16_t offset,
+			      uint16_t length, struct nsm_msg *msg);
+
+/** @brief Decode a Get GPIO State request message
+ *
+ *  @param[in] msg - Request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] offset - Pointer to store GPIO offset
+ *  @param[out] length - Pointer to store number of GPIOs to get
+ *  @return nsm_completion_codes
+ */
+int decode_get_gpio_state_req(const struct nsm_msg *msg, size_t msg_len,
+			      uint16_t *offset, uint16_t *length);
+
+/** @brief Encode a Get GPIO State response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - NSM Reason Code
+ *  @param[in] offset - GPIO offset
+ *  @param[in] length - Number of GPIOs in the response
+ *  @param[in] gpio_values - Pointer to array of GPIO values
+ *  @param[in] gpio_values_size - Size of gpio_values array in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_gpio_state_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, uint16_t offset,
+			       uint16_t length, const uint8_t *gpio_values,
+			       uint32_t gpio_values_size, struct nsm_msg *msg);
+
+/** @brief Decode a Get GPIO State response message
+ *
+ *  @param[in] msg - Response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Pointer to response message completion code
+ *  @param[out] reason_code - Pointer to reason code
+ *  @param[out] offset - Pointer to store GPIO offset
+ *  @param[out] length - Pointer to store number of GPIOs in the response
+ *  @param[out] gpio_values - Pointer to buffer to store GPIO values
+ *  @param[out] gpio_values_size - Actual number of bytes written to gpio_values
+ *  @return nsm_completion_codes
+ */
+int decode_get_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *offset, uint16_t *length,
+			       uint8_t *gpio_values,
+			       uint32_t *gpio_values_size);
+
+/** @brief Encode a Set GPIO State request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] offset - GPIO offset
+ *  @param[in] length - Number of GPIOs to set
+ *  @param[in] gpio_values - Pointer to array of GPIO values to set
+ *  @param[in] gpio_values_size - Size of gpio_values array in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_gpio_state_req(uint8_t instance_id, uint16_t offset,
+			      uint16_t length, const uint8_t *gpio_values,
+			      uint32_t gpio_values_size, struct nsm_msg *msg);
+
+/** @brief Decode a Set GPIO State request message
+ *
+ *  @param[in] msg - Request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] offset - Pointer to store GPIO offset
+ *  @param[out] length - Pointer to store number of GPIOs to set
+ *  @param[out] gpio_values - Pointer to buffer to store GPIO values
+ *  @param[out] gpio_values_size - Actual number of bytes written to gpio_values
+ *  @return nsm_completion_codes
+ */
+int decode_set_gpio_state_req(const struct nsm_msg *msg, size_t msg_len,
+			      uint16_t *offset, uint16_t *length,
+			      uint8_t *gpio_values, uint32_t *gpio_values_size);
+
+/** @brief Encode a Set GPIO State response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - NSM Completion Code
+ *  @param[in] reason_code - NSM Reason Code
+ *  @param[in] offset - GPIO offset
+ *  @param[in] length - Number of GPIOs in the response
+ *  @param[in] gpio_values - Pointer to array of GPIO values
+ *  @param[in] gpio_values_size - Size of gpio_values array in bytes
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_gpio_state_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, uint16_t offset,
+			       uint16_t length, const uint8_t *gpio_values,
+			       uint32_t gpio_values_size, struct nsm_msg *msg);
+
+/** @brief Decode a Set GPIO State response message
+ *
+ *  @param[in] msg - Response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - Pointer to response message completion code
+ *  @param[out] reason_code - Pointer to reason code
+ *  @param[out] offset - Pointer to store GPIO offset
+ *  @param[out] length - Pointer to store number of GPIOs in the response
+ *  @param[out] gpio_values - Pointer to buffer to store GPIO values
+ *  @param[out] gpio_values_size - Actual number of bytes written to gpio_values
+ *  @return nsm_completion_codes
+ */
+int decode_set_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *offset, uint16_t *length,
+			       uint8_t *gpio_values,
+			       uint32_t *gpio_values_size);
 
 #ifdef __cplusplus
 }

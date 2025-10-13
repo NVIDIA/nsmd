@@ -323,7 +323,7 @@ option(
 option(
     'nsm-event-include',
     type: 'array',
-    description: 'List of NSM events to include (rediscovery, xid, threshold, reset-required, fabric-manager-state)',
+    description: 'List of NSM events to include (rediscovery, xid, threshold, reset-required, fabric-manager-state, gpio-state)',
     value: [],
 )
 

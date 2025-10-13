@@ -1505,3 +1505,290 @@ int decode_get_histogram_data_resp(
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_get_gpio_state_req(uint8_t instance_id, uint16_t offset,
+			      uint16_t length, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info hdr_info = {0};
+	hdr_info.instance_id = instance_id;
+	hdr_info.nsm_msg_type = NSM_REQUEST;
+	hdr_info.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	int rc = pack_nsm_header_v2(&hdr_info, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_get_gpio_state_req *req =
+	    (struct nsm_get_gpio_state_req *)msg->payload;
+
+	req->hdr.command = NSM_GET_GPIO_STATE;
+	req->hdr.reserved1 = 0;
+	req->hdr.data_size = htole16(sizeof(offset) + sizeof(length));
+	req->hdr.reserved2 = 0;
+	req->offset = htole16(offset);
+	req->length = htole16(length);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_gpio_state_req(const struct nsm_msg *msg, size_t msg_len,
+			      uint16_t *offset, uint16_t *length)
+{
+	if (msg == NULL || offset == NULL || length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_gpio_state_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	const struct nsm_get_gpio_state_req *req =
+	    (const struct nsm_get_gpio_state_req *)(msg->payload);
+
+	if (le16toh(req->hdr.data_size) <
+	    sizeof(req->offset) + sizeof(req->length)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*offset = le16toh(req->offset);
+	*length = le16toh(req->length);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_get_gpio_state_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, uint16_t offset,
+			       uint16_t length, const uint8_t *gpio_values,
+			       uint32_t gpio_values_size, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_GET_GPIO_STATE,
+					  msg);
+	}
+
+	struct nsm_get_gpio_state_resp *resp =
+	    (struct nsm_get_gpio_state_resp *)msg->payload;
+
+	resp->hdr.command = NSM_GET_GPIO_STATE;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(offset) + sizeof(length) + gpio_values_size);
+	resp->offset = htole16(offset);
+	resp->length = htole16(length);
+
+	if (cc == NSM_SUCCESS) {
+		if (gpio_values == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		memcpy(resp->gpio_values, gpio_values, gpio_values_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_get_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *offset, uint16_t *length,
+			       uint8_t *gpio_values, uint32_t *gpio_values_size)
+{
+	if (offset == NULL || length == NULL || gpio_values_size == NULL ||
+	    gpio_values == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_get_gpio_state_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_get_gpio_state_resp *resp =
+	    (const struct nsm_get_gpio_state_resp *)msg->payload;
+
+	*offset = le16toh(resp->offset);
+	*length = le16toh(resp->length);
+	*gpio_values_size = le16toh(resp->hdr.data_size) -
+			    (sizeof(resp->offset) + sizeof(resp->length));
+
+	memcpy(gpio_values, resp->gpio_values, *gpio_values_size);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_gpio_state_req(uint8_t instance_id, uint16_t offset,
+			      uint16_t length, const uint8_t *gpio_values,
+			      uint32_t gpio_values_size, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if ((gpio_values_size > 0 && gpio_values == NULL) ||
+	    gpio_values_size > NSM_EVENT_DATA_MAX_LEN) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	struct nsm_header_info hdr_info = {0};
+	hdr_info.instance_id = instance_id;
+	hdr_info.nsm_msg_type = NSM_REQUEST;
+	hdr_info.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	int rc = pack_nsm_header_v2(&hdr_info, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_set_gpio_state_req *req =
+	    (struct nsm_set_gpio_state_req *)msg->payload;
+
+	req->hdr.command = NSM_SET_GPIO_STATE;
+	req->hdr.reserved1 = 0;
+	req->hdr.data_size =
+	    htole16(sizeof(offset) + sizeof(length) + gpio_values_size);
+	req->hdr.reserved2 = 0;
+	req->offset = htole16(offset);
+	req->length = htole16(length);
+
+	if (gpio_values_size > 0) {
+		memcpy(req->gpio_values, gpio_values, gpio_values_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_gpio_state_req(const struct nsm_msg *msg, size_t msg_len,
+			      uint16_t *offset, uint16_t *length,
+			      uint8_t *gpio_values, uint32_t *gpio_values_size)
+{
+	if (msg == NULL || offset == NULL || length == NULL ||
+	    gpio_values_size == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_gpio_state_req)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	const struct nsm_set_gpio_state_req *req =
+	    (const struct nsm_set_gpio_state_req *)(msg->payload);
+
+	if (le16toh(req->hdr.data_size) <
+	    sizeof(req->offset) + sizeof(req->length)) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*offset = le16toh(req->offset);
+	*length = le16toh(req->length);
+
+	size_t expected_gpio_size = le16toh(req->hdr.data_size) -
+				    sizeof(req->offset) - sizeof(req->length);
+	*gpio_values_size = expected_gpio_size;
+
+	if (gpio_values != NULL && expected_gpio_size > 0) {
+		memcpy(gpio_values, req->gpio_values, expected_gpio_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_set_gpio_state_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, uint16_t offset,
+			       uint16_t length, const uint8_t *gpio_values,
+			       uint32_t gpio_values_size, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id & INSTANCEID_MASK;
+	header.nvidia_msg_type = NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_SET_GPIO_STATE,
+					  msg);
+	}
+
+	struct nsm_set_gpio_state_resp *resp =
+	    (struct nsm_set_gpio_state_resp *)msg->payload;
+
+	resp->hdr.command = NSM_SET_GPIO_STATE;
+	resp->hdr.completion_code = cc;
+	resp->hdr.data_size =
+	    htole16(sizeof(offset) + sizeof(length) + gpio_values_size);
+	resp->offset = htole16(offset);
+	resp->length = htole16(length);
+
+	if (cc == NSM_SUCCESS) {
+		if (gpio_values == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		memcpy(resp->gpio_values, gpio_values, gpio_values_size);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_set_gpio_state_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code,
+			       uint16_t *offset, uint16_t *length,
+			       uint8_t *gpio_values, uint32_t *gpio_values_size)
+{
+	if (offset == NULL || length == NULL || gpio_values_size == NULL ||
+	    gpio_values == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_set_gpio_state_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	const struct nsm_set_gpio_state_resp *resp =
+	    (const struct nsm_set_gpio_state_resp *)msg->payload;
+
+	*offset = le16toh(resp->offset);
+	*length = le16toh(resp->length);
+	*gpio_values_size = le16toh(resp->hdr.data_size) -
+			    (sizeof(resp->offset) + sizeof(resp->length));
+
+	memcpy(gpio_values, resp->gpio_values, *gpio_values_size);
+
+	return NSM_SW_SUCCESS;
+}

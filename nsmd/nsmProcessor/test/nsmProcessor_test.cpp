@@ -19,6 +19,7 @@
 #include "test/mockSensorManager.hpp"
 using namespace ::testing;
 
+#include "base.h"
 #include "device-configuration.h"
 #include "platform-environmental.h"
 

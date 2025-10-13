@@ -21,6 +21,8 @@ using namespace ::testing;
 
 #define private public
 #define protected public
+#include "base.h"
+
 #include "nsmAssetIntf.hpp"
 #include "nsmChassisAssembly.hpp"
 #include "nsmInventoryProperty.hpp"

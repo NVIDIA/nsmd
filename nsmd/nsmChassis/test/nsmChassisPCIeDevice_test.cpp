@@ -22,6 +22,7 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "base.h"
 #include "pci-links.h"
 
 #include "nsmAssetIntf.hpp"

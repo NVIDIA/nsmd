@@ -40,6 +40,7 @@ extern "C" {
 enum nsm_device_capability_discovery_event_id {
 	NSM_REDISCOVERY_EVENT = 1,
 	NSM_LONG_RUNNING_EVENT = 2,
+	NSM_GPIO_STATE_CHANGE_EVENT = 3,
 };
 
 typedef enum {
@@ -185,6 +186,31 @@ struct nsm_get_device_capabilities_v2_req {
 struct nsm_get_device_capabilities_v2_resp {
 	struct nsm_common_telemetry_resp hdr;
 	uint8_t payload[1];
+} __attribute__((packed));
+
+/** @struct nsm_gpio_event
+ *
+ *  Structure representing individual GPIO event
+ *  Bit 15: Reserved
+ *  Bit 14: GPIO Value
+ *  Bit 0-13: GPIO index
+ */
+struct nsm_gpio_event {
+	uint16_t gpio_index : 14; /* GPIO index (bits 0-13) */
+	uint16_t gpio_value : 1;  /* GPIO value (bit 14) */
+	uint16_t reserved : 1;	  /* Reserved (bit 15) */
+} __attribute__((packed));
+
+/** @struct nsm_gpio_state_change_event_payload
+ *
+ *  Structure representing payload of NSM GPIO state change event
+ */
+struct nsm_gpio_state_change_event_payload {
+	uint32_t timestamp_low;	  /* Timestamp (nanoseconds) */
+	uint32_t timestamp_high;  /* Timestamp (nanoseconds) */
+	uint16_t num_gpio_events; /* Number of GPIO events */
+	struct nsm_gpio_event
+	    gpio_events[1]; /* Array of GPIO events (variable length) */
 } __attribute__((packed));
 
 /** @brief Create a get supported event sources request message
@@ -542,6 +568,33 @@ int decode_nsm_get_device_capabilities_v2_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code, uint8_t *timestamp_generation,
     uint32_t *maximum_input_buffer_size);
+
+/** @brief Encode a GPIO state change event message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] ackr - acknowledgement request
+ *  @param[in] payload - GPIO state change event payload
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_nsm_gpio_state_change_event(
+    uint8_t instance_id, bool ackr,
+    const struct nsm_gpio_state_change_event_payload *payload,
+    struct nsm_msg *msg);
+
+/** @brief Decode a GPIO state change event message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] event_class - pointer to event class
+ *  @param[out] event_state - pointer to event state
+ *  @param[out] payload - pointer to GPIO state change event payload
+ *  @return nsm_completion_codes
+ */
+int decode_nsm_gpio_state_change_event(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *event_class,
+    uint16_t *event_state,
+    struct nsm_gpio_state_change_event_payload **payload);
 
 #ifdef __cplusplus
 }

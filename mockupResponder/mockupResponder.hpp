@@ -226,6 +226,9 @@ class MockupResponder
         getDeviceCapabilitiesV2Handler(const nsm_msg* requestMsg,
                                        size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        getGpioStateHandler(const nsm_msg* requestMsg, size_t requestLen);
+
     // type3 handlers
     std::optional<std::vector<uint8_t>>
         getInventoryInformationHandler(const nsm_msg* requestMsg,
@@ -345,6 +348,10 @@ class MockupResponder
                              bool effective_ber_threshold,
                              bool estimated_effective_ber_threshold,
                              uint8_t portNumber);
+
+    void sendGpioStateChangeEvent(
+        uint8_t dest, bool ackr, uint64_t timestamp,
+        const std::vector<std::pair<uint16_t, bool>>& gpioEvents);
 
     void sendXIDEvent(uint8_t dest, bool ackr, uint8_t flag, uint32_t reason,
                       uint32_t sequence_number, uint64_t timestamp,

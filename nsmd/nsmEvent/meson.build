@@ -12,6 +12,7 @@ valid_events = [
     'threshold',
     'reset-required',
     'fabric-manager-state',
+    'gpio-state',
 ]
 foreach name : include_event_list
     if not valid_events.contains(name)
@@ -33,6 +34,9 @@ if include_all_events or include_event_list.contains('reset-required')
 endif
 if include_all_events or include_event_list.contains('fabric-manager-state')
     sources += ['nsmEvent/nsmFabricManagerStateEvent.cpp']
+endif
+if include_all_events or include_event_list.contains('gpio-state')
+    sources += ['nsmEvent/nsmGPIOStateChangeEvent.cpp']
 endif
 
 nsmd_headers += ['.', '..', 'nsmEvent']

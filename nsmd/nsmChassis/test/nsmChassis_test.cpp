@@ -22,10 +22,12 @@ using namespace ::testing;
 #define private public
 #define protected public
 
+#include "base.h"
 #include "device-configuration.h"
 
 #include "nsmAssetIntf.hpp"
 #include "nsmChassis.hpp"
+#include "nsmGPIO/nsmGPIOStateCommon.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmPowerSupplyStatus.hpp"

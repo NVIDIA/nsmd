@@ -200,6 +200,13 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
                                     last_restart_duration);
     });
 
+    iface->register_method(
+        "genGpioStateChangeEvent",
+        [&](uint8_t dest, bool ackr, uint64_t timestamp,
+            std::vector<std::pair<uint16_t, bool>> gpioEvents) {
+        sendGpioStateChangeEvent(dest, ackr, timestamp, gpioEvents);
+    });
+
     iface->initialize();
 
     mockEid = eid;
@@ -421,6 +428,8 @@ std::optional<Response>
                     return getHistogramDataHandler(request, requestLen);
                 case NSM_GET_DEVICE_CAPABILITIES_V2:
                     return getDeviceCapabilitiesV2Handler(request, requestLen);
+                case NSM_GET_GPIO_STATE:
+                    return getGpioStateHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -3911,6 +3920,84 @@ void MockupResponder::sendThreasholdEvent(
     }
 }
 
+void MockupResponder::sendGpioStateChangeEvent(
+    uint8_t dest, bool ackr, uint64_t timestamp,
+    const std::vector<std::pair<uint16_t, bool>>& gpioEvents)
+{
+    if (verbose)
+    {
+        lg2::info(
+            "sendGpioStateChangeEvent dest eid={EID}, num_events={NUM}, timestamp={TS}",
+            "EID", dest, "NUM", gpioEvents.size(), "TS", timestamp);
+    }
+
+    if (gpioEvents.empty())
+    {
+        lg2::warning("sendGpioStateChangeEvent: No GPIO events provided");
+        return;
+    }
+
+    // Calculate the total size needed for the payload
+    size_t payloadSize = sizeof(nsm_gpio_state_change_event_payload) -
+                         sizeof(nsm_gpio_event) +
+                         (gpioEvents.size() * sizeof(nsm_gpio_event));
+
+    // Allocate memory for the payload
+    std::vector<uint8_t> payloadBuffer(payloadSize);
+    auto payload = reinterpret_cast<nsm_gpio_state_change_event_payload*>(
+        payloadBuffer.data());
+
+    // Fill in the payload
+    payload->timestamp_low = static_cast<uint32_t>(timestamp & 0xFFFFFFFF);
+    payload->timestamp_high =
+        static_cast<uint32_t>((timestamp >> 32) & 0xFFFFFFFF);
+    payload->num_gpio_events = static_cast<uint16_t>(gpioEvents.size());
+
+    // Fill in the GPIO events
+    for (size_t i = 0; i < gpioEvents.size(); ++i)
+    {
+        payload->gpio_events[i].gpio_index = gpioEvents[i].first &
+                                             0x3FFF; // 14 bits
+        payload->gpio_events[i].gpio_value = gpioEvents[i].second ? 1 : 0;
+        payload->gpio_events[i].reserved = 0;
+
+        if (verbose)
+        {
+            lg2::info("  GPIO event[{IDX}]: gpio_index={GPIO_IDX}, value={VAL}",
+                      "IDX", i, "GPIO_IDX", gpioEvents[i].first, "VAL",
+                      gpioEvents[i].second);
+        }
+    }
+
+    // Allocate message buffer
+    std::vector<uint8_t> eventMsg(sizeof(nsm_msg_hdr) + NSM_EVENT_MIN_LEN +
+                                  payloadSize);
+    auto msg = reinterpret_cast<nsm_msg*>(eventMsg.data());
+
+    // Encode the event
+    auto rc = encode_nsm_gpio_state_change_event(mockInstanceId, ackr, payload,
+                                                 msg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendGpioStateChangeEvent: encode failed, rc={RC}", "RC",
+                   rc);
+        return;
+    }
+
+    // Send the event
+    rc = mctpSockSend(dest, eventMsg);
+    if (rc != NSM_SUCCESS)
+    {
+        lg2::error("sendGpioStateChangeEvent: mctpSockSend() failed, rc={RC}",
+                   "RC", rc);
+    }
+    else if (verbose)
+    {
+        lg2::info("sendGpioStateChangeEvent: successfully sent to EID={EID}",
+                  "EID", dest);
+    }
+}
+
 std::optional<std::vector<uint8_t>>
     MockupResponder::getCurrentEnergyCountHandler(const nsm_msg* requestMsg,
                                                   size_t requestLen)
@@ -6978,6 +7065,70 @@ std::optional<std::vector<uint8_t>>
         lg2::error("encode_get_histogram_data_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getGpioStateHandler(const nsm_msg* requestMsg,
+                                         size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getGpioStateHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint16_t offset;
+    uint16_t length;
+
+    auto rc = decode_get_gpio_state_req(requestMsg, requestLen, &offset,
+                                        &length);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_gpio_state_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    // Calculate the number of bytes needed for the requested GPIO values
+    // Each bit represents one GPIO state, so we need (length + 7) / 8 bytes
+    uint32_t gpioValuesSize = (length + 7) / 8;
+    std::vector<uint8_t> gpioValues(gpioValuesSize, 0);
+
+    // Mock data: Generate some sample GPIO states
+    for (uint32_t i = 0; i < gpioValuesSize; ++i)
+    {
+        gpioValues[i] = static_cast<uint8_t>((i % 2 == 0) ? 0xAA : 0x55);
+        if (verbose)
+        {
+            lg2::info("Generated GPIO value at index {IDX}: 0x{VAL:X}", "IDX",
+                      i, "VAL", gpioValues[i]);
+        }
+    }
+
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + NSM_RESPONSE_CONVENTION_LEN + sizeof(offset) +
+            sizeof(length) + gpioValuesSize,
+        0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_gpio_state_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, offset, length,
+        gpioValues.data(), gpioValuesSize, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_gpio_state_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "getGpioStateHandler: returning GPIO states - offset={OFFSET}, length={LENGTH}, size={SIZE}",
+            "OFFSET", offset, "LENGTH", length, "SIZE", gpioValuesSize);
+    }
+
     return response;
 }
 

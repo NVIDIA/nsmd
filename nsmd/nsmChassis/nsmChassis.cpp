@@ -23,6 +23,7 @@
 #include "nsmDebugInfo.hpp"
 #include "nsmDevice.hpp"
 #include "nsmErrorInjection/nsmErrorInjectionCommon.hpp"
+#include "nsmGPIO/nsmGPIOStateCommon.hpp"
 #include "nsmGpuPresenceAndPowerStatus.hpp"
 #include "nsmInventoryProperty.hpp"
 #include "nsmObjectFactory.hpp"
@@ -345,6 +346,13 @@ static void
         std::get<bool>(allCurrentIfaceProperties.at("ResetMetricsSupported")))
     {
         createResetMetrics(device, name, bus);
+    }
+    if (allCurrentIfaceProperties.count("GPIOStateSupported") &&
+        std::get<bool>(allCurrentIfaceProperties.at("GPIOStateSupported")))
+    {
+        createNsmGPIOStateSensors(device, name, "NSM_GPIOState",
+                                  chassisInventoryBasePath.string() + "/" +
+                                      name);
     }
     if (allCurrentIfaceProperties.count("ErrorInjectionSupported") &&
         std::get<bool>(allCurrentIfaceProperties.at("ErrorInjectionSupported")))
