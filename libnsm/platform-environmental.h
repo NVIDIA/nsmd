@@ -31,10 +31,10 @@ enum clock_output_enable_state_index {
 	IBLINK_CLKBUF_INDEX = 0x82,
 };
 
-const uint8_t MAX_VERSION_STRING_SIZE = 100;
-const uint32_t INVALID_POWER_LIMIT = 0xFFFFFFFF;
-const uint32_t INVALID_UINT32_VALUE = 0xFFFFFFFF;
-const uint16_t INVALID_UINT16_VALUE = 0xFFFF;
+static const uint8_t MAX_VERSION_STRING_SIZE = 100;
+static const uint32_t INVALID_POWER_LIMIT = 0xFFFFFFFF;
+static const uint32_t INVALID_UINT32_VALUE = 0xFFFFFFFF;
+static const uint16_t INVALID_UINT16_VALUE = 0xFFFF;
 
 /** @brief NSM Type3 platform environmental commands
  */

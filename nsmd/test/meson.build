@@ -17,6 +17,7 @@ dep_src_files = [
     '../../libnsm/diagnostics.c',
     '../../libnsm/firmware-utils.c',
     '../../libnsm/platform-environmental.c',
+    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../../libnsm/network-ports.c',
     '../../libnsm/requester/mctp.c',
     '../../requester/request_timeout_tracker.cpp',
