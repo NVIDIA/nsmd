@@ -6331,7 +6331,7 @@ TEST(encode4ByteOfUint32Sample, testBadEncode)
 
 TEST(decode4ByteOfUint32Sample, testGoodDecode)
 {
-	uint8_t data[4] = {0x00, 0x00, 0x03, 0xE8};
+	uint8_t data[4] = {0xE8, 0x03, 0x00, 0x00};
 	size_t data_len = 4;
 	uint32_t sample = 0;
 
@@ -6349,7 +6349,7 @@ TEST(decode4ByteOfUint32Sample, testBadDecode)
 	auto rc = decode4ByteOfUint32Sample(NULL, data_len, &sample);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode4ByteOfUint32Sample(data, data_len, &sample);
+	rc = decode4ByteOfUint32Sample(data, data_len, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode4ByteOfUint32Sample(data, data_len - 1, &sample);
@@ -6382,7 +6382,7 @@ TEST(encode2ByteOfUint16Sample, testBadEncode)
 
 TEST(decode2ByteOfUint16Sample, testGoodDecode)
 {
-	uint8_t data[2] = {0x00, 0x03};
+	uint8_t data[2] = {0x03, 0x00};
 	size_t data_len = 2;
 	uint16_t sample = 0;
 
@@ -6400,7 +6400,7 @@ TEST(decode2ByteOfUint16Sample, testBadDecode)
 	auto rc = decode2ByteOfUint16Sample(NULL, data_len, &sample);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	rc = decode2ByteOfUint16Sample(data, data_len, &sample);
+	rc = decode2ByteOfUint16Sample(data, data_len, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
 	rc = decode2ByteOfUint16Sample(data, data_len - 1, &sample);

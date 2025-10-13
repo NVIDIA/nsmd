@@ -28,6 +28,7 @@
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 
 #include "cmd_helper.hpp"
 #include "gpm_metrics_list.hpp"
@@ -4536,6 +4537,707 @@ class QueryPerInstanceGPMMetrics : public CommandInterface
     uint32_t instanceBitfield;
 };
 
+class GetPowerSmoothingFeatureInfoV2 : public CommandInterface
+{
+  public:
+    ~GetPowerSmoothingFeatureInfoV2() = default;
+    GetPowerSmoothingFeatureInfoV2() = delete;
+    GetPowerSmoothingFeatureInfoV2(const GetPowerSmoothingFeatureInfoV2&) =
+        delete;
+    GetPowerSmoothingFeatureInfoV2(GetPowerSmoothingFeatureInfoV2&&) = default;
+    GetPowerSmoothingFeatureInfoV2&
+        operator=(const GetPowerSmoothingFeatureInfoV2&) = delete;
+    GetPowerSmoothingFeatureInfoV2&
+        operator=(GetPowerSmoothingFeatureInfoV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerSmoothingFeatureInfoV2(const char* type, const char* name,
+                                            CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+  private:
+    class GetPowerSmoothingFeatureInfoV2AggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            if (tag == FEATURE_FLAG_TAG)
+            {
+                uint32_t featureFlag;
+                int rc = decodeFeatureFlagSample(data, data_len, &featureFlag);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Feature Supported"] =
+                    (featureFlag & (1u << 0)) != 0 ? true : false;
+                sample_json["Feature Enabled"] =
+                    (featureFlag & (1u << 1)) != 0 ? true : false;
+                sample_json["Ramp Down Enabled"] =
+                    (featureFlag & (1u << 2)) != 0 ? true : false;
+                sample_json["Delayed Power Smoothing"] =
+                    (featureFlag & (1u << 3)) != 0 ? true : false;
+            }
+            else if (tag == CURRENT_TMP_SETTING_TAG)
+            {
+                uint32_t currentTmpSetting;
+                int rc = decodeCurrentTMPSettingSample(data, data_len,
+                                                       &currentTmpSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current TMP Setting"] = currentTmpSetting;
+            }
+            else if (tag == TMP_FLOOR_SETTING_TAG)
+            {
+                uint32_t currentTmpFloorSetting;
+                int rc = decodeCurrentTMPFloorSettingSample(
+                    data, data_len, &currentTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["TMP Floor Setting"] = currentTmpFloorSetting;
+            }
+            else if (tag == MAX_TMP_FLOOR_SETTING_TAG)
+            {
+                uint16_t maxTmpFloorSetting;
+                int rc = decodeMaxTmpFloorSettingSample(data, data_len,
+                                                        &maxTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Max TMP Floor Setting"] = maxTmpFloorSetting;
+            }
+            else if (tag == MIN_TMP_FLOOR_SETTING_TAG)
+            {
+                uint16_t minTmpFloorSetting;
+                int rc = decodeMinTmpFloorSettingSample(data, data_len,
+                                                        &minTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Min TMP Floor Setting"] = minTmpFloorSetting;
+            }
+            else if (tag == FLOOR_WINDOW_MULTIPLIER_TAG)
+            {
+                uint32_t floorWindowMultiplier;
+                int rc = decodeFloorWindowMultiplierSample(
+                    data, data_len, &floorWindowMultiplier);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Floor Window Multiplier"] = floorWindowMultiplier;
+            }
+            else if (tag == MIN_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG)
+            {
+                uint32_t minPrimaryFloorActivationOffset;
+                int rc = decodeMinPrimaryFloorActivationOffset(
+                    data, data_len, &minPrimaryFloorActivationOffset);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Min Primary Floor Activation Offset"] =
+                    minPrimaryFloorActivationOffset;
+            }
+            else if (tag == MIN_PRIMARY_FLOOR_ACTIVATION_POINT_TAG)
+            {
+                uint32_t minPrimaryFloorActivationPoint;
+                int rc = decodeMinPrimaryFloorActivationPoint(
+                    data, data_len, &minPrimaryFloorActivationPoint);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Min Primary Floor Activation Point"] =
+                    minPrimaryFloorActivationPoint;
+            }
+            else
+            {
+                return NSM_SW_ERROR_LENGTH;
+            }
+            return NSM_SW_SUCCESS;
+        }
+    };
+
+  public:
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto requestPtr = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        int rc = NSM_SW_SUCCESS;
+        // Encode the request message
+        rc = encode_get_powersmoothing_featinfo_v2_req(instanceId, requestPtr);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            return {rc, {}};
+        }
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPowerSmoothingFeatureInfoV2AggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+};
+
+class GetPowerSmoothingCurrentProfileInformationV2 : public CommandInterface
+{
+  public:
+    ~GetPowerSmoothingCurrentProfileInformationV2() = default;
+    GetPowerSmoothingCurrentProfileInformationV2() = delete;
+    GetPowerSmoothingCurrentProfileInformationV2(
+        const GetPowerSmoothingCurrentProfileInformationV2&) = delete;
+    GetPowerSmoothingCurrentProfileInformationV2(
+        GetPowerSmoothingCurrentProfileInformationV2&&) = default;
+    GetPowerSmoothingCurrentProfileInformationV2&
+        operator=(const GetPowerSmoothingCurrentProfileInformationV2&) = delete;
+    GetPowerSmoothingCurrentProfileInformationV2&
+        operator=(GetPowerSmoothingCurrentProfileInformationV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerSmoothingCurrentProfileInformationV2(const char* type,
+                                                          const char* name,
+                                                          CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_current_profile_info_v2_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPowerSmoothingCurrentProfileInformationV2AggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    class GetPowerSmoothingCurrentProfileInformationV2AggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            if (tag == ACTIVE_PRESET_PROFILE_ID_TAG)
+            {
+                uint8_t activePresetProfileId;
+                int rc = decodeActivePresetProfileSample(
+                    data, data_len, &activePresetProfileId);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Active Preset Profile Id"] = activePresetProfileId;
+            }
+            else if (tag == ADMIN_OVERRIDE_MASK_TAG)
+            {
+                uint16_t adminOverrideMask;
+                int rc = decodeAdminOverrideMaskSample(data, data_len,
+                                                       &adminOverrideMask);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["tmpFloorPercentApplied"] =
+                    (adminOverrideMask & (1u << 0)) != 0 ? true : false;
+                sample_json["RampUpMaskApplied"] =
+                    (adminOverrideMask & (1u << 1)) != 0 ? true : false;
+                sample_json["RampDownMaskApplied"] =
+                    (adminOverrideMask & (1u << 2)) != 0 ? true : false;
+                sample_json["HysteresisMaskApplied"] =
+                    (adminOverrideMask & (1u << 3)) != 0 ? true : false;
+                sample_json["SecondaryPowerFloorSettingApplied"] =
+                    (adminOverrideMask & (1u << 4)) != 0 ? true : false;
+                sample_json["PrimaryFloorActivationWindowMultiplierApplied"] =
+                    (adminOverrideMask & (1u << 5)) != 0 ? true : false;
+                sample_json["PrimaryFloorTargetWindowApplied"] =
+                    (adminOverrideMask & (1u << 6)) != 0 ? true : false;
+                sample_json["PrimaryFloorActivationOffsetApplied"] =
+                    (adminOverrideMask & (1u << 7)) != 0 ? true : false;
+            }
+            else if (tag == CURRENT_TMP_FLOOR_SETTING_TAG)
+            {
+                uint16_t currentTmpFloorSetting;
+                int rc = decodeCurrentTMPFloorSample(data, data_len,
+                                                     &currentTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current TMP Floor Setting"] =
+                    currentTmpFloorSetting;
+            }
+            else if (tag == CURRENT_RAMPUP_RATE_TAG)
+            {
+                uint32_t currentRampupRate;
+                int rc = decodeCurrentRampupRateSample(data, data_len,
+                                                       &currentRampupRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Ramp Up Rate"] = currentRampupRate;
+            }
+            else if (tag == CURRENT_RAMPDOWN_RATE_TAG)
+            {
+                uint32_t currentRampdownRate;
+                int rc = decodeCurrentRampdownRateSample(data, data_len,
+                                                         &currentRampdownRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Ramp Down Rate"] = currentRampdownRate;
+            }
+            else if (tag == CURRENT_RAMPDOWN_HYSTERESIS_TAG)
+            {
+                uint32_t currentRampdownHysteresis;
+                int rc = decodeCurrentRampdownHysteresisSample(
+                    data, data_len, &currentRampdownHysteresis);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Ramp Down Hysteresis"] =
+                    currentRampdownHysteresis;
+            }
+            else if (tag == CURRENT_SECONDARY_FLOOR_TAG)
+            {
+                uint32_t currentSecondaryFloor;
+                int rc = decodeCurrentSecondaryFloorSample(
+                    data, data_len, &currentSecondaryFloor);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Secondary Floor"] = currentSecondaryFloor;
+            }
+            else if (tag ==
+                     CURRENT_PRIMARY_FLOOR_ACTIVATION_WINDOW_MULTIPLIER_TAG)
+            {
+                uint8_t currentPrimaryFloorActivationWindowMultiplier;
+                int rc =
+                    decodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                        data, data_len,
+                        &currentPrimaryFloorActivationWindowMultiplier);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json
+                    ["Current Primary Floor Activation Window Multiplier"] =
+                        currentPrimaryFloorActivationWindowMultiplier;
+            }
+            else if (tag == CURRENT_PRIMARY_FLOOR_TARGET_WINDOW_TAG)
+            {
+                uint8_t currentPrimaryFloorTargetWindow;
+                int rc = decodeCurrentPrimaryFloorTargetWindowSample(
+                    data, data_len, &currentPrimaryFloorTargetWindow);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Primary Floor Target Window"] =
+                    currentPrimaryFloorTargetWindow;
+            }
+            else if (tag == CURRENT_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG)
+            {
+                uint32_t currentPrimaryFloorActivationOffset;
+                int rc = decodeCurrentPrimaryFloorActivationOffsetSample(
+                    data, data_len, &currentPrimaryFloorActivationOffset);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["Current Primary Floor Activation Offset"] =
+                    currentPrimaryFloorActivationOffset;
+            }
+            else
+            {
+                return NSM_SW_ERROR_LENGTH;
+            }
+            return NSM_SW_SUCCESS;
+        }
+    };
+};
+
+class GetPowerSmoothingPresetProfileInformationV2 : public CommandInterface
+{
+  public:
+    ~GetPowerSmoothingPresetProfileInformationV2() = default;
+    GetPowerSmoothingPresetProfileInformationV2() = delete;
+    GetPowerSmoothingPresetProfileInformationV2(
+        const GetPowerSmoothingPresetProfileInformationV2&) = delete;
+    GetPowerSmoothingPresetProfileInformationV2(
+        GetPowerSmoothingPresetProfileInformationV2&&) = default;
+    GetPowerSmoothingPresetProfileInformationV2&
+        operator=(const GetPowerSmoothingPresetProfileInformationV2&) = delete;
+    GetPowerSmoothingPresetProfileInformationV2&
+        operator=(GetPowerSmoothingPresetProfileInformationV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerSmoothingPresetProfileInformationV2(const char* type,
+                                                         const char* name,
+                                                         CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_preset_profile_info_v2_req(instanceId, request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPowerSmoothingPresetProfileInformationV2AggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    class GetPowerSmoothingPresetProfileInformationV2AggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            uint8_t tagId = tag >> 3;
+            uint8_t profId = tag & 0x07;
+            if (tagId == PRESET_PROFILE_TMP_FLOOR_SETTING_TAG)
+            {
+                uint16_t presetProfileTmpFloorSetting;
+                int rc = decodeCurrentTMPFloorSample(
+                    data, data_len, &presetProfileTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile TMP Floor Setting"] =
+                    presetProfileTmpFloorSetting;
+            }
+            else if (tagId == PRESET_PROFILE_RAMPUP_RATE_TAG)
+            {
+                uint32_t presetProfileRampupRate;
+                int rc = decodeCurrentRampupRateSample(
+                    data, data_len, &presetProfileRampupRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Ramp Up Rate"] =
+                    presetProfileRampupRate;
+            }
+            else if (tagId == PRESET_PROFILE_RAMPDOWN_RATE_TAG)
+            {
+                uint32_t presetProfileRampdownRate;
+                int rc = decodeCurrentRampdownRateSample(
+                    data, data_len, &presetProfileRampdownRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Ramp Down Rate"] =
+                    presetProfileRampdownRate;
+            }
+            else if (tagId == PRESET_PROFILE_RAMPDOWN_HYSTERESIS_TAG)
+            {
+                uint32_t presetProfileRampdownHysteresis;
+                int rc = decodeCurrentRampdownHysteresisSample(
+                    data, data_len, &presetProfileRampdownHysteresis);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Ramp Down Hysteresis"] =
+                    presetProfileRampdownHysteresis;
+            }
+            else if (tagId == PRESET_PROFILE_SECONDARY_FLOOR_TAG)
+            {
+                uint32_t presetProfileSecondaryFloor;
+                int rc = decodeCurrentSecondaryFloorSample(
+                    data, data_len, &presetProfileSecondaryFloor);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Secondary Floor"] =
+                    presetProfileSecondaryFloor;
+            }
+            else if (
+                tagId ==
+                PRESET_PROFILE_PRIMARY_FLOOR_ACTIVATION_WINDOW_MULTIPLIER_TAG)
+            {
+                uint8_t presetProfilePrimaryFloorActivationWindowMultiplier;
+                int rc =
+                    decodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                        data, data_len,
+                        &presetProfilePrimaryFloorActivationWindowMultiplier);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json
+                    ["Preset Profile Primary Floor Activation Window Multiplier"] =
+                        presetProfilePrimaryFloorActivationWindowMultiplier;
+            }
+            else if (tagId == PRESET_PROFILE_PRIMARY_FLOOR_TARGET_WINDOW_TAG)
+            {
+                uint8_t presetProfilePrimaryFloorTargetWindow;
+                int rc = decodeCurrentPrimaryFloorTargetWindowSample(
+                    data, data_len, &presetProfilePrimaryFloorTargetWindow);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Primary Floor Target Window"] =
+                    presetProfilePrimaryFloorTargetWindow;
+            }
+            else if (tagId ==
+                     PRESET_PROFILE_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG)
+            {
+                uint32_t presetProfilePrimaryFloorActivationOffset;
+                int rc = decodeCurrentPrimaryFloorActivationOffsetSample(
+                    data, data_len, &presetProfilePrimaryFloorActivationOffset);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tagId;
+                sample_json["profileId"] = profId;
+                sample_json["Preset Profile Primary Floor Activation Offset"] =
+                    presetProfilePrimaryFloorActivationOffset;
+            }
+            else
+            {
+                return NSM_SW_ERROR_LENGTH;
+            }
+            return NSM_SW_SUCCESS;
+        }
+    };
+};
+
+class GetPowerSmoothingAdminOverrideProfileInformationV2 :
+    public CommandInterface
+{
+  public:
+    ~GetPowerSmoothingAdminOverrideProfileInformationV2() = default;
+    GetPowerSmoothingAdminOverrideProfileInformationV2() = delete;
+    GetPowerSmoothingAdminOverrideProfileInformationV2(
+        const GetPowerSmoothingAdminOverrideProfileInformationV2&) = delete;
+    GetPowerSmoothingAdminOverrideProfileInformationV2(
+        GetPowerSmoothingAdminOverrideProfileInformationV2&&) = default;
+    GetPowerSmoothingAdminOverrideProfileInformationV2& operator=(
+        const GetPowerSmoothingAdminOverrideProfileInformationV2&) = delete;
+    GetPowerSmoothingAdminOverrideProfileInformationV2& operator=(
+        GetPowerSmoothingAdminOverrideProfileInformationV2&&) = default;
+
+    using CommandInterface::CommandInterface;
+
+    explicit GetPowerSmoothingAdminOverrideProfileInformationV2(
+        const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_common_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_get_admin_override_profile_info_v2_req(instanceId,
+                                                                request);
+        return {rc, requestMsg};
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        GetPowerSmoothingAdminOverrideProfileInformationV2AggregateResponseParser{}
+            .parseAggregateResponse(responsePtr, payloadLength);
+    }
+
+  private:
+    class
+        GetPowerSmoothingAdminOverrideProfileInformationV2AggregateResponseParser :
+        public AggregateResponseParser
+    {
+      private:
+        int handleSampleData(uint8_t tag, const uint8_t* data, size_t data_len,
+                             ordered_json& sample_json) final
+        {
+            if (tag == ADMIN_OVERRIDE_PROFILE_TMP_FLOOR_SETTING_TAG)
+            {
+                uint16_t adminOverrideProfileTmpFloorSetting;
+                int rc = decodeCurrentTMPFloorSample(
+                    data, data_len, &adminOverrideProfileTmpFloorSetting);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["TMPFloorSetting"] =
+                    adminOverrideProfileTmpFloorSetting;
+            }
+            else if (tag == ADMIN_OVERRIDE_PROFILE_RAMPUP_RATE_TAG)
+            {
+                uint32_t adminOverrideProfileRampupRate;
+                int rc = decodeCurrentRampupRateSample(
+                    data, data_len, &adminOverrideProfileRampupRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["RampUpRate"] = adminOverrideProfileRampupRate;
+            }
+            else if (tag == ADMIN_OVERRIDE_PROFILE_RAMPDOWN_RATE_TAG)
+            {
+                uint32_t adminOverrideProfileRampdownRate;
+                int rc = decodeCurrentRampdownRateSample(
+                    data, data_len, &adminOverrideProfileRampdownRate);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["RampDownRate"] = adminOverrideProfileRampdownRate;
+            }
+            else if (tag == ADMIN_OVERRIDE_PROFILE_RAMPDOWN_HYSTERESIS_TAG)
+            {
+                uint32_t adminOverrideProfileRampdownHysteresis;
+                int rc = decodeCurrentRampdownHysteresisSample(
+                    data, data_len, &adminOverrideProfileRampdownHysteresis);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["RampDownHysteresis"] =
+                    adminOverrideProfileRampdownHysteresis;
+            }
+            else if (tag == ADMIN_OVERRIDE_PROFILE_SECONDARY_FLOOR_TAG)
+            {
+                uint32_t adminOverrideProfileSecondaryFloor;
+                int rc = decodeCurrentSecondaryFloorSample(
+                    data, data_len, &adminOverrideProfileSecondaryFloor);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["SecondaryFloorSetting"] =
+                    adminOverrideProfileSecondaryFloor;
+            }
+            else if (
+                tag ==
+                ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_ACTIVATION_WINDOW_MULTIPLIER_TAG)
+            {
+                uint8_t
+                    adminOverrideProfilePrimaryFloorActivationWindowMultiplier;
+                int rc = decodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                    data, data_len,
+                    &adminOverrideProfilePrimaryFloorActivationWindowMultiplier);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["PrimaryFloorActivationWindowMultiplier"] =
+                    adminOverrideProfilePrimaryFloorActivationWindowMultiplier;
+            }
+            else if (tag ==
+                     ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_TARGET_WINDOW_TAG)
+            {
+                uint8_t adminOverrideProfilePrimaryFloorTargetWindow;
+                int rc = decodeCurrentPrimaryFloorTargetWindowSample(
+                    data, data_len,
+                    &adminOverrideProfilePrimaryFloorTargetWindow);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["PrimaryFloorTargetWindow"] =
+                    adminOverrideProfilePrimaryFloorTargetWindow;
+            }
+            else if (tag ==
+                     ADMIN_OVERRIDE_PROFILE_PRIMARY_FLOOR_ACTIVATION_OFFSET_TAG)
+            {
+                uint32_t adminOverrideProfilePrimaryFloorActivationOffset;
+                int rc = decodeCurrentPrimaryFloorActivationOffsetSample(
+                    data, data_len,
+                    &adminOverrideProfilePrimaryFloorActivationOffset);
+                if (rc != NSM_SW_SUCCESS)
+                {
+                    return rc;
+                }
+                sample_json["Tag"] = tag;
+                sample_json["PrimaryFloorActivationOffset"] =
+                    adminOverrideProfilePrimaryFloorActivationOffset;
+            }
+            else
+            {
+                return NSM_SW_ERROR_LENGTH;
+            }
+            return NSM_SW_SUCCESS;
+        }
+    };
+};
+
 class GetViolationDuration : public CommandInterface
 {
   public:
@@ -4838,6 +5540,40 @@ void registerCommand(CLI::App& app)
         "GetViolationDuration", "get processor throttle duration");
     commands.push_back(std::make_unique<GetViolationDuration>(
         "telemetry", "GetViolationDuration", getViolationDuration));
+
+    auto getPowerSmoothingFeatureInfoV2 =
+        telemetry->add_subcommand("GetPowerSmoothingFeatureInfoV2",
+                                  "Get Power Smoothing Feature Info V2");
+    commands.push_back(std::make_unique<GetPowerSmoothingFeatureInfoV2>(
+        "telemetry", "GetPowerSmoothingFeatureInfoV2",
+        getPowerSmoothingFeatureInfoV2));
+
+    auto getPowerSmoothingCurrentProfileInformationV2 =
+        telemetry->add_subcommand(
+            "GetPowerSmoothingCurrentProfileInformationV2",
+            "Get Power Smoothing Current Profile Information V2");
+    commands.push_back(
+        std::make_unique<GetPowerSmoothingCurrentProfileInformationV2>(
+            "telemetry", "GetPowerSmoothingCurrentProfileInformationV2",
+            getPowerSmoothingCurrentProfileInformationV2));
+
+    auto getPowerSmoothingAdminOverrideProfileInformationV2 =
+        telemetry->add_subcommand(
+            "GetPowerSmoothingAdminOverrideProfileInformationV2",
+            "Get Power Smoothing Admin Override V2");
+    commands.push_back(
+        std::make_unique<GetPowerSmoothingAdminOverrideProfileInformationV2>(
+            "telemetry", "GetPowerSmoothingAdminOverrideProfileInformationV2",
+            getPowerSmoothingAdminOverrideProfileInformationV2));
+
+    auto getPowerSmoothingPresetProfileInformationV2 =
+        telemetry->add_subcommand(
+            "GetPowerSmoothingPresetProfileInformationV2",
+            "Get Power Smoothing Preset Profile Information V2");
+    commands.push_back(
+        std::make_unique<GetPowerSmoothingPresetProfileInformationV2>(
+            "telemetry", "GetPowerSmoothingPresetProfileInformationV2",
+            getPowerSmoothingPresetProfileInformationV2));
 }
 
 } // namespace telemetry

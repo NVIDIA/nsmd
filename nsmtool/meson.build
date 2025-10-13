@@ -8,6 +8,7 @@ sources = [
     'nsm_passthrough_cmd.cpp',
     'nsmtool.cpp',
     '../libnsm/platform-environmental.c',
+    '../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../libnsm/pci-links.c',
     '../libnsm/network-ports.c',
     '../libnsm/base.c',

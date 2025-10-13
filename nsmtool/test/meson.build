@@ -6,6 +6,7 @@ dep_src_files = [
     '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
     '../../libnsm/platform-environmental.c',
+    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../../libnsm/device-configuration.c',
     '../../libnsm/diagnostics.c',
     '../../libnsm/pci-links.c',
