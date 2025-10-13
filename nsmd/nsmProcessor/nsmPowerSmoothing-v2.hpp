@@ -413,7 +413,7 @@ class NsmPowerSmoothingV2 : public NsmPowerSmoothing
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::info("decode_get_powersmoothing_featinfo_v2_resp successful");
+            lg2::debug("decode_get_powersmoothing_featinfo_v2_resp successful");
         }
         else
         {
@@ -826,7 +826,7 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::info("decode_get_current_profile_info_resp_v2 successful");
+            lg2::debug("decode_get_current_profile_info_resp_v2 successful");
         }
         else
         {
@@ -1170,7 +1170,7 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::info(
+            lg2::debug(
                 "decode_get_admin_override_profile_info_v2_resp successful");
         }
         else
@@ -1618,7 +1618,7 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
             responseMsg, responseLen, &consumed_len, &cc, &telemetry_count);
         if (cc == NSM_SUCCESS && rc == NSM_SW_SUCCESS)
         {
-            lg2::info("decode_get_preset_profile_info_v2_resp successful");
+            lg2::debug("decode_get_preset_profile_info_v2_resp successful");
         }
         else
         {

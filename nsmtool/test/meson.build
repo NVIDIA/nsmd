@@ -8,6 +8,7 @@ dep_src_files = [
     '../../libnsm/device-capability-discovery.c',
     '../../libnsm/firmware-utils.c',
     '../../libnsm/platform-environmental.c',
+    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../../libnsm/device-configuration.c',
     '../../libnsm/diagnostics.c',
     '../../libnsm/pci-links.c',

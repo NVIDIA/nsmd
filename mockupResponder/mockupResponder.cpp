@@ -2742,7 +2742,7 @@ std::optional<std::vector<uint8_t>>
         }
         else if (tag == 3)
         {
-            rc = encodeCurrentRampupRateSample(static_cast<uint16_t>(mockValue),
+            rc = encodeCurrentRampupRateSample(static_cast<uint32_t>(mockValue),
                                                reading, &sample_len);
         }
         else if (tag == 4)
