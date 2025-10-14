@@ -58,7 +58,7 @@ TEST(NsmPCIeGroup2, GoodHandleResp)
     nsm::NsmPciGroup2 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
-    struct nsm_query_scalar_group_telemetry_group_2 data;
+    struct nsm_query_scalar_group_telemetry_group_2 data{};
     data.non_fatal_errors = 1111;
     data.fatal_errors = 2222;
     data.unsupported_request_count = 3333;
@@ -116,7 +116,7 @@ TEST(NsmPCIeGroup3, GoodHandleResp)
     nsm::NsmPciGroup3 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
-    struct nsm_query_scalar_group_telemetry_group_3 data;
+    struct nsm_query_scalar_group_telemetry_group_3 data{};
     data.L0ToRecoveryCount = 8769;
     std::vector<uint8_t> response(
         sizeof(nsm_msg_hdr) +
@@ -169,7 +169,7 @@ TEST(NsmPCIeGroup4, GoodHandleResp)
     nsm::NsmPciGroup4 sensor(sensorName, sensorType, pcieECCIntf, pciePortIntf,
                              deviceId, inventoryObjPath);
 
-    struct nsm_query_scalar_group_telemetry_group_4 data;
+    struct nsm_query_scalar_group_telemetry_group_4 data{};
     data.recv_err_cnt = 100;
     data.NAK_recv_cnt = 200;
     data.NAK_sent_cnt = 300;

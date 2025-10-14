@@ -139,8 +139,8 @@ endforeach
 
 foreach d : valid_nsmd_subdirs
     if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDumpCollection' and not get_option(
-        'enable-debug-info',
-    ).enabled())
+            'enable-debug-info',
+        ).enabled())
         if nsmd_subdirs_include.contains(d)
             warning(
                 d + ' requested but required feature option is disabled; skipping',

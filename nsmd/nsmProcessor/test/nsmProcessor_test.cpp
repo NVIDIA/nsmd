@@ -131,7 +131,7 @@ TEST(nsmEccErrorCounts, GoodHandleResp)
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
 
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;
@@ -157,7 +157,7 @@ TEST(nsmEccErrorCounts, GoodUpdateReading)
     auto eccIntf = std::make_shared<EccModeIntf>(bus, inventoryObjPath.c_str());
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;
@@ -177,7 +177,7 @@ TEST(nsmEccErrorCounts, BadHandleResp)
     nsm::NsmEccErrorCounts sensor(sensorName, sensorType, eccIntf,
                                   inventoryObjPath);
 
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;
@@ -233,7 +233,7 @@ TEST(NsmPCIeGroup5, GoodHandleResp)
     nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
                              deviceId, inventoryObjPath);
 
-    struct nsm_query_scalar_group_telemetry_group_5 data;
+    struct nsm_query_scalar_group_telemetry_group_5 data{};
     data.PCIeRXDwords = 100;
     data.PCIeTXDwords = 200;
 
@@ -260,7 +260,7 @@ TEST(NsmPCIeGroup5, BadHandleResp)
     nsm::NsmPciGroup5 sensor(sensorName, sensorType, processorPerformanceIntf,
                              deviceId, inventoryObjPath);
 
-    struct nsm_query_scalar_group_telemetry_group_5 data;
+    struct nsm_query_scalar_group_telemetry_group_5 data{};
     data.PCIeRXDwords = 100;
     data.PCIeTXDwords = 200;
 
@@ -308,7 +308,7 @@ TEST(nsmEDPpScalingFactor, GoodHandleResp)
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 
-    struct nsm_EDPp_scaling_factors scaling_factors;
+    struct nsm_EDPp_scaling_factors scaling_factors{};
     scaling_factors.persistent_scaling_factor = 70;
     scaling_factors.oneshot_scaling_factor = 90;
     scaling_factors.enforced_scaling_factor = 60;
@@ -337,7 +337,7 @@ TEST(nsmEDPpScalingFactor, GoodUpdateReading)
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 
-    struct nsm_EDPp_scaling_factors scaling_factors;
+    struct nsm_EDPp_scaling_factors scaling_factors{};
     scaling_factors.persistent_scaling_factor = 70;
     scaling_factors.oneshot_scaling_factor = 90;
     scaling_factors.enforced_scaling_factor = 60;
@@ -356,7 +356,7 @@ TEST(nsmEDPpScalingFactor, BadHandleResp)
     nsm::NsmEDPpScalingFactor sensor(sensorName, sensorType, inventoryObjPath,
                                      eDPpIntf, resetEdppAsyncIntf);
 
-    struct nsm_EDPp_scaling_factors scaling_factors;
+    struct nsm_EDPp_scaling_factors scaling_factors{};
     scaling_factors.persistent_scaling_factor = 70;
     scaling_factors.oneshot_scaling_factor = 90;
     scaling_factors.enforced_scaling_factor = 60;
@@ -404,7 +404,7 @@ TEST(NsmClockLimitGraphics, GoodHandleResp)
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
                                       cpuOperatingConfigIntf, inventoryObjPath);
 
-    struct nsm_clock_limit clockLimit;
+    struct nsm_clock_limit clockLimit{};
     clockLimit.requested_limit_min = 800;
     clockLimit.requested_limit_max = 1800;
     clockLimit.present_limit_min = 200;
@@ -431,7 +431,7 @@ TEST(NsmClockLimitGraphics, BadHandleResp)
     nsm::NsmClockLimitGraphics sensor(sensorName, sensorType,
                                       cpuOperatingConfigIntf, inventoryObjPath);
 
-    struct nsm_clock_limit clockLimit;
+    struct nsm_clock_limit clockLimit{};
     clockLimit.requested_limit_min = 800;
     clockLimit.requested_limit_max = 1800;
     clockLimit.present_limit_min = 200;
@@ -757,7 +757,7 @@ TEST(nsmProcessorThrottleDuration, GoodHandleResp)
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
-    struct nsm_violation_duration data;
+    struct nsm_violation_duration data{};
     data.supported_counter.byte = 255;
     data.hw_violation_duration = 2000000;
     data.global_sw_violation_duration = 3000000;
@@ -793,7 +793,7 @@ TEST(nsmProcessorThrottleDuration, BadHandleResp)
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_violation_duration_resp),
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_violation_duration data;
+    struct nsm_violation_duration data{};
     data.supported_counter.byte = 255;
     data.hw_violation_duration = 2000000;
     data.global_sw_violation_duration = 3000000;
@@ -845,7 +845,7 @@ TEST(nsmPowerSmoothing, GoodHandleResp)
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_pwr_smoothing_featureinfo_data feat;
+    struct nsm_pwr_smoothing_featureinfo_data feat{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_powersmoothing_featinfo_resp(
@@ -866,7 +866,7 @@ TEST(nsmPowerSmoothing, BadHandleResp)
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_power_smoothing_feat_resp),
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_pwr_smoothing_featureinfo_data feat;
+    struct nsm_pwr_smoothing_featureinfo_data feat{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_powersmoothing_featinfo_resp(
@@ -885,7 +885,7 @@ TEST(nsmPowerSmoothing, GoodUpdateReading)
         bus, inventoryObjPath, nullptr);
     NsmPowerSmoothing controlSensor(sensorName, sensorType, inventoryObjPath,
                                     featIntf, nullptr);
-    struct nsm_pwr_smoothing_featureinfo_data feat;
+    struct nsm_pwr_smoothing_featureinfo_data feat{};
     feat.feature_flag = 7;
     controlSensor.updateReading(&feat);
     EXPECT_EQ(
@@ -922,7 +922,7 @@ TEST(nsmHwCircuitryTelemetry, GoodHandleResp)
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_hardwareciruitry_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_hardwarecircuitry_data lifetimeusage;
+    struct nsm_hardwarecircuitry_data lifetimeusage{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_hardware_lifetime_cricuitry_resp(
@@ -942,7 +942,7 @@ TEST(nsmHwCircuitryTelemetry, BadHandleResp)
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_hardwareciruitry_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_hardwarecircuitry_data lifetimeusage;
+    struct nsm_hardwarecircuitry_data lifetimeusage{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_hardware_lifetime_cricuitry_resp(
@@ -961,7 +961,7 @@ TEST(nsmHwCircuitryTelemetry, GoodUpdateReading)
         bus, inventoryObjPath, nullptr);
     NsmHwCircuitryTelemetry lifetimeCicuitrySensor(sensorName, sensorType,
                                                    inventoryObjPath, featIntf);
-    struct nsm_hardwarecircuitry_data data;
+    struct nsm_hardwarecircuitry_data data{};
     data.reading = 0;
     lifetimeCicuitrySensor.updateReading(&data);
     EXPECT_EQ(lifetimeCicuitrySensor.pwrSmoothingIntf
@@ -997,7 +997,7 @@ TEST(nsmPowerSmoothingAdminOverride, GoodHandleResp)
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_admin_override_data adminProfileData;
+    struct nsm_admin_override_data adminProfileData{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_query_admin_override_resp(0, NSM_SUCCESS, reason_code,
@@ -1017,7 +1017,7 @@ TEST(nsmPowerSmoothingAdminOverride, BadHandleResp)
     std::vector<uint8_t> responseMsg(
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_query_admin_override_resp), 0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_admin_override_data adminProfileData;
+    struct nsm_admin_override_data adminProfileData{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_query_admin_override_resp(0, NSM_SUCCESS, reason_code,
@@ -1036,7 +1036,7 @@ TEST(nsmPowerSmoothingAdminOverride, GoodUpdateReading)
                                                           nullptr);
     NsmPowerSmoothingAdminOverride adminProfileSensor(
         sensorName, sensorType, featIntf, inventoryObjPath, nullptr);
-    struct nsm_admin_override_data adminProfileData;
+    struct nsm_admin_override_data adminProfileData{};
     adminProfileData.admin_override_percent_tmp_floor = 0;
     adminProfileSensor.updateReading(&adminProfileData);
     EXPECT_EQ(adminProfileSensor.adminProfileIntf
@@ -1066,10 +1066,10 @@ TEST(nsmPowerProfileCollection, GoodHandleResp)
 {
     NsmPowerProfileCollection getAllPowerProfileSensor(
         sensorName, sensorType, inventoryObjPath, nullptr);
-    struct nsm_get_all_preset_profile_meta_data profile_meta_data;
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data{};
     int number_of_profiles = 1;
     profile_meta_data.max_profiles_supported = number_of_profiles;
-    struct nsm_preset_profile_data profiles[1];
+    struct nsm_preset_profile_data profiles[1]{};
     uint16_t meta_data_size =
         sizeof(struct nsm_get_all_preset_profile_meta_data);
     uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
@@ -1096,10 +1096,10 @@ TEST(nsmPowerProfileCollection, BadHandleResp)
 {
     NsmPowerProfileCollection getAllPowerProfileSensor(
         sensorName, sensorType, inventoryObjPath, nullptr);
-    struct nsm_get_all_preset_profile_meta_data profile_meta_data;
+    struct nsm_get_all_preset_profile_meta_data profile_meta_data{};
     int number_of_profiles = 1;
     profile_meta_data.max_profiles_supported = number_of_profiles;
-    struct nsm_preset_profile_data profiles[1];
+    struct nsm_preset_profile_data profiles[1]{};
     uint16_t meta_data_size =
         sizeof(struct nsm_get_all_preset_profile_meta_data);
     uint16_t profile_data_size = sizeof(struct nsm_preset_profile_data);
@@ -1173,7 +1173,7 @@ TEST(nsmCurrentPowerSmoothingProfile, GoodHandleResp)
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_get_current_profile_data profileData;
+    struct nsm_get_current_profile_data profileData{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_current_profile_info_resp(
@@ -1204,7 +1204,7 @@ TEST(nsmCurrentPowerSmoothingProfile, BadHandleResp)
         sizeof(nsm_msg_hdr) + sizeof(struct nsm_get_current_profile_info_resp),
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
-    struct nsm_get_current_profile_data profileData;
+    struct nsm_get_current_profile_data profileData{};
     uint16_t reason_code = ERR_NULL;
 
     uint8_t rc = encode_get_current_profile_info_resp(

@@ -572,8 +572,8 @@ int decode_nsm_query_firmware_header_information(
 				 field->tag);)
 			DBG2(printf("Left telemetries: %u, left payload: %u\n",
 				    (uint32_t)(*telemetry_count),
-				    (uint32_t)(*payload_size));)
-			(*telemetry_count)--;
+				    (uint32_t)(*payload_size));)(
+			    *telemetry_count)--;
 			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
 			    ptr, payload_size);
 			if (!rc_ok) {
@@ -748,8 +748,8 @@ int decode_nsm_query_firmware_slot_information(
 				    field->tag);)
 			DBG2(printf("Left telemetries: %u, left payload: %u\n",
 				    (uint32_t)(*telemetry_count),
-				    (uint32_t)(*payload_size));)
-			(*telemetry_count)--;
+				    (uint32_t)(*payload_size));)(
+			    *telemetry_count)--;
 			rc_ok = decode_nsm_firmware_aggregate_tag_skip(
 			    ptr, payload_size);
 			if (!rc_ok) {

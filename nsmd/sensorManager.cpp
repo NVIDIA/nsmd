@@ -178,7 +178,9 @@ requester::Coroutine SensorManagerImpl::interfaceAddedTask()
 {
     while (!queuedAddedInterfaces.empty())
     {
-        auto [objPath, interface] = queuedAddedInterfaces.front();
+        const auto& firstAddedInterface = queuedAddedInterfaces.front();
+        const auto& objPath = firstAddedInterface.first;
+        const auto& interface = firstAddedInterface.second;
         queuedAddedInterfaces.pop();
 
         co_await NsmObjectFactory::instance().createObjects(*this, interface,

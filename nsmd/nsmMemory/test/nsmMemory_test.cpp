@@ -198,7 +198,7 @@ TEST(nsmRemappingAvailabilityBankCount, GoodHandleResp)
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint16_t reason_code = ERR_NULL;
-    struct nsm_row_remap_availability data;
+    struct nsm_row_remap_availability data{};
     data.high_remapping = 100;
     data.low_remapping = 200;
     data.max_remapping = 300;
@@ -226,7 +226,7 @@ TEST(nsmRemappingAvailabilityBankCount, BadHandleResp)
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint16_t reason_code = ERR_NULL;
-    struct nsm_row_remap_availability data;
+    struct nsm_row_remap_availability data{};
     data.high_remapping = 100;
     data.low_remapping = 200;
     data.max_remapping = 300;
@@ -269,7 +269,7 @@ TEST(nsmEccErrorCountsDram, GoodHandleResp)
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
                                       inventoryObjPath);
 
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;
@@ -296,7 +296,7 @@ TEST(nsmEccErrorCountsDram, GoodUpdateReading)
                                                      inventoryObjPath.c_str());
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
                                       inventoryObjPath);
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;
@@ -315,7 +315,7 @@ TEST(nsmEccErrorCountsDram, BadHandleResp)
     nsm::NsmEccErrorCountsDram sensor(sensorName, sensorType, eccIntf,
                                       inventoryObjPath);
 
-    struct nsm_ECC_error_counts errorCounts;
+    struct nsm_ECC_error_counts errorCounts{};
     errorCounts.flags.byte = 132;
     errorCounts.sram_corrected = 1234;
     errorCounts.sram_uncorrected_secded = 4532;

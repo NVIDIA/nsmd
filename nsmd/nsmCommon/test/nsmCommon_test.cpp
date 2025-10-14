@@ -64,7 +64,7 @@ TEST(nsmMemCapacityUtil, GoodHandleResp)
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
 
     uint16_t reason_code = ERR_NULL;
-    struct nsm_memory_capacity_utilization data;
+    struct nsm_memory_capacity_utilization data{};
     data.reserved_memory = 100;
     data.used_memory = 50;
 
@@ -93,7 +93,7 @@ TEST(nsmMemCapacityUtil, BadHandleResp)
         0);
     auto response = reinterpret_cast<nsm_msg*>(responseMsg.data());
     uint16_t reason_code = ERR_NULL;
-    struct nsm_memory_capacity_utilization data;
+    struct nsm_memory_capacity_utilization data{};
     data.reserved_memory = 100;
     data.used_memory = 50;
 

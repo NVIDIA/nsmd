@@ -98,7 +98,7 @@ TEST(nsmTemp, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_temperature_reading_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -136,7 +136,7 @@ TEST(nsmTemp, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_temperature_reading_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERROR;
@@ -212,7 +212,7 @@ TEST(nsmPower, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_current_power_draw_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -250,7 +250,7 @@ TEST(nsmPower, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_current_power_draw_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERR_NOT_READY;
@@ -304,7 +304,7 @@ TEST(nsmPeakPower, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_max_observed_power_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -331,7 +331,7 @@ TEST(nsmPeakPower, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_max_observed_power_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERR_NOT_READY;
@@ -403,7 +403,7 @@ TEST(nsmEnergy, GoodHandleResp)
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -441,7 +441,7 @@ TEST(nsmEnergy, BadHandleResp)
 
     static constexpr size_t msg_size =
         sizeof(nsm_msg_hdr) + sizeof(nsm_get_current_energy_count_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERROR;
@@ -498,7 +498,7 @@ TEST(nsmVoltage, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_voltage_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -528,7 +528,7 @@ TEST(nsmVoltage, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_voltage_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERR_NOT_READY;
@@ -579,7 +579,7 @@ TEST(nsmAltitudePressure, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_altitude_pressure_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -607,7 +607,7 @@ TEST(nsmAltitudePressure, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_get_altitude_pressure_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERR_NOT_READY;
@@ -657,7 +657,7 @@ TEST(nsmThreshold, GoodHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_read_thermal_parameter_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     const uint8_t cc = NSM_SUCCESS;
@@ -680,7 +680,7 @@ TEST(nsmThreshold, BadHandleResp)
 
     static constexpr size_t msg_size = sizeof(nsm_msg_hdr) +
                                        sizeof(nsm_read_thermal_parameter_resp);
-    std::array<char, msg_size> request;
+    std::array<char, msg_size> request{};
     auto msg = reinterpret_cast<nsm_msg*>(request.data());
     const uint8_t instance_id{30};
     uint8_t cc = NSM_ERR_NOT_READY;

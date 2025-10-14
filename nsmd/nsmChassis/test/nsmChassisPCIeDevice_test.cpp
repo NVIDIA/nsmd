@@ -304,7 +304,8 @@ TEST_F(NsmChassisPCIeDeviceTest, goodTestCreateSensors)
     EXPECT_EQ(HealthIntf::HealthType::OK,
               healthObject->invoke(pdiMethod(health)));
     EXPECT_EQ(PCIE_DEVICE_TYPE_SINGLE_FUNCTION,
-              pcieDeviceObject->invoke(pdiMethod(deviceType)));
+              PCIeDeviceIntf::convertDeviceTypesToString(
+                  pcieDeviceObject->invoke(pdiMethod(deviceType))));
     EXPECT_EQ(get<uint64_t>(ltssmState, "DeviceIndex"),
               ltssmStateSensor->deviceIndex);
     EXPECT_EQ(PCIE_CLKBUF_INDEX, pcieRefClock->bufferIndex);
