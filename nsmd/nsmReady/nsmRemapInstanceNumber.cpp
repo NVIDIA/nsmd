@@ -79,6 +79,11 @@ requester::Coroutine
         deviceType = NSM_DEV_ID_MCTP_BRIDGE;
         deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_CX_SMA;
     }
+    else if (name == "HPMSMAMapping")
+    {
+        deviceType = NSM_DEV_ID_MCTP_BRIDGE;
+        deviceRole = NSM_MCTP_BRIDGE_DEV_ROLE_HPM_SMA;
+    }
     else if (name == "CX7PCIEBridgeMapping")
     {
         deviceType = NSM_DEV_ID_PCIE_BRIDGE;
@@ -88,6 +93,11 @@ requester::Coroutine
     {
         deviceType = NSM_DEV_ID_PCIE_BRIDGE;
         deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX8;
+    }
+    else if (name == "CX9PCIEBridgeMapping")
+    {
+        deviceType = NSM_DEV_ID_PCIE_BRIDGE;
+        deviceRole = NSM_PCIE_BRIDGE_DEV_ROLE_CX9;
     }
     if (deviceType == NSM_DEV_ID_UNKNOWN)
     {

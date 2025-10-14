@@ -26,9 +26,10 @@ namespace nsm
 {
 NsmPowerSmoothing::NsmPowerSmoothing(
     std::string& name, std::string& type, std::string& inventoryObjPath,
-    std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf) :
+    std::shared_ptr<OemPowerSmoothingFeatIntf> pwrSmoothingIntf,
+    std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type), pwrSmoothingIntf(pwrSmoothingIntf),
-    inventoryObjPath(inventoryObjPath)
+    inventoryObjPath(inventoryObjPath), device(device)
 {
     updateMetricOnSharedMemory();
 }
@@ -222,12 +223,14 @@ NsmCurrentPowerSmoothingProfile::NsmCurrentPowerSmoothingProfile(
     std::shared_ptr<OemCurrentPowerProfileIntf> pwrSmoothingCurProfileIntf,
     std::shared_ptr<NsmPowerProfileCollection>
         pwrSmoothingSupportedCollectionSensor,
-    std::shared_ptr<NsmPowerSmoothingAdminOverride> adminProfileSensor) :
+    std::shared_ptr<NsmPowerSmoothingAdminOverride> adminProfileSensor,
+    std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type),
     pwrSmoothingCurProfileIntf(pwrSmoothingCurProfileIntf),
     pwrSmoothingSupportedCollectionSensor(
         pwrSmoothingSupportedCollectionSensor),
-    adminProfileSensor(adminProfileSensor), inventoryObjPath(inventoryObjPath)
+    adminProfileSensor(adminProfileSensor), inventoryObjPath(inventoryObjPath),
+    device(device)
 
 {
     updateMetricOnSharedMemory();
@@ -367,9 +370,9 @@ void NsmCurrentPowerSmoothingProfile::updateReading(
 NsmPowerSmoothingAdminOverride::NsmPowerSmoothingAdminOverride(
     std::string& name, std::string& type,
     std::shared_ptr<OemAdminProfileIntf> adminProfileIntf,
-    std::string& inventoryObjPath) :
+    std::string& inventoryObjPath, std::shared_ptr<NsmDevice> device) :
     NsmSensor(name, type), adminProfileIntf(adminProfileIntf),
-    inventoryObjPath(inventoryObjPath)
+    inventoryObjPath(inventoryObjPath), device(device)
 {}
 
 std::optional<std::vector<uint8_t>>

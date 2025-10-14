@@ -186,10 +186,19 @@ display it in readable format.
 ### nsmMockupResponder
 
 A mockup NSM responder that can be used for development purpose. Its primary
-usage is to test nsmd and nsmtool features on an emulator like QEMU. The mockup
-NSM responder includes modified MCTP control and demux daemon, user can create
-a emulated MCTP endpoint by providing a json file to modified MCTP control
-daemon to expose the emulated MCTP Endpoint to D-Bus.
+usage is to test nsmd and nsmtool features on an emulator like QEMU.
 
-The mockup NSM responder listens to demux unix socket for the request from
-nsmd/nsmtool and returns the respond through modified MCTP demux daemon.
+Follow this steps to run nsmMockupResponder:
+Step 1 -
+On the QEMU instance, restart the `nsmd` service.
+
+Step 2
+Assign an address to the loopback (`lo`) interface
+$ mctp addr add 12 dev lo
+
+Step 3
+Immediately start the mock responder using the assigned address
+$ nsmMockupResponder -v -d Baseboard -i 0 -e 12
+
+Run Step 3 right after Step 2. If there is any delay, nsmd will fail to detect
+the endpoint. If detection fails, repeat all steps from the beginning.

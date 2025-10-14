@@ -211,6 +211,16 @@ class CommandInterface
         return mctpEid;
     }
 
+    /**
+     * @brief check if verbose mode is enabled
+     *
+     * @return bool - true if verbose mode is enabled
+     */
+    inline bool isVerbose() const
+    {
+        return verbose;
+    }
+
   private:
     /** @brief Get MCTP demux daemon socket address
      *

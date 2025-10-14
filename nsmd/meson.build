@@ -69,6 +69,7 @@ if libnsm_all or libnsm_include.contains('diagnostics')
 endif
 if libnsm_all or libnsm_include.contains('platform-environmental')
     sources += ['../libnsm/platform-environmental.c']
+    sources += ['../libnsm/powersmoothing-powerprofile-api-v2.c']
 endif
 if libnsm_all or libnsm_include.contains('pci-links')
     sources += ['../libnsm/pci-links.c']

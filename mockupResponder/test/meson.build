@@ -11,6 +11,7 @@ dep_src_files = [
     '../../libnsm/device-configuration.c',
     '../../libnsm/diagnostics.c',
     '../../libnsm/platform-environmental.c',
+    '../../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../../libnsm/pci-links.c',
     '../../libnsm/requester/mctp.c',
     '../../libnsm/firmware-utils.c',

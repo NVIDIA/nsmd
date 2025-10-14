@@ -34,6 +34,15 @@ enum nsm_firmware_commands {
 	NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER = 0x05,
 	NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER = 0x06,
 	NSM_FW_SET_ROT_PROPERTY = 0x08,
+	NSM_FW_DOT_GET_INFO = 0x20,
+	NSM_FW_DOT_CAK_INSTALL = 0x21,
+	NSM_FW_DOT_LOCK = 0x22,
+	NSM_FW_DOT_UNLOCK = 0x23,
+	NSM_FW_DOT_CAK_ROTATE = 0x24,
+	NSM_FW_DOT_DISABLE = 0x25,
+	NSM_FW_DOT_OVERRIDE = 0x26,
+	NSM_FW_DOT_UNLOCK_CHALLENGE = 0x27,
+	NSM_FW_DOT_RECOVERY = 0x28
 };
 
 /** @struct nsm_firmware_state_information_fields
@@ -448,6 +457,66 @@ struct nsm_code_auth_key_perm_update_req {
 struct nsm_code_auth_key_perm_update_resp {
 	struct nsm_common_resp hdr;
 	uint32_t update_method;
+} __attribute__((packed));
+
+/** @brief Key authentication scheme types for DotCAKInstall */
+enum nsm_key_auth_scheme {
+	NSM_KEY_AUTH_SCHEME_ECDSA = 0,
+	NSM_KEY_AUTH_SCHEME_HYBRID = 1
+};
+
+/** @brief DOT Completion Codes */
+enum nsm_dot_completion_codes {
+	DOT_NO_ERROR = 0x0,	       /* DOT command success */
+	DOT_ERROR_GENERAL_FAULT = 0x81 /* DOT command fail with error that is
+					  not defined specifically */
+};
+
+/** @struct nsm_dot_cak_install_req
+ *
+ *  Structure representing DotCAKInstall request parameters.
+ *  According to spec:
+ *  - CAK.pub: 148-byte key authentication data per spec
+ *  - LAK.pub: 148-byte key authentication data per spec
+ */
+struct nsm_dot_cak_install_req {
+	uint8_t
+	    cak_pub[148]; /* CAK: 148-byte key authentication data per spec */
+	uint8_t
+	    lak_pub[148]; /* LAK: 148-byte key authentication data per spec */
+	uint8_t lock_disable; /* 0: Allow DOT_LOCK, 1: DOT_LOCK not allowed */
+	uint32_t min_svn;     /* MIN_SVN for minimal SVN */
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_install_req_command
+ *
+ *  Structure representing DotCAKInstall request command.
+ *  Uses nsm_common_req_v2 for large payload support (similar to
+ * install_token_req)
+ */
+struct nsm_dot_cak_install_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_cak_install_req dot_cak_install_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_install_resp
+ *
+ *  Structure representing DotCAKInstall response parameters.
+ *  According to spec: only command_code, completion_code, and reserved fields.
+ */
+struct nsm_dot_cak_install_resp {
+	uint8_t command_code;
+	uint8_t completion_code;
+	uint16_t reserved;
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_install_resp_command
+ *
+ *  Structure representing DotCAKInstall response command.
+ */
+struct nsm_dot_cak_install_resp_command {
+	struct nsm_common_resp hdr;
+	struct nsm_dot_cak_install_resp dot_cak_install_resp;
 } __attribute__((packed));
 
 /** @struct nsm_firmware_aggregate_tag
@@ -1104,6 +1173,63 @@ int encode_nsm_firmware_set_rot_property_req(
 int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
 					      size_t msg_len, uint8_t *cc,
 					      uint16_t *reason_code);
+
+/**
+ * @brief Encode nsm DotCAKInstall request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] dot_cak_req - Pointer to the DotCAKInstall request parameters
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_cak_install_req(
+    uint8_t instance_id, const struct nsm_dot_cak_install_req *dot_cak_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DotCAKInstall request message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ * @param[out] dot_cak_req - Pointer to the DotCAKInstall request parameters
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int decode_nsm_dot_cak_install_req(const struct nsm_msg *msg, size_t msg_len,
+				   struct nsm_dot_cak_install_req *dot_cak_req);
+
+/**
+ * @brief Encode nsm DotCAKInstall response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Command completion code
+ * @param[in] reason_code - Reason code
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_cak_install_resp(uint8_t instance_id, uint8_t cc,
+				    uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DotCAKInstall response message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ * @param[out] cc - Command completion code
+ * @param[out] reason_code - Reason code
+ * @param[out] dot_cak_resp - Pointer to the DotCAKInstall response parameters
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int decode_nsm_dot_cak_install_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code, struct nsm_dot_cak_install_resp *dot_cak_resp);
 
 #ifdef __cplusplus
 }

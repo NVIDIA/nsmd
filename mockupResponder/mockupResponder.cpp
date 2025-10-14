@@ -25,12 +25,14 @@
 #include "network-ports.h"
 #include "pci-links.h"
 #include "platform-environmental.h"
+#include "powersmoothing-powerprofile-api-v2.h"
 
 #include "gpmMetricsList.hpp"
 #include "types.hpp"
 #include "utils.hpp"
 
 #include <endian.h>
+#include <linux/mctp.h>
 #include <sys/socket.h>
 
 #include <phosphor-logging/lg2.hpp>
@@ -208,62 +210,39 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
 
 int MockupResponder::initSocket()
 {
+    auto fd = socket(AF_MCTP, SOCK_DGRAM, 0);
+
+    int rc = 0;
+    if (fd == -1)
+    {
+        rc = -errno;
+        lg2::error("Failed to create the socket, RC={RC}, EID={ED}", "RC",
+                   strerror(-rc), "ED", mockEid);
+        return rc;
+    }
+
+    struct sockaddr_mctp addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.smctp_family = AF_MCTP;
+    addr.smctp_network = MCTP_NET_ANY;
+    addr.smctp_addr.s_addr = mockEid;
+    addr.smctp_tag = MCTP_TAG_OWNER;
+    addr.smctp_type = MCTP_MSG_TYPE_PCI_VDM;
+
+    rc = bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr));
+    if (rc == -1)
+    {
+        rc = -errno;
+        lg2::error(
+            "Error while binding the socket to NSM Msg Type, RC={RC}, EID={ED}",
+            "RC", strerror(-rc), "ED", mockEid);
+        return rc;
+    }
+
     if (verbose)
     {
         lg2::info("connect to Mockup EID({EID})", "EID", mockEid);
-    }
-
-    auto fd = ::socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (fd == -1)
-    {
-        return false;
-    }
-
-    struct sockaddr_un addr{};
-
-    addr.sun_family = AF_UNIX;
-    memcpy(addr.sun_path, MCTP_SOCKET_PATH, sizeof(MCTP_SOCKET_PATH) - 1);
-
-    if (::connect(fd, (struct sockaddr*)&addr,
-                  sizeof(MCTP_SOCKET_PATH) + sizeof(addr.sun_family) - 1) == -1)
-    {
-        lg2::error(
-            "connect() error to mctp-demux-daemon, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", std::strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    uint8_t prefix = MCTP_MSG_EMU_PREFIX;
-    uint8_t type = MCTP_MSG_TYPE_VDM;
-
-    ssize_t ret = ::write(fd, &prefix, sizeof(uint8_t));
-    if (ret < 0)
-    {
-        lg2::error(
-            "Failed to write mockup prefix code to socket, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    ret = ::write(fd, &type, sizeof(uint8_t));
-    if (ret < 0)
-    {
-        lg2::error(
-            "Failed to write VDM type code to socket, errno = {ERROR}, {STRERROR}",
-            "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
-    }
-
-    ret = ::write(fd, &mockEid, sizeof(uint8_t));
-    if (ret == -1)
-    {
-        lg2::error("Failed to write eid to socket, errno = {ERROR}, {STRERROR}",
-                   "ERROR", errno, "STRERROR", strerror(errno));
-        close(fd);
-        return -1;
     }
 
     auto callback = [this](sdeventplus::source::IO& io, int fd,
@@ -284,9 +263,18 @@ int MockupResponder::initSocket()
             return;
         }
 
-        std::vector<uint8_t> requestMsg(peekedLength);
-        auto recvDataLength = recv(fd, static_cast<void*>(requestMsg.data()),
-                                   peekedLength, 0);
+        struct sockaddr_mctp addr;
+        memset(&addr, 0, sizeof(addr));
+
+        socklen_t addrlen = sizeof(addr);
+        size_t requestMsgSize = peekedLength;
+        Request requestMsg(requestMsgSize);
+        uint8_t* requestMsgData = requestMsg.data();
+
+        ssize_t recvDataLength = recvfrom(
+            fd, static_cast<void*>(requestMsgData), peekedLength, MSG_TRUNC,
+            reinterpret_cast<struct sockaddr*>(&addr), &addrlen);
+
         if (recvDataLength != peekedLength)
         {
             lg2::error("Failure to read peeked length packet. peekedLength="
@@ -296,53 +284,49 @@ int MockupResponder::initSocket()
             return;
         }
 
-        if (requestMsg[2] != MCTP_MSG_TYPE_VDM)
+        if (addr.smctp_type != MCTP_MSG_TYPE_VDM)
         {
             lg2::error("Received non VDM message type={TYPE}", "TYPE",
-                       requestMsg[2]);
+                       addr.smctp_type);
             return;
         }
 
         if (verbose)
         {
-            utils::printBuffer(utils::Rx, &requestMsg[3], requestMsg.size() - 3,
-                               requestMsg[0], requestMsg[1]);
+            utils::printBuffer(utils::Rx, requestMsgData, requestMsgSize,
+                               addr.smctp_tag, addr.smctp_addr.s_addr);
         }
-
-        // Outgoing message.
-        iovec iov[2]{};
-        // This structure contains the parameter information for the
-        // response message.
-        msghdr msg{};
 
         // process message and send response
         std::optional<Response> longRunningEvent;
         auto response = processRxMsg(requestMsg, longRunningEvent);
         if (response)
         {
+            struct sockaddr_mctp destAddr;
+            memset(&destAddr, 0, sizeof(destAddr));
+
+            destAddr.smctp_family = AF_MCTP;
+            destAddr.smctp_network = addr.smctp_network;
+            destAddr.smctp_addr.s_addr = addr.smctp_addr.s_addr;
+            destAddr.smctp_type = MCTP_MSG_TYPE_VDM;
+
             constexpr uint8_t tagOwnerBitPos = 3;
             constexpr uint8_t tagOwnerMask = ~(1 << tagOwnerBitPos);
-            // Set tag owner bit to 0 for NSM responses
-            requestMsg[0] = requestMsg[0] & tagOwnerMask;
-            iov[0].iov_base = &requestMsg[0];
-            iov[0].iov_len = sizeof(requestMsg[0]) + sizeof(requestMsg[1]) +
-                             sizeof(requestMsg[2]);
-            iov[1].iov_base = (*response).data();
-            iov[1].iov_len = (*response).size();
+            destAddr.smctp_tag = addr.smctp_tag & tagOwnerMask;
 
-            msg.msg_iov = iov;
-            msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
-
+            ssize_t rc = sendto(fd, response->data(), response->size(), 0,
+                                reinterpret_cast<struct sockaddr*>(&destAddr),
+                                sizeof(destAddr));
+            if (rc == -1)
+            {
+                auto returnCode = -errno;
+                lg2::error("sendmsg system call failed, RC={RC}", "RC",
+                           returnCode);
+            }
             if (verbose)
             {
-                utils::printBuffer(utils::Tx, *response, requestMsg[0],
-                                   requestMsg[1]);
-            }
-
-            int result = sendmsg(fd, &msg, 0);
-            if (result < 0)
-            {
-                lg2::error("sendmsg system call failed");
+                utils::printBuffer(utils::Tx, *response, destAddr.smctp_tag,
+                                   destAddr.smctp_addr.s_addr);
             }
         }
         if (longRunningEvent)
@@ -367,8 +351,7 @@ std::optional<Response>
                                   std::optional<Request>& longRunningEvent)
 {
     nsm_header_info hdrFields{};
-    auto hdr =
-        reinterpret_cast<const nsm_msg_hdr*>(rxMsg.data() + MCTP_DEMUX_PREFIX);
+    auto hdr = reinterpret_cast<const nsm_msg_hdr*>(rxMsg.data());
     if (NSM_SUCCESS != unpack_nsm_header(hdr, &hdrFields))
     {
         lg2::error("Empty NSM request header");
@@ -571,14 +554,20 @@ std::optional<Response>
                     return toggleFeatureState(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_FEATURE_INFO:
                     return getPowerSmoothingFeatureInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_FEATURE_INFO_V2:
+                    return getPowerSmoothingFeatureInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_HARDWARE_CIRCUITRY_LIFETIME_USAGE:
                     return getHwCircuiteryUsage(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION:
                     return getCurrentProfileInfo(request, requestLen);
                 case NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE:
                     return getQueryAdminOverride(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_CURRENT_PROFILE_INFORMATION_V2:
+                    return getCurrentProfileInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_SET_ACTIVE_PRESET_PROFILE:
                     return setActivePresetProfile(request, requestLen);
+                case NSM_PWR_SMOOTHING_QUERY_ADMIN_OVERRIDE_V2:
+                    return getQueryAdminOverrideV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_SETUP_ADMIN_OVERRIDE:
                     return setupAdminOverride(request, requestLen);
                 case NSM_PWR_SMOOTHING_APPLY_ADMIN_OVERRIDE:
@@ -587,6 +576,8 @@ std::optional<Response>
                     return toggleImmediateRampDown(request, requestLen);
                 case NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION:
                     return getPresetProfileInfo(request, requestLen);
+                case NSM_PWR_SMOOTHING_GET_PRESET_PROFILE_INFORMATION_V2:
+                    return getPresetProfileInfoV2(request, requestLen);
                 case NSM_PWR_SMOOTHING_UPDATE_PRESET_PROFILE_PARAMETERS:
                     return updatePresetProfileParams(request, requestLen);
                 /*
@@ -750,6 +741,8 @@ std::optional<Response>
                     return queryFirmwareSecurityVersion(request, requestLen);
                 case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
                     return updateMinSecurityVersion(request, requestLen);
+                case NSM_FW_DOT_CAK_INSTALL:
+                    return dotCAKInstallHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -832,9 +825,9 @@ std::optional<std::vector<uint8_t>>
             sizeof(nsm_get_supported_nvidia_message_types_resp),
         0);
 
-    // this is to mock that type-0, 1, 2, 3, 4 and 5 are supported
+    // this is to mock that type-0, 1, 2, 3, 4, 5 and 6 are supported
     bitfield8_t types[SUPPORTED_MSG_TYPE_DATA_SIZE] = {
-        0x3F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x7F, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
         0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
     uint8_t cc = NSM_SUCCESS;
@@ -879,7 +872,7 @@ std::optional<std::vector<uint8_t>>
                  {3, {0, 2, 3, 4, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
-                 {6, {1}},
+                 {6, {1, NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -930,16 +923,17 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,
-                      15,  16,  17,  69,  70,  71,  73,  74,  77,  78,  79,
-                      97,  118, 113, 114, 115, 116, 117, 119, 120, 121, 122,
-                      123, 124, 125, 126, 127, 163, 164, 165, 166, 172, 173}},
+                 {3,
+                  {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,  15,
+                   16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  97,  114,
+                   115, 116, 117, 119, 121, 123, 124, 125, 126, 127, 163, 164,
+                   165, 166, 167, 168, 169, 170, 172, 173, 118, 113, 122, 120}},
                  {4,
                   {0, NSM_GET_DEVICE_DIAGNOSTICS,
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
                    NSM_GET_NETWORK_DEVICE_LOG_INFO, NSM_ERASE_DEBUG_INFO}},
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
-                 {6, {1, 2, 3, 4, 5, 6}},
+                 {6, {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_EROT,
              {
@@ -950,7 +944,8 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_QUERY_CODE_AUTH_KEY_PERM,
                    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
-                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER}},
+                   NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
+                   NSM_FW_DOT_CAK_INSTALL}},
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {
@@ -2596,6 +2591,403 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::getPowerSmoothingFeatureInfoV2(const nsm_msg* requestMsg,
+                                                    size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPowerSmoothingFeatureInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_powersmoothing_featinfo_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_powersmoothing_featinfo_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock power smoothing feature info data
+    for (const auto& [tag, mockValue] : powerSmoothingFeatureInfoMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeFeatureFlagSample(static_cast<uint32_t>(mockValue),
+                                         reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentTMPSettingSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentTMPFloorSettingSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeMaxTmpFloorSettingSample(
+                static_cast<uint16_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeMinTmpFloorSettingSample(
+                static_cast<uint16_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeFloorWindowMultiplierSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeMinPrimaryFloorActivationOffset(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeMinPrimaryFloorActivationPoint(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_powersmoothing_featinfo_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getCurrentProfileInfoV2(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getCurrentProfileInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_current_profile_info_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_current_profile_info_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock current profile info data
+    for (const auto& [tag, mockValue] : currentProfileInfoMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeActivePresetProfileSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeAdminOverrideMaskSample(static_cast<uint16_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint16_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 8)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 9)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_current_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getQueryAdminOverrideV2(const nsm_msg* requestMsg,
+                                             size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getQueryAdminOverrideV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_admin_override_profile_info_v2_req(requestMsg,
+                                                            requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "decode_get_admin_override_profile_info_v2_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock admin override profile info data
+    for (const auto& [tag, mockValue] : adminOverrideMockTable)
+    {
+        ++samplesCount;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_admin_override_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getPresetProfileInfoV2(const nsm_msg* requestMsg,
+                                            size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getPresetProfileInfoV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_preset_profile_info_v2_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_preset_profile_info_v2_req failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
+    // Initialize response vector
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(512);
+
+    uint16_t samplesCount{};
+
+    // Iterate through mock preset profile info data
+    for (const auto& [tmpTag, mockValue] : presetProfileInfoMockTable)
+    {
+        ++samplesCount;
+        uint8_t tag = tmpTag >> 3;
+
+        uint8_t reading[64]{};
+        size_t sample_len{};
+        std::array<uint8_t, 256> sample;
+        auto nsm_sample =
+            reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+        if (tag == 0)
+        {
+            rc = encodeCurrentTMPFloorSample(static_cast<uint16_t>(mockValue),
+                                             reading, &sample_len);
+        }
+        else if (tag == 1)
+        {
+            rc = encodeCurrentRampupRateSample(static_cast<uint32_t>(mockValue),
+                                               reading, &sample_len);
+        }
+        else if (tag == 2)
+        {
+            rc = encodeCurrentRampdownRateSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 3)
+        {
+            rc = encodeCurrentRampdownHysteresisSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 4)
+        {
+            rc = encodeCurrentSecondaryFloorSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 5)
+        {
+            rc = encodeCurrentPrimaryFloorActivationWindowMultiplierSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 6)
+        {
+            rc = encodeCurrentPrimaryFloorTargetWindowSample(
+                static_cast<uint8_t>(mockValue), reading, &sample_len);
+        }
+        else if (tag == 7)
+        {
+            rc = encodeCurrentPrimaryFloorActivationOffsetSample(
+                static_cast<uint32_t>(mockValue), reading, &sample_len);
+        }
+        else
+        {
+            lg2::error("Invalid tag: {TAG}", "TAG", tag);
+            return std::nullopt;
+        }
+
+        rc = encode_aggregate_resp_sample(tmpTag, true, reading, sample_len,
+                                          nsm_sample, &sample_len);
+        assert(rc == NSM_SW_SUCCESS);
+        response.insert(response.end(), sample.begin(),
+                        std::next(sample.begin(), sample_len));
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    rc = encode_get_preset_profile_info_v2_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, samplesCount, responseMsg);
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::getCurrentProfileInfo(const nsm_msg* requestMsg,
                                            size_t requestLen)
 {
@@ -3284,7 +3676,7 @@ int MockupResponder::mctpSockSend(uint8_t destEid,
 
     if (verbose)
     {
-        utils::printBuffer(utils::Tx, requestMsg, prefix[0], prefix[1]);
+        utils::printBuffer(utils::Rx, requestMsg, prefix[0], prefix[1]);
     }
 
     auto rc = sendmsg(sockFd, &msg, 0);
@@ -4730,7 +5122,6 @@ std::optional<std::vector<uint8_t>>
     fpga_diagnostics_settings_data_index data_index;
     [[maybe_unused]] auto rc = decode_get_fpga_diagnostics_settings_req(
         requestMsg, requestLen, &data_index);
-    assert(rc == NSM_SW_SUCCESS);
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error(
@@ -7256,6 +7647,57 @@ std::optional<std::vector<uint8_t>>
     {
         lg2::error("encode_cc_only_resp failed: rc={RC}", "RC", rc);
         return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotCAKInstallHandler(const nsm_msg* requestMsg,
+                                          size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT CAK Install request");
+    }
+
+    // Decode the request
+    struct nsm_dot_cak_install_req dot_cak_req;
+    auto rc = decode_nsm_dot_cak_install_req(requestMsg, requestLen,
+                                             &dot_cak_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_cak_install_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Install request decoded successfully");
+        lg2::info("Lock disable: {LOCK_DISABLE}", "LOCK_DISABLE",
+                  static_cast<int>(dot_cak_req.lock_disable));
+        lg2::info("Min SVN: {MIN_SVN}", "MIN_SVN",
+                  static_cast<int>(dot_cak_req.min_svn));
+    }
+
+    // For mock implementation, we'll always return success
+    // In a real implementation, this would perform the actual CAK installation
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_cak_install_resp(requestMsg->hdr.instance_id,
+                                         NSM_SUCCESS, reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_cak_install_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT CAK Install response encoded successfully");
     }
 
     return response;
