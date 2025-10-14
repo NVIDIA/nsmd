@@ -65,6 +65,7 @@ class NsmNumericSensorComposite : public NsmObject
 
   private:
     std::unique_ptr<ValueIntf> valueIntf = nullptr;
+    uint64_t nextUpdateTimestamp = 0;
     std::unique_ptr<AssociationDefinitionsInft> associationDefinitionsInft =
         nullptr;
     std::unique_ptr<DecoratorAreaIntf> decoratorAreaIntf = nullptr;

@@ -111,13 +111,35 @@ NsmNumericSensorDbusValue::NsmNumericSensorDbusValue(
 
 void NsmNumericSensorDbusValue::updateReading(double value, uint64_t timestamp)
 {
-    if (timestamp == 0 ||
-        (previousValue != value && (timestamp - lastTimestamp) > 1000))
+    if (previousValue != value)
     {
-        lastTimestamp = timestamp;
         valueIntf.value(value);
         previousValue = value;
     }
+
+    calculateNextUpdateTimestamp(timestamp, nextUpdateTimestamp);
+}
+bool NsmNumericSensorDbusValue::canUpdate(const uint64_t& timestamp) const
+{
+    return timestamp >= nextUpdateTimestamp || nextUpdateTimestamp == 0;
+}
+
+void NsmNumericSensorDbusValue::calculateNextUpdateTimestamp(
+    const uint64_t& timestamp, uint64_t& nextUpdateTimestamp)
+{
+    if (nextUpdateTimestamp == 0)
+    {
+        nextUpdateTimestamp = timestamp + 1000;
+        return;
+    }
+    int64_t elapsedSec =
+        static_cast<int64_t>((timestamp - nextUpdateTimestamp) / 1000);
+
+    // Keep at least 1Hz
+    // Wherever performance and staleness is concerned shared memory is
+    // preferred over dbus. Unecessary faster updates on dbus lead to
+    // performance hit
+    nextUpdateTimestamp += 1000 * std::max<int64_t>(1, elapsedSec);
 }
 
 NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
@@ -138,11 +160,7 @@ NsmNumericSensorDbusValueTimestamp::NsmNumericSensorDbusValueTimestamp(
 void NsmNumericSensorDbusValueTimestamp::updateReading(double value,
                                                        uint64_t timestamp)
 {
-    if (lastTimestamp < timestamp)
-    {
-        lastTimestamp = timestamp;
-        timestampIntf.elapsed(timestamp);
-    }
+    timestampIntf.elapsed(timestamp);
     NsmNumericSensorDbusValue::updateReading(value, timestamp);
 }
 
@@ -167,8 +185,16 @@ void NsmNumericSensorValueAggregate::append(
 void NsmNumericSensorValueAggregate::updateReading(double value,
                                                    uint64_t timestamp)
 {
+    timestamp = timestamp > 0 ? timestamp
+                              : utils::getCurrentSteadyClockTimestamp();
     for (const auto& elem : objects)
     {
+        if (auto* dbusValue =
+                dynamic_cast<NsmNumericSensorDbusValue*>(elem.get());
+            dbusValue && !dbusValue->canUpdate(timestamp))
+        {
+            continue;
+        }
         elem->updateReading(value, timestamp);
     }
 }

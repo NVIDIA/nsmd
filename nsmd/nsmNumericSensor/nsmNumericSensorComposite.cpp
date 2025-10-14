@@ -97,13 +97,19 @@ void NsmNumericSensorComposite::updateCompositeReading(std::string childName,
         totalValue = std::nan("");
     }
 
+    auto timestamp = utils::getCurrentSteadyClockTimestamp();
 #ifdef NVIDIA_SHMEM
     if (shmemSensor)
     {
-        shmemSensor->updateReading(totalValue);
+        shmemSensor->updateReading(totalValue, timestamp);
     }
 #endif
-    valueIntf->value(totalValue);
+    if (timestamp >= nextUpdateTimestamp || nextUpdateTimestamp == 0)
+    {
+        valueIntf->value(totalValue);
+        NsmNumericSensorDbusValue::calculateNextUpdateTimestamp(
+            timestamp, nextUpdateTimestamp);
+    }
 }
 
 static requester::Coroutine

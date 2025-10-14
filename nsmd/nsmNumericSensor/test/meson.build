@@ -62,11 +62,12 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests_files = [
-    'nsmNumeric_test.cpp',
-    'nsmNumericAggregator_test.cpp',
-    'nsmNumericSensors_test.cpp',
-    'nsmNumericAggregatorSensors_test.cpp',
+tests = [
+    'nsmNumeric_test',
+    'nsmNumericAggregator_test',
+    'nsmNumericSensors_test',
+    'nsmNumericAggregatorSensors_test',
+    'nsmNumericSensorValueAggregate_test',
 ]
 
 tests_deps = [
@@ -84,15 +85,17 @@ if get_option('shmem').enabled()
     tests_deps += nvidia_shmem
 endif
 
-test(
-    'nsmNumericSensors_test',
-    executable(
-        'nsmNumericSensors_test',
-        tests_files,
-        implicit_include_directories: false,
-        link_args: dynamic_linker,
-        build_rpath: '',
-        dependencies: tests_deps,
-    ),
-    workdir: meson.current_source_dir(),
-)
+foreach t : tests
+    test(
+        t,
+        executable(
+            t.underscorify(),
+            t + '.cpp',
+            implicit_include_directories: false,
+            link_args: dynamic_linker,
+            build_rpath: '',
+            dependencies: tests_deps,
+        ),
+        workdir: meson.current_source_dir(),
+    )
+endforeach
