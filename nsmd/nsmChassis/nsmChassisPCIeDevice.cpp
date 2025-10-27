@@ -181,6 +181,7 @@ void createChassisPCIeDeviceMultiPortPCIeDevice(
     }
 }
 
+#if defined(ENABLE_PCIE_LTSSM_STATE)
 void createChassisPCIeDeviceLTSSMState(
     std::shared_ptr<NsmDevice> device, std::string& name,
     dbus::PropertyMap& allCurrentIfaceProperties)
@@ -205,7 +206,9 @@ void createChassisPCIeDeviceLTSSMState(
         std::make_shared<NsmPCIeLTSSMState>(ltssmStateObject, deviceIndex),
         priority);
 }
+#endif
 
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 void createChassisPCIeDeviceClockOutputEnableState(
     std::shared_ptr<NsmDevice> device, std::string& name,
     const std::string& chassisName,
@@ -238,6 +241,7 @@ void createChassisPCIeDeviceClockOutputEnableState(
         device->addSensor(nvLinkRefClock, CLOCK_OUTPUT_ENABLE_STATE_PRIORITY);
     }
 }
+#endif
 
 requester::Coroutine
     nsmChassisPCIeDeviceCreateSensors(SensorManager& manager,

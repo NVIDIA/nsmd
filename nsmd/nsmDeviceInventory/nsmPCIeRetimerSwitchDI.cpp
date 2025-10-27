@@ -154,6 +154,7 @@ requester::Coroutine
     co_return cc ? cc : rc;
 }
 
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 NsmPCIeRetimerSwitchGetClockState::NsmPCIeRetimerSwitchGetClockState(
     sdbusplus::bus::bus& bus, const std::string& name, const std::string& type,
     const uint64_t& deviceInstance, std::string& inventoryObjPath) :
@@ -239,6 +240,7 @@ bool NsmPCIeRetimerSwitchGetClockState::getRetimerClockState(
             return false;
     }
 }
+#endif
 
 static requester::Coroutine
     CreatePCIeRetimerSwitch(SensorManager& manager,
@@ -265,11 +267,13 @@ static requester::Coroutine
         inventoryObjPath = std::get<std::string>(
             allCurrentIfaceProperties.at("InventoryObjPath"));
     }
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
     bool priority{};
     if (allCurrentIfaceProperties.count("Priority"))
     {
         priority = std::get<bool>(allCurrentIfaceProperties.at("Priority"));
     }
+#endif
     uint64_t deviceInstance{};
     if (allCurrentIfaceProperties.count("DeviceInstance"))
     {
@@ -302,6 +306,7 @@ static requester::Coroutine
 
     if (type == "NSM_PCIeRetimer_Switch")
     {
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
         auto retimerSwitchRefClock =
             std::make_shared<NsmPCIeRetimerSwitchGetClockState>(
                 bus, name, type, deviceInstance, inventoryObjPath);
@@ -314,6 +319,7 @@ static requester::Coroutine
             co_return NSM_ERROR;
         }
         nsmDevice->addSensor(retimerSwitchRefClock, priority);
+#endif
         auto retimerSwitchDi = std::make_shared<NsmPCIeRetimerSwitchDI>(
             bus, name, associations, type, inventoryObjPath, deviceIndex);
         if (!retimerSwitchDi)

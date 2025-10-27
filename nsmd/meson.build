@@ -87,12 +87,15 @@ nsmd_headers = [
     'nsmDbusIfaceOverride',
 ]
 
+# Subdirectories ALWAYS compiled (core functionality)
 subdir('nsmRawCommand')
 subdir('nsmLongRunning')
 subdir('nsmEvent')
 subdir('nsmSetAsync')
 subdir('nsmCommon')
+subdir('nsmProgressCounters')
 
+# Conditional subdirectories - controlled by nsmd-subdirs-all/nsmd-subdirs-include
 nsmd_subdirs_all = get_option('nsmd-subdirs-all')
 nsmd_subdirs_include = get_option('nsmd-subdirs-include')
 if cx8_features
@@ -108,6 +111,7 @@ if cx8_features
 endif
 debug_token_enabled = get_option('enable-debug-token').enabled()
 
+# Valid optional subdirectories (not included by default unless in nsmd-subdirs-all or nsmd-subdirs-include)
 valid_nsmd_subdirs = [
     'nsmNumericSensor',
     'nsmFwSwInventory',
@@ -129,15 +133,16 @@ valid_nsmd_subdirs = [
     'nsmManagers',
     'nsmHistograms',
     'nsmReady',
-    'nsmProgressCounters',
 ]
 
+# Validate requested subdirs
 foreach name : nsmd_subdirs_include
     if not valid_nsmd_subdirs.contains(name)
         warning('Unknown nsmd-subdirs-include: ' + name)
     endif
 endforeach
 
+# Process subdirs: included if nsmd-subdirs-all=true OR in nsmd-subdirs-include
 foreach d : valid_nsmd_subdirs
     if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDumpCollection' and not get_option(
             'enable-debug-info',

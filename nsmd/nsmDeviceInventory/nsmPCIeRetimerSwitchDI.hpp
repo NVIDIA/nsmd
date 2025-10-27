@@ -10,7 +10,9 @@
 
 #include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 #include <xyz/openbmc_project/Inventory/Decorator/PCIeRefClock/server.hpp>
+#endif
 #include <xyz/openbmc_project/Inventory/Item/Switch/server.hpp>
 
 #include <iostream>
@@ -22,7 +24,9 @@ using namespace sdbusplus::xyz::openbmc_project;
 using namespace sdbusplus::server;
 
 using AssociationDefinitionsInft = object_t<Association::server::Definitions>;
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 using PCIeRefClockIntf = object_t<Inventory::Decorator::server::PCIeRefClock>;
+#endif
 using SwitchIntf = object_t<Inventory::Item::server::Switch>;
 
 class NsmPCIeRetimerSwitchDI : public NsmObject
@@ -54,6 +58,7 @@ class NsmPCIeRetimerSwitchDI : public NsmObject
     bool isMultiPciePortEnabled = false;
 };
 
+#if defined(ENABLE_CLOCK_OUTPUT_STATE)
 class NsmPCIeRetimerSwitchGetClockState : public NsmSensor
 {
   public:
@@ -76,4 +81,5 @@ class NsmPCIeRetimerSwitchGetClockState : public NsmSensor
     uint8_t clkBufIndex;
     uint8_t deviceInstanceNumber;
 };
+#endif
 } // namespace nsm

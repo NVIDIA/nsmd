@@ -114,9 +114,6 @@ conf_data.set(
     'INACTIVE_SLEEP_TIME_IN_MS',
     get_option('inactive-sleep-time-in-ms'),
 )
-if get_option('shmem').enabled()
-    conf_data.set('NVIDIA_SHMEM', 0)
-endif
 if get_option('progressCounter').enabled()
     conf_data.set('NVIDIA_PROGRESS_COUNTER', 0)
 endif
@@ -128,6 +125,10 @@ if get_option('reset-metrics').enabled()
 endif
 
 cx8_features = get_option('cx8-features')
+
+if get_option('shmem').enabled() and not cx8_features
+    conf_data.set('NVIDIA_SHMEM', 0)
+endif
 
 if get_option('enable-histogram').enabled() and not cx8_features
     conf_data.set('NVIDIA_HISTOGRAM', 1)
@@ -265,7 +266,7 @@ deps = [
     phosphor_logging,
 ]
 
-if get_option('shmem').enabled()
+if get_option('shmem').enabled() and not cx8_features
     nvidia_shmem = dependency('nvidia-tal', required: true)
     deps += nvidia_shmem
 endif
