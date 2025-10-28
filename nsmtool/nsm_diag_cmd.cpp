@@ -1479,7 +1479,27 @@ class InstallToken : public CommandInterface
             std::cerr << "Invalid file size in fd" << std::endl;
             return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
         }
-        remaining = fileStat.st_size;
+
+        // Read and parse the 16-byte file header
+        constexpr size_t HEADER_SIZE = 16;
+        if (fileStat.st_size < static_cast<off_t>(HEADER_SIZE))
+        {
+            std::cerr << "File too small to contain header (size: "
+                      << fileStat.st_size << ", expected at least "
+                      << HEADER_SIZE << " bytes)" << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+
+        std::array<uint8_t, HEADER_SIZE> header;
+        ssize_t bytesRead = read(fd, header.data(), HEADER_SIZE);
+        if (bytesRead != static_cast<ssize_t>(HEADER_SIZE))
+        {
+            std::cerr << "Failed to read file header: " << strerror(errno)
+                      << std::endl;
+            return std::make_pair(NSM_SW_ERROR_DATA, std::vector<uint8_t>());
+        }
+        remaining = fileStat.st_size - HEADER_SIZE;
+
         chunkSize = NSM_DEBUG_TOKEN_INSTALL_CHUNK_SIZE(bufferSize);
         return createChunkRequestMsg();
     }
