@@ -47,11 +47,6 @@
 
 #define MAX_SENSOR_UPDATE_BATCH_SIZE 10
 
-namespace mctp
-{
-class MctpDiscovery;
-}
-
 namespace nsm
 {
 
@@ -59,7 +54,6 @@ class NsmGPUSWInventoryDriverVersionAndStatus;
 class SensorManager;
 class NsmNumericAggregator;
 class NsmDevice;
-class NsmLongRunningEventHandler;
 class NsmLongRunningEvent;
 using NsmDeviceTable = std::vector<std::shared_ptr<NsmDevice>>;
 using SensorQueue = CircularQueue<std::shared_ptr<NsmObject>>;
@@ -117,30 +111,6 @@ enum class DeviceRemapProperty
     NSM_DEVICE_INSTANCE_NUMBER
 };
 
-class StateChangeToken
-{
-    friend class mctp::MctpDiscovery;
-    friend class NsmDevice;
-
-  private:
-    StateChangeToken() = default;
-
-    static std::shared_ptr<StateChangeToken> create()
-    {
-        // This nested struct allows make_shared to work
-        struct EnableMakeShared : public StateChangeToken
-        {
-            EnableMakeShared() : StateChangeToken() {}
-        };
-
-        // Static variable - initialized only once
-        static std::shared_ptr<StateChangeToken> instance =
-            std::make_shared<EnableMakeShared>();
-
-        return instance; // Always return the same instance
-    }
-};
-
 class NsmDevice :
     public StateChangeLogger,
     public std::enable_shared_from_this<NsmDevice>
@@ -172,10 +142,9 @@ class NsmDevice :
         eventMode(GLOBAL_EVENT_GENERATION_DISABLE), isDeviceActive(false),
         deviceType(deviceType), instanceNumber(instanceNumber),
         deviceRole(deviceRole), nsmMsgHandler(nsmMsgHandler),
-        objServer(objServer),
-        longRunningEventHandler(registerLongRunningEventHandler()),
-        progressCounters(*this)
+        objServer(objServer), progressCounters(*this)
     {
+        registerLongRunningEventHandler();
         if (remapPropName == "NSM_DEVICE_INSTANCE_NUMBER")
         {
             deviceRemapProp = DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER;
@@ -251,23 +220,11 @@ class NsmDevice :
     void updateMessageTypesToCommandCodeMatrix(
         uint8_t messageType, const bitfield8_t supportedCommands[],
         size_t supportedCommandsSize);
-    /** @brief set the nsmDevice to online state */
-    requester::Coroutine
-        setOnline([[maybe_unused]] std::shared_ptr<StateChangeToken> token);
-
-    /** @brief set the nsmDevice to offline state */
-    requester::Coroutine
-        setOffline([[maybe_unused]] std::shared_ptr<StateChangeToken> token);
-
     void addDeviceEvent(std::shared_ptr<NsmEvent> event, NsmType type,
                         NsmEventId eventId)
     {
         deviceEvents.push_back(event);
         eventDispatcher.addEvent(type, eventId, event);
-    }
-    EventDispatcher& getEventDispatcher()
-    {
-        return eventDispatcher;
     }
 
     /**
@@ -502,56 +459,14 @@ class NsmDevice :
     {
         standByToDcRefreshSensors.emplace_back(sensor);
     }
-    void addSensorAggregator(std::shared_ptr<NsmNumericAggregator> sensor)
-    {
-        sensorAggregators.emplace_back(sensor);
-    }
-    void addGpudriverSensor(
+    void addGpuDriverSensor(
         std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> sensor)
     {
-        gpudriverSensor = sensor;
-    }
-    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus>
-        getGpuDriverSensor() const
-    {
-        return gpudriverSensor;
-    }
-    SensorQueue& getPrioritySensors()
-    {
-        return prioritySensors;
-    }
-    SensorQueue& getGpmSensors()
-    {
-        return gpmSensors;
-    }
-    SensorQueue& getLongRunningSensors()
-    {
-        return longRunningSensors;
-    }
-    SensorQueue& getStaticSensors()
-    {
-        return staticSensors;
-    }
-    SensorQueue& getRoundRobinSensors()
-    {
-        return roundRobinSensors;
+        gpuDriverSensor = sensor;
     }
     std::vector<std::shared_ptr<NsmObject>>& getDeviceSensors()
     {
         return deviceSensors;
-    }
-
-    std::vector<std::shared_ptr<NsmObject>>& getStandByToDcRefreshSensors()
-    {
-        return standByToDcRefreshSensors;
-    }
-    PollingType& getNonPriorityPollingType()
-    {
-        return nonPriorityPollingType;
-    }
-    void setNonPriorityPollingType(PollingType& pollingType)
-    {
-        nonPriorityPollingType = pollingType;
     }
 
     /** @brief Getter for the longRunningSemaphore */
@@ -624,13 +539,10 @@ class NsmDevice :
     std::shared_ptr<NsmMessageHandler> nsmMsgHandler;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
-    EventDispatcher eventDispatcher;
-    NsmLongRunningEventHandler& longRunningEventHandler;
-    std::vector<std::shared_ptr<NsmObject>> deviceSensors;
 
     const sdeventplus::Event event = sdeventplus::Event::get_default();
 
-    NsmLongRunningEventHandler& registerLongRunningEventHandler();
+    void registerLongRunningEventHandler();
     common::CoroutineSemaphore
         longRunningSemaphore; // Semaphore for synchronizing long running
     // commands
@@ -638,7 +550,6 @@ class NsmDevice :
         discoverNsmDeviceSemaphore; // Semaphore for synchronizing update nsm
                                     // device during init if mctp rediscovery
                                     // signal is also received
-    std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
     FruInterfaceManager fruDeviceManager;
     std::unique_ptr<void, std::function<void(void*)>> nsmRawCmdIntf;
     // Track if NSM message types were successfully retrieved
@@ -651,12 +562,6 @@ class NsmDevice :
     std::unordered_map<uint8_t, bool> commandCodesRetrieved;
     std::vector<std::shared_ptr<NsmObject>> setSensors;
     std::vector<std::shared_ptr<NsmObject>> capabilityRefreshSensors;
-    std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
-    std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
-    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpudriverSensor =
-        nullptr; // for GPU driver
-    std::shared_ptr<NsmObject> msgTypesSensor =
-        nullptr; // Sensor for retrieving message types
 
     void initMsgTypesSensor();
     requester::Coroutine markSensorsUnrefreshed();
@@ -688,6 +593,26 @@ class NsmDevice :
     requester::Coroutine
         getSupportedCommandCodes(uint8_t nvidia_message_type,
                                  std::vector<uint8_t>& supportedCommands);
+    friend class mctp::MctpDiscovery;
+    /** @brief set the nsmDevice to online state */
+    requester::Coroutine setOnline();
+
+    /** @brief set the nsmDevice to offline state */
+    requester::Coroutine setOffline();
+
+  public:
+    /** Public members not for common use. It shall only be used by
+     * SensorManager and NsmDevice itself. **/
+
+    std::vector<std::shared_ptr<NsmObject>> deviceSensors;
+    std::vector<std::shared_ptr<NsmObject>> standByToDcRefreshSensors;
+    std::vector<std::shared_ptr<NsmNumericAggregator>> sensorAggregators;
+    std::shared_ptr<NsmGPUSWInventoryDriverVersionAndStatus> gpuDriverSensor =
+        nullptr; // for GPU driver
+    std::shared_ptr<NsmObject> msgTypesSensor =
+        nullptr; // Sensor for retrieving message types
+    EventDispatcher eventDispatcher;
+    std::optional<ActiveLongRunningHandlerInfo> longRunningHandler;
 
     /* Polling sensors management */
     PollingType nonPriorityPollingType = PollingType::GpuPerformanceMonitoring;
@@ -703,8 +628,6 @@ class NsmDevice :
     SensorQueue& longRunningSensors = sensors[PollingType::LongRunning];
     SensorQueue& staticSensors = sensors[PollingType::Static];
     SensorQueue& roundRobinSensors = sensors[PollingType::RoundRobin];
-    friend class SensorManagerImpl;
-    friend class DelegatingEventHandler;
     ProgressCounters progressCounters;
 };
 

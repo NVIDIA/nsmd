@@ -532,8 +532,7 @@ requester::Coroutine
                          // for same EID and nsmDevice is not changed with new
                          // EID during updateNsmDevice
             {
-                auto token = nsm::StateChangeToken::create();
-                co_await nsmDevice->setOnline(token);
+                co_await nsmDevice->setOnline();
                 if (nsmDevice->getEid() ==
                     eid) // check if nsmDevice is not changed with new EID
                          // during setOnline
@@ -571,8 +570,7 @@ requester::Coroutine
 
         if (nsmDevice)
         {
-            auto token = nsm::StateChangeToken::create();
-            co_await nsmDevice->setOffline(token);
+            co_await nsmDevice->setOffline();
             if (perEidQueuedMctpInfos[eid].size() == 1 &&
                 nsmDevice->getEid() == eid) // check if nsmDevice is not changed
                                             // with new EID during setOffline
@@ -693,8 +691,7 @@ requester::Coroutine MctpDiscovery::updateNsmDeviceTask(
                                     // pending state (to confirm device is not
                                     // in offline state after rediscovery)
     {
-        auto token = nsm::StateChangeToken::create();
-        co_await nsmDevice->setOnline(token);
+        co_await nsmDevice->setOnline();
         if (nsmDevice->getEid() == tmpEid) // check if nsmDevice is not changed
                                            // with new EID during setOnline
         {

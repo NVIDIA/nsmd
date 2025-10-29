@@ -120,10 +120,9 @@ requester::Coroutine
     while (isRediscoveryRequired)
     {
         isRediscoveryRequired = false;
-        auto gpuDriverSensor = nsmDevice->getGpuDriverSensor();
-        if (gpuDriverSensor)
+        if (nsmDevice->gpuDriverSensor)
         {
-            co_await gpuDriverSensor->update(nsmDevice);
+            co_await nsmDevice->gpuDriverSensor->update(nsmDevice);
         }
         else
         {

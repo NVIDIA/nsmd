@@ -208,8 +208,7 @@ requester::Coroutine NsmDevice::markSensorsUnrefreshed()
 // 4. set isDeviceActive to true
 // 5. Refresh all the capability sensors
 
-requester::Coroutine NsmDevice::setOnline(
-    [[maybe_unused]] std::shared_ptr<StateChangeToken> token)
+requester::Coroutine NsmDevice::setOnline()
 {
     isDeviceReady = false;
     auto tmpEid = eid;
@@ -257,16 +256,15 @@ requester::Coroutine NsmDevice::updateSensorsForOffline()
  * Set GPU driver state to unknown
  * Update values of sensors to NaN
  */
-requester::Coroutine NsmDevice::setOffline(
-    [[maybe_unused]] std::shared_ptr<StateChangeToken> token)
+requester::Coroutine NsmDevice::setOffline()
 {
     isDeviceActive = false;
-    if (gpudriverSensor)
+    if (gpuDriverSensor)
     {
         lg2::info(
             "Setting GPU driver state to unknown as eid = {EID} gets offline",
             "EID", eid);
-        gpudriverSensor->driverState = 0;
+        gpuDriverSensor->driverState = 0;
     }
     lg2::info(
         "NSMDevice: deviceType:{DEVTYPE} InstanceNumber:{INSTNUM} gets offline",
@@ -294,14 +292,11 @@ requester::Coroutine NsmDevice::waitForNsmDeviceUpdate()
     co_return NSM_SW_SUCCESS;
 }
 
-NsmLongRunningEventHandler& NsmDevice::registerLongRunningEventHandler()
+void NsmDevice::registerLongRunningEventHandler()
 {
-    auto longRunningEventHandler =
-        std::make_shared<NsmLongRunningEventHandler>();
-    deviceEvents.emplace_back(longRunningEventHandler);
-    eventDispatcher.addEvent(NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
-                             NSM_LONG_RUNNING_EVENT, longRunningEventHandler);
-    return *longRunningEventHandler;
+    addDeviceEvent(std::make_shared<NsmLongRunningEventHandler>(),
+                   NSM_TYPE_DEVICE_CAPABILITY_DISCOVERY,
+                   NSM_LONG_RUNNING_EVENT);
 }
 
 void NsmDevice::registerLongRunningHandler(
@@ -322,12 +317,6 @@ void NsmDevice::clearLongRunningHandler()
     }
 
     longRunningHandler.reset();
-}
-
-std::optional<ActiveLongRunningHandlerInfo>
-    NsmDevice::getActiveLongRunningHandler() const
-{
-    return longRunningHandler;
 }
 
 int NsmDevice::invokeLongRunningHandler(eid_t eid, NsmType type,

@@ -183,7 +183,7 @@ static requester::Coroutine createGPUDriverSensor(SensorManager& manager,
 
     auto sensor = std::make_shared<NsmGPUSWInventoryDriverVersionAndStatus>(
         bus, name, associations, type, manufacturer);
-    nsmDevice->addGpudriverSensor(sensor);
+    nsmDevice->addGpuDriverSensor(sensor);
     // update sensor
     nsmDevice->addSensor(sensor, false);
     sensor->nsmDeviceFound = nsmDevice;

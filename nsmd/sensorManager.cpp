@@ -227,16 +227,16 @@ void SensorManagerImpl::gpioStatusPropertyChangedHandler(
             {
                 // Mark all the round-robin sensors as unrefreshed.
                 // TODO: check with @aishwaryj
-                for (auto sensor : nsmDevice->getRoundRobinSensors())
+                for (auto sensor : nsmDevice->roundRobinSensors)
                 {
                     sensor->isRefreshed = false;
                 }
 
                 // Re-queue the static sensors for updation.
-                for (auto sensor : nsmDevice->getStandByToDcRefreshSensors())
+                for (auto sensor : nsmDevice->standByToDcRefreshSensors)
                 {
                     sensor->isRefreshed = false;
-                    nsmDevice->getStaticSensors().push(sensor);
+                    nsmDevice->staticSensors.push(sensor);
                 }
 
                 nsmDevice->changeDeviceReadyState(false);
@@ -561,7 +561,7 @@ requester::Coroutine
 #ifdef LTTNG_TRACING
     lttng_ust_tracepoint(nsmd, priority_polling_started, nsmDevice->getEid());
 #endif
-    LimitedSensorQueue sensors(nsmDevice->getPrioritySensors());
+    LimitedSensorQueue sensors(nsmDevice->prioritySensors);
     while (sensors.hasSensorsToUpdate())
     {
         auto rc = co_await sensors.current()->update(nsmDevice);
@@ -596,16 +596,16 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     std::shared_ptr<NsmDevice> nsmDevice, const uint64_t& t0)
 {
     uint64_t t1 = 0;
-    auto longRunningQueue = std::make_shared<LimitedSensorQueue>(
-        nsmDevice->getLongRunningSensors());
+    auto longRunningQueue =
+        std::make_shared<LimitedSensorQueue>(nsmDevice->longRunningSensors);
     SensorQueueMap sensors = SensorQueueUnorderedMap({
         {PollingType::GpuPerformanceMonitoring,
-         std::make_shared<LimitedSensorQueue>(nsmDevice->getGpmSensors())},
+         std::make_shared<LimitedSensorQueue>(nsmDevice->gpmSensors)},
         {PollingType::LongRunning, longRunningQueue},
         {PollingType::Static,
-         std::make_shared<LimitedSensorQueue>(nsmDevice->getStaticSensors())},
-        {PollingType::RoundRobin, std::make_shared<LimitedSensorQueue>(
-                                      nsmDevice->getRoundRobinSensors())},
+         std::make_shared<LimitedSensorQueue>(nsmDevice->staticSensors)},
+        {PollingType::RoundRobin,
+         std::make_shared<LimitedSensorQueue>(nsmDevice->roundRobinSensors)},
     });
 
     PollingType pollingType;
@@ -614,9 +614,9 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
     while (sensors.hasSensorsToUpdate() &&
            (t1 - t0) < (pollingTimeInUsec - allowedBufferInUsec))
     {
-        pollingType = nsmDevice->getNonPriorityPollingType();
+        pollingType = nsmDevice->nonPriorityPollingType;
         // Change state machine polling type to next sensor type
-        sensors.nextSensorState(nsmDevice->getNonPriorityPollingType());
+        sensors.nextSensorState(nsmDevice->nonPriorityPollingType);
 
         auto& pollingSensors = *sensors[pollingType];
         if (!pollingSensors.hasSensorsToUpdate())
@@ -670,7 +670,7 @@ requester::Coroutine SensorManagerImpl::pollNonPrioritySensors(
         {
             // Remove static sensor from the queue if it was successfully
             // updated
-            std::erase(nsmDevice->getStaticSensors(), sensor);
+            std::erase(nsmDevice->staticSensors, sensor);
         }
 
         sd_event_now(event.get(), CLOCK_MONOTONIC, &t1);
@@ -733,7 +733,7 @@ requester::Coroutine
             // The timer event for devices with no priority sensors can be
             // of low priority.
             co_await common::Sleep(event, sleepTime,
-                                   nsmDevice->getPrioritySensors().empty()
+                                   nsmDevice->prioritySensors.empty()
                                        ? common::NonPriority
                                        : common::Priority);
         }
