@@ -56,7 +56,6 @@ dep_src_files = [
     '../../../libnsm/device-configuration.c',
     '../../../libnsm/network-ports.c',
     '../../../libnsm/pci-links.c',
-    '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmSetAsync/nsmSetEgmMode.cpp',

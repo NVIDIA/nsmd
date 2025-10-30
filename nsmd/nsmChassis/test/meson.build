@@ -38,7 +38,6 @@ dep_src_files = [
     '../../../libnsm/pci-links.c',
     '../../../libnsm/device-configuration.c',
     '../../../libnsm/diagnostics.c',
-    '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',

@@ -31,7 +31,6 @@ dep_src_files = [
     '../../../common/test/mockDBusHandler.cpp',
     '../../../libnsm/base.c',
     '../../../libnsm/platform-environmental.c',
-    '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',

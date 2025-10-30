@@ -19,7 +19,6 @@ dep_src_files = [
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/network-ports.c',
     '../../../libnsm/requester/mctp.c',
-    '../../../libnsm/instance-id.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',

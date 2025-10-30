@@ -10,7 +10,6 @@ dep_src_files = [
     '../nsmFwSwInventory/GPUSWInventory.cpp',
     '../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../socket_handler.cpp',
-    '../../libnsm/instance-id.c',
     '../../common/utils.cpp',
     '../../common/test/mockDBusHandler.cpp',
     '../../libnsm/base.c',
@@ -47,7 +46,7 @@ test_src = declare_dependency(
     include_directories: dep_src_headers,
 )
 
-tests = ['nsmDevice_test', 'stateChangeLogger_test']
+tests = ['nsmDevice_test', 'stateChangeLogger_test', 'instance_id_test']
 
 tests_deps = [
     test_src,

@@ -4,7 +4,6 @@ sources = [
     '../debug-token/tlv_decoder.cpp',
     '../debug-token/tlv_encoder.cpp',
     '../libnsm/base.c',
-    '../libnsm/instance-id.c',
     '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',
     '../requester/request_timeout_tracker.cpp',

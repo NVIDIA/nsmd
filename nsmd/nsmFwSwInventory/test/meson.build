@@ -23,7 +23,6 @@ dep_src_files = [
     '../../../libnsm/device-configuration.c',
     '../../../libnsm/diagnostics.c',
     '../../../libnsm/requester/mctp.c',
-    '../../../libnsm/instance-id.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../GPUSWInventory.cpp',
     '../../../requester/mctp_endpoint_discovery.cpp',

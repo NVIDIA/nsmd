@@ -17,100 +17,84 @@
 
 #pragma once
 
-#include "libnsm/instance-id.h"
+#include "libnsm/base.h"
 
-#include <phosphor-logging/lg2.hpp>
-
-#include <cerrno>
+#include <array>
 #include <cstdint>
-#include <exception>
+#include <format>
+#include <stdexcept>
 #include <string>
-#include <system_error>
 
 namespace nsm
 {
 
 /** @class InstanceId
  *  @brief Implementation of NSM instance id
+ *  @note This implementation supports max 1 active request per EID.
+ *        Instance IDs are allocated cyclically (0-31) using a global counter.
  */
 class InstanceIdDb
 {
+    static constexpr uint8_t LOCKED_BIT = 0b10000000;
+    static constexpr uint8_t INSTANCE_MAX = NSM_INSTANCE_MAX;
+    static constexpr uint8_t CYCLIC_COUNTER = NSM_INSTANCE_MAX + 1;
+
   public:
     InstanceIdDb()
     {
-        int rc = instance_db_init_default(&instanceIdDb);
-        if (rc)
+        // Initialize all EIDs as free with counter at INSTANCE_MAX (31)
+        // so the first allocation will be (31+1)%32 = 0
+        for (auto& eid : lockedEids)
         {
-            throw std::system_category().default_error_condition(rc);
-        }
-    }
-
-    /** @brief Constructor
-     *
-     *  @param[in] path - instance ID database path
-     */
-    InstanceIdDb(const std::string& path)
-    {
-        int rc = instance_db_init(&instanceIdDb, path.c_str());
-        if (rc)
-        {
-            throw std::system_category().default_error_condition(rc);
-        }
-    }
-
-    ~InstanceIdDb()
-    {
-        int rc = instance_db_destroy(instanceIdDb);
-        if (rc)
-        {
-            lg2::error("instance_db_destroy failed, rc= {RC}", "RC", rc);
+            eid = INSTANCE_MAX; // Free state, LOCKED_BIT not set
         }
     }
 
     /** @brief Allocate an instance ID for the given terminus
      *  @param[in] eid - the Endpoint ID the instance ID is associated with
-     *  @return - instance id or -EAGAIN if there are no available instance
-     *            IDs
+     *  @return - instance id (0-31)
+     *  @throw std::runtime_error if EID already has an active request
      */
     uint8_t next(uint8_t eid)
     {
-        uint8_t id;
-        int rc = instance_id_alloc(instanceIdDb, eid, &id);
-
-        if (rc == -EAGAIN)
+        uint8_t current = lockedEids[eid];
+        // Check if EID already has an active request
+        if (current & LOCKED_BIT)
         {
-            throw std::runtime_error("No free instance ids");
+            throw std::runtime_error(
+                std::format("No free instance ids for EID {}", eid));
         }
 
-        if (rc)
-        {
-            throw std::system_category().default_error_condition(rc);
-        }
+        // Allocate next instance ID (0-31, cyclic)
+        current = ((current & INSTANCE_MAX) + 1) % CYCLIC_COUNTER;
+        lockedEids[eid] = LOCKED_BIT | current;
 
-        return id;
+        return current;
     }
 
     /** @brief Mark an instance id as unused
      *  @param[in] eid - the terminus ID the instance ID is associated with
      *  @param[in] instanceId - NSM instance id to be freed
+     *  @throw std::runtime_error if ID was not previously allocated for this
+     * EID
      */
     void free(uint8_t eid, uint8_t instanceId)
     {
-        int rc = instance_id_free(instanceIdDb, eid, instanceId);
-        if (rc == -EINVAL)
+        const uint8_t current = lockedEids[eid];
+        if (!(current & LOCKED_BIT) || (current & INSTANCE_MAX) != instanceId)
         {
-            throw std::runtime_error(
-                "Instance ID " + std::to_string(instanceId) + " for EID " +
-                std::to_string(eid) + " was not previously allocated");
+            throw std::runtime_error(std::format(
+                "Instance ID {} for EID {} was not previously allocated",
+                instanceId, eid));
         }
-        if (rc)
-        {
-            throw std::system_category().default_error_condition(rc);
-        }
+        // Clear the locked bit to indicate that the instance ID is free
+        lockedEids[eid] = current & ~LOCKED_BIT;
     }
 
   private:
-    instance_db* instanceIdDb = nullptr;
+    // Bit 7 (LOCKED_BIT): 1 = allocated, 0 = free
+    // Bits 0-4: instance ID value (0-31) for cyclic counter
+    std::array<uint8_t, 256> lockedEids;
 };
 
 } // namespace nsm

@@ -22,7 +22,6 @@ dep_src_files = [
     '../../../libnsm/network-ports.c',
     '../../../libnsm/platform-environmental.c',
     '../../../libnsm/pci-links.c',
-    '../../../libnsm/instance-id.c',
     '../../../libnsm/requester/mctp.c',
     '../../../requester/request_timeout_tracker.cpp',
     '../../nsmFwSwInventory/GPUSWInventory.cpp',
