@@ -14,6 +14,7 @@
 #include <phosphor-logging/lg2.hpp>
 
 #include <optional>
+#include <ranges>
 #include <vector>
 
 namespace nsm
@@ -768,23 +769,24 @@ static requester::Coroutine
     name = utils::makeDBusNameValid(name);
     const bool priority =
         utils::getPropertyFromCollection<bool>(properties, "Priority").value();
-    const uint64_t count =
-        utils::getPropertyFromCollection<uint64_t>(properties, "Count").value();
+    const std::vector<uint64_t> counts =
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(properties,
+                                                                "Counts")
+            .value();
     std::string inventoryObjPath =
         utils::getPropertyFromCollection<std::string>(properties,
                                                       "InventoryObjPath")
             .value();
     std::string uuid =
         utils::getPropertyFromCollection<uuid_t>(properties, "UUID").value();
-    std::string portProtocol = utils::getPropertyFromCollection<std::string>(
-                                   properties, "PortProtocol")
-                                   .value();
+    std::string portProtocol =
+        "xyz.openbmc_project.Inventory.Decorator.PortInfo.PortProtocol.PCIe";
     std::string portType =
         utils::getPropertyFromCollection<std::string>(properties, "PortType")
             .value();
-    const uint64_t upstreamPortNumber =
-        utils::getPropertyFromCollection<uint64_t>(properties,
-                                                   "UpstreamPortNumber")
+    const std::vector<uint64_t> upstreamPortNumbers =
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(
+            properties, "UpstreamPortNumbers")
             .value();
 
     std::vector<utils::Association> associations{};
@@ -823,64 +825,71 @@ static requester::Coroutine
         co_return NSM_ERROR;
     }
 
-    // create pcie link [as per count]
-    for (uint64_t i = 0; i < count; i++)
+    for (auto [count, upstreamPortNumber] :
+         std::views::zip(counts, upstreamPortNumbers))
     {
-        std::string portName = name + '_' + std::to_string(i);
-        std::string objPath = inventoryObjPath + portName;
+        // create pcie link [as per count]
+        for (uint64_t index = 0; index < count; index++)
+        {
+            std::string portName = name + '_' +
+                                   std::to_string(index + upstreamPortNumber);
+            std::string objPath = inventoryObjPath + portName;
 
-        auto pciePortIntfSensor = std::make_shared<NsmPort>(
-            bus, portName, type, associations, objPath);
-        nsmDevice->addStaticSensor(pciePortIntfSensor);
+            auto pciePortIntfSensor = std::make_shared<NsmPort>(
+                bus, portName, type, associations, objPath);
+            nsmDevice->addStaticSensor(pciePortIntfSensor);
 
-        auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus, objPath.c_str());
-        auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
-                                                           objPath.c_str());
-        auto portWidthIntf = std::make_shared<PortWidthIntf>(bus,
+            auto pcieECCIntf = std::make_shared<PCIeEccIntf>(bus,
                                                              objPath.c_str());
+            auto portInfoIntf = std::make_shared<PortInfoIntf>(bus,
+                                                               objPath.c_str());
+            auto portWidthIntf =
+                std::make_shared<PortWidthIntf>(bus, objPath.c_str());
 
-        portInfoIntf->protocol(
-            PortInfoIntf::convertPortProtocolFromString(portProtocol));
-        portInfoIntf->type(PortInfoIntf::convertPortTypeFromString(portType));
+            portInfoIntf->protocol(
+                PortInfoIntf::convertPortProtocolFromString(portProtocol));
+            portInfoIntf->type(
+                PortInfoIntf::convertPortTypeFromString(portType));
 
-        auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
-            portName, type, objPath, portInfoIntf, portWidthIntf, portTypeVal,
-            i, static_cast<uint8_t>(upstreamPortNumber));
-        auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
-            portName, type, objPath, pcieECCIntf, portTypeVal, i,
-            static_cast<uint8_t>(upstreamPortNumber));
-        auto multipcieSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
-            portName, type, objPath, pcieECCIntf, portTypeVal, i,
-            static_cast<uint8_t>(upstreamPortNumber));
-        auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
-            portName, type, objPath, pcieECCIntf, portTypeVal, i,
-            static_cast<uint8_t>(upstreamPortNumber));
-        auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
-            bus, portName, type, objPath, portTypeVal, i,
-            static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
+                portName, type, objPath, portInfoIntf, portWidthIntf,
+                portTypeVal, index, static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup2 = std::make_shared<NsmPCIeECCGroup2>(
+                portName, type, objPath, pcieECCIntf, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup3 = std::make_shared<NsmPCIeECCGroup3>(
+                portName, type, objPath, pcieECCIntf, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
+                portName, type, objPath, pcieECCIntf, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
+                bus, portName, type, objPath, portTypeVal, index,
+                static_cast<uint8_t>(upstreamPortNumber));
 
-        if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||
-            !multipcieSensorGroup3 || !multipcieSensorGroup4 ||
-            !multipcieSensorGroup10)
-        {
-            lg2::error(
-                "Failed to create NSM Multi PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
-                "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
-                objPath);
-            co_return NSM_ERROR;
-        }
+            if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||
+                !multipcieSensorGroup3 || !multipcieSensorGroup4 ||
+                !multipcieSensorGroup10)
+            {
+                lg2::error(
+                    "Failed to create NSM Multi PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
+                    "UUID", uuid, "NAME", portName, "TYPE", type, "OBJPATH",
+                    objPath);
+                co_return NSM_ERROR;
+            }
 
-        nsmDevice->addSensor(multipcieSensorGroup1, priority);
-        nsmDevice->addSensor(multipcieSensorGroup2, priority);
-        nsmDevice->addSensor(multipcieSensorGroup3, priority);
-        nsmDevice->addSensor(multipcieSensorGroup4, priority);
-        nsmDevice->addSensor(multipcieSensorGroup10, priority);
+            nsmDevice->addSensor(multipcieSensorGroup1, priority);
+            nsmDevice->addSensor(multipcieSensorGroup2, priority);
+            nsmDevice->addSensor(multipcieSensorGroup3, priority);
+            nsmDevice->addSensor(multipcieSensorGroup4, priority);
+            nsmDevice->addSensor(multipcieSensorGroup10, priority);
 
-        if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)
-        {
-            createNsmPCIePortConfigurationInfo(bus, portName, type, objPath,
-                                               priority, upstreamPortNumber,
-                                               portTypeVal, i, nsmDevice);
+            if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)
+            {
+                createNsmPCIePortConfigurationInfo(
+                    bus, portName, type, objPath, priority, upstreamPortNumber,
+                    portTypeVal, index, nsmDevice);
+            }
         }
     }
 
