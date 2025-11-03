@@ -7729,8 +7729,8 @@ std::optional<std::vector<uint8_t>>
 
     // For mock implementation, we'll always return success
     // In a real implementation, this would perform the actual CAK installation
-    std::vector<uint8_t> response(
-        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_resp_command), 0);
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
     uint16_t reason_code = ERR_NULL;
 

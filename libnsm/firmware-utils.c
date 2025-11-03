@@ -1834,25 +1834,18 @@ int encode_nsm_dot_cak_install_resp(uint8_t instance_id, uint8_t cc,
 					  NSM_FW_DOT_CAK_INSTALL, msg);
 	}
 
-	struct nsm_dot_cak_install_resp_command *response =
-	    (struct nsm_dot_cak_install_resp_command *)msg->payload;
-	response->hdr.command = NSM_FW_DOT_CAK_INSTALL;
-	response->hdr.completion_code = cc;
-
-	uint16_t msg_size = sizeof(struct nsm_dot_cak_install_resp);
-	response->hdr.data_size = htole16(msg_size);
-
-	// Set response fields according to spec
-	response->dot_cak_install_resp.command_code = NSM_FW_DOT_CAK_INSTALL;
-	response->dot_cak_install_resp.completion_code = cc;
-	response->dot_cak_install_resp.reserved = 0; // Always zero per spec
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+	response->command = NSM_FW_DOT_CAK_INSTALL;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = 0; // No additional data for DOT CAK Install
 
 	return NSM_SW_SUCCESS;
 }
 
-int decode_nsm_dot_cak_install_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, struct nsm_dot_cak_install_resp *dot_cak_resp)
+int decode_nsm_dot_cak_install_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *reason_code)
 {
 	if (msg == NULL || cc == NULL || reason_code == NULL) {
 		return NSM_SW_ERROR_NULL;
@@ -1866,20 +1859,9 @@ int decode_nsm_dot_cak_install_resp(
 	// For success case, set reason_code to ERR_NULL
 	*reason_code = ERR_NULL;
 
-	if (msg_len < sizeof(struct nsm_msg_hdr) +
-			  sizeof(struct nsm_dot_cak_install_resp_command)) {
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
 		return NSM_SW_ERROR_LENGTH;
-	}
-
-	struct nsm_dot_cak_install_resp_command *resp =
-	    (struct nsm_dot_cak_install_resp_command *)msg->payload;
-
-	if (dot_cak_resp != NULL) {
-		dot_cak_resp->command_code =
-		    resp->dot_cak_install_resp.command_code;
-		dot_cak_resp->completion_code =
-		    resp->dot_cak_install_resp.completion_code;
-		dot_cak_resp->reserved = resp->dot_cak_install_resp.reserved;
 	}
 
 	return NSM_SW_SUCCESS;

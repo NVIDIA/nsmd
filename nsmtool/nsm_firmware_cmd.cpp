@@ -1163,20 +1163,19 @@ class DotCAKInstall : public CommandInterface
             return;
         }
 
-        if (payloadLength < sizeof(nsm_dot_cak_install_resp_command))
+        if (payloadLength < sizeof(nsm_common_resp))
         {
             std::cerr << "Error: Payload length too small, expected at least "
-                      << sizeof(nsm_dot_cak_install_resp_command)
-                      << " bytes, got " << payloadLength << " bytes\n";
+                      << sizeof(nsm_common_resp) << " bytes, got "
+                      << payloadLength << " bytes\n";
             return;
         }
 
         uint8_t cc = NSM_SUCCESS;
         uint16_t reason_code = ERR_NULL;
-        struct nsm_dot_cak_install_resp dot_cak_resp;
 
-        auto rc = decode_nsm_dot_cak_install_resp(
-            responsePtr, payloadLength, &cc, &reason_code, &dot_cak_resp);
+        auto rc = decode_nsm_dot_cak_install_resp(responsePtr, payloadLength,
+                                                  &cc, &reason_code);
         if (rc != NSM_SW_SUCCESS)
         {
             std::cerr << "Response message error: "
@@ -1185,13 +1184,16 @@ class DotCAKInstall : public CommandInterface
             return;
         }
 
+        // Get response fields from nsm_common_resp
+        struct nsm_common_resp* resp =
+            (struct nsm_common_resp*)responsePtr->payload;
+
         // Validate response data types
-        if (dot_cak_resp.command_code != NSM_FW_DOT_CAK_INSTALL)
+        if (resp->command != NSM_FW_DOT_CAK_INSTALL)
         {
             std::cerr << "Warning: Unexpected command code in response: 0x"
-                      << std::hex << (int)dot_cak_resp.command_code
-                      << ", expected: 0x" << (int)NSM_FW_DOT_CAK_INSTALL
-                      << std::dec << "\n";
+                      << std::hex << (int)resp->command << ", expected: 0x"
+                      << (int)NSM_FW_DOT_CAK_INSTALL << std::dec << "\n";
         }
 
         // Output response fields according to spec
@@ -1210,11 +1212,11 @@ class DotCAKInstall : public CommandInterface
 
         std::stringstream cmdCode, compCode, res;
         cmdCode << std::hex << std::setw(2) << std::setfill('0')
-                << (int)dot_cak_resp.command_code;
+                << (int)resp->command;
         compCode << std::hex << std::setw(2) << std::setfill('0')
-                 << (int)dot_cak_resp.completion_code;
-        res << std::hex << std::setw(2) << std::setfill('0')
-            << (int)dot_cak_resp.reserved;
+                 << (int)resp->completion_code;
+        res << std::hex << std::setw(4) << std::setfill('0')
+            << (int)resp->reserved;
 
         result["Command code"] = cmdCode.str();
         result["Completion code"] = compCode.str();

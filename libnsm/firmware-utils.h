@@ -500,26 +500,6 @@ struct nsm_dot_cak_install_req_command {
 	struct nsm_dot_cak_install_req dot_cak_install_req;
 } __attribute__((packed));
 
-/** @struct nsm_dot_cak_install_resp
- *
- *  Structure representing DotCAKInstall response parameters.
- *  According to spec: only command_code, completion_code, and reserved fields.
- */
-struct nsm_dot_cak_install_resp {
-	uint8_t command_code;
-	uint8_t completion_code;
-	uint16_t reserved;
-} __attribute__((packed));
-
-/** @struct nsm_dot_cak_install_resp_command
- *
- *  Structure representing DotCAKInstall response command.
- */
-struct nsm_dot_cak_install_resp_command {
-	struct nsm_common_resp hdr;
-	struct nsm_dot_cak_install_resp dot_cak_install_resp;
-} __attribute__((packed));
-
 /** @struct nsm_dot_cak_bypass_req
  *
  *  Structure representing DotCAKBypass request.
@@ -1237,14 +1217,13 @@ int encode_nsm_dot_cak_install_resp(uint8_t instance_id, uint8_t cc,
  * @param[in] msg_len - Length of the received message
  * @param[out] cc - Command completion code
  * @param[out] reason_code - Reason code
- * @param[out] dot_cak_resp - Pointer to the DotCAKInstall response parameters
  *
  * @return 0 on success, otherwise NSM error codes.
  * @note   Caller is responsible for alloc and dealloc of msg
+ * @note   Response uses standard nsm_common_resp structure
  */
-int decode_nsm_dot_cak_install_resp(
-    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
-    uint16_t *reason_code, struct nsm_dot_cak_install_resp *dot_cak_resp);
+int decode_nsm_dot_cak_install_resp(const struct nsm_msg *msg, size_t msg_len,
+				    uint8_t *cc, uint16_t *reason_code);
 
 /**
  * @brief Encode nsm DotCAKBypass request message
