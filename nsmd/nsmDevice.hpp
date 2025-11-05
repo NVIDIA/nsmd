@@ -125,6 +125,12 @@ class NsmDevice
 
     void setEventMode(uint8_t mode);
     uint8_t getEventMode();
+
+    eid_t getEid()
+    {
+        return eid;
+    }
+
     std::vector<std::vector<bool>> messageTypesToCommandCodeMatrix;
     bool isCommandSupported(uint8_t messageType, uint8_t commandCode);
     /** @brief set the nsmDevice to online state */

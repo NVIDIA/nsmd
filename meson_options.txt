@@ -221,3 +221,10 @@ option(
     value: 'enabled',
     description: 'Enable PCIE reference clock count',
 )
+
+option(
+    'enable-network-adapter-protection-option',
+    type: 'feature',
+    description: 'Enable Network Adapter write protection sensor/object',
+    value: 'disabled',
+)

@@ -371,6 +371,19 @@ bool isValidDbusString(std::string_view input);
 
 IDBusHandler& DBusHandler();
 
+/** @brief Convert the buffer to a string
+ *
+ *  @param[in] isTx - True if the buffer is an outgoing NSM message, false if
+ *                    the buffer is an incoming NSM message
+ *  @param[in] buffer - Buffer to convert
+ *  @param[in] tag - Tag to identify the message
+ *  @param[in] eid - EID of the message
+ *
+ *  @return - std::string
+ */
+std::string convertMsgToString(bool isTx, const std::vector<uint8_t>& buffer,
+    uint8_t tag, eid_t eid);
+
 /** @brief Print the buffer
  *
  *  @param[in] isTx - True if the buffer is an outgoing NSM message, false if

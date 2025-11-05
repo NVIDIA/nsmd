@@ -21,6 +21,120 @@
 #include <stdio.h>
 #include <string.h>
 
+int encode_set_protection_options_req(uint8_t instance_id,
+				      uint8_t protection_mode,
+				      struct nsm_msg *msg)
+{
+	int rc = encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				   NSM_SET_PROTECTION_OPTIONS, msg);
+	if (rc == NSM_SW_SUCCESS) {
+		struct nsm_set_protection_options_req *req =
+		    (struct nsm_set_protection_options_req *)msg->payload;
+		req->hdr.data_size = sizeof(uint8_t);
+		req->protection_mode = protection_mode;
+	}
+	return rc;
+}
+
+int decode_set_protection_options_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *protection_mode)
+{
+	int rc = decode_common_req(msg, msg_len);
+	if (rc == NSM_SW_SUCCESS) {
+		if (protection_mode == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_set_protection_options_req)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_set_protection_options_req *req =
+		    (struct nsm_set_protection_options_req *)msg->payload;
+
+		if (req->hdr.data_size != sizeof(uint8_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		*protection_mode = req->protection_mode;
+	}
+	return rc;
+}
+
+int encode_set_protection_options_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       struct nsm_msg *msg)
+{
+	return encode_common_resp(instance_id, cc, reason_code,
+				  NSM_TYPE_DEVICE_CONFIGURATION,
+				  NSM_SET_PROTECTION_OPTIONS, msg);
+}
+
+int decode_set_protection_options_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (data_size != 0) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+	return rc;
+}
+
+int encode_get_protection_options_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	return encode_common_req(instance_id, NSM_TYPE_DEVICE_CONFIGURATION,
+				 NSM_GET_PROTECTION_OPTIONS, msg);
+}
+
+int decode_get_protection_options_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	return decode_common_req(msg, msg_len);
+}
+
+int encode_get_protection_options_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       uint8_t protection_mode,
+				       struct nsm_msg *msg)
+{
+	int rc = encode_common_resp(instance_id, cc, reason_code,
+				    NSM_TYPE_DEVICE_CONFIGURATION,
+				    NSM_GET_PROTECTION_OPTIONS, msg);
+	if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS) {
+		struct nsm_get_protection_options_resp *resp =
+		    (struct nsm_get_protection_options_resp *)msg->payload;
+		resp->hdr.data_size = htole16(sizeof(uint8_t));
+		resp->protection_mode = protection_mode;
+	}
+	return rc;
+}
+
+int decode_get_protection_options_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code,
+				       uint8_t *protection_mode)
+{
+	uint16_t data_size = 0;
+	int rc = decode_common_resp(msg, msg_len, cc, &data_size, reason_code);
+	if (rc == NSM_SW_SUCCESS && *cc == NSM_SUCCESS) {
+		if (protection_mode == NULL) {
+			return NSM_SW_ERROR_NULL;
+		}
+		if (msg_len <
+		    sizeof(struct nsm_msg_hdr) +
+			sizeof(struct nsm_get_protection_options_resp)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		if (data_size != sizeof(uint8_t)) {
+			return NSM_SW_ERROR_LENGTH;
+		}
+		struct nsm_get_protection_options_resp *resp =
+		    (struct nsm_get_protection_options_resp *)msg->payload;
+		*protection_mode = resp->protection_mode;
+	}
+	return rc;
+}
+
 int encode_set_error_injection_mode_v1_req(uint8_t instance_id,
 					   const uint8_t mode,
 					   struct nsm_msg *msg)

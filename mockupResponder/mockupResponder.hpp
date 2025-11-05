@@ -547,7 +547,9 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
-
+    std::optional<std::vector<uint8_t>>
+        getProtectionOptionsHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
         setDevicemodeSettingsHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
@@ -576,6 +578,7 @@ class MockupResponder
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;
+        uint8_t protectionMode;
     } state;
 };
 

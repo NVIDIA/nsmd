@@ -115,6 +115,13 @@ if get_option('enable-histogram').enabled()
     conf_data.set('NVIDIA_HISTOGRAM', 1)
 endif
 
+if get_option('enable-network-adapter-protection-option').enabled()
+    add_project_arguments(
+        '-DENABLE_NETWORK_ADAPTER_PROTECTION_OPTION',
+        language: ['cpp', 'c'],
+    )
+endif
+
 if get_option('aer-error-status-priority')
     conf_data.set('AER_ERR_SENSOR_PRIORITY', 1)
 else
