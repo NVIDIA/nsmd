@@ -1,0 +1,24 @@
+rules:
+  mr_description:
+    required_patterns:
+      - "### Validator Results"
+      - "DMTF Results"
+      - "DMTF Baseline"
+      - "Diff Result"
+      - ".html"
+      - ".xlsx"
+      - "RESULT: PASS"
+    message: |
+      ❌ Validation Results missing or incomplete.
+
+      Please include the following in the MR description and attach required files:
+
+      ### Validator Results
+      - DMTF Results: <attach HTML> 
+      - DMTF Baseline: <attach HTML> 
+      - Diff Result: <attach XLSX> 
+
+      RESULT: PASS
+
+      Attach logs + diff file and update RESULT before merging.
+    block_merge: true
