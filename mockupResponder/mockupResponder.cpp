@@ -146,6 +146,7 @@ MockupResponder::MockupResponder(bool verbose, sdeventplus::Event& event,
         },  // errorInjection
         0,  // migMode
         0,  // eccMode
+        0,  // protectionMode
         {}, // eventSources
     })
 {
@@ -718,6 +719,8 @@ std::optional<Response>
                     return getDevicemodeSettingsHandler(request, requestLen);
                 case NSM_SET_DEVICE_MODE_SETTING:
                     return setDevicemodeSettingsHandler(request, requestLen);
+                case NSM_GET_PROTECTION_OPTIONS:
+                    return getProtectionOptionsHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -984,6 +987,7 @@ std::optional<std::vector<uint8_t>>
                       NSM_GET_ERROR_INJECTION_PAYLOAD,
                       NSM_SET_ERROR_INJECTION_PAYLOAD,
                       NSM_ACTIVATE_ERROR_INJECTION,
+                      NSM_GET_PROTECTION_OPTIONS,
                   }},
              }},
         };
@@ -7412,6 +7416,45 @@ std::optional<std::vector<uint8_t>>
     if (rc != NSM_SW_SUCCESS)
     {
         lg2::error("encode_get_device_mode_settings_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::getProtectionOptionsHandler(const nsm_msg* requestMsg,
+                                                 size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("getProtectionOptionsHandler: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    auto rc = decode_get_protection_options_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_get_protection_options_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    uint8_t protection_mode = state.protectionMode; // Mock protection mode
+    uint16_t reason_code = ERR_NULL;
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_get_protection_options_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_get_protection_options_resp(requestMsg->hdr.instance_id,
+                                            NSM_SUCCESS, reason_code,
+                                            protection_mode, responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_protection_options_resp failed: rc={RC}", "RC",
                    rc);
         return std::nullopt;
     }

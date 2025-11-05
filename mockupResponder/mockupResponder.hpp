@@ -575,6 +575,9 @@ class MockupResponder
         getDevicemodeSettingsHandler(const nsm_msg* requestMsg,
                                      size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        getProtectionOptionsHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getEthPortTelemetryCounterHandler(const nsm_msg* requestMsg,
                                           size_t requestLen);
     std::optional<std::vector<uint8_t>>
@@ -633,6 +636,7 @@ class MockupResponder
         std::map<uint8_t, std::map<error_injection_type, bool>> errorInjection;
         uint8_t migMode;
         uint8_t eccMode;
+        uint8_t protectionMode;
         std::unordered_map<uint8_t,
                            std::array<bitfield8_t, EVENT_SOURCES_LENGTH>>
             eventSources;

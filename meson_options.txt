@@ -467,3 +467,10 @@ option(
     description: 'Enable Network Adapter Reset sensor/object',
     value: 'enabled',
 )
+
+option(
+    'enable-network-adapter-protection-option',
+    type: 'feature',
+    description: 'Enable Network Adapter write protection sensor/object',
+    value: 'disabled',
+)

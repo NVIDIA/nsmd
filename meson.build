@@ -149,6 +149,13 @@ if get_option('enable-network-adapter-reset').enabled() and not cx8_features
     )
 endif
 
+if get_option('enable-network-adapter-protection-option').enabled() or cx8_features
+    add_project_arguments(
+        '-DENABLE_NETWORK_ADAPTER_PROTECTION_OPTION',
+        language: ['cpp', 'c'],
+    )
+endif
+
 if get_option('enable-pcie-aer-error').enabled() and not cx8_features
     add_project_arguments('-DENABLE_PCIE_AER_ERROR', language: ['cpp', 'c'])
 endif

@@ -27,6 +27,7 @@ if cx8_features
     libnsm_all = false
     libnsm_include = [
         'device-capability-discovery',
+        'device-configuration',
         'platform-environmental',
         'pci-links',
         'network-ports',

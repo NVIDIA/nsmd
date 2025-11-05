@@ -25,6 +25,8 @@ extern "C" {
 #include "base.h"
 
 enum device_configuration_command {
+	NSM_SET_PROTECTION_OPTIONS = 0x01,
+	NSM_GET_PROTECTION_OPTIONS = 0x02,
 	NSM_SET_ERROR_INJECTION_MODE_V1 = 0x03,
 	NSM_GET_ERROR_INJECTION_MODE_V1 = 0x04,
 	NSM_GET_SUPPORTED_ERROR_INJECTION_TYPES_V1 = 0x05,
@@ -43,6 +45,13 @@ enum device_configuration_command {
 	NSM_GET_EGM_MODE = 0x43,
 	NSM_SET_DEVICE_MODE_SETTING = 0x80,
 	NSM_GET_DEVICE_MODE_SETTING = 0x81,
+};
+
+enum protection_mode {
+	PROTECTION_NONE = 0,
+	PROTECTION_PREVENT_FW_UPDATE_AND_CONFIG = 1,
+	PROTECTION_PREVENT_FW_UPDATE = 2,
+	PROTECTION_PREVENT_CONFIG = 3,
 };
 
 enum error_injection_type {
@@ -112,6 +121,24 @@ enum roconfiguration_permission {
 };
 
 #define ALL_GPUS_DEVICE_INDEX 0xA
+
+/** @struct nsm_set_protection_options_req
+ *
+ * Structure representing Set Protection Options request.
+ */
+struct nsm_set_protection_options_req {
+	struct nsm_common_req hdr;
+	uint8_t protection_mode;
+} __attribute__((packed));
+
+/** @struct nsm_get_protection_options_resp
+ *
+ * Structure representing Get Protection Options response.
+ */
+struct nsm_get_protection_options_resp {
+	struct nsm_common_resp hdr;
+	uint8_t protection_mode;
+} __attribute__((packed));
 
 /** @struct nsm_error_injection_mode_v1
  *
@@ -506,6 +533,96 @@ struct nsm_set_device_mode_setting_req {
 	uint8_t device_mode_index;
 	uint8_t device_mode;
 } __attribute__((packed));
+
+/** @brief Encode a Set Protection Options request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] protection_mode - Protection mode setting
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_protection_options_req(uint8_t instance_id,
+				      uint8_t protection_mode,
+				      struct nsm_msg *msg);
+
+/** @brief Decode a Set Protection Options request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @param[out] protection_mode - pointer to protection mode setting
+ *  @return nsm_completion_codes
+ */
+int decode_set_protection_options_req(const struct nsm_msg *msg, size_t msg_len,
+				      uint8_t *protection_mode);
+
+/** @brief Encode a Set Protection Options response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_set_protection_options_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Set Protection Options response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to NSM reason code
+ *  @return nsm_completion_codes
+ */
+int decode_set_protection_options_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code);
+
+/** @brief Encode a Get Protection Options request message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_protection_options_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/** @brief Decode a Get Protection Options request message
+ *
+ *  @param[in] msg    - request message
+ *  @param[in] msg_len - Length of request message
+ *  @return nsm_completion_codes
+ */
+int decode_get_protection_options_req(const struct nsm_msg *msg,
+				      size_t msg_len);
+
+/** @brief Encode a Get Protection Options response message
+ *
+ *  @param[in] instance_id - NSM instance ID
+ *  @param[in] cc - pointer to response message completion code
+ *  @param[in] reason_code - NSM reason code
+ *  @param[in] protection_mode - protection mode setting
+ *  @param[out] msg - Message will be written to this
+ *  @return nsm_completion_codes
+ */
+int encode_get_protection_options_resp(uint8_t instance_id, uint8_t cc,
+				       uint16_t reason_code,
+				       uint8_t protection_mode,
+				       struct nsm_msg *msg);
+
+/** @brief Decode a Get Protection Options response message
+ *
+ *  @param[in] msg    - response message
+ *  @param[in] msg_len - Length of response message
+ *  @param[out] cc - pointer to response message completion code
+ *  @param[out] reason_code - pointer to NSM reason code
+ *  @param[out] protection_mode - pointer to protection mode setting
+ *  @return nsm_completion_codes
+ */
+int decode_get_protection_options_resp(const struct nsm_msg *msg,
+				       size_t msg_len, uint8_t *cc,
+				       uint16_t *reason_code,
+				       uint8_t *protection_mode);
 
 /** @brief Encode a Set Device Mode Settings request message
  *

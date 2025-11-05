@@ -30,6 +30,7 @@
 #if defined(ENABLE_DEBUG_INFO)
 #include "nsmLogInfo.hpp"
 #endif
+#include "libnsm/device-configuration.h"
 
 #include <phosphor-logging/lg2.hpp>
 
@@ -62,6 +63,231 @@ NsmNetworkAdapterDI::NsmNetworkAdapterDI(
                                        association.absolutePath);
     }
     associationDefIntf->associations(associations_list);
+}
+
+NsmDeviceProtectionOptions::NsmDeviceProtectionOptions(
+    sdbusplus::bus::bus& bus, const char* path, const std::string& name,
+    const std::string& type) : NsmSensor(name, type)
+{
+    lg2::info("NsmDeviceProtectionOptions: create sensor for {NAME}", "NAME",
+              name.c_str());
+
+    objPath = path;
+    protectionIntf = std::make_shared<ProtectionIntf>(bus, objPath.c_str());
+    protectionIntf->protectionLevel(ProtectionOption::Unknown);
+    asyncPatchInProgress = false;
+}
+
+std::optional<std::vector<uint8_t>>
+    NsmDeviceProtectionOptions::genRequestMsg(eid_t eid, uint8_t instanceId)
+{
+    std::vector<uint8_t> request(sizeof(nsm_msg_hdr) + sizeof(nsm_common_req));
+    auto requestPtr = reinterpret_cast<struct nsm_msg*>(request.data());
+    auto rc = encode_get_protection_options_req(instanceId, requestPtr);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_get_protection_options_req failed. "
+                   "eid={EID} rc={RC}",
+                   "EID", eid, "RC", rc);
+        return std::nullopt;
+    }
+
+    return request;
+}
+
+ProtectionOption NsmDeviceProtectionOptions::convertNsmdToDbusProtectionMode(
+    uint8_t protectionMode)
+{
+    switch (protectionMode)
+    {
+        case PROTECTION_NONE:
+            return ProtectionOption::NoProtection;
+        case PROTECTION_PREVENT_FW_UPDATE_AND_CONFIG:
+            return ProtectionOption::PreventAll;
+        case PROTECTION_PREVENT_FW_UPDATE:
+            return ProtectionOption::PreventHostFirmwareUpdates;
+        case PROTECTION_PREVENT_CONFIG:
+            return ProtectionOption::PreventHostConfigurations;
+        default:
+            lg2::debug("Unknown protection mode received: {MODE}", "MODE",
+                       protectionMode);
+            return ProtectionOption::Unknown;
+    }
+}
+
+uint8_t NsmDeviceProtectionOptions::handleResponseMsg(
+    const struct nsm_msg* responseMsg, size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t reason_code = ERR_NULL;
+    uint8_t protectionMode;
+
+    auto rc = decode_get_protection_options_resp(responseMsg, responseLen, &cc,
+                                                 &reason_code, &protectionMode);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        auto dbusProtectionOption =
+            convertNsmdToDbusProtectionMode(protectionMode);
+        protectionIntf->protectionLevel(dbusProtectionOption);
+    }
+    return cc ? cc : rc;
+}
+
+requester::Coroutine NsmDeviceProtectionOptions::setProtectionOptions(
+    const AsyncSetOperationValueType& value,
+    [[maybe_unused]] AsyncOperationStatusType* status,
+    std::shared_ptr<NsmDevice> device)
+{
+    if (asyncPatchInProgress)
+    {
+        lg2::error("Protection options update already in progress");
+        *status = AsyncOperationStatusType::Unavailable;
+        co_return NSM_SW_ERROR;
+    }
+    asyncPatchInProgress = true;
+
+    uint8_t protectionMode = PROTECTION_NONE;
+
+    const std::string* protectionOptionStr = std::get_if<std::string>(&value);
+    if (!protectionOptionStr)
+    {
+        lg2::error("Invalid argument type for setProtectionOptions");
+        *status = AsyncOperationStatusType::InvalidArgument;
+        asyncPatchInProgress = false;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    try
+    {
+        auto protectionOption =
+            ProtectionIntf::convertProtectionOptionFromString(
+                *protectionOptionStr);
+
+        switch (protectionOption)
+        {
+            case ProtectionOption::NoProtection:
+                protectionMode = PROTECTION_NONE;
+                break;
+            case ProtectionOption::PreventAll:
+                protectionMode = PROTECTION_PREVENT_FW_UPDATE_AND_CONFIG;
+                break;
+            case ProtectionOption::PreventHostFirmwareUpdates:
+                protectionMode = PROTECTION_PREVENT_FW_UPDATE;
+                break;
+            case ProtectionOption::PreventHostConfigurations:
+                protectionMode = PROTECTION_PREVENT_CONFIG;
+                break;
+            default:
+                lg2::error("Unknown protection option: {OPTION}", "OPTION",
+                           *protectionOptionStr);
+                *status = AsyncOperationStatusType::InvalidArgument;
+                asyncPatchInProgress = false;
+                co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Failed to convert protection option string: {ERROR}",
+                   "ERROR", e.what());
+        *status = AsyncOperationStatusType::InvalidArgument;
+        asyncPatchInProgress = false;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    auto eid = device->getEid();
+    lg2::info("set Protection Options for EID: {EID}, mode: {MODE}", "EID", eid,
+              "MODE", static_cast<int>(protectionMode));
+
+    Request request(sizeof(nsm_msg_hdr) +
+                    sizeof(nsm_set_protection_options_req));
+    auto requestMsg = reinterpret_cast<nsm_msg*>(request.data());
+
+    auto rc = encode_set_protection_options_req(0, protectionMode, requestMsg);
+
+    if (rc)
+    {
+        lg2::error(
+            "NsmDeviceProtectionOptions::setProtectionOptions encode_set_protection_options_req failed. rc={RC} requestBytes={REQUESTBYTES}",
+            "RC", rc, "REQUESTBYTES",
+            utils::convertMsgToString(utils::Tx, request, MCTP_MSG_TAG_REQ,
+                                      eid));
+        *status = AsyncOperationStatusType::WriteFailure;
+        asyncPatchInProgress = false;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    auto rc_ = co_await device->postPatchIO(eid, request, responseMsg,
+                                            responseLen);
+    if (rc_)
+    {
+        std::vector<uint8_t> responseVec(
+            reinterpret_cast<const uint8_t*>(responseMsg.get()),
+            reinterpret_cast<const uint8_t*>(responseMsg.get()) + responseLen);
+        lg2::error(
+            "NsmDeviceProtectionOptions::setProtectionOptions postPatchIO failed for"
+            "eid={EID} rc={RC} responseBytes={RESPONSEBYTES}",
+            "EID", eid, "RC", rc_, "RESPONSEBYTES",
+            utils::convertMsgToString(utils::Rx, responseVec, MCTP_TAG_NSM,
+                                      eid));
+        *status = AsyncOperationStatusType::WriteFailure;
+        asyncPatchInProgress = false;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+
+    uint8_t cc = NSM_SUCCESS;
+    uint16_t reason_code = ERR_NULL;
+    rc = decode_set_protection_options_resp(responseMsg.get(), responseLen, &cc,
+                                            &reason_code);
+
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        lg2::info(
+            "NsmDeviceProtectionOptions::setProtectionOptions for EID: {EID} completed",
+            "EID", eid);
+    }
+    else
+    {
+        std::vector<uint8_t> responseVec(
+            reinterpret_cast<const uint8_t*>(responseMsg.get()),
+            reinterpret_cast<const uint8_t*>(responseMsg.get()) + responseLen);
+        lg2::error(
+            "NsmDeviceProtectionOptions::setProtectionOptions decode_set_protection_options_resp failed. eid={EID} CC={CC} reasoncode={RC} RC={A} responseBytes={RESPONSEBYTES}",
+            "EID", eid, "CC", cc, "RC", reason_code, "A", rc, "RESPONSEBYTES",
+            utils::convertMsgToString(utils::Rx, responseVec, MCTP_TAG_NSM,
+                                      eid));
+        *status = AsyncOperationStatusType::WriteFailure;
+        asyncPatchInProgress = false;
+        co_return NSM_SW_ERROR_COMMAND_FAIL;
+    }
+    asyncPatchInProgress = false;
+    co_return NSM_SW_SUCCESS;
+}
+
+inline void createDeviceProtectionOptions(std::shared_ptr<NsmDevice> device,
+                                          const std::string& type,
+                                          const std::string& inventoryObjPath,
+                                          const std::string& deviceName)
+{
+    auto dbusObjPath = inventoryObjPath + deviceName;
+    auto nsmDeviceProtectionOptions =
+        std::make_shared<NsmDeviceProtectionOptions>(
+            utils::DBusHandler::getBus(), dbusObjPath.c_str(), deviceName,
+            type);
+    device->addSensor(nsmDeviceProtectionOptions, false);
+
+    nsm::AsyncSetOperationHandler setProtectionOptionsHandler =
+        std::bind(&NsmDeviceProtectionOptions::setProtectionOptions,
+                  nsmDeviceProtectionOptions, std::placeholders::_1,
+                  std::placeholders::_2, std::placeholders::_3);
+    AsyncOperationManager::getInstance()
+        ->getDispatcher(dbusObjPath)
+        ->addAsyncSetOperation(
+            "com.nvidia.DeviceProtection", "ProtectionLevel",
+            AsyncSetOperationInfo{setProtectionOptionsHandler,
+                                  nsmDeviceProtectionOptions, device});
 }
 
 static requester::Coroutine
@@ -127,6 +353,10 @@ static requester::Coroutine
     auto ntwAdpResetSensor = std::make_shared<NsmNetworkAdapterDIReset>(
         bus, name, type, inventoryObjPath, nsmDevice);
     nsmDevice->addDeviceSensors(ntwAdpResetSensor);
+#endif
+
+#if defined(ENABLE_NETWORK_ADAPTER_PROTECTION_OPTION)
+    createDeviceProtectionOptions(nsmDevice, type, inventoryObjPath, name);
 #endif
 
     // coverity[missing_return]
