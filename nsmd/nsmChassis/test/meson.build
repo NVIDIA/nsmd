@@ -10,6 +10,7 @@ dep_src_files = [
     '../nsmPCIeLTSSMState.cpp',
     '../nsmWriteProtectedJumper.cpp',
     '../nsmAERError.cpp',
+    '../../nsmPort/nsmRetimerPort.cpp',
     '../../nsmSensorAggregator.cpp',
     '../../nsmCommon/nsmCommon.cpp',
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',

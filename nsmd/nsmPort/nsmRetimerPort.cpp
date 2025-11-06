@@ -56,6 +56,7 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
 
     portInfoIntf->maxSpeed(0);
     portInfoIntf->currentSpeed(0);
+    portInfoIntf->targetSpeed(0);
     portWidthIntf->width(0);
     portWidthIntf->activeWidth(0);
 
@@ -79,6 +80,7 @@ NsmPCIeECCGroup1::NsmPCIeECCGroup1(const std::string& name,
 
     portInfoIntf->maxSpeed(0);
     portInfoIntf->currentSpeed(0);
+    portInfoIntf->targetSpeed(0);
     portWidthIntf->width(0);
     portWidthIntf->activeWidth(0);
 
@@ -146,6 +148,8 @@ uint8_t NsmPCIeECCGroup1::handleResponseMsg(const struct nsm_msg* responseMsg,
         portInfoIntf->maxSpeed(convertEncodedSpeedToGbps(data.max_link_speed));
         portInfoIntf->currentSpeed(
             convertEncodedSpeedToGbps(data.negotiated_link_speed));
+        portInfoIntf->targetSpeed(
+            convertEncodedSpeedToGbps(data.target_link_speed));
         portWidthIntf->width(
             convertEncodedWidthToActualWidth(data.max_link_width));
         portWidthIntf->activeWidth(
@@ -354,6 +358,9 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
     pcieEccIntf->replayRolloverCount(0);
     pcieEccIntf->nakSentCount(0);
     pcieEccIntf->nakReceivedCount(0);
+    pcieEccIntf->fcTimeoutErrors(0);
+    pcieEccIntf->badTLPCount(0);
+    pcieEccIntf->receiverErrorCount(0);
 
     updateMetricOnSharedMemory();
 }
@@ -375,6 +382,9 @@ NsmPCIeECCGroup4::NsmPCIeECCGroup4(const std::string& name,
     pcieEccIntf->replayRolloverCount(0);
     pcieEccIntf->nakSentCount(0);
     pcieEccIntf->nakReceivedCount(0);
+    pcieEccIntf->fcTimeoutErrors(0);
+    pcieEccIntf->badTLPCount(0);
+    pcieEccIntf->receiverErrorCount(0);
 
     updateMetricOnSharedMemory();
 }
@@ -399,6 +409,9 @@ uint8_t NsmPCIeECCGroup4::handleResponseMsg(const struct nsm_msg* responseMsg,
         pcieEccIntf->replayRolloverCount(data.replay_rollover_cnt);
         pcieEccIntf->nakSentCount(data.NAK_sent_cnt);
         pcieEccIntf->nakReceivedCount(data.NAK_recv_cnt);
+        pcieEccIntf->fcTimeoutErrors(data.FC_timeout_err_cnt);
+        pcieEccIntf->badTLPCount(data.bad_TLP_cnt);
+        pcieEccIntf->receiverErrorCount(data.recv_err_cnt);
         updateMetricOnSharedMemory();
     }
     return cc ? cc : rc;
@@ -433,6 +446,105 @@ void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
     propName = "NAKReceivedCount";
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNRC);
+
+    nv::sensor_aggregation::DbusVariantType variantFCTE{
+        pcieEccIntf->fcTimeoutErrors()};
+    propName = "FCTimeoutErrors";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantFCTE);
+    nv::sensor_aggregation::DbusVariantType variantREC{
+        pcieEccIntf->receiverErrorCount()};
+    propName = "ReceiverErrorCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantREC);
+
+    nv::sensor_aggregation::DbusVariantType variantBTC{
+        pcieEccIntf->badTLPCount()};
+    propName = "BadTLPCount";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantBTC);
+#endif
+}
+
+NsmPCIeECCGroup5::NsmPCIeECCGroup5(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryPath,
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+    uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_5), objPath(inventoryPath),
+    portMetricsOem2Intf(portMetricsOem2Intf)
+{
+    lg2::info("NsmPCIeECCGroup5: {NAME}", "NAME", name.c_str());
+
+    portMetricsOem2Intf->txBytes(0);
+    portMetricsOem2Intf->rxBytes(0);
+
+    updateMetricOnSharedMemory();
+}
+
+NsmPCIeECCGroup5::NsmPCIeECCGroup5(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryPath,
+    std::shared_ptr<PortMetricsOem2Intf> portMetricsOem2Intf,
+    uint8_t multiPortType, uint8_t multiPortIndex,
+    uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_5, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
+    objPath(inventoryPath), portMetricsOem2Intf(portMetricsOem2Intf)
+{
+    lg2::info("NsmMultiPCIeECCGroup5: {NAME}", "NAME", name.c_str());
+
+    portMetricsOem2Intf->txBytes(0);
+    portMetricsOem2Intf->rxBytes(0);
+
+    updateMetricOnSharedMemory();
+}
+
+uint8_t NsmPCIeECCGroup5::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_query_scalar_group_telemetry_group_5 data;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group5_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup5 decode_query_scalar_group_telemetry_v1_group5_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        uint64_t txBytes = static_cast<uint64_t>(data.PCIeTXDwords) *
+                           BYTES_PER_DWORD;
+        uint64_t rxBytes = static_cast<uint64_t>(data.PCIeRXDwords) *
+                           BYTES_PER_DWORD;
+
+        portMetricsOem2Intf->txBytes(txBytes);
+        portMetricsOem2Intf->rxBytes(rxBytes);
+        updateMetricOnSharedMemory();
+    }
+    return cc ? cc : rc;
+}
+
+void NsmPCIeECCGroup5::updateMetricOnSharedMemory()
+{
+#ifdef NVIDIA_SHMEM
+    auto ifacePortMetricsOem2Name = std::string(portMetricsOem2Intf->interface);
+    std::vector<uint8_t> rawSmbpbiData = {};
+
+    nv::sensor_aggregation::DbusVariantType variantTXB{
+        portMetricsOem2Intf->txBytes()};
+    std::string propName = "TXBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortMetricsOem2Name, propName, rawSmbpbiData, variantTXB);
+
+    nv::sensor_aggregation::DbusVariantType variantRXB{
+        portMetricsOem2Intf->rxBytes()};
+    propName = "RXBytes";
+    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        objPath, ifacePortMetricsOem2Name, propName, rawSmbpbiData, variantRXB);
 #endif
 }
 
@@ -506,6 +618,66 @@ void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
     nsm_shmem_utils::updateSharedMemoryOnSuccess(
         inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
+}
+
+NsmPCIeECCGroup9::NsmPCIeECCGroup9(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryPath,
+    std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
+    uint8_t deviceIndex) :
+    NsmPcieGroup(name, type, deviceIndex, GROUP_ID_9), objPath(inventoryPath),
+    aerErrorStatusIntf(aerErrorStatusIntf)
+{
+    lg2::info("NsmPCIeECCGroup9: {NAME}", "NAME", name.c_str());
+
+    aerErrorStatusIntf->aerUncorrectableErrorStatus("0x00000000");
+    aerErrorStatusIntf->aerCorrectableErrorStatus("0x00000000");
+}
+
+NsmPCIeECCGroup9::NsmPCIeECCGroup9(
+    const std::string& name, const std::string& type,
+    const std::string& inventoryPath,
+    std::shared_ptr<NsmRetimerAERErrorStatusIntf> aerErrorStatusIntf,
+    uint8_t multiPortType, uint8_t multiPortIndex,
+    uint8_t multiPortUpstreamPortNumber) :
+    NsmPcieGroup(name, type, GROUP_ID_9, multiPortType, multiPortIndex,
+                 multiPortUpstreamPortNumber),
+    objPath(inventoryPath), aerErrorStatusIntf(aerErrorStatusIntf)
+{
+    lg2::info("NsmMultiPCIeECCGroup9: {NAME}", "NAME", name.c_str());
+
+    aerErrorStatusIntf->aerUncorrectableErrorStatus("0x00000000");
+    aerErrorStatusIntf->aerCorrectableErrorStatus("0x00000000");
+}
+
+uint8_t NsmPCIeECCGroup9::handleResponseMsg(const struct nsm_msg* responseMsg,
+                                            size_t responseLen)
+{
+    uint8_t cc = NSM_ERROR;
+    uint16_t data_size;
+    uint16_t reason_code = ERR_NULL;
+    struct nsm_query_scalar_group_telemetry_group_9 data;
+
+    auto rc = decode_query_scalar_group_telemetry_v1_group9_resp(
+        responseMsg, responseLen, &cc, &data_size, &reason_code, &data);
+
+    LG2_ERROR_FLT(
+        "NsmPCIeECCGroup9 decode_query_scalar_group_telemetry_v1_group9_resp failure | reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+        "REASONCODE", reason_code, "CC", cc, "RC", rc);
+    if (rc == NSM_SW_SUCCESS && cc == NSM_SUCCESS)
+    {
+        auto hexFormat = [](const uint32_t value) -> std::string {
+            std::string hexStr(sizeof("0x00000000"), '\0');
+            snprintf(hexStr.data(), hexStr.size(), "0x%08X", value);
+            return hexStr;
+        };
+
+        aerErrorStatusIntf->aerUncorrectableErrorStatus(
+            hexFormat(data.aer_uncorrectable_error_status));
+        aerErrorStatusIntf->aerCorrectableErrorStatus(
+            hexFormat(data.aer_correctable_error_status));
+    }
+    return cc ? cc : rc;
 }
 
 NsmPCIeECCGroup10::NsmPCIeECCGroup10(sdbusplus::bus::bus& bus,
@@ -845,12 +1017,13 @@ static requester::Coroutine
                                                                objPath.c_str());
             auto portWidthIntf =
                 std::make_shared<PortWidthIntf>(bus, objPath.c_str());
+            auto portMetricsOem2Intf =
+                std::make_shared<PortMetricsOem2Intf>(bus, objPath.c_str());
 
             portInfoIntf->protocol(
                 PortInfoIntf::convertPortProtocolFromString(portProtocol));
             portInfoIntf->type(
                 PortInfoIntf::convertPortTypeFromString(portType));
-
             auto multipcieSensorGroup1 = std::make_shared<NsmPCIeECCGroup1>(
                 portName, type, objPath, portInfoIntf, portWidthIntf,
                 portTypeVal, index, static_cast<uint8_t>(upstreamPortNumber));
@@ -863,13 +1036,15 @@ static requester::Coroutine
             auto multipcieSensorGroup4 = std::make_shared<NsmPCIeECCGroup4>(
                 portName, type, objPath, pcieECCIntf, portTypeVal, index,
                 static_cast<uint8_t>(upstreamPortNumber));
+            auto multipcieSensorGroup5 = std::make_shared<NsmPCIeECCGroup5>(
+                portName, type, objPath, portMetricsOem2Intf, portTypeVal,
+                index, static_cast<uint8_t>(upstreamPortNumber));
             auto multipcieSensorGroup10 = std::make_shared<NsmPCIeECCGroup10>(
                 bus, portName, type, objPath, portTypeVal, index,
                 static_cast<uint8_t>(upstreamPortNumber));
-
             if (!multipcieSensorGroup1 || !multipcieSensorGroup2 ||
                 !multipcieSensorGroup3 || !multipcieSensorGroup4 ||
-                !multipcieSensorGroup10)
+                !multipcieSensorGroup5 || !multipcieSensorGroup10)
             {
                 lg2::error(
                     "Failed to create NSM Multi PCIe Port sensor : UUID={UUID}, Name={NAME}, Type={TYPE}, Object_Path={OBJPATH}",
@@ -882,6 +1057,7 @@ static requester::Coroutine
             nsmDevice->addSensor(multipcieSensorGroup2, priority);
             nsmDevice->addSensor(multipcieSensorGroup3, priority);
             nsmDevice->addSensor(multipcieSensorGroup4, priority);
+            nsmDevice->addSensor(multipcieSensorGroup5, priority);
             nsmDevice->addSensor(multipcieSensorGroup10, priority);
 
             if (portTypeVal == NSM_PORT_TYPE_UPSTREAM)

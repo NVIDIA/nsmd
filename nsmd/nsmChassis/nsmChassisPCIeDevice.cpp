@@ -25,6 +25,7 @@
 #if defined(ENABLE_PCIE_AER_ERROR)
 #include "nsmAERError.hpp"
 #endif
+#include "nsmPort/nsmRetimerPort.hpp"
 #if defined(ENABLE_CLOCK_OUTPUT_STATE)
 #include "nsmClockOutputEnableState.hpp"
 #endif
@@ -181,6 +182,19 @@ void createChassisPCIeDeviceMultiPortPCIeDevice(
     }
 }
 
+void createChassisPCIeDeviceRetimerAERErrorStatus(
+    std::shared_ptr<NsmDevice> device, std::string& name,
+    const std::string& chassisName)
+{
+    const std::string inventoyObjPath = chassisInventoryBasePath / chassisName /
+                                        "PCIeDevices" / name;
+    auto aerErrorIntf = std::make_shared<NsmRetimerAERErrorStatusIntf>(
+        utils::DBusHandler::getBus(), inventoyObjPath.c_str());
+    auto aerErrorSensor = std::make_shared<NsmPCIeECCGroup9>(
+        name, "PCIeAerErrorStatus", inventoyObjPath, aerErrorIntf, 0, 0, 0);
+    device->addSensor(aerErrorSensor, AER_ERR_SENSOR_PRIORITY);
+}
+
 #if defined(ENABLE_PCIE_LTSSM_STATE)
 void createChassisPCIeDeviceLTSSMState(
     std::shared_ptr<NsmDevice> device, std::string& name,
@@ -324,6 +338,7 @@ requester::Coroutine
     {
         createChassisPCIeDeviceMultiPortPCIeDevice(device, name, chassisName,
                                                    allCurrentIfaceProperties);
+        createChassisPCIeDeviceRetimerAERErrorStatus(device, name, chassisName);
     }
     else if (type == "NSM_LTSSMState")
     {
