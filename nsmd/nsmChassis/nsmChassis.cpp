@@ -18,6 +18,7 @@
 #include "nsmChassis.hpp"
 
 #include "../../common/utils.hpp"
+#include "nsmApSkuId.hpp"
 #include "nsmCommon.hpp"
 #include "nsmDebugInfo.hpp"
 #include "nsmDevice.hpp"

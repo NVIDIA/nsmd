@@ -19,6 +19,7 @@
 #include "platform-environmental.h"
 
 #include "globals.hpp"
+#include "nsmApSkuIdIntf.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmDevice.hpp"
 #include "nsmObjectFactory.hpp"
@@ -57,6 +58,7 @@ class NsmPCIeRetimerChassis : public NsmObject
   private:
     std::unique_ptr<AssociationDefinitionsInft> associationDef_ = nullptr;
     std::unique_ptr<NsmAssetIntf> asset_ = nullptr;
+    std::unique_ptr<NsmApSkuIdIntf> apSkuId_ = nullptr;
     std::unique_ptr<LocationIntf> location_ = nullptr;
     std::unique_ptr<ChassisIntf> chassis_ = nullptr;
     std::unique_ptr<HealthIntf> health_ = nullptr;

@@ -37,7 +37,11 @@ valid_chassis = [
     'irot-responder',
 ]
 if include_all_chassis or include_chassis_list.contains('chassis-core')
-    sources += ['nsmChassis/nsmChassis.cpp']
+    sources += [
+        'nsmChassis/nsmChassis.cpp',
+        'nsmChassis/nsmApSkuId.cpp',
+        'nsmChassis/nsmUpdateApSkuId.cpp',
+    ]
 endif
 foreach name : include_chassis_list
     if not valid_chassis.contains(name)

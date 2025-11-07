@@ -65,7 +65,7 @@ inline std::tuple<uint16_t, std::string>
             case NSM_FW_UPDATE_CODE_AUTH_KEY_PERM:
                 return {cc, "Invalid KeyIndexes"};
             case NSM_FW_SET_ROT_PROPERTY:
-                return {cc, "Invalid In-band Update Policy"};
+                return {cc, "Invalid SetRoTProperty"};
             default:
                 return {cc, "Unknown Error: cc=" + std::to_string(cc)};
         }

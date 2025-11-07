@@ -18,6 +18,7 @@
 #include "nsmPCIeRetimer.hpp"
 
 #include "dBusAsyncUtils.hpp"
+#include "nsmApSkuIdIntf.hpp"
 #include "nsmAssetIntf.hpp"
 
 #include <phosphor-logging/lg2.hpp>
@@ -54,7 +55,9 @@ NsmPCIeRetimerChassis::NsmPCIeRetimerChassis(
 
     asset_ = std::make_unique<NsmAssetIntf>(bus,
                                             pcieRetimerChaasisBasePath.c_str());
-    asset_->sku("");
+    apSkuId_ = std::make_unique<NsmApSkuIdIntf>(
+        bus, pcieRetimerChaasisBasePath.c_str());
+    apSkuId_->sku("");
     location_ =
         std::make_unique<LocationIntf>(bus, pcieRetimerChaasisBasePath.c_str());
     location_->locationType(LocationIntf::convertLocationTypesFromString(

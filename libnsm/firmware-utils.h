@@ -110,6 +110,18 @@ enum nsm_rot_inband_update_policy_lifespan {
 	NSM_ROT_INBAND_UPDATE_POLICY_LIFESPAN_VOLATILE = 1,
 };
 
+/** @brief NSM RoT AP SKU ID Lifespan values
+ */
+enum nsm_rot_ap_sku_id_lifespan {
+	NSM_ROT_AP_SKU_ID_LIFESPAN_PERSISTENT = 0,
+	NSM_ROT_AP_SKU_ID_LIFESPAN_VOLATILE = 1,
+};
+
+/** @brief NSM RoT AP SKU ID argument length
+ * 4 bytes for SKU ID + 1 byte for lifespan
+ */
+#define NSM_ROT_AP_SKU_ID_ARGUMENT_LENGTH 5
+
 /** @brief NSM RoT In-band Update Policy values (Property = 1)
  */
 enum nsm_rot_inband_update_policy {

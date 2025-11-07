@@ -15,21 +15,16 @@
  * limitations under the License.
  */
 
-#include "nsmAssetIntf.hpp"
+#include "nsmApSkuIdIntf.hpp"
 
 namespace nsm
 {
-using AssetIntf = sdbusplus::server::object_t<
-    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::Asset>;
+using ApSkuIdIntf = sdbusplus::server::object_t<
+    sdbusplus::xyz::openbmc_project::Inventory::Decorator::server::SKU>;
 
-NsmAssetIntf::NsmAssetIntf(sdbusplus::bus::bus& bus, const char* path) :
-    AssetIntf(bus, path)
+NsmApSkuIdIntf::NsmApSkuIdIntf(sdbusplus::bus::bus& bus, const char* path) :
+    ApSkuIdIntf(bus, path)
 {
-    AssetIntf::name("NA");
-    AssetIntf::partNumber("NA");
-    AssetIntf::serialNumber("NA");
-    AssetIntf::manufacturer("NA");
-    AssetIntf::buildDate("0000-00-00T00:00:00Z");
-    AssetIntf::model("NA");
+    ApSkuIdIntf::sku("");
 };
 } // namespace nsm
