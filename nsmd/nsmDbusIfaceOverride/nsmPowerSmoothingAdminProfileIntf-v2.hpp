@@ -181,7 +181,7 @@ class OemAdminProfileIntfV2 : public OemAdminProfileIntf
         // milli seconds to seconds
         AdminPowerProfileIntf::primaryFloorActivationWindowMultiplier(
             utils::convertAndScaleDownUint8ToDouble(
-                primaryFloorActivationWindowMultiplier, 1000));
+                primaryFloorActivationWindowMultiplier));
         return rc;
     }
 
@@ -202,7 +202,7 @@ class OemAdminProfileIntfV2 : public OemAdminProfileIntf
         // milli seconds to seconds
         AdminPowerProfileIntf::primaryFloorTargetWindowMultiplier(
             utils::convertAndScaleDownUint8ToDouble(
-                primaryFloorTargetWindowMultiplier, 1000));
+                primaryFloorTargetWindowMultiplier));
         return rc;
     }
 
@@ -393,6 +393,10 @@ class OemAdminProfileIntfV2 : public OemAdminProfileIntf
         if (parameterId == 0)
         {
             parameValueTobeSet = doubleToNvUFXP4_12(paramValue);
+        }
+        else if (parameterId == 5 || parameterId == 6)
+        {
+            parameValueTobeSet = doubleToNvU8(paramValue);
         }
         else
         {

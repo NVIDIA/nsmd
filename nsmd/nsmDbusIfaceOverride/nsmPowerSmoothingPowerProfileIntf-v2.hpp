@@ -184,7 +184,7 @@ class OemPowerProfileIntfV2 : public OemPowerProfileIntf
         {
             PowerProfileIntf::primaryFloorActivationWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorActivationWindowMultiplier, 1000));
+                    primaryFloorActivationWindowMultiplier));
         }
         return rc;
     }
@@ -207,7 +207,7 @@ class OemPowerProfileIntfV2 : public OemPowerProfileIntf
         {
             PowerProfileIntf::primaryFloorTargetWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorTargetWindowMultiplier, 1000));
+                    primaryFloorTargetWindowMultiplier));
         }
         return rc;
     }
@@ -395,6 +395,10 @@ class OemPowerProfileIntfV2 : public OemPowerProfileIntf
         if (parameterId == 0)
         {
             parameValueTobeSet = doubleToNvUFXP4_12(paramValue);
+        }
+        else if (parameterId == 5 || parameterId == 6)
+        {
+            parameValueTobeSet = doubleToNvU8(paramValue);
         }
         else
         {

@@ -3412,6 +3412,7 @@ double NvUFXP4_12ToDouble(uint16_t reading);
 uint16_t doubleToNvUFXP4_12(double reading);
 double NvUFXP8_24ToDouble(uint32_t reading);
 uint32_t doubleToNvUFXP8_24(double reading);
+uint8_t doubleToNvU8(double reading);
 
 /** @brief Encode a Get Row Remap Availability request message
  *

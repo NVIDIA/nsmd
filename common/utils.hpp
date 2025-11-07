@@ -620,7 +620,7 @@ double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor);
  *
  * @param uint8_t value to be converted to double
  */
-double convertAndScaleDownUint8ToDouble(uint8_t value, double scaleFactor);
+double convertAndScaleDownUint8ToDouble(uint8_t value);
 
 /**
  * @brief Convert uint64 to double with safe check.

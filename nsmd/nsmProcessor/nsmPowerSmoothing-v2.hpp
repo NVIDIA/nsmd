@@ -701,7 +701,7 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
         NsmCurrentPowerSmoothingProfile::getPwrSmoothingCurProfileIntf()
             ->CurrentPowerProfileIntf::primaryFloorActivationWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorActivationWindowMultiplier, 1000));
+                    primaryFloorActivationWindowMultiplier));
         return rc;
     }
 
@@ -723,7 +723,7 @@ class NsmCurrentPowerSmoothingProfileV2 : public NsmCurrentPowerSmoothingProfile
         NsmCurrentPowerSmoothingProfile::getPwrSmoothingCurProfileIntf()
             ->CurrentPowerProfileIntf::primaryFloorTargetWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorTargetWindowMultiplier, 1000));
+                    primaryFloorTargetWindowMultiplier));
         return rc;
     }
 
@@ -1025,7 +1025,7 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
         NsmPowerSmoothingAdminOverride::getAdminProfileIntf()
             ->AdminPowerProfileIntf::primaryFloorActivationWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorActivationWindowMultiplier, 1000));
+                    primaryFloorActivationWindowMultiplier));
         return rc;
     }
 
@@ -1047,7 +1047,7 @@ class NsmPowerSmoothingAdminOverrideV2 : public NsmPowerSmoothingAdminOverride
         NsmPowerSmoothingAdminOverride::getAdminProfileIntf()
             ->AdminPowerProfileIntf::primaryFloorTargetWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorTargetWindowMultiplier, 1000));
+                    primaryFloorTargetWindowMultiplier));
         return rc;
     }
 
@@ -1398,7 +1398,7 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
         powerProfileIntf
             ->PowerProfileIntf::primaryFloorActivationWindowMultiplier(
                 utils::convertAndScaleDownUint8ToDouble(
-                    primaryFloorActivationWindowMultiplier, 1000));
+                    primaryFloorActivationWindowMultiplier));
         return rc;
     }
 
@@ -1421,7 +1421,7 @@ class NsmPowerProfileCollectionV2 : public NsmPowerProfileCollection
         // milli seconds to seconds
         powerProfileIntf->PowerProfileIntf::primaryFloorTargetWindowMultiplier(
             utils::convertAndScaleDownUint8ToDouble(
-                primaryFloorTargetWindowMultiplier, 1000));
+                primaryFloorTargetWindowMultiplier));
         return rc;
     }
 
