@@ -53,6 +53,9 @@ class FirmwareStateMachine
     std::vector<uint8_t> ecPendingComponentKeyPerm{0x00};
     std::vector<uint8_t> ecEfuseKeyPerm{0x00};
     std::vector<uint8_t> ecPendingEfuseKeyPerm{0x00};
+
+    // AP SKU ID state
+    uint32_t apSkuId = 0x12345678;
 };
 
 static std::unique_ptr<FirmwareStateMachine> fwStateMachine = nullptr;
@@ -1032,9 +1035,8 @@ std::optional<std::vector<uint8_t>>
         // Property 2: AP SKU ID
         uint32_t apSkuId;
         memcpy(&apSkuId, &rot_req.argument_data[0], sizeof(uint32_t));
-        // Convert from little-endian to host byte order for endianness
-        // consistency
-        apSkuId = le32toh(apSkuId);
+        // Convert from big-endian to host byte order
+        apSkuId = be32toh(apSkuId);
         uint8_t lifespan = rot_req.argument_data[4];
 
         if (lifespan > 1)

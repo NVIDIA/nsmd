@@ -4055,6 +4055,7 @@ std::optional<std::vector<uint8_t>>
     assert(rc == NSM_SW_SUCCESS);
     return response;
 }
+
 void getScalarTelemetryGroup0Data(
     struct nsm_query_scalar_group_telemetry_group_0* data)
 {

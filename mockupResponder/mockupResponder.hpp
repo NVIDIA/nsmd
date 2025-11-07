@@ -398,6 +398,12 @@ class MockupResponder
                                    size_t requestLen);
 
     std::optional<std::vector<uint8_t>>
+        getApSkuIdHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        updateApSkuIdHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
         getEDPpScalingFactorHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
