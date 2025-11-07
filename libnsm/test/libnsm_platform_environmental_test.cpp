@@ -6412,3 +6412,19 @@ TEST(decode2ByteOfUint16Sample, testBadDecode)
 	rc = decode2ByteOfUint16Sample(data, data_len - 1, &sample);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 }
+
+TEST(doubleToNvU8, testGoodDoubleToNvU8)
+{
+	double reading = 255.0;
+	uint8_t value = doubleToNvU8(reading);
+	EXPECT_EQ(value, 255);
+
+	reading = 256.0;
+	value = doubleToNvU8(reading);
+	EXPECT_EQ(value, 0);
+
+	// value less than 0 should return 0
+	reading = -1.0;
+	value = doubleToNvU8(reading);
+	EXPECT_EQ(value, 0);
+}

@@ -840,7 +840,7 @@ double convertAndScaleDownUint32ToDouble(uint32_t value, double scaleFactor)
     }
 }
 
-double convertAndScaleDownUint8ToDouble(uint8_t value, double scaleFactor)
+double convertAndScaleDownUint8ToDouble(uint8_t value)
 {
     if (value == INVALID_UINT8_VALUE)
     {
@@ -848,7 +848,7 @@ double convertAndScaleDownUint8ToDouble(uint8_t value, double scaleFactor)
     }
     else
     {
-        return static_cast<double>(value) / scaleFactor;
+        return static_cast<double>(value);
     }
 }
 

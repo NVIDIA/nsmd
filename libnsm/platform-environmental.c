@@ -5715,6 +5715,15 @@ uint16_t doubleToNvUFXP4_12(double reading)
 	return result;
 }
 
+uint8_t doubleToNvU8(double reading)
+{
+	if (reading < 0)
+		return 0;
+	uint32_t value = (uint32_t)(reading);
+	value = value & 0xFF;
+	return (uint8_t)(value);
+}
+
 double NvUFXP8_24ToDouble(uint32_t reading)
 {
 	// Extract the MSB (8 bits)
