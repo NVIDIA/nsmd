@@ -128,7 +128,7 @@ void NsmMemoryCapacityUtil::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     invoke([](const auto& path, auto& pdi) {
         std::vector<uint8_t> smbusData = {};
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             path, pdi.interface, "CapacityUtilizationPercent", smbusData,
             static_cast<uint16_t>(pdi.capacityUtilizationPercent()));
     });
@@ -303,7 +303,7 @@ void NsmMinGraphicsClockLimit::updateMetricOnSharedMemory()
     std::string propName = "MinSpeed";
     nv::sensor_aggregation::DbusVariantType minSpeedVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::minSpeed()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, minSpeedVal);
 #endif
 }
@@ -391,7 +391,7 @@ void NsmMaxGraphicsClockLimit::updateMetricOnSharedMemory()
     std::string propName = "MaxSpeed";
     nv::sensor_aggregation::DbusVariantType maxSpeedVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::maxSpeed()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, maxSpeedVal);
 #endif
 }

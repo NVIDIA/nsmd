@@ -19,19 +19,46 @@
 
 namespace nsm_shmem_utils
 {
-/**
- * @brief Verify allowed device type and its instance number
- *
- * @param inventoryObjPath Dbus path
- * @param ifaceName interface name
- * @param propName Dbus property name
- * @param smbusData smbus data for the property
- * @param propValue dbus property value
- */
 
-void updateSharedMemoryOnSuccess(
-    const std::string& inventoryObjPath, const std::string& ifaceName,
-    const std::string& propName, std::vector<uint8_t>& smbusData,
-    nv::sensor_aggregation::DbusVariantType propValue);
+class SharedMemoryManager
+{
+  public:
+    // Delete all constructors - this is a pure static class
+    SharedMemoryManager() = delete;
+    SharedMemoryManager(const SharedMemoryManager&) = delete;
+    SharedMemoryManager& operator=(const SharedMemoryManager&) = delete;
+    ~SharedMemoryManager() = delete;
 
+    /**
+     * @brief Update shared memory on success
+     *
+     * @param inventoryObjPath Dbus path
+     * @param ifaceName interface name
+     * @param propName Dbus property name
+     * @param smbusData smbus data for the property
+     * @param propValue dbus property value
+     * @param associatedEntityPath associated entity path
+     */
+    static void cacheTALData(const std::string& inventoryObjPath,
+                             const std::string& ifaceName,
+                             const std::string& propName,
+                             std::vector<uint8_t>& smbusData,
+                             nv::sensor_aggregation::DbusVariantType propValue,
+                             const std::string& associatedEntityPath = "",
+                             uint8_t rc = 0);
+
+    /*
+     * @brief update telemtry on shmem/smbus
+     */
+    static void updateAggregateTelemetryOnTAL();
+
+    /*
+      @brief  initialize tal api
+    */
+    static void initTALNamespace();
+
+  private:
+    // Static member variables (previously global)
+    static std::vector<tal::TelemetryData> telemetryData;
+};
 } // namespace nsm_shmem_utils

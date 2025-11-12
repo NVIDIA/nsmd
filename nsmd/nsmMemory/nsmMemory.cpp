@@ -41,8 +41,8 @@ void NsmMemoryErrorCorrection::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType eccValue{
         static_cast<uint16_t>(dimmIntf->ecc())};
     std::string propName = "ECC";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData, eccValue);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData, eccValue);
 #endif
 }
 
@@ -66,7 +66,7 @@ void NsmMemoryDeviceType::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType memoryTypeValue{
         dimmIntf->convertDeviceTypeToString(dimmIntf->memoryType())};
     std::string propName = "MemoryType";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, memoryTypeValue);
 #endif
 }
@@ -132,16 +132,16 @@ void NsmRowRemapState::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType rowRemappingFailureStateVal{
         memoryRowRemappingStateIntf->rowRemappingFailureState()};
     std::string propName = "RowRemappingFailureState";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 rowRemappingFailureStateVal);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        rowRemappingFailureStateVal);
 
     nv::sensor_aggregation::DbusVariantType rowRemappingPendingStateVal{
         memoryRowRemappingStateIntf->rowRemappingPendingState()};
     propName = "RowRemappingPendingState";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 rowRemappingPendingStateVal);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        rowRemappingPendingStateVal);
 #endif
 }
 
@@ -212,13 +212,13 @@ void NsmRowRemappingCounts::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ceRowRemappingCount{
         memoryRowRemappingCountsIntf->ceRowRemappingCount()};
     std::string propName = "ceRowRemappingCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ceRowRemappingCount);
 
     propName = "ueRowRemappingCount";
     nv::sensor_aggregation::DbusVariantType ueRowRemappingCount{
         memoryRowRemappingCountsIntf->ueRowRemappingCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ueRowRemappingCount);
 #endif
 }
@@ -342,21 +342,21 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType maxRemappingAvailablityBankCount{
         rowRemapIntf->maxRemappingAvailablityBankCount()};
     std::string propName = "MaxRemappingAvailablityBankCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         maxRemappingAvailablityBankCount);
 
     propName = "HighRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType highRemappingAvailablityBankCount{
         rowRemapIntf->highRemappingAvailablityBankCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         highRemappingAvailablityBankCount);
 
     propName = "LowRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType lowRemappingAvailablityBankCount{
         rowRemapIntf->lowRemappingAvailablityBankCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         lowRemappingAvailablityBankCount);
 
@@ -364,14 +364,14 @@ void NsmRemappingAvailabilityBankCount::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType
         partialRemappingAvailablityBankCount{
             rowRemapIntf->partialRemappingAvailablityBankCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         partialRemappingAvailablityBankCount);
 
     propName = "NoRemappingAvailablityBankCount";
     nv::sensor_aggregation::DbusVariantType noRemappingAvailablityBankCount{
         rowRemapIntf->noRemappingAvailablityBankCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         noRemappingAvailablityBankCount);
 
@@ -397,13 +397,13 @@ void NsmEccErrorCountsDram ::updateMetricOnSharedMemory()
     std::string propName = "ceCount";
     nv::sensor_aggregation::DbusVariantType ceCount{
         static_cast<int64_t>(eccIntf->ceCount())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData, ceCount);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData, ceCount);
     propName = "ueCount";
     nv::sensor_aggregation::DbusVariantType ueCount{
         static_cast<int64_t>(eccIntf->ueCount())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData, ueCount);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData, ueCount);
 #endif
 }
 
@@ -613,7 +613,7 @@ void NsmMemCurrClockFreq::updateMetricOnSharedMemory()
         dimmIntf->memoryConfiguredSpeedInMhz()};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "MemoryConfiguredSpeedInMhz";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
 }

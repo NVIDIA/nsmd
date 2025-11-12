@@ -56,8 +56,8 @@ void NsmGPUSWInventoryDriverVersionAndStatus::updateMetricOnSharedMemory()
 
     nv::sensor_aggregation::DbusVariantType variantFun{
         operationalStatus->functional()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 rawSmbpbiData, variantFun);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, rawSmbpbiData, variantFun);
 #endif
 }
 

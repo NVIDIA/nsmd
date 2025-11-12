@@ -61,7 +61,7 @@ void NsmReconfigPermissions::updateMetricOnSharedMemory()
 
         for (size_t i = 0; i < propNames.size(); i++)
         {
-            nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            nsm_shmem_utils::SharedMemoryManager::cacheTALData(
                 hostConfigPath, ifaceName, propNames[i], smbusData,
                 hostValues[i]);
         }
@@ -77,7 +77,7 @@ void NsmReconfigPermissions::updateMetricOnSharedMemory()
 
         for (size_t i = 0; i < propNames.size(); i++)
         {
-            nsm_shmem_utils::updateSharedMemoryOnSuccess(
+            nsm_shmem_utils::SharedMemoryManager::cacheTALData(
                 doeConfigPath, ifaceName, propNames[i], smbusData,
                 doeValues[i]);
         }

@@ -167,13 +167,13 @@ void NsmChassisClockControl::updateMetricOnSharedMemory()
     std::string propName = "SettingMin";
     nv::sensor_aggregation::DbusVariantType settingMin{
         std::get<0>(cpuOperatingConfigIntf->requestedSpeedLimits())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, settingMin);
 
     propName = "SettingMax";
     nv::sensor_aggregation::DbusVariantType settingMax{
         std::get<1>(cpuOperatingConfigIntf->requestedSpeedLimits())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, settingMax);
 #endif
 }

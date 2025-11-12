@@ -90,35 +90,38 @@ void NsmPCIeErrors::updateMetricOnSharedMemory()
         switch (groupId)
         {
             case GROUP_ID_2:
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "CorrectableErrorCount", data,
-                                            pdi.ceCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "NonFatalErrorCount", data,
-                                            pdi.nonfeCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "FatalErrorCount", data,
-                                            pdi.feCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "UnsupportedRequestCount", data,
-                                            pdi.unsupportedRequestCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "CorrectableErrorCount", data,
+                                                  pdi.ceCount());
+
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "NonFatalErrorCount", data,
+                                                  pdi.nonfeCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "FatalErrorCount", data,
+                                                  pdi.feCount());
+                SharedMemoryManager::cacheTALData(
+                    path, pdi.interface, "UnsupportedRequestCount", data,
+                    pdi.unsupportedRequestCount());
                 break;
             case GROUP_ID_3:
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "L0ToRecoveryCount", data,
-                                            pdi.ceCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "L0ToRecoveryCount", data,
+                                                  pdi.ceCount());
                 break;
             case GROUP_ID_4:
-                updateSharedMemoryOnSuccess(path, pdi.interface, "ReplayCount",
-                                            data, pdi.replayCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "ReplayRolloverCount", data,
-                                            pdi.replayRolloverCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface, "NAKSentCount",
-                                            data, pdi.nakSentCount());
-                updateSharedMemoryOnSuccess(path, pdi.interface,
-                                            "NAKReceivedCount", data,
-                                            pdi.nakReceivedCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "ReplayCount", data,
+                                                  pdi.replayCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "ReplayRolloverCount", data,
+                                                  pdi.replayRolloverCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "NAKSentCount", data,
+                                                  pdi.nakSentCount());
+                SharedMemoryManager::cacheTALData(path, pdi.interface,
+                                                  "NAKReceivedCount", data,
+                                                  pdi.nakReceivedCount());
                 break;
         }
     });

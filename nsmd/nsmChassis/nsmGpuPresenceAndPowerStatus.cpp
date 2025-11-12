@@ -77,7 +77,7 @@ void NsmGpuPresenceAndPowerStatus::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     invoke([](const auto& path, auto& pdi) {
         std::vector<uint8_t> data;
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             path, pdi.interface, "State", data,
             OperationalStatusIntf::convertStateTypeToString(pdi.state()));
     });

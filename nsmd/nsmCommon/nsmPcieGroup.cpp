@@ -112,47 +112,47 @@ void NsmPciGroup2::updateMetricOnSharedMemory()
     std::string propName = "nonfeCount";
     nv::sensor_aggregation::DbusVariantType nonfeCountVal{
         pCieEccIntf->nonfeCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nonfeCountVal);
 
     propName = "feCount";
     nv::sensor_aggregation::DbusVariantType feCountVal{pCieEccIntf->feCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, feCountVal);
 
     propName = "ceCount";
     nv::sensor_aggregation::DbusVariantType ceCountVal{pCieEccIntf->ceCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
 
     propName = "UnsupportedRequestCount";
     nv::sensor_aggregation::DbusVariantType unsupportedRequestCount{
         pCieEccIntf->ceCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 unsupportedRequestCount);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        unsupportedRequestCount);
 
     // pcie port metrics
     ifaceName = std::string(pciePortIntf->interface);
     propName = "nonfeCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nonfeCountVal);
 
     ifaceName = std::string(pciePortIntf->interface);
     propName = "feCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, feCountVal);
 
     ifaceName = std::string(pciePortIntf->interface);
     propName = "ceCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountVal);
 
     ifaceName = std::string(pciePortIntf->interface);
     propName = "UnsupportedRequestCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 unsupportedRequestCount);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        unsupportedRequestCount);
 
 #endif
 }
@@ -213,13 +213,13 @@ void NsmPciGroup3::updateMetricOnSharedMemory()
     std::string propName = "L0ToRecoveryCount";
     nv::sensor_aggregation::DbusVariantType l0ToRecoveryCountVal{
         pCieEccIntf->l0ToRecoveryCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, l0ToRecoveryCountVal);
 
     // pcie port metrics
     ifaceName = std::string(pciePortIntf->interface);
     propName = "L0ToRecoveryCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, l0ToRecoveryCountVal);
 #endif
 }
@@ -275,44 +275,44 @@ void NsmPciGroup4::updateMetricOnSharedMemory()
     std::string propName = "ReplayCount";
     nv::sensor_aggregation::DbusVariantType replayCountVal{
         pCieEccIntf->replayCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, replayCountVal);
 
     propName = "ReplayRolloverCount";
     nv::sensor_aggregation::DbusVariantType replayRolloverCountVal{
         pCieEccIntf->replayRolloverCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 replayRolloverCountVal);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        replayRolloverCountVal);
 
     propName = "NAKSentCount";
     nv::sensor_aggregation::DbusVariantType nakSentCountVal{
         pCieEccIntf->nakSentCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nakSentCountVal);
 
     propName = "NAKReceivedCount";
     nv::sensor_aggregation::DbusVariantType nakReceivedCountVal{
         pCieEccIntf->nakReceivedCount()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nakReceivedCountVal);
 
     // pcie port metrics
     propName = "ReplayCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, replayCountVal);
 
     propName = "ReplayRolloverCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 replayRolloverCountVal);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        replayRolloverCountVal);
 
     propName = "NAKSentCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nakSentCountVal);
 
     propName = "NAKReceivedCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, nakReceivedCountVal);
 #endif
 }

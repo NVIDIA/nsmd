@@ -16,6 +16,8 @@
  */
 
 #include "config.h"
+
+#include "sharedMemCommon.hpp"
 #ifdef NVIDIA_SHMEM
 #include "utils.hpp"
 
@@ -23,17 +25,41 @@
 namespace nsm_shmem_utils
 {
 
-void updateSharedMemoryOnSuccess(
-    [[maybe_unused]] const std::string& inventoryObjPath,
-    [[maybe_unused]] const std::string& ifaceName,
-    [[maybe_unused]] const std::string& propName,
-    [[maybe_unused]] std::vector<uint8_t>& smbusData,
-    [[maybe_unused]] nv::sensor_aggregation::DbusVariantType propValue)
+// Static member definitions (required for static class members)
+std::vector<tal::TelemetryData> SharedMemoryManager::telemetryData;
+
+void SharedMemoryManager::cacheTALData(
+    const std::string& inventoryObjPath, const std::string& ifaceName,
+    const std::string& propName, std::vector<uint8_t>& smbusData,
+    nv::sensor_aggregation::DbusVariantType propValue,
+    const std::string& associatedEntityPath, uint8_t rc)
+{
+    telemetryData.push_back(
+        tal::TelemetryData{inventoryObjPath, ifaceName, propName, smbusData, rc,
+                           propValue, associatedEntityPath, 0});
+}
+
+void SharedMemoryManager::updateAggregateTelemetryOnTAL()
 {
     auto timestamp = utils::getCurrentSteadyClockTimestamp();
-    tal::TelemetryAggregator::updateTelemetry(inventoryObjPath, ifaceName,
-                                              propName, smbusData, timestamp, 0,
-                                              propValue);
+    for (auto& data : telemetryData)
+    {
+        data.timestamp = timestamp;
+    }
+
+    tal::TelemetryAggregator::updateAggregateTelemetry(telemetryData);
+
+    telemetryData.clear();
+}
+
+void SharedMemoryManager::initTALNamespace()
+{
+    if (tal::TelemetryAggregator::namespaceInit(tal::ProcessType::Producer,
+                                                "nsmd"))
+    {
+        lg2::info("Initialized tal from nsmd.");
+    }
+    telemetryData.reserve(20);
 }
 
 } // namespace nsm_shmem_utils

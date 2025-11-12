@@ -863,7 +863,7 @@ void NsmUuidIntf::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType valueVariant{uuidIntf->uuid()};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "UUID";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
 }
@@ -1109,7 +1109,7 @@ void NsmMigMode::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType migModeEnabled{
         migModeIntf->MigModeIntf::migModeEnabled()};
     std::string propName = "MIGModeEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, migModeEnabled);
 #endif
 }
@@ -1187,13 +1187,13 @@ void NsmEccMode::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType eccModeEnabled{
         eccModeIntf->EccModeIntf::eccModeEnabled()};
     std::string propName = "ECCModeEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, eccModeEnabled);
 
     propName = "PendingECCState";
     nv::sensor_aggregation::DbusVariantType pendingECCState{
         eccModeIntf->EccModeIntf::pendingECCState()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, pendingECCState);
 #endif
 }
@@ -1267,19 +1267,19 @@ void NsmEccErrorCounts::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ceCountOnSharedMem{
         static_cast<int64_t>(eccErrorCountIntf->ceCount())};
     std::string propName = "ceCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ceCountOnSharedMem);
 
     propName = "ueCount";
     nv::sensor_aggregation::DbusVariantType ueCountOnSharedMem{
         static_cast<int64_t>(eccErrorCountIntf->ueCount())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ueCountOnSharedMem);
 
     propName = "isThresholdExceeded";
     nv::sensor_aggregation::DbusVariantType isThresholdExceeded{
         static_cast<bool>(eccErrorCountIntf->isThresholdExceeded())};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, isThresholdExceeded);
 #endif
 }
@@ -1359,13 +1359,13 @@ void NsmPciGroup5::updateMetricOnSharedMemory()
     std::string propName = "PCIeRXBytes";
     nv::sensor_aggregation::DbusVariantType pcIeRXBytesVal{
         processorPerformanceIntf->pcIeRXBytes()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, pcIeRXBytesVal);
 
     propName = "PCIeTXBytes";
     nv::sensor_aggregation::DbusVariantType pcIeTXBytesVal{
         processorPerformanceIntf->pcIeTXBytes()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, pcIeTXBytesVal);
 
 #endif
@@ -1426,13 +1426,13 @@ void NsmEDPpScalingFactor::updateMetricOnSharedMemory()
     std::string propName = "AllowableMax";
     nv::sensor_aggregation::DbusVariantType allowableMaxVal{
         eDPpIntf->allowableMax()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, allowableMaxVal);
 
     propName = "AllowableMin";
     nv::sensor_aggregation::DbusVariantType allowableMinVal{
         eDPpIntf->allowableMin()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, allowableMinVal);
 #endif
 }
@@ -1714,19 +1714,19 @@ void NsmClockLimitGraphics::updateMetricOnSharedMemory()
     std::string propName = "SpeedLocked";
     nv::sensor_aggregation::DbusVariantType speedLockedVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLocked()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, speedLockedVal);
 
     propName = "SpeedConfig";
     nv::sensor_aggregation::DbusVariantType speedConfigVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedConfig()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, speedConfigVal);
 
     propName = "SpeedLimit";
     nv::sensor_aggregation::DbusVariantType speedLimitVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::speedLimit()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, speedLimitVal);
 #endif
 }
@@ -1811,7 +1811,7 @@ void NsmCurrClockFreq::updateMetricOnSharedMemory()
     std::string propName = "OperatingSpeed";
     nv::sensor_aggregation::DbusVariantType operatingSpeedVal{
         cpuOperatingConfigIntf->CpuOperatingConfigIntf::operatingSpeed()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, operatingSpeedVal);
 
 #endif
@@ -2047,9 +2047,9 @@ void NsmCurrentUtilization::updateMetricOnSharedMemory()
     std::string propName = "Utilization";
     nv::sensor_aggregation::DbusVariantType utilizationVal{
         cpuOperatingConfigIntf->utilization()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, utilizationVal);
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, smUtilizationIntfName, smUtilizationPropertyName,
         smbusData, utilizationVal);
 #endif
@@ -2119,7 +2119,7 @@ void NsmProcessorThrottleReason::updateMetricOnSharedMemory()
     std::string propName = "ThrottleReason";
     nv::sensor_aggregation::DbusVariantType throttleReasonVal{
         throttleReasonsForShmem};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, throttleReasonVal);
 
 #endif
@@ -2229,14 +2229,14 @@ void NsmAccumGpuUtilTime::updateMetricOnSharedMemory()
         accumulatedGPUContextUtilizationDurationVal{
             processorPerformanceIntf
                 ->accumulatedGPUContextUtilizationDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         accumulatedGPUContextUtilizationDurationVal);
 
     propName = "AccumulatedSMUtilizationDuration";
     nv::sensor_aggregation::DbusVariantType accumulatedSMUtilizationDurationVal{
         processorPerformanceIntf->accumulatedSMUtilizationDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         accumulatedSMUtilizationDurationVal);
 
@@ -2391,7 +2391,7 @@ void NsmTotalNvLinks::updateMetricOnSharedMemory()
     std::string propName = "TotalNvLinksCount";
     nv::sensor_aggregation::DbusVariantType totalNvLinksCount{
         totalNvLinkInterface->totalNumberNVLinks()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, totalNvLinksCount);
 
 #endif
@@ -2459,7 +2459,7 @@ void NsmProcessorRevision::updateMetricOnSharedMemory()
 
     std::string propName = "Version";
     nv::sensor_aggregation::DbusVariantType versionVal{revisionIntf->version()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, versionVal);
 
 #endif
@@ -2539,13 +2539,13 @@ void NsmPowerCap::updateMetricOnSharedMemory()
     std::string propName = "PowerCap";
     nv::sensor_aggregation::DbusVariantType powerCapVal{
         powerCapIntf->PowerCapIntf::powerCap()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, powerCapVal);
 
     propName = "PowerCapEnable";
     nv::sensor_aggregation::DbusVariantType powerCapEnableVal{
         powerCapIntf->PowerCapIntf::powerCapEnable()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, powerCapEnableVal);
 
 #endif
@@ -2682,7 +2682,7 @@ void NsmMaxPowerCap::updateMetricOnSharedMemory()
     std::string propName = "MaxPowerWatts";
     nv::sensor_aggregation::DbusVariantType maxPowerVal{
         powerLimitIntf->maxPowerWatts()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, maxPowerVal);
 #endif
 }
@@ -2777,7 +2777,7 @@ void NsmMinPowerCap::updateMetricOnSharedMemory()
     std::string propName = "MinPowerWatts";
     nv::sensor_aggregation::DbusVariantType minPowerVal{
         powerLimitIntf->minPowerWatts()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, minPowerVal);
 #endif
 }
@@ -2953,30 +2953,30 @@ void NsmProcessorThrottleDuration::updateMetricOnSharedMemory()
     std::string propName = "PowerLimitThrottleDuration";
     nv::sensor_aggregation::DbusVariantType powerLimitThrottleDuration{
         processorPerformanceIntf->powerLimitThrottleDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 powerLimitThrottleDuration);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        powerLimitThrottleDuration);
 
     propName = "ThermalLimitThrottleDuration";
     nv::sensor_aggregation::DbusVariantType thermalLimitThrottleDuration{
         processorPerformanceIntf->thermalLimitThrottleDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 thermalLimitThrottleDuration);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        thermalLimitThrottleDuration);
 
     propName = "GlobalSoftwareViolationThrottleDuration";
     nv::sensor_aggregation::DbusVariantType
         globalSoftwareViolationThrottleDuration{
             processorPerformanceIntf
                 ->globalSoftwareViolationThrottleDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         globalSoftwareViolationThrottleDuration);
 
     propName = "HardwareViolationThrottleDuration";
     nv::sensor_aggregation::DbusVariantType hardwareViolationThrottleDuration{
         processorPerformanceIntf->hardwareViolationThrottleDuration()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData,
         hardwareViolationThrottleDuration);
 
@@ -3062,27 +3062,27 @@ void NsmConfidentialCompute::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType ccModeEnabled{
         confidentialComputeIntf->ccModeEnabled()};
     std::string propName = "CCModeEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ccModeEnabled);
 
     propName = "PendingCCModeState";
     nv::sensor_aggregation::DbusVariantType pendingCCModeState{
         confidentialComputeIntf->pendingCCModeState()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, pendingCCModeState);
 
     nv::sensor_aggregation::DbusVariantType ccDevModeEnabled{
         confidentialComputeIntf->ccDevModeEnabled()};
     propName = "CCDevModeEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, ccDevModeEnabled);
 
     propName = "PendingCCDevModeState";
     nv::sensor_aggregation::DbusVariantType pendingCCDevModeState{
         confidentialComputeIntf->pendingCCDevModeState()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath, ifaceName,
-                                                 propName, smbusData,
-                                                 pendingCCDevModeState);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        inventoryObjPath, ifaceName, propName, smbusData,
+        pendingCCDevModeState);
 
 #endif
 }
@@ -3361,13 +3361,13 @@ void NsmEgmMode::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType egmModeEnabled{
         egmModeIntf->EgmModeIntf::egmModeEnabled()};
     std::string propName = "EGMModeEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, egmModeEnabled);
 
     propName = "PendingEGMModeState";
     nv::sensor_aggregation::DbusVariantType pendingEgmModeState{
         egmModeIntf->EgmModeIntf::pendingEGMModeState()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, pendingEgmModeState);
 
 #endif

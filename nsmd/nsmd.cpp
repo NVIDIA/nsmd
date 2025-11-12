@@ -40,6 +40,7 @@
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/server.hpp>
 #include <sdeventplus/event.hpp>
+#include <sharedMemCommon.hpp>
 #ifdef NVIDIA_SHMEM
 #include <tal.hpp>
 #endif
@@ -171,11 +172,13 @@ int main(int argc, char** argv)
 
 #ifdef NVIDIA_SHMEM
         // Initialize TAL
-        if (tal::TelemetryAggregator::namespaceInit(tal::ProcessType::Producer,
-                                                    "nsmd"))
-        {
-            lg2::info("Initialized tal from nsmd.");
-        }
+        nsm_shmem_utils::SharedMemoryManager::initTALNamespace();
+        /*    if
+           (tal::TelemetryAggregator::namespaceInit(tal::ProcessType::Producer,
+                                                        "nsmd"))
+            {
+                lg2::info("Initialized tal from nsmd.");
+            }*/
 #endif
 
         return event.loop();

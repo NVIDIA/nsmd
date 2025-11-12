@@ -140,27 +140,27 @@ void NsmPCIeDeviceQueryScalarTelemetry::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType valueVariantPT{
         pcieDeviceIntf->convertPCIeTypesToString(pcieDeviceIntf->pcIeType())};
     std::string propName = "PCIeType";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 smbusData, valueVariantPT);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, smbusData, valueVariantPT);
 
     nv::sensor_aggregation::DbusVariantType valueVariantMPT{
         pcieDeviceIntf->convertPCIeTypesToString(
             pcieDeviceIntf->maxPCIeType())};
     propName = "MaxPCIeType";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 smbusData, valueVariantMPT);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, smbusData, valueVariantMPT);
 
     nv::sensor_aggregation::DbusVariantType valueVariantLIU{
         pcieDeviceIntf->lanesInUse()};
     propName = "LanesInUse";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 smbusData, valueVariantLIU);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, smbusData, valueVariantLIU);
 
     nv::sensor_aggregation::DbusVariantType valueVariantMLIN{
         pcieDeviceIntf->maxLanes()};
     propName = "MaxLanes";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 smbusData, valueVariantMLIN);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, smbusData, valueVariantMLIN);
 #endif
 }
 
@@ -231,8 +231,8 @@ void NsmPCIeDeviceGetClockOutput::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType valueVariantPRCE{
         pcieRefClockIntf->pcIeReferenceClockEnabled()};
     std::string propName = "PCIeReferenceClockEnabled";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(objPath, ifaceName, propName,
-                                                 smbusData, valueVariantPRCE);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, ifaceName, propName, smbusData, valueVariantPRCE);
 #endif
 }
 

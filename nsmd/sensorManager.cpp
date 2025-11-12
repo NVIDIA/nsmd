@@ -31,6 +31,10 @@
 #include "sensorQueueMap.hpp"
 #include "utils.hpp"
 
+#ifdef NVIDIA_SHMEM
+#include "nsmCommon/sharedMemCommon.hpp"
+#endif
+
 #include <ranges>
 
 #ifdef LTTNG_TRACING
@@ -718,6 +722,11 @@ requester::Coroutine
         if (nsmDevice->isOnline())
         {
             co_await pollPrioritySensors(nsmDevice, t0);
+
+#ifdef NVIDIA_SHMEM
+            nsm_shmem_utils::SharedMemoryManager::
+                updateAggregateTelemetryOnTAL();
+#endif
             co_await pollNonPrioritySensors(nsmDevice, t0);
         }
 

@@ -169,13 +169,13 @@ void NsmPCIeECCGroup1::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType variantCS{
         portInfoIntf->currentSpeed()};
     std::string propName = "CurrentSpeed";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortInfoName, propName, rawSmbpbiData, variantCS);
 
     nv::sensor_aggregation::DbusVariantType variantAW{
         portWidthIntf->activeWidth()};
     propName = "ActiveWidth";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortWidthName, propName, rawSmbpbiData, variantAW);
 #endif
 }
@@ -254,23 +254,23 @@ void NsmPCIeECCGroup2::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType variantNFC{
         pcieEccIntf->nonfeCount()};
     std::string propName = "nonfeCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNFC);
 
     nv::sensor_aggregation::DbusVariantType variantFC{pcieEccIntf->feCount()};
     propName = "feCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantFC);
 
     nv::sensor_aggregation::DbusVariantType variantCC{pcieEccIntf->ceCount()};
     propName = "ceCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantCC);
 
     nv::sensor_aggregation::DbusVariantType variantURC{
         pcieEccIntf->unsupportedRequestCount()};
     propName = "UnsupportedRequestCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantURC);
 #endif
 }
@@ -338,7 +338,7 @@ void NsmPCIeECCGroup3::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType variantL0TRC{
         pcieEccIntf->l0ToRecoveryCount()};
     std::string propName = "L0ToRecoveryCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantL0TRC);
 #endif
 }
@@ -426,42 +426,42 @@ void NsmPCIeECCGroup4::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType variantRC{
         pcieEccIntf->replayCount()};
     std::string propName = "ReplayCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantRC);
 
     nv::sensor_aggregation::DbusVariantType variantRRC{
         pcieEccIntf->replayRolloverCount()};
     propName = "ReplayRolloverCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantRRC);
 
     nv::sensor_aggregation::DbusVariantType variantNSC{
         pcieEccIntf->nakSentCount()};
     propName = "NAKSentCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNSC);
 
     nv::sensor_aggregation::DbusVariantType variantNRC{
         pcieEccIntf->nakReceivedCount()};
     propName = "NAKReceivedCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantNRC);
 
     nv::sensor_aggregation::DbusVariantType variantFCTE{
         pcieEccIntf->fcTimeoutErrors()};
     propName = "FCTimeoutErrors";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantFCTE);
     nv::sensor_aggregation::DbusVariantType variantREC{
         pcieEccIntf->receiverErrorCount()};
     propName = "ReceiverErrorCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantREC);
 
     nv::sensor_aggregation::DbusVariantType variantBTC{
         pcieEccIntf->badTLPCount()};
     propName = "BadTLPCount";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePCIeEccName, propName, rawSmbpbiData, variantBTC);
 #endif
 }
@@ -537,13 +537,13 @@ void NsmPCIeECCGroup5::updateMetricOnSharedMemory()
     nv::sensor_aggregation::DbusVariantType variantTXB{
         portMetricsOem2Intf->txBytes()};
     std::string propName = "TXBytes";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortMetricsOem2Name, propName, rawSmbpbiData, variantTXB);
 
     nv::sensor_aggregation::DbusVariantType variantRXB{
         portMetricsOem2Intf->rxBytes()};
     propName = "RXBytes";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         objPath, ifacePortMetricsOem2Name, propName, rawSmbpbiData, variantRXB);
 #endif
 }
@@ -615,7 +615,7 @@ void NsmPCIeECCGroup8::updateMetricOnSharedMemory()
         laneErrorIntf->rxErrorsPerLane()};
     std::vector<uint8_t> smbusData = {};
     std::string propName = "RXErrorsPerLane";
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, valueVariant);
 #endif
 }

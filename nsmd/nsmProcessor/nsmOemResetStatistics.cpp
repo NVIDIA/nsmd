@@ -161,7 +161,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
             resetCountersIntf->convertResetTypesToString(
                 resetCountersIntf->lastResetType())};
         std::string lastResetTypeProp = "LastResetType";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, lastResetTypeProp, smbusData,
             lastResetTypeValue);
     }
@@ -171,7 +171,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType pfFlrEntryValue{
             resetCountersIntf->pfflrResetEntryCount()};
         std::string pfFlrEntryProp = "PF_FLR_ResetEntryCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, pfFlrEntryProp, smbusData,
             pfFlrEntryValue);
     }
@@ -181,9 +181,9 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType pfFlrExitValue{
             resetCountersIntf->pfflrResetExitCount()};
         std::string pfFlrExitProp = "PF_FLR_ResetExitCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath,
-                                                     ifaceName, pfFlrExitProp,
-                                                     smbusData, pfFlrExitValue);
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, pfFlrExitProp, smbusData,
+            pfFlrExitValue);
     }
 
     // Update ConventionalResetEntryCount
@@ -191,7 +191,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType conventionalEntryValue{
             resetCountersIntf->conventionalResetEntryCount()};
         std::string conventionalEntryProp = "ConventionalResetEntryCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, conventionalEntryProp, smbusData,
             conventionalEntryValue);
     }
@@ -201,7 +201,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType conventionalExitValue{
             resetCountersIntf->conventionalResetExitCount()};
         std::string conventionalExitProp = "ConventionalResetExitCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, conventionalExitProp, smbusData,
             conventionalExitValue);
     }
@@ -211,7 +211,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType fundamentalEntryValue{
             resetCountersIntf->fundamentalResetEntryCount()};
         std::string fundamentalEntryProp = "FundamentalResetEntryCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, fundamentalEntryProp, smbusData,
             fundamentalEntryValue);
     }
@@ -221,7 +221,7 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType fundamentalExitValue{
             resetCountersIntf->fundamentalResetExitCount()};
         std::string fundamentalExitProp = "FundamentalResetExitCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, fundamentalExitProp, smbusData,
             fundamentalExitValue);
     }
@@ -231,9 +231,9 @@ void ResetStatisticsAggregator::updateMetricOnSharedMemory()
         nv::sensor_aggregation::DbusVariantType iRotExitValue{
             resetCountersIntf->iRoTResetExitCount()};
         std::string iRotExitProp = "IRoTResetExitCount";
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(inventoryObjPath,
-                                                     ifaceName, iRotExitProp,
-                                                     smbusData, iRotExitValue);
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+            inventoryObjPath, ifaceName, iRotExitProp, smbusData,
+            iRotExitValue);
     }
 #endif
 }

@@ -24,6 +24,8 @@
 
 #include <endian.h>
 #ifdef NVIDIA_SHMEM
+#include "sharedMemCommon.hpp"
+
 #include <tal.hpp>
 #endif
 namespace nsm
@@ -277,15 +279,13 @@ NsmNumericSensorShmem::NsmNumericSensorShmem(
 
 void NsmNumericSensorShmem::updateReading(double value, uint64_t /*timestamp*/)
 {
-    auto timestamp = utils::getCurrentSteadyClockTimestamp();
-
     nv::sensor_aggregation::DbusVariantType valueVariant{value};
 
     std::vector<uint8_t> smbusData = smbusSensorBytesConverter->convert(value);
 
-    tal::TelemetryAggregator::updateTelemetry(
-        objPath, valueInterface, valueProperty, smbusData, timestamp, 0,
-        valueVariant, association);
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
+        objPath, valueInterface, valueProperty, smbusData, valueVariant,
+        association);
 }
 #endif
 

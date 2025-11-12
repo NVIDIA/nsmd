@@ -53,7 +53,7 @@ void NsmPowerSmoothing::updateMetricOnSharedMemory()
     // Update all metrics in shared memory
     for (const auto& [propName, value] : metrics)
     {
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, propName, smbusData, value);
     }
 #endif
@@ -159,7 +159,7 @@ void NsmHwCircuitryTelemetry::updateMetricOnSharedMemory()
     std::string propName = "LifeTimeRemaining";
     nv::sensor_aggregation::DbusVariantType lifeTimeRemainingVal{
         pwrSmoothingIntf->PowerSmoothingIntf::lifeTimeRemaining()};
-    nsm_shmem_utils::updateSharedMemoryOnSuccess(
+    nsm_shmem_utils::SharedMemoryManager::cacheTALData(
         inventoryObjPath, ifaceName, propName, smbusData, lifeTimeRemainingVal);
 #endif
 }
@@ -261,7 +261,7 @@ void NsmCurrentPowerSmoothingProfile::updateMetricOnSharedMemory()
     // Update all metrics in shared memory
     for (const auto& [propName, value] : metrics)
     {
-        nsm_shmem_utils::updateSharedMemoryOnSuccess(
+        nsm_shmem_utils::SharedMemoryManager::cacheTALData(
             inventoryObjPath, ifaceName, propName, smbusData, value);
     }
 #endif

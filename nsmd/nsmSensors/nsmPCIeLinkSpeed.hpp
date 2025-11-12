@@ -153,13 +153,13 @@ inline void NsmPCIeLinkSpeed<PCIeEccIntf>::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     invoke([](const auto& path, auto& pdi) {
         std::vector<uint8_t> data;
-        updateSharedMemoryOnSuccess(
+        SharedMemoryManager::cacheTALData(
             path, pdi.interface, "PCIeType", data,
             PCIeEccIntf::convertPCIeTypesToString(pdi.pcIeType()));
-        updateSharedMemoryOnSuccess(path, pdi.interface, "LanesInUse", data,
-                                    pdi.lanesInUse());
-        updateSharedMemoryOnSuccess(path, pdi.interface, "MaxLanes", data,
-                                    pdi.maxLanes());
+        SharedMemoryManager::cacheTALData(path, pdi.interface, "LanesInUse",
+                                          data, pdi.lanesInUse());
+        SharedMemoryManager::cacheTALData(path, pdi.interface, "MaxLanes", data,
+                                          pdi.maxLanes());
     });
 #endif
 }
@@ -179,15 +179,16 @@ inline void NsmPCIeLinkSpeed<NsmPortInfoIntf>::updateMetricOnSharedMemory()
 #ifdef NVIDIA_SHMEM
     invoke([](const auto& path, auto& pdi) {
         std::vector<uint8_t> data;
-        updateSharedMemoryOnSuccess(path, pdi.PortInfoIntf::interface,
-                                    "CurrentSpeedGbps", data,
-                                    pdi.currentSpeed());
-        updateSharedMemoryOnSuccess(path, pdi.PortInfoIntf::interface,
-                                    "MaxSpeedGbps", data, pdi.maxSpeed());
-        updateSharedMemoryOnSuccess(path, pdi.PortWidth::interface,
-                                    "ActiveWidth", data, pdi.activeWidth());
-        updateSharedMemoryOnSuccess(path, pdi.PortWidth::interface, "Width",
-                                    data, pdi.width());
+        SharedMemoryManager::cacheTALData(path, pdi.PortInfoIntf::interface,
+                                          "CurrentSpeedGbps", data,
+                                          pdi.currentSpeed());
+        SharedMemoryManager::cacheTALData(path, pdi.PortInfoIntf::interface,
+                                          "MaxSpeedGbps", data, pdi.maxSpeed());
+        SharedMemoryManager::cacheTALData(path, pdi.PortWidth::interface,
+                                          "ActiveWidth", data,
+                                          pdi.activeWidth());
+        SharedMemoryManager::cacheTALData(path, pdi.PortWidth::interface,
+                                          "Width", data, pdi.width());
     });
 #endif
 }
