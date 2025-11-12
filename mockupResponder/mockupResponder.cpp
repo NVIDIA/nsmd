@@ -746,6 +746,8 @@ std::optional<Response>
                     return queryFirmwareSecurityVersion(request, requestLen);
                 case NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER:
                     return updateMinSecurityVersion(request, requestLen);
+                case NSM_FW_SET_ROT_PROPERTY:
+                    return setRotProperty(request, requestLen);
                 case NSM_FW_DOT_CAK_INSTALL:
                     return dotCAKInstallHandler(request, requestLen);
                 case NSM_FW_DOT_CAK_BYPASS:
@@ -879,7 +881,9 @@ std::optional<std::vector<uint8_t>>
                  {3, {0, 2, 3, 4, 12, 15, 97, 106}},
                  {4, {101}},
                  {5, {98, 100}},
-                 {6, {1, NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_CAK_BYPASS}},
+                 {6,
+                  {1, NSM_FW_SET_ROT_PROPERTY, NSM_FW_DOT_CAK_INSTALL,
+                   NSM_FW_DOT_CAK_BYPASS}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -954,7 +958,8 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_UPDATE_CODE_AUTH_KEY_PERM,
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
                    NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
-                   NSM_FW_DOT_CAK_INSTALL, NSM_FW_DOT_CAK_BYPASS}},
+                   NSM_FW_SET_ROT_PROPERTY, NSM_FW_DOT_CAK_INSTALL,
+                   NSM_FW_DOT_CAK_BYPASS}},
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {

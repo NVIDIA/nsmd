@@ -19,6 +19,8 @@
 
 #include "utils.hpp"
 
+#include <endian.h>
+
 #include <mockupResponder.hpp>
 #include <phosphor-logging/lg2.hpp>
 
@@ -96,6 +98,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.inband_update_policy = 1;
         fq_resp.fq_resp_hdr.minimum_security_version = 1;
         fq_resp.fq_resp_hdr.boot_status_code = 1;
+        fq_resp.fq_resp_hdr.ap_sku_id = 0;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -142,6 +145,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.inband_update_policy = 1;
         fq_resp.fq_resp_hdr.minimum_security_version = 1;
         fq_resp.fq_resp_hdr.boot_status_code = 1;
+        fq_resp.fq_resp_hdr.ap_sku_id = 0x12345678;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -188,6 +192,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.active_keyset = 1;
         fq_resp.fq_resp_hdr.inband_update_policy = 1;
         fq_resp.fq_resp_hdr.minimum_security_version = 1;
+        fq_resp.fq_resp_hdr.ap_sku_id = 0;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -235,6 +240,7 @@ std::optional<std::vector<uint8_t>>
         fq_resp.fq_resp_hdr.inband_update_policy = 0x35;
         fq_resp.fq_resp_hdr.firmware_slot_count = 2;
         fq_resp.fq_resp_hdr.boot_status_code = 0x0102030405060708;
+        fq_resp.fq_resp_hdr.ap_sku_id = 0xABCDEF00;
 
         fq_resp.slot_info = (struct nsm_firmware_slot_info*)malloc(
             fq_resp.fq_resp_hdr.firmware_slot_count *
@@ -881,6 +887,184 @@ std::optional<std::vector<uint8_t>>
                    "RC", rc);
         return std::nullopt;
     }
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::setRotProperty(const nsm_msg* requestMsg,
+                                    size_t requestLen)
+{
+    if (fwStateMachine == nullptr)
+    {
+        fwStateMachine = std::make_unique<FirmwareStateMachine>();
+    }
+    // Validate request length
+    if (requestLen <
+        sizeof(nsm_msg_hdr) + sizeof(nsm_firmware_set_rot_property_req_command))
+    {
+        lg2::error("Invalid request length: {LEN}", "LEN", requestLen);
+        return std::nullopt;
+    }
+
+    struct nsm_firmware_set_rot_property_req_command* request =
+        (struct nsm_firmware_set_rot_property_req_command*)requestMsg->payload;
+
+    // Extract request fields
+    struct nsm_firmware_set_rot_property_req rot_req =
+        request->rot_property_req;
+
+    // Prepare response
+    uint16_t msg_size = sizeof(struct nsm_msg_hdr) +
+                        sizeof(nsm_firmware_set_rot_property_resp_command);
+    std::vector<uint8_t> response(msg_size, 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    // Validate property type (should be 0, 1, or 2)
+    if (rot_req.property > 2)
+    {
+        lg2::error("Invalid property type: {PROP}", "PROP", rot_req.property);
+        auto rc = encode_nsm_firmware_set_rot_property_resp(
+            requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+            responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+        return response;
+    }
+
+    // Validate argument length
+    if (rot_req.property == NSM_ROT_PROPERTY_AP_SKU_ID)
+    {
+        // Property 2 (AP SKU ID) requires 5 bytes: 4 for SKU ID + 1 for
+        // lifespan
+        if (rot_req.argument_length != 5)
+        {
+            lg2::error("Invalid argument length for property 2: {LEN}", "LEN",
+                       rot_req.argument_length);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA_LENGTH,
+                reason_code, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+    }
+    else
+    {
+        // Property 0 and 1 require 2 bytes: 1 for policy + 1 for lifespan
+        if (rot_req.argument_length != 2)
+        {
+            lg2::error("Invalid argument length for property {PROP}: {LEN}",
+                       "PROP", rot_req.property, "LEN",
+                       rot_req.argument_length);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA_LENGTH,
+                reason_code, responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+    }
+
+    // Process based on property type
+    if (rot_req.property == NSM_ROT_PROPERTY_REDUNDANCY_POLICY)
+    {
+        // Property 0: Redundancy Policy (Background Copy Policy)
+        uint8_t redundancyPolicy = rot_req.argument_data[0];
+        uint8_t lifespan = rot_req.argument_data[1];
+
+        if (redundancyPolicy > 1)
+        {
+            lg2::error("Invalid redundancy policy: {POLICY}", "POLICY",
+                       redundancyPolicy);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+
+        if (lifespan > 1)
+        {
+            lg2::error("Invalid lifespan: {LIFESPAN}", "LIFESPAN", lifespan);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+
+        lg2::info(
+            "Setting redundancy policy: policy={POLICY}, lifespan={LIFESPAN}",
+            "POLICY", redundancyPolicy, "LIFESPAN", lifespan);
+        // Store the values in state machine (can be extended as needed)
+    }
+    else if (rot_req.property == NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY)
+    {
+        // Property 1: In-band Update Policy
+        uint8_t updatePolicy = rot_req.argument_data[0];
+        uint8_t lifespan = rot_req.argument_data[1];
+
+        if (updatePolicy > 1)
+        {
+            lg2::error("Invalid update policy: {POLICY}", "POLICY",
+                       updatePolicy);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+
+        if (lifespan > 1)
+        {
+            lg2::error("Invalid lifespan: {LIFESPAN}", "LIFESPAN", lifespan);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+
+        lg2::info("Setting update policy: policy={POLICY}, lifespan={LIFESPAN}",
+                  "POLICY", updatePolicy, "LIFESPAN", lifespan);
+        // Store the values in state machine (can be extended as needed)
+    }
+    else if (rot_req.property == NSM_ROT_PROPERTY_AP_SKU_ID)
+    {
+        // Property 2: AP SKU ID
+        uint32_t apSkuId;
+        memcpy(&apSkuId, &rot_req.argument_data[0], sizeof(uint32_t));
+        // Convert from little-endian to host byte order for endianness
+        // consistency
+        apSkuId = le32toh(apSkuId);
+        uint8_t lifespan = rot_req.argument_data[4];
+
+        if (lifespan > 1)
+        {
+            lg2::error("Invalid lifespan: {LIFESPAN}", "LIFESPAN", lifespan);
+            auto rc = encode_nsm_firmware_set_rot_property_resp(
+                requestMsg->hdr.instance_id, NSM_ERR_INVALID_DATA, reason_code,
+                responseMsg);
+            assert(rc == NSM_SW_SUCCESS);
+            return response;
+        }
+
+        lg2::info(
+            "Setting AP SKU ID: skuId={SKUID} (0x{SKUID:x}), lifespan={LIFESPAN}",
+            "SKUID", apSkuId, "LIFESPAN", lifespan);
+        // Store the values in state machine (can be extended as needed)
+    }
+
+    // Encode success response
+    auto rc = encode_nsm_firmware_set_rot_property_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, responseMsg);
+
+    assert(rc == NSM_SW_SUCCESS);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_firmware_set_rot_property_resp failed: rc={RC}",
+                   "RC", rc);
+        return std::nullopt;
+    }
+
     return response;
 }
 
