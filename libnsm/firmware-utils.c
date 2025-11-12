@@ -565,6 +565,18 @@ int decode_nsm_query_firmware_header_information(
 					 fw_info_hdr
 					     ->background_copy_policy_current);)
 			}
+		} else if (tag == NSM_FIRMWARE_AP_SKU_ID) {
+			rc_ok = decode_nsm_firmware_aggregate_tag_uint32(
+			    ptr, &tag, &valid, &(fw_info_hdr->ap_sku_id),
+			    payload_size);
+			if (rc_ok) {
+				(*telemetry_count)--;
+				DBG2(printf("Decoded "
+					    "NSM_FIRMWARE_AP_SKU_ID, "
+					    "CURRENT, "
+					    "value = 0x%08x\n",
+					    fw_info_hdr->ap_sku_id);)
+			}
 		} else {
 			/* Skip unsupported tag */
 			DBG2(printf(
@@ -1754,6 +1766,37 @@ int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
 		sizeof(struct nsm_firmware_set_rot_property_resp_command)) {
 		return NSM_SW_ERROR_LENGTH;
 	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_firmware_set_rot_property_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_SET_ROT_PROPERTY, msg);
+	}
+
+	struct nsm_firmware_set_rot_property_resp_command *response =
+	    (struct nsm_firmware_set_rot_property_resp_command *)msg->payload;
+	response->hdr.command = NSM_FW_SET_ROT_PROPERTY;
+	response->hdr.completion_code = cc;
 
 	return NSM_SW_SUCCESS;
 }

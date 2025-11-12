@@ -71,6 +71,7 @@ enum nsm_firmware_state_information_fields {
 	NSM_FIRMWARE_BOOT_STATUS_CODE = 16,		    // NvU64
 	NSM_FIRMWARE_INBAND_UPDATE_POLICY_CURRENT = 17,	    // Enum8
 	NSM_FIRMWARE_BACKGROUND_COPY_POLICY_CURRENT = 18,   // Enum8
+	NSM_FIRMWARE_AP_SKU_ID = 19,			    // NvU32
 };
 
 /** @brief NSM code authentication key permissions request type
@@ -85,6 +86,7 @@ enum nsm_code_auth_key_perm_request_type {
 enum nsm_rot_property_values {
 	NSM_ROT_PROPERTY_REDUNDANCY_POLICY = 0,
 	NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY = 1,
+	NSM_ROT_PROPERTY_AP_SKU_ID = 2,
 };
 
 /** @brief NSM RoT Redundancy Policy values (Property = 0)
@@ -150,6 +152,7 @@ struct nsm_firmware_erot_state_info_hdr_resp {
 	uint64_t boot_status_code;
 	uint8_t inband_update_policy_current;
 	uint8_t background_copy_policy_current;
+	uint32_t ap_sku_id;
 };
 
 /* This is the maximum string length for firmware
@@ -299,6 +302,8 @@ struct nsm_firmware_update_min_sec_ver_req_command {
  * argument_data[1] = lifespan
  * @note For Property 1 (in-band update policy): argument_data[0] = policy,
  * argument_data[1] = lifespan
+ * @note For Property 2 (AP SKU ID): argument_data[0:3] = AP SKU ID,
+ * argument_data[4] = lifespan
  */
 struct nsm_firmware_set_rot_property_req {
 	uint16_t component_classification;
@@ -306,7 +311,7 @@ struct nsm_firmware_set_rot_property_req {
 	uint8_t component_classification_index;
 	uint8_t property;
 	uint8_t argument_length;
-	uint8_t argument_data[2]; // Policy value and lifespan
+	uint8_t argument_data[5]; // Policy value and lifespan
 } __attribute__((packed));
 
 /**
@@ -1296,6 +1301,19 @@ int decode_nsm_firmware_image_copy_control_query_progress_resp(
 int decode_nsm_firmware_image_copy_control_initiate_copy_resp(
     const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
     uint16_t *reason_code);
+
+/**
+ * @brief Encode nsm firmware set rot property resp
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] cc - command completion code
+ * @param[in] reason_code - command reason code
+ * @param[out] msg - nsm response message
+ * @return nsm_sw return codes
+ */
+int encode_nsm_firmware_set_rot_property_resp(uint8_t instance_id, uint8_t cc,
+					      uint16_t reason_code,
+					      struct nsm_msg *msg);
 
 /**
  * @brief Encode nsm DotCAKInstall request message

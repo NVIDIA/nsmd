@@ -129,6 +129,8 @@ class GetRotInformation : public CommandInterface
             erot_info.fq_resp_hdr.inband_update_policy_current);
         result["Background copy policy current"] = static_cast<uint32_t>(
             erot_info.fq_resp_hdr.background_copy_policy_current);
+        result["AP SKU ID"] =
+            static_cast<uint32_t>(erot_info.fq_resp_hdr.ap_sku_id);
 
         std::vector<ordered_json> slots;
         for (int i = 0; i < erot_info.fq_resp_hdr.firmware_slot_count; i++)
@@ -829,8 +831,8 @@ class SetRoTProperty : public CommandInterface
         ccOptionGroup
             ->add_option(
                 "-p,--property", property,
-                "Property (0: Redundancy Policy, 1: In-band Update Policy)")
-            ->check(CLI::Range(0, 1))
+                "Property (0: Redundancy Policy, 1: In-band Update Policy, 2: AP SKU ID)")
+            ->check(CLI::Range(0, 2))
             ->required();
         ccOptionGroup
             ->add_option(
@@ -844,9 +846,25 @@ class SetRoTProperty : public CommandInterface
             ->check(CLI::Range(0, 1));
         ccOptionGroup
             ->add_option(
+                "-a,--ap-sku-id", apSkuId,
+                "AP SKU ID (32-bit unsigned integer) - only for Property 2")
+            ->check(CLI::Range(0U, UINT32_MAX));
+        ccOptionGroup
+            ->add_option(
                 "-l,--lifespan", lifespan,
                 "Lifespan (0: Persistent, 1: One-shot for Property 0, Volatile for Property 1)")
             ->check(CLI::Range(0, 1));
+        // Add parse callback to validate conditional requirements based on
+        // property value
+        app->parse_complete_callback([this, ccOptionGroup]() {
+            auto apSkuIdOption = ccOptionGroup->get_option("--ap-sku-id");
+            if (property == 2 && apSkuIdOption->count() == 0)
+            {
+                throw CLI::ValidationError(
+                    "--ap-sku-id",
+                    "Option -a,--ap-sku-id is required when property is 2 (AP SKU ID)");
+            }
+        });
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -860,20 +878,29 @@ class SetRoTProperty : public CommandInterface
         nsm_req.component_identifier = htole16(identifier);
         nsm_req.property = property;
         nsm_req.argument_length =
-            ARGUMENT_DATA_LENGTH; // Fixed length for both properties
+            ARGUMENT_DATA_LENGTH; // Fixed length for first two properties
 
         // Populate argument data based on property value
-        if (property == 0)
+        if (property == NSM_ROT_PROPERTY_REDUNDANCY_POLICY)
         {
             // Property 0: Redundancy Policy + Lifespan
             nsm_req.argument_data[0] = redundancyPolicy;
             nsm_req.argument_data[1] = lifespan;
         }
-        else if (property == 1)
+        else if (property == NSM_ROT_PROPERTY_INBAND_UPDATE_POLICY)
         {
             // Property 1: In-band Update Policy + Lifespan
             nsm_req.argument_data[0] = updatePolicy;
             nsm_req.argument_data[1] = lifespan;
+        }
+        else if (property == NSM_ROT_PROPERTY_AP_SKU_ID)
+        {
+            // Property 2: AP SKU ID
+            nsm_req.argument_length = AP_SKU_ID_DATA_LENGTH;
+            // Convert AP SKU ID to little-endian and copy to argument_data
+            uint32_t apSkuIdLE = htole32(apSkuId);
+            memcpy(&nsm_req.argument_data[0], &apSkuIdLE, sizeof(uint32_t));
+            nsm_req.argument_data[4] = lifespan;
         }
 
         auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
@@ -910,8 +937,10 @@ class SetRoTProperty : public CommandInterface
     uint8_t redundancyPolicy{DEFAULT_VALUE};
     uint8_t updatePolicy{DEFAULT_VALUE};
     uint8_t lifespan{};
+    uint32_t apSkuId{0};
 
     static constexpr uint8_t ARGUMENT_DATA_LENGTH = 2;
+    static constexpr uint8_t AP_SKU_ID_DATA_LENGTH = 5;
     static constexpr uint8_t DEFAULT_VALUE = 255;
 };
 
