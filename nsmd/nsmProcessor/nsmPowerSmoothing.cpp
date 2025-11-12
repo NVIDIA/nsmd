@@ -49,7 +49,18 @@ void NsmPowerSmoothing::updateMetricOnSharedMemory()
             {"PowerSmoothingEnabled",
              pwrSmoothingIntf->PowerSmoothingIntf::powerSmoothingEnabled()},
             {"ImmediateRampDownEnabled",
-             pwrSmoothingIntf->PowerSmoothingIntf::immediateRampDownEnabled()}};
+             pwrSmoothingIntf->PowerSmoothingIntf::immediateRampDownEnabled()},
+            {"DelayedPowerSmoothingSupported",
+             pwrSmoothingIntf
+                 ->PowerSmoothingIntf::delayedPowerSmoothingSupported()},
+            {"FloorWindowMultiplier",
+             pwrSmoothingIntf->PowerSmoothingIntf::floorWindowMultiplier()},
+            {"MinPrimaryFloorActivationOffset",
+             pwrSmoothingIntf
+                 ->PowerSmoothingIntf::minPrimaryFloorActivationOffset()},
+            {"MinPrimaryFloorActivationPoint",
+             pwrSmoothingIntf
+                 ->PowerSmoothingIntf::minPrimaryFloorActivationPoint()}};
 
     // Update all metrics in shared memory
     for (const auto& [propName, value] : metrics)
@@ -265,7 +276,19 @@ void NsmCurrentPowerSmoothingProfile::updateMetricOnSharedMemory()
                                  ->CurrentPowerProfileIntf::rampDownRate()},
             {"RampDownHysteresis",
              pwrSmoothingCurProfileIntf
-                 ->CurrentPowerProfileIntf::rampDownHysteresis()}};
+                 ->CurrentPowerProfileIntf::rampDownHysteresis()},
+            {"PrimaryFloorActivationOffset",
+             pwrSmoothingCurProfileIntf
+                 ->CurrentPowerProfileIntf::primaryFloorActivationOffset()},
+            {"SecondaryPowerFloorSetting",
+             pwrSmoothingCurProfileIntf
+                 ->CurrentPowerProfileIntf::secondaryPowerFloorSetting()},
+            {"PrimaryFloorActivationWindowMultiplier",
+             pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::
+                 primaryFloorActivationWindowMultiplier()},
+            {"PrimaryFloorTargetWindowMultiplier",
+             pwrSmoothingCurProfileIntf->CurrentPowerProfileIntf::
+                 primaryFloorTargetWindowMultiplier()}};
 
     // Update all metrics in shared memory
     for (const auto& [propName, value] : metrics)
