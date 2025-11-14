@@ -101,7 +101,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     uint16_t reasonCode = ERR_NULL;
     auto decodeRc = decode_nsm_erase_token_resp(responseMsg.get(), responseLen,
                                                 &cc, &reasonCode);
-    if (decodeRc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    if (decodeRc != NSM_SW_SUCCESS)
     {
         lg2::error("DebugToken: decode_nsm_erase_token_resp: "
                    "eid={EID} rc={RC} cc={CC} len={LEN}",
@@ -120,7 +120,7 @@ requester::Coroutine NsmDebugTokenUnifiedObject::eraseTokenAsyncHandler(
     {
         auto error = std::make_tuple(
             reasonCode, debug_token::Error(reasonCode).to_string());
-        lg2::error("DebugToken: disableTokens: eid={EID} rc={RC}", "EID", eid,
+        lg2::error("DebugToken: eraseToken: eid={EID} rc={RC}", "EID", eid,
                    "RC", reasonCode);
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
