@@ -21,6 +21,7 @@
 #include "firmware-utils.h"
 
 #include "cmd_helper.hpp"
+#include "nsmDotUtils.hpp"
 #include "utils.hpp"
 
 #include <CLI/CLI.hpp>
@@ -1065,47 +1066,21 @@ class DotCAKInstall : public CommandInterface
             lakLms.resize(LMS_KEY_SIZE, 0);
         }
 
-        // Create CAK 148-byte key authentication data per spec:
-        // auth_scheme(4) + u8_x(48) + u8_y(48) + lms(48)
         std::vector<uint8_t> cakCryptoPcp(CRYPTO_PCP_SIZE, 0);
+        if (!nsm::dot::buildKeyAuthData(cakKeyAuthScheme, cakKey.data(),
+                                        cakLms.data(), cakCryptoPcp.data()))
+        {
+            std::cerr << "Error: Failed to build CAK key authentication data\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
 
-        // auth_scheme: 4 bytes (NvU32) - 0 for ECDSA, 1 for Hybrid
-        uint32_t cakAuthScheme = static_cast<uint32_t>(cakKeyAuthScheme);
-        memcpy(cakCryptoPcp.data(), &cakAuthScheme, AUTH_SCHEME_SIZE);
-
-        // u8_x: 48 bytes (first half of ECDSA key)
-        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE, cakKey.data(),
-               ECDSA_COORDINATE_SIZE);
-
-        // u8_y: 48 bytes (second half of ECDSA key)
-        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE,
-               cakKey.data() + ECDSA_COORDINATE_SIZE, ECDSA_COORDINATE_SIZE);
-
-        // lms: 48 bytes (LMS public key or zeros for ECDSA-only)
-        memcpy(cakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
-                   ECDSA_COORDINATE_SIZE,
-               cakLms.data(), LMS_KEY_SIZE);
-
-        // Create LAK 148-byte key authentication data per spec:
-        // auth_scheme(4) + u8_x(48) + u8_y(48) + lms(48)
         std::vector<uint8_t> lakCryptoPcp(CRYPTO_PCP_SIZE, 0);
-
-        // auth_scheme: 4 bytes (NvU32) - 0 for ECDSA, 1 for Hybrid
-        uint32_t lakAuthScheme = static_cast<uint32_t>(lakKeyAuthScheme);
-        memcpy(lakCryptoPcp.data(), &lakAuthScheme, AUTH_SCHEME_SIZE);
-
-        // u8_x: 48 bytes (first half of ECDSA key)
-        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE, lakKey.data(),
-               ECDSA_COORDINATE_SIZE);
-
-        // u8_y: 48 bytes (second half of ECDSA key)
-        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE,
-               lakKey.data() + ECDSA_COORDINATE_SIZE, ECDSA_COORDINATE_SIZE);
-
-        // lms: 48 bytes (LMS public key or zeros for ECDSA-only)
-        memcpy(lakCryptoPcp.data() + AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
-                   ECDSA_COORDINATE_SIZE,
-               lakLms.data(), LMS_KEY_SIZE);
+        if (!nsm::dot::buildKeyAuthData(lakKeyAuthScheme, lakKey.data(),
+                                        lakLms.data(), lakCryptoPcp.data()))
+        {
+            std::cerr << "Error: Failed to build LAK key authentication data\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
 
         // Display key authentication data in hex format (only when verbose is
         // enabled)

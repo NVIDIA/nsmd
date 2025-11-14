@@ -1,3 +1,5 @@
+openssl_dep = dependency('openssl', required: true)
+
 sources = [
     'cmd_helper.cpp',
     'nsm_config_cmd.cpp',
@@ -7,6 +9,7 @@ sources = [
     'nsm_telemetry_cmd.cpp',
     'nsm_passthrough_cmd.cpp',
     'nsmtool.cpp',
+    '../dot/nsmDotUtils.cpp',
     '../libnsm/platform-environmental.c',
     '../libnsm/powersmoothing-powerprofile-api-v2.c',
     '../libnsm/pci-links.c',
@@ -24,7 +27,7 @@ sources = [
     '../debug-token/tlv_encoder.cpp',
 ]
 
-nsmtool_headers = ['.', '..', '../libnsm', '../common']
+nsmtool_headers = ['.', '..', '../libnsm', '../common', '../dot']
 
 executable(
     'nsmtool',
@@ -37,6 +40,7 @@ executable(
         sdbusplus,
         phosphor_logging,
         dependency('dbus-1'),
+        openssl_dep,
     ],
     install: true,
     install_dir: get_option('bindir'),

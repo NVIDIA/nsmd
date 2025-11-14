@@ -278,6 +278,13 @@ option(
 )
 
 option(
+    'enable-dot',
+    type: 'feature',
+    description: 'Enable DOT (Device Ownership Transfer) objects and interfaces',
+    value: 'disabled',
+)
+
+option(
     'enable-debug-info',
     type: 'feature',
     description: 'Enable Debug Info, Log, and EraseTrace objects',

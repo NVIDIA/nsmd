@@ -262,6 +262,11 @@ add_project_arguments(
     language: ['c', 'cpp'],
 )
 
+# Build dot utilities (needed by deps below)
+subdir('dot')
+
+openssl_dep = dependency('openssl', required: true)
+
 dynamic_linker = []
 
 deps = [
@@ -271,6 +276,7 @@ deps = [
     sdeventplus,
     phosphor_dbus_interfaces,
     phosphor_logging,
+    openssl_dep,
 ]
 
 if get_option('shmem').enabled() and not cx8_features

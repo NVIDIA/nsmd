@@ -3,6 +3,7 @@ sources = [
     '../common/dBusHandler.cpp',
     '../debug-token/tlv_decoder.cpp',
     '../debug-token/tlv_encoder.cpp',
+    '../dot/nsmDotUtils.cpp',
     '../libnsm/base.c',
     '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',
@@ -84,6 +85,7 @@ nsmd_headers = [
     '../libnsm',
     '../requester',
     '../common',
+    '../dot',
     'nsmDbusIfaceOverride',
 ]
 
@@ -110,6 +112,7 @@ if cx8_features
     ]
 endif
 debug_token_enabled = get_option('enable-debug-token').enabled()
+dot_enabled = get_option('enable-dot').enabled()
 
 # Valid optional subdirectories (not included by default unless in nsmd-subdirs-all or nsmd-subdirs-include)
 valid_nsmd_subdirs = [
@@ -119,6 +122,7 @@ valid_nsmd_subdirs = [
     'nsmEventConfig',
     'nsmChassis',
     'nsmDebugToken',
+    'nsmDot',
     'nsmPort',
     'nsmDbusIfaceOverride',
     'nsmSPI',
@@ -144,7 +148,7 @@ endforeach
 
 # Process subdirs: included if nsmd-subdirs-all=true OR in nsmd-subdirs-include
 foreach d : valid_nsmd_subdirs
-    if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDumpCollection' and not get_option(
+    if (d == 'nsmDebugToken' and not debug_token_enabled) or (d == 'nsmDot' and not dot_enabled) or (d == 'nsmDumpCollection' and not get_option(
             'enable-debug-info',
         ).enabled())
         if nsmd_subdirs_include.contains(d)
@@ -160,6 +164,8 @@ foreach d : valid_nsmd_subdirs
             sources += ['nsmNumericSensor/nsmNumericSensorComposite.cpp']
         elif d == 'nsmFwSwInventory'
             sources += ['nsmFwSwInventory/GPUSWInventory.cpp']
+        elif d == 'nsmDot'
+            sources += ['nsmDot/nsmDot.cpp']
         endif
     endif
 endforeach
