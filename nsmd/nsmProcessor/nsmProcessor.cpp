@@ -786,11 +786,12 @@ static void
     std::shared_ptr<NsmWorkloadProfileInfoAsyncIntf> profileInfoAsyncIntf =
         std::make_shared<NsmWorkloadProfileInfoAsyncIntf>(
             bus, inventoryObjPath.c_str(), nsmDevice);
-    auto workloadProfileStatusSensor =
+    profileInfoAsyncIntf->workloadProfileStatusSensor =
         std::make_shared<NsmWorkLoadProfileStatus>(name, type, inventoryObjPath,
                                                    profileStatusInfoIntf,
                                                    profileInfoAsyncIntf);
-    nsmDevice->addSensor(workloadProfileStatusSensor, priority);
+    nsmDevice->addSensor(profileInfoAsyncIntf->workloadProfileStatusSensor,
+                         priority);
 
     auto getAllPowerProfileSensor =
         std::make_shared<NsmWorkloadPowerProfileCollection>(
