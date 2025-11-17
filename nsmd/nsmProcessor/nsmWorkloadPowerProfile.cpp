@@ -83,6 +83,21 @@ requester::Coroutine
         lg2::info(
             "requestEnablePresetProfile for EID: {EID} completed, msg = {MSG}",
             "EID", eid, "MSG", msg);
+        rc = co_await workloadProfileStatusSensor->update(manager, eid);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "requestEnablePresetProfile update workloadProfileStatusSensor failed for eid: {EID}, rc: {RC}",
+                "EID", eid, "RC", rc);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+        else
+        {
+            lg2::info(
+                "requestEnablePresetProfile update workloadProfileStatusSensor completed for eid: {EID}",
+                "EID", eid);
+        }
     }
     else
     {
@@ -186,6 +201,21 @@ requester::Coroutine
         lg2::info(
             "requestDisablePresetProfile for EID: {EID} completed, msg = {MSG}",
             "EID", eid, "MSG", msg);
+        rc = co_await workloadProfileStatusSensor->update(manager, eid);
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::error(
+                "requestDisablePresetProfile update workloadProfileStatusSensor failed for eid ={EID}, rc = {RC}",
+                "EID", eid, "RC", rc);
+            *status = AsyncOperationStatusType::WriteFailure;
+            co_return NSM_SW_ERROR_COMMAND_FAIL;
+        }
+        else
+        {
+            lg2::info(
+                "requestDisablePresetProfile update workloadProfileStatusSensor completed for eid: {EID}",
+                "EID", eid);
+        }
     }
     else
     {

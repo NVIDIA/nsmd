@@ -29,6 +29,8 @@
 
 namespace nsm
 {
+
+class NsmWorkLoadProfileStatus;
 // Enable/Disable PowerProfiles
 class NsmWorkloadProfileInfoAsyncIntf : public ProfileInfoAsyncIntf
 {
@@ -53,6 +55,8 @@ class NsmWorkloadProfileInfoAsyncIntf : public ProfileInfoAsyncIntf
     requester::Coroutine
         requestDisablePresetProfile(AsyncOperationStatusType* status,
                                     std::vector<uint8_t>& bytes);
+
+    std::shared_ptr<NsmWorkLoadProfileStatus> workloadProfileStatusSensor;
 
   private:
     std::shared_ptr<NsmDevice> device;
