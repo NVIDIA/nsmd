@@ -38,10 +38,11 @@ using NsmType = uint8_t;
 
 using MctpMedium = std::string;
 using MctpBinding = std::string;
+using MctpObjectPath = std::string;
 using NetworkId = uint8_t;
 using Active = bool;
-using MctpInfo =
-    std::tuple<eid_t, uuid_t, MctpMedium, NetworkId, MctpBinding, Active>;
+using MctpInfo = std::tuple<eid_t, uuid_t, MctpMedium, NetworkId, MctpBinding,
+                            Active, MctpObjectPath>;
 using MctpInfos = std::vector<MctpInfo>;
 using VendorIANA = uint32_t;
 
@@ -65,10 +66,11 @@ using Interface = std::string;
 using Interfaces = std::vector<std::string>;
 using Property = std::string;
 using PropertyType = std::string;
-using Value = std::variant<bool, uint8_t, int16_t, uint16_t, int32_t, uint32_t,
-                           int64_t, uint64_t, double, std::string,
-                           std::vector<uint8_t>, sdbusplus::message::unix_fd,
-                           std::vector<std::string>, std::vector<uint64_t>>;
+using Value = std::variant<
+    bool, uint8_t, int16_t, uint16_t, int32_t, uint32_t, int64_t, uint64_t,
+    double, std::string, std::vector<uint8_t>, sdbusplus::message::unix_fd,
+    std::vector<std::string>, std::vector<uint64_t>,
+    std::vector<std::tuple<std::string, std::string, std::string>>>;
 
 using PropertyMap = std::map<Property, Value>;
 using InterfaceMap = std::map<Interface, PropertyMap>;

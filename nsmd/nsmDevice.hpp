@@ -108,7 +108,8 @@ enum class DeviceRemapProperty
 {
     MCTP_EID,
     MCTP_UUID,
-    NSM_DEVICE_INSTANCE_NUMBER
+    NSM_DEVICE_INSTANCE_NUMBER,
+    MCTP_ASSOCIATION
 };
 
 class NsmDevice :
@@ -189,6 +190,17 @@ class NsmDevice :
         {
             deviceRemapProp = DeviceRemapProperty::MCTP_UUID;
             std::vector<uuid_t> values;
+            for (const auto& remapPropValue : remapPropValues)
+            {
+                values.emplace_back(remapPropValue);
+            }
+            deviceRemapValues = values;
+        }
+
+        else if (remapPropName == "MCTP_ASSOCIATION")
+        {
+            deviceRemapProp = DeviceRemapProperty::MCTP_ASSOCIATION;
+            std::vector<std::string> values;
             for (const auto& remapPropValue : remapPropValues)
             {
                 values.emplace_back(remapPropValue);
@@ -365,6 +377,7 @@ class NsmDevice :
     requester::Coroutine updateNsmDevice();
     bool updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
                                     uint8_t deviceInstanceNumber,
+                                    std::string& associatedPath,
                                     std::string& mctpMedium,
                                     std::string& mctpBinding);
     requester::Coroutine refreshCapabilitySensor();
@@ -532,10 +545,12 @@ class NsmDevice :
     uint8_t instanceNumber = 0;
     uint8_t deviceRole = 0;
     DeviceRemapProperty deviceRemapProp;
-    std::variant<std::vector<uint8_t>, std::vector<uuid_t>> deviceRemapValues;
+    std::variant<std::vector<uint8_t>, std::vector<std::string>>
+        deviceRemapValues;
     std::string mctpMedium;
     std::string mctpBinding;
     uint8_t nsmDeviceInstanceNumber;
+    std::string associatedPath;
     std::shared_ptr<NsmMessageHandler> nsmMsgHandler;
     std::shared_ptr<sdbusplus::asio::object_server> objServer;
     std::vector<std::shared_ptr<NsmEvent>> deviceEvents;
