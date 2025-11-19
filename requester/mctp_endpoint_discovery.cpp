@@ -204,8 +204,9 @@ void MctpDiscovery::populateMctpInfo(const dbus::InterfaceMap& interfaces,
                               mctpTypeVDM) != mctpTypes.end())
                 {
                     handler.registerMctpEndpoint(eid, type, protocol, address);
-                    cachedMctpInfoByPath[objPath] = std::make_tuple(
-                        eid, uuid, mediumType, networkId, bindingType, active);
+                    cachedMctpInfoByPath[objPath] =
+                        std::make_tuple(eid, uuid, mediumType, networkId,
+                                        bindingType, active, objPath);
                     mctpInfos.emplace_back(cachedMctpInfoByPath[objPath]);
                 }
             }
@@ -400,9 +401,9 @@ requester::Coroutine
                 allProperties.at("SupportedMessageTypes"));
         }
 
-        MctpInfo mctpInfo = std::make_tuple(eid, uuid, mediumType, networkId,
-                                            bindingType,
-                                            (connectivity == "Available"));
+        MctpInfo mctpInfo =
+            std::make_tuple(eid, uuid, mediumType, networkId, bindingType,
+                            (connectivity == "Available"), objPath);
         cachedMctpInfoByPath[objPath] = mctpInfo;
         if (connectivity == "Available")
         {
@@ -479,7 +480,6 @@ requester::Coroutine
 void MctpDiscovery::cleanEndpoints(
     [[maybe_unused]] sdbusplus::message::message& msg)
 {
-    lg2::info("MctpDiscovery: Recieved InterfacesRemoved signal");
     sdbusplus::message::object_path objPath;
     std::vector<std::string> interfaces;
     msg.read(objPath, interfaces);
@@ -574,8 +574,8 @@ requester::Coroutine
     for (auto& mctpInfo : mctpInfos)
     {
         // try ping
-        auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding,
-               active] = mctpInfo;
+        auto& [eid, mctpUuid, mctpMedium, networkdId, mctpBinding, active,
+               mctpObjPath] = mctpInfo;
         auto rc = co_await ping(eid);
         if (rc != NSM_SW_SUCCESS)
         {
@@ -584,8 +584,8 @@ requester::Coroutine
             continue;
         }
 
-        lg2::info("found NSM device, eid={EID} uuid={UUID}", "EID", eid, "UUID",
-                  mctpUuid);
+        lg2::info("found NSM Endpoint, eid={EID} uuid={UUID}", "EID", eid,
+                  "UUID", mctpUuid);
 
         // get device identification from device
         uint8_t deviceType = 0;
@@ -600,12 +600,15 @@ requester::Coroutine
             continue;
         }
 
+        std::string configuredPath = "";
+        rc = co_await findConfiguredAssociations(mctpObjPath, configuredPath);
+
         // save the nsm device identification info
-        discoveredEIDs[eid] = {mctpUuid, deviceType, instanceNumber,
-                               true,     mctpMedium, mctpBinding};
+        discoveredEIDs[eid] = {mctpUuid,   deviceType,  instanceNumber, true,
+                               mctpMedium, mctpBinding, configuredPath};
         auto nsmDevice = mapNsmDeviceUsingEid(eid, mctpUuid, deviceType,
-                                              instanceNumber, true, mctpMedium,
-                                              mctpBinding);
+                                              instanceNumber, configuredPath,
+                                              true, mctpMedium, mctpBinding);
         if (nsmDevice)
         {
             lg2::info("initDeviceDiscovery for nsmDevice eid={EID}", "EID",
@@ -649,10 +652,10 @@ requester::Coroutine
             auto& value = discoveredEIDs[eid];
             std::get<3>(value) = false; // set EID is inactive
             auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
-                   mctpMedium, mctpBinding] = value;
-            nsmDevice = mapNsmDeviceUsingEid(eid, uuid, mctpDeviceType,
-                                             mctpDeviceInstanceNumber, false,
-                                             mctpMedium, mctpBinding);
+                   mctpMedium, mctpBinding, associatedPath] = value;
+            nsmDevice = mapNsmDeviceUsingEid(
+                eid, uuid, mctpDeviceType, mctpDeviceInstanceNumber,
+                associatedPath, false, mctpMedium, mctpBinding);
         }
 
         if (nsmDevice)
@@ -752,6 +755,66 @@ requester::Coroutine MctpDiscovery::getQueryDeviceIdentification(
     co_return NSM_SW_SUCCESS;
 }
 
+requester::Coroutine
+    MctpDiscovery::findConfiguredAssociations(const std::string& objPath,
+                                              std::string& configuredPath)
+{
+    dbus::Interfaces interfaces{"xyz.openbmc_project.Association.Definitions"};
+    try
+    {
+        auto mapperResponse = co_await utils::coGetServiceMap(objPath,
+                                                              interfaces);
+        if (mapperResponse.empty())
+        {
+            lg2::error(
+                "No service found for PATH={OBJ_PATH} and associations interface",
+                "OBJ_PATH", objPath);
+            co_return NSM_SW_ERROR_NULL;
+        }
+        for (const auto& [service, interfaces] : mapperResponse)
+        {
+            auto allProperties = co_await utils::coGetAllDbusProperty(service,
+                                                                      objPath);
+            if (allProperties.contains("Associations"))
+            {
+                auto associations = std::get<std::vector<
+                    std::tuple<std::string, std::string, std::string>>>(
+                    allProperties.at("Associations"));
+                for (const auto& [forward, reverse, target] : associations)
+                {
+                    if (forward == "configured_by")
+                    {
+                        configuredPath = target;
+                        break;
+                    }
+                }
+                if (configuredPath.empty())
+                {
+                    lg2::info(
+                        "No configured association found for PATH={OBJ_PATH}",
+                        "OBJ_PATH", objPath);
+                }
+
+                else
+                {
+                    lg2::info(
+                        "Configured association path for objectPath={OBJ_PATH} is {CONFIGURED_BY_PATH}",
+                        "OBJ_PATH", objPath, "CONFIGURED_BY_PATH",
+                        configuredPath);
+                }
+                break;
+            }
+        }
+    }
+
+    catch (const std::exception& e)
+    {
+        lg2::error("Error while finding configured associations.", "ERROR", e);
+        co_return NSM_SW_ERROR;
+    }
+    co_return NSM_SW_SUCCESS;
+}
+
 void MctpDiscovery::discoverAndUpdateNsmDeviceTask(
     std::shared_ptr<nsm::NsmDevice> nsmDevice)
 {
@@ -842,7 +905,7 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
     for (auto& [eid, value] : discoveredEIDs)
     {
         auto& [uuid, mctpDeviceType, mctpDeviceInstanceNumber, active,
-               mctpMedium, mctpBinding] = value;
+               mctpMedium, mctpBinding, associatedPath] = value;
         if (mctpDeviceType == nsmDevice->getDeviceType() &&
             nsmDevice->getDeviceRemapProp() ==
                 nsm::DeviceRemapProperty::NSM_DEVICE_INSTANCE_NUMBER)
@@ -850,9 +913,9 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
             if (containsValue(mctpDeviceInstanceNumber,
                               nsmDevice->getDeviceRemapValues()))
             {
-                nsmDevice->updateDiscoveryIdentifiers(eid, uuid,
-                                                      mctpDeviceInstanceNumber,
-                                                      mctpMedium, mctpBinding);
+                nsmDevice->updateDiscoveryIdentifiers(
+                    eid, uuid, mctpDeviceInstanceNumber, associatedPath,
+                    mctpMedium, mctpBinding);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -862,9 +925,9 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
         {
             if (containsValue(uuid, nsmDevice->getDeviceRemapValues()))
             {
-                nsmDevice->updateDiscoveryIdentifiers(eid, uuid,
-                                                      mctpDeviceInstanceNumber,
-                                                      mctpMedium, mctpBinding);
+                nsmDevice->updateDiscoveryIdentifiers(
+                    eid, uuid, mctpDeviceInstanceNumber, associatedPath,
+                    mctpMedium, mctpBinding);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -874,9 +937,22 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
         {
             if (containsValue(eid, nsmDevice->getDeviceRemapValues()))
             {
-                nsmDevice->updateDiscoveryIdentifiers(eid, uuid,
-                                                      mctpDeviceInstanceNumber,
-                                                      mctpMedium, mctpBinding);
+                nsmDevice->updateDiscoveryIdentifiers(
+                    eid, uuid, mctpDeviceInstanceNumber, associatedPath,
+                    mctpMedium, mctpBinding);
+                ret = NSM_SW_SUCCESS;
+            }
+        }
+        else if (mctpDeviceType == nsmDevice->getDeviceType() &&
+                 nsmDevice->getDeviceRemapProp() ==
+                     nsm::DeviceRemapProperty::MCTP_ASSOCIATION)
+        {
+            if (containsValue(associatedPath,
+                              nsmDevice->getDeviceRemapValues()))
+            {
+                nsmDevice->updateDiscoveryIdentifiers(
+                    eid, uuid, mctpDeviceInstanceNumber, associatedPath,
+                    mctpMedium, mctpBinding);
                 ret = NSM_SW_SUCCESS;
             }
         }
@@ -886,8 +962,8 @@ int MctpDiscovery::mapMctpEIDForNsmDevice(
 
 std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
     eid_t eid, uuid_t mctpUuid, uint8_t deviceType, uint8_t instanceNumber,
-    [[__maybe_unused__]] bool active, MctpMedium mctpMedium,
-    MctpBinding mctpBinding)
+    std::string associatedPath, [[__maybe_unused__]] bool active,
+    MctpMedium mctpMedium, MctpBinding mctpBinding)
 {
     std::shared_ptr<nsm::NsmDevice> ret{};
 
@@ -907,7 +983,8 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
                               nsmDevice->getDeviceRemapValues()))
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
-                        eid, mctpUuid, instanceNumber, mctpMedium, mctpBinding))
+                        eid, mctpUuid, instanceNumber, associatedPath,
+                        mctpMedium, mctpBinding))
                 {
                     ret = nsmDevice;
                 }
@@ -919,7 +996,8 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             if (containsValue(mctpUuid, nsmDevice->getDeviceRemapValues()))
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
-                        eid, mctpUuid, instanceNumber, mctpMedium, mctpBinding))
+                        eid, mctpUuid, instanceNumber, associatedPath,
+                        mctpMedium, mctpBinding))
                 {
                     ret = nsmDevice;
                 }
@@ -931,7 +1009,22 @@ std::shared_ptr<nsm::NsmDevice> MctpDiscovery::mapNsmDeviceUsingEid(
             if (containsValue(eid, nsmDevice->getDeviceRemapValues()))
             {
                 if (nsmDevice->updateDiscoveryIdentifiers(
-                        eid, mctpUuid, instanceNumber, mctpMedium, mctpBinding))
+                        eid, mctpUuid, instanceNumber, associatedPath,
+                        mctpMedium, mctpBinding))
+                {
+                    ret = nsmDevice;
+                }
+            }
+        }
+        else if (nsmDevice->getDeviceRemapProp() ==
+                 nsm::DeviceRemapProperty::MCTP_ASSOCIATION)
+        {
+            if (containsValue(associatedPath,
+                              nsmDevice->getDeviceRemapValues()))
+            {
+                if (nsmDevice->updateDiscoveryIdentifiers(
+                        eid, mctpUuid, instanceNumber, associatedPath,
+                        mctpMedium, mctpBinding))
                 {
                     ret = nsmDevice;
                 }

@@ -107,12 +107,12 @@ struct coGetDbusProperty
     /** @brief Constructor of awaitable object to initialize necessary member
      * variables.
      */
-    coGetDbusProperty(const std::string& objectPath,
+    coGetDbusProperty(const std::string& objectPath, // GCOV_EXCL_LINE
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
         service(service), objectPath(objectPath), interface(interface),
         property(property), ret{}
-    {}
+    {} // GCOV_EXCL_LINE
 };
 
 /** @struct coGetServiceMap
@@ -264,12 +264,12 @@ struct coGetDbusProperty
         return ret;
     }
 
-    coGetDbusProperty(const std::string& objectPath,
+    coGetDbusProperty(const std::string& objectPath, // GCOV_EXCL_LINE
                       const std::string& property, const std::string& interface,
                       const std::string service = entityManagerService) :
         service(service), objectPath(objectPath), interface(interface),
         property(property), ret{}
-    {}
+    {} // GCOV_EXCL_LINE
 };
 
 struct coGetServiceMap

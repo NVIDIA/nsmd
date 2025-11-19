@@ -471,6 +471,7 @@ requester::Coroutine
 
 bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
                                            uint8_t deviceInstanceNumber,
+                                           std::string& associatedPath,
                                            std::string& mctpMedium,
                                            std::string& mctpBinding)
 {
@@ -493,22 +494,23 @@ bool NsmDevice::updateDiscoveryIdentifiers(eid_t eid, uuid_t uuid,
         this->mctpMedium = mctpMedium;
         this->mctpBinding = mctpBinding;
         this->nsmDeviceInstanceNumber = deviceInstanceNumber;
+        this->associatedPath = associatedPath;
         lg2::info(
-            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING} deviceInstanceNumber = {DEVICE_INSTANCE_NUMBER}",
+            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING} deviceInstanceNumber = {DEVICE_INSTANCE_NUMBER} mctpAssociation = {MCTP_ASSOCIATION}",
             "TYPE", getDeviceType(), "INST", getInstanceNumber(), "ROLE",
             getDeviceRole(), "EID", eid, "UUID", uuid, "MCTP_MEDIUM",
             mctpMedium, "MCTP_BINDING", mctpBinding, "DEVICE_INSTANCE_NUMBER",
-            deviceInstanceNumber);
+            deviceInstanceNumber, "MCTP_ASSOCIATION", associatedPath);
     }
     else
     {
         lg2::info(
-            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is not updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING}, as device is already on EID={EXISTING_EID} medium={EXISTING_MEDIUM} and binding={EXISTING_BINDING}",
+            "NsmDevice: DeviceType={TYPE} InstanceNumber={INST} DeviceRole={ROLE} is not updated with eid={EID} uuid={UUID} mctpMedium={MCTP_MEDIUM} mctpBinding={MCTP_BINDING}, as device is already on EID={EXISTING_EID} medium={EXISTING_MEDIUM} binding={EXISTING_BINDING} mctpAssociation = {MCTP_ASSOCIATION}",
             "TYPE", getDeviceType(), "INST", getInstanceNumber(), "ROLE",
             getDeviceRole(), "EID", eid, "UUID", uuid, "MCTP_MEDIUM",
             mctpMedium, "MCTP_BINDING", mctpBinding, "EXISTING_EID", this->eid,
             "EXISTING_MEDIUM", this->mctpMedium, "EXISTING_BINDING",
-            this->mctpBinding);
+            this->mctpBinding, "MCTP_ASSOCIATION", associatedPath);
     }
 
     return isPreferred;
@@ -1018,10 +1020,10 @@ void NsmDevice::dumpNsmDeviceInfo()
         "DT", getDeviceType(), "ROLE", getDeviceRole(), "INST",
         getInstanceNumber());
     lg2::error(
-        "EID: {EID}, UUID: {UUID}, , Device Instance Number: {DEVICE_INSTANCE_NUMBER}, Device UUID: {DEVICE_UUID}, MCTP Medium: {MCTP_MEDIUM}, MCTP Binding: {MCTP_BINDING}",
+        "EID: {EID}, UUID: {UUID}, , Device Instance Number: {DEVICE_INSTANCE_NUMBER}, Device UUID: {DEVICE_UUID}, MCTP Medium: {MCTP_MEDIUM}, MCTP Binding: {MCTP_BINDING} Associated Path: {ASSOCIATED_PATH}",
         "EID", eid, "UUID", getUuid(), "DEVICE_UUID", deviceUuid, "MCTP_MEDIUM",
         mctpMedium, "MCTP_BINDING", mctpBinding, "DEVICE_INSTANCE_NUMBER",
-        nsmDeviceInstanceNumber);
+        nsmDeviceInstanceNumber, "ASSOCIATED_PATH", associatedPath);
     lg2::error(
         "Device Active: {DEVICE_ACTIVE}, Device Ready: {DEVICE_READY}, Discovery Pending: {DISCOVERY_PENDING}",
         "DEVICE_ACTIVE", isDeviceActive, "DEVICE_READY", isDeviceReady,
