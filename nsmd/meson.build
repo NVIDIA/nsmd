@@ -198,3 +198,13 @@ if get_option('progressCounter').enabled()
         install_dir: get_option('bindir'),
     )
 endif
+
+if get_option('shmem').enabled()
+    executable(
+        'nsmDump',
+        'nsmDump.cpp',
+        dependencies: [nvidia_shmem, phosphor_logging],
+        install: true,
+        install_dir: get_option('bindir'),
+    )
+endif
