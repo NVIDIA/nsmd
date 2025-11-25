@@ -2677,6 +2677,7 @@ class QueryScalarGroupTelemetry : public CommandInterface
                 result["Completion Code"] = cc;
                 result["NegotiatedLinkSpeed"] = (int)data.negotiated_link_speed;
                 result["NegotiatedLinkWidth"] = (int)data.negotiated_link_width;
+                result["TargetLinkSpeed"] = (int)data.target_link_speed;
                 result["maxLinkSpeed"] = (int)data.max_link_speed;
                 result["maxLinkWidth"] = (int)data.max_link_width;
                 nsmtool::helper::DisplayInJson(result);
@@ -2770,10 +2771,13 @@ class QueryScalarGroupTelemetry : public CommandInterface
 
                 ordered_json result;
                 result["Completion Code"] = cc;
-                result["replayCount"] = (int)data.replay_cnt;
-                result["replayRolloverCount"] = (int)data.replay_rollover_cnt;
-                result["nakSentCount"] = (int)data.NAK_sent_cnt;
+                result["ReceiverErrorCount"] = (int)data.recv_err_cnt;
                 result["nakRecievedCount"] = (int)data.NAK_recv_cnt;
+                result["nakSentCount"] = (int)data.NAK_sent_cnt;
+                result["BadTLPCount"] = (int)data.bad_TLP_cnt;
+                result["replayRolloverCount"] = (int)data.replay_rollover_cnt;
+                result["FCTimeoutErrorCount"] = (int)data.FC_timeout_err_cnt;
+                result["replayCount"] = (int)data.replay_cnt;
                 nsmtool::helper::DisplayInJson(result);
                 break;
             }
