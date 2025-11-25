@@ -96,6 +96,24 @@ class NsmDebugTokenUnifiedObject :
     sdbusplus::message::object_path
         installToken(sdbusplus::message::unix_fd fd);
 
+    /**
+     * @brief Installs a debug token from file descriptor for aggregation
+     *
+     * Installs a debug token from a file descriptor for aggregation operations.
+     * Uses internal structures to track progress and updates token status.
+     * Takes ownership of the fd. Returns result via output parameters.
+     *
+     * @param fd File descriptor containing the debug token data (will be
+     * closed)
+     * @param totalSize Total size of the token data
+     * @param[out] errorCode Error code result (0 = success)
+     * @param[out] errorMessage Error message result
+     * @return Coroutine that completes when installation finishes
+     */
+    requester::Coroutine installTokenDirect(int fd, size_t totalSize,
+                                            uint16_t& errorCode,
+                                            std::string& errorMessage);
+
   private:
     /**
      * @brief Information structure for tracking token installation progress

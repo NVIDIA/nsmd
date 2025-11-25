@@ -16,12 +16,16 @@
  */
 
 #include "common/coroutine.hpp"
+#include "common/globals.hpp"
 #include "common/types.hpp"
 #include "common/utils.hpp"
 #include "dBusAsyncUtils.hpp"
+#include "nsmDebugTokenAggregation.hpp"
 #include "nsmDebugTokenNIC.hpp"
 #include "nsmDebugTokenUnified.hpp"
 #include "nsmObjectFactory.hpp"
+
+#include <phosphor-logging/lg2.hpp>
 
 #include <algorithm>
 #include <memory>
@@ -36,6 +40,8 @@ static requester::Coroutine createNsmDebugToken(SensorManager& manager,
                                                 const std::string& interface,
                                                 const std::string& objPath)
 {
+    DebugTokenAggregationManager::getInstance();
+
     auto& bus = utils::DBusHandler::getBus();
     dbus::PropertyMap allBaseIfaceProperties;
     auto rc = co_await utils::coGetCachedBaseProperties(objPath, interface,
@@ -79,6 +85,7 @@ static requester::Coroutine createNsmDebugToken(SensorManager& manager,
         auto object = std::make_shared<NsmDebugTokenUnifiedObject>(
             bus, chassisName, uuid);
         device->addStaticSensor(object);
+        manager.debugTokenList.push_back(object);
     }
 
     co_return NSM_SUCCESS;

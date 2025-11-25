@@ -137,8 +137,10 @@ std::optional<Request> NsmDebugTokenUnifiedObject::createInstallTokenRequest(
         lg2::error("DebugToken: Invalid file descriptor: {FD}", "FD", info->fd);
         return std::nullopt;
     }
+
     size_t bytesToRead = std::min(info->totalSize - info->offset,
                                   installationChunkSize);
+
     std::unique_ptr<uint8_t[]> buffer(new uint8_t[bytesToRead]);
     auto readBytes = read(info->fd, buffer.get(), bytesToRead);
     if (readBytes < 0)
@@ -233,8 +235,8 @@ requester::Coroutine NsmDebugTokenUnifiedObject::installTokenAsyncHandler(
     {
         auto error = std::make_tuple(
             reasonCode, debug_token::Error(reasonCode).to_string());
-        lg2::error("DebugToken: installToken: eid={EID} rc={RC}", "EID", eid,
-                   "RC", reasonCode);
+        lg2::error("DebugToken: installToken: eid={EID} cc={CC} rc={RC}", "EID",
+                   eid, "CC", cc, "RC", reasonCode);
         valueIntf->value(error);
         statusIntf->status(AsyncOperationStatusType::InternalFailure);
     }
@@ -297,6 +299,98 @@ sdbusplus::message::object_path
                                                         fileStat.st_size);
     installTokenAsyncHandler(info, statusIntf, valueIntf).detach();
     return objPath;
+}
+
+requester::Coroutine NsmDebugTokenUnifiedObject::installTokenDirect(
+    int fd, size_t totalSize, uint16_t& errorCode, std::string& errorMessage)
+{
+    auto info = std::make_shared<TokenInstallationInfo>(fd, totalSize);
+
+    auto device = SensorManager::getInstance().getNsmDeviceFromStaticUUID(uuid);
+    if (!device)
+    {
+        errorCode = static_cast<uint16_t>(NSM_SW_ERROR);
+        errorMessage = "Device not found";
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = device->getEid();
+
+    // Check if installationChunkSize is initialized
+    if (installationChunkSize == 0)
+    {
+        lg2::error("DebugToken: installationChunkSize is not initialized! "
+                   "Device capabilities not queried. Call update() first.");
+        errorCode = static_cast<uint16_t>(NSM_SW_ERROR);
+        errorMessage = "Chunk size not initialized";
+        co_return NSM_SW_ERROR;
+    }
+
+    // Process chunks until complete
+    while (info->offset < info->totalSize)
+    {
+        auto request = createInstallTokenRequest(info);
+        if (!request)
+        {
+            errorCode = static_cast<uint16_t>(NSM_SW_ERROR);
+            errorMessage = "Failed to create request";
+            co_return NSM_SW_ERROR;
+        }
+
+        // Send the chunk
+        std::shared_ptr<const nsm_msg> responseMsg;
+        size_t responseLen = 0;
+        auto sendRc = co_await device->postPatchIO(eid, *request, responseMsg,
+                                                   responseLen);
+        if (sendRc != NSM_SW_SUCCESS)
+        {
+            lg2::error("DebugToken: installTokenDirect postPatchIO failed "
+                       "rc={RC}, eid={EID}",
+                       "RC", static_cast<int>(sendRc), "EID", eid);
+            debug_token::Error error(sendRc);
+            errorCode = static_cast<uint16_t>(sendRc);
+            errorMessage = std::string(error.to_string());
+            co_return sendRc;
+        }
+
+        // Decode the response
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = ERR_NULL;
+        auto decodeRc = decode_nsm_install_token_resp(
+            responseMsg.get(), responseLen, &cc, &reasonCode);
+        if (decodeRc != NSM_SW_SUCCESS)
+        {
+            lg2::error("DebugToken: decode_nsm_install_token_resp: "
+                       "eid={EID} rc={RC} cc={CC} len={LEN}",
+                       "EID", eid, "RC", decodeRc, "CC", cc, "LEN",
+                       responseLen);
+            errorCode = static_cast<uint16_t>(decodeRc);
+            debug_token::Error error(decodeRc);
+            errorMessage = std::string(error.to_string());
+            co_return decodeRc;
+        }
+
+        // Check completion code
+        if (cc != NSM_SUCCESS)
+        {
+            lg2::error("DebugToken: installTokenDirect: eid={EID} cc={CC} "
+                       "rc={RC}",
+                       "EID", eid, "CC", cc, "RC", reasonCode);
+            errorCode = reasonCode;
+            // Force copy by creating Error object first, then explicitly copy
+            // string
+            debug_token::Error error(reasonCode);
+            errorMessage = std::string(error.to_string());
+            co_return reasonCode;
+        }
+    }
+
+    // Installation complete - update token status
+    queryTokenHandler(device).detach();
+
+    errorCode = 0;
+    errorMessage = "Success";
+    co_return NSM_SW_SUCCESS;
 }
 
 requester::Coroutine NsmDebugTokenUnifiedObject::queryTokenHandler(

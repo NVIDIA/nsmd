@@ -42,6 +42,7 @@ class NsmPowerCap;
 class NsmDefaultPowerCap;
 class NsmMaxPowerCap;
 class NsmMinPowerCap;
+class NsmDebugTokenUnifiedObject;
 class LimitedSensorQueue;
 /**
  * @brief Sensor manager abstraction class
@@ -83,6 +84,9 @@ class SensorManager
     std::vector<std::shared_ptr<NsmDefaultPowerCap>> defaultPowerCapList;
     std::vector<std::shared_ptr<NsmMaxPowerCap>> maxPowerCapList;
     std::vector<std::shared_ptr<NsmMinPowerCap>> minPowerCapList;
+    // debug token list to maintain debug token objects for aggregated
+    // operations. Sensor Manager is the class that owns and tracks all objects.
+    std::vector<std::shared_ptr<NsmDebugTokenUnifiedObject>> debugTokenList;
     std::map<std::string, std::vector<std::shared_ptr<NsmDevice>>>
         processorModuleToDeviceMap;
     std::map<std::shared_ptr<NsmDevice>,
