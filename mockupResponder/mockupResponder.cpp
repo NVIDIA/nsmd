@@ -736,6 +736,8 @@ std::optional<Response>
                     return getRotInformation(request, requestLen);
                 case NSM_FW_IRREVERSABLE_CONFIGURATION:
                     return irreversibleConfig(request, requestLen);
+                case NSM_FW_IMAGE_COPY_CONTROL:
+                    return imageCopyControl(request, requestLen);
                 case NSM_FW_QUERY_CODE_AUTH_KEY_PERM:
                     return codeAuthKeyPermQueryHandler(request, requestLen);
                 case NSM_FW_UPDATE_CODE_AUTH_KEY_PERM:

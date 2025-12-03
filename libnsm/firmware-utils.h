@@ -34,6 +34,7 @@ enum nsm_firmware_commands {
 	NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER = 0x05,
 	NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER = 0x06,
 	NSM_FW_SET_ROT_PROPERTY = 0x08,
+	NSM_FW_IMAGE_COPY_CONTROL = 0x09,
 	NSM_FW_DOT_GET_INFO = 0x20,
 	NSM_FW_DOT_CAK_INSTALL = 0x21,
 	NSM_FW_DOT_LOCK = 0x22,
@@ -112,6 +113,13 @@ enum nsm_rot_inband_update_policy_lifespan {
 enum nsm_rot_inband_update_policy {
 	NSM_ROT_INBAND_UPDATE_POLICY_DISABLE = 0,
 	NSM_ROT_INBAND_UPDATE_POLICY_ENABLE = 1,
+};
+
+/** @brief NSM Image Copy Control types
+ */
+enum nsm_image_copy_control_types {
+	NSM_IMAGE_COPY_QUERY_PROGRESS = 0,
+	NSM_IMAGE_COPY_INITIATE_IMAGE_COPY = 1,
 };
 
 /** @brief NSM EFUSE update method
@@ -321,6 +329,74 @@ struct nsm_firmware_set_rot_property_req_command {
  * the operation.
  */
 struct nsm_firmware_set_rot_property_resp_command {
+	struct nsm_common_resp hdr;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm firmware image copy control request
+ * parameters
+ */
+struct nsm_firmware_image_copy_control_req {
+	uint8_t request_type;
+	uint8_t component_count;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing a single component identity entry
+ * for image copy control
+ */
+struct nsm_firmware_image_copy_component_entry {
+	uint16_t component_classification;
+	uint16_t component_identifier;
+	uint8_t component_classification_index;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing nsm firmware image copy control request
+ * command
+ */
+struct nsm_firmware_image_copy_control_req_command {
+	struct nsm_common_req hdr;
+	struct nsm_firmware_image_copy_control_req image_copy_control_req;
+} __attribute__((packed));
+
+/** @brief NSM Image Copy Status values
+ */
+enum nsm_image_copy_status {
+	NSM_IMAGE_COPY_NOT_TRIGGERED = 0,
+	NSM_IMAGE_COPY_IN_PROGRESS = 1,
+	NSM_IMAGE_COPY_COMPLETE = 2,
+	NSM_IMAGE_COPY_UNDEFINED_FAILURE = 3,
+	NSM_IMAGE_COPY_NO_VALID_IMAGE = 4,
+	NSM_IMAGE_COPY_DESTINATION_WRITE_PROTECTED = 5,
+	NSM_IMAGE_COPY_FAIL_FLASH_ACCESS = 6,
+	NSM_IMAGE_COPY_FAILED_VERIFY = 7,
+};
+
+/**
+ * @struct Structure representing image copy control response for Query
+ * Progress image copy control state for Query Progress
+ */
+struct nsm_firmware_image_copy_control_query_progress_resp {
+	uint8_t image_copy_status;
+	uint8_t image_copy_progress;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing image copy control response for Query
+ * image copy control state command for Query Progress
+ */
+struct nsm_firmware_image_copy_control_query_progress_resp_command {
+	struct nsm_common_resp hdr;
+	struct nsm_firmware_image_copy_control_query_progress_resp
+	    image_copy_control_query;
+} __attribute__((packed));
+
+/**
+ * @struct Structure representing image copy control response for Initiate
+ * the Components commands
+ */
+struct nsm_firmware_image_copy_control_initiate_copy_resp_command {
 	struct nsm_common_resp hdr;
 } __attribute__((packed));
 
@@ -1168,6 +1244,58 @@ int encode_nsm_firmware_set_rot_property_req(
 int decode_nsm_firmware_set_rot_property_resp(const struct nsm_msg *msg,
 					      size_t msg_len, uint8_t *cc,
 					      uint16_t *reason_code);
+
+/**
+ * @brief Encode nsm firmware image copy control request
+ *
+ * @param[in] instance_id - instance id
+ * @param[in] image_copy_control_req - image copy control request
+ * @param[in] component_entries - array of component entries (can be NULL if
+ * component_count is 0)
+ * @param[in] msg - nsm message (must be pre-allocated with sufficient size)
+ * @return int - NSM_SW_SUCCESS on success, error code otherwise
+ *
+ * @note The caller must ensure msg buffer is large enough to hold:
+ *       sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+ *       sizeof(nsm_firmware_image_copy_control_req) +
+ *       (component_count * sizeof(nsm_firmware_image_copy_component_entry))
+ */
+int encode_nsm_firmware_image_copy_control_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_image_copy_control_req *image_copy_control_req,
+    const struct nsm_firmware_image_copy_component_entry *component_entries,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm firmware image copy control response for Query
+ * Progress
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @param[out] image_copy_control_query - image copy control query
+ * @return int
+ */
+int decode_nsm_firmware_image_copy_control_query_progress_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_image_copy_control_query_progress_resp
+	*image_copy_control_query);
+
+/**
+ * @brief Decode nsm firmware image copy control response for Initiate One
+ * Component and Initiate All Components commands
+ *
+ * @param[in] msg - nsm message
+ * @param[in] msg_len - message length
+ * @param[out] cc - command completion code
+ * @param[out] reason_code - command reason code
+ * @return int
+ */
+int decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code);
 
 /**
  * @brief Encode nsm DotCAKInstall request message

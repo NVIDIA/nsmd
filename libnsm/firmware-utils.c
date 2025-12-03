@@ -1956,3 +1956,120 @@ int decode_nsm_dot_cak_bypass_resp(const struct nsm_msg *msg, size_t msg_len,
 
 	return NSM_SW_SUCCESS;
 }
+
+int encode_nsm_firmware_image_copy_control_req(
+    uint8_t instance_id,
+    const struct nsm_firmware_image_copy_control_req *fw_req,
+    const struct nsm_firmware_image_copy_component_entry *component_entries,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || fw_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	// Validate component_entries if component_count > 0
+	if (fw_req->component_count > 0 && component_entries == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_firmware_image_copy_control_req_command *request =
+	    (struct nsm_firmware_image_copy_control_req_command *)msg->payload;
+	request->hdr.command = NSM_FW_IMAGE_COPY_CONTROL;
+	request->hdr.data_size =
+	    htole16(sizeof(struct nsm_firmware_image_copy_control_req) +
+		    (fw_req->component_count *
+		     sizeof(struct nsm_firmware_image_copy_component_entry)));
+	memcpy(&request->image_copy_control_req, fw_req,
+	       sizeof(struct nsm_firmware_image_copy_control_req));
+
+	// Encode component entries if present
+	if (fw_req->component_count > 0) {
+		uint8_t *component_data =
+		    msg->payload + sizeof(struct nsm_common_req) +
+		    sizeof(struct nsm_firmware_image_copy_control_req);
+
+		for (uint8_t i = 0; i < fw_req->component_count; ++i) {
+			struct nsm_firmware_image_copy_component_entry *entry =
+			    (struct nsm_firmware_image_copy_component_entry *)
+				component_data;
+
+			entry->component_classification = htole16(
+			    component_entries[i].component_classification);
+			entry->component_identifier =
+			    htole16(component_entries[i].component_identifier);
+			entry->component_classification_index =
+			    component_entries[i].component_classification_index;
+
+			component_data += sizeof(
+			    struct nsm_firmware_image_copy_component_entry);
+		}
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_firmware_image_copy_control_query_progress_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code,
+    struct nsm_firmware_image_copy_control_query_progress_resp
+	*image_copy_control_query)
+{
+	if (msg == NULL || image_copy_control_query == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(
+		    struct
+		    nsm_firmware_image_copy_control_query_progress_resp_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_firmware_image_copy_control_query_progress_resp_command
+	    *resp =
+		(struct
+		 nsm_firmware_image_copy_control_query_progress_resp_command *)
+		    msg->payload;
+
+	memcpy(
+	    image_copy_control_query, &(resp->image_copy_control_query),
+	    sizeof(struct nsm_firmware_image_copy_control_query_progress_resp));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *cc,
+    uint16_t *reason_code)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	return NSM_SW_SUCCESS;
+}

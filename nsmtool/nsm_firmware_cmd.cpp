@@ -192,7 +192,10 @@ class GetRotInformation : public CommandInterface
         {3, "Staged"},
         {4, "Write in progress"},
         {5, "Inactive"},
-        {6, "Failed authentication"}};
+        {6, "Failed authentication"},
+        {7, "Pending image copy"},
+        {8, "Image copy in progress"},
+        {9, "Failed image copy"}};
 
     std::string mapEnumToString(
         uint32_t value,
@@ -1386,6 +1389,284 @@ class DotCAKBypass : public CommandInterface
     }
 };
 
+class ImageCopyControl : public CommandInterface
+{
+  public:
+    ~ImageCopyControl() = default;
+    ImageCopyControl() = delete;
+    ImageCopyControl(const ImageCopyControl&) = delete;
+    ImageCopyControl(ImageCopyControl&&) = default;
+    ImageCopyControl& operator=(const ImageCopyControl&) = delete;
+    ImageCopyControl& operator=(ImageCopyControl&&) = default;
+    explicit ImageCopyControl(const char* type, const char* name,
+                              CLI::App* app) : CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for Image Copy Control");
+        ccOptionGroup
+            ->add_option(
+                "-r,--requestType", requestType,
+                "Request Type (0: Query Image Copy Progress, 1: Initiate Image Copy)")
+            ->check(CLI::Range(0, 1))
+            ->required();
+        ccOptionGroup->add_option("-n,--componentCount", componentCount,
+                                  "The number of component identities.");
+        ccOptionGroup->add_option(
+            "-c,--classification", classifications,
+            "Component classification(s) - can be specified multiple times");
+        ccOptionGroup->add_option(
+            "-i,--identifier", identifiers,
+            "Component identifier(s) - can be specified multiple times");
+        ccOptionGroup->add_option(
+            "-d,--index", indices,
+            "Component classification index/indices - can be specified multiple times");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        // Validate that all component arrays have the same size
+        if (!classifications.empty() || !identifiers.empty() ||
+            !indices.empty())
+        {
+            size_t maxSize = std::max(
+                {classifications.size(), identifiers.size(), indices.size()});
+            if (classifications.size() != maxSize ||
+                identifiers.size() != maxSize || indices.size() != maxSize)
+            {
+                std::cerr
+                    << "Error: All component parameters (classification, identifier, index) "
+                    << "must be specified the same number of times\n";
+                return std::make_pair(-1, std::vector<uint8_t>());
+            }
+        }
+
+        uint8_t compCount = static_cast<uint8_t>(classifications.size());
+
+        // Validate component count if expectedComponentCount was specified
+        if (componentCount != compCount)
+        {
+            std::cerr << "Error: Expected component count ("
+                      << (int)componentCount
+                      << ") does not match actual component count ("
+                      << (int)compCount << ")\n";
+            return std::make_pair(-1, std::vector<uint8_t>());
+        }
+
+        // Calculate message size: header + common_req + request + (component
+        // entries)
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+            sizeof(nsm_firmware_image_copy_control_req) +
+            (compCount * sizeof(nsm_firmware_image_copy_component_entry)));
+
+        // Build component entries array
+        std::vector<nsm_firmware_image_copy_component_entry> componentEntries;
+        componentEntries.reserve(compCount);
+        for (size_t i = 0; i < compCount; ++i)
+        {
+            nsm_firmware_image_copy_component_entry entry;
+            entry.component_classification = classifications[i];
+            entry.component_identifier = identifiers[i];
+            entry.component_classification_index = indices[i];
+            componentEntries.push_back(entry);
+        }
+
+        nsm_firmware_image_copy_control_req nsm_req;
+        nsm_req.request_type = requestType;
+        nsm_req.component_count = compCount;
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_firmware_image_copy_control_req(
+            instanceId, &nsm_req,
+            compCount > 0 ? componentEntries.data() : nullptr, request);
+
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        ordered_json result;
+        switch (requestType)
+        {
+            case NSM_IMAGE_COPY_QUERY_PROGRESS: // Query Image Copy
+                                                // Progress
+            {
+                struct nsm_firmware_image_copy_control_query_progress_resp
+                    image_copy_control_query{};
+                auto rc =
+                    decode_nsm_firmware_image_copy_control_query_progress_resp(
+                        responsePtr, payloadLength, &cc, &reason_code,
+                        &image_copy_control_query);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << "\n";
+                    if (cc != NSM_SUCCESS)
+                    {
+                        std::cerr << "  Completion code: 0x" << std::hex
+                                  << (int)cc << std::dec << " - "
+                                  << getCompletionCodeDescription(cc) << "\n";
+                    }
+                    if (reason_code != ERR_NULL)
+                    {
+                        std::cerr << "  Reason code: 0x" << std::hex
+                                  << reason_code << std::dec << " - "
+                                  << getReasonCodeDescription(reason_code)
+                                  << "\n";
+                    }
+                    return;
+                }
+
+                if (image_copy_control_query.image_copy_progress >
+                    UNSUPPORTED_PROGRESS_PERCENT)
+                {
+                    std::cerr << "Incorrect progress percentage: "
+                              << image_copy_control_query.image_copy_progress
+                              << " (expected: 0-101)\n";
+                    return;
+                }
+
+                // Map status code to human-readable string
+                std::string statusStr;
+                switch (image_copy_control_query.image_copy_status)
+                {
+                    case NSM_IMAGE_COPY_NOT_TRIGGERED:
+                        statusStr = "Image copy not triggered";
+                        break;
+                    case NSM_IMAGE_COPY_IN_PROGRESS:
+                        statusStr = "In progress";
+                        break;
+                    case NSM_IMAGE_COPY_COMPLETE:
+                        statusStr = "Complete";
+                        break;
+                    case NSM_IMAGE_COPY_UNDEFINED_FAILURE:
+                        statusStr = "Undefined failure";
+                        break;
+                    case NSM_IMAGE_COPY_NO_VALID_IMAGE:
+                        statusStr = "No valid image";
+                        break;
+                    case NSM_IMAGE_COPY_DESTINATION_WRITE_PROTECTED:
+                        statusStr = "Destination write protected";
+                        break;
+                    case NSM_IMAGE_COPY_FAIL_FLASH_ACCESS:
+                        statusStr = "Fail flash access";
+                        break;
+                    case NSM_IMAGE_COPY_FAILED_VERIFY:
+                        statusStr = "Failed verify";
+                        break;
+                    default:
+                        statusStr =
+                            "Unknown status (" +
+                            std::to_string(
+                                image_copy_control_query.image_copy_status) +
+                            ")";
+                        break;
+                }
+
+                result["Image copy status"] = statusStr;
+                result["Image copy status code"] =
+                    image_copy_control_query.image_copy_status;
+
+                result["Image copy progress"] =
+                    image_copy_control_query.image_copy_progress;
+                break;
+            }
+            case NSM_IMAGE_COPY_INITIATE_IMAGE_COPY: // Initiate Image Copy
+            {
+                auto rc =
+                    decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+                        responsePtr, payloadLength, &cc, &reason_code);
+                if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+                {
+                    std::cerr << "Response message error: " << "rc=" << rc
+                              << "\n";
+                    if (cc != NSM_SUCCESS)
+                    {
+                        std::cerr << "  Completion code: 0x" << std::hex
+                                  << (int)cc << std::dec << " - "
+                                  << getCompletionCodeDescription(cc) << "\n";
+                    }
+
+                    if (reason_code != ERR_NULL)
+                    {
+                        std::cerr << "  Reason code: 0x" << std::hex
+                                  << reason_code << std::dec << " - "
+                                  << getReasonCodeDescription(reason_code)
+                                  << "\n";
+                    }
+
+                    return;
+                }
+                break;
+            }
+            default:
+            {
+                std::cerr << "Unknown request type " << requestType << "\n";
+                break;
+            }
+        }
+        result["Completion code"] = cc;
+        result["Reason code"] = reason_code;
+        DisplayInJson(result);
+    }
+
+  private:
+    uint8_t requestType{};
+    std::vector<uint16_t> classifications;
+    std::vector<uint16_t> identifiers;
+    std::vector<uint8_t> indices;
+    uint8_t componentCount{DEFAULT_VALUE};
+
+    static constexpr uint8_t DEFAULT_VALUE = 0;
+    static constexpr uint8_t UNSUPPORTED_PROGRESS_PERCENT = 101;
+
+    // Helper function to get human-readable completion code description
+    static std::string getCompletionCodeDescription(uint8_t cc)
+    {
+        switch (cc)
+        {
+            case NSM_ERR_INVALID_DATA:
+                return "INVALID_DATA (The request payload contained invalid data or illegal value)";
+            case NSM_ERR_INVALID_STATE_FOR_COMMAND:
+                return "INVALID_STATE_FOR_COMMAND (The device is not in a state to expect this command)";
+            case NSM_ERR_INVALID_REQUEST_TYPE:
+                return "INVALID_REQUEST_TYPE (The requested request type is not supported by the device)";
+            default:
+                return "Unknown completion code";
+        }
+    }
+
+    // Helper function to get human-readable reason code description
+    static std::string getReasonCodeDescription(uint16_t reason_code)
+    {
+        switch (reason_code)
+        {
+            case ERR_PROPERTY_NOT_SUPPORTED:
+                return "PROPERTY_NOT_SUPPORTED (Property to be updated via SetRoTProperty command is not supported by the device)";
+            case ERR_LIFESPAN_VOLATILE_NOT_SUPPORTED:
+                return "LIFESPAN_VOLATILE_NOT_SUPPORTED (Volatile lifespan for a property is not supported by device)";
+            case ERR_LIFESPAN_PERSISTENT_NOT_SUPPORTED:
+                return "LIFESPAN_PERSISTENT_NOT_SUPPORTED (Persistent lifespan for a property is not supported by device)";
+            case ERR_NO_BOOT_COMPLETE:
+                return "NO_BOOT_COMPLETE (The RoT has not received a boot complete indication from the AP)";
+            case ERR_UPDATE_IN_PROGRESS:
+                return "UPDATE_IN_PROGRESS (A firmware update is in progress)";
+            case ERR_IMAGE_COPY_IN_PROGRESS:
+                return "IMAGE_COPY_IN_PROGRESS (An image copy is in progress)";
+            case ERR_IMAGE_COPY_COMPLETED:
+                return "IMAGE_COPY_COMPLETED (An image copy was completed successfully)";
+            case ERR_FLASH_WEAR_MITIGATION:
+                return "FLASH_WEAR_MITIGATION (A flash wear out mitigation policy is in effect)";
+            case ERR_INCOMPLETE_COMPONENT_SET:
+                return "INCOMPLETE_COMPONENT_SET (The RoT requires additional components to be included in the request)";
+            default:
+                return "Unknown reason code";
+        }
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -1433,5 +1714,9 @@ void registerCommand(CLI::App& app)
         "DotCAKBypass", "Bypass DOT CAK install and continue boot");
     commands.push_back(std::make_unique<DotCAKBypass>(
         "firmware", "DotCAKBypass", dotCAKBypass));
+    auto imageCopyControl = firmware->add_subcommand("ImageCopyControl",
+                                                     "Image Copy Control");
+    commands.push_back(std::make_unique<ImageCopyControl>(
+        "firmware", "ImageCopyControl", imageCopyControl));
 }
 } // namespace nsmtool::firmware

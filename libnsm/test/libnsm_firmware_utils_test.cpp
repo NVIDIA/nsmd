@@ -2447,3 +2447,555 @@ TEST(DotCAKBypass, testBoundaryConditions)
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 	EXPECT_EQ(0x1234, reason_code);
 }
+
+TEST(ImageCopyControl, testGoodEncodeRequestNoComponents)
+{
+	// Test encoding Image Copy Control request with no components (Query
+	// Progress)
+	uint8_t requestType = 0; // Query Image Copy Progress
+	uint8_t componentCount = 0;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+	    sizeof(nsm_firmware_image_copy_control_req));
+
+	nsm_firmware_image_copy_control_req nsm_req;
+	nsm_req.request_type = requestType;
+	nsm_req.component_count = componentCount;
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_firmware_image_copy_control_req(0, &nsm_req,
+							     nullptr, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify message header
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	// Verify common request header
+	auto common_req = reinterpret_cast<nsm_common_req *>(request->payload);
+	EXPECT_EQ(NSM_FW_IMAGE_COPY_CONTROL, common_req->command);
+
+	// Verify request data
+	auto req_data = reinterpret_cast<nsm_firmware_image_copy_control_req *>(
+	    request->payload + sizeof(nsm_common_req));
+	EXPECT_EQ(requestType, req_data->request_type);
+	EXPECT_EQ(componentCount, req_data->component_count);
+}
+
+TEST(ImageCopyControl, testGoodEncodeRequestWithSingleComponent)
+{
+	// Test encoding Image Copy Control request with one component
+	uint8_t requestType = 1; // Initiate Image Copy
+	uint8_t componentCount = 1;
+
+	nsm_firmware_image_copy_component_entry component;
+	component.component_classification = 0x1234;
+	component.component_identifier = 0x5678;
+	component.component_classification_index = 0xAB;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+	    sizeof(nsm_firmware_image_copy_control_req) +
+	    (componentCount * sizeof(nsm_firmware_image_copy_component_entry)));
+
+	nsm_firmware_image_copy_control_req nsm_req;
+	nsm_req.request_type = requestType;
+	nsm_req.component_count = componentCount;
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_firmware_image_copy_control_req(
+	    0, &nsm_req, &component, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify message header
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
+
+	// Verify common request header
+	auto common_req = reinterpret_cast<nsm_common_req *>(request->payload);
+	EXPECT_EQ(NSM_FW_IMAGE_COPY_CONTROL, common_req->command);
+
+	// Verify request data
+	auto req_data = reinterpret_cast<nsm_firmware_image_copy_control_req *>(
+	    request->payload + sizeof(nsm_common_req));
+	EXPECT_EQ(requestType, req_data->request_type);
+	EXPECT_EQ(componentCount, req_data->component_count);
+
+	// Verify component entry
+	auto component_entry =
+	    reinterpret_cast<nsm_firmware_image_copy_component_entry *>(
+		request->payload + sizeof(nsm_common_req) +
+		sizeof(nsm_firmware_image_copy_control_req));
+	EXPECT_EQ(0x1234, component_entry->component_classification);
+	EXPECT_EQ(0x5678, component_entry->component_identifier);
+	EXPECT_EQ(0xAB, component_entry->component_classification_index);
+}
+
+TEST(ImageCopyControl, testGoodEncodeRequestWithMultipleComponents)
+{
+	// Test encoding Image Copy Control request with multiple components
+	uint8_t requestType = 1; // Initiate Image Copy
+	uint8_t componentCount = 3;
+
+	std::vector<nsm_firmware_image_copy_component_entry> components(
+	    componentCount);
+	components[0].component_classification = 0x0001;
+	components[0].component_identifier = 0x0002;
+	components[0].component_classification_index = 0;
+
+	components[1].component_classification = 0x0003;
+	components[1].component_identifier = 0x0004;
+	components[1].component_classification_index = 1;
+
+	components[2].component_classification = 0x0005;
+	components[2].component_identifier = 0x0006;
+	components[2].component_classification_index = 2;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+	    sizeof(nsm_firmware_image_copy_control_req) +
+	    (componentCount * sizeof(nsm_firmware_image_copy_component_entry)));
+
+	nsm_firmware_image_copy_control_req nsm_req;
+	nsm_req.request_type = requestType;
+	nsm_req.component_count = componentCount;
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_firmware_image_copy_control_req(
+	    0, &nsm_req, components.data(), request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify request data
+	auto req_data = reinterpret_cast<nsm_firmware_image_copy_control_req *>(
+	    request->payload + sizeof(nsm_common_req));
+	EXPECT_EQ(requestType, req_data->request_type);
+	EXPECT_EQ(componentCount, req_data->component_count);
+
+	// Verify all component entries
+	auto component_entries =
+	    reinterpret_cast<nsm_firmware_image_copy_component_entry *>(
+		request->payload + sizeof(nsm_common_req) +
+		sizeof(nsm_firmware_image_copy_control_req));
+
+	for (uint8_t i = 0; i < componentCount; ++i) {
+		EXPECT_EQ(components[i].component_classification,
+			  component_entries[i].component_classification);
+		EXPECT_EQ(components[i].component_identifier,
+			  component_entries[i].component_identifier);
+		EXPECT_EQ(components[i].component_classification_index,
+			  component_entries[i].component_classification_index);
+	}
+}
+
+TEST(ImageCopyControl, testGoodDecodeResponseQueryProgress)
+{
+	// Test decoding response for Query Progress
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00,			// data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_IN_PROGRESS, // image_copy_status
+	    0x64,			// image_copy_progress (100%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_IN_PROGRESS, query_resp.image_copy_status);
+	EXPECT_EQ(100, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusComplete)
+{
+	// Test decoding response with Complete status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00,		     // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_COMPLETE, // image_copy_status
+	    0x64,		     // image_copy_progress (100%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_COMPLETE, query_resp.image_copy_status);
+	EXPECT_EQ(100, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusNotTriggered)
+{
+	// Test decoding response with Not Triggered status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00,			  // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_NOT_TRIGGERED, // image_copy_status
+	    0x00,			  // image_copy_progress (0%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_NOT_TRIGGERED, query_resp.image_copy_status);
+	EXPECT_EQ(0, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusUndefinedFailure)
+{
+	// Test decoding response with Undefined Failure status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00, // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_UNDEFINED_FAILURE, // image_copy_status
+	    0x32,			      // image_copy_progress (50%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = 0;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_UNDEFINED_FAILURE,
+		  query_resp.image_copy_status);
+	EXPECT_EQ(50, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusNoValidImage)
+{
+	// Test decoding response with No Valid Image status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00,			   // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_NO_VALID_IMAGE, // image_copy_status
+	    0x00,			   // image_copy_progress (0%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_NO_VALID_IMAGE, query_resp.image_copy_status);
+	EXPECT_EQ(0, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusWriteProtected)
+{
+	// Test decoding response with Destination Write Protected status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00, // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_DESTINATION_WRITE_PROTECTED, // image_copy_status
+	    0x00, // image_copy_progress (0%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_DESTINATION_WRITE_PROTECTED,
+		  query_resp.image_copy_status);
+	EXPECT_EQ(0, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusFlashAccessFailure)
+{
+	// Test decoding response with Flash Access Failure status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00, // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_FAIL_FLASH_ACCESS, // image_copy_status
+	    0x00,			      // image_copy_progress (0%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_FAIL_FLASH_ACCESS,
+		  query_resp.image_copy_status);
+	EXPECT_EQ(0, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testDecodeResponseStatusFailedVerify)
+{
+	// Test decoding response with Failed Verify status
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x02,
+	    0x00,			  // data_size (2 bytes, little-endian)
+	    NSM_IMAGE_COPY_FAILED_VERIFY, // image_copy_status
+	    0x64,			  // image_copy_progress (100%)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, msg_len, &cc, &reason_code, &query_resp);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+	EXPECT_EQ(NSM_IMAGE_COPY_FAILED_VERIFY, query_resp.image_copy_status);
+	EXPECT_EQ(100, query_resp.image_copy_progress);
+}
+
+TEST(ImageCopyControl, testGoodDecodeResponseInitiateCopy)
+{
+	// Test decoding response for Initiate Copy
+	std::vector<uint8_t> responseMsg{
+	    0x10,
+	    0xDE,		       // PCI VID: NVIDIA 0x10DE
+	    0x00,		       // RQ=0, D=0, RSVD=0, INSTANCE_ID=0
+	    0x8A,		       // OCP_TYPE=8, OCP_VER=10
+	    NSM_TYPE_FIRMWARE,	       // NVIDIA_MSG_TYPE
+	    NSM_FW_IMAGE_COPY_CONTROL, // command
+	    NSM_SUCCESS,	       // completion code
+	    0x00,
+	    0x00, // reserved (2 bytes)
+	    0x00,
+	    0x00, // data_size (2 bytes, little-endian)
+	};
+
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	size_t msg_len = responseMsg.size();
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+
+	auto rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+	    response, msg_len, &cc, &reason_code);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+}
+
+TEST(ImageCopyControl, testNullEncodeRequest)
+{
+	// Test encoding with null parameters
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+	    sizeof(nsm_firmware_image_copy_control_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_firmware_image_copy_control_req nsm_req;
+	nsm_req.request_type = 0;
+	nsm_req.component_count = 0;
+
+	// Test with null request structure
+	auto rc = encode_nsm_firmware_image_copy_control_req(0, nullptr,
+							     nullptr, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test with null message buffer
+	rc = encode_nsm_firmware_image_copy_control_req(0, &nsm_req, nullptr,
+							nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(ImageCopyControl, testNullDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp) + 2);
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	// Test null response message
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    nullptr, responseMsg.size(), &cc, &reason_code, &query_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test null response data
+	rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    response, responseMsg.size(), &cc, &reason_code, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Test null parameters for Initiate Copy decode
+	rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+	    nullptr, responseMsg.size(), &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(ImageCopyControl, testInvalidResponseSize)
+{
+	uint8_t cc;
+	uint16_t reason_code = ERR_NULL;
+	nsm_firmware_image_copy_control_query_progress_resp query_resp = {};
+
+	// Test query progress response with size too small
+	std::vector<uint8_t> smallResponseMsg(sizeof(nsm_msg_hdr) - 1);
+	auto smallResponse =
+	    reinterpret_cast<nsm_msg *>(smallResponseMsg.data());
+
+	auto rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    smallResponse, smallResponseMsg.size(), &cc, &reason_code,
+	    &query_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test query progress response with size smaller than minimum required
+	std::vector<uint8_t> tinyResponseMsg(sizeof(nsm_msg_hdr) +
+					     sizeof(nsm_common_resp));
+	auto tinyResponse = reinterpret_cast<nsm_msg *>(tinyResponseMsg.data());
+
+	rc = decode_nsm_firmware_image_copy_control_query_progress_resp(
+	    tinyResponse, tinyResponseMsg.size(), &cc, &reason_code,
+	    &query_resp);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test initiate copy response with size too small
+	rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+	    smallResponse, smallResponseMsg.size(), &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test initiate copy response with zero size
+	rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+	    smallResponse, 0, &cc, &reason_code);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}

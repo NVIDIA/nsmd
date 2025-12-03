@@ -361,6 +361,120 @@ std::optional<std::vector<uint8_t>>
 }
 
 std::optional<std::vector<uint8_t>>
+    MockupResponder::imageCopyControl(const nsm_msg* requestMsg,
+                                      size_t requestLen)
+{
+    // Decode the request
+    if (requestLen < sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                         sizeof(nsm_firmware_image_copy_control_req))
+    {
+        lg2::error(
+            "imageCopyControl: Invalid request length={LEN}, expected at least {MIN}",
+            "LEN", requestLen, "MIN",
+            sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+                sizeof(nsm_firmware_image_copy_control_req));
+        return std::nullopt;
+    }
+
+    auto* reqCmd =
+        reinterpret_cast<const nsm_firmware_image_copy_control_req_command*>(
+            requestMsg->payload);
+    uint8_t requestType = reqCmd->image_copy_control_req.request_type;
+    uint8_t componentCount = reqCmd->image_copy_control_req.component_count;
+
+    if (verbose)
+    {
+        lg2::info(
+            "imageCopyControl: requestType={TYPE}, componentCount={COUNT}",
+            "TYPE", requestType, "COUNT", componentCount);
+    }
+
+    // Prepare response
+    uint8_t cc = NSM_SUCCESS;
+
+    switch (requestType)
+    {
+        case NSM_IMAGE_COPY_QUERY_PROGRESS:
+        {
+            // Query Image Copy Progress - return progress value
+            uint16_t msg_size =
+                sizeof(nsm_msg_hdr) +
+                sizeof(
+                    nsm_firmware_image_copy_control_query_progress_resp_command);
+            std::vector<uint8_t> response(msg_size, 0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            // Build response manually since there's no encode function
+            struct nsm_header_info header = {};
+            header.nsm_msg_type = NSM_RESPONSE;
+            header.instance_id = requestMsg->hdr.instance_id;
+            header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+            auto rc = pack_nsm_header(&header, &responseMsg->hdr);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("pack_nsm_header failed: rc={RC}", "RC", rc);
+                return std::nullopt;
+            }
+
+            auto* respPayload = reinterpret_cast<
+                nsm_firmware_image_copy_control_query_progress_resp_command*>(
+                responseMsg->payload);
+            respPayload->hdr.command = NSM_FW_IMAGE_COPY_CONTROL;
+            respPayload->hdr.completion_code = cc;
+            respPayload->hdr.reserved = 0;
+            respPayload->hdr.data_size = htole16(
+                sizeof(nsm_firmware_image_copy_control_query_progress_resp));
+
+            // Mock status and progress values - return complete with 100%
+            respPayload->image_copy_control_query.image_copy_status =
+                NSM_IMAGE_COPY_COMPLETE;
+            respPayload->image_copy_control_query.image_copy_progress = 100;
+
+            return response;
+        }
+        case NSM_IMAGE_COPY_INITIATE_IMAGE_COPY:
+        {
+            // Initiate Image Copy - just return success
+            uint16_t msg_size =
+                sizeof(nsm_msg_hdr) +
+                sizeof(
+                    nsm_firmware_image_copy_control_initiate_copy_resp_command);
+            std::vector<uint8_t> response(msg_size, 0);
+            auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+            struct nsm_header_info header = {};
+            header.nsm_msg_type = NSM_RESPONSE;
+            header.instance_id = requestMsg->hdr.instance_id;
+            header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+            auto rc = pack_nsm_header(&header, &responseMsg->hdr);
+            if (rc != NSM_SUCCESS)
+            {
+                lg2::error("pack_nsm_header failed: rc={RC}", "RC", rc);
+                return std::nullopt;
+            }
+
+            auto* respPayload = reinterpret_cast<
+                nsm_firmware_image_copy_control_initiate_copy_resp_command*>(
+                responseMsg->payload);
+            respPayload->hdr.command = NSM_FW_IMAGE_COPY_CONTROL;
+            respPayload->hdr.completion_code = cc;
+            respPayload->hdr.reserved = 0;
+            respPayload->hdr.data_size = 0;
+
+            return response;
+        }
+        default:
+        {
+            lg2::error("imageCopyControl: Unsupported request type {TYPE}",
+                       "TYPE", requestType);
+            return std::nullopt;
+        }
+    }
+}
+
+std::optional<std::vector<uint8_t>>
     MockupResponder::codeAuthKeyPermQueryHandler(const nsm_msg* requestMsg,
                                                  size_t requestLen)
 {

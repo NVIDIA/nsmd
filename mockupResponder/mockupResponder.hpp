@@ -552,6 +552,8 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         irreversibleConfig(const nsm_msg* requestMsg, size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        imageCopyControl(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         codeAuthKeyPermQueryHandler(const nsm_msg* requestMsg,
                                     size_t requestLen);
     std::optional<std::vector<uint8_t>>
