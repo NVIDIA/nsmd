@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 #pragma once
+#ifdef NVIDIA_SHMEM
 #include <tal.hpp>
 
 namespace nsm_shmem_utils
@@ -62,3 +63,4 @@ class SharedMemoryManager
     static std::vector<tal::TelemetryData> telemetryData;
 };
 } // namespace nsm_shmem_utils
+#endif // NVIDIA_SHMEM

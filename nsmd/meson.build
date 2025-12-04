@@ -199,7 +199,7 @@ if get_option('progressCounter').enabled()
     )
 endif
 
-if get_option('shmem').enabled()
+if get_option('shmem').enabled() and not get_option('cx8-features')
     executable(
         'nsmDump',
         'nsmDump.cpp',
