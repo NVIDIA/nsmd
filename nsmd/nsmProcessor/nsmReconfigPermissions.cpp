@@ -138,6 +138,8 @@ reconfiguration_permissions_v1_index
             return RP_EGM_MODE;
         case ReconfigSettingsIntf::FeatureType::InfoROMFileSystemRecreate:
             return RP_INFOROM_RECREATE_ALLOW_INB;
+        case ReconfigSettingsIntf::FeatureType::RISTDiagnostic:
+            return RP_RUNTIME_IN_SYSTEM_TEST;
         default:
             throw std::invalid_argument("Invalid feature :" +
                                         std::to_string(uint64_t(feature)));
@@ -195,8 +197,10 @@ requester::Coroutine NsmReconfigPermissions::patchHostOneShotConfig(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    lg2::info("patchHostOneShotConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchHostOneShotConfig On Device for EID: {EID} and ConfigurationIdex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
 
     const auto allowValue = std::get_if<bool>(&value);
 
@@ -238,8 +242,10 @@ requester::Coroutine NsmReconfigPermissions::patchDOEOneShotConfig(
     std::shared_ptr<NsmDevice> device)
 {
     const auto allowValue = std::get_if<bool>(&value);
-    lg2::info("patchDOEOneShotConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchDOEOneShotConfig On Device for EID: {EID} and ConfigurationIndex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
 
     if (!allowValue)
     {
@@ -278,8 +284,10 @@ requester::Coroutine NsmReconfigPermissions::patchHostPersistentConfig(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    lg2::info("patchHostPersistentConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchHostPersistentConfig On Device for EID: {EID} and ConfigurationIndex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
 
     const auto allowValue = std::get_if<bool>(&value);
 
@@ -318,8 +326,10 @@ requester::Coroutine NsmReconfigPermissions::patchDOEPersistentConfig(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    lg2::info("patchDOEPersistentConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchDOEPersistentConfig On Device for EID: {EID} and ConfigurationIndex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
     const auto allowValue = std::get_if<bool>(&value);
 
     if (!allowValue)
@@ -359,8 +369,10 @@ requester::Coroutine NsmReconfigPermissions::patchHostFLRPersistentConfig(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    lg2::info("patchHostFLRPersistentConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchHostFLRPersistentConfig On Device for EID: {EID} and ConfigurationIndex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
     const auto allowValue = std::get_if<bool>(&value);
 
     if (!allowValue)
@@ -400,8 +412,10 @@ requester::Coroutine NsmReconfigPermissions::patchDOEFLRPersistentConfig(
     const AsyncSetOperationValueType& value, AsyncOperationStatusType* status,
     std::shared_ptr<NsmDevice> device)
 {
-    lg2::info("patchDOEFLRPersistentConfig On Device for EID: {EID}", "EID",
-              SensorManager::getInstance().getEid(device));
+    lg2::info(
+        "patchDOEFLRPersistentConfig On Device for EID: {EID} and ConfigurationIndex: {CONFIGURATION}",
+        "EID", SensorManager::getInstance().getEid(device), "CONFIGURATION",
+        index);
     const auto allowValue = std::get_if<bool>(&value);
 
     if (!allowValue)

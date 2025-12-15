@@ -6658,7 +6658,7 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
-    if (settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB)
+    if (settingsIndex > RP_RUNTIME_IN_SYSTEM_TEST)
     {
         lg2::error(
             "getReconfigurationPermissionsV1Handler: Invalid Settings Index");
@@ -6707,7 +6707,7 @@ std::optional<std::vector<uint8_t>>
             "RC", rc);
         return std::nullopt;
     }
-    if (settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB)
+    if (settingsIndex > RP_RUNTIME_IN_SYSTEM_TEST)
     {
         lg2::error(
             "setReconfigurationPermissionsV1Handler: Invalid Settings Index");

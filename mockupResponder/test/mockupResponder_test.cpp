@@ -8570,7 +8570,7 @@ TEST_F(MockupResponderTest, testGetCurrentErrorInjectionTypesUnknownDeviceType)
 TEST_F(MockupResponderTest,
        DISABLED_testGetReconfigurationPermissionsV1InvalidSettingsIndex)
 {
-    // settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB (23) → returns nullopt
+    // settingsIndex > RP_RUNTIME_IN_SYSTEM_TEST (24) -> returns nullopt
     Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_get_reconfiguration_permissions_v1_req),
                     0);
@@ -8578,7 +8578,7 @@ TEST_F(MockupResponderTest,
     auto rc = encode_get_reconfiguration_permissions_v1_req(
         instanceId, RP_IN_SYSTEM_TEST, requestMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // Manually overwrite setting_index to invalid value (> 23)
+    // Manually overwrite setting_index to invalid value (> 24)
     auto* reqPayload =
         reinterpret_cast<nsm_get_reconfiguration_permissions_v1_req*>(
             requestMsg->payload);
@@ -8623,7 +8623,7 @@ TEST_F(MockupResponderTest, testEnableDisableGpuIstModeHandlerAllGpusDisable)
 TEST_F(MockupResponderTest,
        DISABLED_testSetReconfigurationPermissionsV1InvalidSettingsIndex)
 {
-    // settingsIndex > RP_INFOROM_RECREATE_ALLOW_INB (23) → returns nullopt
+    // settingsIndex > RP_RUNTIME_IN_SYSTEM_TEST (24) -> returns nullopt
     Request request(sizeof(nsm_msg_hdr) +
                         sizeof(nsm_set_reconfiguration_permissions_v1_req),
                     0);
@@ -8631,7 +8631,7 @@ TEST_F(MockupResponderTest,
     auto rc = encode_set_reconfiguration_permissions_v1_req(
         instanceId, RP_IN_SYSTEM_TEST, RP_ONESHOOT_HOT_RESET, 0, requestMsg);
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
-    // Manually overwrite setting_index to invalid value (> 23)
+    // Manually overwrite setting_index to invalid value (> 24)
     auto* reqPayload =
         reinterpret_cast<nsm_set_reconfiguration_permissions_v1_req*>(
             requestMsg->payload);
