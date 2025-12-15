@@ -556,6 +556,8 @@ std::optional<Response>
                     return queryAggregatedGPMMetrics(request, requestLen);
                 case NSM_QUERY_PER_INSTANCE_GPM_METRICS:
                     return queryPerInstanceGPMMetrics(request, requestLen);
+                case NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2:
+                    return queryPerInstanceGPMMetricsV2(request, requestLen);
                 case NSM_GET_VIOLATION_DURATION:
                     return getViolationDurationHandler(request, requestLen,
                                                        true, longRunningEvent);
@@ -960,11 +962,11 @@ std::optional<std::vector<uint8_t>>
                    NSM_GET_DEVICE_CAPABILITIES_V2}},
                  {1, {1, 65, 66, 67, 68, 69}},
                  {2, {2, 4, 5}},
-                 {3,
-                  {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,  14,  15,
-                   16,  17,  69,  70,  71,  73,  74,  77,  78,  79,  97,  114,
-                   115, 116, 117, 119, 121, 123, 124, 125, 126, 127, 163, 164,
-                   165, 166, 167, 168, 169, 170, 172, 173, 118, 113, 122, 120}},
+                 {3, {0,   2,   3,   6,   7,   8,   9,   10,  11,  12,
+                      14,  15,  16,  17,  69,  70,  71,  73,  74,  75,
+                      77,  78,  79,  97,  114, 115, 116, 117, 119, 121,
+                      123, 124, 125, 126, 127, 163, 164, 165, 166, 167,
+                      168, 169, 170, 172, 173, 118, 113, 122, 120}},
                  {4,
                   {0, NSM_GET_DEVICE_DIAGNOSTICS,
                    NSM_GET_NETWORK_DEVICE_DEBUG_INFO, NSM_ERASE_TRACE,
@@ -6372,6 +6374,126 @@ std::optional<std::vector<uint8_t>>
 
             response.insert(response.end(), sample.begin(),
                             std::next(sample.begin(), consumed_len));
+        }
+    }
+
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+    rc = encode_aggregate_resp(requestMsg->hdr.instance_id,
+                               request->hdr.command, NSM_SUCCESS, samplesCount,
+                               responseMsg);
+
+    assert(rc == NSM_SW_SUCCESS);
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::queryPerInstanceGPMMetricsV2(const nsm_msg* requestMsg,
+                                                  size_t requestLen)
+{
+    auto request =
+        reinterpret_cast<const nsm_query_per_instance_gpm_metrics_v2_req*>(
+            requestMsg->payload);
+    if (verbose)
+    {
+        lg2::info("queryPerInstanceGPMMetricsV2: request length={LEN}", "LEN",
+                  requestLen);
+    }
+
+    uint8_t retrieval_source;
+    uint8_t gpu_instance;
+    uint8_t compute_instance;
+    uint8_t metric_id;
+    bitfield8_t* instance_bitfield;
+    size_t instance_bitfield_length;
+
+    auto rc = decode_query_per_instance_gpm_metrics_v2_req(
+        requestMsg, requestLen, &retrieval_source, &gpu_instance,
+        &compute_instance, &metric_id, &instance_bitfield,
+        &instance_bitfield_length);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error(
+            "queryPerInstanceGPMMetricsV2: decode_query_per_instance_gpm_metrics_v2_req failed: rc={RC}",
+            "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_aggregate_resp), 0);
+    response.reserve(256);
+
+    uint16_t samplesCount{};
+
+    const auto info = metricsTable.find(metric_id);
+    if (info == metricsTable.end())
+    {
+        auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+
+        rc = encode_cc_only_resp(requestMsg->hdr.instance_id,
+                                 requestMsg->hdr.nvidia_msg_type,
+                                 request->hdr.command, NSM_ERR_INVALID_DATA,
+                                 ERR_NOT_SUPPORTED, responseMsg);
+        assert(rc == NSM_SW_SUCCESS);
+
+        return response;
+    }
+
+    for (size_t i{}; i < instance_bitfield_length; ++i)
+    {
+        auto byte = instance_bitfield[i].byte;
+        for (size_t j{}; j < 8; ++j)
+        {
+            if (byte & 1 << j)
+            {
+                ++samplesCount;
+
+                uint8_t reading[64]{};
+                size_t consumed_len{};
+                std::array<uint8_t, 256> sample;
+                auto nsm_sample =
+                    reinterpret_cast<nsm_aggregate_resp_sample*>(sample.data());
+
+                switch (info->second.unit)
+                {
+                    case GPMMetricsUnit::PERCENTAGE:
+                    {
+                        auto val = info->second.mockValue * (i * 8 + j + 1);
+                        val -= 100 * (static_cast<int>(val) / 100);
+                        rc = encode_aggregate_gpm_metric_percentage_data(
+                            val, reading, &consumed_len);
+                        assert(rc == NSM_SW_SUCCESS);
+
+                        break;
+                    }
+
+                    case GPMMetricsUnit::BANDWIDTH:
+                    {
+                        // To obtain a unique value for each instance
+                        // Metric, base Metric value is multiplied by
+                        // instance number and then the module of base 10 is
+                        // taken on that number.
+                        constexpr uint64_t mod = 10 * 1024 * 1024 * 128;
+                        auto val = info->second.mockValue * (i * 8 + j + 1);
+                        val -= mod * (static_cast<uint64_t>(val) / mod);
+                        rc = encode_aggregate_gpm_metric_bandwidth_data(
+                            val, reading, &consumed_len);
+                        assert(rc == NSM_SW_SUCCESS);
+
+                        break;
+                    }
+                }
+
+                rc = encode_aggregate_resp_sample(i * 8 + j, true, reading,
+                                                  consumed_len, nsm_sample,
+                                                  &consumed_len);
+                assert(rc == NSM_SW_SUCCESS);
+
+                response.insert(response.end(), sample.begin(),
+                                std::next(sample.begin(), consumed_len));
+            }
         }
     }
 

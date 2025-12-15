@@ -59,5 +59,17 @@ const static std::unordered_map<uint8_t, MetricsInfo> metricsTable{
     {17, {"IntergerActivityUtilizationPercent",     GPMMetricsUnit::PERCENTAGE,     93.343}},
     {18, {"DMMAUtilizationPercent",                 GPMMetricsUnit::PERCENTAGE,     19.053}},
     {19, {"HMMAUtilizationPercent",                 GPMMetricsUnit::PERCENTAGE,     46.304}},
-    {20, {"IMMAUtilizationPercent",                 GPMMetricsUnit::PERCENTAGE,     39.013}}};
+    {20, {"IMMAUtilizationPercent",                 GPMMetricsUnit::PERCENTAGE,     39.013}},
+    {21, {"NVEncoderUtilizationPercent",            GPMMetricsUnit::PERCENTAGE,     21.034}},
+    {22, {"HostMemCacheHitRatePercent",             GPMMetricsUnit::PERCENTAGE,     22.034}},
+    {23, {"HostMemCacheMissRatePercent",            GPMMetricsUnit::PERCENTAGE,     23.034}},
+    {24, {"PeerMemCacheHitRatePercent",             GPMMetricsUnit::PERCENTAGE,     24.034}},
+    {25, {"PeerMemCacheMissRatePercent",            GPMMetricsUnit::PERCENTAGE,     25.034}},
+    {26, {"DRAMCacheHitRatePercent",               GPMMetricsUnit::PERCENTAGE,     26.034}},
+    {27, {"DRAMCacheMissRatePercent",              GPMMetricsUnit::PERCENTAGE,     27.034}},
+    {28, {"C2CTotalTxBandwidthGbps",                GPMMetricsUnit::BANDWIDTH,      28.034 * 1024 * 1024 * 128}},
+    {29, {"C2CTotalRxBandwidthGbps",                GPMMetricsUnit::BANDWIDTH,      29.034 * 1024 * 1024 * 128}},
+    {30, {"C2CDataTxBandwidthGbps",                GPMMetricsUnit::BANDWIDTH,      30.034 * 1024 * 1024 * 128}},
+    {31, {"C2CDataRxBandwidthGbps",                GPMMetricsUnit::BANDWIDTH,      31.034 * 1024 * 1024 * 128}},
+};
 // clang-format on

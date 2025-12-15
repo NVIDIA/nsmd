@@ -73,10 +73,15 @@ static requester::Coroutine
 }
 
 requester::Coroutine createNsmPerInstanceGPMMetric(
-    std::shared_ptr<GPMMetricsIntf> gpmInf,
+    std::shared_ptr<NsmGPMInterfaceCreator> gpmInterfaceCreator,
     std::shared_ptr<NsmDevice> nsmDevice, const std::string& inventoryObjPath,
-    const std::string& interface, const std::string& objPath)
+    const std::string& interface, const std::string& objPath,
+    const std::string& uuid)
 {
+    lg2::info(
+        "createNsmPerInstanceGPMMetric: interface={INTERFACE}, objPath={OBJPATH}",
+        "INTERFACE", interface, "OBJPATH", objPath);
+
     auto properties = utils::DBusHandler().getDbusProperties(objPath.c_str(),
                                                              interface.c_str());
     std::sort(properties.begin(), properties.end());
@@ -104,22 +109,44 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
     const uint8_t metricId =
         utils::getPropertyFromCollection<uint64_t>(properties, "MetricId")
             .value();
-    const uint32_t instanceBitfield =
-        utils::getPropertyFromCollection<uint64_t>(properties,
-                                                   "InstanceBitfield")
+    const std::vector<uint64_t> instanceBitfield =
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(
+            properties, "InstanceBitfield")
             .value();
-
+    std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
+    for (size_t i = 0; i < instanceBitfield.size(); i++)
+    {
+        instanceBitfieldBytes[i].byte =
+            static_cast<uint8_t>(instanceBitfield[i]);
+    }
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator{};
     GPMMetricsUnit metricUnit{};
 
     if (metric == "NVDEC")
     {
-        metricUpdator = makeNVDecPerInstanceUpdator(inventoryObjPath, gpmInf);
+        std::string propertyName = "NVDecInstanceUtilizationPercent";
+        gpmInterfaceCreator->addGpmIntfProperty(propertyName,
+                                                DataType::VectorDouble);
+        metricUpdator = makeGPMPerInstanceUpdator(
+            propertyName, inventoryObjPath, gpmInterfaceCreator->getGPMIntf());
         metricUnit = GPMMetricsUnit::PERCENTAGE;
     }
     else if (metric == "NVJPG")
     {
-        metricUpdator = makeNVJpgPerInstanceUpdator(inventoryObjPath, gpmInf);
+        std::string propertyName = "NVJpgInstanceUtilizationPercent";
+        gpmInterfaceCreator->addGpmIntfProperty(propertyName,
+                                                DataType::VectorDouble);
+        metricUpdator = makeGPMPerInstanceUpdator(
+            propertyName, inventoryObjPath, gpmInterfaceCreator->getGPMIntf());
+        metricUnit = GPMMetricsUnit::PERCENTAGE;
+    }
+    else if (metric == "NVENC")
+    {
+        std::string propertyName = "NVEncInstanceUtilizationPercent";
+        gpmInterfaceCreator->addGpmIntfProperty(propertyName,
+                                                DataType::VectorDouble);
+        metricUpdator = makeGPMPerInstanceUpdator(
+            propertyName, inventoryObjPath, gpmInterfaceCreator->getGPMIntf());
         metricUnit = GPMMetricsUnit::PERCENTAGE;
     }
     else
@@ -133,11 +160,11 @@ requester::Coroutine createNsmPerInstanceGPMMetric(
 
     auto gpmPerInstanceMetric = std::make_shared<NsmGPMPerInstance>(
         name, type, retrievalSource, gpuInstance, computeInstance, metricId,
-        instanceBitfield, metricUnit, metricUpdator);
+        instanceBitfieldBytes, metricUnit, metricUpdator);
 
     lg2::info(
         "Created NSM GPM PerInstance Metrics : UUID={UUID}, Name={NAME}, Type={TYPE}",
-        "UUID", nsmDevice->getUuid(), "NAME", name, "TYPE", type);
+        "UUID", uuid, "NAME", name, "TYPE", type);
 
     nsmDevice->addSensor(gpmPerInstanceMetric,
                          PollingType::GpuPerformanceMonitoring);
@@ -195,34 +222,50 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
 
     auto nsmDevice = manager.getNsmDeviceFromStaticUUID(uuid);
 
-    auto gpmIntf = std::make_shared<GPMMetricsIntf>(bus,
-                                                    inventoryObjPath.c_str());
     auto nvlinkMetricsIntf =
         std::make_shared<NVLinkMetricsIntf>(bus, inventoryObjPath.c_str());
 
+    auto gpmInterfaceCreator = std::make_shared<NsmGPMInterfaceCreator>(
+        manager.getObjServer(), inventoryObjPath);
+    gpmInterfaceCreator->addGpmIntfProperty(metricsBitfield);
     auto gpmAggregateMetrics = std::make_shared<NsmGPMAggregated>(
         name, type, inventoryObjPath, retrievalSource, gpuInstance,
-        computeInstance, metricsBitfield, gpmIntf, nvlinkMetricsIntf);
-
-    if (populateMemoryBandwidth)
+        computeInstance, metricsBitfield, gpmInterfaceCreator->getGPMIntf(),
+        nvlinkMetricsIntf);
+    try
     {
-        std::string memoryInventoryObjPath =
-            utils::getPropertyFromCollection<std::string>(
-                properties, "MemoryInventoryObjPath")
-                .value();
-        memoryInventoryObjPath =
-            utils::makeDBusNameValid(memoryInventoryObjPath);
+        if (populateMemoryBandwidth)
+        {
+            std::string memoryInventoryObjPath =
+                utils::getPropertyFromCollection<std::string>(
+                    properties, "MemoryInventoryObjPath")
+                    .value();
+            memoryInventoryObjPath =
+                utils::makeDBusNameValid(memoryInventoryObjPath);
 
-        auto sensorObjectPath = memoryInventoryObjPath +
-                                "/xyz.openbmc_project.Inventory.Item.Dimm";
+            auto sensorObjectPath = memoryInventoryObjPath +
+                                    "/xyz.openbmc_project.Inventory.Item.Dimm";
 
-        std::shared_ptr<DimmIntf> dimmIntf = getInterfaceOnObjectPath<DimmIntf>(
-            sensorObjectPath, manager, bus, memoryInventoryObjPath.c_str());
+            std::shared_ptr<DimmIntf> dimmIntf =
+                getInterfaceOnObjectPath<DimmIntf>(
+                    sensorObjectPath, manager, bus,
+                    memoryInventoryObjPath.c_str());
 
-        auto dramUsage = gpmAggregateMetrics->getMetricInfo(
-            static_cast<uint8_t>(GPMMetricId::DRAMUsage));
-        dramUsage->updater = std::make_unique<DRAMUsageMetricUpdator>(
-            dimmIntf, memoryInventoryObjPath);
+            auto dramUsage = gpmAggregateMetrics->getMetricInfo(
+                static_cast<uint8_t>(GPMMetricId::DRAMUsage));
+            if (dramUsage.size() > 0)
+            {
+                dramUsage[0]->updater =
+                    std::make_unique<DRAMUsageMetricUpdator>(
+                        dimmIntf, memoryInventoryObjPath);
+            }
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "Caught execption while create populateMemoryBandwidth. Error: {ERROR}",
+            "ERROR", e.what());
     }
 
     lg2::info(
@@ -233,17 +276,28 @@ static requester::Coroutine createNsmGPMMetrics(SensorManager& manager,
                          PollingType::GpuPerformanceMonitoring);
 
     std::vector<std::string> perInstanceInterfaces;
-    auto result = co_await getPerInstanceInterfacesAsync(interface, objPath,
-                                                         perInstanceInterfaces);
-
-    if (result == NSM_SW_SUCCESS)
+    try
     {
-        for (const auto& intf : perInstanceInterfaces)
+        auto result = co_await getPerInstanceInterfacesAsync(
+            interface, objPath, perInstanceInterfaces);
+
+        if (result == NSM_SW_SUCCESS)
         {
-            co_await createNsmPerInstanceGPMMetric(
-                gpmIntf, nsmDevice, inventoryObjPath, intf, objPath);
+            for (const auto& intf : perInstanceInterfaces)
+            {
+                co_await createNsmPerInstanceGPMMetric(
+                    gpmInterfaceCreator, nsmDevice, inventoryObjPath, intf,
+                    objPath, uuid);
+            }
         }
     }
+    catch (const std::exception& e)
+    {
+        lg2::error(
+            "Caught execption while create getPerInstanceInterfacesAsync. Error: {ERROR}",
+            "ERROR", e.what());
+    }
+    gpmInterfaceCreator->initialize();
     // coverity[missing_return]
     co_return NSM_SUCCESS;
 }
@@ -284,10 +338,16 @@ static requester::Coroutine
         utils::getPropertyFromCollection<std::vector<uint64_t>>(properties,
                                                                 "Ports")
             .value();
-    const uint32_t instanceBitfield =
-        utils::getPropertyFromCollection<uint64_t>(properties,
-                                                   "InstanceBitfield")
+    const std::vector<uint64_t> instanceBitfield =
+        utils::getPropertyFromCollection<std::vector<uint64_t>>(
+            properties, "InstanceBitfield")
             .value();
+    std::vector<bitfield8_t> instanceBitfieldBytes(instanceBitfield.size());
+    for (size_t i = 0; i < instanceBitfield.size(); i++)
+    {
+        instanceBitfieldBytes[i].byte =
+            static_cast<uint8_t>(instanceBitfield[i]);
+    }
     std::string inventoryObjPath =
         utils::getPropertyFromCollection<std::string>(properties,
                                                       "InventoryObjPath")
@@ -349,13 +409,12 @@ static requester::Coroutine
 
         auto gpmPerPortMetric = std::make_shared<NsmGPMPerInstance>(
             name + "_" + metric, type, retrievalSource, gpuInstance,
-            computeInstance, metricId, instanceBitfield, unit,
+            computeInstance, metricId, instanceBitfieldBytes, unit,
             std::move(updator));
 
         lg2::info(
             "Created NSM GPM PerPort Metric {METRIC}: UUID={UUID}, Name={NAME}, Type={TYPE}",
-            "METRIC", metric, "UUID", nsmDevice->getUuid(), "NAME", name,
-            "TYPE", type);
+            "METRIC", metric, "UUID", uuid, "NAME", name, "TYPE", type);
 
         nsmDevice->addSensor(gpmPerPortMetric,
                              PollingType::GpuPerformanceMonitoring);

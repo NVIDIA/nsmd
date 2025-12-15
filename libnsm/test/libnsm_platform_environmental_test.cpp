@@ -6076,6 +6076,108 @@ TEST(queryPerInstanceGPMMetrics, testGoodDecodeRequest)
 	EXPECT_EQ(instance_bitfield, 17716);
 }
 
+TEST(queryPerInstanceGPMMetricsV2, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) +
+	    sizeof(nsm_query_per_instance_gpm_metrics_v2_req) + 5 - 1);
+
+	const uint8_t retrieval_source = 1;
+	const uint8_t gpu_instance = 0xFF;
+	const uint8_t compute_instance = 38;
+	const uint8_t metric_id = 12;
+	const uint8_t instance_bitfield_length = 5;
+
+	const bitfield8_t instance_bitfield_bytes[instance_bitfield_length] = {
+	    {.byte = 0x01},
+	    {.byte = 0x02},
+	    {.byte = 0x03},
+	    {.byte = 0x04},
+	    {.byte = 0x05}};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_query_per_instance_gpm_metrics_v2_req(
+	    0, retrieval_source, gpu_instance, compute_instance, metric_id,
+	    instance_bitfield_bytes, instance_bitfield_length, request);
+
+	struct nsm_query_per_instance_gpm_metrics_v2_req *req =
+	    reinterpret_cast<
+		struct nsm_query_per_instance_gpm_metrics_v2_req *>(
+		request->payload);
+	EXPECT_EQ(1, request->hdr.request);
+	EXPECT_EQ(0, request->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_PLATFORM_ENVIRONMENTAL,
+		  request->hdr.nvidia_msg_type);
+	EXPECT_EQ(NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_query_per_instance_gpm_metrics_v2_req) -
+		      sizeof(nsm_common_req) + instance_bitfield_length - 1,
+		  req->hdr.data_size);
+	EXPECT_EQ(retrieval_source, req->retrieval_source);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(gpu_instance, req->gpu_instance);
+	EXPECT_EQ(compute_instance, req->compute_instance);
+	EXPECT_EQ(metric_id, req->metric_id);
+	EXPECT_EQ(instance_bitfield_bytes[0].byte,
+		  req->instance_bitmask[0].byte);
+	EXPECT_EQ(instance_bitfield_bytes[1].byte,
+		  req->instance_bitmask[1].byte);
+	EXPECT_EQ(instance_bitfield_bytes[2].byte,
+		  req->instance_bitmask[2].byte);
+	EXPECT_EQ(instance_bitfield_bytes[3].byte,
+		  req->instance_bitmask[3].byte);
+	EXPECT_EQ(instance_bitfield_bytes[4].byte,
+		  req->instance_bitmask[4].byte);
+}
+
+TEST(queryPerInstanceGPMMetricsV2, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg{
+	    0x10,
+	    0xDE,			     // PCI VID: NVIDIA 0x10DE
+	    0x80,			     // RQ=1, D=0, RSVD=0, INSTANCE_ID=0
+	    0x89,			     // OCP_TYPE=8, OCP_VER=9
+	    NSM_TYPE_PLATFORM_ENVIRONMENTAL, // NVIDIA_MSG_TYPE
+	    NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2, // command
+	    sizeof(nsm_query_per_instance_gpm_metrics_v2_req) -
+		sizeof(nsm_common_req) + 5 - 1, // data size
+	    4,					// retrieval_source
+	    8,					// gpu_instance
+	    9,					// compute_instance
+	    45,					// metric_id
+	    0x01,				// instance_bitmask
+	    0x02,				// instance_bitmask
+	    0x03,				// instance_bitmask
+	    0x04,				// instance_bitmask
+	    0x05,				// instance_bitmask
+	};
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	uint8_t retrieval_source;
+	uint8_t gpu_instance;
+	uint8_t compute_instance;
+	uint8_t metric_id;
+	bitfield8_t *instance_bitmask;
+	size_t instance_bitmask_length;
+
+	auto rc = decode_query_per_instance_gpm_metrics_v2_req(
+	    request, msg_len, &retrieval_source, &gpu_instance,
+	    &compute_instance, &metric_id, &instance_bitmask,
+	    &instance_bitmask_length);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(retrieval_source, 4);
+	EXPECT_EQ(gpu_instance, 8);
+	EXPECT_EQ(compute_instance, 9);
+	EXPECT_EQ(metric_id, 45);
+	EXPECT_EQ(instance_bitmask_length, 5);
+	EXPECT_EQ(instance_bitmask[0].byte, 0x01);
+	EXPECT_EQ(instance_bitmask[1].byte, 0x02);
+	EXPECT_EQ(instance_bitmask[2].byte, 0x03);
+	EXPECT_EQ(instance_bitmask[3].byte, 0x04);
+	EXPECT_EQ(instance_bitmask[4].byte, 0x05);
+}
+
 TEST(getViolationDuration, testGoodEncodeRequest)
 {
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +

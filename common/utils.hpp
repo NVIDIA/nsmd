@@ -859,4 +859,7 @@ void setCachedBaseProperties(const std::string& objPath,
 int parseStaticUuid(uuid_t& uuid, uint8_t& deviceType, uint8_t& instanceNumber,
                     uint8_t& deviceRole, std::string& remapPropName,
                     std::vector<std::string>& remapPropValues);
+
+void convertBitfieldToVector(const std::vector<uint8_t>& bitfield,
+                             std::vector<bool>& supportedGPMMetrics);
 } // namespace utils

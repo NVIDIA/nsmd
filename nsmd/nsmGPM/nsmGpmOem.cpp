@@ -36,16 +36,16 @@ using updatePerInstanceGPMMetricFunc =
 class GPMMetricUpdator : public MetricUpdator
 {
   public:
-    GPMMetricUpdator(GPMMetricsIntf* intf, updateGPMMetricFunc updateFunc,
-                     const std::string& objPath) :
-        intf(intf), updateFunc(updateFunc), objPath(objPath) {};
+    GPMMetricUpdator(const std::string& propertyName,
+                     const std::string& objPath,
+                     std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf) :
+        propertyName(propertyName), objPath(objPath), gpmIntf(gpmIntf) {};
 
-    void updateMetric([[maybe_unused]] const std::string& name,
-                      const double val) override
+    void updateMetric(const double val) override
     {
-        if (previousValue != val)
+        if (previousValue != val && gpmIntf)
         {
-            (intf->*updateFunc)(val);
+            gpmIntf->set_property(propertyName, val);
             previousValue = val;
         }
 
@@ -55,15 +55,16 @@ class GPMMetricUpdator : public MetricUpdator
         DbusVariantType valueVariant{val};
 
         nv::shmem::AggregationService::updateTelemetry(
-            objPath, DBusIntf, name, valueVariant, timestamp, 0);
+            objPath, GPMDBusInterfaceName, propertyName, valueVariant,
+            timestamp, 0);
 #endif
     }
 
   private:
-    GPMMetricsIntf* const intf;
-    const updateGPMMetricFunc updateFunc;
-    const std::string& objPath;
+    const std::string propertyName;
+    const std::string objPath;
     static const std::string DBusIntf;
+    const std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf;
 };
 
 const std::string GPMMetricUpdator::DBusIntf{"com.nvidia.GPMMetrics"};
@@ -73,11 +74,10 @@ class NVLinkMetricUpdator : public MetricUpdator
   public:
     NVLinkMetricUpdator(NVLinkMetricsIntf* intf,
                         updateNVLinkMetricFunc updateFunc,
-                        const std::string& objPath) :
-        intf(intf), updateFunc(updateFunc), objPath(objPath) {};
+                        const std::string& objPath, const std::string& name) :
+        intf(intf), updateFunc(updateFunc), objPath(objPath), name(name) {};
 
-    void updateMetric([[maybe_unused]] const std::string& name,
-                      const double val) override
+    void updateMetric(const double val) override
     {
         if (previousValue != val)
         {
@@ -100,6 +100,7 @@ class NVLinkMetricUpdator : public MetricUpdator
     const updateNVLinkMetricFunc updateFunc;
     const std::string& objPath;
     static const std::string DBusIntf;
+    const std::string name;
 };
 
 const std::string NVLinkMetricUpdator::DBusIntf{
@@ -110,8 +111,7 @@ DRAMUsageMetricUpdator::DRAMUsageMetricUpdator(std::shared_ptr<DimmIntf> intf,
     intf(intf), objPath(objPath)
 {}
 
-void DRAMUsageMetricUpdator::updateMetric(
-    [[maybe_unused]] const std::string& name, const double val)
+void DRAMUsageMetricUpdator::updateMetric(const double val)
 {
     if (previousValue != val)
     {
@@ -157,20 +157,104 @@ std::pair<uint8_t, double> decodeBandwidth(const uint8_t* sample, size_t size)
     return {rc, bandwidthGbps};
 }
 
+const std::unordered_map<uint8_t, std::vector<GpmIntfMetricInfo>>
+    GPMIntfMetricsTable{
+        {0,
+         {GpmIntfMetricInfo{"GraphicsEngineActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {1,
+         {GpmIntfMetricInfo{"SMActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {2,
+         {GpmIntfMetricInfo{"SMOccupancyPercent", DataType::Double,
+                            decodePercentage}}},
+        {3,
+         {GpmIntfMetricInfo{"TensorCoreActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {5,
+         {GpmIntfMetricInfo{"FP64ActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {6,
+         {GpmIntfMetricInfo{"FP32ActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {7,
+         {GpmIntfMetricInfo{"FP16ActivityPercent", DataType::Double,
+                            decodePercentage}}},
+        {8,
+         {GpmIntfMetricInfo{"PCIeRawTxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+        {9,
+         {GpmIntfMetricInfo{"PCIeRawRxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+        {14,
+         {GpmIntfMetricInfo{"NVDecUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {15,
+         {GpmIntfMetricInfo{"NVJpgUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {16,
+         {GpmIntfMetricInfo{"NVOfaUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {17,
+         {GpmIntfMetricInfo{"IntegerActivityUtilizationPercent",
+                            DataType::Double, decodePercentage}}},
+        {18,
+         {GpmIntfMetricInfo{"DMMAUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {19,
+         {GpmIntfMetricInfo{"HMMAUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {20,
+         {GpmIntfMetricInfo{"IMMAUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {21,
+         {GpmIntfMetricInfo{"NVEncUtilizationPercent", DataType::Double,
+                            decodePercentage}}},
+        {22,
+         {GpmIntfMetricInfo{"HostMemoryCacheHitPercent", DataType::Double,
+                            decodePercentage}}},
+        {23,
+         {GpmIntfMetricInfo{"HostMemoryCacheMissPercent", DataType::Double,
+                            decodePercentage}}},
+        {24,
+         {GpmIntfMetricInfo{"PeerMemoryCacheHitPercent", DataType::Double,
+                            decodePercentage}}},
+        {25,
+         {GpmIntfMetricInfo{"PeerMemoryCacheMissPercent", DataType::Double,
+                            decodePercentage}}},
+        {26,
+         {GpmIntfMetricInfo{"DRAMMemoryCacheHitPercent", DataType::Double,
+                            decodePercentage}}},
+        {27,
+         {GpmIntfMetricInfo{"DRAMMemoryCacheMissPercent", DataType::Double,
+                            decodePercentage}}},
+        {28,
+         {GpmIntfMetricInfo{"C2CRawTxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+        {29,
+         {GpmIntfMetricInfo{"C2CRawRxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+        {30,
+         {GpmIntfMetricInfo{"C2CDataTxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+        {31,
+         {GpmIntfMetricInfo{"C2CDataRxBandwidthGbps", DataType::Double,
+                            decodeBandwidth}}},
+    };
+
 class GPMMetricInstanceUpdator : public MetricPerInstanceUpdator
 {
   public:
-    GPMMetricInstanceUpdator(const std::string& name,
-                             const std::string& objPath,
-                             const std::shared_ptr<GPMMetricsIntf>& gpmIntf,
-                             updatePerInstanceGPMMetricFunc updateFunc) :
-        name(name), objPath(objPath), gpmIntf(gpmIntf), updateFunc(updateFunc)
+    GPMMetricInstanceUpdator(
+        const std::string& propertyName, const std::string& objPath,
+        std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf) :
+        propertyName(propertyName), objPath(objPath), gpmIntf(gpmIntf)
     {}
     void updateMetric(const std::vector<double>& metrics) override
     {
-        if (previousMetrics != metrics)
+        if (previousMetrics != metrics && gpmIntf)
         {
-            (*gpmIntf.*updateFunc)(metrics);
+            gpmIntf->set_property(propertyName, metrics);
             previousMetrics = metrics;
         }
 
@@ -180,16 +264,16 @@ class GPMMetricInstanceUpdator : public MetricPerInstanceUpdator
         DbusVariantType valueVariant{metrics};
 
         nv::shmem::AggregationService::updateTelemetry(
-            objPath, DBusIntf, name, valueVariant, timestamp, 0);
+            objPath, GPMDBusInterfaceName, propertyName, valueVariant,
+            timestamp, 0);
 #endif
     }
 
   private:
-    const std::string name;
+    const std::string propertyName;
     const std::string objPath;
-    const std::shared_ptr<GPMMetricsIntf> gpmIntf;
-    updatePerInstanceGPMMetricFunc updateFunc;
-    const static std::string DBusIntf;
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf;
+    static const std::string DBusIntf;
 };
 
 const std::string GPMMetricInstanceUpdator::DBusIntf{"com.nvidia.GPMMetrics"};
@@ -243,24 +327,12 @@ class PortMetricPerInstanceUpdator : public MetricPerInstanceUpdator
 const std::string PortMetricPerInstanceUpdator::DBusIntf{
     "com.nvidia.NVLink.NVLinkMetrics"};
 
-std::shared_ptr<MetricPerInstanceUpdator>
-    makeNVDecPerInstanceUpdator(const std::string& objPath,
-                                const std::shared_ptr<GPMMetricsIntf> gpmIntf)
+std::shared_ptr<MetricPerInstanceUpdator> makeGPMPerInstanceUpdator(
+    const std::string& propertyName, const std::string& objPath,
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf)
 {
     return std::shared_ptr<MetricPerInstanceUpdator>{
-        new GPMMetricInstanceUpdator{
-            "NVDecInstanceUtilizationPercent", objPath, gpmIntf,
-            &GPMMetricsIntf::nvDecInstanceUtilizationPercent}};
-}
-
-std::shared_ptr<MetricPerInstanceUpdator>
-    makeNVJpgPerInstanceUpdator(const std::string& objPath,
-                                const std::shared_ptr<GPMMetricsIntf> gpmIntf)
-{
-    return std::shared_ptr<MetricPerInstanceUpdator>{
-        new GPMMetricInstanceUpdator{
-            "NVJpgInstanceUtilizationPercent", objPath, gpmIntf,
-            &GPMMetricsIntf::nvJpgInstanceUtilizationPercent}};
+        new GPMMetricInstanceUpdator{propertyName, objPath, gpmIntf}};
 }
 
 std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkRawRxPerInstanceUpdator(
@@ -299,125 +371,135 @@ std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkDataTxPerInstanceUpdator(
             &NVLinkMetricsIntf::nvLinkDataTxBandwidthGbps}};
 }
 
+NsmGPMInterfaceCreator::NsmGPMInterfaceCreator(
+    sdbusplus::asio::object_server& objServer, const std::string& objpath) :
+    objServer(objServer), objpath(objpath)
+{
+    createGPMIntf();
+}
+
+void NsmGPMInterfaceCreator::createGPMIntf()
+{
+    gpmIntf = objServer.add_interface(objpath.c_str(), GPMDBusInterfaceName);
+    if (!gpmIntf)
+    {
+        lg2::error("Failed to create GPM Interface on object path {OBJPATH}",
+                   "OBJPATH", objpath);
+        return;
+    }
+}
+
+void NsmGPMInterfaceCreator::addGpmIntfProperty(
+    const std::vector<uint8_t>& metricsBitfield)
+{
+    if (!gpmIntf)
+    {
+        lg2::error("GPM Interface not created");
+        return;
+    }
+    std::vector<bool> supportedGPMMetrics;
+    utils::convertBitfieldToVector(metricsBitfield, supportedGPMMetrics);
+    for (size_t i = 0; i < supportedGPMMetrics.size(); i++)
+    {
+        if (supportedGPMMetrics[i] &&
+            GPMIntfMetricsTable.find(i) != GPMIntfMetricsTable.end())
+        {
+            for (const auto& metric : GPMIntfMetricsTable.at(i))
+            {
+                switch (metric.dataType)
+                {
+                    case DataType::Double:
+                        gpmIntf->register_property(
+                            metric.name,
+                            double{std::numeric_limits<double>::quiet_NaN()});
+                        break;
+                    case DataType::VectorDouble:
+                        gpmIntf->register_property(metric.name,
+                                                   std::vector<double>{});
+                        break;
+                }
+            }
+        }
+    }
+}
+
+void NsmGPMInterfaceCreator::addGpmIntfProperty(const std::string& name,
+                                                const DataType& dataType)
+{
+    if (!gpmIntf)
+    {
+        lg2::error("GPM Interface not created");
+        return;
+    }
+
+    switch (dataType)
+    {
+        case DataType::Double:
+            gpmIntf->register_property(
+                name, double{std::numeric_limits<double>::quiet_NaN()});
+            break;
+        case DataType::VectorDouble:
+            gpmIntf->register_property(name, std::vector<double>{});
+            break;
+    }
+}
+
 NsmGPMAggregated::NsmGPMAggregated(
     const std::string& name, const std::string& type,
     const std::string& objpath, uint8_t retrievalSource, uint8_t gpuInstance,
     uint8_t computeInstance, const std::vector<uint8_t>& metricsBitfield,
-    std::shared_ptr<GPMMetricsIntf> gpmIntf,
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf,
     std::shared_ptr<NVLinkMetricsIntf> nvlinkMetricsIntf) :
     NsmSensorAggregator(name, type), retrievalSource(retrievalSource),
     gpuInstance(gpuInstance), computeInstance(computeInstance),
     metricsBitfield(metricsBitfield), objPath(objpath), gpmIntf(gpmIntf),
     nvlinkMetricsIntf(nvlinkMetricsIntf)
 {
-    metricsTable[0] = {
-        "GraphicsEngineActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::graphicsEngineActivityPercent,
-            objPath}}};
+    std::vector<bool> supportedGPMMetrics;
+    utils::convertBitfieldToVector(metricsBitfield, supportedGPMMetrics);
+    for (size_t i = 0; i < supportedGPMMetrics.size(); i++)
+    {
+        if (supportedGPMMetrics[i] &&
+            GPMIntfMetricsTable.find(i) != GPMIntfMetricsTable.end())
+        {
+            metricsTable[i].clear();
+            for (const auto& metric : GPMIntfMetricsTable.at(i))
+            {
+                metricsTable[i].emplace_back(MetricInfo{
+                    metric.decodeFunc,
+                    std::unique_ptr<MetricUpdator>{
+                        new GPMMetricUpdator{metric.name, objPath, gpmIntf}}});
+            }
+        }
+    }
 
-    metricsTable[1] = {
-        "SMActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::smActivityPercent, objPath}}};
+    metricsTable[4].clear();
+    metricsTable[4].emplace_back(MetricInfo{decodePercentage, {}});
 
-    metricsTable[2] = {
-        "SMOccupancyPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::smOccupancyPercent, objPath}}};
-
-    metricsTable[3] = {
-        "TensorCoreActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::tensorCoreActivityPercent,
-            objPath}}};
-
-    metricsTable[4] = {"DRAMUsagePercent", decodePercentage, {}};
-
-    metricsTable[5] = {
-        "FP64ActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::fP64ActivityPercent, objPath}}};
-
-    metricsTable[6] = {
-        "FP32ActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::fP32ActivityPercent, objPath}}};
-
-    metricsTable[7] = {
-        "FP16ActivityPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::fP16ActivityPercent, objPath}}};
-
-    metricsTable[8] = {
-        "PCIeRawTxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::pcIeRawTxBandwidthGbps, objPath}}};
-
-    metricsTable[9] = {
-        "PCIeRawRxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::pcIeRawRxBandwidthGbps, objPath}}};
-
-    metricsTable[10] = {
-        "NVLinkRawTxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
-            nvlinkMetricsIntf.get(),
-            &NVLinkMetricsIntf::nvLinkRawTxBandwidthGbps, objPath}}};
-
-    metricsTable[11] = {
-        "NVLinkDataTxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
-            nvlinkMetricsIntf.get(),
-            &NVLinkMetricsIntf::nvLinkDataTxBandwidthGbps, objPath}}};
-
-    metricsTable[12] = {
-        "NVLinkRawRxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
-            nvlinkMetricsIntf.get(),
-            &NVLinkMetricsIntf::nvLinkRawRxBandwidthGbps, objPath}}};
-
-    metricsTable[13] = {
-        "NVLinkDataRxBandwidthGbps", decodeBandwidth,
-        std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
-            nvlinkMetricsIntf.get(),
-            &NVLinkMetricsIntf::nvLinkDataRxBandwidthGbps, objPath}}};
-
-    metricsTable[14] = {
-        "NVDecUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::nvDecUtilizationPercent, objPath}}};
-
-    metricsTable[15] = {
-        "NVJpgUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::nvJpgUtilizationPercent, objPath}}};
-
-    metricsTable[16] = {
-        "NVOfaUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::nvOfaUtilizationPercent, objPath}}};
-
-    metricsTable[17] = {
-        "IntegerActivityUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::integerActivityUtilizationPercent,
-            objPath}}};
-
-    metricsTable[18] = {
-        "DMMAUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::dmmaUtilizationPercent, objPath}}};
-
-    metricsTable[19] = {
-        "HMMAUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::hmmaUtilizationPercent, objPath}}};
-
-    metricsTable[20] = {
-        "IMMAUtilizationPercent", decodePercentage,
-        std::unique_ptr<MetricUpdator>{new GPMMetricUpdator{
-            gpmIntf.get(), &GPMMetricsIntf::immaUtilizationPercent, objPath}}};
+    metricsTable[10].clear();
+    metricsTable[10].emplace_back(MetricInfo{
+        decodeBandwidth, std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
+                             nvlinkMetricsIntf.get(),
+                             &NVLinkMetricsIntf::nvLinkRawTxBandwidthGbps,
+                             objPath, "NVLinkRawTxBandwidthGbps"}}});
+    metricsTable[11].clear();
+    metricsTable[11].emplace_back(MetricInfo{
+        decodeBandwidth, std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
+                             nvlinkMetricsIntf.get(),
+                             &NVLinkMetricsIntf::nvLinkDataTxBandwidthGbps,
+                             objPath, "NVLinkDataTxBandwidthGbps"}}});
+    metricsTable[12].clear();
+    metricsTable[12].emplace_back(MetricInfo{
+        decodeBandwidth, std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
+                             nvlinkMetricsIntf.get(),
+                             &NVLinkMetricsIntf::nvLinkRawRxBandwidthGbps,
+                             objPath, "NVLinkRawRxBandwidthGbps"}}});
+    metricsTable[13].clear();
+    metricsTable[13].emplace_back(MetricInfo{
+        decodeBandwidth, std::unique_ptr<MetricUpdator>{new NVLinkMetricUpdator{
+                             nvlinkMetricsIntf.get(),
+                             &NVLinkMetricsIntf::nvLinkDataRxBandwidthGbps,
+                             objPath, "NVLinkDataRxBandwidthGbps"}}});
 }
 
 std::optional<std::vector<uint8_t>>
@@ -456,31 +538,32 @@ int NsmGPMAggregated::handleSample(const TelemetrySample& sample)
         return returnValue;
     }
 
-    const auto& metric = metricsTable[sample.tag];
-    if (!metric.decodeFunc || !metric.updater)
+    for (auto& metric : metricsTable[sample.tag])
     {
-        return returnValue;
+        if (!metric.decodeFunc || !metric.updater)
+        {
+            return returnValue;
+        }
+
+        auto [rc, val] = metric.decodeFunc(sample.data, sample.data_len);
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            lg2::debug(
+                "Failed to decode GPM Aggregate Metric {SAMPLE_TAG}. Object Path = {OBJPATH}, rc = {RC}.",
+                "SAMPLE_TAG", sample.tag, "OBJPATH", objPath, "RC", rc);
+            returnValue = rc;
+        }
+
+        metric.updater->updateMetric(val);
     }
-
-    auto [rc, val] = metric.decodeFunc(sample.data, sample.data_len);
-
-    if (rc != NSM_SW_SUCCESS)
-    {
-        lg2::debug(
-            "Failed to decode GPM Aggregate Metric {NAME}. Object Path = {OBJPATH}, rc = {RC}.",
-            "NAME", metric.name, "OBJPATH", objPath, "RC", rc);
-        returnValue = rc;
-    }
-
-    metric.updater->updateMetric(metric.name, val);
-
     return returnValue;
 }
 
 NsmGPMPerInstance::NsmGPMPerInstance(
     const std::string& name, const std::string& type, uint8_t retrievalSource,
     uint8_t gpuInstance, uint8_t computeInstance, uint8_t metricId,
-    const uint32_t instanceBitfield, GPMMetricsUnit unit,
+    const std::vector<bitfield8_t> instanceBitfield, GPMMetricsUnit unit,
     std::shared_ptr<MetricPerInstanceUpdator> metricUpdator) :
     NsmSensor(name, type), retrievalSource(retrievalSource),
     gpuInstance(gpuInstance), computeInstance(computeInstance),
@@ -506,13 +589,14 @@ std::optional<std::vector<uint8_t>>
     std::vector<uint8_t> request;
 
     request.resize(sizeof(nsm_msg_hdr) +
-                   sizeof(nsm_query_per_instance_gpm_metrics_req));
+                   sizeof(nsm_query_per_instance_gpm_metrics_v2_req) +
+                   instanceBitfield.size() - 1);
 
     auto requestPtr = reinterpret_cast<nsm_msg*>(request.data());
 
-    auto rc = encode_query_per_instance_gpm_metrics_req(
+    auto rc = encode_query_per_instance_gpm_metrics_v2_req(
         instanceId, retrievalSource, gpuInstance, computeInstance, metricId,
-        instanceBitfield, requestPtr);
+        instanceBitfield.data(), instanceBitfield.size(), requestPtr);
 
     if (rc)
     {

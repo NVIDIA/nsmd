@@ -462,6 +462,9 @@ class MockupResponder
         queryPerInstanceGPMMetrics(const nsm_msg* requestMsg,
                                    size_t requestLen);
     std::optional<std::vector<uint8_t>>
+        queryPerInstanceGPMMetricsV2(const nsm_msg* requestMsg,
+                                     size_t requestLen);
+    std::optional<std::vector<uint8_t>>
         getReconfigurationPermissionsV1Handler(const nsm_msg* requestMsg,
                                                size_t requestLen);
     std::optional<std::vector<uint8_t>>

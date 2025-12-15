@@ -4187,6 +4187,80 @@ int decode_query_per_instance_gpm_metrics_req(
 	return NSM_SW_SUCCESS;
 }
 
+int encode_query_per_instance_gpm_metrics_v2_req(
+    uint8_t instance, uint8_t retrieval_source, uint8_t gpu_instance,
+    uint8_t compute_instance, uint8_t metric_id,
+    const bitfield8_t *instance_bitmask, size_t instance_bitmask_length,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance;
+	header.nvidia_msg_type = NSM_TYPE_PLATFORM_ENVIRONMENTAL;
+
+	uint8_t rc = pack_nsm_header(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_query_per_instance_gpm_metrics_v2_req *request =
+	    (struct nsm_query_per_instance_gpm_metrics_v2_req *)msg->payload;
+
+	request->hdr.command = NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2;
+	request->hdr.data_size =
+	    sizeof(struct nsm_query_per_instance_gpm_metrics_v2_req) -
+	    sizeof(struct nsm_common_req) + instance_bitmask_length - 1;
+	request->retrieval_source = retrieval_source;
+	request->gpu_instance = gpu_instance;
+	request->compute_instance = compute_instance;
+	request->metric_id = metric_id;
+	memcpy(&request->instance_bitmask[0], instance_bitmask,
+	       instance_bitmask_length);
+	return NSM_SW_SUCCESS;
+}
+
+int decode_query_per_instance_gpm_metrics_v2_req(
+    const struct nsm_msg *msg, size_t msg_len, uint8_t *retrieval_source,
+    uint8_t *gpu_instance, uint8_t *compute_instance, uint8_t *metric_id,
+    bitfield8_t **instance_bitmask, size_t *instance_bitmask_length)
+{
+	if (msg == NULL || retrieval_source == NULL || gpu_instance == NULL ||
+	    compute_instance == NULL || metric_id == NULL ||
+	    instance_bitmask == NULL || instance_bitmask_length == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) +
+		sizeof(struct nsm_query_per_instance_gpm_metrics_v2_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_query_per_instance_gpm_metrics_v2_req *request =
+	    (struct nsm_query_per_instance_gpm_metrics_v2_req *)msg->payload;
+
+	if (request->hdr.data_size <
+	    (sizeof(struct nsm_query_per_instance_gpm_metrics_v2_req) -
+	     sizeof(struct nsm_common_req))) {
+		return NSM_SW_ERROR_DATA;
+	}
+
+	*retrieval_source = request->retrieval_source;
+	*gpu_instance = request->gpu_instance;
+	*compute_instance = request->compute_instance;
+	*metric_id = request->metric_id;
+	*instance_bitmask = request->instance_bitmask;
+	*instance_bitmask_length =
+	    request->hdr.data_size -
+	    (sizeof(struct nsm_query_per_instance_gpm_metrics_v2_req) -
+	     sizeof(struct nsm_common_req) - 1);
+
+	return NSM_SW_SUCCESS;
+}
+
 int encode_aggregate_gpm_metric_percentage_data(double percentage,
 						uint8_t *data, size_t *data_len)
 {

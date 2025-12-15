@@ -298,7 +298,10 @@ class GetHistogramFormat : public CommandInterface
         histoFormatOptionGroup->add_option(
             "-i, --histogramId", histogramId,
             "retrieve histogram format information for histogram Id");
-        histoFormatOptionGroup->require_option(1);
+        histoFormatOptionGroup->add_option(
+            "-p, --parameter", parameter,
+            "parameter value for histogram format request");
+        histoFormatOptionGroup->require_option(2);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
@@ -488,7 +491,10 @@ class GetHistogramData : public CommandInterface
         histoDataOptionGroup->add_option(
             "-i, --histogramId", histogramId,
             "retrieve histogram format information for histogram Id");
-        histoDataOptionGroup->require_option(1);
+        histoDataOptionGroup->add_option(
+            "-p, --parameter", parameter,
+            "parameter value for histogram data request");
+        histoDataOptionGroup->require_option(2);
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override

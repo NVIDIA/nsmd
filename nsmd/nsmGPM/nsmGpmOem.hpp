@@ -21,6 +21,7 @@
 #include <com/nvidia/NVLink/NVLinkMetrics/server.hpp>
 #include <nsmSensor.hpp>
 #include <nsmSensorAggregator.hpp>
+#include <sdbusplus/asio/object_server.hpp>
 #include <xyz/openbmc_project/Inventory/Item/Dimm/server.hpp>
 
 namespace nsm
@@ -31,14 +32,32 @@ enum class GPMMetricsUnit : uint8_t
     BANDWIDTH
 };
 
+using DecodeMetricFunc = std::pair<uint8_t, double> (*)(const uint8_t*, size_t);
+std::pair<uint8_t, double> decodePercentage(const uint8_t* sample, size_t size);
+std::pair<uint8_t, double> decodeBandwidth(const uint8_t* sample, size_t size);
+enum class DataType
+{
+    Double,
+    VectorDouble
+};
+struct GpmIntfMetricInfo
+{
+    std::string name;
+    DataType dataType;
+    DecodeMetricFunc decodeFunc;
+};
+
+const static std::string GPMDBusInterfaceName = "com.nvidia.GPMMetrics";
+
+extern const std::unordered_map<uint8_t, std::vector<GpmIntfMetricInfo>>
+    GPMIntfMetricsTable;
+
 using GPMMetricsIntf =
     sdbusplus::server::object_t<sdbusplus::com::nvidia::server::GPMMetrics>;
 using NVLinkMetricsIntf = sdbusplus::server::object_t<
     sdbusplus::com::nvidia::NVLink::server::NVLinkMetrics>;
 using DimmIntf = sdbusplus::server::object_t<
     sdbusplus::xyz::openbmc_project::Inventory::Item::server::Dimm>;
-
-using DecodeMetricFunc = std::pair<uint8_t, double> (*)(const uint8_t*, size_t);
 
 class MetricUpdator
 {
@@ -48,7 +67,7 @@ class MetricUpdator
   public:
     virtual ~MetricUpdator() = default;
 
-    virtual void updateMetric(const std::string& name, const double val) = 0;
+    virtual void updateMetric(const double val) = 0;
 };
 
 class MetricPerInstanceUpdator
@@ -63,7 +82,6 @@ class MetricPerInstanceUpdator
 
 struct MetricInfo
 {
-    const char* name;
     DecodeMetricFunc decodeFunc;
     std::unique_ptr<MetricUpdator> updater;
 };
@@ -74,16 +92,9 @@ struct NVLinkMetricsUpdatorInfo
     std::shared_ptr<NVLinkMetricsIntf> interface;
 };
 
-std::pair<uint8_t, double> decodePercentage(const uint8_t* sample, size_t size);
-std::pair<uint8_t, double> decodeBandwidth(const uint8_t* sample, size_t size);
-
-std::shared_ptr<MetricPerInstanceUpdator>
-    makeNVDecPerInstanceUpdator(const std::string& objPath,
-                                const std::shared_ptr<GPMMetricsIntf> gpmIntf);
-
-std::shared_ptr<MetricPerInstanceUpdator>
-    makeNVJpgPerInstanceUpdator(const std::string& objPath,
-                                const std::shared_ptr<GPMMetricsIntf> gpmIntf);
+std::shared_ptr<MetricPerInstanceUpdator> makeGPMPerInstanceUpdator(
+    const std::string& propertyName, const std::string& objPath,
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf);
 
 std::shared_ptr<MetricPerInstanceUpdator> makeNVLinkRawRxPerInstanceUpdator(
     const std::vector<NVLinkMetricsUpdatorInfo>& gpmIntf);
@@ -103,13 +114,45 @@ class DRAMUsageMetricUpdator : public MetricUpdator
     DRAMUsageMetricUpdator(std::shared_ptr<DimmIntf> intf,
                            const std::string& objPath);
 
-    void updateMetric(const std::string& name, const double val) override;
+    void updateMetric(const double val) override;
 
   private:
     std::shared_ptr<DimmIntf> intf;
     const std::string objPath;
     static const std::string dBusIntf;
     static const std::string dBusProperty;
+};
+
+class NsmGPMInterfaceCreator
+{
+  public:
+    NsmGPMInterfaceCreator(sdbusplus::asio::object_server& objServer,
+                           const std::string& objpath);
+
+    void createGPMIntf();
+    void addGpmIntfProperty(const std::vector<uint8_t>& metricsBitfield);
+    void addGpmIntfProperty(const std::string& name, const DataType& dataType);
+    std::shared_ptr<sdbusplus::asio::dbus_interface> getGPMIntf()
+    {
+        return gpmIntf;
+    }
+    void initialize()
+    {
+        if (gpmIntf)
+        {
+            gpmIntf->initialize();
+        }
+        else
+        {
+            lg2::error("gpmIntf not created for {OBJ_PATH}", "OBJ_PATH",
+                       objpath);
+        }
+    }
+
+  private:
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf;
+    sdbusplus::asio::object_server& objServer;
+    const std::string objpath;
 };
 
 class NsmGPMAggregated : public NsmSensorAggregator
@@ -119,17 +162,20 @@ class NsmGPMAggregated : public NsmSensorAggregator
                      const std::string& objpath, uint8_t retrievalSource,
                      uint8_t gpuInstance, uint8_t computeIndex,
                      const std::vector<uint8_t>& metricsBitfield,
-                     std::shared_ptr<GPMMetricsIntf> gpmIntf,
+                     std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf,
                      std::shared_ptr<NVLinkMetricsIntf> nvlinkMetricsIntf);
 
     std::optional<std::vector<uint8_t>>
         genRequestMsg(eid_t eid, uint8_t instanceId) override;
 
-    MetricInfo* getMetricInfo(uint8_t metricId)
+    std::vector<MetricInfo*> getMetricInfo(uint8_t metricId)
     {
-        return metricId < NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE
-                   ? &metricsTable[metricId]
-                   : nullptr;
+        std::vector<MetricInfo*> metricInfos;
+        for (auto& metric : metricsTable[metricId])
+        {
+            metricInfos.push_back(&metric);
+        }
+        return metricInfos;
     }
 
   private:
@@ -142,10 +188,11 @@ class NsmGPMAggregated : public NsmSensorAggregator
     const std::vector<uint8_t> metricsBitfield;
     const std::string objPath;
 
-    std::shared_ptr<GPMMetricsIntf> gpmIntf{nullptr};
+    std::shared_ptr<sdbusplus::asio::dbus_interface> gpmIntf{nullptr};
     std::shared_ptr<NVLinkMetricsIntf> nvlinkMetricsIntf{nullptr};
 
-    std::array<MetricInfo, NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE>
+    std::array<std::vector<MetricInfo>,
+               NSM_AGGREGATE_MAX_UNRESERVED_SAMPLE_TAG_VALUE>
         metricsTable{};
 };
 
@@ -155,7 +202,8 @@ class NsmGPMPerInstance : public NsmSensor
     NsmGPMPerInstance(const std::string& name, const std::string& type,
                       uint8_t retrievalSource, uint8_t gpuInstance,
                       uint8_t computeInstance, uint8_t metricId,
-                      const uint32_t instanceBitfield, GPMMetricsUnit unit,
+                      const std::vector<bitfield8_t> instanceBitfield,
+                      GPMMetricsUnit unit,
                       std::shared_ptr<MetricPerInstanceUpdator> metricUpdator);
 
     std::optional<std::vector<uint8_t>>
@@ -169,7 +217,7 @@ class NsmGPMPerInstance : public NsmSensor
     const uint8_t gpuInstance;
     const uint8_t computeInstance;
     const uint8_t metricId;
-    const uint32_t instanceBitfield;
+    const std::vector<bitfield8_t> instanceBitfield;
     const std::string objPath;
 
     DecodeMetricFunc decodeFunc{};

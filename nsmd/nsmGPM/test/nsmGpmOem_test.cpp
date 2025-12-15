@@ -17,6 +17,10 @@
 
 #include "platform-environmental.h"
 
+#include <boost/asio/io_context.hpp>
+#include <sdbusplus/asio/connection.hpp>
+#include <sdbusplus/asio/object_server.hpp>
+
 #include <cmath>
 
 #include <gmock/gmock.h>
@@ -37,8 +41,7 @@ class MockMetricPerInstanceUpdator : public nsm::MetricPerInstanceUpdator
 class MockMetricUpdator : public nsm::MetricUpdator
 {
   public:
-    MOCK_METHOD(void, updateMetric, (const std::string& name, const double val),
-                (override));
+    MOCK_METHOD(void, updateMetric, (const double val), (override));
 };
 
 TEST(nsmGPMAggregated, GoodGenReq)
@@ -48,9 +51,13 @@ TEST(nsmGPMAggregated, GoodGenReq)
     const uint8_t compute_instance = 90;
     const std::vector<uint8_t> metrics_bitfield{0x89, 0x04, 0x15};
 
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+    auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
-    auto gpmIntf = std::make_shared<nsm::GPMMetricsIntf>(
-        bus, "/xyz/openbmc_project/inventory/gpm");
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(
         bus, "/xyz/openbmc_project/inventory/gpm");
     nsm::NsmGPMAggregated gpm{"sensor",
@@ -60,7 +67,7 @@ TEST(nsmGPMAggregated, GoodGenReq)
                               gpu_instance,
                               compute_instance,
                               metrics_bitfield,
-                              gpmIntf,
+                              gpmAsioIntf,
                               nvlinkIntf};
 
     const uint8_t eid{12};
@@ -89,9 +96,13 @@ TEST(nsmGPMAggregated, GoodHandleResp)
     const uint8_t compute_instance = 90;
     const std::vector<uint8_t> metrics_bitfield{0x89, 0x04, 0x15};
 
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+    auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        "com.nvidia.GPMMetrics");
     auto bus = sdbusplus::bus::new_default();
-    auto gpmIntf = std::make_shared<nsm::GPMMetricsIntf>(
-        bus, "/xyz/openbmc_project/inventory/gpm");
     auto nvlinkIntf = std::make_shared<nsm::NVLinkMetricsIntf>(
         bus, "/xyz/openbmc_project/inventory/gpm");
     nsm::NsmGPMAggregated gpm{"sensor",
@@ -101,18 +112,18 @@ TEST(nsmGPMAggregated, GoodHandleResp)
                               gpu_instance,
                               compute_instance,
                               metrics_bitfield,
-                              gpmIntf,
+                              gpmAsioIntf,
                               nvlinkIntf};
 
     auto updator = std::make_unique<MockMetricUpdator>();
     auto percentage_updator = updator.get();
-    gpm.metricsTable[3] = {"TensorCoreActivityPercent", nsm::decodePercentage,
-                           std::move(updator)};
+    gpm.metricsTable[3].emplace_back(
+        nsm::MetricInfo{nsm::decodePercentage, std::move(updator)});
 
     updator = std::make_unique<MockMetricUpdator>();
     auto bandwidth_updator = updator.get();
-    gpm.metricsTable[8] = {"PCIeRawTxBandwidthGbps", nsm::decodeBandwidth,
-                           std::move(updator)};
+    gpm.metricsTable[8].emplace_back(
+        nsm::MetricInfo{nsm::decodeBandwidth, std::move(updator)});
 
     const double percentage{34.5633};
     const double bandwidth{689535402};
@@ -130,13 +141,11 @@ TEST(nsmGPMAggregated, GoodHandleResp)
     EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
     EXPECT_CALL(*percentage_updator,
-                updateMetric("TensorCoreActivityPercent",
-                             testing::DoubleNear(percentage, 0.01)))
+                updateMetric(testing::DoubleNear(percentage, 0.01)))
         .Times(1);
 
     static constexpr uint64_t conversionFactor = 1024 * 1024 * 128;
-    EXPECT_CALL(*bandwidth_updator, updateMetric("PCIeRawTxBandwidthGbps",
-                                                 bandwidth / conversionFactor))
+    EXPECT_CALL(*bandwidth_updator, updateMetric(bandwidth / conversionFactor))
         .Times(1);
 
     rc = gpm.handleSample({3, static_cast<uint8_t>(percentage_data_len),
@@ -153,11 +162,14 @@ TEST(nsmGPMPerIntance, GoodGenReq)
     const uint8_t gpu_instance = 0xFF;
     const uint8_t compute_instance = 38;
     const uint8_t metric_id = 34;
-    const uint32_t instance_bitmask = 38;
+    const std::vector<bitfield8_t> instance_bitmask{{.byte = 38}};
 
-    auto bus = sdbusplus::bus::new_default();
-    auto gpmIntf = std::make_shared<nsm::GPMMetricsIntf>(
-        bus, "/xyz/openbmc_project/inventory/gpm");
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+    auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        "com.nvidia.GPMMetrics");
 
     nsm::NsmGPMPerInstance gpm{
         "sensor",
@@ -168,8 +180,8 @@ TEST(nsmGPMPerIntance, GoodGenReq)
         metric_id,
         instance_bitmask,
         nsm::GPMMetricsUnit::PERCENTAGE,
-        nsm::makeNVDecPerInstanceUpdator("/xyz/openbmc_project/inventory/gpm",
-                                         gpmIntf)};
+        nsm::makeGPMPerInstanceUpdator(
+            "PropertyName", "/xyz/openbmc_project/inventory/gpm", gpmAsioIntf)};
 
     const uint8_t eid{12};
     const uint8_t instance_id{30};
@@ -179,15 +191,15 @@ TEST(nsmGPMPerIntance, GoodGenReq)
 
     auto msg = reinterpret_cast<const nsm_msg*>(request->data());
     auto command =
-        reinterpret_cast<const nsm_query_per_instance_gpm_metrics_req*>(
+        reinterpret_cast<const nsm_query_per_instance_gpm_metrics_v2_req*>(
             msg->payload);
 
-    EXPECT_EQ(NSM_QUERY_PER_INSTANCE_GPM_METRICS, command->hdr.command);
+    EXPECT_EQ(NSM_QUERY_PER_INSTANCE_GPM_METRICS_V2, command->hdr.command);
     EXPECT_EQ(retrieval_source, command->retrieval_source);
     EXPECT_EQ(gpu_instance, command->gpu_instance);
     EXPECT_EQ(compute_instance, command->compute_instance);
     EXPECT_EQ(metric_id, command->metric_id);
-    EXPECT_EQ(instance_bitmask, command->instance_bitmask);
+    EXPECT_EQ(instance_bitmask[0].byte, command->instance_bitmask[0].byte);
 }
 
 TEST(nsmGPMPerIntance, GoodHandleResp)
@@ -196,11 +208,14 @@ TEST(nsmGPMPerIntance, GoodHandleResp)
     const uint8_t gpu_instance = 0xFF;
     const uint8_t compute_instance = 38;
     const uint8_t metric_id = 34;
-    const uint32_t instance_bitmask = 38;
+    const std::vector<bitfield8_t> instance_bitmask{{.byte = 38}};
 
-    auto bus = sdbusplus::bus::new_default();
-    auto gpmIntf = std::make_shared<nsm::GPMMetricsIntf>(
-        bus, "/xyz/openbmc_project/inventory/gpm");
+    boost::asio::io_context io;
+    auto systemBus = std::make_shared<sdbusplus::asio::connection>(io);
+    sdbusplus::asio::object_server objServer(systemBus);
+    auto gpmAsioIntf = std::make_shared<sdbusplus::asio::dbus_interface>(
+        systemBus, "/xyz/openbmc_project/inventory/gpm",
+        "com.nvidia.GPMMetrics");
 
     nsm::NsmGPMPerInstance gpm{
         "sensor",
@@ -211,9 +226,10 @@ TEST(nsmGPMPerIntance, GoodHandleResp)
         metric_id,
         instance_bitmask,
         nsm::GPMMetricsUnit::BANDWIDTH,
-        nsm::makeNVDecPerInstanceUpdator("/xyz/openbmc_project/inventory/gpm",
-                                         gpmIntf)};
+        nsm::makeGPMPerInstanceUpdator(
+            "PropertyName", "/xyz/openbmc_project/inventory/gpm", gpmAsioIntf)};
 
+    // Replace the metricUpdator with mock
     auto updator = std::make_shared<MockMetricPerInstanceUpdator>();
     const_cast<std::shared_ptr<nsm::MetricPerInstanceUpdator>&>(
         gpm.metricUpdator) = updator;

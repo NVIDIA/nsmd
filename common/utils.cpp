@@ -1309,4 +1309,23 @@ bool CustomFD::read(const off_t pos, uint8_t* data, const size_t size)
     return true;
 }
 
+void convertBitfieldToVector(const std::vector<uint8_t>& bitfield,
+                             std::vector<bool>& supportedGPMMetrics)
+{
+    for (size_t i = 0; i < bitfield.size(); i++)
+    {
+        for (size_t j = 0; j < 8; j++)
+        {
+            if (bitfield[i] & (1 << j))
+            {
+                supportedGPMMetrics.push_back(true);
+            }
+            else
+            {
+                supportedGPMMetrics.push_back(false);
+            }
+        }
+    }
+}
+
 } // namespace utils
