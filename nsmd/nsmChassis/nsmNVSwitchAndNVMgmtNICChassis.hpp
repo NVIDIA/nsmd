@@ -18,6 +18,7 @@
 #pragma once
 
 #include "globals.hpp"
+#include "nsmApSkuIdIntf.hpp"
 #include "nsmAssetIntf.hpp"
 #include "nsmInterface.hpp"
 

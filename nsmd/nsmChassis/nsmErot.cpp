@@ -401,38 +401,42 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             bus, name, type, uuid, rotProgressIntf);
         device->addSensor(securityCfg, false);
 
-        // Create SKU interface for regular chassis (not RoT)
-        if (skuIdSensor == nullptr && apComponentFound)
+        // Create SKU and Async.Set interface for chassis with SKU update
+        // enabled
+        if (apComponentFound && enableUpdateSKU)
         {
-            skuIdSensor = std::make_shared<NsmApSkuIdObject>(
-                bus, name, type, uuid, nullptr, apClassification, apIdentifier,
-                apIndex);
-            device->addSensor(skuIdSensor, false);
-        }
+            if (skuIdSensor == nullptr)
+            {
+                skuIdSensor = std::make_shared<NsmApSkuIdObject>(
+                    bus, name, type, uuid, nullptr, apClassification,
+                    apIdentifier, apIndex);
+                device->addSensor(skuIdSensor, false);
+            }
 
-        if (updateSkuIntf == nullptr && enableUpdateSKU && apComponentFound)
-        {
-            auto inventoryPath = std::string(chassisInventoryBasePath) + "/" +
-                                 name;
-            lg2::info(
-                "Creating SKU Update interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
-                "CHASSIS", name, "PATH", inventoryPath, "CLASS",
-                apClassification, "ID", apIdentifier, "IDX", apIndex);
-            updateSkuIntf = std::make_shared<NsmUpdateApSkuIdIntf>(
-                bus, inventoryPath.c_str());
-            nsm::AsyncSetOperationHandler updateSkuHandler =
-                std::bind(&updateApSkuIdHandler, std::placeholders::_1,
-                          std::placeholders::_2, std::placeholders::_3,
-                          apClassification, apIdentifier, apIndex);
-            AsyncOperationManager::getInstance()
-                ->getDispatcher(inventoryPath)
-                ->addAsyncSetOperation(
-                    "xyz.openbmc_project.Inventory.Decorator.SKU", "SKU",
-                    AsyncSetOperationInfo{updateSkuHandler, skuIdSensor,
-                                          device});
-            lg2::info(
-                "SKU Update interface created successfully for chassis:{CHASSIS}",
-                "CHASSIS", name);
+            if (updateSkuIntf == nullptr)
+            {
+                auto inventoryPath = std::string(chassisInventoryBasePath) +
+                                     "/" + name;
+                lg2::info(
+                    "Creating SKU Update interface for chassis:{CHASSIS} path:{PATH} with AP component (class={CLASS}, id={ID}, idx={IDX})",
+                    "CHASSIS", name, "PATH", inventoryPath, "CLASS",
+                    apClassification, "ID", apIdentifier, "IDX", apIndex);
+                updateSkuIntf = std::make_shared<NsmUpdateApSkuIdIntf>(
+                    bus, inventoryPath.c_str());
+                nsm::AsyncSetOperationHandler updateSkuHandler =
+                    std::bind(&updateApSkuIdHandler, std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3,
+                              apClassification, apIdentifier, apIndex);
+                AsyncOperationManager::getInstance()
+                    ->getDispatcher(inventoryPath)
+                    ->addAsyncSetOperation(
+                        "xyz.openbmc_project.Inventory.Decorator.SKU", "SKU",
+                        AsyncSetOperationInfo{updateSkuHandler, skuIdSensor,
+                                              device});
+                lg2::info(
+                    "SKU Update interface created successfully for chassis:{CHASSIS}",
+                    "CHASSIS", name);
+            }
         }
         else if (enableUpdateSKU && !apComponentFound)
         {

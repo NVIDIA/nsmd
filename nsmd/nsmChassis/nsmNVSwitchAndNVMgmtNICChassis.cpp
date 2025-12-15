@@ -175,6 +175,15 @@ void createChassisVersion(std::shared_ptr<NsmDevice> device, std::string& name,
     device->addStaticSensor(versionSensor);
 }
 
+void createChassisSKU(std::shared_ptr<NsmDevice> device, std::string& name,
+                      const std::string& baseType)
+{
+    auto chassisSKU =
+        std::make_shared<NsmNVSwitchAndNicChassis<NsmApSkuIdIntf>>(name,
+                                                                   baseType);
+    device->addStaticSensor(chassisSKU);
+}
+
 requester::Coroutine createNsmChassis(SensorManager& manager,
                                       const std::string& interface,
                                       const std::string& objPath,
@@ -231,6 +240,7 @@ requester::Coroutine createNsmChassis(SensorManager& manager,
     else if (type == "NSM_Chassis_Attributes")
     {
         createChassisAsset(device, name, baseType);
+        createChassisSKU(device, name, baseType);
         createChassisHealth(device, name, baseType);
         if (allCurrentIfaceProperties.count("ChassisType"))
         {

@@ -99,7 +99,7 @@ uint8_t NsmApSkuIdObject::handleResponseMsg(const struct nsm_msg* responseMsg,
     std::string apSkuIdStr = formatApSkuId(apSkuIdValue);
     apSkuIdObject->sku(apSkuIdStr);
 
-    lg2::info("AP SKU ID received: {SKUID}", "SKUID", apSkuIdValue);
+    lg2::debug("AP SKU ID received: {SKUID}", "SKUID", apSkuIdValue);
 
     free(erot_info.slot_info);
     return cc ? cc : rc;

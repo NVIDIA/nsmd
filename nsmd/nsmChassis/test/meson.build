@@ -18,6 +18,7 @@ dep_src_files = [
     '../../nsmLongRunning/nsmLongRunningSensor.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
+    '../../nsmDbusIfaceOverride/nsmApSkuIdIntf.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmDumpCollection/nsmDebugInfo.cpp',
     '../../nsmDevice.cpp',

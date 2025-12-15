@@ -32,6 +32,7 @@ dep_src_files = [
     '../../nsmPort/nsmPortDisableFuture.cpp',
     '../../nsmSensors/nsmInventoryProperty.cpp',
     '../../nsmSensors/nsmPCIeLinkSpeed.cpp',
+    '../../nsmDbusIfaceOverride/nsmApSkuIdIntf.cpp',
     '../../nsmDbusIfaceOverride/nsmAssetIntf.cpp',
     '../../nsmDbusIfaceOverride/nsmMNNVLinkTopologyIntf.cpp',
     '../../nsmErrorInjection/nsmErrorInjection.cpp',

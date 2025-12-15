@@ -61,6 +61,13 @@ static void createAsset(std::shared_ptr<NsmDevice> device,
     device->addStaticSensor(model);
 }
 
+static void createSKU(std::shared_ptr<NsmDevice> device,
+                      const std::string& name)
+{
+    auto chassisSKU = std::make_shared<NsmChassis<NsmApSkuIdIntf>>(name);
+    device->addStaticSensor(chassisSKU);
+}
+
 static void createFPGAAsset(std::shared_ptr<NsmDevice> device,
                             const std::string& name,
                             const dbus::PropertyMap& allCurrentIfaceProperties)
@@ -296,8 +303,8 @@ static void
             allCurrentIfaceProperties.at("AssetInformationAvailable")))
     {
         createAsset(device, name, allCurrentIfaceProperties);
+        createSKU(device, name);
     }
-
     // Handle Location and LocationCode from ChassisAttributes
     if (allCurrentIfaceProperties.count("LocationType"))
     {
@@ -359,6 +366,7 @@ static void
                          const dbus::PropertyMap& allCurrentIfaceProperties)
 {
     createFPGAAsset(device, name, allCurrentIfaceProperties);
+    createSKU(device, name);
 
     // Handle Location and ChassisType from FPGAAttributes
     if (allCurrentIfaceProperties.count("LocationType"))
