@@ -33,6 +33,24 @@ const static std::unordered_map<uint16_t, std::string> firmwareCommandErrors = {
     {0x8B, "Firmware Pending Activation"},
 };
 
+const static std::unordered_map<uint16_t, std::string>
+    imageCopyInvalidStateErrors = {
+        {ERR_NO_BOOT_COMPLETE,
+         "The RoT has not received a boot complete indication from the AP"},
+        {ERR_UPDATE_IN_PROGRESS, "A firmware update is in progress"},
+        {ERR_IMAGE_COPY_IN_PROGRESS, "An image copy is in progress"},
+        {ERR_IMAGE_COPY_COMPLETED, "An image copy was completed successfully"},
+        {ERR_FLASH_WEAR_MITIGATION,
+         "A flash wear out mitigation policy is in effect"},
+};
+
+const static std::unordered_map<uint16_t, std::string>
+    imageCopyInvalidRequestErrors = {
+        {ERR_INCOMPLETE_COMPONENT_SET,
+         "The RoT requires additional components to be included in the "
+         "request"},
+};
+
 /**
  * @brief Method to get redfish error message based on completion code and
  * reason code.
@@ -66,6 +84,8 @@ inline std::tuple<uint16_t, std::string>
                 return {cc, "Invalid KeyIndexes"};
             case NSM_FW_SET_ROT_PROPERTY:
                 return {cc, "Invalid SetRoTProperty"};
+            case NSM_FW_IMAGE_COPY_CONTROL:
+                return {cc, "Invalid Image Copy Control"};
             default:
                 return {cc, "Unknown Error: cc=" + std::to_string(cc)};
         }
@@ -74,6 +94,42 @@ inline std::tuple<uint16_t, std::string>
     if (cc == NSM_ERR_UNSUPPORTED_COMMAND_CODE)
     {
         return {cc, "Unsupported Command Code"};
+    }
+
+    if (cc == NSM_ERR_INVALID_STATE_FOR_COMMAND)
+    {
+        switch (commandType)
+        {
+            case NSM_FW_IMAGE_COPY_CONTROL:
+            {
+                if (imageCopyInvalidStateErrors.find(reasonCode) !=
+                    imageCopyInvalidStateErrors.end())
+                {
+                    return {cc, imageCopyInvalidStateErrors.at(reasonCode)};
+                }
+                return {cc, "Invalid State For Command"};
+            }
+            default:
+                return {cc, "Unknown Error: cc=" + std::to_string(cc)};
+        }
+    }
+
+    if (cc == NSM_ERR_INVALID_REQUEST_TYPE)
+    {
+        switch (commandType)
+        {
+            case NSM_FW_IMAGE_COPY_CONTROL:
+            {
+                if (imageCopyInvalidRequestErrors.find(reasonCode) !=
+                    imageCopyInvalidRequestErrors.end())
+                {
+                    return {cc, imageCopyInvalidRequestErrors.at(reasonCode)};
+                }
+                return {cc, "Invalid Request Type"};
+            }
+            default:
+                return {cc, "Unknown Error: cc=" + std::to_string(cc)};
+        }
     }
 
     // else: At present there are no specific errors for other cc

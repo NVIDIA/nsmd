@@ -23,6 +23,48 @@
 namespace nsm
 {
 
+/**
+ * @brief Helper function to map NSM reason codes to ImageCopy ErrorCode enum
+ *
+ * Maps the NSM firmware reason codes to the D-Bus ImageCopy interface ErrorCode
+ * enumeration values.
+ *
+ * Error code mappings:
+ * - 0x103: NoBootComplete - RoT has not received boot complete from AP
+ * - 0x104: UpdateInProgress - A firmware update is currently in progress
+ * - 0x105: ImageCopyInProgress - An image copy is currently in progress
+ * - 0x106: ImageCopyCompleted - An image copy was completed successfully
+ * - 0x107: FlashWearMitigation - Flash wear mitigation policy is active
+ * - 0x108: IncompleteComponentSet - Additional components required in request
+ *
+ * @param reasonCode The reason code from the NSM response
+ * @return sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
+ */
+static sdbusplus::common::com::nvidia::ImageCopy::ErrorCode
+    mapReasonCodeToErrorCode(uint16_t reasonCode)
+{
+    using ErrorCode = sdbusplus::common::com::nvidia::ImageCopy::ErrorCode;
+
+    switch (reasonCode)
+    {
+        case ERR_NO_BOOT_COMPLETE:
+            return ErrorCode::NoBootComplete;
+        case ERR_UPDATE_IN_PROGRESS:
+            return ErrorCode::UpdateInProgress;
+        case ERR_IMAGE_COPY_IN_PROGRESS:
+            return ErrorCode::ImageCopyInProgress;
+        case ERR_IMAGE_COPY_COMPLETED:
+            return ErrorCode::ImageCopyCompleted;
+        case ERR_FLASH_WEAR_MITIGATION:
+            return ErrorCode::FlashWearMitigation;
+        case ERR_INCOMPLETE_COMPONENT_SET:
+            return ErrorCode::IncompleteComponentSet;
+        case ERR_NULL:
+        default:
+            return ErrorCode::None;
+    }
+}
+
 void NsmInbandUpdatePolicy::updatePolicy(bool state)
 {
     const auto [objPath, statusIntf, valueIntf] =
@@ -212,6 +254,374 @@ uint8_t NsmInbandUpdatePolicyObject::handleResponseMsg(
     nsmInbandUpdatePolicy->updateProperties(erot_info);
     free(erot_info.slot_info);
     return cc ? cc : rc;
+}
+
+void NsmImageCopy::setImageCopyResult(std::shared_ptr<AsyncValueIntf> valueIntf,
+                                      uint8_t cc, uint16_t reasonCode,
+                                      ImageCopyRequestStatus status,
+                                      uint16_t errorCodeReason)
+{
+    auto error = getErrorCode(NSM_FW_IMAGE_COPY_CONTROL, cc, reasonCode);
+    valueIntf->value(error);
+    errorCode(mapReasonCodeToErrorCode(errorCodeReason));
+    imageCopyRequestStatus(status);
+}
+
+requester::Coroutine
+    NsmImageCopy::getActiveSlotComponentInfo(const std::string& objectPath,
+                                             ComponentInfo& componentInfo)
+{
+    const std::string chassisPath =
+        std::string("/xyz/openbmc_project/inventory/system/chassis");
+
+    const std::string nsmRoTSlotInterface =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    const std::string nsmRoTSlotAssociationsInterface =
+        "xyz.openbmc_project.Configuration.NSM_RoT_Slot.Associations0";
+    const std::string entityManagerService =
+        "xyz.openbmc_project.EntityManager";
+
+    GetSubTreeResponse slotsResponse = utils::DBusHandler().getSubtree(
+        chassisPath, 0, {nsmRoTSlotInterface, nsmRoTSlotAssociationsInterface});
+
+    for (const auto& [slotPath, mapServiceInterfaces] : slotsResponse)
+    {
+        if (mapServiceInterfaces.empty())
+        {
+            continue;
+        }
+
+        try
+        {
+            auto associations = co_await utils::coGetAllDbusProperty(
+                entityManagerService.c_str(), slotPath.c_str(),
+                nsmRoTSlotAssociationsInterface.c_str());
+
+            if (associations.count("AbsolutePath"))
+            {
+                std::string absolutePath =
+                    std::get<std::string>(associations.at("AbsolutePath"));
+                if (absolutePath != objectPath)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                continue;
+            }
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error("Exception getting associations: {ERROR}", "ERROR",
+                       e.what());
+            continue;
+        }
+
+        try
+        {
+            auto slotProperties = co_await utils::coGetAllDbusProperty(
+                entityManagerService.c_str(), slotPath.c_str(),
+                nsmRoTSlotInterface.c_str());
+
+            if (slotProperties.count("SlotType"))
+            {
+                std::string slotType =
+                    std::get<std::string>(slotProperties.at("SlotType"));
+
+                if (slotType == "Active")
+                {
+                    auto classificationVal = std::get<uint64_t>(
+                        slotProperties.at("ComponentClassification"));
+                    auto identifierVal = std::get<uint64_t>(
+                        slotProperties.at("ComponentIdentifier"));
+                    auto indexVal =
+                        std::get<uint64_t>(slotProperties.at("ComponentIndex"));
+
+                    if (classificationVal > UINT16_MAX ||
+                        identifierVal > UINT16_MAX || indexVal > UINT8_MAX)
+                    {
+                        lg2::error(
+                            "Component property value out of range: "
+                            "classification={CLASSIFICATION}, identifier={IDENTIFIER}, index={INDEX}",
+                            "CLASSIFICATION", classificationVal, "IDENTIFIER",
+                            identifierVal, "INDEX", indexVal);
+                        continue;
+                    }
+
+                    ComponentInfo info;
+                    info.classification =
+                        static_cast<uint16_t>(classificationVal);
+                    info.identifier = static_cast<uint16_t>(identifierVal);
+                    info.index = static_cast<uint8_t>(indexVal);
+                    componentInfo = info;
+
+                    co_return NSM_SW_SUCCESS;
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            lg2::error("Exception getting slot properties: {ERROR}", "ERROR",
+                       e.what());
+            continue;
+        }
+    }
+
+    co_return NSM_SW_ERROR;
+}
+
+void NsmImageCopy::requestImageCopy(
+    std::vector<sdbusplus::message::object_path> objectPaths)
+{
+    // Check if an image copy operation is already in progress
+    if (ImageCopyRequestStatus() == ImageCopyRequestStatus::Processing)
+    {
+        lg2::error("Cannot initiate image copy: operation already in progress");
+        throw Common::Error::Unavailable();
+    }
+
+    const auto [objPath, statusIntf, valueIntf] =
+        AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+    if (objPath.empty())
+    {
+        imageCopyRequestStatus(ImageCopyRequestStatus::Rejected);
+        throw Common::Error::Unavailable();
+    }
+
+    // Set status to InProgress when initiating the operation
+    imageCopyRequestStatus(ImageCopyRequestStatus::Processing);
+
+    // Start a timeout timer to prevent getting stuck in InProgress state
+    imageCopyTimeoutTimer = std::make_shared<sdbusplus::Timer>([this]() {
+        lg2::warning(
+            "Image copy operation timed out, resetting status to None");
+        imageCopyRequestStatus(ImageCopyRequestStatus::None);
+        errorCode(ErrorCode::TimedOut);
+        return false; // Don't restart timer
+    });
+    imageCopyTimeoutTimer->start(std::chrono::minutes(2));
+
+    // Convert string_path_wrapper to std::string
+    std::vector<std::string> paths;
+    paths.reserve(objectPaths.size());
+    for (const auto& path : objectPaths)
+    {
+        paths.emplace_back(path.str);
+    }
+
+    initiateImageCopyAsync(paths, statusIntf, valueIntf).detach();
+}
+
+requester::Coroutine NsmImageCopy::initiateImageCopyAsync(
+    std::vector<std::string> objectPaths,
+    std::shared_ptr<AsyncStatusIntf> statusIntf,
+    std::shared_ptr<AsyncValueIntf> valueIntf)
+{
+    try
+    {
+        errorCode(mapReasonCodeToErrorCode(ERR_NULL));
+
+        std::vector<ComponentInfo> componentInfos;
+
+        for (const auto& objPath : objectPaths)
+        {
+            ComponentInfo componentInfo;
+            uint8_t rc = co_await getActiveSlotComponentInfo(objPath,
+                                                             componentInfo);
+            if (rc != NSM_SW_SUCCESS)
+            {
+                lg2::error("Failed to get component info for {PATH}, rc={RC}",
+                           "PATH", objPath, "RC", rc);
+                setImageCopyResult(valueIntf, NSM_SW_ERROR, ERR_NULL,
+                                   ImageCopyRequestStatus::Rejected);
+                // Stop the timeout timer since operation completed
+                if (imageCopyTimeoutTimer)
+                {
+                    imageCopyTimeoutTimer->stop();
+                }
+                statusIntf->status(AsyncOperationStatusType::InternalFailure);
+                co_return rc;
+            }
+            else
+            {
+                componentInfos.push_back(componentInfo);
+            }
+        }
+
+        if (componentInfos.empty())
+        {
+            setImageCopyResult(valueIntf, NSM_ERR_INVALID_DATA, ERR_NULL,
+                               ImageCopyRequestStatus::Rejected);
+            // Stop the timeout timer since operation completed
+            if (imageCopyTimeoutTimer)
+            {
+                imageCopyTimeoutTimer->stop();
+            }
+            statusIntf->status(AsyncOperationStatusType::WriteFailure);
+            co_return NSM_SW_ERROR;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reasonCode = 0;
+        co_await imageCopyAsyncHandler(componentInfos, cc, reasonCode);
+
+        if (cc != NSM_SUCCESS)
+        {
+            lg2::error(
+                "Image copy operation returned error, cc={CC}, reasonCode={REASONCODE}",
+                "CC", cc, "REASONCODE", reasonCode);
+            setImageCopyResult(valueIntf, cc, reasonCode,
+                               ImageCopyRequestStatus::Rejected, reasonCode);
+            // Stop the timeout timer since operation completed
+            if (imageCopyTimeoutTimer)
+            {
+                imageCopyTimeoutTimer->stop();
+            }
+            statusIntf->status(AsyncOperationStatusType::InternalFailure);
+            co_return NSM_SW_ERROR;
+        }
+
+        setImageCopyResult(valueIntf, NSM_SUCCESS, 0,
+                           ImageCopyRequestStatus::Accepted);
+        // Stop the timeout timer since operation completed successfully
+        if (imageCopyTimeoutTimer)
+        {
+            imageCopyTimeoutTimer->stop();
+        }
+        statusIntf->status(AsyncOperationStatusType::Success);
+        co_return NSM_SW_SUCCESS;
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Unhandled exception in initiateImageCopyAsync: {ERROR}",
+                   "ERROR", e.what());
+        setImageCopyResult(valueIntf, NSM_SW_ERROR, ERR_NULL,
+                           ImageCopyRequestStatus::Rejected);
+        // Stop the timeout timer since operation completed
+        if (imageCopyTimeoutTimer)
+        {
+            imageCopyTimeoutTimer->stop();
+        }
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        co_return NSM_SW_ERROR;
+    }
+    catch (...)
+    {
+        lg2::error("Unknown exception in initiateImageCopyAsync");
+        setImageCopyResult(valueIntf, NSM_SW_ERROR, ERR_NULL,
+                           ImageCopyRequestStatus::Rejected);
+        // Stop the timeout timer since operation completed
+        if (imageCopyTimeoutTimer)
+        {
+            imageCopyTimeoutTimer->stop();
+        }
+        statusIntf->status(AsyncOperationStatusType::InternalFailure);
+        co_return NSM_SW_ERROR;
+    }
+}
+
+requester::Coroutine NsmImageCopy::imageCopyAsyncHandler(
+    const std::vector<ComponentInfo>& componentInfos, uint8_t& cc,
+    uint16_t& reasonCode)
+{
+    cc = NSM_ERROR;
+    reasonCode = ERR_NULL;
+
+    // Get the device from the UUID
+    SensorManager& manager = SensorManager::getInstance();
+    auto device = manager.getNsmDeviceFromStaticUUID(uuid);
+    if (!device)
+    {
+        lg2::error("Failed to get device for UUID: {UUID}", "UUID",
+                   std::string(uuid.begin(), uuid.end()));
+        co_return NSM_SW_ERROR;
+    }
+
+    auto eid = device->getEid();
+
+    // Calculate message size: base + component entries
+    uint8_t componentCount = static_cast<uint8_t>(componentInfos.size());
+    size_t msgSize =
+        sizeof(nsm_msg_hdr) + sizeof(nsm_common_req) +
+        sizeof(nsm_firmware_image_copy_control_req) +
+        (componentCount * sizeof(nsm_firmware_image_copy_component_entry));
+
+    auto request = std::make_shared<Request>(msgSize);
+    auto requestMsg = reinterpret_cast<struct nsm_msg*>(request->data());
+    struct ::nsm_firmware_image_copy_control_req nsm_req;
+
+    nsm_req.request_type = NSM_IMAGE_COPY_INITIATE_IMAGE_COPY;
+    nsm_req.component_count = componentCount;
+
+    // Convert ComponentInfo to nsm_firmware_image_copy_component_entry
+    std::vector<nsm_firmware_image_copy_component_entry> componentEntries;
+    componentEntries.reserve(componentInfos.size());
+    for (const auto& component : componentInfos)
+    {
+        nsm_firmware_image_copy_component_entry entry;
+        entry.component_classification = component.classification;
+        entry.component_identifier = component.identifier;
+        entry.component_classification_index = component.index;
+        componentEntries.push_back(entry);
+    }
+
+    auto rc = encode_nsm_firmware_image_copy_control_req(
+        0, &nsm_req, componentEntries.data(), requestMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_firmware_image_copy_control_req failed: rc={RC}",
+                   "RC", rc);
+        reasonCode = static_cast<uint16_t>(rc);
+        co_return rc;
+    }
+
+    // Send the request to the device
+    std::shared_ptr<const nsm_msg> responseMsg;
+    size_t responseLen = 0;
+    rc = co_await device->postPatchIO(eid, *request, responseMsg, responseLen);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("postPatchIO failed for chassis {UUID}, eid={EID}, rc={RC}",
+                   "UUID", std::string(uuid.begin(), uuid.end()), "EID", eid,
+                   "RC", rc);
+        reasonCode = static_cast<uint16_t>(rc);
+        co_return rc;
+    }
+
+    // Decode the response
+    uint8_t decodedCc = 0;
+    uint16_t decodedReasonCode = 0;
+    rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
+        responseMsg.get(), responseLen, &decodedCc, &decodedReasonCode);
+
+    // Set output parameters with decoded values
+    cc = decodedCc;
+    reasonCode = decodedReasonCode;
+
+    if (rc != NSM_SW_SUCCESS || cc != NSM_SUCCESS)
+    {
+        lg2::error(
+            "decode_nsm_firmware_image_copy_control_initiate_copy_resp failure for chassis {UUID} | "
+            "reasonCode: {REASONCODE}, cc: {CC}, rc: {RC}",
+            "UUID", std::string(uuid.begin(), uuid.end()), "REASONCODE",
+            reasonCode, "CC", cc, "RC", rc);
+        co_return NSM_SW_ERROR;
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
+NsmImageCopyObject::NsmImageCopyObject(sdbusplus::bus::bus& bus,
+                                       const std::string& chassisName,
+                                       const uuid_t& uuid) :
+    NsmObject(chassisName, "NSM_ChassisRoT"), objectPath(getPath(chassisName))
+{
+    lg2::info("NsmImageCopy: create object: {PATH}", "PATH",
+              objectPath.c_str());
+    nsmImageCopy = std::make_unique<NsmImageCopy>(bus, objectPath, uuid, *this);
 }
 
 } // namespace nsm

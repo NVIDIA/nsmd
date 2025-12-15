@@ -23,8 +23,10 @@
 #include "nsmObjectFactory.hpp"
 #include "utils.hpp"
 
+#include <com/nvidia/ImageCopy/server.hpp>
 #include <com/nvidia/InbandUpdatePolicy/server.hpp>
 #include <sdbusplus/asio/object_server.hpp>
+#include <sdbusplus/timer.hpp>
 
 #include <array>
 #include <memory>
@@ -37,6 +39,7 @@ using namespace sdbusplus::common::xyz::openbmc_project::software;
 using namespace sdbusplus::server;
 using InbandUpdatePolicyIntf =
     object_t<sdbusplus::server::com::nvidia::InbandUpdatePolicy>;
+using ImageCopyIntf = object_t<sdbusplus::server::com::nvidia::ImageCopy>;
 
 class NsmInbandUpdatePolicy :
     public InbandUpdatePolicyIntf,
@@ -105,6 +108,79 @@ class NsmInbandUpdatePolicyObject : public NsmSensor
     uint16_t classification;
     uint16_t identifier;
     uint8_t index;
+};
+
+// Structure to hold component information for image copy
+struct ComponentInfo
+{
+    uint16_t classification;
+    uint16_t identifier;
+    uint8_t index;
+};
+
+/**
+ * @brief Class for initiating image copy for a chassis
+ */
+class NsmImageCopy : public ImageCopyIntf, public StateChangeLogger
+{
+  public:
+    NsmImageCopy(sdbusplus::bus::bus& bus, const std::string& objPath,
+                 const uuid_t& uuidIn, NsmObject& nsmObject) :
+        ImageCopyIntf(bus, objPath.c_str()), uuid(uuidIn), nsmObject(nsmObject)
+    {
+        imageCopyRequestStatus(ImageCopyRequestStatus::None);
+        errorCode(ErrorCode::None);
+    }
+
+    virtual ~NsmImageCopy() = default;
+
+    void requestImageCopy(
+        std::vector<sdbusplus::message::object_path> objectPaths) override;
+
+  private:
+    requester::Coroutine
+        initiateImageCopyAsync(std::vector<std::string> objectPaths,
+                               std::shared_ptr<AsyncStatusIntf> statusIntf,
+                               std::shared_ptr<AsyncValueIntf> valueIntf);
+
+    requester::Coroutine
+        imageCopyAsyncHandler(const std::vector<ComponentInfo>& componentInfos,
+                              uint8_t& cc, uint16_t& reasonCode);
+
+    requester::Coroutine
+        getActiveSlotComponentInfo(const std::string& objectPath,
+                                   ComponentInfo& componentInfo);
+
+    void setImageCopyResult(std::shared_ptr<AsyncValueIntf> valueIntf,
+                            uint8_t cc, uint16_t reasonCode,
+                            ImageCopyRequestStatus status,
+                            uint16_t errorCodeReason = ERR_NULL);
+
+    const uuid_t uuid;
+    NsmObject& nsmObject;
+    std::shared_ptr<sdbusplus::Timer> imageCopyTimeoutTimer;
+};
+
+/**
+ * @brief Object class for Image Copy that inherits from NsmObject
+ */
+class NsmImageCopyObject : public NsmObject
+{
+  private:
+    std::string getPath(const std::string& chassisName)
+    {
+        using namespace std::string_literals;
+        return std::string(chassisInventoryBasePath) + "/" + chassisName;
+    }
+
+  public:
+    NsmImageCopyObject(sdbusplus::bus::bus& bus, const std::string& chassisName,
+                       const uuid_t& uuid);
+    NsmImageCopyObject() = delete;
+
+  private:
+    std::string objectPath;
+    std::unique_ptr<NsmImageCopy> nsmImageCopy;
 };
 
 } // namespace nsm

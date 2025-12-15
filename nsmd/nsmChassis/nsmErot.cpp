@@ -158,6 +158,13 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 std::get<uint64_t>(allCurrentIfaceProperties.at("SlotCount"));
         }
 
+        bool imageCopyEnabled = false;
+        if (allCurrentIfaceProperties.count("ImageCopyEnabled"))
+        {
+            imageCopyEnabled = std::get<bool>(
+                allCurrentIfaceProperties.at("ImageCopyEnabled"));
+        }
+
         auto device = manager.getNsmDeviceFromStaticUUID(uuid);
 
         if (!device)
@@ -181,6 +188,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         std::shared_ptr<NsmMinSecVersionObject> ecMinSecVersion = nullptr;
         std::shared_ptr<NsmInbandUpdatePolicyObject> inbandUpdatePolicy =
             nullptr;
+        std::shared_ptr<NsmImageCopyObject> imageCopyObject = nullptr;
 
         // Check if SKU update is enabled by looking for "AP_SKU_ID" in
         // SetRotPropertyList
@@ -355,6 +363,13 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                         bus, name, uuid, classification, identifier,
                         static_cast<uint8_t>(index));
                 device->addSensor(inbandUpdatePolicy, false);
+            }
+
+            if (imageCopyObject == nullptr and imageCopyEnabled)
+            {
+                imageCopyObject =
+                    std::make_shared<NsmImageCopyObject>(bus, name, uuid);
+                device->addSensor(imageCopyObject, false);
             }
         }
         if (apFirmwareType)
