@@ -80,29 +80,45 @@ requester::Coroutine NsmNvlinkLedIntf::update(SensorManager& manager, eid_t eid)
     {
         switch (ledAggredateState)
         {
-            case NSM_NVLINK_LED_GREEN:
+            case NSM_NVLINK_LED_0_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::Steady_Green);
+                        LedState::X0_Percent_Utilization);
                 break;
-            case NSM_NVLINK_LED_GREEN_BLINK:
+            case NSM_NVLINK_LED_25_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::Blinking_Green);
+                        LedState::X25_Percent_Utilization);
                 break;
-            case NSM_NVLINK_LED_AMBER:
+            case NSM_NVLINK_LED_50_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::Steady_Amber);
+                        LedState::X50_Percent_Utilization);
                 break;
-            case NSM_NVLINK_LED_AMBER_BLINK:
+            case NSM_NVLINK_LED_75_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::Blinking_Amber);
+                        LedState::X75_Percent_Utilization);
                 break;
-            case NSM_NVLINK_LED_OFF:
-                nvlinkledIntf->ledState(sdbusplus::common::com::nvidia::
-                                            nv_link::NVLinkLED::LedState::Off);
+            case NSM_NVLINK_LED_100_PERCENT:
+                nvlinkledIntf->ledState(
+                    sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
+                        LedState::X100_Percent_Utilization);
+                break;
+            case NSM_NVLINK_LED_DISABLED:
+                nvlinkledIntf->ledState(
+                    sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
+                        LedState::Disabled);
+                break;
+            case NSM_NVLINK_LED_NO_LINK:
+                nvlinkledIntf->ledState(
+                    sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
+                        LedState::No_Link);
+                break;
+            case NSM_NVLINK_LED_BEACON:
+                nvlinkledIntf->ledState(
+                    sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
+                        LedState::Beacon);
                 break;
             default:
                 nvlinkledIntf->ledState(

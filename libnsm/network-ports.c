@@ -339,28 +339,34 @@ int decode_get_nvlink_agg_led_status_resp(const struct nsm_msg *msg,
 
 	uint8_t led_status_byte = response->LED_State_Aggregate;
 
-	// The top bit of the led state byte indicates an invalid state
+	// The top bit of the led state byte indicates a valid state
 	// so we will check it before reading the value
 	if ((led_status_byte >> 7) == 1) {
 		// First 3 bits provide LED state, so we will mask them off
 		switch (led_status_byte & 0x07) {
-		case 0:
-			*led_state = NSM_NVLINK_LED_GREEN;
+		case 0: // Steady green, 0% utilization
+			*led_state = NSM_NVLINK_LED_0_PERCENT;
 			break;
-		case 1: // Blinking at 0.5 Hz
-		case 2: // Blinking at 1 Hz
-		case 3: // Blinking at 2 Hz
-		case 4: // Blinking at 4 Hz
-			*led_state = NSM_NVLINK_LED_GREEN_BLINK;
+		case 1: // Blinking green at 0.5 Hz, 25% utilization
+			*led_state = NSM_NVLINK_LED_25_PERCENT;
 			break;
-		case 5:
-			*led_state = NSM_NVLINK_LED_AMBER;
+		case 2: // Blinking green at 1 Hz, 50% utilization
+			*led_state = NSM_NVLINK_LED_50_PERCENT;
 			break;
-		case 6:
-			*led_state = NSM_NVLINK_LED_OFF;
+		case 3: // Blinking green at 2 Hz, 75% utilization
+			*led_state = NSM_NVLINK_LED_75_PERCENT;
 			break;
-		case 7: // Blinking at 1 Hz
-			*led_state = NSM_NVLINK_LED_AMBER_BLINK;
+		case 4: // Blinking green at 4 Hz, 100% utilization
+			*led_state = NSM_NVLINK_LED_100_PERCENT;
+			break;
+		case 5: // Steady amber, disabled
+			*led_state = NSM_NVLINK_LED_DISABLED;
+			break;
+		case 6: // Off, no link
+			*led_state = NSM_NVLINK_LED_NO_LINK;
+			break;
+		case 7: // Blinking amber at 1 Hz, beacon
+			*led_state = NSM_NVLINK_LED_BEACON;
 			break;
 		default:
 			*led_state = NSM_NVLINK_LED_ERROR;

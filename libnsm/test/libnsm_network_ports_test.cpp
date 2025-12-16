@@ -88,7 +88,7 @@ TEST(queryNvlinkLED, testGoodDecodeResponse)
 	    request, msg_len, &cc, &reason_code, &ledStatus);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
-	EXPECT_EQ(NSM_NVLINK_LED_AMBER_BLINK, ledStatus);
+	EXPECT_EQ(NSM_NVLINK_LED_BEACON, ledStatus);
 }
 
 TEST(queryNvlinkLED, testBadDecodeResponse)
