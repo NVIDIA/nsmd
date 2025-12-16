@@ -33,7 +33,6 @@ valid_chassis = [
     'aer-error',
     'leak-detection',
     'erot',
-    'security-rbp',
     'processor-module-power-control',
     'irot-responder',
 ]
@@ -108,9 +107,6 @@ if include_all_chassis or include_chassis_list.contains('leak-detection')
 endif
 if include_all_chassis or include_chassis_list.contains('erot')
     sources += ['nsmChassis/nsmErot.cpp', 'nsmChassis/nsmRoTProperty.cpp']
-endif
-if include_all_chassis or include_chassis_list.contains('security-rbp')
-    sources += ['nsmChassis/nsmSecurityRBP.cpp']
 endif
 if include_all_chassis or include_chassis_list.contains(
     'processor-module-power-control',
