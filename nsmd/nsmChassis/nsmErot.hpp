@@ -30,6 +30,18 @@ namespace nsm
 using namespace sdbusplus::server::xyz::openbmc_project::software;
 using namespace sdbusplus::server;
 
+struct SlotInfo
+{
+    std::string slotName;
+    uint64_t classification = 0;
+    uint64_t identifier = 0;
+    uint64_t index = 0;
+    std::string fwType;
+    std::vector<utils::Association> associations;
+    std::string chassisName;
+    bool isRoT = false;
+};
+
 class NsmBuildTypeObject : public NsmSensor
 {
   public:
@@ -52,6 +64,17 @@ class NsmBuildTypeObject : public NsmSensor
 
     uuid_t uuid;
     nsm_firmware_erot_state_info_req nsmRequest;
+    /**
+     * @brief Parse the slots from the D-Bus interface
+     * @param path The path of the D-Bus interface
+     * @param slotCount The number of slots
+     * @param rotSlotInterface The interface of the RoT slots
+     * @param result The result of the parsing
+     * @return The result of the parsing
+     */
+    requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
+                                    const std::string& rotSlotInterface,
+                                    std::vector<SlotInfo>& slots);
 };
 
 } // namespace nsm

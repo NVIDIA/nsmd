@@ -68,7 +68,8 @@ class NsmFirmwareSlot :
   public:
     NsmFirmwareSlot(sdbusplus::bus::bus& bus, const std::string& chassisPath,
                     const std::vector<utils::Association>& associations,
-                    int slotNum, SlotIntf::FirmwareType fwType);
+                    int slotNum, SlotIntf::FirmwareType fwType,
+                    const std::string& chassisName);
 
     void update(
         const struct ::nsm_firmware_slot_info& info,
@@ -81,10 +82,12 @@ class NsmFirmwareSlot :
                 const std::vector<uint8_t>& pendingRevokedKeyIndices);
 
   private:
-    std::string getPath(const std::string& chassisPath, int slotNum)
+    std::string getPath(const std::string& chassisPath, int slotNum,
+                        const std::string& chassisName)
     {
         using namespace std::string_literals;
-        return chassisPath + "/Slots/"s + std::to_string(slotNum);
+        return chassisPath + "/Slots/"s + std::to_string(slotNum) + "/"s +
+               chassisName;
     }
     void updateActiveSlotAssociation();
     void updateSlotKeyData();

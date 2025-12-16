@@ -23,17 +23,21 @@ namespace nsm
 NsmFirmwareSlot::NsmFirmwareSlot(
     sdbusplus::bus::bus& bus, const std::string& chassisPath,
     const std::vector<utils::Association>& associations, int slotNum,
-    SlotIntf::FirmwareType fwType) :
-    AssociationDefinitionsIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    SecSigningIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    BuildTypeIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    ExtendedVersionIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    SettingsIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    SigningTypeIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    SlotIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    StateIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    SecurityVersionIntf(bus, getPath(chassisPath, slotNum).c_str()),
-    VersionComparisonIntf(bus, getPath(chassisPath, slotNum).c_str())
+    SlotIntf::FirmwareType fwType, const std::string& chassisName) :
+    AssociationDefinitionsIntf(
+        bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    SecSigningIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    BuildTypeIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    ExtendedVersionIntf(bus,
+                        getPath(chassisPath, slotNum, chassisName).c_str()),
+    SettingsIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    SigningTypeIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    SlotIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    StateIntf(bus, getPath(chassisPath, slotNum, chassisName).c_str()),
+    SecurityVersionIntf(bus,
+                        getPath(chassisPath, slotNum, chassisName).c_str()),
+    VersionComparisonIntf(bus,
+                          getPath(chassisPath, slotNum, chassisName).c_str())
 {
     lg2::info("NsmFirmwareSlot - {CHASSIS} - {SLOT}", "CHASSIS", chassisPath,
               "SLOT", slotNum);

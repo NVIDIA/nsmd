@@ -117,11 +117,73 @@ static int extractNumber(const std::string& str)
     return number;
 }
 
+requester::Coroutine parseSlots(const std::string& path, uint64_t slotCount,
+                                const std::string& rotSlotInterface,
+                                std::vector<SlotInfo>& slots)
+{
+    for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
+    {
+        auto slotPath = path + "/Slot" + std::to_string(slotIndex);
+        auto allSlotIfaceProperties = co_await utils::coGetAllDbusProperty(
+            utils::entityManagerServiceStr, slotPath.c_str(),
+            rotSlotInterface.c_str());
+
+        SlotInfo slot{};
+        if (allSlotIfaceProperties.count("Name"))
+        {
+            slot.slotName =
+                std::get<std::string>(allSlotIfaceProperties.at("Name"));
+        }
+        if (allSlotIfaceProperties.count("ComponentClassification"))
+        {
+            slot.classification = std::get<uint64_t>(
+                allSlotIfaceProperties.at("ComponentClassification"));
+        }
+        if (allSlotIfaceProperties.count("ComponentIdentifier"))
+        {
+            slot.identifier = std::get<uint64_t>(
+                allSlotIfaceProperties.at("ComponentIdentifier"));
+        }
+        if (allSlotIfaceProperties.count("ComponentIndex"))
+        {
+            slot.index =
+                std::get<uint64_t>(allSlotIfaceProperties.at("ComponentIndex"));
+        }
+        if (allSlotIfaceProperties.count("FirmwareType"))
+        {
+            slot.fwType = std::get<std::string>(
+                allSlotIfaceProperties.at("FirmwareType"));
+        }
+        slot.associations = utils::getAssociations(
+            slotPath, std::string(rotSlotInterface) + ".Associations");
+        if (allSlotIfaceProperties.count("ChassisName"))
+        {
+            slot.chassisName =
+                std::get<std::string>(allSlotIfaceProperties.at("ChassisName"));
+        }
+
+        slot.isRoT = false;
+        if (allSlotIfaceProperties.count("IsRoT"))
+        {
+            slot.isRoT = std::get<bool>(allSlotIfaceProperties.at("IsRoT"));
+        }
+
+        if (slot.fwType == "EC")
+        {
+            slot.isRoT = true;
+        }
+
+        slots.push_back(slot);
+    }
+
+    co_return NSM_SW_SUCCESS;
+}
+
 requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                                           const std::string& interface,
                                           const std::string& objPath)
 {
-    auto erotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
+    auto rotSlotInterface = "xyz.openbmc_project.Configuration.NSM_RoT_Slot";
 
     auto allCurrentIfaceProperties = co_await utils::coGetAllDbusProperty(
         utils::entityManagerServiceStr, objPath.c_str(), interface.c_str());
@@ -146,16 +208,16 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         }
 
         auto path = std::string(chassisInventoryBasePath) + "/" + name;
-        if (name.find("RoT_") == std::string::npos)
-        {
-            // coverity[missing_return]
-            co_return NSM_SUCCESS;
-        }
         uint64_t slotCount{};
         if (allCurrentIfaceProperties.count("SlotCount"))
         {
             slotCount =
                 std::get<uint64_t>(allCurrentIfaceProperties.at("SlotCount"));
+        }
+        else
+        {
+            // coverity[missing_return]
+            co_return NSM_SUCCESS; // not a RoT chassis
         }
 
         bool imageCopyEnabled = false;
@@ -183,10 +245,14 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
         auto& bus = utils::DBusHandler::getBus();
 
         std::shared_ptr<ProgressIntf> rotProgressIntf = nullptr;
-        std::shared_ptr<NsmBuildTypeObject> apFirmwareType = nullptr;
-        std::shared_ptr<ProgressIntf> apProgressIntf = nullptr;
-        std::shared_ptr<NsmKeyMgmt> apKeyMgmt = nullptr;
-        std::shared_ptr<NsmMinSecVersionObject> apMinSecVersion = nullptr;
+
+        std::map<std::string, std::shared_ptr<NsmBuildTypeObject>>
+            apFirmwareTypeMap;
+        std::map<std::string, std::shared_ptr<ProgressIntf>> apProgressIntfMap;
+        std::map<std::string, std::shared_ptr<NsmKeyMgmt>> apKeyMgmtMap;
+        std::map<std::string, std::shared_ptr<NsmMinSecVersionObject>>
+            apMinSecVersionMap;
+
         std::shared_ptr<NsmApSkuIdObject> skuIdSensor = nullptr;
         std::shared_ptr<NsmUpdateApSkuIdIntf> updateSkuIntf = nullptr;
         std::shared_ptr<NsmBuildTypeObject> ecFirmwareType = nullptr;
@@ -230,136 +296,111 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             }
         }
 
-        for (size_t slotIndex = 1; slotIndex <= slotCount; slotIndex++)
+        std::vector<SlotInfo> allSlots;
+        uint8_t parseRc = co_await parseSlots(path, slotCount, rotSlotInterface,
+                                              allSlots);
+        if (parseRc != NSM_SW_SUCCESS)
         {
-            auto slotPath = path + "/Slot" + std::to_string(slotIndex);
-            auto allSlotIfaceProperties = co_await utils::coGetAllDbusProperty(
-                utils::entityManagerServiceStr, slotPath.c_str(),
-                erotSlotInterface);
+            lg2::error("Failed to parse slots for {PATH}", "PATH", path);
+            co_return parseRc;
+        }
 
-            std::string slotName{};
-            if (allSlotIfaceProperties.count("Name"))
-            {
-                slotName =
-                    std::get<std::string>(allSlotIfaceProperties.at("Name"));
-            }
-            auto classification =
-                utils::DBusHandler().getDbusProperty<uint64_t>(
-                    slotPath.c_str(), "ComponentClassification",
-                    erotSlotInterface);
-            uint64_t identifier{};
-            if (allSlotIfaceProperties.count("ComponentIdentifier"))
-            {
-                identifier = std::get<uint64_t>(
-                    allSlotIfaceProperties.at("ComponentIdentifier"));
-            }
-            uint64_t index{};
-            if (allSlotIfaceProperties.count("ComponentIndex"))
-            {
-                index = std::get<uint64_t>(
-                    allSlotIfaceProperties.at("ComponentIndex"));
-            }
-            std::string fwType{};
-            if (allSlotIfaceProperties.count("FirmwareType"))
-            {
-                fwType = std::get<std::string>(
-                    allSlotIfaceProperties.at("FirmwareType"));
-            }
-            auto associations = utils::getAssociations(
-                slotPath, std::string(erotSlotInterface) + ".Associations");
-            std::string chassisName{};
-            if (allSlotIfaceProperties.count("ChassisName"))
-            {
-                chassisName = std::get<std::string>(
-                    allSlotIfaceProperties.at("ChassisName"));
-            }
-
-            if (fwType == "AP")
+        for (const auto& slot : allSlots)
+        {
+            if (slot.fwType == "AP")
             {
                 auto slotObject = std::make_shared<NsmFirmwareSlot>(
-                    bus, path, associations, extractNumber(slotName),
-                    SlotIntf::FirmwareType::AP);
-                if (apFirmwareType == nullptr)
-                {
-                    apFirmwareType = std::make_shared<NsmBuildTypeObject>(
-                        name, type, uuid, classification, identifier);
-                }
-                apFirmwareType->addSlotObject(slotObject);
+                    bus, path, slot.associations, extractNumber(slot.slotName),
+                    SlotIntf::FirmwareType::AP, slot.chassisName);
 
-                // Store AP component identification for SKU updates
+                const std::string& slotKey = slot.isRoT ? name
+                                                        : slot.chassisName;
+
+                if (apFirmwareTypeMap.find(slotKey) == apFirmwareTypeMap.end())
+                {
+                    apFirmwareTypeMap[slotKey] =
+                        std::make_shared<NsmBuildTypeObject>(
+                            name, type, uuid, slot.classification,
+                            slot.identifier);
+                }
+                apFirmwareTypeMap[slotKey]->addSlotObject(slotObject);
+
                 if (!apComponentFound)
                 {
-                    apClassification = classification;
-                    apIdentifier = identifier;
-                    apIndex = static_cast<uint8_t>(index);
+                    apClassification = slot.classification;
+                    apIdentifier = slot.identifier;
+                    apIndex = static_cast<uint8_t>(slot.index);
                     apComponentFound = true;
                 }
-                if (apProgressIntf == nullptr)
+
+                if (apProgressIntfMap.find(slot.chassisName) ==
+                    apProgressIntfMap.end())
                 {
                     auto progressPath = std::string(chassisInventoryBasePath) +
-                                        "/" + chassisName;
-                    apProgressIntf = std::make_shared<ProgressIntf>(
-                        bus, progressPath.c_str());
-                }
-                if (apKeyMgmt == nullptr)
-                {
-                    apKeyMgmt = std::make_shared<NsmKeyMgmt>(
-                        bus, chassisName, type, uuid, apProgressIntf,
-                        classification, identifier,
-                        static_cast<uint8_t>(index));
-                }
-                apKeyMgmt->addSlotObject(slotObject);
-                if (apMinSecVersion == nullptr)
-                {
-                    apMinSecVersion = std::make_shared<NsmMinSecVersionObject>(
-                        bus, chassisName, type, uuid, classification,
-                        identifier, static_cast<uint8_t>(index),
-                        apProgressIntf);
-                    device->addSensor(apMinSecVersion, false);
+                                        "/" + slot.chassisName;
+                    apProgressIntfMap[slot.chassisName] =
+                        std::make_shared<ProgressIntf>(bus,
+                                                       progressPath.c_str());
                 }
 
-                if (chassisName == name)
+                if (apKeyMgmtMap.find(slot.chassisName) == apKeyMgmtMap.end())
                 {
-                    rotProgressIntf = apProgressIntf;
+                    apKeyMgmtMap[slot.chassisName] =
+                        std::make_shared<NsmKeyMgmt>(
+                            bus, slot.chassisName, type, uuid,
+                            apProgressIntfMap[slot.chassisName],
+                            slot.classification, slot.identifier,
+                            static_cast<uint8_t>(slot.index));
+                }
+                apKeyMgmtMap[slot.chassisName]->addSlotObject(slotObject);
+
+                if (apMinSecVersionMap.find(slot.chassisName) ==
+                    apMinSecVersionMap.end())
+                {
+                    apMinSecVersionMap[slot.chassisName] =
+                        std::make_shared<NsmMinSecVersionObject>(
+                            bus, slot.chassisName, type, uuid,
+                            slot.classification, slot.identifier,
+                            static_cast<uint8_t>(slot.index),
+                            apProgressIntfMap[slot.chassisName]);
+                    device->addSensor(apMinSecVersionMap[slot.chassisName],
+                                      PollingType::RoundRobin);
                 }
             }
             else // EC
             {
                 auto slotObject = std::make_shared<NsmFirmwareSlot>(
-                    bus, path, associations, extractNumber(slotName),
-                    SlotIntf::FirmwareType::EC);
+                    bus, path, slot.associations, extractNumber(slot.slotName),
+                    SlotIntf::FirmwareType::EC, slot.chassisName);
+
                 if (ecFirmwareType == nullptr)
                 {
                     ecFirmwareType = std::make_shared<NsmBuildTypeObject>(
-                        name, type, uuid, classification, identifier);
+                        name, type, uuid, slot.classification, slot.identifier);
                 }
                 ecFirmwareType->addSlotObject(slotObject);
                 if (ecProgressIntf == nullptr)
                 {
                     auto progressPath = std::string(chassisInventoryBasePath) +
-                                        "/" + chassisName;
+                                        "/" + name;
                     ecProgressIntf = std::make_shared<ProgressIntf>(
                         bus, progressPath.c_str());
                 }
                 if (ecKeyMgmt == nullptr)
                 {
                     ecKeyMgmt = std::make_shared<NsmKeyMgmt>(
-                        bus, chassisName, type, uuid, ecProgressIntf,
-                        classification, identifier,
-                        static_cast<uint8_t>(index));
+                        bus, name, type, uuid, ecProgressIntf,
+                        slot.classification, slot.identifier,
+                        static_cast<uint8_t>(slot.index));
                 }
                 ecKeyMgmt->addSlotObject(slotObject);
                 if (ecMinSecVersion == nullptr)
                 {
                     ecMinSecVersion = std::make_shared<NsmMinSecVersionObject>(
-                        bus, chassisName, type, uuid, classification,
-                        identifier, static_cast<uint8_t>(index),
+                        bus, name, type, uuid, slot.classification,
+                        slot.identifier, static_cast<uint8_t>(slot.index),
                         ecProgressIntf);
-                    device->addSensor(ecMinSecVersion, false);
-                }
-                if (chassisName == name)
-                {
-                    rotProgressIntf = ecProgressIntf;
+                    device->addSensor(ecMinSecVersion, PollingType::RoundRobin);
                 }
             }
 
@@ -370,17 +411,18 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
 
                 inbandUpdatePolicy =
                     std::make_shared<NsmInbandUpdatePolicyObject>(
-                        bus, name, classification, identifier,
-                        static_cast<uint8_t>(index));
-                device->addSensor(inbandUpdatePolicy, false);
+                        bus, name, slot.classification, slot.identifier,
+                        static_cast<uint8_t>(slot.index));
+                device->addSensor(inbandUpdatePolicy, PollingType::RoundRobin);
 
                 // Register async set handler for InbandUpdatePolicy property
                 // with Async.Set support
                 nsm::AsyncSetOperationHandler inbandUpdatePolicyHandler =
                     std::bind(&nsm::updateInbandUpdatePolicyHandler,
                               std::placeholders::_1, std::placeholders::_2,
-                              std::placeholders::_3, classification, identifier,
-                              index);
+                              std::placeholders::_3, slot.classification,
+                              slot.identifier,
+                              static_cast<uint8_t>(slot.index));
                 AsyncOperationManager::getInstance()
                     ->getDispatcher(inventoryPath)
                     ->addAsyncSetOperation(
@@ -393,37 +435,50 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
             {
                 imageCopyObject =
                     std::make_shared<NsmImageCopyObject>(bus, name, uuid);
-                device->addSensor(imageCopyObject, false);
+                device->addSensor(imageCopyObject, PollingType::RoundRobin);
             }
         }
-        if (apFirmwareType)
+
+        for (const auto& [_, apFwType] : apFirmwareTypeMap)
         {
-            device->addSensor(apFirmwareType, false);
+            if (apFwType)
+            {
+                device->addSensor(apFwType, PollingType::RoundRobin);
+            }
         }
-        if (apKeyMgmt)
+        for (const auto& [_, apKeyMgmtObj] : apKeyMgmtMap)
         {
-            device->addSensor(apKeyMgmt, false);
+            if (apKeyMgmtObj)
+            {
+                device->addSensor(apKeyMgmtObj, PollingType::RoundRobin);
+            }
         }
+
         if (ecFirmwareType)
         {
-            device->addSensor(ecFirmwareType, false);
+            device->addSensor(ecFirmwareType, PollingType::RoundRobin);
         }
         if (ecKeyMgmt)
         {
-            device->addSensor(ecKeyMgmt, false);
+            device->addSensor(ecKeyMgmt, PollingType::RoundRobin);
         }
         if (rotProgressIntf == nullptr)
         {
-            // IRoT does not have security and key management properties,
-            // progress interface is not created while parsing slot properties
-            auto progressPath = std::string(chassisInventoryBasePath) + "/" +
-                                name;
-            rotProgressIntf =
-                std::make_shared<ProgressIntf>(bus, progressPath.c_str());
+            if (ecProgressIntf != nullptr)
+            {
+                rotProgressIntf = ecProgressIntf;
+            }
+            else
+            {
+                auto progressPath = std::string(chassisInventoryBasePath) +
+                                    "/" + name;
+                rotProgressIntf =
+                    std::make_shared<ProgressIntf>(bus, progressPath.c_str());
+            }
         }
         auto securityCfg = std::make_shared<NsmSecurityCfgObject>(
             bus, name, type, uuid, rotProgressIntf);
-        device->addSensor(securityCfg, false);
+        device->addSensor(securityCfg, PollingType::RoundRobin);
 
         // Create SKU and Async.Set interface for chassis with SKU update
         // enabled
@@ -434,7 +489,7 @@ requester::Coroutine nsmErotCreateSensors(SensorManager& manager,
                 skuIdSensor = std::make_shared<NsmApSkuIdObject>(
                     bus, name, type, uuid, nullptr, apClassification,
                     apIdentifier, apIndex);
-                device->addSensor(skuIdSensor, false);
+                device->addSensor(skuIdSensor, PollingType::RoundRobin);
             }
 
             if (updateSkuIntf == nullptr)
