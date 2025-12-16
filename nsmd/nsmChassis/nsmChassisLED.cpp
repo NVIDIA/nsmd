@@ -83,27 +83,27 @@ requester::Coroutine NsmNvlinkLedIntf::update(SensorManager& manager, eid_t eid)
             case NSM_NVLINK_LED_0_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::X0_Percent_Utilization);
+                        LedState::Utilization_0_Percent);
                 break;
             case NSM_NVLINK_LED_25_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::X25_Percent_Utilization);
+                        LedState::Utilization_25_Percent);
                 break;
             case NSM_NVLINK_LED_50_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::X50_Percent_Utilization);
+                        LedState::Utilization_50_Percent);
                 break;
             case NSM_NVLINK_LED_75_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::X75_Percent_Utilization);
+                        LedState::Utilization_75_Percent);
                 break;
             case NSM_NVLINK_LED_100_PERCENT:
                 nvlinkledIntf->ledState(
                     sdbusplus::common::com::nvidia::nv_link::NVLinkLED::
-                        LedState::X100_Percent_Utilization);
+                        LedState::Utilization_100_Percent);
                 break;
             case NSM_NVLINK_LED_DISABLED:
                 nvlinkledIntf->ledState(
