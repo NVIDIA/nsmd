@@ -2181,15 +2181,17 @@ TEST_F(NsmProcessorTest, goodCreateModelAndSerialNumberWithoutDuplicate)
                             chassisBasicIntfName + ".ChassisAttributes",
                             chassisObjPath);
 
-    // Chassis creates 3 asset sensors + 1 health sensor, but SERIAL_NUMBER and
-    // MARKETING_NAME merge with processor sensors. Final result:
+    // Chassis creates 3 asset sensors + 1 SKU sensor + 1 health sensor, but
+    // SERIAL_NUMBER and MARKETING_NAME merge with processor sensors. Final
+    // result:
     // - DEVICE_PART_NUMBER (processor only)
     // - FRU_PART_NUMBER (chassis only)
     // - SERIAL_NUMBER (merged: processor + chassis interfaces)
     // - MARKETING_NAME (merged: processor + chassis interfaces)
+    // - SKU (chassis only)
     // - Health (chassis only)
-    // Total: 5 sensors
-    EXPECT_EQ(5, gpu->deviceSensors.size());
+    // Total: 6 sensors
+    EXPECT_EQ(6, gpu->deviceSensors.size());
     auto partNumberSensor =
         dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
             gpu->deviceSensors[3]); // New FRU_PART_NUMBER sensor

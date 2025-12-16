@@ -196,9 +196,9 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
     nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
     EXPECT_EQ(1, devices.size());
-    EXPECT_EQ(10, gpu->staticSensors.size());
+    EXPECT_EQ(11, gpu->staticSensors.size());
     EXPECT_EQ(0, gpu->roundRobinSensors.size());
-    EXPECT_EQ(10, gpu->deviceSensors.size());
+    EXPECT_EQ(11, gpu->deviceSensors.size());
 
     auto sensors = 0;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<UuidIntf>>(
@@ -214,7 +214,8 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
         dynamic_pointer_cast<NsmInterfaceProvider<AssociationDefinitionsInft>>(
             gpu->deviceSensors[sensors++]));
     // Skip asset inventory property sensors (partNumber, serialNumber, model)
-    sensors += 3;
+    // and SKU
+    sensors += 4;
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                            gpu->deviceSensors[sensors++]));
     EXPECT_NE(nullptr,
@@ -241,7 +242,8 @@ TEST_F(NsmChassisTest, goodTestCreateGpuChassis)
             .size());
 
     // Skip asset inventory property sensors (partNumber, serialNumber, model)
-    sensors += 3;
+    // and SKU
+    sensors += 4;
 
     EXPECT_NE(nullptr, dynamic_pointer_cast<NsmInterfaceProvider<LocationIntf>>(
                            gpu->deviceSensors[sensors]));
@@ -311,9 +313,9 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
     nsmChassisCreateSensors(mockManager, basicIntfName + ".ChassisAttributes",
                             objPath);
     EXPECT_EQ(2, devices.size());
-    EXPECT_EQ(4, fpga->staticSensors.size());
+    EXPECT_EQ(5, fpga->staticSensors.size());
     EXPECT_EQ(0, fpga->roundRobinSensors.size());
-    EXPECT_EQ(5, fpga->deviceSensors.size());
+    EXPECT_EQ(6, fpga->deviceSensors.size());
 
     auto sensors = 0;
 
@@ -326,10 +328,13 @@ TEST_F(NsmChassisTest, goodTestCreateBaseboardChassis)
             fpga->deviceSensors[sensors++]);
     auto chassisAsset = dynamic_pointer_cast<NsmChassis<NsmAssetIntf>>(
         fpga->deviceSensors[sensors++]);
+    auto chassisSKU = dynamic_pointer_cast<NsmChassis<NsmApSkuIdIntf>>(
+        fpga->deviceSensors[sensors++]);
     EXPECT_NE(nullptr, chassisUuid);
     EXPECT_NE(nullptr, mctpUuid);
     EXPECT_NE(nullptr, pcieRefClock);
     EXPECT_NE(nullptr, chassisAsset);
+    EXPECT_NE(nullptr, chassisSKU);
     EXPECT_EQ(MANUFACTURER_NVIDIA,
               chassisAsset->invoke(pdiMethod(manufacturer)));
 
@@ -371,9 +376,9 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
 
     EXPECT_EQ(2, devices.size());
     fpga = dynamic_pointer_cast<MockNsmDeviceBase>(devices[1]);
-    EXPECT_EQ(10, fpga->staticSensors.size());
+    EXPECT_EQ(11, fpga->staticSensors.size());
     EXPECT_EQ(1, fpga->roundRobinSensors.size());
-    EXPECT_EQ(11, fpga->deviceSensors.size());
+    EXPECT_EQ(12, fpga->deviceSensors.size());
 
     auto sensors = 0;
     sensors += 3;
@@ -384,7 +389,7 @@ TEST_F(NsmChassisTest, goodTestCreateStaticSensors)
             fpga->deviceSensors[sensors++]);
     auto model = dynamic_pointer_cast<NsmInventoryProperty<NsmAssetIntf>>(
         fpga->deviceSensors[sensors++]);
-    sensors += 1;
+    sensors += 2; // Skip SKU sensor and one more
     auto depth = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
         fpga->deviceSensors[sensors++]);
     auto width = dynamic_pointer_cast<NsmInventoryProperty<DimensionIntf>>(
