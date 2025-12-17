@@ -752,6 +752,18 @@ std::optional<Response>
                     return dotCAKInstallHandler(request, requestLen);
                 case NSM_FW_DOT_CAK_BYPASS:
                     return dotCAKBypassHandler(request, requestLen);
+                case NSM_FW_DOT_LOCK:
+                    return dotLockHandler(request, requestLen);
+                case NSM_FW_DOT_UNLOCK_CHALLENGE:
+                    return dotUnlockChallengeHandler(request, requestLen);
+                case NSM_FW_DOT_UNLOCK:
+                    return dotUnlockHandler(request, requestLen);
+                case NSM_FW_DOT_CAK_ROTATE:
+                    return dotCAKRotateHandler(request, requestLen);
+                case NSM_FW_DOT_GET_INFO:
+                    return dotGetInfoHandler(request, requestLen);
+                case NSM_FW_DOT_GET_STATUS:
+                    return dotGetStatusHandler(request, requestLen);
                 default:
                     lg2::error(
                         "unsupported Command:{CMD} request length={LEN}, msgType={TYPE}",
@@ -883,7 +895,10 @@ std::optional<std::vector<uint8_t>>
                  {5, {98, 100}},
                  {6,
                   {1, NSM_FW_SET_ROT_PROPERTY, NSM_FW_DOT_CAK_INSTALL,
-                   NSM_FW_DOT_CAK_BYPASS}},
+                   NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
+                   NSM_FW_DOT_UNLOCK_CHALLENGE, NSM_FW_DOT_UNLOCK,
+                   NSM_FW_DOT_CAK_ROTATE, NSM_FW_DOT_GET_INFO,
+                   NSM_FW_DOT_GET_STATUS}},
              }},
             {NSM_DEV_ID_SWITCH,
              {
@@ -946,7 +961,10 @@ std::optional<std::vector<uint8_t>>
                  {5, {3, 4, 5, 6, 7, 8, 9, 64, 65}},
                  {6,
                   {1, 2, 3, 4, 5, 6, NSM_FW_DOT_CAK_INSTALL,
-                   NSM_FW_DOT_CAK_BYPASS}},
+                   NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
+                   NSM_FW_DOT_UNLOCK_CHALLENGE, NSM_FW_DOT_UNLOCK,
+                   NSM_FW_DOT_CAK_ROTATE, NSM_FW_DOT_GET_INFO,
+                   NSM_FW_DOT_GET_STATUS}},
              }},
             {NSM_DEV_ID_EROT,
              {
@@ -959,7 +977,10 @@ std::optional<std::vector<uint8_t>>
                    NSM_FW_QUERY_MIN_SECURITY_VERSION_NUMBER,
                    NSM_FW_UPDATE_MIN_SECURITY_VERSION_NUMBER,
                    NSM_FW_SET_ROT_PROPERTY, NSM_FW_DOT_CAK_INSTALL,
-                   NSM_FW_DOT_CAK_BYPASS}},
+                   NSM_FW_DOT_CAK_BYPASS, NSM_FW_DOT_LOCK,
+                   NSM_FW_DOT_UNLOCK_CHALLENGE, NSM_FW_DOT_UNLOCK,
+                   NSM_FW_DOT_CAK_ROTATE, NSM_FW_DOT_GET_INFO,
+                   NSM_FW_DOT_GET_STATUS}},
              }},
             {NSM_DEV_ID_MCTP_BRIDGE,
              {
@@ -7711,32 +7732,15 @@ std::optional<std::vector<uint8_t>>
     MockupResponder::dotCAKInstallHandler(const nsm_msg* requestMsg,
                                           size_t requestLen)
 {
-    if (verbose)
-    {
-        lg2::info("Processing DOT CAK Install request");
-    }
-
-    // Decode the request
     struct nsm_dot_cak_install_req dot_cak_req;
     auto rc = decode_nsm_dot_cak_install_req(requestMsg, requestLen,
                                              &dot_cak_req);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("decode_nsm_dot_cak_install_req failed: rc={RC}", "RC", rc);
+        lg2::error("DOT CAK Install: decode failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
 
-    if (verbose)
-    {
-        lg2::info("DOT CAK Install request decoded successfully");
-        lg2::info("Lock disable: {LOCK_DISABLE}", "LOCK_DISABLE",
-                  static_cast<int>(dot_cak_req.lock_disable));
-        lg2::info("Min SVN: {MIN_SVN}", "MIN_SVN",
-                  static_cast<int>(dot_cak_req.min_svn));
-    }
-
-    // For mock implementation, we'll always return success
-    // In a real implementation, this would perform the actual CAK installation
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -7746,15 +7750,11 @@ std::optional<std::vector<uint8_t>>
                                          NSM_SUCCESS, reason_code, responseMsg);
     if (rc != NSM_SW_SUCCESS)
     {
-        lg2::error("encode_nsm_dot_cak_install_resp failed: rc={RC}", "RC", rc);
+        lg2::error("DOT CAK Install: encode failed: rc={RC}", "RC", rc);
         return std::nullopt;
     }
 
-    if (verbose)
-    {
-        lg2::info("DOT CAK Install response encoded successfully");
-    }
-
+    lg2::debug("DOT CAK Install: operation completed successfully");
     return response;
 }
 
@@ -7767,7 +7767,6 @@ std::optional<std::vector<uint8_t>>
         lg2::info("Processing DOT CAK Bypass request");
     }
 
-    // Decode the request (simple validation)
     auto rc = decode_nsm_dot_cak_bypass_req(requestMsg, requestLen);
     if (rc != NSM_SW_SUCCESS)
     {
@@ -7780,9 +7779,6 @@ std::optional<std::vector<uint8_t>>
         lg2::info("DOT CAK Bypass request decoded successfully");
     }
 
-    // For mock implementation, we'll always return success
-    // In a real implementation, this would bypass the DOT CAK installation
-    // and allow the system to continue booting
     std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
                                   0);
     auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
@@ -7799,6 +7795,285 @@ std::optional<std::vector<uint8_t>>
     if (verbose)
     {
         lg2::info("DOT CAK Bypass response encoded successfully");
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotLockHandler(const nsm_msg* requestMsg,
+                                    size_t requestLen)
+{
+    struct nsm_dot_lock_req dot_lock_req;
+    auto rc = decode_nsm_dot_lock_req(requestMsg, requestLen, &dot_lock_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Lock: decode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_lock_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t dummy_dot_blob[DOT_BLOB_SIZE];
+    for (int i = 0; i < DOT_BLOB_SIZE; i++)
+    {
+        dummy_dot_blob[i] = static_cast<uint8_t>(i % 256);
+    }
+
+    rc = encode_nsm_dot_lock_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                  reason_code, dummy_dot_blob, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Lock: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    lg2::debug("DOT Lock: operation completed successfully");
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotUnlockChallengeHandler(const nsm_msg* requestMsg,
+                                               size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Unlock Challenge request");
+    }
+
+    struct nsm_dot_unlock_challenge_req unlock_challenge_req;
+    auto rc = decode_nsm_dot_unlock_challenge_req(requestMsg, requestLen,
+                                                  &unlock_challenge_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_unlock_challenge_req failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Unlock Challenge request decoded successfully");
+        lg2::info("Unlock type: {TYPE}", "TYPE",
+                  static_cast<int>(unlock_challenge_req.unlock_type));
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t dummy_challenge[DOT_CHALLENGE_SIZE];
+    for (int i = 0; i < DOT_CHALLENGE_SIZE; i++)
+    {
+        dummy_challenge[i] = static_cast<uint8_t>((i * 3 + 17) % 256);
+    }
+
+    rc = encode_nsm_dot_unlock_challenge_resp(requestMsg->hdr.instance_id,
+                                              NSM_SUCCESS, reason_code,
+                                              dummy_challenge, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_unlock_challenge_resp failed: rc={RC}", "RC",
+                   rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "DOT Unlock Challenge response encoded successfully with challenge");
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotUnlockHandler(const nsm_msg* requestMsg,
+                                      size_t requestLen)
+{
+    struct nsm_dot_unlock_req dot_unlock_req;
+    auto rc = decode_nsm_dot_unlock_req(requestMsg, requestLen,
+                                        &dot_unlock_req);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Unlock: decode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp),
+                                  0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    rc = encode_nsm_dot_unlock_resp(requestMsg->hdr.instance_id, NSM_SUCCESS,
+                                    reason_code, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT Unlock: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    lg2::debug("DOT Unlock: operation completed successfully");
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotCAKRotateHandler(const nsm_msg* requestMsg,
+                                         [[maybe_unused]] size_t requestLen)
+{
+    nsm_dot_cak_rotate_req cak_rotate_req;
+    auto decode_rc = decode_nsm_dot_cak_rotate_req(requestMsg, requestLen,
+                                                   &cak_rotate_req);
+    if (decode_rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT CAK Rotate: decode failed: rc={RC}", "RC", decode_rc);
+        return std::nullopt;
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_rotate_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+
+    uint8_t dummy_dot_blob[DOT_BLOB_SIZE];
+    for (int i = 0; i < DOT_BLOB_SIZE; i++)
+    {
+        dummy_dot_blob[i] = static_cast<uint8_t>((i * 5 + 23) % 256);
+    }
+
+    auto rc = encode_nsm_dot_cak_rotate_resp(requestMsg->hdr.instance_id,
+                                             NSM_SUCCESS, reason_code,
+                                             dummy_dot_blob, responseMsg);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("DOT CAK Rotate: encode failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    lg2::debug("DOT CAK Rotate: operation completed successfully");
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotGetInfoHandler(const nsm_msg* requestMsg,
+                                       size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Get Info request");
+    }
+
+    auto rc = decode_nsm_dot_get_info_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_get_info_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Get Info request decoded successfully");
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_info_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    uint16_t version = 1;
+    uint8_t fuse_change_state = 0x00;
+    uint8_t transfers_remaining = 128;
+
+    std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+    for (int i = 0; i < DOT_BLOB_SIZE; i++)
+    {
+        dotBlob[i] = (i % 256);
+    }
+
+    rc = encode_nsm_dot_get_info_resp(
+        requestMsg->hdr.instance_id, NSM_SUCCESS, reason_code, version,
+        fuse_change_state, transfers_remaining, dotBlob.data(), responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_get_info_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info(
+            "DOT Get Info response encoded: version={VER}, fuseState={FUSE}, transfers={TRANS}",
+            "VER", version, "FUSE", fuse_change_state, "TRANS",
+            transfers_remaining);
+    }
+
+    return response;
+}
+
+std::optional<std::vector<uint8_t>>
+    MockupResponder::dotGetStatusHandler(const nsm_msg* requestMsg,
+                                         size_t requestLen)
+{
+    if (verbose)
+    {
+        lg2::info("Processing DOT Get Status request");
+    }
+
+    auto rc = decode_nsm_dot_get_status_req(requestMsg, requestLen);
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("decode_nsm_dot_get_status_req failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        lg2::info("DOT Get Status request decoded successfully");
+    }
+
+    std::vector<uint8_t> response(
+        sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp), 0);
+    auto responseMsg = reinterpret_cast<nsm_msg*>(response.data());
+    uint16_t reason_code = ERR_NULL;
+    uint8_t status = 1; // Volatile state
+
+    rc = encode_nsm_dot_get_status_resp(requestMsg->hdr.instance_id,
+                                        NSM_SUCCESS, reason_code, status,
+                                        responseMsg);
+
+    if (rc != NSM_SW_SUCCESS)
+    {
+        lg2::error("encode_nsm_dot_get_status_resp failed: rc={RC}", "RC", rc);
+        return std::nullopt;
+    }
+
+    if (verbose)
+    {
+        std::string statusText;
+        switch (status)
+        {
+            case 0:
+                statusText = "Uninitialized";
+                break;
+            case 1:
+                statusText = "Volatile";
+                break;
+            case 2:
+                statusText = "Locked";
+                break;
+            case 3:
+                statusText = "Disabled";
+                break;
+            default:
+                statusText = "Unknown";
+                break;
+        }
+        lg2::info("DOT Get Status response encoded: status={STATUS} ({TEXT})",
+                  "STATUS", status, "TEXT", statusText);
     }
 
     return response;

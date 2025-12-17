@@ -617,8 +617,23 @@ class MockupResponder
     std::optional<std::vector<uint8_t>>
         dotCAKBypassHandler(const nsm_msg* requestMsg, size_t requestLen);
 
+    std::optional<std::vector<uint8_t>>
+        dotLockHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        dotUnlockChallengeHandler(const nsm_msg* requestMsg, size_t requestLen);
+
+    std::optional<std::vector<uint8_t>>
+        dotUnlockHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        dotCAKRotateHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        dotGetInfoHandler(const nsm_msg* requestMsg, size_t requestLen);
+    std::optional<std::vector<uint8_t>>
+        dotGetStatusHandler(const nsm_msg* requestMsg, size_t requestLen);
+
   private:
-    std::optional<Request>
+    std::optional<Response>
         getQueryScalarGroupTelemetryResponse(uint8_t requestInstanceId,
                                              uint32_t groupId);
     sdeventplus::Event& event;

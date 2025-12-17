@@ -37,16 +37,86 @@ namespace nsmtool::firmware
 using namespace nsmtool::helper;
 std::vector<std::unique_ptr<CommandInterface>> commands;
 
-// DOT CAK/LAK key size constants
-constexpr size_t ECDSA_KEY_SIZE =
-    96; // Total ECDSA key size (x + y coordinates)
-constexpr size_t ECDSA_COORDINATE_SIZE = 48; // Each coordinate (x or y) size
-constexpr size_t LMS_KEY_SIZE = 48;          // LMS public key size
-constexpr size_t AUTH_SCHEME_SIZE =
-    4; // Authentication scheme field size (NvU32)
+constexpr size_t ECDSA_KEY_SIZE = 96;
+constexpr size_t ECDSA_COORDINATE_SIZE = 48;
+constexpr size_t LMS_KEY_SIZE = 48;
+constexpr size_t AUTH_SCHEME_SIZE = 4;
 constexpr size_t CRYPTO_PCP_SIZE = AUTH_SCHEME_SIZE + ECDSA_COORDINATE_SIZE +
-                                   ECDSA_COORDINATE_SIZE +
-                                   LMS_KEY_SIZE; // 148 bytes total
+                                   ECDSA_COORDINATE_SIZE + LMS_KEY_SIZE;
+constexpr size_t KEY_AUTH_DATA_SIZE = 148;
+constexpr uint8_t KEY_AUTH_SCHEME_ECDSA = 0;
+constexpr uint8_t KEY_AUTH_SCHEME_HYBRID = 1;
+constexpr size_t STATIC_CHALLENGE_SIZE = 32;
+constexpr size_t SIGNATURE_SIZE = 1840;
+constexpr size_t ECDSA_SIGNATURE_SIZE = 96;
+constexpr size_t LMS_SIGNATURE_SIZE = 1744;
+
+/**
+ * @brief Validates that a file exists and has the expected size
+ *
+ * @param filename Path to the file to validate
+ * @param expectedSize Expected file size in bytes
+ * @param fileType Description of the file type for error messages
+ * @return Empty string if valid, error message string if invalid
+ */
+static std::string validateFileSize(const std::string& filename,
+                                    size_t expectedSize,
+                                    const std::string& fileType)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file)
+    {
+        return "Cannot open " + fileType + " file: " + filename;
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t actualSize = file.tellg();
+    file.close();
+
+    if (actualSize != expectedSize)
+    {
+        return fileType + " file must contain exactly " +
+               std::to_string(expectedSize) + " bytes, got " +
+               std::to_string(actualSize) + " bytes";
+    }
+
+    return "";
+}
+
+static std::vector<uint8_t> readFileAsBytes(const std::string& filename)
+{
+    if (filename.empty())
+    {
+        std::cerr << "Error: Filename is empty\n";
+        return {};
+    }
+
+    std::ifstream file(filename, std::ios::binary);
+    if (!file)
+    {
+        std::cerr << "Error: Cannot open file " << filename << "\n";
+        return {};
+    }
+
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (size == 0)
+    {
+        std::cerr << "Error: File " << filename << " is empty\n";
+        return {};
+    }
+
+    std::vector<uint8_t> buffer(size);
+    if (!file.read(reinterpret_cast<char*>(buffer.data()), size))
+    {
+        std::cerr << "Error: Failed to read file " << filename << "\n";
+        return {};
+    }
+
+    return buffer;
+}
 
 class GetRotInformation : public CommandInterface
 {
@@ -440,7 +510,7 @@ class UpdateCodeAuthKeyPerm : public CommandInterface
         nlohmann::ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reasonCode;
-        // Fill update methods response
+
         ordered_json updateMethods;
         bitfield32_t updateMethodBits = {updateMethod};
         if (updateMethodBits.bits.bit0)
@@ -649,7 +719,7 @@ class UpdateMinSecurityVersion : public CommandInterface
         ordered_json result;
         result["Completion code"] = cc;
         result["Reason code"] = reason_code;
-        // Fill update methods response
+
         ordered_json updateMethods;
         bitfield32_t updateMethodBits = {sec_info.update_methods};
         if (updateMethodBits.bits.bit0)
@@ -960,7 +1030,6 @@ class DotCAKInstall : public CommandInterface
         auto ccOptionGroup =
             app->add_option_group("Required", "Parameters for DotCAKInstall");
 
-        // CAK Key Auth Scheme - must be 0 or 1
         ccOptionGroup
             ->add_option(
                 "--cak_key_auth_scheme", cakKeyAuthScheme,
@@ -968,7 +1037,6 @@ class DotCAKInstall : public CommandInterface
             ->required()
             ->check(CLI::Range(0, 1));
 
-        // CAK Key ECDSA file - must be valid file path and exactly 96 bytes
         ccOptionGroup
             ->add_option("--cak_ecdsa_key", cakKeyEcdsaKeyFile,
                          "File containing 96 Bytes of ECDSA data (raw bytes)")
@@ -978,9 +1046,6 @@ class DotCAKInstall : public CommandInterface
             return validateFileSize(filename, ECDSA_KEY_SIZE, "CAK key");
         });
 
-        // CAK LMS file - optional, only required for hybrid auth scheme (1)
-        // For ECDSA-only auth scheme (0), LMS will be filled with 48 bytes of
-        // zeros
         app->add_option(
                "--cak_lms_key", cakLmsKeyFile,
                "File containing 48 Bytes (raw bytes) - required only for hybrid auth scheme (1)")
@@ -989,14 +1054,12 @@ class DotCAKInstall : public CommandInterface
             return validateFileSize(filename, LMS_KEY_SIZE, "CAK LMS");
         });
 
-        // LAK Key Auth Scheme - must be 0 or 1
         ccOptionGroup
             ->add_option("--lak_key_auth_scheme", lakKeyAuthScheme,
                          "LAK key authentication scheme (0 or 1)")
             ->required()
             ->check(CLI::Range(0, 1));
 
-        // LAK Key ECDSA file - must be valid file path and exactly 96 bytes
         ccOptionGroup
             ->add_option("--lak_ecdsa_key", lakKeyEcdsaKeyFile,
                          "File containing 96 Bytes LAK key (raw bytes)")
@@ -1006,9 +1069,6 @@ class DotCAKInstall : public CommandInterface
             return validateFileSize(filename, ECDSA_KEY_SIZE, "LAK key");
         });
 
-        // LAK LMS file - optional, only required for hybrid auth scheme (1)
-        // For ECDSA-only auth scheme (0), LMS will be filled with 48 bytes of
-        // zeros
         app->add_option(
                "--lak_lms_key", lakLmsKeyFile,
                "File containing 48 Bytes LAK LMS (raw bytes) - required only for hybrid auth scheme (1)")
@@ -1017,24 +1077,21 @@ class DotCAKInstall : public CommandInterface
             return validateFileSize(filename, LMS_KEY_SIZE, "LAK LMS");
         });
 
-        // Lock Disable - must be 0 or 1 (default: 0 = lock enabled)
         ccOptionGroup
             ->add_option("--lock_disable", lockDisable,
                          "Contains state for lock allowing (default: 0)")
             ->default_val(0)
             ->check(CLI::Range(0, 1));
 
-        // Min SVN - must be valid uint32_t (0 to UINT32_MAX)
         ccOptionGroup
             ->add_option("--min_svn", minSvn,
                          "Minimum Firmware Security Version")
-            ->required()
+            ->default_val(0)
             ->check(CLI::Range(0U, UINT32_MAX));
     }
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
-        // Read CAK key from file
         std::vector<uint8_t> cakKey = readFileAsBytes(cakKeyEcdsaKeyFile);
         if (cakKey.empty())
         {
@@ -1043,9 +1100,8 @@ class DotCAKInstall : public CommandInterface
             return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
         }
 
-        // Read CAK LMS from file (only for Hybrid auth scheme)
         std::vector<uint8_t> cakLms;
-        if (cakKeyAuthScheme == 1) // Hybrid (ECDSA + LMS)
+        if (cakKeyAuthScheme == KEY_AUTH_SCHEME_HYBRID)
         {
             if (cakLmsKeyFile.empty())
             {
@@ -1061,12 +1117,11 @@ class DotCAKInstall : public CommandInterface
                 return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
             }
         }
-        else // ECDSA only - fill with zeros
+        else
         {
             cakLms.resize(LMS_KEY_SIZE, 0);
         }
 
-        // Read LAK key from file
         std::vector<uint8_t> lakKey = readFileAsBytes(lakKeyEcdsaKeyFile);
         if (lakKey.empty())
         {
@@ -1075,9 +1130,8 @@ class DotCAKInstall : public CommandInterface
             return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
         }
 
-        // Read LAK LMS from file (only for Hybrid auth scheme)
         std::vector<uint8_t> lakLms;
-        if (lakKeyAuthScheme == 1) // Hybrid (ECDSA + LMS)
+        if (lakKeyAuthScheme == KEY_AUTH_SCHEME_HYBRID)
         {
             if (lakLmsKeyFile.empty())
             {
@@ -1114,8 +1168,6 @@ class DotCAKInstall : public CommandInterface
             return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
         }
 
-        // Display key authentication data in hex format (only when verbose is
-        // enabled)
         if (isVerbose())
         {
             std::cout << "CAK key authentication data (" << CRYPTO_PCP_SIZE
@@ -1147,10 +1199,7 @@ class DotCAKInstall : public CommandInterface
             sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
         nsm_dot_cak_install_req nsm_req;
 
-        // Copy CAK key authentication data (148 bytes per spec)
         memcpy(nsm_req.cak_pub, cakCryptoPcp.data(), CRYPTO_PCP_SIZE);
-
-        // Copy LAK key authentication data (148 bytes per spec)
         memcpy(nsm_req.lak_pub, lakCryptoPcp.data(), CRYPTO_PCP_SIZE);
 
         nsm_req.lock_disable = lockDisable;
@@ -1163,7 +1212,6 @@ class DotCAKInstall : public CommandInterface
 
     void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
     {
-        // Validate input parameters
         if (responsePtr == nullptr)
         {
             std::cerr << "Error: Response pointer is null\n";
@@ -1191,11 +1239,9 @@ class DotCAKInstall : public CommandInterface
             return;
         }
 
-        // Get response fields from nsm_common_resp
         struct nsm_common_resp* resp =
             (struct nsm_common_resp*)responsePtr->payload;
 
-        // Validate response data types
         if (resp->command != NSM_FW_DOT_CAK_INSTALL)
         {
             std::cerr << "Warning: Unexpected command code in response: 0x"
@@ -1203,19 +1249,7 @@ class DotCAKInstall : public CommandInterface
                       << (int)NSM_FW_DOT_CAK_INSTALL << std::dec << "\n";
         }
 
-        // Output response fields according to spec
         ordered_json result;
-
-        // Add NSM header info as hex bytes
-        std::stringstream nsmHeaderHex;
-        for (int i = 0; i < 5; i++)
-        {
-            nsmHeaderHex << std::hex << std::setw(2) << std::setfill('0')
-                         << (int)((uint8_t*)&responsePtr->hdr)[i];
-            if (i < 4)
-                nsmHeaderHex << " ";
-        }
-        result["nsm_header"] = nsmHeaderHex.str();
 
         std::stringstream cmdCode, compCode, res;
         cmdCode << std::hex << std::setw(2) << std::setfill('0')
@@ -1225,8 +1259,8 @@ class DotCAKInstall : public CommandInterface
         res << std::hex << std::setw(4) << std::setfill('0')
             << (int)resp->reserved;
 
-        result["Command code"] = cmdCode.str();
-        result["Completion code"] = compCode.str();
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
         result["Reserved"] = res.str();
 
         DisplayInJson(result);
@@ -1241,80 +1275,6 @@ class DotCAKInstall : public CommandInterface
     std::string lakLmsKeyFile;
     uint8_t lockDisable;
     uint32_t minSvn;
-
-    // Helper function to validate file size
-    std::string validateFileSize(const std::string& filename,
-                                 size_t expectedSize,
-                                 const std::string& fileType)
-    {
-        std::ifstream file(filename, std::ios::binary);
-        if (!file)
-        {
-            return "Cannot open " + fileType + " file: " + filename;
-        }
-
-        file.seekg(0, std::ios::end);
-        size_t actualSize = file.tellg();
-        file.close();
-
-        if (actualSize != expectedSize)
-        {
-            return fileType + " file must contain exactly " +
-                   std::to_string(expectedSize) + " bytes, got " +
-                   std::to_string(actualSize) + " bytes";
-        }
-
-        return ""; // Empty string means validation passed
-    }
-
-    std::vector<uint8_t> readFileAsBytes(const std::string& filename)
-    {
-        // Validate filename
-        if (filename.empty())
-        {
-            std::cerr << "Error: Filename is empty\n";
-            return {};
-        }
-
-        std::ifstream file(filename, std::ios::binary);
-        if (!file)
-        {
-            std::cerr << "Error: Cannot open file " << filename << "\n";
-            return {};
-        }
-
-        file.seekg(0, std::ios::end);
-        size_t size = file.tellg();
-        file.seekg(0, std::ios::beg);
-
-        // Validate file size
-        if (size == 0)
-        {
-            std::cerr << "Error: File " << filename << " is empty\n";
-            return {};
-        }
-
-        if (size > SIZE_MAX)
-        {
-            std::cerr << "Error: File " << filename
-                      << " is too large (size: " << size << " bytes)\n";
-            return {};
-        }
-
-        std::vector<uint8_t> buffer(size);
-        file.read(reinterpret_cast<char*>(buffer.data()), size);
-
-        // Validate read operation
-        if (file.gcount() != static_cast<std::streamsize>(size))
-        {
-            std::cerr << "Error: Failed to read complete file " << filename
-                      << " (expected: " << size
-                      << " bytes, read: " << file.gcount() << " bytes)\n";
-            return {};
-        }
-
-        return buffer;
-    }
 };
 
 class DotCAKBypass : public CommandInterface
@@ -1329,9 +1289,7 @@ class DotCAKBypass : public CommandInterface
 
     explicit DotCAKBypass(const char* type, const char* name, CLI::App* app) :
         CommandInterface(type, name, app)
-    {
-        // No parameters required for this command
-    }
+    {}
 
     std::pair<int, std::vector<uint8_t>> createRequestMsg() override
     {
@@ -1364,32 +1322,19 @@ class DotCAKBypass : public CommandInterface
             return;
         }
 
-        // Output response fields according to spec
         ordered_json result;
 
-        // Add NSM header info as hex bytes
-        std::stringstream nsmHeaderHex;
-        for (int i = 0; i < 5; i++)
-        {
-            nsmHeaderHex << std::hex << std::setw(2) << std::setfill('0')
-                         << (int)((uint8_t*)&responsePtr->hdr)[i];
-            if (i < 4)
-                nsmHeaderHex << " ";
-        }
-        result["nsm_header"] = nsmHeaderHex.str();
-
-        // For error responses, show reason code instead of detailed fields
         if (cc != NSM_SUCCESS)
         {
             std::stringstream cmdCode;
             cmdCode << std::hex << std::setw(2) << std::setfill('0')
                     << (int)NSM_FW_DOT_CAK_BYPASS;
-            result["Command code"] = cmdCode.str();
+            result["CommandCode"] = cmdCode.str();
 
             std::stringstream compCode;
             compCode << std::hex << std::setw(2) << std::setfill('0')
                      << (int)cc;
-            result["Completion code"] = compCode.str();
+            result["CompletionCode"] = compCode.str();
 
             std::stringstream reasonCode;
             reasonCode << std::hex << std::setw(4) << std::setfill('0')
@@ -1409,8 +1354,8 @@ class DotCAKBypass : public CommandInterface
             res << std::hex << std::setw(4) << std::setfill('0')
                 << (int)le16toh(resp->reserved);
 
-            result["Command code"] = cmdCode.str();
-            result["Completion code"] = compCode.str();
+            result["CommandCode"] = cmdCode.str();
+            result["CompletionCode"] = compCode.str();
             result["Reserved"] = res.str();
         }
 
@@ -1519,8 +1464,7 @@ class ImageCopyControl : public CommandInterface
         ordered_json result;
         switch (requestType)
         {
-            case NSM_IMAGE_COPY_QUERY_PROGRESS: // Query Image Copy
-                                                // Progress
+            case NSM_IMAGE_COPY_QUERY_PROGRESS:
             {
                 struct nsm_firmware_image_copy_control_query_progress_resp
                     image_copy_control_query{};
@@ -1602,7 +1546,7 @@ class ImageCopyControl : public CommandInterface
                     image_copy_control_query.image_copy_progress;
                 break;
             }
-            case NSM_IMAGE_COPY_INITIATE_IMAGE_COPY: // Initiate Image Copy
+            case NSM_IMAGE_COPY_INITIATE_IMAGE_COPY:
             {
                 auto rc =
                     decode_nsm_firmware_image_copy_control_initiate_copy_resp(
@@ -1696,6 +1640,926 @@ class ImageCopyControl : public CommandInterface
     }
 };
 
+class DotLock : public CommandInterface
+{
+  public:
+    ~DotLock() = default;
+    DotLock() = delete;
+    DotLock(const DotLock&) = delete;
+    DotLock(DotLock&&) = default;
+    DotLock& operator=(const DotLock&) = delete;
+    DotLock& operator=(DotLock&&) = default;
+
+    explicit DotLock(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group("Required",
+                                                   "Parameters for DotLock");
+
+        ccOptionGroup
+            ->add_option("--cak_key_auth_scheme", cakKeyAuthScheme,
+                         "CAK key authentication scheme (0=ECDSA, 1=Hybrid)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        ccOptionGroup
+            ->add_option("--cak_ecdsa_key", cakEcdsaKeyFile,
+                         "File containing 96 bytes of CAK ECDSA key")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, ECDSA_KEY_SIZE, "CAK ECDSA key");
+        });
+
+        app->add_option(
+               "--cak_lms_key", cakLmsKeyFile,
+               "File containing 48 bytes of CAK LMS key (required for hybrid)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, LMS_KEY_SIZE, "CAK LMS key");
+        });
+
+        ccOptionGroup
+            ->add_option("--lak_key_auth_scheme", lakKeyAuthScheme,
+                         "LAK key authentication scheme (0=ECDSA, 1=Hybrid)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        ccOptionGroup
+            ->add_option("--lak_ecdsa_key", lakEcdsaKeyFile,
+                         "File containing 96 bytes of LAK ECDSA key")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, ECDSA_KEY_SIZE, "LAK ECDSA key");
+        });
+
+        app->add_option(
+               "--lak_lms_key", lakLmsKeyFile,
+               "File containing 48 bytes of LAK LMS key (required for hybrid)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, LMS_KEY_SIZE, "LAK LMS key");
+        });
+
+        ccOptionGroup
+            ->add_option(
+                "--unlock_method", unlockMethod,
+                "Unlock method for future DOT_UNLOCK (0=DeviceUID, 1=RandomNonce, 2=StaticValue)")
+            ->required()
+            ->check(CLI::Range(0, 2));
+
+        app->add_option(
+               "--static_challenge", staticChallengeFile,
+               "File containing 32 bytes static challenge (required when unlock_method == 2)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, STATIC_CHALLENGE_SIZE,
+                                    "Static challenge");
+        });
+
+        ccOptionGroup
+            ->add_option("--lock_signature_auth_scheme",
+                         lockSignatureAuthScheme,
+                         "Signature authentication scheme (0=ECDSA, 1=Hybrid)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        ccOptionGroup
+            ->add_option(
+                "--signature", signatureFile,
+                "File containing 1840 bytes of signature (96 bytes ECDSA + 1744 bytes LMS)")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, SIGNATURE_SIZE, "Signature");
+        });
+
+        app->add_option("--output", outputFile,
+                        "Output file for DOT blob (1024 bytes)");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> cakEcdsa = readFileAsBytes(cakEcdsaKeyFile);
+        if (cakEcdsa.empty() || cakEcdsa.size() != ECDSA_KEY_SIZE)
+        {
+            std::cerr << "Error: Failed to read CAK ECDSA key file: "
+                      << cakEcdsaKeyFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> cakLms;
+        if (cakKeyAuthScheme == KEY_AUTH_SCHEME_HYBRID)
+        {
+            if (cakLmsKeyFile.empty())
+            {
+                std::cerr
+                    << "Error: CAK LMS key file required for hybrid auth scheme\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            cakLms = readFileAsBytes(cakLmsKeyFile);
+            if (cakLms.empty() || cakLms.size() != LMS_KEY_SIZE)
+            {
+                std::cerr << "Error: Failed to read CAK LMS key file: "
+                          << cakLmsKeyFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+        else
+        {
+            cakLms.resize(LMS_KEY_SIZE, 0);
+        }
+
+        std::vector<uint8_t> lakEcdsa = readFileAsBytes(lakEcdsaKeyFile);
+        if (lakEcdsa.empty() || lakEcdsa.size() != ECDSA_KEY_SIZE)
+        {
+            std::cerr << "Error: Failed to read LAK ECDSA key file: "
+                      << lakEcdsaKeyFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> lakLms;
+        if (lakKeyAuthScheme == KEY_AUTH_SCHEME_HYBRID)
+        {
+            if (lakLmsKeyFile.empty())
+            {
+                std::cerr
+                    << "Error: LAK LMS key file required for hybrid auth scheme\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            lakLms = readFileAsBytes(lakLmsKeyFile);
+            if (lakLms.empty() || lakLms.size() != LMS_KEY_SIZE)
+            {
+                std::cerr << "Error: Failed to read LAK LMS key file: "
+                          << lakLmsKeyFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+        else
+        {
+            lakLms.resize(LMS_KEY_SIZE, 0);
+        }
+
+        std::vector<uint8_t> cakPub(CRYPTO_PCP_SIZE, 0);
+        if (!nsm::dot::buildKeyAuthData(cakKeyAuthScheme, cakEcdsa.data(),
+                                        cakLms.data(), cakPub.data()))
+        {
+            std::cerr << "Error: Failed to build CAK key authentication data\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> lakPub(CRYPTO_PCP_SIZE, 0);
+        if (!nsm::dot::buildKeyAuthData(lakKeyAuthScheme, lakEcdsa.data(),
+                                        lakLms.data(), lakPub.data()))
+        {
+            std::cerr << "Error: Failed to build LAK key authentication data\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> sChallenge(STATIC_CHALLENGE_SIZE, 0);
+        if (unlockMethod == 2)
+        {
+            if (staticChallengeFile.empty())
+            {
+                std::cerr
+                    << "Error: Static challenge file required when unlock_method == 2\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            sChallenge = readFileAsBytes(staticChallengeFile);
+            if (sChallenge.empty() ||
+                sChallenge.size() != STATIC_CHALLENGE_SIZE)
+            {
+                std::cerr << "Error: Failed to read static challenge file: "
+                          << staticChallengeFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+
+        std::vector<uint8_t> signature = readFileAsBytes(signatureFile);
+        if (signature.empty() || signature.size() != SIGNATURE_SIZE)
+        {
+            std::cerr << "Error: Failed to read signature file (expected "
+                      << SIGNATURE_SIZE << " bytes): " << signatureFile
+                      << std::endl;
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_lock_req_command));
+        nsm_dot_lock_req nsm_req;
+
+        memcpy(nsm_req.cak_pub, cakPub.data(), KEY_AUTH_DATA_SIZE);
+        memcpy(nsm_req.lak_pub, lakPub.data(), KEY_AUTH_DATA_SIZE);
+        nsm_req.unlock_method = htole32(unlockMethod);
+        memcpy(nsm_req.s_challenge, sChallenge.data(), STATIC_CHALLENGE_SIZE);
+        memcpy(nsm_req.signature, signature.data(), SIGNATURE_SIZE);
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_lock_req(instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+
+        auto rc = decode_nsm_dot_lock_resp(responsePtr, payloadLength, &cc,
+                                           &reason_code, dotBlob.data());
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_LOCK;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+
+        if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+        {
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["Reserved"] = "0000";
+            result["reasonCode"] = reasonCodeHex.str();
+
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+        }
+        else
+        {
+            result["Reserved"] = "0000";
+
+            result["DOTBlobSize"] = DOT_BLOB_SIZE;
+
+            if (!outputFile.empty())
+            {
+                std::ofstream outFile(outputFile, std::ios::binary);
+                if (outFile)
+                {
+                    outFile.write(reinterpret_cast<const char*>(dotBlob.data()),
+                                  DOT_BLOB_SIZE);
+                    outFile.close();
+                    result["dotBlobFile"] = outputFile;
+                }
+                else
+                {
+                    std::cerr << "Error: Failed to write DOT blob to file: "
+                              << outputFile << "\n";
+                }
+            }
+        }
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint32_t cakKeyAuthScheme;
+    std::string cakEcdsaKeyFile;
+    std::string cakLmsKeyFile;
+    uint32_t lakKeyAuthScheme;
+    std::string lakEcdsaKeyFile;
+    std::string lakLmsKeyFile;
+    uint32_t unlockMethod;
+    std::string staticChallengeFile;
+    uint32_t lockSignatureAuthScheme;
+    std::string signatureFile;
+    std::string outputFile;
+};
+
+class DotCAKRotate : public CommandInterface
+{
+  public:
+    ~DotCAKRotate() = default;
+    DotCAKRotate() = delete;
+    DotCAKRotate(const DotCAKRotate&) = delete;
+    DotCAKRotate(DotCAKRotate&&) = default;
+    DotCAKRotate& operator=(const DotCAKRotate&) = delete;
+    DotCAKRotate& operator=(DotCAKRotate&&) = default;
+
+    explicit DotCAKRotate(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup =
+            app->add_option_group("Required", "Parameters for DotCAKRotate");
+
+        ccOptionGroup
+            ->add_option(
+                "--new_cak_key_auth_scheme", newCakKeyAuthScheme,
+                "New CAK key authentication scheme (0=ECDSA, 1=Hybrid)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        ccOptionGroup
+            ->add_option("--new_cak_ecdsa_key", newCakEcdsaKeyFile,
+                         "File containing 96 bytes of new CAK ECDSA key")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, ECDSA_KEY_SIZE,
+                                    "New CAK ECDSA key");
+        });
+
+        app->add_option(
+               "--new_cak_lms_key", newCakLmsKeyFile,
+               "File containing 48 bytes of new CAK LMS key (required for hybrid)")
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, LMS_KEY_SIZE, "New CAK LMS key");
+        });
+
+        ccOptionGroup
+            ->add_option(
+                "--lak_signature_auth_scheme", lakSignatureAuthScheme,
+                "LAK signature authentication scheme (0=ECDSA, 1=Hybrid)")
+            ->required()
+            ->check(CLI::Range(0, 1));
+
+        ccOptionGroup
+            ->add_option(
+                "--signature", signatureFile,
+                "File containing 1840 bytes of LAK signature (96 bytes ECDSA + 1744 bytes LMS)")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, SIGNATURE_SIZE, "LAK signature");
+        });
+
+        app->add_option("--output", outputFile,
+                        "Output file for new DOT blob (1024 bytes)");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> newCakEcdsa = readFileAsBytes(newCakEcdsaKeyFile);
+        if (newCakEcdsa.empty() || newCakEcdsa.size() != ECDSA_KEY_SIZE)
+        {
+            std::cerr << "Error: Failed to read new CAK ECDSA key file: "
+                      << newCakEcdsaKeyFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> newCakLms;
+        if (newCakKeyAuthScheme == KEY_AUTH_SCHEME_HYBRID)
+        {
+            if (newCakLmsKeyFile.empty())
+            {
+                std::cerr
+                    << "Error: New CAK LMS key file required for hybrid auth scheme\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+            newCakLms = readFileAsBytes(newCakLmsKeyFile);
+            if (newCakLms.empty() || newCakLms.size() != LMS_KEY_SIZE)
+            {
+                std::cerr << "Error: Failed to read new CAK LMS key file: "
+                          << newCakLmsKeyFile << "\n";
+                return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+            }
+        }
+        else
+        {
+            newCakLms.resize(LMS_KEY_SIZE, 0);
+        }
+
+        std::vector<uint8_t> newCakKey(KEY_AUTH_DATA_SIZE, 0);
+        if (!nsm::dot::buildKeyAuthData(newCakKeyAuthScheme, newCakEcdsa.data(),
+                                        newCakLms.data(), newCakKey.data()))
+        {
+            std::cerr
+                << "Error: Failed to build new CAK key authentication data\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> signature = readFileAsBytes(signatureFile);
+        if (signature.empty() || signature.size() != SIGNATURE_SIZE)
+        {
+            std::cerr << "Error: Failed to read signature file (expected "
+                      << SIGNATURE_SIZE << " bytes): " << signatureFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_cak_rotate_req_command));
+        nsm_dot_cak_rotate_req nsm_req;
+
+        memcpy(nsm_req.new_cak, newCakKey.data(), KEY_AUTH_DATA_SIZE);
+        memcpy(nsm_req.signature, signature.data(), SIGNATURE_SIZE);
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_cak_rotate_req(instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+
+        auto rc = decode_nsm_dot_cak_rotate_resp(
+            responsePtr, payloadLength, &cc, &reason_code, dotBlob.data());
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_CAK_ROTATE;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+
+        if (rc != NSM_SW_SUCCESS)
+        {
+            std::cerr << "Error: Failed to decode response, rc=" << (int)rc
+                      << "\n";
+            std::cout << result.dump(4) << "\n";
+            return;
+        }
+
+        if (cc == NSM_SUCCESS)
+        {
+            result["Reserved"] = "0000";
+            result["dataSize"] = "0400";
+
+            if (!outputFile.empty())
+            {
+                std::ofstream outFile(outputFile, std::ios::binary);
+                if (outFile.is_open())
+                {
+                    outFile.write(reinterpret_cast<char*>(dotBlob.data()),
+                                  dotBlob.size());
+                    outFile.close();
+                    result["dotBlobFile"] = outputFile;
+                    result["DOTBlobSize"] = dotBlob.size();
+                }
+                else
+                {
+                    std::cerr << "Error: Failed to write DOT blob to file: "
+                              << outputFile << "\n";
+                }
+            }
+            else
+            {
+                result["DOTBlobSize"] = dotBlob.size();
+            }
+        }
+        else
+        {
+            result["Reserved"] = "0000";
+            result["dataSize"] = "0000";
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["reasonCode"] = reasonCodeHex.str();
+        }
+
+        std::cout << result.dump(4) << "\n";
+    }
+
+  private:
+    uint32_t newCakKeyAuthScheme;
+    std::string newCakEcdsaKeyFile;
+    std::string newCakLmsKeyFile;
+    uint32_t lakSignatureAuthScheme;
+    std::string signatureFile;
+    std::string outputFile;
+};
+
+class DotUnlockChallenge : public CommandInterface
+{
+  public:
+    ~DotUnlockChallenge() = default;
+    DotUnlockChallenge() = delete;
+    DotUnlockChallenge(const DotUnlockChallenge&) = delete;
+    DotUnlockChallenge(DotUnlockChallenge&&) = default;
+    DotUnlockChallenge& operator=(const DotUnlockChallenge&) = delete;
+    DotUnlockChallenge& operator=(DotUnlockChallenge&&) = default;
+
+    explicit DotUnlockChallenge(const char* type, const char* name,
+                                CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        auto ccOptionGroup = app->add_option_group(
+            "Required", "Parameters for DotUnlockChallenge");
+
+        ccOptionGroup
+            ->add_option("--unlock_type", unlockType,
+                         "Unlock type: 1=Owner_Unlock, 2=Vendor_Unlock")
+            ->required()
+            ->check(CLI::Range(1, 2));
+
+        app->add_option("--output", outputFile,
+                        "File to save challenge (32 bytes)")
+            ->required();
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_req_command));
+
+        nsm_dot_unlock_challenge_req nsm_req;
+        nsm_req.unlock_type = unlockType;
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_unlock_challenge_req(instanceId, &nsm_req,
+                                                      request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        std::vector<uint8_t> challenge(STATIC_CHALLENGE_SIZE);
+
+        auto rc = decode_nsm_dot_unlock_challenge_resp(
+            responsePtr, payloadLength, &cc, &reason_code, challenge.data());
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_UNLOCK_CHALLENGE;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+
+        if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+        {
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["Reserved"] = "0000";
+            result["dataSize"] = "0000";
+            result["reasonCode"] = reasonCodeHex.str();
+
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+        }
+        else
+        {
+            result["Reserved"] = "0000";
+
+            std::ofstream outFile(outputFile, std::ios::binary);
+            if (outFile)
+            {
+                outFile.write(reinterpret_cast<const char*>(challenge.data()),
+                              STATIC_CHALLENGE_SIZE);
+                outFile.close();
+                result["challengeFile"] = outputFile;
+                result["challengeSize"] = STATIC_CHALLENGE_SIZE;
+            }
+            else
+            {
+                std::cerr << "Error: Failed to write challenge to file: "
+                          << outputFile << "\n";
+            }
+        }
+
+        DisplayInJson(result);
+    }
+
+  private:
+    uint32_t unlockType;
+    std::string outputFile;
+};
+
+class DotUnlock : public CommandInterface
+{
+  public:
+    ~DotUnlock() = default;
+    DotUnlock() = delete;
+    DotUnlock(const DotUnlock&) = delete;
+    DotUnlock(DotUnlock&&) = default;
+    DotUnlock& operator=(const DotUnlock&) = delete;
+    DotUnlock& operator=(DotUnlock&&) = default;
+
+    explicit DotUnlock(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->add_option(
+               "--signature", signatureFile,
+               "File containing 1840 bytes of LAK signature "
+               "(ECDSA: 96B + 1744B padding; Hybrid: 96B ECDSA + 1744B LMS)")
+            ->required()
+            ->check(CLI::ExistingFile)
+            ->check([this](const std::string& filename) -> std::string {
+            return validateFileSize(filename, SIGNATURE_SIZE, "Signature");
+        });
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> signature = readFileAsBytes(signatureFile);
+        if (signature.empty() || signature.size() != SIGNATURE_SIZE)
+        {
+            std::cerr << "Error: Failed to read signature file: "
+                      << signatureFile << "\n";
+            return std::make_pair(NSM_SW_ERROR, std::vector<uint8_t>());
+        }
+
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_unlock_req_command));
+
+        nsm_dot_unlock_req nsm_req;
+        memcpy(nsm_req.signature, signature.data(), SIGNATURE_SIZE);
+
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_unlock_req(instanceId, &nsm_req, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+
+        auto rc = decode_nsm_dot_unlock_resp(responsePtr, payloadLength, &cc,
+                                             &reason_code);
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_UNLOCK;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+        result["Reserved"] = "0000";
+
+        if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+        {
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["dataSize"] = "0000";
+            result["reasonCode"] = reasonCodeHex.str();
+
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+        }
+        else
+        {
+            result["dataSize"] = "0000";
+        }
+
+        DisplayInJson(result);
+    }
+
+  private:
+    std::string signatureFile;
+};
+
+class DotGetInfo : public CommandInterface
+{
+  public:
+    ~DotGetInfo() = default;
+    DotGetInfo() = delete;
+    DotGetInfo(const DotGetInfo&) = delete;
+    DotGetInfo(DotGetInfo&&) = default;
+    DotGetInfo& operator=(const DotGetInfo&) = delete;
+    DotGetInfo& operator=(DotGetInfo&&) = default;
+
+    explicit DotGetInfo(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {
+        app->get_option("--mctp_eid")->required();
+
+        app->add_option("--output", outputFile,
+                        "Output file for DOT blob (1024 bytes)");
+    }
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_get_info_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_get_info_req(instanceId, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        uint16_t version = 0;
+        uint8_t fuse_change_state = 0;
+        uint8_t transfers_remaining = 0;
+        std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+
+        auto rc = decode_nsm_dot_get_info_resp(
+            responsePtr, payloadLength, &cc, &reason_code, &version,
+            &fuse_change_state, &transfers_remaining, dotBlob.data());
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_GET_INFO;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+
+        if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+        {
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["Reserved"] = "0000";
+            result["dataSize"] = "0000";
+            result["reasonCode"] = reasonCodeHex.str();
+
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+        }
+        else
+        {
+            result["Reserved"] = "0000";
+
+            std::stringstream versionHex;
+            versionHex << std::hex << std::setw(4) << std::setfill('0')
+                       << (int)version;
+            result["version"] = versionHex.str();
+
+            std::stringstream fuseStateHex;
+            fuseStateHex << std::hex << std::setw(2) << std::setfill('0')
+                         << (int)fuse_change_state;
+            result["fuseChangeState"] = fuseStateHex.str();
+
+            result["transfersRemaining"] = (int)transfers_remaining;
+
+            // Save DOT blob to file if output file is specified
+            if (!outputFile.empty())
+            {
+                std::ofstream outFile(outputFile, std::ios::binary);
+                if (outFile)
+                {
+                    outFile.write(reinterpret_cast<const char*>(dotBlob.data()),
+                                  DOT_BLOB_SIZE);
+                    outFile.close();
+                    result["dotBlobFile"] = outputFile;
+                    result["DOTBlobSize"] = DOT_BLOB_SIZE;
+                }
+                else
+                {
+                    std::cerr << "Warning: Failed to write DOT blob to file: "
+                              << outputFile << "\n";
+                }
+            }
+            else
+            {
+                result["DOTBlobSize"] = DOT_BLOB_SIZE;
+                result["note"] =
+                    "DOT blob not saved (no output file specified)";
+            }
+        }
+
+        DisplayInJson(result);
+    }
+
+  private:
+    std::string outputFile;
+};
+
+class DotGetStatus : public CommandInterface
+{
+  public:
+    ~DotGetStatus() = default;
+    DotGetStatus() = delete;
+    DotGetStatus(const DotGetStatus&) = delete;
+    DotGetStatus(DotGetStatus&&) = default;
+    DotGetStatus& operator=(const DotGetStatus&) = delete;
+    DotGetStatus& operator=(DotGetStatus&&) = default;
+
+    explicit DotGetStatus(const char* type, const char* name, CLI::App* app) :
+        CommandInterface(type, name, app)
+    {}
+
+    std::pair<int, std::vector<uint8_t>> createRequestMsg() override
+    {
+        std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+                                        sizeof(nsm_dot_get_status_req));
+        auto request = reinterpret_cast<nsm_msg*>(requestMsg.data());
+        auto rc = encode_nsm_dot_get_status_req(instanceId, request);
+        return std::make_pair(rc, requestMsg);
+    }
+
+    void parseResponseMsg(nsm_msg* responsePtr, size_t payloadLength) override
+    {
+        if (responsePtr == nullptr)
+        {
+            std::cerr << "Error: Response pointer is null\n";
+            return;
+        }
+
+        uint8_t cc = NSM_SUCCESS;
+        uint16_t reason_code = ERR_NULL;
+        uint8_t status = 0;
+
+        auto rc = decode_nsm_dot_get_status_resp(responsePtr, payloadLength,
+                                                 &cc, &reason_code, &status);
+
+        ordered_json result;
+
+        std::stringstream cmdCode, compCode;
+        cmdCode << std::hex << std::setw(2) << std::setfill('0')
+                << (int)NSM_FW_DOT_GET_STATUS;
+        compCode << std::hex << std::setw(2) << std::setfill('0') << (int)cc;
+
+        result["CommandCode"] = cmdCode.str();
+        result["CompletionCode"] = compCode.str();
+
+        if (cc != NSM_SUCCESS || rc != NSM_SW_SUCCESS)
+        {
+            std::stringstream reasonCodeHex;
+            reasonCodeHex << std::hex << std::setw(4) << std::setfill('0')
+                          << (int)reason_code;
+            result["Reserved"] = "0000";
+            result["dataSize"] = "0000";
+            result["reasonCode"] = reasonCodeHex.str();
+
+            std::cerr << "Response message error: "
+                      << "rc=" << rc << ", cc=" << (int)cc
+                      << ", reasonCode=" << (int)reason_code << "\n";
+        }
+        else
+        {
+            result["Reserved"] = "0000";
+
+            std::stringstream statusHex;
+            statusHex << std::hex << std::setw(2) << std::setfill('0')
+                      << (int)status;
+            result["status"] = statusHex.str();
+
+            std::string statusText;
+            switch (status & 0x03)
+            {
+                case 0:
+                    statusText = "Uninitialized";
+                    break;
+                case 1:
+                    statusText = "Volatile";
+                    break;
+                case 2:
+                    statusText = "Mutable Locked";
+                    break;
+                case 3:
+                    statusText = "Mutable Disabled";
+                    break;
+                default:
+                    statusText = "Unknown";
+                    break;
+            }
+            result["statusText"] = statusText;
+        }
+
+        DisplayInJson(result);
+    }
+};
+
 void registerCommand(CLI::App& app)
 {
     auto firmware = app.add_subcommand("firmware",
@@ -1747,5 +2611,34 @@ void registerCommand(CLI::App& app)
                                                      "Image Copy Control");
     commands.push_back(std::make_unique<ImageCopyControl>(
         "firmware", "ImageCopyControl", imageCopyControl));
+    auto dotLock = firmware->add_subcommand(
+        "DotLock", "Lock DOT and transition from volatile to locked state");
+    commands.push_back(
+        std::make_unique<DotLock>("firmware", "DotLock", dotLock));
+
+    auto dotCAKRotate = firmware->add_subcommand(
+        "DotCAKRotate", "Rotate CAK without changing DOT FUSE state");
+    commands.push_back(std::make_unique<DotCAKRotate>(
+        "firmware", "DotCAKRotate", dotCAKRotate));
+
+    auto dotUnlockChallenge = firmware->add_subcommand(
+        "DotUnlockChallenge", "Get challenge for DOT unlock operation");
+    commands.push_back(std::make_unique<DotUnlockChallenge>(
+        "firmware", "DotUnlockChallenge", dotUnlockChallenge));
+
+    auto dotUnlock = firmware->add_subcommand(
+        "DotUnlock", "Unlock DOT and transition from locked to volatile state");
+    commands.push_back(
+        std::make_unique<DotUnlock>("firmware", "DotUnlock", dotUnlock));
+    auto dotGetInfo = firmware->add_subcommand(
+        "DotGetInfo",
+        "Get DOT information including version, fuse state, and DOT blob");
+    commands.push_back(
+        std::make_unique<DotGetInfo>("firmware", "DotGetInfo", dotGetInfo));
+    auto dotGetStatus = firmware->add_subcommand(
+        "DotGetStatus",
+        "Get DOT status (Uninitialized/Volatile/Locked/Disabled)");
+    commands.push_back(std::make_unique<DotGetStatus>(
+        "firmware", "DotGetStatus", dotGetStatus));
 }
 } // namespace nsmtool::firmware
