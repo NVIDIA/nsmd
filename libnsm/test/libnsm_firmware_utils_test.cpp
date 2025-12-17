@@ -16,6 +16,7 @@
  */
 
 #include "base.h"
+#include "dot_test_fixtures.hpp"
 #include "firmware-utils.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -1587,18 +1588,10 @@ TEST(UpdateFirmwareSecurityVersion, testEncodeRequest)
 
 TEST(DotCAKInstall, testGoodEncodeRequest)
 {
-	// Create test data for CAK and LAK
 	nsm_dot_cak_install_req dot_req;
-	// Fill CAK with pattern 0x01-0x94 (148 bytes)
-	for (int i = 0; i < 148; i++) {
-		dot_req.cak_pub[i] = (i % 256);
-	}
-	// Fill LAK with pattern 0xA0-0xFF cycling (148 bytes)
-	for (int i = 0; i < 148; i++) {
-		dot_req.lak_pub[i] = ((i + 0xA0) % 256);
-	}
-	dot_req.lock_disable = 0;
-	dot_req.min_svn = 0x12345678;
+	// CAK: 148 bytes pattern 0x00-0x93, LAK: 148 bytes pattern 0xA0-0xFF
+	// cycling
+	dot_test::createDotCAKInstallRequest(dot_req, 0, 0xA0, 0, 0x12345678);
 
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
@@ -1607,24 +1600,17 @@ TEST(DotCAKInstall, testGoodEncodeRequest)
 	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, request);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
 
-	// Check NSM header
-	EXPECT_EQ(1, request->hdr.request);
-	EXPECT_EQ(0, request->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
-	EXPECT_EQ(OCP_VERSION_V2, request->hdr.ocp_version);
-
-	// Check command header
 	nsm_dot_cak_install_req_command *req =
 	    (nsm_dot_cak_install_req_command *)request->payload;
 	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL, req->hdr.command);
 	EXPECT_EQ(sizeof(nsm_dot_cak_install_req), le16toh(req->hdr.data_size));
 
-	// Verify data
-	for (int i = 0; i < 148; i++) {
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
 		EXPECT_EQ((i % 256), req->dot_cak_install_req.cak_pub[i]);
 	}
-	for (int i = 0; i < 148; i++) {
+	for (size_t i = 0; i < dot_test::LAK_KEY_SIZE; i++) {
 		EXPECT_EQ(((i + 0xA0) % 256),
 			  req->dot_cak_install_req.lak_pub[i]);
 	}
@@ -1634,13 +1620,11 @@ TEST(DotCAKInstall, testGoodEncodeRequest)
 
 TEST(DotCAKInstall, testGoodDecodeRequest)
 {
-	// Build a valid request message
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
 
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
-	// Fill header
 	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
 	request->hdr.request = 1;
 	request->hdr.datagram = 0;
@@ -1649,29 +1633,25 @@ TEST(DotCAKInstall, testGoodDecodeRequest)
 	request->hdr.ocp_version = OCP_VERSION_V2;
 	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
 
-	// Fill payload
 	nsm_dot_cak_install_req_command *req_cmd =
 	    (nsm_dot_cak_install_req_command *)request->payload;
 	req_cmd->hdr.command = NSM_FW_DOT_CAK_INSTALL;
 	req_cmd->hdr.data_size = htole16(sizeof(nsm_dot_cak_install_req));
 
-	// Fill CAK and LAK with test data
-	for (int i = 0; i < 148; i++) {
-		req_cmd->dot_cak_install_req.cak_pub[i] = (i % 256);
-		req_cmd->dot_cak_install_req.lak_pub[i] = ((i + 0xA0) % 256);
-	}
+	dot_test::fillPatternSequential(req_cmd->dot_cak_install_req.cak_pub,
+					dot_test::CAK_KEY_SIZE, 0);
+	dot_test::fillPatternCycling(req_cmd->dot_cak_install_req.lak_pub,
+				     dot_test::LAK_KEY_SIZE, 0xA0);
 	req_cmd->dot_cak_install_req.lock_disable = 1;
 	req_cmd->dot_cak_install_req.min_svn = htole32(0xAABBCCDD);
 
-	// Decode
 	nsm_dot_cak_install_req dot_req;
 	auto rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
 						 &dot_req);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Verify data
-	for (int i = 0; i < 148; i++) {
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
 		EXPECT_EQ((i % 256), dot_req.cak_pub[i]);
 		EXPECT_EQ(((i + 0xA0) % 256), dot_req.lak_pub[i]);
 	}
@@ -1681,7 +1661,6 @@ TEST(DotCAKInstall, testGoodDecodeRequest)
 
 TEST(DotCAKInstall, testShortDecodeRequest)
 {
-	// Create a message that's too short
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 10);
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 
@@ -1696,11 +1675,9 @@ TEST(DotCAKInstall, testNullDecodeRequest)
 {
 	nsm_dot_cak_install_req dot_req;
 
-	// Null message pointer
 	auto rc = decode_nsm_dot_cak_install_req(NULL, 100, &dot_req);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Null output pointer
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
@@ -1720,7 +1697,6 @@ TEST(DotCAKInstall, testGoodEncodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Check NSM header
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(0, response->hdr.datagram);
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
@@ -1794,30 +1770,22 @@ TEST(DotCAKInstall, testBadDecodeResponse)
 
 TEST(DotCAKInstall, testEncodeDecodeRoundTrip)
 {
-	// Create original request
 	nsm_dot_cak_install_req original_req;
-	for (int i = 0; i < 148; i++) {
-		original_req.cak_pub[i] = i & 0xFF;
-		original_req.lak_pub[i] = (i + 100) & 0xFF;
-	}
-	original_req.lock_disable = 1;
-	original_req.min_svn = 0xDEADBEEF;
+	dot_test::createDotCAKInstallRequest(original_req, 0, 100, 1,
+					     0xDEADBEEF);
 
-	// Encode
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	auto rc = encode_nsm_dot_cak_install_req(5, &original_req, request);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Decode
 	nsm_dot_cak_install_req decoded_req;
 	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
 					    &decoded_req);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Verify round-trip
-	for (int i = 0; i < 148; i++) {
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
 		EXPECT_EQ(original_req.cak_pub[i], decoded_req.cak_pub[i]);
 		EXPECT_EQ(original_req.lak_pub[i], decoded_req.lak_pub[i]);
 	}
@@ -1827,7 +1795,6 @@ TEST(DotCAKInstall, testEncodeDecodeRoundTrip)
 
 TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
 {
-	// Test successful response round-trip
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
 					 sizeof(nsm_common_resp));
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -1835,12 +1802,10 @@ TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
 	uint16_t original_reason_code = ERR_NULL;
 	uint8_t original_cc = NSM_SUCCESS;
 
-	// Encode success response
 	auto rc = encode_nsm_dot_cak_install_resp(
 	    7, original_cc, original_reason_code, response);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Decode the encoded response
 	uint8_t decoded_cc = 0;
 	uint16_t decoded_reason_code = 0xFFFF;
 
@@ -1848,17 +1813,14 @@ TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
 					     &decoded_cc, &decoded_reason_code);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Verify round-trip for success case
 	EXPECT_EQ(original_cc, decoded_cc);
 	EXPECT_EQ(original_reason_code, decoded_reason_code);
 
-	// Verify response fields from nsm_common_resp
 	nsm_common_resp *resp = (nsm_common_resp *)response->payload;
 	EXPECT_EQ(NSM_FW_DOT_CAK_INSTALL, resp->command);
 	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
 	EXPECT_EQ(0, resp->reserved);
 
-	// Test error response round-trip
 	std::vector<uint8_t> errorResponseMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp));
 	auto error_response =
@@ -1867,12 +1829,10 @@ TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
 	uint16_t error_reason_code = 0xABCD;
 	uint8_t error_cc = NSM_ERROR;
 
-	// Encode error response (uses V2 header now)
 	rc = encode_nsm_dot_cak_install_resp(3, error_cc, error_reason_code,
 					     error_response);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Decode the encoded error response
 	uint8_t decoded_error_cc = 0;
 	uint16_t decoded_error_reason_code = 0;
 
@@ -1881,43 +1841,32 @@ TEST(DotCAKInstall, testEncodeDecodeResponseRoundTrip)
 	    &decoded_error_reason_code);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Verify round-trip for error case
 	EXPECT_EQ(error_cc, decoded_error_cc);
 	EXPECT_EQ(error_reason_code, decoded_error_reason_code);
 }
 
 TEST(DotCAKInstall, testNullPointerHandling)
 {
-	// Test encode with null message pointer
 	nsm_dot_cak_install_req dot_req;
-	for (int i = 0; i < 148; i++) {
-		dot_req.cak_pub[i] = i;
-		dot_req.lak_pub[i] = i + 100;
-	}
-	dot_req.lock_disable = 0;
-	dot_req.min_svn = 0x12345678;
+	dot_test::createDotCAKInstallRequest(dot_req, 0, 100, 0, 0x12345678);
 
 	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test encode with null request pointer
 	std::vector<uint8_t> requestMsg(
 	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_install_req_command));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
 	rc = encode_nsm_dot_cak_install_req(0, NULL, request);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test encode response with null message pointer
 	rc = encode_nsm_dot_cak_install_resp(0, NSM_SUCCESS, ERR_NULL, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test decode response with null message pointer
 	uint8_t cc = 0;
 	uint16_t reason_code = 0;
 	rc = decode_nsm_dot_cak_install_resp(NULL, 100, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test decode response with null cc pointer
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
 					 sizeof(nsm_common_resp));
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -1932,7 +1881,6 @@ TEST(DotCAKInstall, testNullPointerHandling)
 					     &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test decode response with null reason_code pointer
 	rc = decode_nsm_dot_cak_install_resp(response, responseMsg.size(), &cc,
 					     NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
@@ -1940,7 +1888,6 @@ TEST(DotCAKInstall, testNullPointerHandling)
 
 TEST(DotCAKInstall, testDataIntegrity)
 {
-	// Test with various key patterns to ensure no data corruption
 	const struct {
 		const char *name;
 		uint8_t cak_pattern_start;
@@ -1956,9 +1903,8 @@ TEST(DotCAKInstall, testDataIntegrity)
 	};
 
 	for (const auto &test : test_cases) {
-		// Create request with specific pattern
 		nsm_dot_cak_install_req original_req;
-		for (int i = 0; i < 148; i++) {
+		for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
 			original_req.cak_pub[i] =
 			    (test.cak_pattern_start + i) & 0xFF;
 			original_req.lak_pub[i] =
@@ -1967,7 +1913,6 @@ TEST(DotCAKInstall, testDataIntegrity)
 		original_req.lock_disable = test.lock_disable;
 		original_req.min_svn = test.min_svn;
 
-		// Encode
 		std::vector<uint8_t> requestMsg(
 		    sizeof(nsm_msg_hdr) +
 		    sizeof(nsm_dot_cak_install_req_command));
@@ -1977,15 +1922,13 @@ TEST(DotCAKInstall, testDataIntegrity)
 		ASSERT_EQ(rc, NSM_SW_SUCCESS)
 		    << "Encoding failed for test case: " << test.name;
 
-		// Decode
 		nsm_dot_cak_install_req decoded_req;
 		rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
 						    &decoded_req);
 		ASSERT_EQ(rc, NSM_SW_SUCCESS)
 		    << "Decoding failed for test case: " << test.name;
 
-		// Verify data integrity
-		for (int i = 0; i < 148; i++) {
+		for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
 			EXPECT_EQ(original_req.cak_pub[i],
 				  decoded_req.cak_pub[i])
 			    << "CAK mismatch at byte " << i
@@ -2004,7 +1947,6 @@ TEST(DotCAKInstall, testDataIntegrity)
 
 TEST(DotCAKInstall, testBoundaryConditions)
 {
-	// Test minimum valid message size
 	nsm_dot_cak_install_req dot_req;
 	memset(&dot_req, 0, sizeof(dot_req));
 
@@ -2015,23 +1957,19 @@ TEST(DotCAKInstall, testBoundaryConditions)
 	auto rc = encode_nsm_dot_cak_install_req(0, &dot_req, request);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Test decode with exact minimum size
 	nsm_dot_cak_install_req decoded_req;
 	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size(),
 					    &decoded_req);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Test decode with size too small by 1 byte
 	rc = decode_nsm_dot_cak_install_req(request, requestMsg.size() - 1,
 					    &decoded_req);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test decode with just the header (way too small)
 	rc = decode_nsm_dot_cak_install_req(request, sizeof(nsm_msg_hdr),
 					    &decoded_req);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test decode response boundary conditions
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
 					 sizeof(nsm_common_resp));
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -2069,7 +2007,6 @@ TEST(DotCAKInstall, testBoundaryConditions)
 	EXPECT_EQ(0x1234, reason_code);
 
 	// Test minimum valid size (11 bytes = 5 header + 6 common_resp)
-	// This is the correct requirement - devices return nsm_common_resp
 	std::vector<uint8_t> minimalMsg{
 	    0x10,
 	    0xDE,		    // PCI VID: NVIDIA 0x10DE
@@ -2091,12 +2028,10 @@ TEST(DotCAKInstall, testBoundaryConditions)
 	EXPECT_EQ(NSM_SUCCESS, cc);
 	EXPECT_EQ(ERR_NULL, reason_code);
 
-	// Test too short by 1 byte (10 bytes)
 	rc = decode_nsm_dot_cak_install_resp(
 	    minimal_response, minimalMsg.size() - 1, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test way too short (just header = 5 bytes)
 	rc = decode_nsm_dot_cak_install_resp(
 	    minimal_response, sizeof(nsm_msg_hdr), &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
@@ -2107,12 +2042,9 @@ TEST(DotCAKInstall, testDecodeResponseNegativeCases)
 	uint8_t cc;
 	uint16_t reason_code;
 
-	// Test 1: NULL message pointer
 	auto rc = decode_nsm_dot_cak_install_resp(NULL, 11, &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test 2: NULL cc pointer
-	// Message must be 11 bytes (5 header + 6 payload) for Test 8 to succeed
 	std::vector<uint8_t> validMsg{
 	    0x10,
 	    0xDE,		    // PCI VID: NVIDIA 0x10DE
@@ -2132,33 +2064,27 @@ TEST(DotCAKInstall, testDecodeResponseNegativeCases)
 					     NULL, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test 3: NULL reason_code pointer
 	rc = decode_nsm_dot_cak_install_resp(valid_response, validMsg.size(),
 					     &cc, NULL);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test 4: Message length zero
 	rc = decode_nsm_dot_cak_install_resp(valid_response, 0, &cc,
 					     &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test 5: Message length less than header (5 bytes)
 	rc = decode_nsm_dot_cak_install_resp(valid_response, 5, &cc,
 					     &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test 6: Message length exactly header size (5 bytes) - missing
 	// payload
 	rc = decode_nsm_dot_cak_install_resp(
 	    valid_response, sizeof(nsm_msg_hdr), &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test 7: Message length 1 byte less than required (10 bytes)
 	rc = decode_nsm_dot_cak_install_resp(valid_response, 10, &cc,
 					     &reason_code);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test 8: Valid message should succeed (sanity check)
 	rc = decode_nsm_dot_cak_install_resp(valid_response, validMsg.size(),
 					     &cc, &reason_code);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
@@ -2175,14 +2101,8 @@ TEST(DotCAKBypass, testGoodEncodeRequest)
 	auto rc = encode_nsm_dot_cak_bypass_req(0, request);
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
 
-	// Check NSM header
-	EXPECT_EQ(1, request->hdr.request);
-	EXPECT_EQ(0, request->hdr.datagram);
-	EXPECT_EQ(NSM_TYPE_FIRMWARE, request->hdr.nvidia_msg_type);
-	EXPECT_EQ(OCP_VERSION_V2, request->hdr.ocp_version);
-
-	// Check command header
 	nsm_dot_cak_bypass_req *req =
 	    (nsm_dot_cak_bypass_req *)request->payload;
 	EXPECT_EQ(NSM_FW_DOT_CAK_BYPASS, req->command);
@@ -2191,7 +2111,6 @@ TEST(DotCAKBypass, testGoodEncodeRequest)
 
 TEST(DotCAKBypass, testGoodDecodeRequest)
 {
-	// Build a valid request message
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_dot_cak_bypass_req));
 
@@ -2205,7 +2124,6 @@ TEST(DotCAKBypass, testGoodDecodeRequest)
 	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
 	request->hdr.ocp_version = OCP_VERSION_V2;
 
-	// Fill command
 	nsm_dot_cak_bypass_req *req =
 	    (nsm_dot_cak_bypass_req *)request->payload;
 	req->command = NSM_FW_DOT_CAK_BYPASS;
@@ -2242,12 +2160,10 @@ TEST(DotCAKBypass, testGoodEncodeResponse)
 
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Check NSM header
 	EXPECT_EQ(0, response->hdr.request);
 	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
 	EXPECT_EQ(OCP_VERSION_V2, response->hdr.ocp_version);
 
-	// Check response
 	nsm_common_resp *resp = (nsm_common_resp *)response->payload;
 	EXPECT_EQ(NSM_FW_DOT_CAK_BYPASS, resp->command);
 	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
@@ -2257,7 +2173,6 @@ TEST(DotCAKBypass, testGoodEncodeResponse)
 
 TEST(DotCAKBypass, testGoodDecodeResponse)
 {
-	// Manually construct a valid success response with V2 header
 	std::vector<uint8_t> responseMsg = {
 	    0x15,
 	    0x68,		   // PCI Vendor ID (little endian)
@@ -2287,7 +2202,6 @@ TEST(DotCAKBypass, testGoodDecodeResponse)
 
 TEST(DotCAKBypass, testBadDecodeResponse)
 {
-	// Manually construct an error response with V2 header
 	std::vector<uint8_t> errorMsg = {
 	    0x15,
 	    0x68,		   // PCI Vendor ID (little endian)
@@ -2313,7 +2227,6 @@ TEST(DotCAKBypass, testBadDecodeResponse)
 
 TEST(DotCAKBypass, testEncodeDecodeRoundTrip)
 {
-	// Test request round-trip
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_dot_cak_bypass_req));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
@@ -2329,7 +2242,6 @@ TEST(DotCAKBypass, testEncodeDecodeRoundTrip)
 
 TEST(DotCAKBypass, testEncodeDecodeResponseRoundTrip)
 {
-	// Test success response round-trip
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
 					 sizeof(nsm_common_resp));
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -2351,7 +2263,6 @@ TEST(DotCAKBypass, testEncodeDecodeResponseRoundTrip)
 	EXPECT_EQ(original_cc, decoded_cc);
 	EXPECT_EQ(original_reason_code, decoded_reason_code);
 
-	// Test error response round-trip
 	std::vector<uint8_t> errorMsg(sizeof(nsm_msg_hdr) +
 				      sizeof(nsm_common_non_success_resp));
 	auto error_response = reinterpret_cast<nsm_msg *>(errorMsg.data());
@@ -2374,19 +2285,15 @@ TEST(DotCAKBypass, testEncodeDecodeResponseRoundTrip)
 
 TEST(DotCAKBypass, testNullPointerHandling)
 {
-	// Test null message in encode
 	auto rc = encode_nsm_dot_cak_bypass_req(0, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test null message in decode
 	rc = decode_nsm_dot_cak_bypass_req(nullptr, 100);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test null response message in encode
 	rc = encode_nsm_dot_cak_bypass_resp(0, NSM_SUCCESS, ERR_NULL, nullptr);
 	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
 
-	// Test null parameters in decode response
 	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
 					 sizeof(nsm_common_resp));
 	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
@@ -2409,7 +2316,6 @@ TEST(DotCAKBypass, testNullPointerHandling)
 
 TEST(DotCAKBypass, testBoundaryConditions)
 {
-	// Test minimum valid message size for request
 	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
 					sizeof(nsm_dot_cak_bypass_req));
 	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
@@ -2417,15 +2323,12 @@ TEST(DotCAKBypass, testBoundaryConditions)
 	auto rc = encode_nsm_dot_cak_bypass_req(0, request);
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Decode with exact size - should succeed
 	rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size());
 	EXPECT_EQ(rc, NSM_SW_SUCCESS);
 
-	// Decode with one byte less - should fail
 	rc = decode_nsm_dot_cak_bypass_req(request, requestMsg.size() - 1);
 	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
 
-	// Test error response message handling
 	std::vector<uint8_t> errorMsg = {
 	    0x15,
 	    0x68,		   // PCI Vendor ID (little endian)
@@ -2999,4 +2902,1311 @@ TEST(ImageCopyControl, testInvalidResponseSize)
 		rc = decode_nsm_firmware_image_copy_control_initiate_copy_resp(
 		    smallResponse, 0, &cc, &reason_code);
 		EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH); */
+}
+
+// ================ DOT LOCK Tests ================
+
+TEST(DotLock, testGoodEncodeRequest)
+{
+	nsm_dot_lock_req dot_req;
+	dot_test::createDotLockRequest(dot_req, 0, 0xA0, 2, 0, 7);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_lock_req(0, &dot_req, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
+
+	nsm_dot_lock_req_command *req =
+	    (nsm_dot_lock_req_command *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_LOCK, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_dot_lock_req), le16toh(req->hdr.data_size));
+
+	// Verify CAK and LAK public keys
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
+		EXPECT_EQ((i % 256), req->dot_lock_req.cak_pub[i]);
+		EXPECT_EQ(((i + 0xA0) % 256), req->dot_lock_req.lak_pub[i]);
+	}
+
+	// Verify unlock method
+	EXPECT_EQ(2, le32toh(req->dot_lock_req.unlock_method));
+
+	// Verify static challenge
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		EXPECT_EQ((i % 256), req->dot_lock_req.s_challenge[i]);
+	}
+
+	// Verify signature
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(((i * 7) % 256), req->dot_lock_req.signature[i]);
+	}
+}
+
+TEST(DotLock, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	// Fill header
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	// Fill payload
+	nsm_dot_lock_req_command *req_cmd =
+	    (nsm_dot_lock_req_command *)request->payload;
+	req_cmd->hdr.command = NSM_FW_DOT_LOCK;
+	req_cmd->hdr.data_size = htole16(sizeof(nsm_dot_lock_req));
+
+	dot_test::fillPatternSequential(req_cmd->dot_lock_req.cak_pub,
+					dot_test::CAK_KEY_SIZE, 0);
+	dot_test::fillPatternCycling(req_cmd->dot_lock_req.lak_pub,
+				     dot_test::LAK_KEY_SIZE, 0xA0);
+	req_cmd->dot_lock_req.unlock_method = htole32(2);
+	dot_test::fillPatternSequential(req_cmd->dot_lock_req.s_challenge,
+					dot_test::CHALLENGE_SIZE, 0);
+	dot_test::fillPatternMultiplied(req_cmd->dot_lock_req.signature,
+					dot_test::SIGNATURE_SIZE, 7);
+
+	// Decode the request
+	nsm_dot_lock_req dot_req;
+	auto rc = decode_nsm_dot_lock_req(request, requestMsg.size(), &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Verify decoded data
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
+		EXPECT_EQ((i % 256), dot_req.cak_pub[i]);
+		EXPECT_EQ(((i + 0xA0) % 256), dot_req.lak_pub[i]);
+	}
+	EXPECT_EQ(2, dot_req.unlock_method);
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		EXPECT_EQ((i % 256), dot_req.s_challenge[i]);
+	}
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(((i * 7) % 256), dot_req.signature[i]);
+	}
+}
+
+TEST(DotLock, testShortDecodeRequest)
+{
+	// Create a message that's too short
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 100);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_dot_lock_req dot_req;
+	auto rc = decode_nsm_dot_lock_req(request, requestMsg.size(), &dot_req);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotLock, testNullDecodeRequest)
+{
+	nsm_dot_lock_req dot_req;
+
+	// Null message pointer
+	auto rc = decode_nsm_dot_lock_req(NULL, 100, &dot_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	// Null output pointer
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = decode_nsm_dot_lock_req(request, requestMsg.size(), NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotLock, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_lock_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Create a test DOT blob
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		dot_blob[i] = (i % 256);
+	}
+
+	uint16_t reason_code = ERR_NULL;
+	auto rc = encode_nsm_dot_lock_resp(0, NSM_SUCCESS, reason_code,
+					   dot_blob, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
+
+	nsm_dot_lock_resp *resp = (nsm_dot_lock_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_LOCK, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+	EXPECT_EQ(DOT_BLOB_SIZE, le16toh(resp->data_size));
+
+	// Verify DOT blob
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ((i % 256), resp->dot_blob[i]);
+	}
+}
+
+TEST(DotLock, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_lock_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Fill header
+	response->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	response->hdr.request = 0;
+	response->hdr.datagram = 0;
+	response->hdr.instance_id = 0;
+	response->hdr.ocp_type = OCP_TYPE;
+	response->hdr.ocp_version = OCP_VERSION_V2;
+	response->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	// Fill response
+	nsm_dot_lock_resp *resp = (nsm_dot_lock_resp *)response->payload;
+	resp->command = NSM_FW_DOT_LOCK;
+	resp->completion_code = NSM_SUCCESS;
+	resp->reserved = 0;
+	resp->data_size = htole16(DOT_BLOB_SIZE);
+
+	// Fill DOT blob with test pattern
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		resp->dot_blob[i] = ((i * 3) % 256);
+	}
+
+	// Decode response
+	uint8_t cc = 0;
+	uint16_t reason_code = 0xFFFF;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	auto rc = decode_nsm_dot_lock_resp(response, responseMsg.size(), &cc,
+					   &reason_code, decoded_blob);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+
+	// Verify DOT blob
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ(((i * 3) % 256), decoded_blob[i]);
+	}
+}
+
+TEST(DotLock, testErrorResponse)
+{
+	std::vector<uint8_t> errorMsg(sizeof(nsm_msg_hdr) +
+				      sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	// Encode error response
+	uint16_t reason_code = 0x3412;
+	auto rc =
+	    encode_nsm_dot_lock_resp(0, NSM_ERROR, reason_code, NULL, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Decode error response
+	uint8_t cc = 0;
+	uint16_t decoded_reason_code = 0;
+	rc = decode_nsm_dot_lock_resp(response, errorMsg.size(), &cc,
+				      &decoded_reason_code, NULL);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x3412, decoded_reason_code);
+}
+
+TEST(DotLock, testEncodeDecodeRoundTrip)
+{
+	nsm_dot_lock_req original_req;
+	dot_test::createDotLockRequestCustom(original_req, 0, 100, 2, 2, 3);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_dot_lock_req(5, &original_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_lock_req decoded_req;
+	rc = decode_nsm_dot_lock_req(request, requestMsg.size(), &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < dot_test::CAK_KEY_SIZE; i++) {
+		EXPECT_EQ(original_req.cak_pub[i], decoded_req.cak_pub[i]);
+		EXPECT_EQ(original_req.lak_pub[i], decoded_req.lak_pub[i]);
+	}
+	EXPECT_EQ(original_req.unlock_method, decoded_req.unlock_method);
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		EXPECT_EQ(original_req.s_challenge[i],
+			  decoded_req.s_challenge[i]);
+	}
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(original_req.signature[i], decoded_req.signature[i]);
+	}
+}
+
+TEST(DotLock, testEncodeDecodeResponseRoundTrip)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_lock_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Create original DOT blob
+	uint8_t original_blob[DOT_BLOB_SIZE];
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		original_blob[i] = (i * 5) & 0xFF;
+	}
+
+	uint16_t original_reason_code = ERR_NULL;
+	uint8_t original_cc = NSM_SUCCESS;
+
+	auto rc = encode_nsm_dot_lock_resp(7, original_cc, original_reason_code,
+					   original_blob, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_cc = 0;
+	uint16_t decoded_reason_code = 0xFFFF;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	rc = decode_nsm_dot_lock_resp(response, responseMsg.size(), &decoded_cc,
+				      &decoded_reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(original_cc, decoded_cc);
+	EXPECT_EQ(original_reason_code, decoded_reason_code);
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ(original_blob[i], decoded_blob[i]);
+	}
+
+	// Verify response fields
+	nsm_dot_lock_resp *resp = (nsm_dot_lock_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_LOCK, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+}
+
+TEST(DotLock, testNullPointerHandling)
+{
+	nsm_dot_lock_req dot_req;
+	memset(&dot_req, 0, sizeof(dot_req));
+
+	auto rc = encode_nsm_dot_lock_req(0, &dot_req, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = encode_nsm_dot_lock_req(0, NULL, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t blob[DOT_BLOB_SIZE] = {0};
+	rc = encode_nsm_dot_lock_resp(0, NSM_SUCCESS, ERR_NULL, blob, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	rc = decode_nsm_dot_lock_resp(NULL, 100, &cc, &reason_code, blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_lock_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	rc = encode_nsm_dot_lock_resp(0, NSM_SUCCESS, ERR_NULL, blob, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_lock_resp(response, responseMsg.size(), NULL,
+				      &reason_code, blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_lock_resp(response, responseMsg.size(), &cc, NULL,
+				      blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotLock, testBufferLengthValidation)
+{
+	// Test request encoding and decoding with exact buffer size
+	nsm_dot_lock_req dot_req;
+	memset(&dot_req, 0, sizeof(dot_req));
+	dot_req.unlock_method = 2;
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_lock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_lock_req(0, &dot_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_lock_req decoded_req;
+	rc = decode_nsm_dot_lock_req(request, requestMsg.size(), &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Test decode with too short buffer
+	rc = decode_nsm_dot_lock_req(request, requestMsg.size() - 1,
+				     &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc =
+	    decode_nsm_dot_lock_req(request, sizeof(nsm_msg_hdr), &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Test response decoding with too short buffer
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_lock_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t blob[DOT_BLOB_SIZE] = {0};
+	rc = encode_nsm_dot_lock_resp(0, NSM_SUCCESS, ERR_NULL, blob, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	rc = decode_nsm_dot_lock_resp(response, responseMsg.size(), &cc,
+				      &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	// Too short for full response
+	rc = decode_nsm_dot_lock_resp(response, responseMsg.size() - 1, &cc,
+				      &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	// Only header size
+	rc = decode_nsm_dot_lock_resp(response, sizeof(nsm_msg_hdr), &cc,
+				      &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// ============================================================================
+// DOT CAK ROTATE Tests
+// ============================================================================
+
+TEST(DotCAKRotate, testGoodEncodeRequest)
+{
+	nsm_dot_cak_rotate_req cak_rotate_req;
+	dot_test::createDotCAKRotateRequest(cak_rotate_req, 0, 3);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_rotate_req(0, &cak_rotate_req, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
+
+	nsm_dot_cak_rotate_req_command *req =
+	    (nsm_dot_cak_rotate_req_command *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_ROTATE, req->hdr.command);
+	EXPECT_EQ(sizeof(nsm_dot_cak_rotate_req), le16toh(req->hdr.data_size));
+
+	for (size_t i = 0; i < DOT_KEY_AUTH_DATA_SIZE; i++) {
+		EXPECT_EQ((i % 256), req->dot_cak_rotate_req.new_cak[i]);
+	}
+
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(((i * 3) % 256),
+			  req->dot_cak_rotate_req.signature[i]);
+	}
+}
+
+TEST(DotCAKRotate, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	nsm_dot_cak_rotate_req_command *req_cmd =
+	    (nsm_dot_cak_rotate_req_command *)request->payload;
+	req_cmd->hdr.command = NSM_FW_DOT_CAK_ROTATE;
+	req_cmd->hdr.data_size = htole16(sizeof(nsm_dot_cak_rotate_req));
+
+	nsm_dot_cak_rotate_req temp_req;
+	dot_test::createDotCAKRotateRequest(temp_req, 0, 5);
+	std::memcpy(&req_cmd->dot_cak_rotate_req, &temp_req,
+		    sizeof(nsm_dot_cak_rotate_req));
+
+	nsm_dot_cak_rotate_req cak_rotate_req;
+	auto rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size(),
+						&cak_rotate_req);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < DOT_KEY_AUTH_DATA_SIZE; i++) {
+		EXPECT_EQ((i % 256), cak_rotate_req.new_cak[i]);
+	}
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(((i * 5) % 256), cak_rotate_req.signature[i]);
+	}
+}
+
+TEST(DotCAKRotate, testShortDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) + 100);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	nsm_dot_cak_rotate_req cak_rotate_req;
+	auto rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size(),
+						&cak_rotate_req);
+
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotCAKRotate, testNullDecodeRequest)
+{
+	nsm_dot_cak_rotate_req cak_rotate_req;
+
+	auto rc = decode_nsm_dot_cak_rotate_req(NULL, 100, &cak_rotate_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size(), NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotCAKRotate, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_cak_rotate_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		dot_blob[i] = (i % 256);
+	}
+
+	uint16_t reason_code = ERR_NULL;
+	auto rc = encode_nsm_dot_cak_rotate_resp(0, NSM_SUCCESS, reason_code,
+						 dot_blob, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(0, response->hdr.request);
+	EXPECT_EQ(0, response->hdr.datagram);
+	EXPECT_EQ(NSM_TYPE_FIRMWARE, response->hdr.nvidia_msg_type);
+
+	nsm_dot_cak_rotate_resp *resp =
+	    (nsm_dot_cak_rotate_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_ROTATE, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(0, resp->reserved);
+	EXPECT_EQ(DOT_BLOB_SIZE, le16toh(resp->data_size));
+
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ((i % 256), resp->dot_blob[i]);
+	}
+}
+
+TEST(DotCAKRotate, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_cak_rotate_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	response->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	response->hdr.request = 0;
+	response->hdr.datagram = 0;
+	response->hdr.instance_id = 0;
+	response->hdr.ocp_type = OCP_TYPE;
+	response->hdr.ocp_version = OCP_VERSION_V2;
+	response->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	nsm_dot_cak_rotate_resp *resp =
+	    (nsm_dot_cak_rotate_resp *)response->payload;
+	resp->command = NSM_FW_DOT_CAK_ROTATE;
+	resp->completion_code = NSM_SUCCESS;
+	resp->reserved = 0;
+	resp->data_size = htole16(DOT_BLOB_SIZE);
+
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		resp->dot_blob[i] = ((i * 7) % 256);
+	}
+
+	uint8_t cc = 0;
+	uint16_t reason_code = 0xFFFF;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	auto rc = decode_nsm_dot_cak_rotate_resp(
+	    response, responseMsg.size(), &cc, &reason_code, decoded_blob);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(ERR_NULL, reason_code);
+
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ(((i * 7) % 256), decoded_blob[i]);
+	}
+}
+
+TEST(DotCAKRotate, testErrorResponse)
+{
+	std::vector<uint8_t> errorMsg(sizeof(nsm_msg_hdr) +
+				      sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(errorMsg.data());
+
+	uint16_t reason_code = 0x0042;
+	auto rc = encode_nsm_dot_cak_rotate_resp(0, NSM_ERROR, reason_code,
+						 NULL, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc = 0;
+	uint16_t decoded_reason_code = 0;
+	rc = decode_nsm_dot_cak_rotate_resp(response, errorMsg.size(), &cc,
+					    &decoded_reason_code, NULL);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_ERROR, cc);
+	EXPECT_EQ(0x0042, decoded_reason_code);
+}
+
+TEST(DotCAKRotate, testEncodeDecodeRoundTrip)
+{
+	nsm_dot_cak_rotate_req original_req;
+	dot_test::createDotCAKRotateRequest(original_req, 0, 11);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	auto rc = encode_nsm_dot_cak_rotate_req(7, &original_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_cak_rotate_req decoded_req;
+	rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size(),
+					   &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < DOT_KEY_AUTH_DATA_SIZE; i++) {
+		EXPECT_EQ(original_req.new_cak[i], decoded_req.new_cak[i]);
+	}
+	for (size_t i = 0; i < DOT_SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(original_req.signature[i], decoded_req.signature[i]);
+	}
+}
+
+TEST(DotCAKRotate, testEncodeDecodeResponseRoundTrip)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_cak_rotate_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t original_blob[DOT_BLOB_SIZE];
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		original_blob[i] = (i * 13) & 0xFF;
+	}
+
+	uint16_t original_reason_code = ERR_NULL;
+	uint8_t original_cc = NSM_SUCCESS;
+
+	auto rc = encode_nsm_dot_cak_rotate_resp(
+	    9, original_cc, original_reason_code, original_blob, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t decoded_cc = 0;
+	uint16_t decoded_reason_code = 0xFFFF;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, responseMsg.size(),
+					    &decoded_cc, &decoded_reason_code,
+					    decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	EXPECT_EQ(original_cc, decoded_cc);
+	EXPECT_EQ(original_reason_code, decoded_reason_code);
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ(original_blob[i], decoded_blob[i]);
+	}
+
+	nsm_dot_cak_rotate_resp *resp =
+	    (nsm_dot_cak_rotate_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_CAK_ROTATE, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+}
+
+TEST(DotCAKRotate, testNullPointerHandling)
+{
+	nsm_dot_cak_rotate_req cak_rotate_req;
+	memset(&cak_rotate_req, 0, sizeof(cak_rotate_req));
+
+	auto rc = encode_nsm_dot_cak_rotate_req(0, &cak_rotate_req, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	rc = encode_nsm_dot_cak_rotate_req(0, NULL, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	uint8_t blob[DOT_BLOB_SIZE] = {0};
+	rc = encode_nsm_dot_cak_rotate_resp(0, NSM_SUCCESS, ERR_NULL, blob,
+					    NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_cak_rotate_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t cc = 0;
+	uint16_t reason_code = 0;
+	rc = decode_nsm_dot_cak_rotate_resp(NULL, 100, &cc, &reason_code, blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_nsm_dot_cak_rotate_resp(0, NSM_SUCCESS, ERR_NULL, blob,
+					    response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, responseMsg.size(), NULL,
+					    &reason_code, blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, responseMsg.size(), &cc,
+					    NULL, blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotCAKRotate, testBufferLengthValidation)
+{
+	nsm_dot_cak_rotate_req cak_rotate_req;
+	memset(&cak_rotate_req, 0, sizeof(cak_rotate_req));
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_cak_rotate_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_cak_rotate_req(0, &cak_rotate_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_cak_rotate_req decoded_req;
+	rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size(),
+					   &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_cak_rotate_req(request, requestMsg.size() - 1,
+					   &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_nsm_dot_cak_rotate_req(request, sizeof(nsm_msg_hdr),
+					   &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_cak_rotate_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+	uint8_t blob[DOT_BLOB_SIZE] = {0};
+	rc = encode_nsm_dot_cak_rotate_resp(0, NSM_SUCCESS, ERR_NULL, blob,
+					    response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+	uint8_t decoded_blob[DOT_BLOB_SIZE];
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, responseMsg.size(), &cc,
+					    &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, responseMsg.size() - 1,
+					    &cc, &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_nsm_dot_cak_rotate_resp(response, sizeof(nsm_msg_hdr), &cc,
+					    &reason_code, decoded_blob);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+// ============================================================================
+// DOT UNLOCK CHALLENGE Tests
+// ============================================================================
+
+TEST(DotUnlockChallenge, testGoodEncodeRequest)
+{
+	nsm_dot_unlock_challenge_req unlock_challenge_req;
+	unlock_challenge_req.unlock_type = 1; // Owner_Unlock
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_req(0, &unlock_challenge_req,
+						      request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto req_cmd = reinterpret_cast<nsm_dot_unlock_challenge_req_command *>(
+	    request->payload);
+	EXPECT_EQ(req_cmd->hdr.command, NSM_FW_DOT_UNLOCK_CHALLENGE);
+	EXPECT_EQ(le32toh(req_cmd->unlock_challenge_req.unlock_type), 1);
+}
+
+TEST(DotUnlockChallenge, testGoodDecodeRequest)
+{
+	nsm_dot_unlock_challenge_req unlock_challenge_req;
+	unlock_challenge_req.unlock_type = 2; // Vendor_Unlock
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_req(0, &unlock_challenge_req,
+						      request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_unlock_challenge_req decoded_req;
+	rc = decode_nsm_dot_unlock_challenge_req(request, requestMsg.size(),
+						 &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(decoded_req.unlock_type, 2);
+}
+
+TEST(DotUnlockChallenge, testGoodEncodeResponse)
+{
+	uint8_t challenge[32];
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		challenge[i] = static_cast<uint8_t>(i);
+	}
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_unlock_challenge_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_resp(0, NSM_SUCCESS, ERR_NULL,
+						       challenge, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto resp = reinterpret_cast<nsm_dot_unlock_challenge_resp *>(
+	    response->payload);
+	EXPECT_EQ(resp->command, NSM_FW_DOT_UNLOCK_CHALLENGE);
+	EXPECT_EQ(resp->completion_code, NSM_SUCCESS);
+	EXPECT_EQ(le16toh(resp->data_size), 32);
+}
+
+TEST(DotUnlockChallenge, testGoodDecodeResponse)
+{
+	uint8_t challenge[32];
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		challenge[i] = static_cast<uint8_t>(i * 2);
+	}
+
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_unlock_challenge_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_resp(0, NSM_SUCCESS, ERR_NULL,
+						       challenge, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+	uint8_t decoded_challenge[32];
+
+	rc = decode_nsm_dot_unlock_challenge_resp(
+	    response, responseMsg.size(), &cc, &reason_code, decoded_challenge);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+
+	for (size_t i = 0; i < dot_test::CHALLENGE_SIZE; i++) {
+		EXPECT_EQ(decoded_challenge[i], i * 2);
+	}
+}
+
+TEST(DotUnlockChallenge, testErrorResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_resp(
+	    0, NSM_ERR_INVALID_DATA, 0x0003, nullptr, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+	uint8_t decoded_challenge[32];
+
+	rc = decode_nsm_dot_unlock_challenge_resp(
+	    response, responseMsg.size(), &cc, &reason_code, decoded_challenge);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(reason_code, 0x0003);
+}
+
+TEST(DotUnlockChallenge, testNullPointerHandling)
+{
+	nsm_dot_unlock_challenge_req unlock_challenge_req;
+	unlock_challenge_req.unlock_type = 1;
+
+	std::vector<uint8_t> requestMsg(
+	    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_challenge_req(0, nullptr, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_nsm_dot_unlock_challenge_req(0, &unlock_challenge_req,
+						 nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_unlock_challenge_req(nullptr, requestMsg.size(),
+						 &unlock_challenge_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_unlock_challenge_req(request, requestMsg.size(),
+						 nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+// ============================================================================
+// DOT UNLOCK Tests
+// ============================================================================
+
+TEST(DotUnlock, testGoodEncodeRequest)
+{
+	nsm_dot_unlock_req dot_unlock_req;
+	memset(&dot_unlock_req, 0, sizeof(dot_unlock_req));
+
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		dot_unlock_req.signature[i] = static_cast<uint8_t>(i % 256);
+	}
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_unlock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_req(0, &dot_unlock_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto req_cmd =
+	    reinterpret_cast<nsm_dot_unlock_req_command *>(request->payload);
+	EXPECT_EQ(req_cmd->hdr.command, NSM_FW_DOT_UNLOCK);
+}
+
+TEST(DotUnlock, testGoodDecodeRequest)
+{
+	nsm_dot_unlock_req dot_unlock_req;
+	memset(&dot_unlock_req, 0, sizeof(dot_unlock_req));
+
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		dot_unlock_req.signature[i] = static_cast<uint8_t>(i + 10);
+	}
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_unlock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_req(0, &dot_unlock_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_unlock_req decoded_req;
+	rc =
+	    decode_nsm_dot_unlock_req(request, requestMsg.size(), &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	for (size_t i = 0; i < dot_test::SIGNATURE_SIZE; i++) {
+		EXPECT_EQ(decoded_req.signature[i], (i + 10) % 256);
+	}
+}
+
+TEST(DotUnlock, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc =
+	    encode_nsm_dot_unlock_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	auto resp = reinterpret_cast<nsm_common_resp *>(response->payload);
+	EXPECT_EQ(resp->command, NSM_FW_DOT_UNLOCK);
+	EXPECT_EQ(resp->completion_code, NSM_SUCCESS);
+	EXPECT_EQ(le16toh(resp->data_size), 0);
+}
+
+TEST(DotUnlock, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc =
+	    encode_nsm_dot_unlock_resp(0, NSM_SUCCESS, ERR_NULL, response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	rc = decode_nsm_dot_unlock_resp(response, responseMsg.size(), &cc,
+					&reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_SUCCESS);
+	EXPECT_EQ(reason_code, ERR_NULL);
+}
+
+TEST(DotUnlock, testErrorResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_common_non_success_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_resp(0, NSM_ERR_INVALID_DATA, 0x0005,
+					     response);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	uint8_t cc;
+	uint16_t reason_code;
+
+	rc = decode_nsm_dot_unlock_resp(response, responseMsg.size(), &cc,
+					&reason_code);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(cc, NSM_ERR_INVALID_DATA);
+	EXPECT_EQ(reason_code, 0x0005);
+}
+
+TEST(DotUnlock, testNullPointerHandling)
+{
+	nsm_dot_unlock_req dot_unlock_req;
+	memset(&dot_unlock_req, 0, sizeof(dot_unlock_req));
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_unlock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_req(0, nullptr, request);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = encode_nsm_dot_unlock_req(0, &dot_unlock_req, nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_unlock_req(nullptr, requestMsg.size(),
+				       &dot_unlock_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+
+	rc = decode_nsm_dot_unlock_req(request, requestMsg.size(), nullptr);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotUnlock, testBufferLengthValidation)
+{
+	nsm_dot_unlock_req dot_unlock_req;
+	memset(&dot_unlock_req, 0, sizeof(dot_unlock_req));
+
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_unlock_req_command));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_unlock_req(0, &dot_unlock_req, request);
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_unlock_req decoded_req;
+	rc = decode_nsm_dot_unlock_req(request, requestMsg.size() - 1,
+				       &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+
+	rc = decode_nsm_dot_unlock_req(request, sizeof(nsm_msg_hdr),
+				       &decoded_req);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+// Unit tests for DOT GET INFO and GET STATUS
+
+TEST(DotGetInfo, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_get_info_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_get_info_req(0, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
+
+	nsm_dot_get_info_req *req = (nsm_dot_get_info_req *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_GET_INFO, req->command);
+	EXPECT_EQ(0, le16toh(req->data_size));
+}
+
+TEST(DotGetInfo, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_get_info_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	// Fill header
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	// Fill payload
+	nsm_dot_get_info_req *req_cmd =
+	    (nsm_dot_get_info_req *)request->payload;
+	req_cmd->command = NSM_FW_DOT_GET_INFO;
+	req_cmd->data_size = 0;
+
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_nsm_dot_get_info_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(DotGetInfo, testBadDecodeRequest)
+{
+	auto rc = decode_nsm_dot_get_info_req(NULL, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotGetInfo, testTooShortDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(5);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_nsm_dot_get_info_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotGetInfo, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_get_info_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint16_t version = 1;
+	uint8_t fuseChangeState = 0x02;
+	uint8_t transfersRemaining = 128;
+	std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+	for (size_t i = 0; i < DOT_BLOB_SIZE; i++) {
+		dotBlob[i] = (i % 256);
+	}
+
+	auto rc = encode_nsm_dot_get_info_resp(
+	    0, NSM_SUCCESS, 0, version, fuseChangeState, transfersRemaining,
+	    dotBlob.data(), response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_get_info_resp *resp =
+	    (nsm_dot_get_info_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_GET_INFO, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(1028, le16toh(resp->data_size));
+	EXPECT_EQ(1, le16toh(resp->version));
+	EXPECT_EQ(0x02, resp->fuse_change_state);
+	EXPECT_EQ(128, resp->transfers_remaining);
+
+	for (size_t i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ((i % 256), resp->dot_blob[i]);
+	}
+}
+
+TEST(DotGetInfo, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_get_info_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Fill response
+	nsm_dot_get_info_resp *resp =
+	    (nsm_dot_get_info_resp *)response->payload;
+	resp->command = NSM_FW_DOT_GET_INFO;
+	resp->completion_code = NSM_SUCCESS;
+	resp->reserved = 0;
+	resp->data_size = htole16(1027);
+	resp->version = htole16(1);
+	resp->fuse_change_state = 0x02;
+	resp->transfers_remaining = 128;
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		resp->dot_blob[i] = (i % 256);
+	}
+
+	uint8_t cc;
+	uint16_t reasonCode;
+	uint16_t version;
+	uint8_t fuseChangeState;
+	uint8_t transfersRemaining;
+	std::vector<uint8_t> dotBlob(DOT_BLOB_SIZE);
+
+	auto rc = decode_nsm_dot_get_info_resp(
+	    response, responseMsg.size(), &cc, &reasonCode, &version,
+	    &fuseChangeState, &transfersRemaining, dotBlob.data());
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(1, version);
+	EXPECT_EQ(0x02, fuseChangeState);
+	EXPECT_EQ(128, transfersRemaining);
+
+	for (int i = 0; i < DOT_BLOB_SIZE; i++) {
+		EXPECT_EQ((i % 256), dotBlob[i]);
+	}
+}
+
+TEST(DotGetInfo, testBadDecodeResponse)
+{
+	uint8_t cc;
+	auto rc = decode_nsm_dot_get_info_resp(NULL, 0, &cc, NULL, NULL, NULL,
+					       NULL, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotGetStatus, testGoodEncodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_get_status_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	auto rc = encode_nsm_dot_get_status_req(0, request);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_TRUE(dot_test::validateNSMRequestHeader(request));
+
+	nsm_dot_get_status_req *req =
+	    (nsm_dot_get_status_req *)request->payload;
+	EXPECT_EQ(NSM_FW_DOT_GET_STATUS, req->command);
+	EXPECT_EQ(0, le16toh(req->data_size));
+}
+
+TEST(DotGetStatus, testGoodDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(sizeof(nsm_msg_hdr) +
+					sizeof(nsm_dot_get_status_req));
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+
+	// Fill header
+	request->hdr.pci_vendor_id = htobe16(PCI_VENDOR_ID);
+	request->hdr.request = 1;
+	request->hdr.datagram = 0;
+	request->hdr.instance_id = 0;
+	request->hdr.ocp_type = OCP_TYPE;
+	request->hdr.ocp_version = OCP_VERSION_V2;
+	request->hdr.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	// Fill payload
+	nsm_dot_get_status_req *req_cmd =
+	    (nsm_dot_get_status_req *)request->payload;
+	req_cmd->command = NSM_FW_DOT_GET_STATUS;
+	req_cmd->data_size = 0;
+
+	size_t msg_len = requestMsg.size();
+	auto rc = decode_nsm_dot_get_status_req(request, msg_len);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST(DotGetStatus, testBadDecodeRequest)
+{
+	auto rc = decode_nsm_dot_get_status_req(NULL, 0);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotGetStatus, testTooShortDecodeRequest)
+{
+	std::vector<uint8_t> requestMsg(5);
+	auto request = reinterpret_cast<nsm_msg *>(requestMsg.data());
+	size_t msg_len = requestMsg.size();
+
+	auto rc = decode_nsm_dot_get_status_req(request, msg_len);
+	EXPECT_EQ(rc, NSM_SW_ERROR_LENGTH);
+}
+
+TEST(DotGetStatus, testGoodEncodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_get_status_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	uint8_t status = 1; // Volatile
+
+	auto rc =
+	    encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, 0, status, response);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+	nsm_dot_get_status_resp *resp =
+	    (nsm_dot_get_status_resp *)response->payload;
+	EXPECT_EQ(NSM_FW_DOT_GET_STATUS, resp->command);
+	EXPECT_EQ(NSM_SUCCESS, resp->completion_code);
+	EXPECT_EQ(1, le16toh(resp->data_size));
+	EXPECT_EQ(1, resp->status);
+}
+
+TEST(DotGetStatus, testGoodDecodeResponse)
+{
+	std::vector<uint8_t> responseMsg(sizeof(nsm_msg_hdr) +
+					 sizeof(nsm_dot_get_status_resp));
+	auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+	// Fill response
+	nsm_dot_get_status_resp *resp =
+	    (nsm_dot_get_status_resp *)response->payload;
+	resp->command = NSM_FW_DOT_GET_STATUS;
+	resp->completion_code = NSM_SUCCESS;
+	resp->reserved = 0;
+	resp->data_size = htole16(1);
+	resp->status = 2; // Locked
+
+	uint8_t cc;
+	uint16_t reasonCode;
+	uint8_t status;
+
+	auto rc = decode_nsm_dot_get_status_resp(response, responseMsg.size(),
+						 &cc, &reasonCode, &status);
+
+	EXPECT_EQ(rc, NSM_SW_SUCCESS);
+	EXPECT_EQ(NSM_SUCCESS, cc);
+	EXPECT_EQ(2, status);
+}
+
+TEST(DotGetStatus, testBadDecodeResponse)
+{
+	uint8_t cc;
+	auto rc = decode_nsm_dot_get_status_resp(NULL, 0, &cc, NULL, NULL);
+	EXPECT_EQ(rc, NSM_SW_ERROR_NULL);
+}
+
+TEST(DotGetStatus, testAllStatusValues)
+{
+	for (uint8_t status = 0; status <= 3; status++) {
+		std::vector<uint8_t> responseMsg(
+		    sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_status_resp));
+		auto response = reinterpret_cast<nsm_msg *>(responseMsg.data());
+
+		auto rc = encode_nsm_dot_get_status_resp(0, NSM_SUCCESS, 0,
+							 status, response);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+
+		uint8_t cc;
+		uint16_t reasonCode;
+		uint8_t decodedStatus;
+
+		rc = decode_nsm_dot_get_status_resp(
+		    response, responseMsg.size(), &cc, &reasonCode,
+		    &decodedStatus);
+		EXPECT_EQ(rc, NSM_SW_SUCCESS);
+		EXPECT_EQ(NSM_SUCCESS, cc);
+		EXPECT_EQ(status, decodedStatus);
+	}
 }
