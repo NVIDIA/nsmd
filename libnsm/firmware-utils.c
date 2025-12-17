@@ -1848,7 +1848,6 @@ int decode_nsm_dot_cak_install_req(const struct nsm_msg *msg, size_t msg_len,
 
 	struct nsm_dot_cak_install_req_command *request =
 	    (struct nsm_dot_cak_install_req_command *)msg->payload;
-	// data_size validation removed - not required for this function
 
 	*dot_cak_req = request->dot_cak_install_req;
 
@@ -1899,7 +1898,6 @@ int decode_nsm_dot_cak_install_resp(const struct nsm_msg *msg, size_t msg_len,
 		return rc;
 	}
 
-	// For success case, set reason_code to ERR_NULL
 	*reason_code = ERR_NULL;
 
 	if (msg_len <
@@ -1931,7 +1929,7 @@ int encode_nsm_dot_cak_bypass_req(uint8_t instance_id, struct nsm_msg *msg)
 	request->command = NSM_FW_DOT_CAK_BYPASS;
 	request->reserved1 = 0;
 	request->reserved2 = 0;
-	request->data_size = 0; // No additional data
+	request->data_size = 0;
 
 	return NSM_SW_SUCCESS;
 }
@@ -1994,7 +1992,6 @@ int decode_nsm_dot_cak_bypass_resp(const struct nsm_msg *msg, size_t msg_len,
 		return rc;
 	}
 
-	// For success case, set reason_code to ERR_NULL
 	*reason_code = ERR_NULL;
 
 	return NSM_SW_SUCCESS;
@@ -2112,6 +2109,710 @@ int decode_nsm_firmware_image_copy_control_initiate_copy_resp(
 	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
 	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
 		return rc;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_lock_req(uint8_t instance_id,
+			    const struct nsm_dot_lock_req *dot_lock_req,
+			    struct nsm_msg *msg)
+{
+	if (msg == NULL || dot_lock_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_lock_req_command *request =
+	    (struct nsm_dot_lock_req_command *)msg->payload;
+
+	request->hdr.command = NSM_FW_DOT_LOCK;
+	request->hdr.reserved1 = 0;
+	request->hdr.reserved2 = 0;
+	request->hdr.data_size = htole16(sizeof(struct nsm_dot_lock_req));
+
+	memcpy(&(request->dot_lock_req), dot_lock_req,
+	       sizeof(struct nsm_dot_lock_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_lock_req(const struct nsm_msg *msg, size_t msg_len,
+			    struct nsm_dot_lock_req *dot_lock_req)
+{
+	if (msg == NULL || dot_lock_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_lock_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_lock_req_command *request =
+	    (struct nsm_dot_lock_req_command *)msg->payload;
+
+	*dot_lock_req = request->dot_lock_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_lock_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, const uint8_t *dot_blob,
+			     struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_FW_DOT_LOCK,
+					  msg);
+	}
+
+	struct nsm_dot_lock_resp *response =
+	    (struct nsm_dot_lock_resp *)msg->payload;
+	response->command = NSM_FW_DOT_LOCK;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = htole16(DOT_BLOB_SIZE);
+
+	if (dot_blob != NULL) {
+		memcpy(response->dot_blob, dot_blob, DOT_BLOB_SIZE);
+	} else {
+		memset(response->dot_blob, 0, DOT_BLOB_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_lock_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *reason_code,
+			     uint8_t *dot_blob)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	*reason_code = ERR_NULL;
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_dot_lock_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_lock_resp *response =
+	    (struct nsm_dot_lock_resp *)msg->payload;
+
+	if (dot_blob != NULL) {
+		memcpy(dot_blob, response->dot_blob, DOT_BLOB_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_unlock_challenge_req(
+    uint8_t instance_id,
+    const struct nsm_dot_unlock_challenge_req *unlock_challenge_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || unlock_challenge_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_unlock_challenge_req_command *request =
+	    (struct nsm_dot_unlock_challenge_req_command *)msg->payload;
+
+	request->hdr.command = NSM_FW_DOT_UNLOCK_CHALLENGE;
+	request->hdr.reserved1 = 0;
+	request->hdr.data_size =
+	    htole16(sizeof(struct nsm_dot_unlock_challenge_req));
+	request->hdr.reserved2 = 0;
+
+	request->unlock_challenge_req.unlock_type =
+	    htole32(unlock_challenge_req->unlock_type);
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_unlock_challenge_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_dot_unlock_challenge_req *unlock_challenge_req)
+{
+	if (msg == NULL || unlock_challenge_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_unlock_challenge_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_unlock_challenge_req_command *request =
+	    (struct nsm_dot_unlock_challenge_req_command *)msg->payload;
+
+	unlock_challenge_req->unlock_type =
+	    le32toh(request->unlock_challenge_req.unlock_type);
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_unlock_challenge_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 const uint8_t *challenge,
+					 struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_DOT_UNLOCK_CHALLENGE, msg);
+	}
+
+	struct nsm_dot_unlock_challenge_resp *response =
+	    (struct nsm_dot_unlock_challenge_resp *)msg->payload;
+	response->command = NSM_FW_DOT_UNLOCK_CHALLENGE;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = htole16(DOT_CHALLENGE_SIZE);
+
+	if (challenge != NULL) {
+		memcpy(response->challenge, challenge, DOT_CHALLENGE_SIZE);
+	} else {
+		memset(response->challenge, 0, DOT_CHALLENGE_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_unlock_challenge_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *reason_code,
+					 uint8_t *challenge)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	*reason_code = ERR_NULL;
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_unlock_challenge_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_unlock_challenge_resp *response =
+	    (struct nsm_dot_unlock_challenge_resp *)msg->payload;
+
+	if (challenge != NULL) {
+		memcpy(challenge, response->challenge, DOT_CHALLENGE_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_unlock_req(uint8_t instance_id,
+			      const struct nsm_dot_unlock_req *dot_unlock_req,
+			      struct nsm_msg *msg)
+{
+	if (msg == NULL || dot_unlock_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_unlock_req_command *request =
+	    (struct nsm_dot_unlock_req_command *)msg->payload;
+
+	request->hdr.command = NSM_FW_DOT_UNLOCK;
+	request->hdr.reserved1 = 0;
+	request->hdr.reserved2 = 0;
+	request->hdr.data_size = htole16(sizeof(struct nsm_dot_unlock_req));
+
+	memcpy(&(request->dot_unlock_req), dot_unlock_req,
+	       sizeof(struct nsm_dot_unlock_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_unlock_req(const struct nsm_msg *msg, size_t msg_len,
+			      struct nsm_dot_unlock_req *dot_unlock_req)
+{
+	if (msg == NULL || dot_unlock_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_unlock_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_unlock_req_command *request =
+	    (struct nsm_dot_unlock_req_command *)msg->payload;
+
+	*dot_unlock_req = request->dot_unlock_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_unlock_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_FW_DOT_UNLOCK,
+					  msg);
+	}
+
+	struct nsm_common_resp *response =
+	    (struct nsm_common_resp *)msg->payload;
+	response->command = NSM_FW_DOT_UNLOCK;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_unlock_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	*reason_code = ERR_NULL;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_get_info_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_dot_get_info_req *request = (nsm_dot_get_info_req *)msg->payload;
+	request->command = NSM_FW_DOT_GET_INFO;
+	request->reserved1 = 0;
+	request->data_size = htole16(0);
+	request->reserved2 = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_get_info_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_dot_get_info_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_get_info_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint16_t version,
+				 uint8_t fuse_change_state,
+				 uint8_t transfers_remaining,
+				 const uint8_t *dot_blob, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code, NSM_FW_DOT_GET_INFO,
+					  msg);
+	}
+
+	struct nsm_dot_get_info_resp *response =
+	    (struct nsm_dot_get_info_resp *)msg->payload;
+	response->command = NSM_FW_DOT_GET_INFO;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = htole16(DOT_GET_INFO_DATA_SIZE);
+	response->version = htole16(version);
+	response->fuse_change_state = fuse_change_state;
+	response->transfers_remaining = transfers_remaining;
+
+	if (dot_blob != NULL) {
+		memcpy(response->dot_blob, dot_blob, 1024);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_get_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint16_t *version, uint8_t *fuse_change_state,
+				 uint8_t *transfers_remaining,
+				 uint8_t *dot_blob)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_get_info_resp *response =
+	    (struct nsm_dot_get_info_resp *)msg->payload;
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_dot_get_info_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (version != NULL) {
+		*version = le16toh(response->version);
+	}
+	if (fuse_change_state != NULL) {
+		*fuse_change_state = response->fuse_change_state;
+	}
+	if (transfers_remaining != NULL) {
+		*transfers_remaining = response->transfers_remaining;
+	}
+	if (dot_blob != NULL) {
+		memcpy(dot_blob, response->dot_blob, DOT_BLOB_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_get_status_req(uint8_t instance_id, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	nsm_dot_get_status_req *request =
+	    (nsm_dot_get_status_req *)msg->payload;
+	request->command = NSM_FW_DOT_GET_STATUS;
+	request->reserved1 = 0;
+	request->data_size = htole16(0);
+	request->reserved2 = 0;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_get_status_req(const struct nsm_msg *msg, size_t msg_len)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(nsm_dot_get_status_req)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_get_status_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, uint8_t status,
+				   struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_DOT_GET_STATUS, msg);
+	}
+
+	struct nsm_dot_get_status_resp *response =
+	    (struct nsm_dot_get_status_resp *)msg->payload;
+	response->command = NSM_FW_DOT_GET_STATUS;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = htole16(1);
+	response->status = status;
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_get_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t *status)
+{
+	if (msg == NULL || cc == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len <
+	    sizeof(struct nsm_msg_hdr) + sizeof(struct nsm_common_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_get_status_resp *response =
+	    (struct nsm_dot_get_status_resp *)msg->payload;
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_get_status_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	if (status != NULL) {
+		*status = response->status;
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_cak_rotate_req(
+    uint8_t instance_id,
+    const struct nsm_dot_cak_rotate_req *dot_cak_rotate_req,
+    struct nsm_msg *msg)
+{
+	if (msg == NULL || dot_cak_rotate_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_REQUEST;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	struct nsm_dot_cak_rotate_req_command *request =
+	    (struct nsm_dot_cak_rotate_req_command *)msg->payload;
+
+	request->hdr.command = NSM_FW_DOT_CAK_ROTATE;
+	request->hdr.reserved1 = 0;
+	request->hdr.reserved2 = 0;
+	request->hdr.data_size = htole16(sizeof(struct nsm_dot_cak_rotate_req));
+
+	memcpy(&(request->dot_cak_rotate_req), dot_cak_rotate_req,
+	       sizeof(struct nsm_dot_cak_rotate_req));
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_rotate_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_dot_cak_rotate_req *dot_cak_rotate_req)
+{
+	if (msg == NULL || dot_cak_rotate_req == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_cak_rotate_req_command)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_cak_rotate_req_command *request =
+	    (struct nsm_dot_cak_rotate_req_command *)msg->payload;
+
+	*dot_cak_rotate_req = request->dot_cak_rotate_req;
+
+	return NSM_SW_SUCCESS;
+}
+
+int encode_nsm_dot_cak_rotate_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const uint8_t *dot_blob, struct nsm_msg *msg)
+{
+	if (msg == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	struct nsm_header_info header = {0};
+	header.nsm_msg_type = NSM_RESPONSE;
+	header.instance_id = instance_id;
+	header.nvidia_msg_type = NSM_TYPE_FIRMWARE;
+
+	uint8_t rc = pack_nsm_header_v2(&header, &msg->hdr);
+	if (rc != NSM_SW_SUCCESS) {
+		return rc;
+	}
+
+	if (cc != NSM_SUCCESS) {
+		return encode_reason_code(cc, reason_code,
+					  NSM_FW_DOT_CAK_ROTATE, msg);
+	}
+
+	struct nsm_dot_cak_rotate_resp *response =
+	    (struct nsm_dot_cak_rotate_resp *)msg->payload;
+	response->command = NSM_FW_DOT_CAK_ROTATE;
+	response->completion_code = cc;
+	response->reserved = 0;
+	response->data_size = htole16(DOT_BLOB_SIZE);
+
+	if (dot_blob != NULL) {
+		memcpy(response->dot_blob, dot_blob, DOT_BLOB_SIZE);
+	} else {
+		memset(response->dot_blob, 0, DOT_BLOB_SIZE);
+	}
+
+	return NSM_SW_SUCCESS;
+}
+
+int decode_nsm_dot_cak_rotate_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t *dot_blob)
+{
+	if (msg == NULL || cc == NULL || reason_code == NULL) {
+		return NSM_SW_ERROR_NULL;
+	}
+
+	int rc = decode_reason_code_and_cc(msg, msg_len, cc, reason_code);
+	if (rc != NSM_SW_SUCCESS || *cc != NSM_SUCCESS) {
+		return rc;
+	}
+
+	*reason_code = ERR_NULL;
+
+	if (msg_len < sizeof(struct nsm_msg_hdr) +
+			  sizeof(struct nsm_dot_cak_rotate_resp)) {
+		return NSM_SW_ERROR_LENGTH;
+	}
+
+	struct nsm_dot_cak_rotate_resp *response =
+	    (struct nsm_dot_cak_rotate_resp *)msg->payload;
+
+	if (dot_blob != NULL) {
+		memcpy(dot_blob, response->dot_blob, DOT_BLOB_SIZE);
 	}
 
 	return NSM_SW_SUCCESS;

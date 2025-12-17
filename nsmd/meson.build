@@ -4,6 +4,7 @@ sources = [
     '../debug-token/tlv_decoder.cpp',
     '../debug-token/tlv_encoder.cpp',
     '../dot/nsmDotUtils.cpp',
+    '../dot/dotErrorHandler.cpp',
     '../libnsm/base.c',
     '../libnsm/requester/mctp.c',
     '../requester/mctp_endpoint_discovery.cpp',

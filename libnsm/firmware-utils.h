@@ -44,8 +44,16 @@ enum nsm_firmware_commands {
 	NSM_FW_DOT_OVERRIDE = 0x26,
 	NSM_FW_DOT_UNLOCK_CHALLENGE = 0x27,
 	NSM_FW_DOT_RECOVERY = 0x28,
-	NSM_FW_DOT_CAK_BYPASS = 0x29
+	NSM_FW_DOT_CAK_BYPASS = 0x29,
+	NSM_FW_DOT_GET_STATUS = 0x2A,
 };
+
+#define DOT_KEY_AUTH_DATA_SIZE 148
+#define DOT_STATIC_CHALLENGE_SIZE 32
+#define DOT_CHALLENGE_SIZE 32
+#define DOT_BLOB_SIZE 1024
+#define DOT_SIGNATURE_SIZE 1840
+#define DOT_GET_INFO_DATA_SIZE 1028
 
 /** @struct nsm_firmware_state_information_fields
  *
@@ -566,6 +574,31 @@ enum nsm_dot_completion_codes {
 					  not defined specifically */
 };
 
+/** @brief DOT Reason Codes */
+enum nsm_dot_reason_codes {
+	DOT_RC_INTERNAL_ERROR = 0x2000,
+	DOT_RC_STATE_INVALID = 0x2001,
+	DOT_RC_SIGNATURE_VERIFICATION_FAILED = 0x2002,
+	DOT_RC_STORAGE_ERROR = 0x2003,
+	DOT_RC_LOCK_DISABLED = 0x2004,
+	DOT_RC_KEY_MISMATCH = 0x2005,
+	DOT_RC_INVALID_UNLOCK_TYPE = 0x2006,
+	DOT_RC_INVALID_UNLOCK_METHOD = 0x2007,
+	DOT_RC_CRYPTO_ERROR = 0x2008,
+	DOT_RC_BLOB_CREATION_FAILED = 0x2009,
+	DOT_RC_INVALID_STATE_FOR_LOCK = 0x200A,
+	DOT_RC_INVALID_STATE_FOR_UNLOCK = 0x200B,
+	DOT_RC_INVALID_STATE_FOR_DISABLE = 0x200C,
+	DOT_RC_INVALID_STATE_FOR_CAK_ROTATE = 0x200D,
+	DOT_RC_INVALID_STATE_FOR_CAK_INSTALL = 0x200E,
+	DOT_RC_NULL_POINTER = 0x200F,
+	DOT_RC_FUSE_INCREMENT_FAILED = 0x2010,
+	DOT_RC_RECOVERY_FAILED = 0x2011,
+	DOT_RC_INVALID_COMMAND = 0x2012,
+	DOT_RC_UNSUPPORTED_COMMAND = 0x202E,
+	DOT_RC_INVALID_LENGTH = 0x202F,
+};
+
 /** @struct nsm_dot_cak_install_req
  *
  *  Structure representing DotCAKInstall request parameters.
@@ -574,10 +607,8 @@ enum nsm_dot_completion_codes {
  *  - LAK.pub: 148-byte key authentication data per spec
  */
 struct nsm_dot_cak_install_req {
-	uint8_t
-	    cak_pub[148]; /* CAK: 148-byte key authentication data per spec */
-	uint8_t
-	    lak_pub[148]; /* LAK: 148-byte key authentication data per spec */
+	uint8_t cak_pub[DOT_KEY_AUTH_DATA_SIZE];
+	uint8_t lak_pub[DOT_KEY_AUTH_DATA_SIZE];
 	uint8_t lock_disable; /* 0: Allow DOT_LOCK, 1: DOT_LOCK not allowed */
 	uint32_t min_svn;     /* MIN_SVN for minimal SVN */
 } __attribute__((packed));
@@ -606,6 +637,191 @@ typedef struct nsm_common_req_v2 nsm_dot_cak_bypass_req;
  *  Contains only success / error information.
  */
 typedef struct nsm_common_resp nsm_dot_cak_bypass_resp;
+
+/** @struct nsm_dot_lock_req
+ *
+ *  Structure representing DOT LOCK request parameters.
+ *  According to spec:
+ *  - CAK.pub: 148-byte key authentication data per spec
+ *  - LAK.pub: 148-byte key authentication data per spec
+ *  - unlock_method: 4-byte unlock method for future DOT_UNLOCK
+ *  - s_challenge: 32-byte static nonce (only when unlock_method == 2)
+ *  - signature: 1840-byte LAK signature
+ */
+struct nsm_dot_lock_req {
+	uint8_t cak_pub[DOT_KEY_AUTH_DATA_SIZE];
+	uint8_t lak_pub[DOT_KEY_AUTH_DATA_SIZE];
+	uint32_t unlock_method;
+	uint8_t s_challenge[DOT_STATIC_CHALLENGE_SIZE];
+	uint8_t signature[DOT_SIGNATURE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_lock_req_command
+ *
+ *  Structure representing DOT LOCK request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_lock_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_lock_req dot_lock_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_rotate_req
+ *
+ *  Structure representing DOT CAK ROTATE request parameters.
+ *  According to spec:
+ *  - new_cak: 148-byte new CAK public key data
+ *  - signature: 1840-byte LAK signature over new_cak
+ */
+struct nsm_dot_cak_rotate_req {
+	uint8_t new_cak[DOT_KEY_AUTH_DATA_SIZE];
+	uint8_t signature[DOT_SIGNATURE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_rotate_req_command
+ *
+ *  Structure representing DOT CAK ROTATE request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_cak_rotate_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_cak_rotate_req dot_cak_rotate_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_cak_rotate_resp
+ *
+ *  Structure representing DOT CAK ROTATE response.
+ *  Contains DOT blob (1024 bytes) on success.
+ */
+struct nsm_dot_cak_rotate_resp {
+	uint8_t command;
+	uint8_t completion_code;
+	uint16_t reserved;
+	uint16_t data_size;
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_lock_resp
+ *
+ *  Structure representing DOT LOCK response.
+ *  Contains DOT blob (1024 bytes) on success.
+ */
+struct nsm_dot_lock_resp {
+	uint8_t command; /* Command code (0x22) */
+	uint8_t completion_code;
+	uint16_t reserved;
+	uint16_t data_size;
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_unlock_challenge_req
+ *
+ *  Structure representing DOT UNLOCK CHALLENGE request.
+ *  Command code: 0x27
+ *  Total size: 16 bytes (12-byte header + 4-byte payload)
+ */
+struct nsm_dot_unlock_challenge_req {
+	uint32_t unlock_type; /* 1=Owner_Unlock, 2=Vendor_Unlock */
+} __attribute__((packed));
+
+/** @struct nsm_dot_unlock_challenge_req_command
+ *
+ *  Structure representing DOT UNLOCK CHALLENGE request command.
+ */
+struct nsm_dot_unlock_challenge_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_unlock_challenge_req unlock_challenge_req;
+} __attribute__((packed));
+
+/** @struct nsm_dot_unlock_challenge_resp
+ *
+ *  Structure representing DOT UNLOCK CHALLENGE response.
+ *  Contains a 32-byte challenge on success.
+ */
+struct nsm_dot_unlock_challenge_resp {
+	uint8_t command; /* Command code (0x27) */
+	uint8_t completion_code;
+	uint16_t reserved;
+	uint16_t data_size;
+	uint8_t challenge[DOT_CHALLENGE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_unlock_req
+ *
+ *  Structure representing DOT UNLOCK request parameters.
+ *  According to spec:
+ *  - signature: 1840-byte LAK signature over (LAK.pub | challenge)
+ *    - ECDSA-only: 96 bytes ECDSA + 1744 bytes padding (zeros)
+ *    - Hybrid: 96 bytes ECDSA + 1744 bytes LMS
+ *  Total size: 1852 bytes (12-byte header + 1840-byte signature)
+ */
+struct nsm_dot_unlock_req {
+	uint8_t signature[DOT_SIGNATURE_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_unlock_req_command
+ *
+ *  Structure representing DOT UNLOCK request command.
+ *  Uses nsm_common_req_v2 for large payload support.
+ */
+struct nsm_dot_unlock_req_command {
+	struct nsm_common_req_v2 hdr;
+	struct nsm_dot_unlock_req dot_unlock_req;
+} __attribute__((packed));
+
+typedef struct nsm_common_resp nsm_dot_unlock_resp;
+
+/** @struct nsm_dot_get_info_req
+ *
+ *  Structure representing DOT GET INFO request.
+ *  Command code: 0x20
+ *  Request contains only header (no additional data).
+ */
+typedef struct nsm_common_req_v2 nsm_dot_get_info_req;
+
+/** @struct nsm_dot_get_info_resp
+ *
+ *  Structure representing DOT GET INFO response.
+ *  Command code: 0x20
+ *  Total size: 1040 bytes (16-byte header + 1024-byte payload)
+ *  Contains DOT information including version, fuse state, transfers remaining,
+ * and DOT blob.
+ */
+struct nsm_dot_get_info_resp {
+	uint8_t command;	   /* Command code (0x20) */
+	uint8_t completion_code;   /* Completion code */
+	uint16_t reserved;	   /* Reserved field */
+	uint16_t data_size;	   /* Size of data (1028 bytes) */
+	uint16_t version;	   /* DOT commands format version */
+	uint8_t fuse_change_state; /* Fuse state change indicator: 0x00=none,
+				      0x01=in progress, 0x02=completed */
+	uint8_t transfers_remaining;
+	uint8_t dot_blob[DOT_BLOB_SIZE];
+} __attribute__((packed));
+
+/** @struct nsm_dot_get_status_req
+ *
+ *  Structure representing DOT GET STATUS request.
+ *  Command code: 0x2A
+ *  Request contains only header (no additional data).
+ */
+typedef struct nsm_common_req_v2 nsm_dot_get_status_req;
+
+/** @struct nsm_dot_get_status_resp
+ *
+ *  Structure representing DOT GET STATUS response.
+ *  Command code: 0x2A
+ *  Total size: 13 bytes (12-byte header + 1-byte payload)
+ *  Contains current DOT status.
+ */
+struct nsm_dot_get_status_resp {
+	uint8_t command; /* Command code (0x2A) */
+	uint8_t completion_code;
+	uint16_t reserved;  /* Reserved field */
+	uint16_t data_size; /* Size of data (1 byte) */
+	uint8_t status;	    /* DOT state: 0=Uninitialized, 1=Volatile, 2=Mutable
+			       Locked, 3=Mutable Disabled */
+} __attribute__((packed));
 
 /** @struct nsm_firmware_aggregate_tag
  *
@@ -1432,6 +1648,332 @@ int encode_nsm_dot_cak_bypass_resp(uint8_t instance_id, uint8_t cc,
  */
 int decode_nsm_dot_cak_bypass_resp(const struct nsm_msg *msg, size_t msg_len,
 				   uint8_t *cc, uint16_t *reason_code);
+
+/**
+ * @brief Encode nsm DOT LOCK request message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] dot_lock_req - Pointer to the DOT LOCK request parameters
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_lock_req(uint8_t instance_id,
+			    const struct nsm_dot_lock_req *dot_lock_req,
+			    struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DOT LOCK request message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ * @param[out] dot_lock_req - Pointer to the DOT LOCK request parameters
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int decode_nsm_dot_lock_req(const struct nsm_msg *msg, size_t msg_len,
+			    struct nsm_dot_lock_req *dot_lock_req);
+
+/**
+ * @brief Encode nsm DOT LOCK response message
+ *
+ * @param[in] instance_id - NSM instance ID
+ * @param[in] cc - Command completion code
+ * @param[in] reason_code - Reason code (for error response)
+ * @param[in] dot_blob - Pointer to DOT blob data (1024 bytes, NULL for error)
+ * @param[out] msg - Pointer to NSM message
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ */
+int encode_nsm_dot_lock_resp(uint8_t instance_id, uint8_t cc,
+			     uint16_t reason_code, const uint8_t *dot_blob,
+			     struct nsm_msg *msg);
+
+/**
+ * @brief Decode nsm DOT LOCK response message
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of the received message
+ * @param[out] cc - Command completion code
+ * @param[out] reason_code - Reason code
+ * @param[out] dot_blob - Pointer to buffer for DOT blob (1024 bytes, can be
+ * NULL)
+ *
+ * @return 0 on success, otherwise NSM error codes.
+ * @note   Caller is responsible for alloc and dealloc of msg
+ * @note   If dot_blob is NULL, blob data is not copied (useful for checking
+ * success)
+ */
+int decode_nsm_dot_lock_resp(const struct nsm_msg *msg, size_t msg_len,
+			     uint8_t *cc, uint16_t *reason_code,
+			     uint8_t *dot_blob);
+
+/**
+ * @brief Encode NSM DOT UNLOCK CHALLENGE request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] unlock_challenge_req - Pointer to DOT unlock challenge request
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_unlock_challenge_req(
+    uint8_t instance_id,
+    const struct nsm_dot_unlock_challenge_req *unlock_challenge_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT UNLOCK CHALLENGE request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] unlock_challenge_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_unlock_challenge_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_dot_unlock_challenge_req *unlock_challenge_req);
+
+/**
+ * @brief Encode NSM DOT UNLOCK CHALLENGE response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[in] challenge - Pointer to 32-byte challenge (NULL if error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_unlock_challenge_resp(uint8_t instance_id, uint8_t cc,
+					 uint16_t reason_code,
+					 const uint8_t *challenge,
+					 struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT UNLOCK CHALLENGE response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @param[out] challenge - Pointer to store 32-byte challenge
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_unlock_challenge_resp(const struct nsm_msg *msg,
+					 size_t msg_len, uint8_t *cc,
+					 uint16_t *reason_code,
+					 uint8_t *challenge);
+
+/**
+ * @brief Encode NSM DOT UNLOCK request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] dot_unlock_req - Pointer to DOT unlock request
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_unlock_req(uint8_t instance_id,
+			      const struct nsm_dot_unlock_req *dot_unlock_req,
+			      struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT UNLOCK request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] dot_unlock_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_unlock_req(const struct nsm_msg *msg, size_t msg_len,
+			      struct nsm_dot_unlock_req *dot_unlock_req);
+
+/**
+ * @brief Encode NSM DOT UNLOCK response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_unlock_resp(uint8_t instance_id, uint8_t cc,
+			       uint16_t reason_code, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT UNLOCK response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_unlock_resp(const struct nsm_msg *msg, size_t msg_len,
+			       uint8_t *cc, uint16_t *reason_code);
+
+/**
+ * @brief Encode NSM DOT GET INFO request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_get_info_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT GET INFO request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_get_info_req(const struct nsm_msg *msg, size_t msg_len);
+
+/**
+ * @brief Encode NSM DOT GET INFO response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[in] version - DOT commands format version
+ * @param[in] fuse_change_state - Fuse state change indicator
+ * @param[in] transfers_remaining - Number of ownership transfers remaining
+ * @param[in] dot_blob - Pointer to 1024-byte DOT blob (NULL if error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_get_info_resp(uint8_t instance_id, uint8_t cc,
+				 uint16_t reason_code, uint16_t version,
+				 uint8_t fuse_change_state,
+				 uint8_t transfers_remaining,
+				 const uint8_t *dot_blob, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT GET INFO response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @param[out] version - Pointer to store DOT commands format version
+ * @param[out] fuse_change_state - Pointer to store fuse state change indicator
+ * @param[out] transfers_remaining - Pointer to store number of transfers
+ * remaining
+ * @param[out] dot_blob - Pointer to store 1024-byte DOT blob
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_get_info_resp(const struct nsm_msg *msg, size_t msg_len,
+				 uint8_t *cc, uint16_t *reason_code,
+				 uint16_t *version, uint8_t *fuse_change_state,
+				 uint8_t *transfers_remaining,
+				 uint8_t *dot_blob);
+
+/**
+ * @brief Encode NSM DOT GET STATUS request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_get_status_req(uint8_t instance_id, struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT GET STATUS request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_get_status_req(const struct nsm_msg *msg, size_t msg_len);
+
+/**
+ * @brief Encode NSM DOT GET STATUS response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[in] status - DOT status (0-3)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_get_status_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code, uint8_t status,
+				   struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT GET STATUS response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @param[out] status - Pointer to store DOT status
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_get_status_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t *status);
+
+/**
+ * @brief Encode NSM DOT CAK ROTATE request
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] dot_cak_rotate_req - Pointer to DOT CAK ROTATE request
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_cak_rotate_req(
+    uint8_t instance_id,
+    const struct nsm_dot_cak_rotate_req *dot_cak_rotate_req,
+    struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT CAK ROTATE request
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] dot_cak_rotate_req - Pointer to store decoded request
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_cak_rotate_req(
+    const struct nsm_msg *msg, size_t msg_len,
+    struct nsm_dot_cak_rotate_req *dot_cak_rotate_req);
+
+/**
+ * @brief Encode NSM DOT CAK ROTATE response
+ *
+ * @param[in] instance_id - Instance ID for the message
+ * @param[in] cc - Completion code
+ * @param[in] reason_code - Reason code (used if completion code indicates
+ * error)
+ * @param[in] dot_blob - Pointer to 1024-byte DOT blob (NULL if error)
+ * @param[out] msg - Pointer to NSM message buffer
+ * @return 0 on success, negative error code on failure
+ */
+int encode_nsm_dot_cak_rotate_resp(uint8_t instance_id, uint8_t cc,
+				   uint16_t reason_code,
+				   const uint8_t *dot_blob,
+				   struct nsm_msg *msg);
+
+/**
+ * @brief Decode NSM DOT CAK ROTATE response
+ *
+ * @param[in] msg - Pointer to NSM message
+ * @param[in] msg_len - Length of message
+ * @param[out] cc - Pointer to store completion code
+ * @param[out] reason_code - Pointer to store reason code
+ * @param[out] dot_blob - Pointer to store 1024-byte DOT blob (can be NULL)
+ * @return 0 on success, negative error code on failure
+ */
+int decode_nsm_dot_cak_rotate_resp(const struct nsm_msg *msg, size_t msg_len,
+				   uint8_t *cc, uint16_t *reason_code,
+				   uint8_t *dot_blob);
 
 #ifdef __cplusplus
 }
