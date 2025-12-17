@@ -68,13 +68,86 @@ class NsmDotTest : public Test, public SensorManagerTest
         return response;
     }
 
+    Response createDotLockResponse(uint8_t completionCode = NSM_SUCCESS,
+                                   uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_lock_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        std::vector<uint8_t> dotBlob(148, 0x42);
+        auto rc = encode_nsm_dot_lock_resp(0, completionCode, reasonCode,
+                                           dotBlob.data(), dotBlob.size(), msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response
+        createDotUnlockChallengeResponse(uint8_t completionCode = NSM_SUCCESS,
+                                         uint16_t reasonCode = 0)
+    {
+        Response response(
+            sizeof(nsm_msg_hdr) + sizeof(nsm_dot_unlock_challenge_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        uint8_t challenge[32];
+        std::fill_n(challenge, 32, 0xAB);
+        auto rc = encode_nsm_dot_unlock_challenge_resp(
+            0, completionCode, reasonCode, challenge, msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotUnlockResponse(uint8_t completionCode = NSM_SUCCESS,
+                                     uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_common_resp), 0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        auto rc = encode_nsm_dot_unlock_resp(0, completionCode, reasonCode,
+                                             msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotCAKRotateResponse(uint8_t completionCode = NSM_SUCCESS,
+                                        uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_cak_rotate_resp),
+                          0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        std::vector<uint8_t> dotBlob(148, 0x55);
+        auto rc = encode_nsm_dot_cak_rotate_resp(
+            0, completionCode, reasonCode, dotBlob.data(), dotBlob.size(), msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
+    Response createDotGetInfoResponse(uint8_t completionCode = NSM_SUCCESS,
+                                      uint16_t reasonCode = 0)
+    {
+        Response response(sizeof(nsm_msg_hdr) + sizeof(nsm_dot_get_info_resp),
+                          0);
+        auto msg = reinterpret_cast<nsm_msg*>(response.data());
+
+        uint8_t version = 1;
+        uint8_t fuseChangeState = 0;
+        uint8_t transfersRemaining = 5;
+        std::vector<uint8_t> dotBlob(148, 0x77);
+
+        auto rc = encode_nsm_dot_get_info_resp(
+            0, completionCode, reasonCode, version, fuseChangeState,
+            transfersRemaining, dotBlob.data(), dotBlob.size(), msg);
+        EXPECT_EQ(rc, NSM_SW_SUCCESS);
+        return response;
+    }
+
     auto callDotCAKInstallAsync()
     {
         const auto [_, statusInterface, valueInterface] =
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
 
-        // Valid ECDSA key (96 bytes in hex)
-        std::string ecdsaKey = std::string(192, '0'); // 96 bytes * 2 hex chars
+        std::string ecdsaKey = std::string(192, '0');
         std::string lmsKey = "";
 
         auto rc = dotObject
@@ -92,6 +165,94 @@ class NsmDotTest : public Test, public SensorManagerTest
             AsyncOperationManager::getInstance()->getNewStatusValueInterface();
 
         auto rc = dotObject->bypassAsyncHandler(statusInterface, valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callLockAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        std::string ecdsaKey = std::string(192, '0');       // 96 bytes in hex
+        std::string lmsKey = "";
+        std::string staticChallenge = std::string(64, '0'); // 32 bytes in hex
+        std::string ecdsaSignature = std::string(192, '0'); // 96 bytes in hex
+
+        DotLockParams params{
+            .cakKeyAuthScheme = DotActionIntf::KeyAuthScheme::Ecdsa,
+            .cakEcdsaKey = ecdsaKey,
+            .cakLmsKey = lmsKey,
+            .lakKeyAuthScheme = DotActionIntf::KeyAuthScheme::Ecdsa,
+            .lakEcdsaKey = ecdsaKey,
+            .lakLmsKey = lmsKey,
+            .unlockMethod = DotActionIntf::UnlockMethod::StaticValue,
+            .staticChallenge = staticChallenge,
+            .lockSignatureAuthScheme = DotActionIntf::KeyAuthScheme::Ecdsa,
+            .ecdsaSignature = ecdsaSignature,
+            .lmsSignature = lmsKey};
+
+        auto rc =
+            dotObject->lockAsyncHandler(params, statusInterface, valueInterface)
+                .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callUnlockChallengeAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        auto rc = dotObject
+                      ->unlockChallengeAsyncHandler(
+                          DotActionIntf::UnlockType::OwnerUnlock,
+                          statusInterface, valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callUnlockAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        std::string ecdsaSignature = std::string(192, '0'); // 96 bytes in hex
+        std::string lmsSignature = "";
+
+        auto rc = dotObject
+                      ->unlockAsyncHandler(DotActionIntf::KeyAuthScheme::Ecdsa,
+                                           ecdsaSignature, lmsSignature,
+                                           statusInterface, valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callCAKRotateAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        std::string ecdsaKey = std::string(192, '0'); // 96 bytes in hex (CAK)
+        std::string lmsKey = "";
+        std::string ecdsaSignature = std::string(192, '0'); // 96 bytes in hex
+        std::string lmsSignature = "";
+
+        auto rc = dotObject
+                      ->cakRotateAsyncHandler(
+                          DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
+                          DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature,
+                          lmsSignature, statusInterface, valueInterface)
+                      .await_resume();
+        return std::make_tuple(rc, statusInterface, valueInterface);
+    }
+
+    auto callGetInfoAsync()
+    {
+        const auto [_, statusInterface, valueInterface] =
+            AsyncOperationManager::getInstance()->getNewStatusValueInterface();
+
+        auto rc = dotObject
+                      ->getInfoAsyncHandler(statusInterface, valueInterface)
                       .await_resume();
         return std::make_tuple(rc, statusInterface, valueInterface);
     }
@@ -119,8 +280,8 @@ TEST_F(NsmDotTest, DotCAKInstallInvalidCAKEcdsaKey)
 {
     EXPECT_THROW(
         dotObject->dotCAKInstall(DotActionIntf::KeyAuthScheme::Ecdsa,
-                                 "invalid_key", // Invalid key
-                                 "", DotActionIntf::KeyAuthScheme::Ecdsa,
+                                 "invalid_key", "",
+                                 DotActionIntf::KeyAuthScheme::Ecdsa,
                                  std::string(192, '0'), "", false, 0),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
@@ -128,11 +289,9 @@ TEST_F(NsmDotTest, DotCAKInstallInvalidCAKEcdsaKey)
 TEST_F(NsmDotTest, DotCAKInstallInvalidLAKEcdsaKey)
 {
     EXPECT_THROW(
-        dotObject->dotCAKInstall(DotActionIntf::KeyAuthScheme::Ecdsa,
-                                 std::string(192, '0'), "",
-                                 DotActionIntf::KeyAuthScheme::Ecdsa,
-                                 "invalid_key", // Invalid key
-                                 "", false, 0),
+        dotObject->dotCAKInstall(
+            DotActionIntf::KeyAuthScheme::Ecdsa, std::string(192, '0'), "",
+            DotActionIntf::KeyAuthScheme::Ecdsa, "invalid_key", "", false, 0),
         sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
 
@@ -170,7 +329,6 @@ TEST_F(NsmDotTest, DotCAKInstallAsyncHandlerDeviceError)
         .WillOnce([errorResponse](eid_t, Request&,
                                   std::shared_ptr<const nsm_msg>& responseMsg,
                                   size_t& responseLen) -> requester::Coroutine {
-        // Set correct length for error response (non-success resp is smaller)
         responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
         if (responseLen > 0)
         {
@@ -245,7 +403,6 @@ TEST_F(NsmDotTest, BypassAsyncHandlerDeviceError)
         .WillOnce([errorResponse](eid_t, Request&,
                                   std::shared_ptr<const nsm_msg>& responseMsg,
                                   size_t& responseLen) -> requester::Coroutine {
-        // Set correct length for error response (non-success resp is smaller)
         responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
         if (responseLen > 0)
         {
@@ -284,4 +441,526 @@ TEST_F(NsmDotTest, BypassAsyncHandlerSendFailure)
     EXPECT_EQ(rc, NSM_ERROR);
     EXPECT_EQ(statusInterface->status(),
               AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// Mutable State Tests - Lock Operation
+// ============================================================================
+
+TEST_F(NsmDotTest, LockAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotLockResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callLockAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    EXPECT_TRUE(std::holds_alternative<std::vector<uint8_t>>(value));
+}
+
+TEST_F(NsmDotTest, LockAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotLockResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callLockAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(0xFFFF));
+    EXPECT_EQ(std::get<1>(tuple), "DOT Lock failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, LockAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotLockResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callLockAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// Mutable State Tests - Unlock Challenge Operation
+// ============================================================================
+
+TEST_F(NsmDotTest, UnlockChallengeAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotUnlockChallengeResponse()));
+
+    const auto [rc, statusInterface,
+                valueInterface] = callUnlockChallengeAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    auto challenge = std::get<std::vector<uint8_t>>(value);
+    EXPECT_EQ(challenge.size(), 32); // 32-byte challenge
+}
+
+TEST_F(NsmDotTest, UnlockChallengeAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotUnlockChallengeResponse(NSM_ERROR,
+                                                              0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface,
+                valueInterface] = callUnlockChallengeAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(0xFFFF));
+    EXPECT_EQ(std::get<1>(tuple), "DOT Unlock Challenge failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, UnlockChallengeAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(
+            mockPostPatchIO(createDotUnlockChallengeResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callUnlockChallengeAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// Mutable State Tests - Unlock Operation
+// ============================================================================
+
+TEST_F(NsmDotTest, UnlockAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotUnlockResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callUnlockAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    EXPECT_TRUE(std::holds_alternative<std::vector<uint8_t>>(value));
+}
+
+TEST_F(NsmDotTest, UnlockAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotUnlockResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callUnlockAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(0xFFFF));
+    EXPECT_EQ(std::get<1>(tuple), "DOT Unlock failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, UnlockAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotUnlockResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callUnlockAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// Mutable State Tests - CAK Rotate Operation
+// ============================================================================
+
+TEST_F(NsmDotTest, CAKRotateAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotCAKRotateResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callCAKRotateAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    EXPECT_TRUE(std::holds_alternative<std::vector<uint8_t>>(value));
+}
+
+TEST_F(NsmDotTest, CAKRotateAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotCAKRotateResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callCAKRotateAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(0xFFFF));
+    EXPECT_EQ(std::get<1>(tuple), "DOT CAK Rotate failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, CAKRotateAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotCAKRotateResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callCAKRotateAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// GetInfo Operation Tests
+// ============================================================================
+
+TEST_F(NsmDotTest, GetInfoSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotGetInfoResponse()));
+
+    auto path = dotObject->getInfo();
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, GetInfoAsyncHandlerSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotGetInfoResponse()));
+
+    const auto [rc, statusInterface, valueInterface] = callGetInfoAsync();
+
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+    EXPECT_EQ(statusInterface->status(), AsyncOperationStatusType::Success);
+    auto value = valueInterface->value();
+    EXPECT_TRUE(std::holds_alternative<
+                std::tuple<uint8_t, uint8_t, uint8_t, std::vector<uint8_t>>>(
+        value));
+}
+
+TEST_F(NsmDotTest, GetInfoAsyncHandlerDeviceError)
+{
+    Response errorResponse = createDotGetInfoResponse(NSM_ERROR, 0xFFFF);
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce([errorResponse](eid_t, Request&,
+                                  std::shared_ptr<const nsm_msg>& responseMsg,
+                                  size_t& responseLen) -> requester::Coroutine {
+        responseLen = sizeof(nsm_msg_hdr) + sizeof(nsm_common_non_success_resp);
+        if (responseLen > 0)
+        {
+            responseMsg = std::shared_ptr<const nsm_msg>(
+                reinterpret_cast<const nsm_msg*>(malloc(responseLen)),
+                [](const nsm_msg* ptr) { free((void*)ptr); });
+            memcpy((uint8_t*)responseMsg.get(), errorResponse.data(),
+                   responseLen);
+        }
+        co_return NSM_SW_SUCCESS;
+    });
+
+    const auto [rc, statusInterface, valueInterface] = callGetInfoAsync();
+
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+    auto value = valueInterface->value();
+    auto tuple = std::get<std::tuple<uint16_t, std::string>>(value);
+    EXPECT_EQ(std::get<0>(tuple), static_cast<uint16_t>(0xFFFF));
+    EXPECT_EQ(std::get<1>(tuple), "DOT Get Info failed");
+    EXPECT_EQ(rc, NSM_SW_SUCCESS);
+}
+
+TEST_F(NsmDotTest, GetInfoAsyncHandlerSendFailure)
+{
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotGetInfoResponse(), NSM_ERROR));
+
+    const auto [rc, statusInterface, _] = callGetInfoAsync();
+
+    EXPECT_EQ(rc, NSM_ERROR);
+    EXPECT_EQ(statusInterface->status(),
+              AsyncOperationStatusType::WriteFailure);
+}
+
+// ============================================================================
+// Public Method Success Tests for Mutable Operations
+// ============================================================================
+
+TEST_F(NsmDotTest, LockSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotLockResponse()));
+
+    std::string ecdsaKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string staticChallenge = std::string(64, '0');
+    std::string ecdsaSignature = std::string(192, '0');
+
+    auto path = dotObject->lock(
+        DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
+        DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
+        DotActionIntf::UnlockMethod::StaticValue, staticChallenge,
+        DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature, lmsKey);
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, UnlockChallengeSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotUnlockChallengeResponse()));
+
+    auto path =
+        dotObject->unlockChallenge(DotActionIntf::UnlockType::OwnerUnlock);
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, UnlockSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotUnlockResponse()));
+
+    std::string ecdsaSignature = std::string(192, '0');
+    std::string lmsSignature = "";
+
+    auto path = dotObject->unlock(DotActionIntf::KeyAuthScheme::Ecdsa,
+                                  ecdsaSignature, lmsSignature);
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+TEST_F(NsmDotTest, CAKRotateSuccess)
+{
+    testing::Mock::AllowLeak(mockDevice.get());
+    EXPECT_CALL(*mockDevice, postPatchIO)
+        .WillOnce(mockPostPatchIO(createDotCAKRotateResponse()));
+
+    std::string ecdsaKey = std::string(192, '0');       // New CAK key
+    std::string lmsKey = "";
+    std::string ecdsaSignature = std::string(192, '0'); // LAK signature
+    std::string lmsSignature = "";
+
+    auto path = dotObject->cakRotate(
+        DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaKey, lmsKey,
+        DotActionIntf::KeyAuthScheme::Ecdsa, ecdsaSignature, lmsSignature);
+
+    EXPECT_NE(path, sdbusplus::message::object_path{});
+}
+
+// ============================================================================
+// Input Validation Tests for Mutable Operations
+// ============================================================================
+
+TEST_F(NsmDotTest, LockInvalidCAKKey)
+{
+    std::string invalidKey = "invalid";
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string staticChallenge = std::string(64, '0');
+    std::string ecdsaSignature = std::string(192, '0');
+
+    EXPECT_THROW(
+        dotObject->lock(DotActionIntf::KeyAuthScheme::Ecdsa, invalidKey, lmsKey,
+                        DotActionIntf::KeyAuthScheme::Ecdsa, validKey, lmsKey,
+                        DotActionIntf::UnlockMethod::StaticValue,
+                        staticChallenge, DotActionIntf::KeyAuthScheme::Ecdsa,
+                        ecdsaSignature, lmsKey),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, LockInvalidLAKKey)
+{
+    std::string validKey = std::string(192, '0');
+    std::string invalidKey = "invalid";
+    std::string lmsKey = "";
+    std::string staticChallenge = std::string(64, '0');
+    std::string ecdsaSignature = std::string(192, '0');
+
+    EXPECT_THROW(
+        dotObject->lock(DotActionIntf::KeyAuthScheme::Ecdsa, validKey, lmsKey,
+                        DotActionIntf::KeyAuthScheme::Ecdsa, invalidKey, lmsKey,
+                        DotActionIntf::UnlockMethod::StaticValue,
+                        staticChallenge, DotActionIntf::KeyAuthScheme::Ecdsa,
+                        ecdsaSignature, lmsKey),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, LockHybridModeWithoutLmsKey)
+{
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string staticChallenge = std::string(64, '0');
+    std::string ecdsaSignature = std::string(192, '0');
+
+    EXPECT_THROW(
+        dotObject->lock(DotActionIntf::KeyAuthScheme::Hybrid, validKey,
+                        lmsKey, // Missing LMS key
+                        DotActionIntf::KeyAuthScheme::Ecdsa, validKey, lmsKey,
+                        DotActionIntf::UnlockMethod::StaticValue,
+                        staticChallenge, DotActionIntf::KeyAuthScheme::Ecdsa,
+                        ecdsaSignature, lmsKey),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, UnlockInvalidEcdsaSignature)
+{
+    std::string invalidSignature = "invalid";
+    std::string lmsSignature = "";
+
+    EXPECT_THROW(
+        dotObject->unlock(DotActionIntf::KeyAuthScheme::Ecdsa, invalidSignature,
+                          lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, UnlockHybridModeWithoutLmsSignature)
+{
+    std::string ecdsaSignature = std::string(192, '0');
+    std::string lmsSignature = "";
+
+    EXPECT_THROW(
+        dotObject->unlock(DotActionIntf::KeyAuthScheme::Hybrid, ecdsaSignature,
+                          lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, CAKRotateInvalidCAKKey)
+{
+    std::string invalidKey = "invalid";
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string ecdsaSignature = std::string(192, '0');
+    std::string lmsSignature = "";
+
+    EXPECT_THROW(
+        dotObject->cakRotate(DotActionIntf::KeyAuthScheme::Ecdsa, invalidKey,
+                             lmsKey, DotActionIntf::KeyAuthScheme::Ecdsa,
+                             ecdsaSignature, lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, CAKRotateHybridModeWithoutLmsKey)
+{
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string ecdsaSignature = std::string(192, '0');
+    std::string lmsSignature = "";
+
+    EXPECT_THROW(
+        dotObject->cakRotate(DotActionIntf::KeyAuthScheme::Hybrid, validKey,
+                             lmsKey, // Missing LMS key for CAK
+                             DotActionIntf::KeyAuthScheme::Ecdsa,
+                             ecdsaSignature, lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, CAKRotateInvalidSignature)
+{
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string invalidSignature = "invalid";
+    std::string lmsSignature = "";
+
+    EXPECT_THROW(
+        dotObject->cakRotate(DotActionIntf::KeyAuthScheme::Ecdsa, validKey,
+                             lmsKey, DotActionIntf::KeyAuthScheme::Ecdsa,
+                             invalidSignature, lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
+}
+
+TEST_F(NsmDotTest, CAKRotateHybridModeWithoutLmsSignature)
+{
+    std::string validKey = std::string(192, '0');
+    std::string lmsKey = "";
+    std::string ecdsaSignature = std::string(192, '0');
+    std::string lmsSignature = ""; // Missing LMS signature for Hybrid
+
+    EXPECT_THROW(
+        dotObject->cakRotate(DotActionIntf::KeyAuthScheme::Ecdsa, validKey,
+                             lmsKey, DotActionIntf::KeyAuthScheme::Hybrid,
+                             ecdsaSignature, lmsSignature),
+        sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument);
 }
